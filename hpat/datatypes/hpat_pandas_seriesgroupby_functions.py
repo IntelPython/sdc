@@ -26,7 +26,7 @@
 
 """
 
-| :class:`pandas.SeriesGroupBy` functions and operators implementations in HPAT
+| :class:`pandas.SeriesGroupBy` functions and operators implementations in SDC
 | Also, it contains Numba internal operators which are required for :class:`pandas.SeriesGroupBy` type handling
 
 """

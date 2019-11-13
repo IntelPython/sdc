@@ -1,3 +1,30 @@
+# *****************************************************************************
+# Copyright (c) 2019, Intel Corporation All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#     Redistributions of source code must retain the above copyright notice,
+#     this list of conditions and the following disclaimer.
+#
+#     Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# *****************************************************************************
+
+
 import operator
 from collections import defaultdict, namedtuple
 import re
@@ -857,7 +884,7 @@ class HiFramesTypedPassImpl(object):
         # single arg functions
         if func_name in ('sum', 'count', 'mean', 'var', 'min', 'max'):
             if rhs.args or rhs.kws:
-                raise ValueError("HPAT pipeline does not support arguments for Series.{}()".format(func_name))
+                raise ValueError("SDC pipeline does not support arguments for Series.{}()".format(func_name))
 
             # TODO: handle skipna, min_count arguments
             series_typ = self.state.typemap[series_var.name]
@@ -981,9 +1008,9 @@ class HiFramesTypedPassImpl(object):
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [series_var, S2])
 
-        if func_name in ('argsort', 'sort_values'):
-            return self._handle_series_sort(
-                lhs, rhs, series_var, func_name == 'argsort')
+        # if func_name in ('argsort', 'sort_values'):
+        #     return self._handle_series_sort(
+        #         lhs, rhs, series_var, func_name == 'argsort')
 
         if func_name == 'rolling':
             # XXX: remove rolling setup call, assuming still available in definitions
@@ -1012,28 +1039,28 @@ class HiFramesTypedPassImpl(object):
         #     return self._replace_func(
         #         lambda S: S.isna() == False, [series_var])
 
-        if func_name == 'value_counts':
-            nodes = []
-            data = self._get_series_data(series_var, nodes)
-            # reusing aggregate/count
-            # TODO: write optimized implementation
-            # data of input becomes both key and data for aggregate input
-            # data of output is the counts
-            out_key_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_index'), lhs.loc)
-            self.state.typemap[out_key_var.name] = self.state.typemap[data.name]
-            out_data_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
-            self.state.typemap[out_data_var.name] = self.state.typemap[lhs.name].data
-            agg_func = series_replace_funcs['count']
-            agg_node = hiframes.aggregate.Aggregate(
-                lhs.name, 'series', ['series'], [out_key_var], {
-                    'data': out_data_var}, {
-                    'data': data}, [data], agg_func, None, lhs.loc)
-            nodes.append(agg_node)
-            # TODO: handle args like sort=False
-
-            def func(A, B):
-                return hpat.hiframes.api.init_series(A, B).sort_values(ascending=False)
-            return self._replace_func(func, [out_data_var, out_key_var], pre_nodes=nodes)
+        # if func_name == 'value_counts':
+        #     nodes = []
+        #     data = self._get_series_data(series_var, nodes)
+        #     # reusing aggregate/count
+        #     # TODO: write optimized implementation
+        #     # data of input becomes both key and data for aggregate input
+        #     # data of output is the counts
+        #     out_key_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_index'), lhs.loc)
+        #     self.state.typemap[out_key_var.name] = self.state.typemap[data.name]
+        #     out_data_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
+        #     self.state.typemap[out_data_var.name] = self.state.typemap[lhs.name].data
+        #     agg_func = series_replace_funcs['count']
+        #     agg_node = hiframes.aggregate.Aggregate(
+        #         lhs.name, 'series', ['series'], [out_key_var], {
+        #             'data': out_data_var}, {
+        #             'data': data}, [data], agg_func, None, lhs.loc)
+        #     nodes.append(agg_node)
+        #     # TODO: handle args like sort=False
+        #
+        #     def func(A, B):
+        #         return hpat.hiframes.api.init_series(A, B).sort_values(ascending=False)
+        #     return self._replace_func(func, [out_data_var, out_key_var], pre_nodes=nodes)
 
         # astype with string output
         if func_name == 'astype' and is_str_series_typ(self.state.typemap[lhs.name]):
@@ -1560,7 +1587,7 @@ class HiFramesTypedPassImpl(object):
         # XXX seq pipeline used since dist pass causes a hang
         m = numba.ir_utils._max_label
         impl_disp = numba.njit(
-            kernel_func, pipeline_class=hpat.compiler.HPATPipelineSeq)
+            kernel_func, pipeline_class=hpat.compiler.SDCPipelineSeq)
         # precompile to avoid REP counting conflict in testing
         sig = out_dtype(types.Array(dtype, 1, 'C'))
         impl_disp.compile(sig)
