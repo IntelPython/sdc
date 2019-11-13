@@ -168,7 +168,7 @@ class TestResults:
         columns = ['median', 'min', 'max', 'compile', 'boxing']
         return test_results_data.groupby(self.index)[columns].first().sort_values(self.index)
 
-    def add(self, test_name, test_type, data_size, data_width, test_results,
+    def add(self, test_name, test_type, data_size, test_results, data_width=None,
             boxing_results=None, compile_results=None, num_threads=config.NUMBA_NUM_THREADS):
         """
         Add performance testing timing results into global storage
