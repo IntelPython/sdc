@@ -25,69 +25,40 @@
 # *****************************************************************************
 
 '''
-This is a set of configuration variables in SDC initialized at startup
+| Procedures are required for SDC DataFrameType handling in Numba
 '''
 
+import hpat
 
-import os
-from distutils import util as distutils_util
 
-try:
-    from .io import _hdf5
-    import h5py
-    # TODO: make sure h5py/hdf5 supports parallel
-except ImportError:
-    _has_h5py = False
-else:
-    _has_h5py = True
+def sdc_dataframepassimpl_overload(*args, **kwargs):
+    """
+    This is a pointer intended to use as Numba AnnotateTypes run_pass() function
+    A hook made to overload Numba function and:
+    - call original function
+    - call DataFramePass exposed in this module
 
-try:
-    import pyarrow
-except ImportError:
-    _has_pyarrow = False
-else:
-    _has_pyarrow = True
+    return the status of original Numba function
 
-try:
-    from . import ros_cpp
-except ImportError:
-    _has_ros = False
-else:
-    _has_ros = True
+    This function needs to be removed if SDC DataFrame support
+    no more needs Numba IR transformations via DataFramePass
+    """
 
-try:
-    from . import cv_wrapper
-except ImportError:
-    _has_opencv = False
-else:
-    _has_opencv = True
-    import hpat.cv_ext
+    if hpat.config.numba_typed_passes_annotatetypes_orig is None:
+        """
+        Unexpected usage of this function
+        """
 
-try:
-    from . import hxe_ext
-except ImportError:
-    _has_xenon = False
-else:
-    _has_xenon = True
-    import hpat.io.xenon_ext
+        return False
 
-config_transport_mpi_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_MPI', 'True'))
-'''
-Default value for transport used if no function decorator controls the transport
-'''
+    status_numba_pass = hpat.config.numba_typed_passes_annotatetypes_orig(*args, **kwargs)
 
-config_transport_mpi = config_transport_mpi_default
-'''
-Current value for transport controlled by decorator need to initialize this here
-because decorator called later then modules have been initialized
-'''
+    numba_state_var = args[1]
 
-config_pipeline_hpat_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_PIPELINE_SDC', 'True'))
-'''
-Default value used to select compiler pipeline in a function decorator
-'''
+    status_dataframe_pass = hpat.hiframes.dataframe_pass.DataFramePassImpl(numba_state_var).run_pass()
+    status_postprocess_pass = hpat.compiler.PostprocessorPass().run_pass(numba_state_var)
+    status_dataframe_typed_pass = hpat.hiframes.hiframes_typed.HiFramesTypedPassImpl(numba_state_var).run_pass()
 
-numba_typed_passes_annotatetypes_orig = None
-'''
-Default value for a pointer intended to use as Numba AnnotateTypes run_pass() in overloaded function
-'''
+    is_ir_mutated = status_numba_pass or status_dataframe_pass or status_postprocess_pass or status_dataframe_typed_pass
+
+    return is_ir_mutated
