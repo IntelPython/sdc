@@ -446,19 +446,19 @@ class SeriesAttribute(AttributeTemplate):
         # TODO: support iat/iloc differences
         return SeriesIatType(ary)
 
-    @bound_function("array.astype")
-    def resolve_astype(self, ary, args, kws):
-        # TODO: handle other types like datetime etc.
-        dtype, = args
-        if ((isinstance(dtype, types.Function) and dtype.typing_key == str)
-                or (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
-            ret_type = SeriesType(string_type, index=ary.index)
-            sig = signature(ret_type, *args)
-        else:
-            resolver = ArrayAttribute.resolve_astype.__wrapped__
-            sig = resolver(self, ary.data, args, kws)
-            sig.return_type = if_arr_to_series_type(sig.return_type)
-        return sig
+    # @bound_function("array.astype")
+    # def resolve_astype(self, ary, args, kws):
+    #     # TODO: handle other types like datetime etc.
+    #     dtype, = args
+    #     if ((isinstance(dtype, types.Function) and dtype.typing_key == str)
+    #             or (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
+    #         ret_type = SeriesType(string_type, index=ary.index)
+    #         sig = signature(ret_type, *args)
+    #     else:
+    #         resolver = ArrayAttribute.resolve_astype.__wrapped__
+    #         sig = resolver(self, ary.data, args, kws)
+    #         sig.return_type = if_arr_to_series_type(sig.return_type)
+    #     return sig
 
     # @bound_function("array.copy")
     # def resolve_copy(self, ary, args, kws):
@@ -997,7 +997,7 @@ _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flat
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_corr', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
                            'resolve_argsort', 'resolve_sort_values', 'resolve_pct_change',
-                           'resolve_prod', 'resolve_count', 'resolve_dropna', 'resolve_fillna']
+                           'resolve_prod', 'resolve_count', 'resolve_dropna', 'resolve_fillna', 'resolve_astype']
 
 # disable using of some Array attributes in non-hpat pipeline only
 if not hpat.config.config_pipeline_hpat_default:
