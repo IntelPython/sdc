@@ -698,7 +698,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.arange(n))
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('TODO: needs Numba astype impl support string literal as dtype arg')
     def test_series_astype_literal_dtype1(self):
         '''Verifies Series.astype implementation with a string literal dtype argument
            converts float series to series of integers
@@ -757,6 +756,19 @@ class TestSeries(unittest.TestCase):
 
         def test_impl(S):
             return S.astype(str)
+
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=[2, 3, 5])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_errors_ignore_return_self_str(self):
+        '''Verifies Series.astype implementation return self object on error
+           if errors='ignore' is passed in arguments
+        '''
+
+        def test_impl(S):
+            return S.astype(np.float64, errors='ignore')
 
         hpat_func = self.jit(test_impl)
 
