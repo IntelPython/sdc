@@ -1063,14 +1063,14 @@ class HiFramesTypedPassImpl(object):
         #     return self._replace_func(func, [out_data_var, out_key_var], pre_nodes=nodes)
 
         # astype with string output
-        if func_name == 'astype' and is_str_series_typ(self.state.typemap[lhs.name]):
-            # just return input if string
-            if is_str_series_typ(self.state.typemap[series_var.name]):
-                return self._replace_func(lambda a: a, [series_var])
-            func = series_replace_funcs['astype_str']
-            nodes = []
-            data = self._get_series_data(series_var, nodes)
-            return self._replace_func(func, [data], pre_nodes=nodes)
+        # if func_name == 'astype' and is_str_series_typ(self.state.typemap[lhs.name]):
+        #     # just return input if string
+        #     if is_str_series_typ(self.state.typemap[series_var.name]):
+        #         return self._replace_func(lambda a: a, [series_var])
+        #     func = series_replace_funcs['astype_str']
+        #     nodes = []
+        #     data = self._get_series_data(series_var, nodes)
+        #     return self._replace_func(func, [data], pre_nodes=nodes)
 
         if func_name in explicit_binop_funcs.keys():
             binop_map = {k: _binop_to_str[v] for k, v in explicit_binop_funcs.items()}
@@ -1083,7 +1083,7 @@ class HiFramesTypedPassImpl(object):
             return self._replace_func(_binop_impl, [series_var] + rhs.args)
 
         # functions we revert to Numpy for now, otherwise warning
-        _conv_to_np_funcs = ('cumsum', 'cumprod', 'astype')
+        _conv_to_np_funcs = ('cumsum', 'cumprod')
         # TODO: handle series-specific cases for this funcs
         if (not func_name.startswith("values.") and func_name
                 not in _conv_to_np_funcs):
