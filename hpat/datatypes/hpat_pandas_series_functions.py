@@ -36,7 +36,7 @@ import pandas
 
 from numba.errors import TypingError
 from numba.extending import overload, overload_method, overload_attribute
-from numba import types
+from numba import types, njit
 
 import hpat
 import hpat.datatypes.common_functions as common_functions
@@ -3037,7 +3037,6 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
 
     return hpat_pandas_series_median_impl
 
-
 @overload_method(SeriesType, 'argsort')
 def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     """
@@ -3117,6 +3116,40 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
         return pandas.Series(result)
 
     return hpat_pandas_series_argsort_noidx_impl
+
+
+@njit
+def _sort_map_func(list1):
+    return numpy.sort(list1)
+
+
+@njit
+def _sort_reduce_func(list1, list2):
+    # TODO: proper NaNs handling
+    size_1 = len(list1)
+    size_2 = len(list2)
+    res = numpy.empty(size_1 + size_2, list1.dtype)
+    i, j, k = 0, 0, 0
+    while i < size_1 and j < size_2:
+        if list1[i] < list2[j]:
+            res[k] = list1[i]
+            i += 1
+        else:
+            res[k] = list2[j]
+            j += 1
+        k += 1
+
+    while i < size_1:
+        res[k] = list1[i]
+        i += 1
+        k += 1
+
+    while j < size_2:
+        res[k] = list2[j]
+        j += 1
+        k += 1
+
+    return res
 
 
 @overload_method(SeriesType, 'sort_values')
@@ -3201,7 +3234,14 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
             na = self.isna().sum()
             indices = numpy.arange(len(self._data))
             index_result = numpy.argsort(self._data, kind='mergesort')
-            result = numpy.sort(self._data)
+
+            result = common_functions.map_reduce_chunked(
+                self._data,
+                numpy.empty(0, self._data.dtype),
+                _sort_map_func,
+                _sort_reduce_func)
+            # result = numpy.sort(self._data)
+
             i = len(self._data) - na
             index_result[i:] = index_result[i:][::-1]
             if not ascending:

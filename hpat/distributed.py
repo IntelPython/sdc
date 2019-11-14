@@ -38,6 +38,7 @@ import copy
 import warnings
 from collections import defaultdict
 import numpy as np
+import os
 
 import numba
 from numba import ir, types, typing, config, numpy_support, ir_utils, postproc
@@ -106,6 +107,7 @@ distributed_run_extensions = {}
 dist_analysis = None
 fir_text = None
 
+_distribution_depth = int(os.getenv('SDC_DISTRIBUTION_DEPTH', '1'))
 
 @register_pass(mutates_CFG=True, analysis_only=False)
 class DistributedPass(FunctionPass):
@@ -121,7 +123,6 @@ class DistributedPass(FunctionPass):
 
     def run_pass(self, state):
         return DistributedPassImpl(state).run_pass()
-
 
 class DistributedPassImpl(object):
     """The summary of the class should be here for example below is the summary line for this class
@@ -169,7 +170,7 @@ class DistributedPassImpl(object):
 
         self._gen_dist_inits()
         self.state.func_ir._definitions = build_definitions(self.state.func_ir.blocks)
-        self.state.func_ir.blocks = self._run_dist_pass(self.state.func_ir.blocks)
+        self.state.func_ir.blocks = self._run_dist_pass(self.state.func_ir.blocks, 0)
         self.state.func_ir.blocks = self._dist_prints(self.state.func_ir.blocks)
         remove_dead(self.state.func_ir.blocks, self.state.func_ir.arg_names, self.state.func_ir, self.state.typemap)
         dprint_func_ir(self.state.func_ir, "after distributed pass")
@@ -195,7 +196,7 @@ class DistributedPassImpl(object):
 
         return True
 
-    def _run_dist_pass(self, blocks):
+    def _run_dist_pass(self, blocks, depth):
         """This function does something"""
         topo_order = find_topo_order(blocks)
         namevar_table = get_name_var_table(blocks)
@@ -212,11 +213,11 @@ class DistributedPassImpl(object):
                                   self.state.typemap, self.state.calltypes, self.state.typingctx,
                                   self.state.targetctx, self)
                 elif isinstance(inst, Parfor):
-                    out_nodes = self._run_parfor(inst, namevar_table)
+                    out_nodes = self._run_parfor(inst, namevar_table, depth)
                     # run dist pass recursively
                     p_blocks = wrap_parfor_blocks(inst)
                     # build_definitions(p_blocks, self.state.func_ir._definitions)
-                    self._run_dist_pass(p_blocks)
+                    self._run_dist_pass(p_blocks, depth + 1)
                     unwrap_parfor_blocks(inst)
                 elif isinstance(inst, ir.Assign):
                     lhs = inst.target.name
@@ -1692,9 +1693,16 @@ class DistributedPassImpl(object):
 
         return out
 
-    def _run_parfor(self, parfor, namevar_table):
+    def _run_parfor(self, parfor, namevar_table, depth):
         # stencil_accesses, neighborhood = get_stencil_accesses(
         #     parfor, self.state.typemap)
+
+        global _distribution_depth
+        if depth >= _distribution_depth:
+            # Do not distribute
+            if depth == _distribution_depth:
+                parfor.no_sequential_lowering = True
+            return [parfor]
 
         # Thread and 1D parfors turn to gufunc in multithread mode
         if (hpat.multithread_mode
