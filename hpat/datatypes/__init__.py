@@ -27,3 +27,4 @@
 
 import hpat.datatypes.hpat_pandas_dataframe_pass
 import hpat.datatypes.hpat_pandas_seriesgroupby_functions
+import hpat.datatypes.hpat_pandas_stringmethods_functions

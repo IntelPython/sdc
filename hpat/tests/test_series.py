@@ -698,7 +698,6 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.arange(n))
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('TODO: needs Numba astype impl support string literal as dtype arg')
     def test_series_astype_literal_dtype1(self):
         '''Verifies Series.astype implementation with a string literal dtype argument
            converts float series to series of integers
@@ -757,6 +756,19 @@ class TestSeries(unittest.TestCase):
 
         def test_impl(S):
             return S.astype(str)
+
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(['aa', 'bb', 'cc'], index=[2, 3, 5])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_astype_errors_ignore_return_self_str(self):
+        '''Verifies Series.astype implementation return self object on error
+           if errors='ignore' is passed in arguments
+        '''
+
+        def test_impl(S):
+            return S.astype(np.float64, errors='ignore')
 
         hpat_func = self.jit(test_impl)
 
@@ -2239,16 +2251,42 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_str2str(self):
-        str2str_methods = ('capitalize', 'lower', 'lstrip', 'rstrip',
-                           'strip', 'swapcase', 'title', 'upper')
+        common_methods = ['lower', 'upper']
+        sdc_methods = ['capitalize', 'lstrip', 'rstrip', 'strip', 'swapcase', 'title']
+        str2str_methods = common_methods[:]
+        if hpat.config.config_pipeline_hpat_default:
+            str2str_methods += sdc_methods
+
         for method in str2str_methods:
-            func_text = "def test_impl(S):\n"
-            func_text += "  return S.str.{}()\n".format(method)
+            func_lines = ['def test_impl(S):',
+                          '  return S.str.{}()'.format(method)]
+            func_text = '\n'.join(func_lines)
             test_impl = _make_func_from_text(func_text)
             hpat_func = self.jit(test_impl)
 
+            # TODO: fix issue occurred if name is not assigned
+            S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'], name='A')
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S),
+                                           check_names=method in common_methods)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.str.<method>() unsupported')
+    def test_series_str2str_unsupported(self):
+        unsupported_methods = ['capitalize', 'lstrip', 'rstrip',
+                               'strip', 'swapcase', 'title']
+        for method in unsupported_methods:
+            func_lines = ['def test_impl(S):',
+                          '  return S.str.{}()'.format(method)]
+            func_text = '\n'.join(func_lines)
+            test_impl = _make_func_from_text(func_text)
+            hpat_func = hpat.jit(test_impl)
+
             S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'])
-            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+            # TypingError with expected message is raised internally by Numba
+            with self.assertRaises(TypingError) as raises:
+                hpat_func(S)
+            expected_msg = 'Series.str.{} is not supported yet'.format(method)
+            self.assertIn(expected_msg, str(raises.exception))
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      "Old-style append implementation doesn't handle ignore_index argument")
@@ -3968,6 +4006,7 @@ class TestSeries(unittest.TestCase):
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
 
+
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      'Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum(self):
@@ -4104,6 +4143,77 @@ class TestSeries(unittest.TestCase):
         with self.assertRaises(TypingError) as raises:
             hpat_func(S1, S2, min_periods=0.5)
         msg = 'Method cov(). The object min_periods'
+        self.assertIn(msg, str(raises.exception))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.pct_change unsupported some Series')
+    def test_series_pct_change(self):
+        def test_series_pct_change_impl(S, periods, method):
+            return S.pct_change(periods=periods, fill_method=method, limit=None, freq=None)
+
+        hpat_func = hpat.jit(test_series_pct_change_impl)
+        test_input_data = [
+            [],
+            [np.nan, np.nan, np.nan],
+            [np.nan, np.nan, np.inf],
+            [0] * 8,
+            [0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf],
+            [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+            [1, 2, 3, 4, np.nan, np.inf, 0, 0, np.nan, np.nan]
+        ]
+        for input_data in test_input_data:
+            S = pd.Series(input_data)
+            for periods in [0, 1, 2, 5, 10, -1, -2, -5]:
+                for method in [None, 'pad', 'ffill', 'backfill', 'bfill']:
+                    result_ref = test_series_pct_change_impl(S, periods, method)
+                    result = hpat_func(S, periods, method)
+                    pd.testing.assert_series_equal(result, result_ref)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.pct_change() strings as input data unsupported')
+    def test_series_pct_change_str(self):
+        def test_series_pct_change_impl(S):
+            return S.pct_change(periods=1, fill_method='pad', limit=None, freq=None)
+
+        hpat_func = hpat.jit(test_series_pct_change_impl)
+        S = pd.Series(test_global_input_data_unicode_kind4)
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S)
+        msg = 'Method pct_change(). The object self.data'
+        self.assertIn(msg, str(raises.exception))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.pct_change() does not raise an exception')
+    def test_series_pct_change_not_supported(self):
+        def test_series_pct_change_impl(S, periods=1, fill_method='pad', limit=None, freq=None):
+            return S.pct_change(periods=periods, fill_method=fill_method, limit=limit, freq=freq)
+
+        hpat_func = hpat.jit(test_series_pct_change_impl)
+        S = pd.Series([0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf])
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(S, fill_method='ababa')
+        msg = 'Method pct_change(). Unsupported parameter. The function uses fill_method pad (ffill) or backfill (bfill) or None.'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S, limit=5)
+        msg = 'Method pct_change(). The object limit'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S, freq=5)
+        msg = 'Method pct_change(). The object freq'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S, fill_method=1.6)
+        msg = 'Method pct_change(). The object fill_method'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S, periods=1.6)
+        msg = 'Method pct_change(). The object periods'
         self.assertIn(msg, str(raises.exception))
 
 
