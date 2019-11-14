@@ -47,6 +47,7 @@ from numba.typing.templates import Signature, bound_function, signature, infer_g
 from numba.compiler_machinery import FunctionPass, register_pass
 
 import hpat
+from hpat.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from hpat.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
                         is_whole_slice, is_array, update_globals)
 from hpat.str_ext import (string_type, unicode_to_std_str, std_str_to_unicode,
@@ -58,7 +59,7 @@ from hpat.hiframes import series_kernels, split_impl
 from hpat.hiframes.pd_series_ext import (SeriesType, is_str_series_typ,
                                          series_to_array_type, is_dt64_series_typ,
                                          if_series_to_array_type, is_series_type,
-                                         series_str_methods_type, SeriesRollingType, SeriesIatType,
+                                         SeriesRollingType, SeriesIatType,
                                          explicit_binop_funcs, series_dt_methods_type)
 from hpat.hiframes.pd_index_ext import DatetimeIndexType
 from hpat.hiframes.rolling import get_rolling_setup_args
@@ -483,9 +484,7 @@ class HiFramesTypedPassImpl(object):
         else:
             func_name, func_mod = fdef
 
-        if (isinstance(func_mod, ir.Var)
-                and self.state.typemap[func_mod.name]
-                == series_str_methods_type):
+        if (isinstance(func_mod, ir.Var) and isinstance(self.state.typemap[func_mod.name], StringMethodsType)):
             f_def = guard(get_definition, self.state.func_ir, rhs.func)
             str_def = guard(get_definition, self.state.func_ir, f_def.value)
             if str_def is None:  # TODO: check for errors
@@ -493,7 +492,10 @@ class HiFramesTypedPassImpl(object):
 
             series_var = str_def.value
 
-            return self._run_series_str_method(assign, assign.target, series_var, func_name, rhs)
+            # functions which are used from Numba directly by calling from StringMethodsType
+            # other functions (for example, 'capitalize' is not presented in Numba) goes to be replaced here
+            if func_name not in hpat.hiframes.pd_series_ext.str2str_methods_excluded:
+                return self._run_series_str_method(assign, assign.target, series_var, func_name, rhs)
 
         # replace _get_type_max_value(arr.dtype) since parfors
         # arr.dtype transformation produces invalid code for dt64
@@ -1063,14 +1065,14 @@ class HiFramesTypedPassImpl(object):
         #     return self._replace_func(func, [out_data_var, out_key_var], pre_nodes=nodes)
 
         # astype with string output
-        if func_name == 'astype' and is_str_series_typ(self.state.typemap[lhs.name]):
-            # just return input if string
-            if is_str_series_typ(self.state.typemap[series_var.name]):
-                return self._replace_func(lambda a: a, [series_var])
-            func = series_replace_funcs['astype_str']
-            nodes = []
-            data = self._get_series_data(series_var, nodes)
-            return self._replace_func(func, [data], pre_nodes=nodes)
+        # if func_name == 'astype' and is_str_series_typ(self.state.typemap[lhs.name]):
+        #     # just return input if string
+        #     if is_str_series_typ(self.state.typemap[series_var.name]):
+        #         return self._replace_func(lambda a: a, [series_var])
+        #     func = series_replace_funcs['astype_str']
+        #     nodes = []
+        #     data = self._get_series_data(series_var, nodes)
+        #     return self._replace_func(func, [data], pre_nodes=nodes)
 
         if func_name in explicit_binop_funcs.keys():
             binop_map = {k: _binop_to_str[v] for k, v in explicit_binop_funcs.items()}
@@ -1083,7 +1085,7 @@ class HiFramesTypedPassImpl(object):
             return self._replace_func(_binop_impl, [series_var] + rhs.args)
 
         # functions we revert to Numpy for now, otherwise warning
-        _conv_to_np_funcs = ('cumsum', 'cumprod', 'astype')
+        _conv_to_np_funcs = ('cumsum', 'cumprod')
         # TODO: handle series-specific cases for this funcs
         if (not func_name.startswith("values.") and func_name
                 not in _conv_to_np_funcs):
@@ -1714,10 +1716,9 @@ class HiFramesTypedPassImpl(object):
     def _run_series_str_method(self, assign, lhs, series_var, func_name, rhs):
 
         supported_methods = (hpat.hiframes.pd_series_ext.str2str_methods
-                             + ('len', 'replace', 'split', 'get', 'contains'))
+                             + ['len', 'replace', 'split', 'get', 'contains'])
         if func_name not in supported_methods:
-            raise NotImplementedError(
-                "Series.str.{} not supported yet".format(func_name))
+            raise NotImplementedError("Series.str.{} is not supported yet".format(func_name))
 
         nodes = []
         arr = self._get_series_data(series_var, nodes)

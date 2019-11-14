@@ -13,7 +13,6 @@ from utilities import get_activate_env_cmd
 from utilities import get_conda_activate_cmd
 from utilities import run_command
 from utilities import set_environment_variable
-from utilities import setup_conda
 
 
 def run_smoke_tests(sdc_src, test_env_activate):
@@ -63,7 +62,7 @@ if __name__ == '__main__':
     test_env_activate    = get_activate_env_cmd(conda_activate, test_env)
     develop_env_activate = get_activate_env_cmd(conda_activate, develop_env)
 
-    conda_channels = '-c numba -c conda-forge -c defaults -c intel'
+    conda_channels = '-c conda-forge -c numba -c intel -c defaults --override-channels'
 
     conda_build_packages = ['conda-build']
     if platform.system() == 'Windows':
@@ -72,9 +71,6 @@ if __name__ == '__main__':
             set_environment_variable('LIB', os.path.join('%CONDA_PREFIX%', 'Library', 'lib'))
 
         conda_build_packages.extend(['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64'])
-
-    # Setup conda
-    setup_conda(conda_activate)
 
     # Get sdc build and test environment
     sdc_env = get_sdc_env(conda_activate, sdc_src, sdc_recipe, python, numpy, conda_channels)
@@ -87,9 +83,9 @@ if __name__ == '__main__':
                                                             f'--python {python}',
                                                             f'--numpy={numpy}',
                                                             f'--output-folder {output_folder}',
-                                                            f'--prefix-length 10 {sdc_recipe}']))
+                                                            f'--prefix-length 10 {conda_channels} {sdc_recipe}']))
     else:
-        create_conda_env(conda_activate, develop_env, python, sdc_env['build'])
+        create_conda_env(conda_activate, develop_env, python, sdc_env['build'], conda_channels)
         build_cmd = f'{develop_env_activate} && python setup.py {build_mode}'
 
     # Start build
@@ -125,13 +121,13 @@ if __name__ == '__main__':
             if '.tar.bz2' in package:
                 # Start test for conda package
                 format_print(f'Run tests for sdc conda package: {package}')
-                create_conda_env(conda_activate, test_env, python, sdc_env['test'])
+                create_conda_env(conda_activate, test_env, python, sdc_env['test'], conda_channels)
                 run_command(f'{test_env_activate} && conda install -y {package}')
                 run_smoke_tests(sdc_src, test_env_activate)
             elif '.whl' in package:
                 # Start test for wheel package
                 format_print(f'Run tests for sdc wheel package: {package}')
-                create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['pip'])
+                create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['pip'], conda_channels)
                 run_command(f'{test_env_activate} && pip install {package}')
                 run_smoke_tests(sdc_src, test_env_activate)
     else:

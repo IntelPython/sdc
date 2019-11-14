@@ -40,6 +40,7 @@ from numba import types
 
 import hpat
 import hpat.datatypes.common_functions as common_functions
+from hpat.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars)
 from hpat.utils import to_array
@@ -665,6 +666,41 @@ def hpat_pandas_series_size(self):
     return hpat_pandas_series_size_impl
 
 
+@overload_attribute(SeriesType, 'str')
+def hpat_pandas_series_str(self):
+    """
+    Pandas Series attribute :attr:`pandas.Series.str` implementation
+
+    .. only:: developer
+
+        Test: python -m hpat.runtests hpat.tests.test_hiframes.TestHiFrames.test_str_get
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+        input series
+
+    Returns
+    -------
+    :class:`pandas.core.strings.StringMethods`
+        Output class to manipulate with input data.
+    """
+
+    _func_name = 'Attribute str.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, (types.List, types.UnicodeType)):
+        msg = '{}  Can only use .str accessor with string values. Given: {}'
+        raise TypingError(msg.format(_func_name, self.data.dtype))
+
+    def hpat_pandas_series_str_impl(self):
+        return pandas.core.strings.StringMethods(self)
+
+    return hpat_pandas_series_str_impl
+
+
 @overload_attribute(SeriesType, 'ndim')
 def hpat_pandas_series_ndim(self):
     """
@@ -755,6 +791,109 @@ def hpat_pandas_series_len(self):
         return len(self._data)
 
     return hpat_pandas_series_len_impl
+
+
+@overload_method(SeriesType, 'astype')
+def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
+    """
+    Pandas Series method :meth:`pandas.Series.astype` implementation.
+    Cast a pandas object to a specified dtype dtype
+    .. only:: developer
+        Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_astype*
+
+    Parameters
+    -----------
+    dtype : :obj:`numpy.dtype` or :obj:`dict`
+               Use a numpy.dtype or Python type to cast entire pandas object to the same type.
+               Alternatively, use {col: dtype, …}, where col is a column label and dtype is a numpy.dtype
+               or Python type to cast one or more of the DataFrame’s columns to column-specific types.
+
+    copy : :obj:`bool`, default :obj:`True`
+            Return a copy when True
+            Currently copy=False is not supported
+    errors : :obj:`str`, default :obj:`'raise'`
+            Control raising of exceptions on invalid data for provided dtype.
+                * raise : allow exceptions to be raised
+                * ignore : suppress exceptions. On error return original object
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` Cast a :obj:`pandas.Series` to a specified dtype dtype
+    """
+
+    _func_name = 'Method astype().'
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+
+    if not isinstance(copy, (types.Omitted, bool, types.Boolean)):
+        raise TypingError('{} The object must be a boolean. Given copy: {}'.format(_func_name, copy))
+
+    if (not isinstance(errors, (types.Omitted, str, types.UnicodeType, types.StringLiteral)) and
+        errors in ('raise', 'ignore')):
+        raise TypingError('{} The object must be a string literal. Given errors: {}'.format(_func_name, errors))
+
+    # Return StringArray for astype(str) or astype('str')
+    def hpat_pandas_series_astype_to_str_impl(self, dtype, copy=True, errors='raise'):
+        num_chars = 0
+        arr_len = len(self._data)
+
+        # Get total chars for new array
+        for i in numba.parfor.internal_prange(arr_len):
+            item = self._data[i]
+            num_chars += len(str(item))  # TODO: check NA
+
+        data = hpat.str_arr_ext.pre_alloc_string_array(arr_len, num_chars)
+        for i in numba.parfor.internal_prange(arr_len):
+            item = self._data[i]
+            data[i] = str(item)  # TODO: check NA
+
+        return pandas.Series(data, self._index, self._name)
+
+    # Return npytypes.Array from npytypes.Array for astype(types.functions.NumberClass), example - astype(np.int64)
+    def hpat_pandas_series_astype_numba_impl(self, dtype, copy=True, errors='raise'):
+        return pandas.Series(self._data.astype(dtype), self._index, self._name)
+
+    # Return npytypes.Array from npytypes.Array for astype(types.StringLiteral), example - astype('int64')
+    def hpat_pandas_series_astype_literal_type_numba_impl(self, dtype, copy=True, errors='raise'):
+        return pandas.Series(self._data.astype(numpy.dtype(dtype)), self._index, self._name)
+
+    # Return self
+    def hpat_pandas_series_astype_no_modify_impl(self, dtype, copy=True, errors='raise'):
+        return pandas.Series(self._data, self._index, self._name)
+
+
+    if ((isinstance(dtype, types.Function) and dtype.typing_key == str)
+        or (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
+        return hpat_pandas_series_astype_to_str_impl
+
+    # Needs Numba astype impl support converting unicode_type to NumberClass and other types
+    if isinstance(self.data, StringArrayType):
+        if isinstance(dtype, types.functions.NumberClass) and errors == 'raise':
+            raise TypingError(f'Needs Numba astype impl support converting unicode_type to {dtype}')
+        if isinstance(dtype, types.StringLiteral) and errors == 'raise':
+            try:
+                literal_value = numpy.dtype(dtype.literal_value)
+            except:
+                pass # Will raise the exception later
+            else:
+                raise TypingError(f'Needs Numba astype impl support converting unicode_type to {dtype.literal_value}')
+
+    if isinstance(self.data, types.npytypes.Array) and isinstance(dtype, types.functions.NumberClass):
+        return hpat_pandas_series_astype_numba_impl
+
+    if isinstance(self.data, types.npytypes.Array) and isinstance(dtype, types.StringLiteral):
+        try:
+            literal_value = numpy.dtype(dtype.literal_value)
+        except:
+            pass # Will raise the exception later
+        else:
+            return hpat_pandas_series_astype_literal_type_numba_impl
+
+    # Raise error if dtype is not supported
+    if errors == 'raise':
+        raise TypingError(f'{_func_name} The object must be a supported type. Given dtype: {dtype}')
+    else:
+        return hpat_pandas_series_astype_no_modify_impl
 
 
 @overload_method(SeriesType, 'shift')
@@ -3405,3 +3544,105 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
         return numpy.cov(self_arr, other_arr)[0, 1]
 
     return hpat_pandas_series_cov_impl
+
+
+@overload_method(SeriesType, 'pct_change')
+def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None, freq=None):
+    """
+    Pandas Series method :meth:`pandas.Series.pct_change` implementation.
+
+    Note: Unsupported mixed numeric and string data
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_pct_change
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+        input series
+    periods: :obj:`int`, default 1
+        Periods to shift for forming percent change.
+    fill_method: :obj:`str`, default 'pad'
+        How to handle NAs before computing percent changes.
+    limit: :obj:`int`, default Nogne
+        The number of consecutive NAs to fill before stopping.
+        *unsupported*
+    freq: :obj: DateOffset, timedelta, or offset alias string, optional
+        Increment to use from time series API (e.g. 'M' or BDay()).
+        *unsupported*
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method pct_change().')
+    ty_checker.check(self, SeriesType)
+
+    if not isinstance(self.data.dtype, types.Number):
+        ty_checker.raise_exc(self.data.dtype, 'number', 'self.data')
+
+    if not isinstance(periods, (types.Integer, types.Omitted)):
+        ty_checker.raise_exc(periods, 'int64', 'periods')
+
+    if not isinstance(fill_method, (str, types.UnicodeType, types.StringLiteral, types.NoneType, types.Omitted)):
+        ty_checker.raise_exc(fill_method, 'string', 'fill_method')
+
+    if not isinstance(limit, (types.Omitted, types.NoneType)):
+        ty_checker.raise_exc(limit, 'None', 'limit')
+
+    if not isinstance(freq, (types.Omitted, types.NoneType)):
+        ty_checker.raise_exc(freq, 'None', 'freq')
+
+    def hpat_pandas_series_pct_change_impl(self, periods=1, fill_method='pad', limit=None, freq=None):
+        if not (fill_method is None or fill_method in ['pad', 'ffill', 'backfill', 'bfill']):
+            raise ValueError(
+                "Method pct_change(). Unsupported parameter. The function uses fill_method pad (ffill) or backfill (bfill) or None.")
+        local_series = self.copy()
+        if fill_method is not None:
+            # replacement method fillna for given method
+            # =========================================
+            # Example:
+            # s = [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2]
+            # result = [1.1, 0.3, 0.3, 1, inf, 0, 1.1, 1.1, 2.2, inf, 2, 2]
+            # ==========================================
+            for i in range(len(local_series._data)):
+                # check each element on numpy.nan
+                if numpy.isnan(local_series._data[i]):
+                    if fill_method in ['pad', 'ffill']:
+                        # if it first element is nan, element will be is nan
+                        # if it not first element, element will be is nearest is not nan element
+                        # take a step back while will not find is not nan element
+                        # if before the first element you did not find one, the element will be equal nan
+                        if i == 0:
+                            local_series._data[i] = numpy.nan
+                        else:
+                            k = 1
+                            while numpy.isnan(local_series._data[i - k]):
+                                if i - k == 0:
+                                    local_series._data[i] = numpy.nan
+                                    break
+                                k += 1
+                            local_series._data[i] = local_series._data[i - k]
+                    elif fill_method in ['backfill', 'bfill']:
+                        # if it last element is nan, element will be is nan
+                        # if it not last element, element will be is nearest is not nan element
+                        # take a step front while will not find is not nan element
+                        # if before the last element you did not find one, the element will be equal nan
+                        if i == len(local_series._data)-1:
+                            local_series._data[i] = numpy.nan
+                        else:
+                            k = 1
+                            while numpy.isnan(local_series._data[i + k]):
+                                if i + k == len(local_series._data) - 1:
+                                    local_series._data[i] = numpy.nan
+                                    break
+                                k += 1
+                            local_series._data[i] = local_series._data[i + k]
+        rshift = local_series.shift(periods=periods, freq=freq)
+        rdiv = local_series.div(rshift)
+        result = rdiv._data - 1
+        return pandas.Series(result)
+
+    return hpat_pandas_series_pct_change_impl

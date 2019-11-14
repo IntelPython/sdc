@@ -102,6 +102,7 @@ for method in str2str_noargs:
     str_overload_noargs(method)
 
 # strip string methods that take one argument and return a string
+# Numba bug https://github.com/numba/numba/issues/4731
 str2str_1arg = ('lstrip', 'rstrip', 'strip')
 
 
