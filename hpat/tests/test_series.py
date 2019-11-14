@@ -3980,6 +3980,7 @@ class TestSeries(unittest.TestCase):
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
 
+
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      'Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum(self):
@@ -4116,6 +4117,77 @@ class TestSeries(unittest.TestCase):
         with self.assertRaises(TypingError) as raises:
             hpat_func(S1, S2, min_periods=0.5)
         msg = 'Method cov(). The object min_periods'
+        self.assertIn(msg, str(raises.exception))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.pct_change unsupported some Series')
+    def test_series_pct_change(self):
+        def test_series_pct_change_impl(S, periods, method):
+            return S.pct_change(periods=periods, fill_method=method, limit=None, freq=None)
+
+        hpat_func = hpat.jit(test_series_pct_change_impl)
+        test_input_data = [
+            [],
+            [np.nan, np.nan, np.nan],
+            [np.nan, np.nan, np.inf],
+            [0] * 8,
+            [0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf],
+            [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+            [1, 2, 3, 4, np.nan, np.inf, 0, 0, np.nan, np.nan]
+        ]
+        for input_data in test_input_data:
+            S = pd.Series(input_data)
+            for periods in [0, 1, 2, 5, 10, -1, -2, -5]:
+                for method in [None, 'pad', 'ffill', 'backfill', 'bfill']:
+                    result_ref = test_series_pct_change_impl(S, periods, method)
+                    result = hpat_func(S, periods, method)
+                    pd.testing.assert_series_equal(result, result_ref)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.pct_change() strings as input data unsupported')
+    def test_series_pct_change_str(self):
+        def test_series_pct_change_impl(S):
+            return S.pct_change(periods=1, fill_method='pad', limit=None, freq=None)
+
+        hpat_func = hpat.jit(test_series_pct_change_impl)
+        S = pd.Series(test_global_input_data_unicode_kind4)
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S)
+        msg = 'Method pct_change(). The object self.data'
+        self.assertIn(msg, str(raises.exception))
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.pct_change() does not raise an exception')
+    def test_series_pct_change_not_supported(self):
+        def test_series_pct_change_impl(S, periods=1, fill_method='pad', limit=None, freq=None):
+            return S.pct_change(periods=periods, fill_method=fill_method, limit=limit, freq=freq)
+
+        hpat_func = hpat.jit(test_series_pct_change_impl)
+        S = pd.Series([0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf])
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(S, fill_method='ababa')
+        msg = 'Method pct_change(). Unsupported parameter. The function uses fill_method pad (ffill) or backfill (bfill) or None.'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S, limit=5)
+        msg = 'Method pct_change(). The object limit'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S, freq=5)
+        msg = 'Method pct_change(). The object freq'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S, fill_method=1.6)
+        msg = 'Method pct_change(). The object fill_method'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S, periods=1.6)
+        msg = 'Method pct_change(). The object periods'
         self.assertIn(msg, str(raises.exception))
 
 

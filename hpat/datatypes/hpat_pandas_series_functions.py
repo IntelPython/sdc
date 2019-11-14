@@ -3460,3 +3460,105 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
         return numpy.cov(self_arr, other_arr)[0, 1]
 
     return hpat_pandas_series_cov_impl
+
+
+@overload_method(SeriesType, 'pct_change')
+def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None, freq=None):
+    """
+    Pandas Series method :meth:`pandas.Series.pct_change` implementation.
+
+    Note: Unsupported mixed numeric and string data
+
+    .. only:: developer
+
+       Test: python -m hpat.runtests -k hpat.tests.test_series.TestSeries.test_series_pct_change
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+        input series
+    periods: :obj:`int`, default 1
+        Periods to shift for forming percent change.
+    fill_method: :obj:`str`, default 'pad'
+        How to handle NAs before computing percent changes.
+    limit: :obj:`int`, default Nogne
+        The number of consecutive NAs to fill before stopping.
+        *unsupported*
+    freq: :obj: DateOffset, timedelta, or offset alias string, optional
+        Increment to use from time series API (e.g. 'M' or BDay()).
+        *unsupported*
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method pct_change().')
+    ty_checker.check(self, SeriesType)
+
+    if not isinstance(self.data.dtype, types.Number):
+        ty_checker.raise_exc(self.data.dtype, 'number', 'self.data')
+
+    if not isinstance(periods, (types.Integer, types.Omitted)):
+        ty_checker.raise_exc(periods, 'int64', 'periods')
+
+    if not isinstance(fill_method, (str, types.UnicodeType, types.StringLiteral, types.NoneType, types.Omitted)):
+        ty_checker.raise_exc(fill_method, 'string', 'fill_method')
+
+    if not isinstance(limit, (types.Omitted, types.NoneType)):
+        ty_checker.raise_exc(limit, 'None', 'limit')
+
+    if not isinstance(freq, (types.Omitted, types.NoneType)):
+        ty_checker.raise_exc(freq, 'None', 'freq')
+
+    def hpat_pandas_series_pct_change_impl(self, periods=1, fill_method='pad', limit=None, freq=None):
+        if not (fill_method is None or fill_method in ['pad', 'ffill', 'backfill', 'bfill']):
+            raise ValueError(
+                "Method pct_change(). Unsupported parameter. The function uses fill_method pad (ffill) or backfill (bfill) or None.")
+        local_series = self.copy()
+        if fill_method is not None:
+            # replacement method fillna for given method
+            # =========================================
+            # Example:
+            # s = [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2]
+            # result = [1.1, 0.3, 0.3, 1, inf, 0, 1.1, 1.1, 2.2, inf, 2, 2]
+            # ==========================================
+            for i in range(len(local_series._data)):
+                # check each element on numpy.nan
+                if numpy.isnan(local_series._data[i]):
+                    if fill_method in ['pad', 'ffill']:
+                        # if it first element is nan, element will be is nan
+                        # if it not first element, element will be is nearest is not nan element
+                        # take a step back while will not find is not nan element
+                        # if before the first element you did not find one, the element will be equal nan
+                        if i == 0:
+                            local_series._data[i] = numpy.nan
+                        else:
+                            k = 1
+                            while numpy.isnan(local_series._data[i - k]):
+                                if i - k == 0:
+                                    local_series._data[i] = numpy.nan
+                                    break
+                                k += 1
+                            local_series._data[i] = local_series._data[i - k]
+                    elif fill_method in ['backfill', 'bfill']:
+                        # if it last element is nan, element will be is nan
+                        # if it not last element, element will be is nearest is not nan element
+                        # take a step front while will not find is not nan element
+                        # if before the last element you did not find one, the element will be equal nan
+                        if i == len(local_series._data)-1:
+                            local_series._data[i] = numpy.nan
+                        else:
+                            k = 1
+                            while numpy.isnan(local_series._data[i + k]):
+                                if i + k == len(local_series._data) - 1:
+                                    local_series._data[i] = numpy.nan
+                                    break
+                                k += 1
+                            local_series._data[i] = local_series._data[i + k]
+        rshift = local_series.shift(periods=periods, freq=freq)
+        rdiv = local_series.div(rshift)
+        result = rdiv._data - 1
+        return pandas.Series(result)
+
+    return hpat_pandas_series_pct_change_impl

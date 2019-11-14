@@ -996,7 +996,7 @@ _not_series_array_attrs = ['flat', 'ctypes', 'itemset', 'reshape', 'sort', 'flat
                            'resolve_cumsum',
                            'resolve_shift', 'resolve_sum', 'resolve_copy', 'resolve_corr', 'resolve_mean',
                            'resolve_take', 'resolve_max', 'resolve_min', 'resolve_nunique',
-                           'resolve_argsort', 'resolve_sort_values',
+                           'resolve_argsort', 'resolve_sort_values', 'resolve_pct_change',
                            'resolve_prod', 'resolve_count', 'resolve_dropna', 'resolve_fillna', 'resolve_astype']
 
 # disable using of some Array attributes in non-hpat pipeline only
@@ -1004,7 +1004,7 @@ if not hpat.config.config_pipeline_hpat_default:
     for attr in ['resolve_std', 'resolve_var']:
         _not_series_array_attrs.append(attr)
 
-_non_hpat_pipeline_attrs = ['resolve_nsmallest', 'resolve_nlargest', 'resolve_cov', 'resolve_corr']
+_non_hpat_pipeline_attrs = ['resolve_nsmallest', 'resolve_nlargest', 'resolve_cov', 'resolve_corr', 'resolve_pct_change']
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():
