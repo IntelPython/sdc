@@ -40,6 +40,7 @@ from numba import types
 
 import hpat
 import hpat.datatypes.common_functions as common_functions
+from hpat.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from hpat.hiframes.pd_series_ext import SeriesType
 from hpat.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars)
 from hpat.utils import to_array
@@ -663,6 +664,41 @@ def hpat_pandas_series_size(self):
         return len(self._data)
 
     return hpat_pandas_series_size_impl
+
+
+@overload_attribute(SeriesType, 'str')
+def hpat_pandas_series_str(self):
+    """
+    Pandas Series attribute :attr:`pandas.Series.str` implementation
+
+    .. only:: developer
+
+        Test: python -m hpat.runtests hpat.tests.test_hiframes.TestHiFrames.test_str_get
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+        input series
+
+    Returns
+    -------
+    :class:`pandas.core.strings.StringMethods`
+        Output class to manipulate with input data.
+    """
+
+    _func_name = 'Attribute str.'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.data.dtype, (types.List, types.UnicodeType)):
+        msg = '{}  Can only use .str accessor with string values. Given: {}'
+        raise TypingError(msg.format(_func_name, self.data.dtype))
+
+    def hpat_pandas_series_str_impl(self):
+        return pandas.core.strings.StringMethods(self)
+
+    return hpat_pandas_series_str_impl
 
 
 @overload_attribute(SeriesType, 'ndim')

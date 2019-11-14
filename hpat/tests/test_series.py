@@ -2251,16 +2251,42 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_str2str(self):
-        str2str_methods = ('capitalize', 'lower', 'lstrip', 'rstrip',
-                           'strip', 'swapcase', 'title', 'upper')
+        common_methods = ['lower', 'upper']
+        sdc_methods = ['capitalize', 'lstrip', 'rstrip', 'strip', 'swapcase', 'title']
+        str2str_methods = common_methods[:]
+        if hpat.config.config_pipeline_hpat_default:
+            str2str_methods += sdc_methods
+
         for method in str2str_methods:
-            func_text = "def test_impl(S):\n"
-            func_text += "  return S.str.{}()\n".format(method)
+            func_lines = ['def test_impl(S):',
+                          '  return S.str.{}()'.format(method)]
+            func_text = '\n'.join(func_lines)
             test_impl = _make_func_from_text(func_text)
             hpat_func = self.jit(test_impl)
 
+            # TODO: fix issue occurred if name is not assigned
+            S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'], name='A')
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S),
+                                           check_names=method in common_methods)
+
+    @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
+                     'Series.str.<method>() unsupported')
+    def test_series_str2str_unsupported(self):
+        unsupported_methods = ['capitalize', 'lstrip', 'rstrip',
+                               'strip', 'swapcase', 'title']
+        for method in unsupported_methods:
+            func_lines = ['def test_impl(S):',
+                          '  return S.str.{}()'.format(method)]
+            func_text = '\n'.join(func_lines)
+            test_impl = _make_func_from_text(func_text)
+            hpat_func = hpat.jit(test_impl)
+
             S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'])
-            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+            # TypingError with expected message is raised internally by Numba
+            with self.assertRaises(TypingError) as raises:
+                hpat_func(S)
+            expected_msg = 'Series.str.{} is not supported yet'.format(method)
+            self.assertIn(expected_msg, str(raises.exception))
 
     @unittest.skipIf(hpat.config.config_pipeline_hpat_default,
                      "Old-style append implementation doesn't handle ignore_index argument")
