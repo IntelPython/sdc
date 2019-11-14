@@ -3057,7 +3057,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     kind: :obj:'str', {'mergesort', 'quicksort', 'heapsort'}, default: 'quicksort'
         Choice of sorting algorithm. See np.sort for more information. 'mergesort' is the only stable algorithm
         *uses python func - sorted() for str and numpy func - sort() for num*
-        *unsupported*
+        *'heapsort' unsupported*
     order: :obj:`str` or  :obj:`list of str`, default: None
         Has no effect but is accepted for compatibility with numpy.
         *unsupported*
@@ -3079,13 +3079,29 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     if not (isinstance(axis, types.Omitted) or isinstance(axis, types.Integer) or axis == 0):
         raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
 
+    if not isinstance(kind, (types.Omitted, str, types.UnicodeType, types.StringLiteral)):
+        raise TypingError('{} Non-string type unsupported. Given kind: {}'.format(_func_name, kind))
+
+    if not isinstance(order, (str, types.UnicodeType, types.StringLiteral, types.Omitted, types.NoneType, types.List))\
+            and order is not None:
+        raise TypingError('{} Unsupported parameters. Given order: {}'.format(_func_name, order))
+
     if not isinstance(self.index, types.NoneType):
         def hpat_pandas_series_argsort_idx_impl(self, axis=0, kind='quicksort', order=None):
-            sort = numpy.argsort(self._data, kind='mergesort')
+            if kind != 'quicksort' and kind != 'mergesort':
+                raise ValueError("Method argsort(). Unsupported parameter. Given 'kind' != 'quicksort' or 'mergesort'")
+            if kind == 'mergesort':
+                #It is impossible to use numpy.argsort(self._data, kind=kind) since numba gives typing error
+                sort = numpy.argsort(self._data, kind='mergesort')
+            else:
+                sort = numpy.argsort(self._data)
             na = self.isna().sum()
             result = numpy.empty(len(self._data), dtype=numpy.int64)
             na_data_arr = hpat.hiframes.api.get_nan_mask(self._data)
-            sort_nona = numpy.argsort(self._data[~na_data_arr], kind='mergesort')
+            if kind == 'mergesort':
+                sort_nona = numpy.argsort(self._data[~na_data_arr], kind='mergesort')
+            else:
+                sort_nona = numpy.argsort(self._data[~na_data_arr])
             q = 0
             for id, i in enumerate(sort):
                 if id not in list(sort[len(self._data) - na:]):
@@ -3100,11 +3116,19 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
         return hpat_pandas_series_argsort_idx_impl
 
     def hpat_pandas_series_argsort_noidx_impl(self, axis=0, kind='quicksort', order=None):
-        sort = numpy.argsort(self._data, kind='mergesort')
+        if kind != 'quicksort' and kind != 'mergesort':
+            raise ValueError("Method argsort(). Unsupported parameter. Given 'kind' != 'quicksort' or 'mergesort'")
+        if kind == 'mergesort':
+            sort = numpy.argsort(self._data, kind='mergesort')
+        else:
+            sort = numpy.argsort(self._data)
         na = self.isna().sum()
         result = numpy.empty(len(self._data), dtype=numpy.int64)
         na_data_arr = hpat.hiframes.api.get_nan_mask(self._data)
-        sort_nona = numpy.argsort(self._data[~na_data_arr], kind='mergesort')
+        if kind == 'mergesort':
+            sort_nona = numpy.argsort(self._data[~na_data_arr], kind='mergesort')
+        else:
+            sort_nona = numpy.argsort(self._data[~na_data_arr])
         q = 0
         for id, i in enumerate(sort):
             if id not in list(sort[len(self._data) - na:]):
@@ -3140,7 +3164,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     kind: :obj:'str', {'mergesort', 'quicksort', 'heapsort'}, default: 'quicksort'
         Choice of sorting algorithm.
         *uses python func - sorted() for str and numpy func - sort() for num*
-        *unsupported*
+        *'heapsort' unsupported*
     na_position: {'first' or 'last'}, default 'last'
         Argument 'first' puts NaNs at the beginning, 'last' puts NaNs at the end.
         *unsupported*
@@ -3155,12 +3179,23 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
+    if not (isinstance(axis, types.Omitted) or isinstance(axis, types.Integer) or axis == 0):
+        raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
+
     if not (isinstance(ascending, types.Omitted) or isinstance(ascending, types.Boolean) or ascending is True or False):
         raise TypingError('{} Unsupported parameters. Given ascending: {}'.format(_func_name, ascending))
+
+    if not isinstance(kind, (types.Omitted, str, types.UnicodeType, types.StringLiteral)):
+        raise TypingError('{} Non-string type unsupported. Given kind: {}'.format(_func_name, kind))
+
+    if not isinstance(na_position, (types.Omitted, str, types.UnicodeType, types.StringLiteral)):
+        raise TypingError('{} Unsupported parameters. Given na_position: {}'.format(_func_name, na_position))
 
     if isinstance(self.index, types.NoneType) and isinstance(self.data.dtype, types.UnicodeType):
         def hpat_pandas_series_sort_values_str_noidx_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
+            if kind != 'quicksort' and kind != 'mergesort':
+                raise ValueError("Method sort_values(). Unsupported parameter. Given kind != 'quicksort', 'mergesort'")
             index = numpy.arange(len(self._data))
             my_index = numpy.arange(len(self._data))
             used_index = numpy.full((len(self._data)), -1)
@@ -3198,9 +3233,15 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     if isinstance(self.index, types.NoneType) and isinstance(self.data.dtype, types.Number):
         def hpat_pandas_series_sort_values_num_noidx_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
+            if kind != 'quicksort' and kind != 'mergesort':
+                raise ValueError("Method sort_values(). Unsupported parameter. Given kind != 'quicksort', 'mergesort'")
             na = self.isna().sum()
             indices = numpy.arange(len(self._data))
-            index_result = numpy.argsort(self._data, kind='mergesort')
+            if kind == 'mergesort':
+                # It is impossible to use numpy.argsort(self._data, kind=kind) since numba gives typing error
+                index_result = numpy.argsort(self._data, kind='mergesort')
+            else:
+                index_result = numpy.argsort(self._data)
             result = numpy.sort(self._data)
             i = len(self._data) - na
             index_result[i:] = index_result[i:][::-1]
@@ -3217,6 +3258,8 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     if isinstance(self.data.dtype, types.UnicodeType):
         def hpat_pandas_series_sort_values_str_idx_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
+            if kind != 'quicksort' and kind != 'mergesort':
+                raise ValueError("Method sort_values(). Unsupported parameter. Given kind != 'quicksort', 'mergesort'")
             index = self._index
             my_index = numpy.arange(len(self._data))
             used_index = numpy.full((len(self._data)), -1)
@@ -3254,9 +3297,14 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     if isinstance(self.data.dtype, types.Number):
         def hpat_pandas_series_sort_values_num_idx_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
                                                 na_position='last'):
+            if kind != 'quicksort' and kind != 'mergesort':
+                raise ValueError("Method sort_values(). Unsupported parameter. Given kind != 'quicksort', 'mergesort'")
             na = self.isna().sum()
             indices = self._index.copy()
-            index_result = numpy.argsort(self._data, kind='mergesort')
+            if kind == 'mergesort':
+                index_result = numpy.argsort(self._data, kind='mergesort')
+            else:
+                index_result = numpy.argsort(self._data)
             result = numpy.sort(self._data)
             i = len(self._data) - na
             index_result[i:] = index_result[i:][::-1]
