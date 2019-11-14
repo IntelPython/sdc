@@ -271,6 +271,22 @@ class TestDataFrameHpat(TestDataFrame, unittest.TestCase):
 
         delattr(numba.types, "SeriesType")
 
+    def test_pyarrow_read_csv_series_objmode(self):
+        'Create DataFrame from series created from PyArrow in objmode'
+        from hpat.hiframes.pd_series_ext import SeriesType
+        setattr(numba.types, "SeriesType", SeriesType)
+
+        import pyarrow
+
+        def test_impl():
+            with numba.objmode(out="SeriesType(int64)"):
+                out = pyarrow.table({"A": [1, 2]}).to_pandas()["A"]
+            df = pd.DataFrame(data={"A": out})
+            return df
+        self._check_frame(test_impl)
+
+        delattr(numba.types, "SeriesType")
+
     def test_len1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.random.ranf(n)})
