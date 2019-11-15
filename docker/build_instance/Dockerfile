@@ -18,5 +18,5 @@ RUN conda install -y conda-build anaconda-client conda-verify
 
 #RUN echo "source activate BUILD" >> /root/.bashrc
 RUN echo -e "channels:\n  - ehsantn\n  - defaults\n  - conda-forge\n\nanaconda_upload: False\n" > /root/.condarc
-#RUN git clone https://github.com/IntelLabs/hpat.git
+#RUN git clone https://github.com/IntelLabs/sdc.git
 #RUN conda install

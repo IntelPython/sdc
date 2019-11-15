@@ -25,7 +25,7 @@
 # *****************************************************************************
 
 
-import hpat
+import sdc
 
 from .common import Implementation as Impl
 from .data_generator import DataGenerator, FloatSeriesGenerator
@@ -49,7 +49,7 @@ class Quantile():
         self.idx = data[dtype]
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _quantile(idx, quantile, interpolation):
         return idx.quantile(quantile, interpolation=interpolation)
 
@@ -71,7 +71,7 @@ class Absolute:
         self.series = FloatSeriesGenerator(size=size).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _abs(series):
         return series.abs()
 
@@ -94,7 +94,7 @@ class ValueCounts:
         self.series = FloatSeriesGenerator(size).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _value_counts(series):
         return series.value_counts()
 
@@ -117,7 +117,7 @@ class MinMax:
         self.series = FloatSeriesGenerator(size=size).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _min(series):
         return series.min()
 
@@ -129,7 +129,7 @@ class MinMax:
             return self.series.min()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _max(series):
         return series.max()
 
@@ -153,7 +153,7 @@ class Correlation:
         self.series2 = FloatSeriesGenerator(size).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _cov(series, series2):
         return series.cov(series2)
 
@@ -165,7 +165,7 @@ class Correlation:
             return self.series.cov(self.series2)
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _corr(series, series2):
         return series.corr(series2)
 
@@ -188,7 +188,7 @@ class Sum:
         self.series = FloatSeriesGenerator(size=size).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _sum(series):
         return series.sum()
 
@@ -211,7 +211,7 @@ class Count:
         self.series = FloatSeriesGenerator(size).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _count(series):
         return series.count()
 
@@ -234,7 +234,7 @@ class Nlargest:
         self.series = FloatSeriesGenerator(size).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _nlargest(series):
         return series.nlargest()
 
@@ -256,7 +256,7 @@ class Nsmallest:
         self.series = FloatSeriesGenerator(size).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _nsmallest(series):
         return series.nsmallest()
 
@@ -278,7 +278,7 @@ class Var:
         self.series = FloatSeriesGenerator(size).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _var(series):
         return series.var()
 
@@ -300,7 +300,7 @@ class Mean:
         self.series = FloatSeriesGenerator(size).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _mean(series):
         return series.mean()
 
@@ -322,7 +322,7 @@ class Median:
         self.series = FloatSeriesGenerator(size).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _median(series):
         return series.median()
 

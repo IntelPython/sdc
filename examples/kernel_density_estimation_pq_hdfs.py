@@ -26,14 +26,14 @@
 
 
 import pyarrow.parquet as pq
-import hpat
-from hpat import prange
+import sdc
+from sdc import prange
 import numpy as np
 import argparse
 import time
 
 
-@hpat.jit
+@sdc.jit
 def kde():
     t = pq.read_table('hdfs://localhost:9016/user/etotoni/kde.parquet')
     df = t.to_pandas()

@@ -51,9 +51,9 @@ if SDC_DOC_NO_API_REF_STR in os.environ:
 
 if not sdc_doc_no_api_ref:
     try:
-        import hpat  # TODO: Rename hpat module name to sdc
+        import sdc  # TODO: Rename hpat module name to sdc
     except ImportError:
-        print('IMPORT EXCEPTION: Cannot import hpat. ')
+        print('IMPORT EXCEPTION: Cannot import sdc. ')
         print('Documentation generator for API Reference for a given module expects that module '
               'to be installed. Use conda/pip install hpat to install it prior to using API Reference generation')
         print('If you want to disable API Reference generation, set the environment variable SDC_DOC_NO_API_REF=1')
@@ -214,7 +214,7 @@ pdf_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'hpat', 'HPAT Documentation',
+    (master_doc, 'sdc', 'HPAT Documentation',
      [author], 1)
 ]
 

@@ -27,10 +27,10 @@
 
 import pandas as pd
 import numpy as np
-import hpat
+import sdc
 
 
-@hpat.jit(pivots={'pt': ['small', 'large']})
+@sdc.jit(pivots={'pt': ['small', 'large']})
 def df_pivot(df):
     pt = df.pivot_table(index='A', columns='C', values='D', aggfunc='sum')
     print(pt.small.values)

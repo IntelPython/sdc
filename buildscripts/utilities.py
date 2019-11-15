@@ -76,7 +76,7 @@ def get_sdc_build_packages(build_output):
     sdc_build_dir = os.path.join(build_output, os_dir)
     for item in os.listdir(sdc_build_dir):
         item_path = os.path.join(sdc_build_dir, item)
-        if os.path.isfile(item_path) and re.search(r'^hpat.*\.tar\.bz2$|^hpat.*\.whl$', item):
+        if os.path.isfile(item_path) and re.search(r'^sdc.*\.tar\.bz2$|^sdc.*\.whl$', item):
             sdc_packages.append(item_path)
 
     return sdc_packages

@@ -27,17 +27,17 @@
 
 import pandas as pd
 import numpy as np
-import hpat
+import sdc
 
 
-@hpat.jit
+@sdc.jit
 def get_mean(df):
     ser = pd.Series(df['Bonus %'])
     m = ser.mean()
     return m
 
 
-@hpat.jit
+@sdc.jit
 def sort_name(df):
     ser = pd.Series(df['First Name'])
     m = ser.sort_values()

@@ -45,7 +45,7 @@ class Methods:
         self.series = StringSeriesGenerator(size=size, nchars=nchars).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _len(series):
         return series.str.len()
 
