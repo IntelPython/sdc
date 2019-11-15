@@ -88,38 +88,37 @@ def typeof_pd_index(val, c):
         raise NotImplementedError("unsupported pd.Index type")
 
 
-if hpat.config.config_pipeline_hpat_default is not 0:
-    @unbox(DataFrameType)
-    def unbox_dataframe(typ, val, c):
-        """unbox dataframe to an empty DataFrame struct
-        columns will be extracted later if necessary.
-        """
-        n_cols = len(typ.columns)
-        column_strs = [numba.unicode.make_string_from_constant(
-            c.context, c.builder, string_type, a) for a in typ.columns]
-        # create dataframe struct and store values
-        dataframe = cgutils.create_struct_proxy(typ)(c.context, c.builder)
+@unbox(DataFrameType)
+def unbox_dataframe(typ, val, c):
+    """unbox dataframe to an empty DataFrame struct
+    columns will be extracted later if necessary.
+    """
+    n_cols = len(typ.columns)
+    column_strs = [numba.unicode.make_string_from_constant(
+        c.context, c.builder, string_type, a) for a in typ.columns]
+    # create dataframe struct and store values
+    dataframe = cgutils.create_struct_proxy(typ)(c.context, c.builder)
 
-        column_tup = c.context.make_tuple(
-            c.builder, types.UniTuple(string_type, n_cols), column_strs)
-        zero = c.context.get_constant(types.int8, 0)
-        unboxed_tup = c.context.make_tuple(
-            c.builder, types.UniTuple(types.int8, n_cols + 1), [zero] * (n_cols + 1))
+    column_tup = c.context.make_tuple(
+        c.builder, types.UniTuple(string_type, n_cols), column_strs)
+    zero = c.context.get_constant(types.int8, 0)
+    unboxed_tup = c.context.make_tuple(
+        c.builder, types.UniTuple(types.int8, n_cols + 1), [zero] * (n_cols + 1))
 
-        # TODO: support unboxing index
-        if typ.index == types.none:
-            dataframe.index = c.context.get_constant(types.none, None)
-        dataframe.columns = column_tup
-        dataframe.unboxed = unboxed_tup
-        dataframe.parent = val
+    # TODO: support unboxing index
+    if typ.index == types.none:
+        dataframe.index = c.context.get_constant(types.none, None)
+    dataframe.columns = column_tup
+    dataframe.unboxed = unboxed_tup
+    dataframe.parent = val
 
-        # increase refcount of stored values
-        if c.context.enable_nrt:
-            # TODO: other objects?
-            for var in column_strs:
-                c.context.nrt.incref(c.builder, string_type, var)
+    # increase refcount of stored values
+    if c.context.enable_nrt:
+        # TODO: other objects?
+        for var in column_strs:
+            c.context.nrt.incref(c.builder, string_type, var)
 
-        return NativeValue(dataframe._getvalue())
+    return NativeValue(dataframe._getvalue())
 
 
 def get_hiframes_dtypes(df):
@@ -198,73 +197,72 @@ def _infer_index_type(index):
     return types.Array(numba_index_type, 1, 'C')
 
 
-if hpat.config.config_pipeline_hpat_default is not 0:
-    @box(DataFrameType)
-    def box_dataframe(typ, val, c):
-        context = c.context
-        builder = c.builder
+@box(DataFrameType)
+def box_dataframe(typ, val, c):
+    context = c.context
+    builder = c.builder
 
-        n_cols = len(typ.columns)
-        col_names = typ.columns
-        arr_typs = typ.data
-        dtypes = [a.dtype for a in arr_typs]  # TODO: check Categorical
+    n_cols = len(typ.columns)
+    col_names = typ.columns
+    arr_typs = typ.data
+    dtypes = [a.dtype for a in arr_typs]  # TODO: check Categorical
 
-        dataframe = cgutils.create_struct_proxy(typ)(context, builder, value=val)
-        col_arrs = [builder.extract_value(dataframe.data, i) for i in range(n_cols)]
-        # df unboxed from Python
-        has_parent = cgutils.is_not_null(builder, dataframe.parent)
+    dataframe = cgutils.create_struct_proxy(typ)(context, builder, value=val)
+    col_arrs = [builder.extract_value(dataframe.data, i) for i in range(n_cols)]
+    # df unboxed from Python
+    has_parent = cgutils.is_not_null(builder, dataframe.parent)
 
-        pyapi = c.pyapi
-        # gil_state = pyapi.gil_ensure()  # acquire GIL
+    pyapi = c.pyapi
+    # gil_state = pyapi.gil_ensure()  # acquire GIL
 
-        mod_name = context.insert_const_string(c.builder.module, "pandas")
-        class_obj = pyapi.import_module_noblock(mod_name)
-        df_obj = pyapi.call_method(class_obj, "DataFrame", ())
+    mod_name = context.insert_const_string(c.builder.module, "pandas")
+    class_obj = pyapi.import_module_noblock(mod_name)
+    df_obj = pyapi.call_method(class_obj, "DataFrame", ())
 
-        for i, cname, arr, arr_typ, dtype in zip(range(n_cols), col_names, col_arrs, arr_typs, dtypes):
-            # df['cname'] = boxed_arr
-            # TODO: datetime.date, DatetimeIndex?
-            name_str = context.insert_const_string(c.builder.module, cname)
-            cname_obj = pyapi.string_from_string(name_str)
-            # if column not unboxed, just used the boxed version from parent
-            unboxed_val = builder.extract_value(dataframe.unboxed, i)
-            not_unboxed = builder.icmp(lc.ICMP_EQ, unboxed_val, context.get_constant(types.int8, 0))
-            use_parent = builder.and_(has_parent, not_unboxed)
+    for i, cname, arr, arr_typ, dtype in zip(range(n_cols), col_names, col_arrs, arr_typs, dtypes):
+        # df['cname'] = boxed_arr
+        # TODO: datetime.date, DatetimeIndex?
+        name_str = context.insert_const_string(c.builder.module, cname)
+        cname_obj = pyapi.string_from_string(name_str)
+        # if column not unboxed, just used the boxed version from parent
+        unboxed_val = builder.extract_value(dataframe.unboxed, i)
+        not_unboxed = builder.icmp(lc.ICMP_EQ, unboxed_val, context.get_constant(types.int8, 0))
+        use_parent = builder.and_(has_parent, not_unboxed)
 
-            with builder.if_else(use_parent) as (then, orelse):
-                with then:
-                    arr_obj = pyapi.object_getattr_string(dataframe.parent, cname)
-                    pyapi.object_setitem(df_obj, cname_obj, arr_obj)
+        with builder.if_else(use_parent) as (then, orelse):
+            with then:
+                arr_obj = pyapi.object_getattr_string(dataframe.parent, cname)
+                pyapi.object_setitem(df_obj, cname_obj, arr_obj)
 
-                with orelse:
-                    if dtype == string_type:
-                        arr_obj = box_str_arr(arr_typ, arr, c)
-                    elif isinstance(dtype, PDCategoricalDtype):
-                        arr_obj = box_categorical_array(arr_typ, arr, c)
-                        # context.nrt.incref(builder, arr_typ, arr)
-                    elif arr_typ == string_array_split_view_type:
-                        arr_obj = box_str_arr_split_view(arr_typ, arr, c)
-                    elif dtype == types.List(string_type):
-                        arr_obj = box_list(list_string_array_type, arr, c)
-                        # context.nrt.incref(builder, arr_typ, arr)  # TODO required?
-                        # pyapi.print_object(arr_obj)
-                    else:
-                        arr_obj = box_array(arr_typ, arr, c)
-                        # TODO: is incref required?
-                        # context.nrt.incref(builder, arr_typ, arr)
-                    pyapi.object_setitem(df_obj, cname_obj, arr_obj)
+            with orelse:
+                if dtype == string_type:
+                    arr_obj = box_str_arr(arr_typ, arr, c)
+                elif isinstance(dtype, PDCategoricalDtype):
+                    arr_obj = box_categorical_array(arr_typ, arr, c)
+                    # context.nrt.incref(builder, arr_typ, arr)
+                elif arr_typ == string_array_split_view_type:
+                    arr_obj = box_str_arr_split_view(arr_typ, arr, c)
+                elif dtype == types.List(string_type):
+                    arr_obj = box_list(list_string_array_type, arr, c)
+                    # context.nrt.incref(builder, arr_typ, arr)  # TODO required?
+                    # pyapi.print_object(arr_obj)
+                else:
+                    arr_obj = box_array(arr_typ, arr, c)
+                    # TODO: is incref required?
+                    # context.nrt.incref(builder, arr_typ, arr)
+                pyapi.object_setitem(df_obj, cname_obj, arr_obj)
 
-            # pyapi.decref(arr_obj)
-            pyapi.decref(cname_obj)
+        # pyapi.decref(arr_obj)
+        pyapi.decref(cname_obj)
 
-        # set df.index if necessary
-        if typ.index != types.none:
-            arr_obj = box_array(typ.index, dataframe.index, c)
-            pyapi.object_setattr_string(df_obj, 'index', arr_obj)
+    # set df.index if necessary
+    if typ.index != types.none:
+        arr_obj = box_array(typ.index, dataframe.index, c)
+        pyapi.object_setattr_string(df_obj, 'index', arr_obj)
 
-        pyapi.decref(class_obj)
-        # pyapi.gil_release(gil_state)    # release GIL
-        return df_obj
+    pyapi.decref(class_obj)
+    # pyapi.gil_release(gil_state)    # release GIL
+    return df_obj
 
 
 @intrinsic

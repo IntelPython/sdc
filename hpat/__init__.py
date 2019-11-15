@@ -64,6 +64,22 @@ __version__ = get_versions()['version']
 del get_versions
 
 
+if not hpat.config.config_pipeline_hpat_default:
+    """
+    Overload Numba functions to allow call SDC pass in Numba compiler pipeline
+    Functions are:
+    - AnnotateTypes run_pass()
+    - InlineClosureLikes run_pass()
+
+    TODO: Needs to detect 'import Pandas' and align initialization according to it
+    """
+
+    hpat.config.numba_typed_passes_annotatetypes_orig = numba.typed_passes.AnnotateTypes.run_pass
+    numba.typed_passes.AnnotateTypes.run_pass = hpat.datatypes.hpat_pandas_dataframe_pass.sdc_dataframepassimpl_overload
+
+    hpat.config.numba_untyped_passes_inlineclosurelikes_orig = numba.untyped_passes.InlineClosureLikes.run_pass
+    numba.untyped_passes.InlineClosureLikes.run_pass = hpat.datatypes.hpat_pandas_dataframe_pass.sdc_hiframespassimpl_overload
+
 def _init_extension():
     '''Register Pandas classes and functions with Numba.
 

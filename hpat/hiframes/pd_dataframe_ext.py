@@ -45,147 +45,144 @@ from hpat.str_ext import string_type
 from hpat.str_arr_ext import string_array_type
 
 
-if hpat.config.config_pipeline_hpat_default is 0:
-    from hpat.datatypes.hpat_pandas_dataframe_types import DataFrameType
-else:
-    class DataFrameType(types.Type):  # TODO: IterableType over column names
-        """Temporary type class for DataFrame objects.
-        """
+class DataFrameType(types.Type):  # TODO: IterableType over column names
+    """Temporary type class for DataFrame objects.
+    """
 
-        def __init__(self, data=None, index=None, columns=None, has_parent=False):
-            self.data = data
-            if index is None:
-                index = types.none
-            self.index = index
-            self.columns = columns
-            # keeping whether it is unboxed from Python to enable reflection of new
-            # columns
-            self.has_parent = has_parent
-            super(DataFrameType, self).__init__(
-                name="dataframe({}, {}, {}, {})".format(data, index, columns, has_parent))
+    def __init__(self, data=None, index=None, columns=None, has_parent=False):
+        self.data = data
+        if index is None:
+            index = types.none
+        self.index = index
+        self.columns = columns
+        # keeping whether it is unboxed from Python to enable reflection of new
+        # columns
+        self.has_parent = has_parent
+        super(DataFrameType, self).__init__(
+            name="dataframe({}, {}, {}, {})".format(data, index, columns, has_parent))
 
-        def copy(self, index=None, has_parent=None):
-            # XXX is copy necessary?
-            if index is None:
-                index = types.none if self.index == types.none else self.index.copy()
-            data = tuple(a.copy() for a in self.data)
-            if has_parent is None:
-                has_parent = self.has_parent
-            return DataFrameType(data, index, self.columns, has_parent)
+    def copy(self, index=None, has_parent=None):
+        # XXX is copy necessary?
+        if index is None:
+            index = types.none if self.index == types.none else self.index.copy()
+        data = tuple(a.copy() for a in self.data)
+        if has_parent is None:
+            has_parent = self.has_parent
+        return DataFrameType(data, index, self.columns, has_parent)
 
-        @property
-        def key(self):
-            # needed?
-            return self.data, self.index, self.columns, self.has_parent
+    @property
+    def key(self):
+        # needed?
+        return self.data, self.index, self.columns, self.has_parent
 
-        def unify(self, typingctx, other):
-            if (isinstance(other, DataFrameType)
-                    and len(other.data) == len(self.data)
-                    and other.columns == self.columns
-                    and other.has_parent == self.has_parent):
-                new_index = types.none
-                if self.index != types.none and other.index != types.none:
-                    new_index = self.index.unify(typingctx, other.index)
-                elif other.index != types.none:
-                    new_index = other.index
-                elif self.index != types.none:
-                    new_index = self.index
+    def unify(self, typingctx, other):
+        if (isinstance(other, DataFrameType)
+                and len(other.data) == len(self.data)
+                and other.columns == self.columns
+                and other.has_parent == self.has_parent):
+            new_index = types.none
+            if self.index != types.none and other.index != types.none:
+                new_index = self.index.unify(typingctx, other.index)
+            elif other.index != types.none:
+                new_index = other.index
+            elif self.index != types.none:
+                new_index = self.index
 
-                data = tuple(a.unify(typingctx, b) for a, b in zip(self.data, other.data))
-                return DataFrameType(data, new_index, self.columns, self.has_parent)
+            data = tuple(a.unify(typingctx, b) for a, b in zip(self.data, other.data))
+            return DataFrameType(data, new_index, self.columns, self.has_parent)
 
-        def is_precise(self):
-            return all(a.is_precise() for a in self.data) and self.index.is_precise()
+    def is_precise(self):
+        return all(a.is_precise() for a in self.data) and self.index.is_precise()
 
-    @register_model(DataFrameType)
-    class DataFrameModel(models.StructModel):
-        def __init__(self, dmm, fe_type):
-            n_cols = len(fe_type.columns)
-            members = [
-                ('data', types.Tuple(fe_type.data)),
-                ('index', fe_type.index),
-                ('columns', types.UniTuple(string_type, n_cols)),
-                # for lazy unboxing of df coming from Python (usually argument)
-                # list of flags noting which columns and index are unboxed
-                # index flag is last
-                ('unboxed', types.UniTuple(types.int8, n_cols + 1)),
-                ('parent', types.pyobject),
-            ]
-            super(DataFrameModel, self).__init__(dmm, fe_type, members)
+@register_model(DataFrameType)
+class DataFrameModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        n_cols = len(fe_type.columns)
+        members = [
+            ('data', types.Tuple(fe_type.data)),
+            ('index', fe_type.index),
+            ('columns', types.UniTuple(string_type, n_cols)),
+            # for lazy unboxing of df coming from Python (usually argument)
+            # list of flags noting which columns and index are unboxed
+            # index flag is last
+            ('unboxed', types.UniTuple(types.int8, n_cols + 1)),
+            ('parent', types.pyobject),
+        ]
+        super(DataFrameModel, self).__init__(dmm, fe_type, members)
 
-    make_attribute_wrapper(DataFrameType, 'data', '_data')
-    make_attribute_wrapper(DataFrameType, 'index', '_index')
-    make_attribute_wrapper(DataFrameType, 'columns', '_columns')
-    make_attribute_wrapper(DataFrameType, 'unboxed', '_unboxed')
-    make_attribute_wrapper(DataFrameType, 'parent', '_parent')
+make_attribute_wrapper(DataFrameType, 'data', '_data')
+make_attribute_wrapper(DataFrameType, 'index', '_index')
+make_attribute_wrapper(DataFrameType, 'columns', '_columns')
+make_attribute_wrapper(DataFrameType, 'unboxed', '_unboxed')
+make_attribute_wrapper(DataFrameType, 'parent', '_parent')
 
-    @infer_getattr
-    class DataFrameAttribute(AttributeTemplate):
-        key = DataFrameType
+@infer_getattr
+class DataFrameAttribute(AttributeTemplate):
+    key = DataFrameType
 
-        def resolve_shape(self, ary):
-            return types.UniTuple(types.intp, 2)
+    def resolve_shape(self, ary):
+        return types.UniTuple(types.intp, 2)
 
-        def resolve_iat(self, ary):
-            return DataFrameIatType(ary)
+    def resolve_iat(self, ary):
+        return DataFrameIatType(ary)
 
-        def resolve_iloc(self, ary):
-            return DataFrameILocType(ary)
+    def resolve_iloc(self, ary):
+        return DataFrameILocType(ary)
 
-        def resolve_loc(self, ary):
-            return DataFrameLocType(ary)
+    def resolve_loc(self, ary):
+        return DataFrameLocType(ary)
 
-        def resolve_values(self, ary):
-            # using np.stack(data, 1) for both typing and implementation
-            stack_sig = self.context.resolve_function_type(
-                np.stack, (types.Tuple(ary.data), types.IntegerLiteral(1)), {})
-            return stack_sig.return_type
+    def resolve_values(self, ary):
+        # using np.stack(data, 1) for both typing and implementation
+        stack_sig = self.context.resolve_function_type(
+            np.stack, (types.Tuple(ary.data), types.IntegerLiteral(1)), {})
+        return stack_sig.return_type
 
-        @bound_function("df.apply")
-        def resolve_apply(self, df, args, kws):
-            kws = dict(kws)
-            func = args[0] if len(args) > 0 else kws.get('func', None)
-            # check lambda
-            if not isinstance(func, types.MakeFunctionLiteral):
-                raise ValueError("df.apply(): lambda not found")
+    @bound_function("df.apply")
+    def resolve_apply(self, df, args, kws):
+        kws = dict(kws)
+        func = args[0] if len(args) > 0 else kws.get('func', None)
+        # check lambda
+        if not isinstance(func, types.MakeFunctionLiteral):
+            raise ValueError("df.apply(): lambda not found")
 
-            # check axis
-            axis = args[1] if len(args) > 1 else kws.get('axis', None)
-            if (axis is None or not isinstance(axis, types.IntegerLiteral)
-                    or axis.literal_value != 1):
-                raise ValueError("only apply() with axis=1 supported")
+        # check axis
+        axis = args[1] if len(args) > 1 else kws.get('axis', None)
+        if (axis is None or not isinstance(axis, types.IntegerLiteral)
+                or axis.literal_value != 1):
+            raise ValueError("only apply() with axis=1 supported")
 
-            # using NamedTuple instead of Series, TODO: pass Series
-            Row = namedtuple('R', df.columns)
+        # using NamedTuple instead of Series, TODO: pass Series
+        Row = namedtuple('R', df.columns)
 
-            # the data elements come from getitem of Series to perform conversion
-            # e.g. dt64 to timestamp in TestDate.test_ts_map_date2
-            dtypes = []
-            for arr_typ in df.data:
-                series_typ = SeriesType(arr_typ.dtype, arr_typ, df.index, True)
-                el_typ = self.context.resolve_function_type(
-                    operator.getitem, (series_typ, types.int64), {}).return_type
-                dtypes.append(el_typ)
+        # the data elements come from getitem of Series to perform conversion
+        # e.g. dt64 to timestamp in TestDate.test_ts_map_date2
+        dtypes = []
+        for arr_typ in df.data:
+            series_typ = SeriesType(arr_typ.dtype, arr_typ, df.index, True)
+            el_typ = self.context.resolve_function_type(
+                operator.getitem, (series_typ, types.int64), {}).return_type
+            dtypes.append(el_typ)
 
-            row_typ = types.NamedTuple(dtypes, Row)
-            code = func.literal_value.code
-            f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
-            _, f_return_type, _ = numba.typed_passes.type_inference_stage(
-                self.context, f_ir, (row_typ,), None)
+        row_typ = types.NamedTuple(dtypes, Row)
+        code = func.literal_value.code
+        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
+        _, f_return_type, _ = numba.typed_passes.type_inference_stage(
+            self.context, f_ir, (row_typ,), None)
 
-            return signature(SeriesType(f_return_type), *args)
+        return signature(SeriesType(f_return_type), *args)
 
-        @bound_function("df.describe")
-        def resolve_describe(self, df, args, kws):
-            # TODO: use overload
-            # TODO: return proper series output
-            return signature(string_type, *args)
+    @bound_function("df.describe")
+    def resolve_describe(self, df, args, kws):
+        # TODO: use overload
+        # TODO: return proper series output
+        return signature(string_type, *args)
 
-        def generic_resolve(self, df, attr):
-            if attr in df.columns:
-                ind = df.columns.index(attr)
-                arr_typ = df.data[ind]
-                return SeriesType(arr_typ.dtype, arr_typ, df.index, True)
+    def generic_resolve(self, df, attr):
+        if attr in df.columns:
+            ind = df.columns.index(attr)
+            arr_typ = df.data[ind]
+            return SeriesType(arr_typ.dtype, arr_typ, df.index, True)
 
 
 @intrinsic
@@ -1572,14 +1569,13 @@ def lower_prod_dummy(context, builder, sig, args):
     return out_obj._getvalue()
 
 
-if hpat.config.config_pipeline_hpat_default is not 0:
-    @overload_method(DataFrameType, 'count')
-    def count_overload(df, axis=0, level=None, numeric_only=False):
-        # TODO: avoid dummy and generate func here when inlining is possible
-        def _impl(df, axis=0, level=None, numeric_only=False):
-            return hpat.hiframes.pd_dataframe_ext.count_dummy(df)
+@overload_method(DataFrameType, 'count')
+def count_overload(df, axis=0, level=None, numeric_only=False):
+    # TODO: avoid dummy and generate func here when inlining is possible
+    def _impl(df, axis=0, level=None, numeric_only=False):
+        return hpat.hiframes.pd_dataframe_ext.count_dummy(df)
 
-        return _impl
+    return _impl
 
 
 def count_dummy(df, n):

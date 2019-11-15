@@ -1314,9 +1314,14 @@ void get_nth(T* res, T* data, int64_t local_size, int64_t k, int type_enum, int 
 
 static void nth_dispatch(void* res, void* data, int64_t local_size, int64_t k, int type_enum, bool parallel)
 {
-    int myrank, n_pes;
-    MPI_Comm_size(MPI_COMM_WORLD, &n_pes);
-    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    int myrank = 0;
+    int n_pes = 1;
+
+    if (parallel)
+    {
+        MPI_Comm_size(MPI_COMM_WORLD, &n_pes);
+        MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    }
 
     switch (type_enum)
     {
