@@ -29,10 +29,10 @@ import h5py
 import numpy as np
 import argparse
 import time
-import hpat
+import sdc
 
 
-@hpat.jit
+@sdc.jit
 def gen_kde(N, file_name):
     # np.random.seed(0)
     points = np.random.random(N)

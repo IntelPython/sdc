@@ -27,17 +27,17 @@
 
 import daal4py
 import daal4py.hpat
-import hpat
+import sdc
 import numpy as np
 
 
-@hpat.jit
+@sdc.jit
 def lr_predict(N, D, model):
     data = np.random.ranf((N / 2, D))
     return daal4py.linear_regression_prediction().compute(data, model)
 
 
-@hpat.jit
+@sdc.jit
 def lr_train(N, D):
     data = np.random.ranf((N, D))
     gt = np.random.ranf((N, 2))
@@ -49,4 +49,4 @@ p_res = lr_predict(1000, 10, t_res.model)
 
 print(p_res.prediction[0], t_res.model.NumberOfBetas)
 
-hpat.distribution_report()
+sdc.distribution_report()

@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 import argparse
 import time
-import hpat
+import sdc
 
 
 def gen_kde(N, file_name):

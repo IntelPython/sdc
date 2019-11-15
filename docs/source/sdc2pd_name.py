@@ -26,7 +26,7 @@
 
 import os
 import glob
-import hpat  # TODO: Rename hpat module name to sdc
+import sdc  # TODO: Rename hpat module name to sdc
 
 # *****************************************************************************************************
 # ***                                     PARSER CONFIGURATION                                      ***
@@ -139,7 +139,7 @@ def parse_file(fname):
 
 
 #  Get path to SDC module installed
-sdc_path = os.path.dirname(hpat.__file__)  # TODO: Change hpat to sdc
+sdc_path = os.path.dirname(sdc.__file__)  # TODO: Change hpat to sdc
 sdc_datatypes_path = os.path.join(sdc_path, "datatypes")
 sdc_datatypes_pathname_mask = os.path.join(sdc_datatypes_path, "*.py")
 

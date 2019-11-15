@@ -25,13 +25,13 @@
 # *****************************************************************************
 
 
-import hpat
+import sdc
 import numpy as np
 import argparse
 import time
 
 
-@hpat.jit
+@sdc.jit
 def calc_pi(n):
     t1 = time.time()
     x = 2 * np.random.ranf(n) - 1

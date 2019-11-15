@@ -73,7 +73,7 @@ if __name__ == '__main__':
         os.environ['PYTHONPATH'] = '.'
         os.environ['HDF5_DIR'] = conda_prefix
         try:
-            run_command(f'{develop_env_activate} && python -m hpat.tests.gen_test_data && coverage erase && coverage run -m hpat.runtests && coveralls -v')
+            run_command(f'{develop_env_activate} && python -m sdc.tests.gen_test_data && coverage erase && coverage run -m sdc.runtests && coveralls -v')
         except:
             format_print('Coverage fails')
             print(traceback.format_exc())
@@ -85,13 +85,13 @@ if __name__ == '__main__':
         os.chdir(../sdc_src) is a workaround for the following error:
         Traceback (most recent call last):
             File "<string>", line 1, in <module>
-            File "hpat/hpat/__init__.py", line 9, in <module>
-                import hpat.dict_ext
-            File "hpat/hpat/dict_ext.py", line 12, in <module>
-                from hpat.str_ext import string_type, gen_unicode_to_std_str, gen_std_str_to_unicode
-            File "hpat/hpat/str_ext.py", line 18, in <module>
+            File "sdc/sdc/__init__.py", line 9, in <module>
+                import sdc.dict_ext
+            File "sdc/sdc/dict_ext.py", line 12, in <module>
+                from sdc.str_ext import string_type, gen_unicode_to_std_str, gen_std_str_to_unicode
+            File "sdc/sdc/str_ext.py", line 18, in <module>
                 from . import hstr_ext
-        ImportError: cannot import name 'hstr_ext' from 'hpat' (hpat/hpat/__init__.py)
+        ImportError: cannot import name 'hstr_ext' from 'sdc' (sdc/sdc/__init__.py)
         """
         os.chdir(os.path.dirname(sdc_src))
         run_command(f'{develop_env_activate} && {test_script}')
@@ -119,13 +119,13 @@ if __name__ == '__main__':
         os.chdir(../sdc_src) is a workaround for the following error:
         Traceback (most recent call last):
             File "<string>", line 1, in <module>
-            File "hpat/hpat/__init__.py", line 9, in <module>
-                import hpat.dict_ext
-            File "hpat/hpat/dict_ext.py", line 12, in <module>
-                from hpat.str_ext import string_type, gen_unicode_to_std_str, gen_std_str_to_unicode
-            File "hpat/hpat/str_ext.py", line 18, in <module>
+            File "sdc/sdc/__init__.py", line 9, in <module>
+                import sdc.dict_ext
+            File "sdc/sdc/dict_ext.py", line 12, in <module>
+                from sdc.str_ext import string_type, gen_unicode_to_std_str, gen_std_str_to_unicode
+            File "sdc/sdc/str_ext.py", line 18, in <module>
                 from . import hstr_ext
-        ImportError: cannot import name 'hstr_ext' from 'hpat' (hpat/hpat/__init__.py)
+        ImportError: cannot import name 'hstr_ext' from 'sdc' (sdc/sdc/__init__.py)
         """
         os.chdir(os.path.dirname(sdc_src))
         sdc_packages = get_sdc_build_packages(build_folder)
