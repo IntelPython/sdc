@@ -17,7 +17,7 @@ from utilities import set_environment_variable
 
 def run_smoke_tests(sdc_src, test_env_activate):
         sdc_pi_example = os.path.join(sdc_src, 'buildscripts', 'sdc_pi_example.py')
-        run_command(f'{test_env_activate} && python -c "import hpat"')
+        run_command(f'{test_env_activate} && python -c "import sdc"')
         run_command(f'{test_env_activate} && python {sdc_pi_example}')
 
 
@@ -104,13 +104,13 @@ if __name__ == '__main__':
     os.chdir(../sdc_src) is a workaround for the following error:
     Traceback (most recent call last):
         File "<string>", line 1, in <module>
-        File "hpat/hpat/__init__.py", line 9, in <module>
-            import hpat.dict_ext
-        File "hpat/hpat/dict_ext.py", line 12, in <module>
-            from hpat.str_ext import string_type, gen_unicode_to_std_str, gen_std_str_to_unicode
-        File "hpat/hpat/str_ext.py", line 18, in <module>
+        File "sdc/sdc/__init__.py", line 9, in <module>
+            import sdc.dict_ext
+        File "sdc/sdc/dict_ext.py", line 12, in <module>
+            from sdc.str_ext import string_type, gen_unicode_to_std_str, gen_std_str_to_unicode
+        File "sdc/sdc/str_ext.py", line 18, in <module>
             from . import hstr_ext
-    ImportError: cannot import name 'hstr_ext' from 'hpat' (hpat/hpat/__init__.py)
+    ImportError: cannot import name 'hstr_ext' from 'sdc' (sdc/sdc/__init__.py)
     """
     os.chdir(os.path.dirname(sdc_src))
 
