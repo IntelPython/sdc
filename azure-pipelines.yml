@@ -7,6 +7,12 @@ jobs:
       vs2017_py3.7_numpy1.16:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'False'
+
+      vs2017_py3.7_numpy1.16_numba_master:
+        PYTHON_VER: '3.7'
+        NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'True'
 
 - template: buildscripts/azure/template-linux-macos.yml
   parameters:
@@ -16,6 +22,12 @@ jobs:
       xcode9_py3.7_numpy1.16:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'False'
+
+      xcode9_py3.7_numpy1.16_numba_master:
+        PYTHON_VER: '3.7'
+        NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'True'
 
 - template: buildscripts/azure/template-linux-macos.yml
   parameters:
@@ -25,30 +37,9 @@ jobs:
       py3.7_numpy1.16:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'False'
 
-- template: buildscripts/azure/template-windows-master-numba.yml
-  parameters:
-    name: Windows_2016
-    vmImage: vs2017-win2016
-    matrix:
-      vs2017_py3.7_numpy1.16_numba_master:
-        PYTHON_VER: '3.7'
-        NUMPY_VER: '1.16'
-
-- template: buildscripts/azure/template-linux-macos-master-numba.yml
-  parameters:
-    name: OSX_10_13
-    vmImage: xcode9-macos10.13
-    matrix:
-      xcode9_py3.7_numpy1.16_numba_master:
-        PYTHON_VER: '3.7'
-        NUMPY_VER: '1.16'
-
-- template: buildscripts/azure/template-linux-macos-master-numba.yml
-  parameters:
-    name: Ubuntu_16_04
-    vmImage: ubuntu-16.04
-    matrix:
       py3.7_numpy1.16_numba_master:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'True'
