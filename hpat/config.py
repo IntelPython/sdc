@@ -91,3 +91,8 @@ numba_typed_passes_annotatetypes_orig = None
 '''
 Default value for a pointer intended to use as Numba AnnotateTypes run_pass() in overloaded function
 '''
+
+numba_untyped_passes_inlineclosurelikes_orig = None
+'''
+Default value for a pointer intended to use as Numba InlineClosureLikes run_pass() in overloaded function
+'''
