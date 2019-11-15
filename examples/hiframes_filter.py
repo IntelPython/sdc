@@ -27,10 +27,10 @@
 
 import pandas as pd
 import numpy as np
-import hpat
+import sdc
 
 
-@hpat.jit
+@sdc.jit
 def filter_df(n):
     df = pd.DataFrame({'A': np.random.ranf(n), 'B': np.random.ranf(n)})
     df1 = df[df.A > .5]

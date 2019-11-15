@@ -163,11 +163,11 @@ if not is_win:
     boost_libs = ['boost_filesystem', 'boost_system']
     io_libs += boost_libs
 
-ext_io = Extension(name="hpat.hio",
-                   sources=["hpat/io/_io.cpp", "hpat/io/_csv.cpp"],
-                   depends=["hpat/_hpat_common.h", "hpat/_distributed.h",
-                            "hpat/_import_py.h", "hpat/io/_csv.h",
-                            "hpat/_datetime_ext.h"],
+ext_io = Extension(name="sdc.hio",
+                   sources=["sdc/io/_io.cpp", "sdc/io/_csv.cpp"],
+                   depends=["sdc/_hpat_common.h", "sdc/_distributed.h",
+                            "sdc/_import_py.h", "sdc/io/_csv.h",
+                            "sdc/_datetime_ext.h"],
                    libraries=boost_libs,
                    include_dirs=ind + np_compile_args['include_dirs'],
                    library_dirs=lid,
@@ -177,9 +177,9 @@ ext_io = Extension(name="hpat.hio",
                    language="c++"
                    )
 
-ext_transport_mpi = Extension(name="hpat.transport_mpi",
-                              sources=["hpat/transport/hpat_transport_mpi.cpp"],
-                              depends=["hpat/_distributed.h"],
+ext_transport_mpi = Extension(name="sdc.transport_mpi",
+                              sources=["sdc/transport/hpat_transport_mpi.cpp"],
+                              depends=["sdc/_distributed.h"],
                               libraries=io_libs,
                               include_dirs=ind,
                               library_dirs=lid,
@@ -188,9 +188,9 @@ ext_transport_mpi = Extension(name="hpat.transport_mpi",
                               language="c++"
                               )
 
-ext_transport_seq = Extension(name="hpat.transport_seq",
-                              sources=["hpat/transport/hpat_transport_single_process.cpp"],
-                              depends=["hpat/_distributed.h"],
+ext_transport_seq = Extension(name="sdc.transport_seq",
+                              sources=["sdc/transport/hpat_transport_single_process.cpp"],
+                              depends=["sdc/_distributed.h"],
                               include_dirs=ind,
                               library_dirs=lid,
                               extra_compile_args=eca,
@@ -198,8 +198,8 @@ ext_transport_seq = Extension(name="hpat.transport_seq",
                               language="c++"
                               )
 
-ext_hdf5 = Extension(name="hpat.io._hdf5",
-                     sources=["hpat/io/_hdf5.cpp"],
+ext_hdf5 = Extension(name="sdc.io._hdf5",
+                     sources=["sdc/io/_hdf5.cpp"],
                      depends=[],
                      libraries=hdf5_libs,
                      include_dirs=[HDF5_DIR + '/include', ] + ind,
@@ -210,18 +210,18 @@ ext_hdf5 = Extension(name="hpat.io._hdf5",
                      language="c++"
                      )
 
-ext_hdist = Extension(name="hpat.hdist",
-                      sources=["hpat/_distributed.cpp"],
-                      depends=["hpat/_hpat_common.h"],
+ext_hdist = Extension(name="sdc.hdist",
+                      sources=["sdc/_distributed.cpp"],
+                      depends=["sdc/_hpat_common.h"],
                       extra_compile_args=eca,
                       extra_link_args=ela,
                       include_dirs=ind,
                       library_dirs=lid,
                       )
 
-ext_chiframes = Extension(name="hpat.chiframes",
-                          sources=["hpat/_hiframes.cpp"],
-                          depends=["hpat/_hpat_sort.h"],
+ext_chiframes = Extension(name="sdc.chiframes",
+                          sources=["sdc/_hiframes.cpp"],
+                          depends=["sdc/_hpat_sort.h"],
                           extra_compile_args=eca,
                           extra_link_args=ela,
                           include_dirs=ind,
@@ -229,16 +229,16 @@ ext_chiframes = Extension(name="hpat.chiframes",
                           )
 
 
-ext_dict = Extension(name="hpat.hdict_ext",
-                     sources=["hpat/_dict_ext.cpp"],
+ext_dict = Extension(name="sdc.hdict_ext",
+                     sources=["sdc/_dict_ext.cpp"],
                      extra_compile_args=eca,
                      extra_link_args=ela,
                      include_dirs=ind,
                      library_dirs=lid,
                      )
 
-ext_set = Extension(name="hpat.hset_ext",
-                    sources=["hpat/_set_ext.cpp"],
+ext_set = Extension(name="sdc.hset_ext",
+                    sources=["sdc/_set_ext.cpp"],
                     extra_compile_args=eca,
                     extra_link_args=ela,
                     include_dirs=ind,
@@ -250,8 +250,8 @@ str_libs = np_compile_args['libraries']
 if not is_win:
     str_libs += ['boost_regex']
 
-ext_str = Extension(name="hpat.hstr_ext",
-                    sources=["hpat/_str_ext.cpp"],
+ext_str = Extension(name="sdc.hstr_ext",
+                    sources=["sdc/_str_ext.cpp"],
                     libraries=str_libs,
                     define_macros=np_compile_args['define_macros'] + [('USE_BOOST_REGEX', None)],
                     extra_compile_args=eca,
@@ -265,8 +265,8 @@ ext_str = Extension(name="hpat.hstr_ext",
 #dt_args['library_dirs'] = dt_args['library_dirs'] + [PANDAS_DIR+'/_libs/tslibs']
 #dt_args['libraries'] = dt_args['libraries'] + ['np_datetime']
 
-ext_dt = Extension(name="hpat.hdatetime_ext",
-                   sources=["hpat/_datetime_ext.cpp"],
+ext_dt = Extension(name="sdc.hdatetime_ext",
+                   sources=["sdc/_datetime_ext.cpp"],
                    libraries=np_compile_args['libraries'],
                    define_macros=np_compile_args['define_macros'],
                    extra_compile_args=['-std=c++11'],
@@ -289,8 +289,8 @@ if not is_win:
 #     # seperate parquet reader used due to ABI incompatibility of arrow
 #     pq_libs += ['hpat_parquet_reader']
 
-ext_parquet = Extension(name="hpat.parquet_cpp",
-                        sources=["hpat/io/_parquet.cpp"],
+ext_parquet = Extension(name="sdc.parquet_cpp",
+                        sources=["sdc/io/_parquet.cpp"],
                         libraries=pq_libs,
                         include_dirs=['.'] + ind,
                         define_macros=[('BUILTIN_PARQUET_READER', None)],
@@ -299,14 +299,14 @@ ext_parquet = Extension(name="hpat.parquet_cpp",
                         library_dirs=lid,
                         )
 
-# ext_daal_wrapper = Extension(name="hpat.daal_wrapper",
+# ext_daal_wrapper = Extension(name="sdc.daal_wrapper",
 #                             include_dirs = [DAALROOT+'/include'],
 #                             libraries = ['daal_core', 'daal_thread']+MPI_LIBS,
-#                             sources=["hpat/_daal.cpp"]
+#                             sources=["sdc/_daal.cpp"]
 #                             )
 
-ext_ros = Extension(name="hpat.ros_cpp",
-                    sources=["hpat/_ros.cpp"],
+ext_ros = Extension(name="sdc.ros_cpp",
+                    sources=["sdc/_ros.cpp"],
                     include_dirs=['/opt/ros/lunar/include',
                                   '/opt/ros/lunar/include/xmlrpcpp',
                                   PREFIX_DIR + '/include/',
@@ -344,8 +344,8 @@ cv_libs = ['opencv_core', 'opencv_imgproc', 'opencv_imgcodecs', 'opencv_highgui'
 if is_win:
     cv_libs = [l + '331' for l in cv_libs]
 
-ext_cv_wrapper = Extension(name="hpat.cv_wrapper",
-                           sources=["hpat/_cv.cpp"],
+ext_cv_wrapper = Extension(name="sdc.cv_wrapper",
+                           sources=["sdc/_cv.cpp"],
                            include_dirs=[OPENCV_DIR + '/include'] + ind,
                            library_dirs=[os.path.join(OPENCV_DIR, 'lib')] + lid,
                            libraries=cv_libs,
@@ -353,8 +353,8 @@ ext_cv_wrapper = Extension(name="hpat.cv_wrapper",
                            language="c++",
                            )
 
-ext_xenon_wrapper = Extension(name="hpat.hxe_ext",
-                              sources=["hpat/io/_xe_wrapper.cpp"],
+ext_xenon_wrapper = Extension(name="sdc.hxe_ext",
+                              sources=["sdc/io/_xe_wrapper.cpp"],
                               #include_dirs = ['/usr/include'],
                               include_dirs=['.'] + ind,
                               library_dirs=['.'] + lid,
@@ -383,9 +383,9 @@ if _has_xenon:
 #
 # These commands extends standart setuptools build procedure
 #
-hpat_build_commands = versioneer.get_cmdclass()
-hpat_build_commands['build_doc'] = build_doc
-hpat_build_commands['build_devdoc'] = build_devdoc
+sdc_build_commands = versioneer.get_cmdclass()
+sdc_build_commands['build_doc'] = build_doc
+sdc_build_commands['build_devdoc'] = build_devdoc
 
 
 class style(Command):
@@ -505,9 +505,9 @@ class style(Command):
             print("%s Style check passed" % self._result_marker)
 
 
-hpat_build_commands.update({'style': style})
+sdc_build_commands.update({'style': style})
 
-setup(name='hpat',
+setup(name='sdc',
       version=versioneer.get_version(),
       description='compiling Python code for clusters',
       long_description=readme(),
@@ -521,17 +521,17 @@ setup(name='hpat',
           "Topic :: System :: Distributed Computing",
       ],
       keywords='data analytics cluster',
-      url='https://github.com/IntelPython/hpat',
+      url='https://github.com/IntelPython/sdc',
       author='Intel',
       packages=find_packages(),
-      package_data={'hpat.tests': ['*.bz2'], },
+      package_data={'sdc.tests': ['*.bz2'], },
       install_requires=['numba'],
       extras_require={'HDF5': ["h5py"], 'Parquet': ["pyarrow"]},
-      cmdclass=hpat_build_commands,
+      cmdclass=sdc_build_commands,
       ext_modules=_ext_mods,
       entry_points={
           "numba_extensions": [
-              "init = hpat:_init_extension",
+              "init = sdc:_init_extension",
           ],
       },
 )

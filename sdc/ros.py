@@ -1,0 +1,217 @@
+# *****************************************************************************
+# Copyright (c) 2019, Intel Corporation All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#     Redistributions of source code must retain the above copyright notice,
+#     this list of conditions and the following disclaimer.
+#
+#     Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# *****************************************************************************
+
+
+import llvmlite.binding as ll
+from . import ros_cpp
+from llvmlite import ir as lir
+from numba.targets.arrayobj import make_array
+from numba import cgutils
+from numba import types, ir_utils, ir
+from numba.ir_utils import (compile_to_numba_ir, replace_arg_nodes)
+from numba.typing import signature
+from numba.typing.templates import infer_global, AbstractTemplate
+from numba.extending import models, register_model, lower_builtin
+import sdc
+import numpy as np
+
+
+def read_ros_images(f_name):
+    # implementation to enable regular python
+    def f(file_name):  # pragma: no cover
+        bag = sdc.ros.open_bag(file_name)
+        num_msgs = sdc.ros.get_msg_count(bag)
+        m, n = sdc.ros.get_image_dims(bag)
+        # sdc.cprint(num_msgs, m, n)
+        A = np.empty((num_msgs, m, n, 3), dtype=np.uint8)
+        s = sdc.ros.read_ros_images_inner(A, bag)
+        return A
+
+    return sdc.jit(f)(f_name)
+
+# inner functions
+
+
+def open_bag(file_name):
+    return 0
+
+
+def get_msg_count(bag):
+    return 0
+
+
+def get_image_dims(bag):
+    return 0
+
+
+def read_ros_images_inner(A, bag):
+    return 0
+
+
+def read_ros_images_inner_parallel():
+    return 0
+
+
+def _handle_read_images(lhs, rhs):
+    fname = rhs.args[0]
+
+    def f(file_name):  # pragma: no cover
+        bag = sdc.ros.open_bag(file_name)
+        _num_msgs = sdc.ros.get_msg_count(bag)
+        _ros_m, _ros_n = sdc.ros.get_image_dims(bag)
+        # sdc.cprint(num_msgs, m, n)
+        _in_ros_arr = np.empty((_num_msgs, _ros_m, _ros_n, 3), dtype=np.uint8)
+        _ret = sdc.ros.read_ros_images_inner(_in_ros_arr, bag)
+
+    f_block = compile_to_numba_ir(
+        f, {'np': np, 'sdc': sdc}).blocks.popitem()[1]
+    replace_arg_nodes(f_block, [fname])
+    nodes = f_block.body[:-3]  # remove none return
+    A_var = nodes[-2].value.args[0]
+    #A_var = nodes[-1].target
+    nodes.append(ir.Assign(A_var, lhs, lhs.loc))
+    return nodes
+
+
+class BagFileType(types.Opaque):
+    def __init__(self):
+        super(BagFileType, self).__init__(name='BagFileType')
+
+
+bag_file_type = BagFileType()
+
+register_model(BagFileType)(models.OpaqueModel)
+
+
+@infer_global(read_ros_images)
+class ReadMsgImageTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        return signature(types.Array(types.uint8, 4, 'C'), *args)
+
+
+@infer_global(open_bag)
+class BagOpenTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        return signature(bag_file_type, *args)
+
+
+@infer_global(get_msg_count)
+class MsgCountTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        return signature(types.intp, *args)
+
+
+@infer_global(get_image_dims)
+class MsgDimsTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 1
+        return signature(types.UniTuple(types.intp, 2), *args)
+
+
+@infer_global(read_ros_images_inner)
+class ReadInnerTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 2
+        return signature(types.int32, *args)
+
+
+@infer_global(read_ros_images_inner_parallel)
+class ReadInnerParallelTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        assert not kws
+        assert len(args) == 4
+        return signature(types.int32, *args)
+
+
+ll.add_symbol('open_bag', ros_cpp.open_bag)
+ll.add_symbol('get_msg_count', ros_cpp.get_msg_count)
+ll.add_symbol('get_image_dims', ros_cpp.get_image_dims)
+ll.add_symbol('read_images', ros_cpp.read_images)
+ll.add_symbol('read_images_parallel', ros_cpp.read_images_parallel)
+
+
+@lower_builtin(open_bag, sdc.string_type)
+def lower_open_bag(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
+                            [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="open_bag")
+    return builder.call(fn, args)
+
+
+@lower_builtin(get_msg_count, bag_file_type)
+def lower_get_msg_count(context, builder, sig, args):
+    fnty = lir.FunctionType(lir.IntType(64),
+                            [lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="get_msg_count")
+    return builder.call(fn, args)
+
+
+@lower_builtin(get_image_dims, bag_file_type)
+def lower_get_image_dims(context, builder, sig, args):
+    out_ptr = cgutils.alloca_once(builder, lir.IntType(64), 2)
+    out_typ = lir.ArrayType(lir.IntType(64), 2)
+    fnty = lir.FunctionType(lir.VoidType(),
+                            [lir.IntType(64).as_pointer(),
+                             lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="get_image_dims")
+    builder.call(fn, [out_ptr] + args)
+    out_ptr_fixed_typ = builder.bitcast(out_ptr, out_typ.as_pointer())
+    return builder.load(out_ptr_fixed_typ)
+
+
+@lower_builtin(read_ros_images_inner, types.Array, bag_file_type)
+def lower_read_images_inner(context, builder, sig, args):
+    bag = args[1]
+    out = make_array(sig.args[0])(context, builder, args[0])
+
+    fnty = lir.FunctionType(lir.IntType(32),
+                            [lir.IntType(8).as_pointer(),
+                             lir.IntType(8).as_pointer()])
+    fn = builder.module.get_or_insert_function(fnty, name="read_images")
+    return builder.call(fn, [builder.bitcast(out.data, lir.IntType(8).as_pointer()), bag])
+
+
+@lower_builtin(read_ros_images_inner_parallel, types.Array, bag_file_type, types.intp, types.intp)
+def lower_read_images_inner(context, builder, sig, args):
+    bag = args[1]
+    out = make_array(sig.args[0])(context, builder, args[0])
+
+    fnty = lir.FunctionType(lir.IntType(32),
+                            [lir.IntType(8).as_pointer(),
+                             lir.IntType(8).as_pointer(),
+                             lir.IntType(64),
+                             lir.IntType(64)])
+    fn = builder.module.get_or_insert_function(
+        fnty, name="read_images_parallel")
+    return builder.call(fn, [builder.bitcast(out.data, lir.IntType(8).as_pointer()), bag, args[2], args[3]])

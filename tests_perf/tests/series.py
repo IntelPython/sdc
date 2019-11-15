@@ -25,7 +25,7 @@
 # *****************************************************************************
 
 
-import hpat
+import sdc
 
 from .common import Implementation as Impl
 from .data_generator import StringSeriesGenerator, WhiteSpaceStringSeriesGenerator
@@ -44,7 +44,7 @@ class String:
         self.series = StringSeriesGenerator(size=size, nchars=nchars).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _len(series):
         return series.str.len()
 
@@ -56,7 +56,7 @@ class String:
             return self.series.str.len()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _capitalize(series):
         return series.str.capitalize()
 
@@ -68,7 +68,7 @@ class String:
             return self.series.str.capitalize()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _lower(series):
         return series.str.lower()
 
@@ -80,7 +80,7 @@ class String:
             return self.series.str.lower()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _swapcase(series):
         return series.str.swapcase()
 
@@ -92,7 +92,7 @@ class String:
             return self.series.str.swapcase()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _title(series):
         return series.str.title()
 
@@ -104,7 +104,7 @@ class String:
             return self.series.str.title()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _upper(series):
         return series.str.upper()
 
@@ -128,7 +128,7 @@ class WhiteSpaceString:
         self.series = WhiteSpaceStringSeriesGenerator(size=size, nchars=nchars).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _lstrip(series):
         return series.str.lstrip()
 
@@ -140,7 +140,7 @@ class WhiteSpaceString:
             return self.series.str.lstrip()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _rstrip(series):
         return series.str.rstrip()
 
@@ -152,7 +152,7 @@ class WhiteSpaceString:
             return self.series.str.rstrip()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _strip(series):
         return series.str.strip()
 
@@ -175,7 +175,7 @@ class SortValues:
         self.series = FloatSeriesGenerator(size=size).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _sort_values(series):
         return series.sort_values()
 
@@ -197,7 +197,7 @@ class IdxMaxMin:
         self.series = FloatSeriesIndexGenerator(size=size).generate()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _idxmax(series):
         return series.idxmax()
 
@@ -208,7 +208,7 @@ class IdxMaxMin:
             return self.series.idxmax()
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _idxmin(series):
         return series.idxmin()
 

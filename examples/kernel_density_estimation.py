@@ -25,15 +25,15 @@
 # *****************************************************************************
 
 
-import hpat
-from hpat import prange
+import sdc
+from sdc import prange
 import numpy as np
 import h5py
 import argparse
 import time
 
 
-@hpat.jit
+@sdc.jit
 def kde():
     f = h5py.File("kde.hdf5", "r")
     X = f['points'][:]

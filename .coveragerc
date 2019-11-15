@@ -1,15 +1,15 @@
 # configuration file used by run_coverage.py
 [run]
 branch = True
-source = hpat
+source = sdc
 concurrency = multiprocessing
 parallel = True
 
 [report]
 
 omit =
-    hpat/ml/*
-    hpat/xenon_ext.py
-    hpat/ros.py
-    hpat/cv_ext.py
-    hpat/tests/*
+    sdc/ml/*
+    sdc/xenon_ext.py
+    sdc/ros.py
+    sdc/cv_ext.py
+    sdc/tests/*

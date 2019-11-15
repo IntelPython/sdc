@@ -25,14 +25,14 @@
 # *****************************************************************************
 
 
-import hpat
+import sdc
 import numpy as np
 import h5py
 import argparse
 import time
 
 
-@hpat.jit
+@sdc.jit
 def linear_regression(iterations):
     f = h5py.File("lir.hdf5", "r")
     X = f['points'][:]

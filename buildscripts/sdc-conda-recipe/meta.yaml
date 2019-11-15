@@ -4,7 +4,7 @@
 {% set ARROW_CPP_VERSION = "==0.15.0" %}
 
 package:
-  name: hpat
+  name: sdc
   version: {{ GIT_DESCRIBE_TAG }}
 
 source:
@@ -58,13 +58,13 @@ test:
     - h5py
     - scipy
   imports:
-    - hpat
+    - sdc
 
 outputs:
   - type: conda
-    name: hpat
+    name: sdc
   - type: wheel
-    name: hpat
+    name: sdc
     requirements:
       build:
         - {{ compiler('c') }}
