@@ -1,6 +1,7 @@
 from numba import autojit
 import numpy as np
-#from pylab import imshow, jet, show, ion
+# from pylab import imshow, jet, show, ion
+
 
 @autojit
 def mandel(x, y, max_iters):
@@ -10,7 +11,7 @@ def mandel(x, y, max_iters):
     set given a fixed number of iterations.
     """
     i = 0
-    c = complex(x,y)
+    c = complex(x, y)
     z = 0.0j
     for i in range(max_iters):
         z = z*z + c
@@ -35,9 +36,10 @@ def create_fractal(min_x, max_x, min_y, max_y, image, iters):
 
     return image
 
+
 image = np.zeros((500, 750), dtype=np.uint8)
 create_fractal(-2.0, 1.0, -1.0, 1.0, image, 20)
-#jet()
-#ion()
-#show()
+# jet()
+# ion()
+# show()
 print("mandel OK")

@@ -76,23 +76,23 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    test_mode        = args.test_mode
-    package_type     = args.package_type
-    python           = args.python
-    numpy            = args.numpy
-    build_folder     = args.build_folder
-    conda_prefix     = os.getenv('CONDA_PREFIX', args.conda_prefix)
-    run_coverage     = args.run_coverage
-    channel_list     = args.channel_list
+    test_mode = args.test_mode
+    package_type = args.package_type
+    python = args.python
+    numpy = args.numpy
+    build_folder = args.build_folder
+    conda_prefix = os.getenv('CONDA_PREFIX', args.conda_prefix)
+    run_coverage = args.run_coverage
+    channel_list = args.channel_list
     use_numba_master = args.use_numba_master
-    numba_channel    = numba_master_channel if use_numba_master == True else args.numba_channel
+    numba_channel = numba_master_channel if use_numba_master is True else args.numba_channel
     assert conda_prefix is not None, 'CONDA_PREFIX is not defined; Please use --conda-prefix option or activate your conda'
 
     # Init variables
-    conda_activate       = get_conda_activate_cmd(conda_prefix).replace('"', '')
-    test_env             = f'sdc-test-env-py{python}-numpy{numpy}'
-    develop_env          = f'sdc-develop-env-py{python}-numpy{numpy}'
-    test_env_activate    = get_activate_env_cmd(conda_activate, test_env)
+    conda_activate = get_conda_activate_cmd(conda_prefix).replace('"', '')
+    test_env = f'sdc-test-env-py{python}-numpy{numpy}'
+    develop_env = f'sdc-develop-env-py{python}-numpy{numpy}'
+    test_env_activate = get_activate_env_cmd(conda_activate, test_env)
     develop_env_activate = get_activate_env_cmd(conda_activate, develop_env)
 
     conda_channels = f'-c {numba_channel} -c conda-forge -c intel -c defaults --override-channels'
