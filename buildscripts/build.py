@@ -113,9 +113,6 @@ if __name__ == '__main__':
 
         conda_build_packages.extend(['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64'])
 
-    # Get sdc build and test environment
-    sdc_env = get_sdc_env(conda_activate, sdc_src, sdc_recipe, python, numpy, conda_channels)
-
     # Build Numba from master
     if use_numba_master == True:
         create_conda_env(conda_activate, build_env, python, conda_build_packages)
@@ -127,6 +124,9 @@ if __name__ == '__main__':
                                                 f'--output-folder {numba_output_folder}',
                                                 f'--prefix-length 10 {numba_conda_channels} {numba_recipe}'])))
         format_print('NUMBA BUILD COMPETED')
+
+    # Get sdc build and test environment
+    sdc_env = get_sdc_env(conda_activate, sdc_src, sdc_recipe, python, numpy, conda_channels)
 
     # Set build command
     if build_mode == 'package':
