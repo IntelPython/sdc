@@ -46,7 +46,9 @@ if __name__ == '__main__':
     sdc_src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sdc_recipe = os.path.join(sdc_src, 'buildscripts', 'sdc-conda-recipe')
     numba_output_folder = os.path.join(sdc_src, 'numba-build')
-    numba_master_channel = f'file://{numba_output_folder}'
+    numba_master_channel = f'file:/{numba_output_folder}'
+    if platform.system() == 'Windows':
+        numba_master_channel = f'{numba_output_folder}'
 
     os.chdir(sdc_src)
 
