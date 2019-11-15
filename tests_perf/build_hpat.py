@@ -28,7 +28,7 @@
 """
 Build HPAT from source
 Usage:
-python build_hpat.py --env-dir <conda_hpat_env_dir> --build-dir <hpat_source_dir>
+python build_sdc.py --env-dir <conda_hpat_env_dir> --build-dir <hpat_source_dir>
 """
 import argparse
 import logging
