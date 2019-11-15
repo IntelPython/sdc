@@ -17,6 +17,8 @@ from utilities import run_command
 if __name__ == '__main__':
     sdc_src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sdc_recipe = os.path.join(sdc_src, 'buildscripts', 'sdc-conda-recipe')
+    numba_output_folder = os.path.join(sdc_src, 'numba-build')
+    numba_master_channel = f'file://{numba_output_folder}'
 
     os.chdir(sdc_src)
 
@@ -38,16 +40,24 @@ if __name__ == '__main__':
     parser.add_argument('--conda-prefix', default=None, help='Conda prefix')
     parser.add_argument('--run-coverage', default='False', choices=['True', 'False'],
                         help='Run coverage (sdc must be build in develop mode)')
+    parser.add_argument('--numba-channel', default='numba',
+                        help='Numba channel to build with special Numba, default=numba')
+    parser.add_argument('--use-numba-master', action='store_true',
+                        help=f'Test with Numba master from {numba_master_channel}')
+    parser.add_argument('--channel-list', default=None, help='List of channels to use: "-c <channel> -c <channel>"')
 
     args = parser.parse_args()
 
-    test_mode     = args.test_mode
-    package_type  = args.package_type
-    python        = args.python
-    numpy         = args.numpy
-    build_folder  = args.build_folder
-    conda_prefix  = os.getenv('CONDA_PREFIX', args.conda_prefix)
-    run_coverage  = args.run_coverage
+    test_mode        = args.test_mode
+    package_type     = args.package_type
+    python           = args.python
+    numpy            = args.numpy
+    build_folder     = args.build_folder
+    conda_prefix     = os.getenv('CONDA_PREFIX', args.conda_prefix)
+    run_coverage     = args.run_coverage
+    channel_list     = args.channel_list
+    use_numba_master = args.use_numba_master
+    numba_channel    = numba_master_channel if use_numba_master == True else args.numba_channel
     assert conda_prefix is not None, 'CONDA_PREFIX is not defined; Please use --conda-prefix option or activate your conda'
 
     # Init variables
@@ -57,7 +67,9 @@ if __name__ == '__main__':
     test_env_activate    = get_activate_env_cmd(conda_activate, test_env)
     develop_env_activate = get_activate_env_cmd(conda_activate, develop_env)
 
-    conda_channels = '-c conda-forge -c numba -c intel -c defaults --override-channels'
+    conda_channels = f'-c {numba_channel} -c conda-forge -c intel -c defaults --override-channels'
+    if channel_list:
+        conda_channels = f'{channel_list} --override-channels'
 
     if platform.system() == 'Windows':
         test_script = os.path.join(sdc_recipe, 'run_test.bat')

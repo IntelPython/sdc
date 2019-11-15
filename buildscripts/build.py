@@ -24,6 +24,9 @@ def run_smoke_tests(sdc_src, test_env_activate):
 if __name__ == '__main__':
     sdc_src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sdc_recipe = os.path.join(sdc_src, 'buildscripts', 'sdc-conda-recipe')
+    numba_recipe = os.path.join(sdc_src, 'buildscripts', 'numba-conda-recipe', 'recipe')
+    numba_output_folder = os.path.join(sdc_src, 'numba-build')
+    numba_master_channel = f'file://{numba_output_folder}'
 
     os.chdir(sdc_src)
 
@@ -42,6 +45,10 @@ if __name__ == '__main__':
                         help='Output folder for build packages, default = sdc-build')
     parser.add_argument('--conda-prefix', default=None, help='Conda prefix')
     parser.add_argument('--skip-smoke-tests', action='store_true', help='Skip smoke tests for build')
+    parser.add_argument('--numba-channel', default='numba',
+                        help='Numba channel to build with special Numba, default=numba')
+    parser.add_argument('--use-numba-master', action='store_true', help=f'Build with Numba from master')
+    parser.add_argument('--channel-list', default=None, help='List of channels to use: "-c <channel> -c <channel>"')
 
     args = parser.parse_args()
 
@@ -51,6 +58,9 @@ if __name__ == '__main__':
     output_folder    = args.output_folder
     conda_prefix     = os.getenv('CONDA_PREFIX', args.conda_prefix)
     skip_smoke_tests = args.skip_smoke_tests
+    channel_list     = args.channel_list
+    use_numba_master = args.use_numba_master
+    numba_channel    = numba_master_channel if use_numba_master == True else args.numba_channel
     assert conda_prefix is not None, 'CONDA_PREFIX is not defined; Please use --conda-prefix option or activate your conda'
     
     # Init variables
@@ -62,7 +72,10 @@ if __name__ == '__main__':
     test_env_activate    = get_activate_env_cmd(conda_activate, test_env)
     develop_env_activate = get_activate_env_cmd(conda_activate, develop_env)
 
-    conda_channels = '-c conda-forge -c numba -c intel -c defaults --override-channels'
+    conda_channels = f'-c {numba_channel} -c conda-forge -c intel -c defaults --override-channels'
+    numba_conda_channels = '-c conda-forge -c intel --override-channels'
+    if channel_list:
+        conda_channels = f'{channel_list} --override-channels'
 
     conda_build_packages = ['conda-build']
     if platform.system() == 'Windows':
@@ -75,13 +88,25 @@ if __name__ == '__main__':
     # Get sdc build and test environment
     sdc_env = get_sdc_env(conda_activate, sdc_src, sdc_recipe, python, numpy, conda_channels)
 
+    # Build Numba from master
+    if use_numba_master == True:
+        create_conda_env(conda_activate, build_env, python, conda_build_packages)
+        format_print('Start build Numba from master')
+        run_command('{} && {}'.format(build_env_activate,
+                                      ' '.join(['conda build --no-test',
+                                                f'--python {python}',
+                                                f'--numpy {numpy}',
+                                                f'--output-folder {numba_output_folder}',
+                                                f'--prefix-length 10 {numba_conda_channels} {numba_recipe}'])))
+        format_print('NUMBA BUILD COMPETED')
+
     # Set build command
     if build_mode == 'package':
         create_conda_env(conda_activate, build_env, python, conda_build_packages)
         build_cmd = '{} && {}'.format(build_env_activate,
                                       ' '.join(['conda build --no-test',
                                                             f'--python {python}',
-                                                            f'--numpy={numpy}',
+                                                            f'--numpy {numpy}',
                                                             f'--output-folder {output_folder}',
                                                             f'--prefix-length 10 {conda_channels} {sdc_recipe}']))
     else:
