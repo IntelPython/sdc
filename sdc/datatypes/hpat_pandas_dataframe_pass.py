@@ -79,7 +79,7 @@ def sdc_hiframespassimpl_overload(*args, **kwargs):
     no more needs Numba IR transformations via DataFramePass
     """
 
-    if hpat.config.numba_untyped_passes_inlineclosurelikes_orig is None:
+    if sdc.config.numba_untyped_passes_inlineclosurelikes_orig is None:
         """
         Unexpected usage of this function
         """
@@ -88,10 +88,10 @@ def sdc_hiframespassimpl_overload(*args, **kwargs):
 
     numba_state_var = args[1]
 
-    status_inlinepass_pass = hpat.compiler.InlinePass().run_pass(numba_state_var)
-    status_hiframespass_pass = hpat.hiframes.hiframes_untyped.HiFramesPassImpl(numba_state_var).run_pass()
+    status_inlinepass_pass = sdc.compiler.InlinePass().run_pass(numba_state_var)
+    status_hiframespass_pass = sdc.hiframes.hiframes_untyped.HiFramesPassImpl(numba_state_var).run_pass()
 
-    status_numba_pass = hpat.config.numba_untyped_passes_inlineclosurelikes_orig(*args, **kwargs)
+    status_numba_pass = sdc.config.numba_untyped_passes_inlineclosurelikes_orig(*args, **kwargs)
 
     is_ir_mutated = status_inlinepass_pass or status_hiframespass_pass or status_numba_pass
 

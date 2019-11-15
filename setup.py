@@ -383,9 +383,9 @@ if _has_xenon:
 #
 # These commands extends standart setuptools build procedure
 #
-hpat_build_commands = versioneer.get_cmdclass()
-hpat_build_commands['build_doc'] = build_doc
-hpat_build_commands['build_devdoc'] = build_devdoc
+sdc_build_commands = versioneer.get_cmdclass()
+sdc_build_commands['build_doc'] = build_doc
+sdc_build_commands['build_devdoc'] = build_devdoc
 
 
 class style(Command):
@@ -505,7 +505,7 @@ class style(Command):
             print("%s Style check passed" % self._result_marker)
 
 
-hpat_build_commands.update({'style': style})
+sdc_build_commands.update({'style': style})
 
 setup(name='sdc',
       version=versioneer.get_version(),
@@ -521,17 +521,17 @@ setup(name='sdc',
           "Topic :: System :: Distributed Computing",
       ],
       keywords='data analytics cluster',
-      url='https://github.com/IntelPython/hpat',
+      url='https://github.com/IntelPython/sdc',
       author='Intel',
       packages=find_packages(),
       package_data={'sdc.tests': ['*.bz2'], },
       install_requires=['numba'],
       extras_require={'HDF5': ["h5py"], 'Parquet': ["pyarrow"]},
-      cmdclass=hpat_build_commands,
+      cmdclass=sdc_build_commands,
       ext_modules=_ext_mods,
       entry_points={
           "numba_extensions": [
-              "init = hpat:_init_extension",
+              "init = sdc:_init_extension",
           ],
       },
 )
