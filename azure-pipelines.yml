@@ -40,7 +40,7 @@ jobs:
     matrix:
       py3.7_numpy1.16:
         PYTHON_VER: '3.7'
-        NUMPY_VER: '1.16'
+        NUMPY_VER: '1.17'
         USE_NUMBA_MASTER: 'True'
 
 - template: buildscripts/azure/template-linux-macos.yml
@@ -51,7 +51,7 @@ jobs:
     matrix:
       py3.7_numpy1.16:
         PYTHON_VER: '3.7'
-        NUMPY_VER: '1.16'
+        NUMPY_VER: '1.17'
         USE_NUMBA_MASTER: 'True'
 
 - template: buildscripts/azure/template-linux-macos.yml
@@ -62,5 +62,5 @@ jobs:
     matrix:
       py3.7_numpy1.16:
         PYTHON_VER: '3.7'
-        NUMPY_VER: '1.16'
+        NUMPY_VER: '1.17'
         USE_NUMBA_MASTER: 'True'

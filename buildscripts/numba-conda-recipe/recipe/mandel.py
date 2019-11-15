@@ -20,6 +20,7 @@ def mandel(x, y, max_iters):
 
     return 255
 
+
 @autojit
 def create_fractal(min_x, max_x, min_y, max_y, image, iters):
     height = image.shape[0]

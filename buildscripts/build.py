@@ -124,7 +124,7 @@ if __name__ == '__main__':
                                                 f'--python {python}',
                                                 f'--numpy {numpy}',
                                                 f'--output-folder {numba_output_folder}',
-                                                f'--prefix-length 10 {numba_conda_channels} {numba_recipe}'])))
+                                                f'{numba_conda_channels} {numba_recipe}'])))
         format_print('NUMBA BUILD COMPETED')
 
     # Get sdc build and test environment
@@ -138,13 +138,13 @@ if __name__ == '__main__':
                                                             f'--python {python}',
                                                             f'--numpy {numpy}',
                                                             f'--output-folder {output_folder}',
-                                                            f'--prefix-length 10 {conda_channels} {sdc_recipe}']))
+                                                            f'{conda_channels} {sdc_recipe}']))
     else:
         create_conda_env(conda_activate, develop_env, python, sdc_env['build'], conda_channels)
         build_cmd = f'{develop_env_activate} && python setup.py {build_mode}'
 
     # Start build
-    format_print('Start build')
+    format_print('START SDC BUILD')
     run_command(build_cmd)
     format_print('BUILD COMPETED')
 
@@ -189,4 +189,4 @@ if __name__ == '__main__':
         format_print('Run tests for installed sdc package')
         run_smoke_tests(sdc_src, develop_env_activate)
 
-    format_print('Smoke tests are PASSED')
+    format_print('SMOKE TESTS ARE PASSED')

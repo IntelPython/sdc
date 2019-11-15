@@ -145,7 +145,7 @@ if __name__ == '__main__':
         for package in sdc_packages:
             if '.tar.bz2' in package:
                 format_print(f'Run tests for sdc conda package: {package}')
-                run_command(f'{test_env_activate} && conda build --test --prefix-length 10 {conda_channels} {package}')
+                run_command(f'{test_env_activate} && conda build --test {conda_channels} {package}')
         format_print('Tests for conda packages are PASSED')
         sys.exit(0)
 
