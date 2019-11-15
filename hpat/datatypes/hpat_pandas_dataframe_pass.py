@@ -36,9 +36,11 @@ def sdc_dataframepassimpl_overload(*args, **kwargs):
     This is a pointer intended to use as Numba AnnotateTypes run_pass() function
     A hook made to overload Numba function and:
     - call original function
-    - call DataFramePass exposed in this module
+    - call hiframes.dataframe_pass.DataFramePass
+    - call compiler.PostprocessorPass
+    - call hiframes.hiframes_typed.HiFramesTypedPass
 
-    return the status of original Numba function
+    return True if any passes mutated original Numba IR
 
     This function needs to be removed if SDC DataFrame support
     no more needs Numba IR transformations via DataFramePass
@@ -60,5 +62,37 @@ def sdc_dataframepassimpl_overload(*args, **kwargs):
     status_dataframe_typed_pass = hpat.hiframes.hiframes_typed.HiFramesTypedPassImpl(numba_state_var).run_pass()
 
     is_ir_mutated = status_numba_pass or status_dataframe_pass or status_postprocess_pass or status_dataframe_typed_pass
+
+    return is_ir_mutated
+
+def sdc_hiframespassimpl_overload(*args, **kwargs):
+    """
+    This is a pointer intended to use as Numba InlineClosureLikes run_pass() function
+    A hook made to overload Numba function and:
+    - call compiler.InlinePass
+    - call hiframes.hiframes_untyped.HiFramesPass
+    - call original function
+
+    return True if any passes mutated original Numba IR
+
+    This function needs to be removed if SDC DataFrame support
+    no more needs Numba IR transformations via DataFramePass
+    """
+
+    if hpat.config.numba_untyped_passes_inlineclosurelikes_orig is None:
+        """
+        Unexpected usage of this function
+        """
+
+        return False
+
+    numba_state_var = args[1]
+
+    status_inlinepass_pass = hpat.compiler.InlinePass().run_pass(numba_state_var)
+    status_hiframespass_pass = hpat.hiframes.hiframes_untyped.HiFramesPassImpl(numba_state_var).run_pass()
+
+    status_numba_pass = hpat.config.numba_untyped_passes_inlineclosurelikes_orig(*args, **kwargs)
+
+    is_ir_mutated = status_inlinepass_pass or status_hiframespass_pass or status_numba_pass
 
     return is_ir_mutated
