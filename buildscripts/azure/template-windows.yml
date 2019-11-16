@@ -1,6 +1,7 @@
 parameters:
   name: ''
   vmImage: ''
+  allowFailure: ''
   matrix: []
 
 jobs:
@@ -19,9 +20,17 @@ jobs:
     #   displayName: 'Install conda'
 
     - script: |
-        "C:\\Miniconda\\python.exe" buildscripts\\build.py --build-mode=package --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="C:\\Miniconda"
+        IF "%USE_NUMBA_MASTER%" == "False" (
+            "C:\\Miniconda\\python.exe" buildscripts\\build.py --build-mode=package --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="C:\\Miniconda"
+            ) ELSE (
+            "C:\\Miniconda\\python.exe" buildscripts\\build.py --build-mode=package --python=%PYTHON_VER% --numpy=%NUMPY_VER% --use-numba-master --conda-prefix="C:\\Miniconda")
       displayName: 'Build conda and wheel packages'
+      continueOnError: ${{ parameters.allowFailure }}
 
     - script: |
-        "C:\\Miniconda\\python.exe" buildscripts\\test.py --test-mode=conda --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="C:\\Miniconda"
+        IF "%USE_NUMBA_MASTER%" == "False" (
+            "C:\\Miniconda\\python.exe" buildscripts\\test.py --test-mode=conda --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="C:\\Miniconda"
+            ) ELSE (
+            "C:\\Miniconda\\python.exe" buildscripts\\test.py --test-mode=conda --python=%PYTHON_VER% --numpy=%NUMPY_VER% --use-numba-master --conda-prefix="C:\\Miniconda")
       displayName: 'Test conda package'
+      continueOnError: ${{ parameters.allowFailure }}
