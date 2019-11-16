@@ -1,3 +1,31 @@
+# *****************************************************************************
+# Copyright (c) 2019, Intel Corporation All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#     Redistributions of source code must retain the above copyright notice,
+#     this list of conditions and the following disclaimer.
+#
+#     Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# *****************************************************************************
+
+
+
 import argparse
 import os
 import platform
@@ -17,6 +45,10 @@ from utilities import run_command
 if __name__ == '__main__':
     sdc_src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sdc_recipe = os.path.join(sdc_src, 'buildscripts', 'sdc-conda-recipe')
+    numba_output_folder = os.path.join(sdc_src, 'numba-build')
+    numba_master_channel = f'file:/{numba_output_folder}'
+    if platform.system() == 'Windows':
+        numba_master_channel = f'{numba_output_folder}'
 
     os.chdir(sdc_src)
 
@@ -38,26 +70,36 @@ if __name__ == '__main__':
     parser.add_argument('--conda-prefix', default=None, help='Conda prefix')
     parser.add_argument('--run-coverage', default='False', choices=['True', 'False'],
                         help='Run coverage (sdc must be build in develop mode)')
+    parser.add_argument('--numba-channel', default='numba',
+                        help='Numba channel to build with special Numba, default=numba')
+    parser.add_argument('--use-numba-master', action='store_true',
+                        help=f'Test with Numba master from {numba_master_channel}')
+    parser.add_argument('--channel-list', default=None, help='List of channels to use: "-c <channel> -c <channel>"')
 
     args = parser.parse_args()
 
-    test_mode     = args.test_mode
-    package_type  = args.package_type
-    python        = args.python
-    numpy         = args.numpy
-    build_folder  = args.build_folder
-    conda_prefix  = os.getenv('CONDA_PREFIX', args.conda_prefix)
-    run_coverage  = args.run_coverage
+    test_mode = args.test_mode
+    package_type = args.package_type
+    python = args.python
+    numpy = args.numpy
+    build_folder = args.build_folder
+    conda_prefix = os.getenv('CONDA_PREFIX', args.conda_prefix)
+    run_coverage = args.run_coverage
+    channel_list = args.channel_list
+    use_numba_master = args.use_numba_master
+    numba_channel = numba_master_channel if use_numba_master is True else args.numba_channel
     assert conda_prefix is not None, 'CONDA_PREFIX is not defined; Please use --conda-prefix option or activate your conda'
 
     # Init variables
-    conda_activate       = get_conda_activate_cmd(conda_prefix).replace('"', '')
-    test_env             = f'sdc-test-env-py{python}-numpy{numpy}'
-    develop_env          = f'sdc-develop-env-py{python}-numpy{numpy}'
-    test_env_activate    = get_activate_env_cmd(conda_activate, test_env)
+    conda_activate = get_conda_activate_cmd(conda_prefix).replace('"', '')
+    test_env = f'sdc-test-env-py{python}-numpy{numpy}'
+    develop_env = f'sdc-develop-env-py{python}-numpy{numpy}'
+    test_env_activate = get_activate_env_cmd(conda_activate, test_env)
     develop_env_activate = get_activate_env_cmd(conda_activate, develop_env)
 
-    conda_channels = '-c conda-forge -c numba -c intel -c defaults --override-channels'
+    conda_channels = f'-c {numba_channel} -c conda-forge -c intel -c defaults --override-channels'
+    if channel_list:
+        conda_channels = f'{channel_list} --override-channels'
 
     if platform.system() == 'Windows':
         test_script = os.path.join(sdc_recipe, 'run_test.bat')
@@ -105,7 +147,7 @@ if __name__ == '__main__':
         for package in sdc_packages:
             if '.tar.bz2' in package:
                 format_print(f'Run tests for sdc conda package: {package}')
-                run_command(f'{test_env_activate} && conda build --test --prefix-length 10 {conda_channels} {package}')
+                run_command(f'{test_env_activate} && conda build --test {conda_channels} {package}')
         format_print('Tests for conda packages are PASSED')
         sys.exit(0)
 
