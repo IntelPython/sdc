@@ -114,7 +114,7 @@ class DistributedPass(FunctionPass):
     This is an adapter for a new numba passes interface. Numba pass must be stateless. This class wraps statefull DistributedPassImpl
     """
 
-    _name = "distributed_pass"
+    _name = "sdc_extention_distributed_pass"
 
     def __init__(self):
         pass

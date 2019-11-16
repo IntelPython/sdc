@@ -68,7 +68,7 @@ from sdc.hiframes.aggregate import get_agg_func
 class DataFramePass(FunctionPass):
     """Analyze and transform dataframe calls after typing"""
 
-    _name = "dataframe_pass"
+    _name = "sdc_extention_dataframe_pass"
 
     def __init__(self):
         pass

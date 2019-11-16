@@ -134,7 +134,7 @@ numba.ir_utils.remove_call_handlers.append(remove_hiframes)
 class HiFramesPass(FunctionPass):
     """analyze and transform hiframes calls"""
 
-    _name = "hi_frames_pass"
+    _name = "sdc_extention_hi_frames_pass"
 
     def __init__(self):
         pass
