@@ -413,11 +413,29 @@ def pandas_read_csv(
     """Implements pandas.read_csv via pyarrow.csv.read_csv.
     This function has the same interface as pandas.read_csv.
     """
+
+    # Fallback to pandas
+    need_categorical = isinstance(dtype, pd.CategoricalDtype)
+    try:
+        need_categorical |= any(isinstance(v, pd.CategoricalDtype) for v in dtype.values())
+    except: pass
+
+    if need_categorical:
+        return pd.read_csv(
+            filepath_or_buffer,
+            sep=sep,
+            names=names,
+            usecols=usecols,
+            dtype=dtype,
+            skiprows=skiprows,
+            parse_dates=parse_dates
+        )
+
     autogenerate_column_names = bool(names)
 
     include_columns = None
 
-    categories = None
+    # categories = None
 
     if usecols is not None:
         include_columns = [f'f{i}' for i in usecols]
@@ -432,14 +450,14 @@ def pandas_read_csv(
         delimiter=sep,
     )
 
-    try:
-        keys = [k for k, v in dtype.items() if isinstance(v, pd.CategoricalDtype)]
-        if keys:
-            for k in keys:
-                del dtype[k]
-            names_list = list(names)
-            categories = [f"f{names_list.index(k)}" for k in keys]
-    except: pass
+    # try:
+    #     keys = [k for k, v in dtype.items() if isinstance(v, pd.CategoricalDtype)]
+    #     if keys:
+    #         for k in keys:
+    #             del dtype[k]
+    #         names_list = list(names)
+    #         categories = [f"f{names_list.index(k)}" for k in keys]
+    # except: pass
 
     if dtype is not None:
         names_list = list(names)
@@ -469,7 +487,7 @@ def pandas_read_csv(
     )
 
     dataframe = table.to_pandas(
-        categories=categories,
+        # categories=categories,
     )
 
     if names is not None:

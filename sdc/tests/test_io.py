@@ -822,7 +822,6 @@ class TestIO(unittest.TestCase):
             return df.C2
         return test_impl
 
-    @unittest.skip("Implementation via PyArrow doesn't support CategoricalDtype.")
     def test_csv_cat1(self):
         test_impl = self.pd_csv_cat1()
         hpat_func = sdc.jit(test_impl)
@@ -867,7 +866,6 @@ class TestIO(unittest.TestCase):
                 return df
         return test_impl
 
-    @unittest.skip("Implementation via PyArrow doesn't support CategoricalDtype.")
     def test_csv_cat2(self):
         test_impl = self.pd_csv_cat2()
         hpat_func = sdc.jit(test_impl)
