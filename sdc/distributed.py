@@ -879,7 +879,7 @@ class DistributedPassImpl(object):
             return self._run_call_rebalance_array(lhs, assign, rhs.args)
 
         # output of mnb.predict is 1D with same size as 1st dimension of input
-        # TODO: remove ml module and use new DAAL API
+        # TODO: remove ml module and use new Intel(R) Data Analytics Acceleration Library (Intel(R) DAAL) API
         if func_name == 'predict':
             getattr_call = guard(get_definition, self.state.func_ir, func_var)
             if (getattr_call and self.state.typemap[getattr_call.value.name] == sdc.ml.naive_bayes.mnb_type):

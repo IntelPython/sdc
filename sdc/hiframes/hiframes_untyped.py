@@ -1938,7 +1938,3 @@ def simple_block_copy_propagate(block):
             for k in lhs_kill:
                 var_dict.pop(k, None)
     return
-
-
-def _sanitize_varname(varname):
-    return varname.replace('$', '_').replace('.', '_')
