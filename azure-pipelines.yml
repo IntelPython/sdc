@@ -1,38 +1,66 @@
 jobs:
 - template: buildscripts/azure/template-windows.yml
   parameters:
-    name: Windows_2016
+    name: Windows2016_vs2017_Numba046
     vmImage: vs2017-win2016
+    allowFailure: false
     matrix:
-      vs2017_py3.7_numpy1.16_np0:
+      py3.7_numpy1.16:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
-
-      vs2017_py3.7_numpy1.16_np2:
-        SDC_NP_MPI: '2'
-        PYTHON_VER: '3.7'
-        NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'False'
 
 - template: buildscripts/azure/template-linux-macos.yml
   parameters:
-    name: OSX_10_13
+    name: macOS1013_xcode9_Numba046
     vmImage: xcode9-macos10.13
+    allowFailure: false
     matrix:
-      xcode9_py3.7_numpy1.16_np0:
+      py3.7_numpy1.16:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
-
-      xcode9_py3.7_numpy1.16_np2:
-        SDC_NP_MPI: '2'
-        PYTHON_VER: '3.7'
-        NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'False'
 
 - template: buildscripts/azure/template-linux-macos.yml
   parameters:
-    name: Ubuntu_16_04
+    name: Ubuntu1604_Numba046
     vmImage: ubuntu-16.04
+    allowFailure: false
     matrix:
-      py3.7_numpy1.16_np3:
-        SDC_NP_MPI: '3'
+      py3.7_numpy1.16:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'False'
+
+- template: buildscripts/azure/template-windows.yml
+  parameters:
+    name: Windows2016_vs2017_NumbaMaster
+    vmImage: vs2017-win2016
+    allowFailure: true
+    matrix:
+      py3.7_numpy1.16:
+        PYTHON_VER: '3.7'
+        NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'True'
+
+- template: buildscripts/azure/template-linux-macos.yml
+  parameters:
+    name: macOS1013_xcode9_NumbaMaster
+    vmImage: xcode9-macos10.13
+    allowFailure: true
+    matrix:
+      py3.7_numpy1.16:
+        PYTHON_VER: '3.7'
+        NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'True'
+
+- template: buildscripts/azure/template-linux-macos.yml
+  parameters:
+    name: Ubuntu1604_NumbaMaster
+    vmImage: ubuntu-16.04
+    allowFailure: true
+    matrix:
+      py3.7_numpy1.16:
+        PYTHON_VER: '3.7'
+        NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'True'

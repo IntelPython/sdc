@@ -113,7 +113,7 @@ _binop_to_str = {
 class HiFramesTypedPass(FunctionPass):
     """Analyze and transform hiframes calls after typing"""
 
-    _name = "hi_frames_typed_pass"
+    _name = "sdc_extention_hi_frames_typed_pass"
 
     def __init__(self):
         pass

@@ -124,7 +124,7 @@ def replace_pass(pm, pass_cls, location):
 
 @register_pass(mutates_CFG=True, analysis_only=False)
 class InlinePass(FunctionPass):
-    _name = "sdc_inline_pass"
+    _name = "sdc_extention_inline_pass"
 
     def __init__(self):
         pass
@@ -136,7 +136,7 @@ class InlinePass(FunctionPass):
 
 @register_pass(mutates_CFG=True, analysis_only=False)
 class PostprocessorPass(FunctionPass):
-    _name = "sdc_postprocessor_pass"
+    _name = "sdc_extention_postprocessor_pass"
 
     def __init__(self):
         pass
@@ -152,7 +152,7 @@ class SDCPipeline(numba.compiler.CompilerBase):
     """
 
     def define_pipelines(self):
-        name = 'sdc'
+        name = 'sdc_extention_pipeline_distributed'
         pm = DefaultPassBuilder.define_nopython_pipeline(self.state)
 
         add_pass_before(pm, InlinePass, InlineClosureLikes)
@@ -168,7 +168,7 @@ class SDCPipeline(numba.compiler.CompilerBase):
 
 @register_pass(mutates_CFG=True, analysis_only=False)
 class ParforSeqPass(FunctionPass):
-    _name = "sdc_parfor_seq_pass"
+    _name = "sdc_extention_parfor_seq_pass"
 
     def __init__(self):
         pass
@@ -185,7 +185,7 @@ class SDCPipelineSeq(SDCPipeline):
     """
 
     def define_pipelines(self):
-        name = 'sdc_seq'
+        name = 'sdc_extention_pipeline_seq'
         pm = DefaultPassBuilder.define_nopython_pipeline(self.state)
 
         add_pass_before(pm, InlinePass, InlineClosureLikes)
