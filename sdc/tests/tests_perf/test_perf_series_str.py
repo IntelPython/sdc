@@ -190,10 +190,10 @@ class TestSeriesStringMethods(unittest.TestCase):
             hpat_func(test_data)
 
             exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)
-            self.test_results.add(name, 'JIT', test_data.size, data_width, exec_times,
+            self.test_results.add(name, 'JIT', test_data.size, exec_times, data_width,
                                   boxing_times, compile_results=compile_results, num_threads=self.num_threads)
             exec_times, _ = get_times(pyfunc, test_data, iter_number=self.iter_number)
-            self.test_results.add(name, 'Reference', test_data.size, data_width, exec_times,
+            self.test_results.add(name, 'Reference', test_data.size, exec_times, data_width,
                                   num_threads=self.num_threads)
 
     def test_series_str_len(self):

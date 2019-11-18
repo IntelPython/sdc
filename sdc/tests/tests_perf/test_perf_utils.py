@@ -168,17 +168,18 @@ class TestResults:
         columns = ['median', 'min', 'max', 'compile', 'boxing']
         return test_results_data.groupby(self.index)[columns].first().sort_values(self.index)
 
-    def add(self, test_name, test_type, data_size, data_width, test_results,
+    def add(self, test_name, test_type, data_size, test_results, data_width=None,
             boxing_results=None, compile_results=None, num_threads=config.NUMBA_NUM_THREADS):
         """
         Add performance testing timing results into global storage
                   test_name: Name of test (1st column in grouped result)
-                  test_type: Type of test (2nd column in grouped result)
-            test_data_width: Scalability attribute for input data (3rd column in grouped result)
+                  test_type: Type of test (3rd column in grouped result)
+                  data_size: Size of input data (4s column in grouped result)
                test_results: List of timing results of the experiment
+                 data_width: Scalability attribute for str input data (5s column in grouped result)
              boxing_results: List of timing results of the overhead (boxing/unboxing)
            compilation_time: Timing result of compilation
-                num_threads: Value from NUMBA_NUM_THREADS
+                num_threads: Value from NUMBA_NUM_THREADS (2nd column in grouped result)
         """
         local_results = pandas.DataFrame({'name': test_name,
                                           'N': num_threads,
