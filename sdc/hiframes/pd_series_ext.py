@@ -1239,10 +1239,11 @@ class SeriesUnaryOpUfuncs(NumpyRulesUnaryArrayOperator):
         return series_op_generic(SeriesUnaryOpUfuncs, self, args, kws)
 
 
-# TODO: change class name to Series in install_operations
-SeriesOpUfuncs.install_operations()
-SeriesInplaceOpUfuncs.install_operations()
-SeriesUnaryOpUfuncs.install_operations()
+if sdc.config.config_pipeline_hpat_default:
+    # TODO: change class name to Series in install_operations
+    SeriesOpUfuncs.install_operations()
+    SeriesInplaceOpUfuncs.install_operations()
+    SeriesUnaryOpUfuncs.install_operations()
 
 
 class Series_Numpy_rules_ufunc(Numpy_rules_ufunc):

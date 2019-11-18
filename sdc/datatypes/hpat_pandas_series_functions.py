@@ -37,13 +37,16 @@ import pandas
 from numba.errors import TypingError
 from numba.extending import overload, overload_method, overload_attribute
 from numba import types
+from numba import numpy_support
 
 import sdc
 import sdc.datatypes.common_functions as common_functions
 from sdc.datatypes.common_functions import TypeChecker
+from sdc.datatypes.common_functions import _hpat_ensure_array_capacity
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.hiframes.pd_series_ext import SeriesType
-from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars)
+from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars, string_array_type,
+                             str_arr_is_na, pre_alloc_string_array, str_arr_set_na)
 from sdc.utils import to_array
 
 
@@ -3722,3 +3725,343 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
         return pandas.Series(result)
 
     return hpat_pandas_series_pct_change_impl
+
+
+def hpat_join_series_indexes(left, right):
+    pass
+
+@overload(hpat_join_series_indexes)
+def hpat_join_series_indexes_overload(left, right):
+    '''Function for joining arrays left and right in a way similar to pandas.join 'outer' algorithm'''
+
+    if (isinstance(left, types.Array) and isinstance(right, types.Array)):
+        np_dtypes = [numpy_support.as_dtype(left.dtype), numpy_support.as_dtype(right.dtype)]
+        np_common_dtype = numpy.find_common_type([], np_dtypes)
+        numba_common_dtype = numpy_support.from_dtype(np_common_dtype)
+        if (isinstance(left.dtype, types.Number) and isinstance(right.dtype, types.Number)):
+
+            def hpat_join_series_indexes_impl(left, right):
+
+                # allocate result arrays
+                lsize = len(left)
+                rsize = len(right)
+                est_total_size = int(1.1 * (lsize + rsize))
+
+                lidx = numpy.empty(est_total_size, numpy.int64)
+                ridx = numpy.empty(est_total_size, numpy.int64)
+                joined = numpy.empty(est_total_size, numba_common_dtype)
+
+                # sort arrays saving the old positions
+                sorted_left = numpy.argsort(left, kind='mergesort')
+                sorted_right = numpy.argsort(right, kind='mergesort')
+
+                i, j, k = 0, 0, 0
+                while (i < lsize and j < rsize):
+                    joined = _hpat_ensure_array_capacity(k, joined)
+                    lidx = _hpat_ensure_array_capacity(k, lidx)
+                    ridx = _hpat_ensure_array_capacity(k, ridx)
+
+                    left_index = left[sorted_left[i]]
+                    right_index = right[sorted_right[j]]
+
+                    if (left_index < right_index):
+                        joined[k] = left_index
+                        lidx[k] = sorted_left[i]
+                        ridx[k] = -1
+                        i += 1
+                        k += 1
+                    elif (left_index > right_index):
+                        joined[k] = right_index
+                        lidx[k] = -1
+                        ridx[k] = sorted_right[j]
+                        j += 1
+                        k += 1
+                    else:
+                        # find ends of sequences of equivalent index values in left and right
+                        ni, nj = i, j
+                        while (ni < lsize and left[sorted_left[ni]] == left_index):
+                            ni += 1
+                        while (nj < rsize and right[sorted_right[nj]] == right_index):
+                            nj += 1
+
+                        # join the blocks found into results  
+                        for s in numpy.arange(i, ni, 1):
+                            block_size = nj - j
+                            to_joined = numpy.repeat(left_index, block_size)
+                            to_lidx = numpy.repeat(sorted_left[s], block_size)
+                            to_ridx = numpy.array([sorted_right[k] for k in numpy.arange(j, nj, 1)], numpy.int64)
+
+                            joined = _hpat_ensure_array_capacity(k + block_size, joined)
+                            lidx = _hpat_ensure_array_capacity(k + block_size, lidx)
+                            ridx = _hpat_ensure_array_capacity(k + block_size, ridx)
+
+                            joined[k:k + block_size] = to_joined
+                            lidx[k:k + block_size] = to_lidx
+                            ridx[k:k + block_size] = to_ridx
+                            k += block_size
+                        i = ni
+                        j = nj
+
+                # fill the end of joined with remaining part of left or right
+                if i < lsize:
+                    block_size = lsize - i
+                    joined = _hpat_ensure_array_capacity(k + block_size, joined)
+                    lidx = _hpat_ensure_array_capacity(k + block_size, lidx)
+                    ridx = _hpat_ensure_array_capacity(k + block_size, ridx)
+                    ridx[k: k + block_size] = numpy.repeat(-1, block_size)
+                    while i < lsize:
+                        joined[k] = left[sorted_left[i]]
+                        lidx[k] = sorted_left[i]
+                        i += 1
+                        k += 1
+
+                elif j < rsize:
+                    block_size = rsize - j
+                    joined = _hpat_ensure_array_capacity(k + block_size, joined)
+                    lidx = _hpat_ensure_array_capacity(k + block_size, lidx)
+                    ridx = _hpat_ensure_array_capacity(k + block_size, ridx)
+                    lidx[k: k + block_size] = numpy.repeat(-1, block_size)
+                    while j < rsize:
+                        joined[k] = right[sorted_right[j]]
+                        ridx[k] = sorted_right[j]
+                        j += 1
+                        k += 1
+
+                return joined[:k], lidx[:k], ridx[:k]
+
+            return hpat_join_series_indexes_impl
+
+    elif (left == string_array_type and right == string_array_type):
+
+        def hpat_join_series_indexes_impl(left, right):
+
+            # allocate result arrays
+            lsize = len(left)
+            rsize = len(right)
+            est_total_size = int(1.1 * (lsize + rsize))
+
+            lidx = numpy.empty(est_total_size, numpy.int64)
+            ridx = numpy.empty(est_total_size, numpy.int64)
+
+            # use Series.sort_values since argsort for StringArrays not implemented
+            original_left_series = pandas.Series(left)
+            original_right_series = pandas.Series(right)
+
+            # sort arrays saving the old positions
+            left_series = original_left_series.sort_values(kind='mergesort')
+            right_series = original_right_series.sort_values(kind='mergesort')
+            sorted_left = left_series._index
+            sorted_right = right_series._index
+
+            i, j, k = 0, 0, 0
+            while (i < lsize and j < rsize):
+                lidx = _hpat_ensure_array_capacity(k, lidx)
+                ridx = _hpat_ensure_array_capacity(k, ridx)
+
+                left_index = left[sorted_left[i]]
+                right_index = right[sorted_right[j]]
+
+                if (left_index < right_index):
+                    lidx[k] = sorted_left[i]
+                    ridx[k] = -1
+                    i += 1
+                    k += 1
+                elif (left_index > right_index):
+                    lidx[k] = -1
+                    ridx[k] = sorted_right[j]
+                    j += 1
+                    k += 1
+                else:
+                    # find ends of sequences of equivalent index values in left and right
+                    ni, nj = i, j
+                    while (ni < lsize and left[sorted_left[ni]] == left_index):
+                        ni += 1
+                    while (nj < rsize and right[sorted_right[nj]] == right_index):
+                        nj += 1
+
+                    # join the blocks found into results
+                    for s in numpy.arange(i, ni, 1):
+                        block_size = nj - j
+                        to_lidx = numpy.repeat(sorted_left[s], block_size)
+                        to_ridx = numpy.array([sorted_right[k] for k in numpy.arange(j, nj, 1)], numpy.int64)
+
+                        lidx = _hpat_ensure_array_capacity(k + block_size, lidx)
+                        ridx = _hpat_ensure_array_capacity(k + block_size, ridx)
+
+                        lidx[k:k + block_size] = to_lidx
+                        ridx[k:k + block_size] = to_ridx
+                        k += block_size
+                    i = ni
+                    j = nj
+
+            # fill the end of joined with remaining part of left or right
+            if i < lsize:
+                block_size = lsize - i
+                lidx = _hpat_ensure_array_capacity(k + block_size, lidx)
+                ridx = _hpat_ensure_array_capacity(k + block_size, ridx)
+                ridx[k: k + block_size] = numpy.repeat(-1, block_size)
+                while i < lsize:
+                    lidx[k] = sorted_left[i]
+                    i += 1
+                    k += 1
+
+            elif j < rsize:
+                block_size = rsize - j
+                lidx = _hpat_ensure_array_capacity(k + block_size, lidx)
+                ridx = _hpat_ensure_array_capacity(k + block_size, ridx)
+                lidx[k: k + block_size] = numpy.repeat(-1, block_size)
+                while j < rsize:
+                    ridx[k] = sorted_right[j]
+                    j += 1
+                    k += 1
+
+            # count total number of characters and allocate joined array
+            total_joined_size = k
+            num_chars_in_joined = 0
+            for i in numpy.arange(total_joined_size):
+                if lidx[i] != -1:
+                    num_chars_in_joined += len(left[lidx[i]])
+                elif ridx[i] != -1:
+                    num_chars_in_joined += len(right[ridx[i]])
+
+            joined = pre_alloc_string_array(total_joined_size, num_chars_in_joined)
+
+            # iterate over joined and fill it with indexes using lidx and ridx indexers
+            for i in numpy.arange(total_joined_size):
+                if lidx[i] != -1:
+                    joined[i] = left[lidx[i]]
+                    if (str_arr_is_na(left, lidx[i])):
+                        str_arr_set_na(joined, i)
+                elif ridx[i] != -1:
+                    joined[i] = right[ridx[i]]
+                    if (str_arr_is_na(right, ridx[i])):
+                        str_arr_set_na(joined, i)
+                else:
+                    str_arr_set_na(joined, i)
+
+            return joined, lidx, ridx
+
+        return hpat_join_series_indexes_impl
+
+
+@overload(operator.add)
+def hpat_pandas_series_operator_add(self, other):
+    """
+    Pandas Series operator :attr:`pandas.Series.add` implementation
+
+    .. only:: developer
+
+    **Test**: python -m hpat.runtests sdc.tests.test_series.TestSeries.test_series_op1
+              python -m hpat.runtests sdc.tests.test_series.TestSeries.test_series_op2
+              python -m hpat.runtests sdc.tests.test_series.TestSeries.test_series_op3
+              python -m hpat.runtests sdc.tests.test_series.TestSeries.test_series_op4
+              python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_operator_add*
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+        Input series
+    other: :obj:`pandas.Series` or :obj:`scalar`
+        Series or scalar value to be used as a second argument of binary operation
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+        The result of the operation
+    """
+
+    _func_name = 'Operator add().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not (isinstance(other, SeriesType)
+                or isinstance(other, types.Number)):
+        raise TypingError('{} The object must be a pandas.series or a scalar. Given: {}'.format(_func_name, other))
+
+    series_indexes_alignable = False
+    if isinstance(other, SeriesType):
+        if (other.index == string_array_type and self.index == string_array_type):
+            series_indexes_alignable = True
+
+        if ((isinstance(self.index, types.NoneType) or
+                isinstance(self.index, types.Array) and isinstance(self.index.dtype, types.Number))
+            and (isinstance(other.index, types.NoneType) or
+                    isinstance(other.index, types.Array) and isinstance(other.index.dtype, types.Number))):
+            series_indexes_alignable = True
+
+    if isinstance(other, SeriesType) and not series_indexes_alignable:
+        raise TypingError('{} Not implemented for series with not-alignable indexes. \
+        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
+
+    if (isinstance(other, types.Number)):
+        def hpat_pandas_series_add_scalar_impl(self, other):
+            return pandas.Series(self._data + other, self._index)
+
+        return hpat_pandas_series_add_scalar_impl
+
+    elif (isinstance(other, SeriesType)):
+        is_numeric_index = isinstance(self.index, (types.Array, types.NoneType))
+
+        if is_numeric_index:
+            ty_left_index_dtype = types.int64 if isinstance(self.index, types.NoneType) else self.index.dtype
+            ty_right_index_dtype = types.int64 if isinstance(other.index, types.NoneType) else other.index.dtype
+            np_index_dtypes = [numpy_support.as_dtype(ty_left_index_dtype), numpy_support.as_dtype(ty_right_index_dtype)]
+            np_index_common_dtype = numpy.find_common_type([], np_index_dtypes)
+            numba_index_common_dtype = numpy_support.from_dtype(np_index_common_dtype)
+
+        if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
+            def hpat_pandas_series_add_impl(self, other):
+
+                if (len(self._data) == len(other._data)):
+                    return pandas.Series(numpy.asarray(self._data + other._data, numpy.float64))
+                else:
+                    min_data_size = min(len(self._data), len(other._data))
+                    max_data_size = max(len(self._data), len(other._data))
+                    new_data = numpy.empty(max_data_size, dtype=numpy.float64)
+                    new_data[:min_data_size] = self._data[:min_data_size] + other._data[:min_data_size]
+                    new_data[min_data_size:] = numpy.repeat(numpy.nan, max_data_size - min_data_size)
+
+                    return pandas.Series(new_data, self._index)
+        else:
+            def hpat_pandas_series_add_impl(self, other):
+                left_index, right_index = self.index, other.index
+
+                # check if indexes are equal and series don't have to be aligned
+                if is_numeric_index == True:  # noqa
+                    if (numpy.array_equal(left_index, right_index)):
+                        return pandas.Series(numpy.asarray(self._data + other._data, numpy.float64),
+                                             numpy.asarray(left_index, numba_index_common_dtype))
+                else:
+                    # TODO: replace with StringArrays comparison
+                    is_index_equal = (len(self._index) == len(other._index)
+                                      and num_total_chars(self._index) == num_total_chars(other._index))
+                    for i in numpy.arange(len(self._index)):
+                        if (self._index[i] != other._index[i]
+                                or str_arr_is_na(self._index, i) is not str_arr_is_na(other._index, i)):
+                            is_index_equal = False
+
+                    if is_index_equal:
+                        return pandas.Series(numpy.asarray(self._data + other._data, numpy.float64),
+                                             self._index)
+
+                # TODO: replace below with core join(how='outer') when implemented
+                joined_index, left_indexer, right_indexer = hpat_join_series_indexes(left_index, right_index)
+
+                joined_index_range = numpy.arange(len(joined_index))
+                left_values = numpy.asarray(
+                    [self._data[left_indexer[i]] for i in joined_index_range],
+                    numpy.float64
+                )
+                left_values[left_indexer == -1] = numpy.nan
+
+                right_values = numpy.asarray(
+                    [other._data[right_indexer[i]] for i in joined_index_range],
+                    numpy.float64
+                )
+                right_values[right_indexer == -1] = numpy.nan
+
+                return pandas.Series(left_values + right_values, joined_index)
+
+
+    return hpat_pandas_series_add_impl

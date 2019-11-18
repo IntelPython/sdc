@@ -32,6 +32,7 @@
 
 import numpy
 
+import numba
 from numba import types
 from numba.errors import TypingError
 from numba.extending import overload
@@ -181,3 +182,19 @@ def hpat_arrays_append_overload(A, B):
                 return new_data
 
             return _append_list_string_array_impl
+
+
+@numba.njit
+def _hpat_ensure_array_capacity(new_size, arr):
+    '''Function creating a copy of numpy array with a size more than specified'''
+    # TODO: replace this function with np.resize when supported by Numba
+    k = len(arr)
+    if k > new_size:
+        return arr
+
+    n = k
+    while n < new_size:
+        n = 2 * n
+    res = numpy.empty(n, arr.dtype)
+    res[:k] = arr[:k]
+    return res
