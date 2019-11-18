@@ -131,7 +131,7 @@ try:
     ll.add_symbol('dtor_mnb', daal_wrapper.dtor_mnb)
 except ImportError:
     if debug_prints():  # pragma: no cover
-        print("daal import error")
+        print("Intel(R) Data Analytics Acceleration Library (Intel(R) DAAL) import error")
 
 
 @lower_builtin(MultinomialNB, types.intp)
