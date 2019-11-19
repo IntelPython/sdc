@@ -74,11 +74,14 @@ if not sdc.config.config_pipeline_hpat_default:
     TODO: Needs to detect 'import Pandas' and align initialization according to it
     """
 
-    sdc.config.numba_typed_passes_annotatetypes_orig = numba.typed_passes.AnnotateTypes.run_pass
-    numba.typed_passes.AnnotateTypes.run_pass = sdc.datatypes.hpat_pandas_dataframe_pass.sdc_dataframepassimpl_overload
+# Need more work since Series tests failed
+# Test: SDC_CONFIG_PIPELINE_SDC=0 python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_sort_values1
 
-    sdc.config.numba_untyped_passes_inlineclosurelikes_orig = numba.untyped_passes.InlineClosureLikes.run_pass
-    numba.untyped_passes.InlineClosureLikes.run_pass = sdc.datatypes.hpat_pandas_dataframe_pass.sdc_hiframespassimpl_overload
+#    sdc.config.numba_typed_passes_annotatetypes_orig = numba.typed_passes.AnnotateTypes.run_pass
+#    numba.typed_passes.AnnotateTypes.run_pass = sdc.datatypes.hpat_pandas_dataframe_pass.sdc_dataframepassimpl_overload
+
+#    sdc.config.numba_untyped_passes_inlineclosurelikes_orig = numba.untyped_passes.InlineClosureLikes.run_pass
+#    numba.untyped_passes.InlineClosureLikes.run_pass = sdc.datatypes.hpat_pandas_dataframe_pass.sdc_hiframespassimpl_overload
 
 def _init_extension():
     '''Register Pandas classes and functions with Numba.
