@@ -117,7 +117,7 @@ class TestML(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 1)
         self.assertEqual(count_parfor_OneDs(), 2)
 
-    @unittest.skipIf(check_numba_version('0.46.0'),
+    @unittest.skipIf(check_numba_version('0.46.0') or True,
                      "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
     def test_kmeans(self):
         def test_impl(numCenter, numIter, N, D):
