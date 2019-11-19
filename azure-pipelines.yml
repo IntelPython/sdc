@@ -1,0 +1,66 @@
+jobs:
+- template: buildscripts/azure/template-windows.yml
+  parameters:
+    name: Windows2016_vs2017_Numba046
+    vmImage: vs2017-win2016
+    allowFailure: false
+    matrix:
+      py3.7_numpy1.16:
+        PYTHON_VER: '3.7'
+        NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'False'
+
+- template: buildscripts/azure/template-linux-macos.yml
+  parameters:
+    name: macOS1013_xcode9_Numba046
+    vmImage: xcode9-macos10.13
+    allowFailure: false
+    matrix:
+      py3.7_numpy1.16:
+        PYTHON_VER: '3.7'
+        NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'False'
+
+- template: buildscripts/azure/template-linux-macos.yml
+  parameters:
+    name: Ubuntu1604_Numba046
+    vmImage: ubuntu-16.04
+    allowFailure: false
+    matrix:
+      py3.7_numpy1.16:
+        PYTHON_VER: '3.7'
+        NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'False'
+
+- template: buildscripts/azure/template-windows.yml
+  parameters:
+    name: Windows2016_vs2017_NumbaMaster
+    vmImage: vs2017-win2016
+    allowFailure: true
+    matrix:
+      py3.7_numpy1.16:
+        PYTHON_VER: '3.7'
+        NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'True'
+
+- template: buildscripts/azure/template-linux-macos.yml
+  parameters:
+    name: macOS1013_xcode9_NumbaMaster
+    vmImage: xcode9-macos10.13
+    allowFailure: true
+    matrix:
+      py3.7_numpy1.16:
+        PYTHON_VER: '3.7'
+        NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'True'
+
+- template: buildscripts/azure/template-linux-macos.yml
+  parameters:
+    name: Ubuntu1604_NumbaMaster
+    vmImage: ubuntu-16.04
+    allowFailure: true
+    matrix:
+      py3.7_numpy1.16:
+        PYTHON_VER: '3.7'
+        NUMPY_VER: '1.16'
+        USE_NUMBA_MASTER: 'True'

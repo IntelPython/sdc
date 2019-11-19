@@ -2,29 +2,28 @@
 
 dist: trusty
 
-matrix:
-    include:
-        - os: osx
-          env: CONDA_ENV=travisci NUM_PES=1
-        - os: osx
-          env: CONDA_ENV=travisci NUM_PES=2
-        - os: osx
-          env: CONDA_ENV=travisci NUM_PES=3
-        - env: RUN_COVERAGE=yes CONDA_ENV=travisci NUM_PES=1
-        - env: CONDA_ENV=travisci NUM_PES=2
-        - env: CONDA_ENV=travisci NUM_PES=3
+env:
+    global:
+        - GIT_DESCRIBE_TAG=0.29.2
+        - GIT_DESCRIBE_NUMBER=1
+        - PYTHON_VER=3.7
+        - NUMPY_VER=1.16
+        - CONDA_PREFIX_PATH=$HOME/miniconda3
+    matrix:
+        - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=1
+        - BUILD_MODE=develop TEST_MODE=develop RUN_COVERAGE=True
 
 before_install:
-    - buildscripts/setup_conda.sh
-    - export PATH=$HOME/miniconda3/bin:$PATH
+    - chmod 777 buildscripts/install_conda.sh
+    - buildscripts/install_conda.sh $CONDA_PREFIX_PATH
+
 install:
-    - buildscripts/build.sh
+    - travis_wait 40 $CONDA_PREFIX_PATH/bin/python buildscripts/build.py --build-mode=$BUILD_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH
 
 script:
-    - buildscripts/test.sh
+    - $CONDA_PREFIX_PATH/bin/python buildscripts/test.py --test-mode=$TEST_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH --run-coverage=$RUN_COVERAGE
 
-after_success:
-    - buildscripts/after_success.sh
+after_success: skip
 
 notifications:
     email: false

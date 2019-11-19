@@ -1,33 +1,37 @@
+﻿.. _overview:
+.. include:: ./ext_links.txt
 
-Overview
-========
+What is Intel® Scalable Dataframe Compiler?
+===========================================
 
-High Performance Analytics Toolkit (HPAT) is a big data analytics and machine
-learning framework that provides Python's ease of use but is extremely fast.
+Intel® Scalable Dataframe Compiler (Intel® SDC) is an extension of
+`Numba*`_ that allows just-in-time and ahead-of-time
+compilation of Python codes, which are the mix of `Pandas*`_,
+`NumPy*`_, and other numerical functions.
+ 
+Being the Numba extension, with the ``@njit`` decorator and respective compilation options
+Intel SDC generates machine code using the `LLVM* Compiler`_:
 
-HPAT scales analytics programs in python to cluster/cloud environments
-automatically, requiring only minimal code changes. Here is a logistic
-regression program using HPAT::
+.. literalinclude:: ../../examples/basic_workflow.py
+   :language: python
+   :emphasize-lines: 9-10
+   :lines: 27-
+   :caption: Example 1: Compiling Basic Pandas* Workflow
+   :name: ex_basic_workflow
 
-    @hpat.jit
-    def logistic_regression(iterations):
-        f = h5py.File("lr.hdf5", "r")
-        X = f['points'][:]
-        Y = f['responses'][:]
-        D = X.shape[1]
-        w = np.random.ranf(D)
-        t1 = time.time()
-        for i in range(iterations):
-            z = ((1.0 / (1.0 + np.exp(-Y * np.dot(X, w))) - 1.0) * Y)
-            w -= np.dot(z, X)
-        return w
+On a single machine Intel SDC uses multi-threading (based on `Intel® TBB`_ or `OpenMP*`_ )
+to parallelize `Pandas*`_ and `Numpy*`_ operations. To turn on the multi-threading you just need to add
+``parallel=True`` option to ``@njit`` decorator:
 
-This code runs on cluster and cloud environments using a simple command like
-`mpiexec -n 1024 python logistic_regression.py`.
+.. literalinclude:: ../../examples/basic_workflow_parallel.py
+   :language: python
+   :emphasize-lines: 9-10
+   :lines: 27-
+   :caption: Example 2: Parallelizing `Pandas*`_ Workflow
+   :name: ex_basic_workflow_parallel
 
-HPAT compiles a :ref:`subset of Python <supported>` to efficient native parallel code
-(with `MPI <https://en.wikipedia.org/wiki/Message_Passing_Interface>`_).
-This is in contrast to other frameworks such as Apache Spark which are
-master-executor libraries. Hence, HPAT is typically 100x or more faster.
-HPAT is built on top of `Numba <https://github.com/numba/numba>`_
-and `LLVM <https://llvm.org/>`_ compilers.
+.. note::
+    Using the same ``@njit`` decorator the Intel SDC is designed to scale to many nodes automatically
+    without the need to use frameworks like `Dask*`_ , `Ray*`_, and `Spark*`_.
+
+    This feature is in active development, and will become available in a future Intel SDC release.

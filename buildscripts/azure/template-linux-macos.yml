@@ -1,0 +1,39 @@
+parameters:
+  name: ''
+  vmImage: ''
+  allowFailure: ''
+  matrix: []
+
+jobs:
+- job: ${{ parameters.name }}
+  timeoutInMinutes: 120
+  pool:
+    vmImage: ${{ parameters.vmImage }}
+  strategy:
+    maxParallel: 11
+    matrix:
+      ${{ insert }}: ${{ parameters.matrix }}
+
+  steps:
+    - script: |
+        chmod 777 buildscripts/install_conda.sh
+        buildscripts/install_conda.sh $HOME/miniconda3
+      displayName: 'Install conda'
+
+    - script: |
+        if [ "$USE_NUMBA_MASTER" == "False" ]; then
+            $HOME/miniconda3/bin/python buildscripts/build.py --build-mode=package --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$HOME/miniconda3;
+        else
+            $HOME/miniconda3/bin/python buildscripts/build.py --build-mode=package --python=$PYTHON_VER --numpy=$NUMPY_VER --use-numba-master --conda-prefix=$HOME/miniconda3;
+        fi
+      displayName: 'Build conda and wheel packages'
+      continueOnError: ${{ parameters.allowFailure }}
+
+    - script: |
+        if [ "$USE_NUMBA_MASTER" == "False" ]; then
+            $HOME/miniconda3/bin/python buildscripts/test.py --test-mode=conda --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$HOME/miniconda3;
+        else
+            $HOME/miniconda3/bin/python buildscripts/test.py --test-mode=conda --python=$PYTHON_VER --numpy=$NUMPY_VER --use-numba-master --conda-prefix=$HOME/miniconda3;
+        fi
+      displayName: 'Test conda package'
+      continueOnError: ${{ parameters.allowFailure }}
