@@ -26,7 +26,6 @@
 # *****************************************************************************
 
 import itertools
-import os
 import time
 import unittest
 from contextlib import contextmanager
@@ -34,6 +33,7 @@ from contextlib import contextmanager
 import pandas as pd
 
 from sdc.tests.test_utils import *
+from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import *
 
 
@@ -159,24 +159,12 @@ def get_times(f, test_data, iter_number=5):
     return exec_times, boxing_times
 
 
-class TestSeriesStringMethods(unittest.TestCase):
-    iter_number = 5
-
+class TestSeriesStringMethods(TestBase):
     @classmethod
     def setUpClass(cls):
-        cls.test_results = TestResults()
-        if is_true(os.environ.get('LOAD_PREV_RESULTS')):
-            cls.test_results.load()
-
+        super().setUpClass()
         cls.total_data_length = [10**4 + 513, 10**5 + 2025]
         cls.width = [16, 64, 512, 1024]
-        cls.num_threads = int(os.environ.get('NUMBA_NUM_THREADS', config.NUMBA_NUM_THREADS))
-        cls.threading_layer = os.environ.get('NUMBA_THREADING_LAYER', config.THREADING_LAYER)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.test_results.print()
-        cls.test_results.dump()
 
     def _test_series_str(self, pyfunc, name, input_data=None):
         input_data = input_data or test_global_input_data_unicode_kind4
