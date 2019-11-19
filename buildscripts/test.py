@@ -116,7 +116,7 @@ if __name__ == '__main__':
         coverage_omit = './sdc/ml/*,./sdc/xenon_ext.py,./sdc/ros.py,./sdc/cv_ext.py,./sdc/tests/*'
         coverage_cmd = ' && '.join('coverage erase',
                                    f'coverage run --source=./sdc --omit {coverage_omit} ./sdc/runtests.py'
-                                   'coveralls -v'
+                                   'coveralls -v')
 
         format_print('Run coverage')
         format_print(f'Assume that SDC is installed in develop build-mode to {develop_env} environment', new_block=False)
