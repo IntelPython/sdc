@@ -28,12 +28,14 @@ def pandas_read_csv_via_pyarrow():
     df = sdc.io.csv_ext.pandas_read_csv('data_100000.csv')
     return df
 
+
 @pytest.mark.benchmark(group="read_csv")
 def test_py_pandas_read_csv(benchmark):
     result = benchmark(pandas_read_csv)
 
     # no need to compare with itself
     # pandas.testing.assert_frame_equal(result, pandas_read_csv())
+
 
 @pytest.mark.benchmark(group="read_csv")
 def test_py_pyarrow_read_csv(benchmark):
