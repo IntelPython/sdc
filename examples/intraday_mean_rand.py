@@ -28,14 +28,14 @@
 import pandas as pd
 import numpy as np
 import time
-import hpat
-from hpat import prange
+import sdc
+from sdc import prange
 
 # adopted from:
 # http://www.pythonforfinance.net/2017/02/20/intraday-stock-mean-reversion-trading-backtest-in-python/
 
 
-@hpat.jit
+@sdc.jit
 def intraday_mean_revert():
     nsyms = 1000
     max_num_days = 80000

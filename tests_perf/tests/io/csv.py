@@ -25,7 +25,7 @@
 # *****************************************************************************
 
 
-import hpat
+import sdc
 
 from ..common import BaseIO, Implementation as Impl
 from ..data_generator import DataGenerator
@@ -44,7 +44,7 @@ class ToCSV(BaseIO):
         self.df = data_generator.make_numeric_dataframe(5 * N)
 
     @staticmethod
-    @hpat.jit
+    @sdc.jit
     def _to_csv(df, fname):
         return df.to_csv(fname)
 

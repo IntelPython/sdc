@@ -1,3 +1,31 @@
+# *****************************************************************************
+# Copyright (c) 2019, Intel Corporation All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#     Redistributions of source code must retain the above copyright notice,
+#     this list of conditions and the following disclaimer.
+#
+#     Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+# EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# *****************************************************************************
+
+
+
 import os
 import platform
 import re
@@ -76,7 +104,7 @@ def get_sdc_build_packages(build_output):
     sdc_build_dir = os.path.join(build_output, os_dir)
     for item in os.listdir(sdc_build_dir):
         item_path = os.path.join(sdc_build_dir, item)
-        if os.path.isfile(item_path) and re.search(r'^hpat.*\.tar\.bz2$|^hpat.*\.whl$', item):
+        if os.path.isfile(item_path) and re.search(r'^sdc.*\.tar\.bz2$|^sdc.*\.whl$', item):
             sdc_packages.append(item_path)
 
     return sdc_packages
@@ -135,17 +163,3 @@ def set_environment_variable(key, value):
         os.environ[key] += os.pathsep + value
     else:
         os.environ[key] = value
-
-
-"""
-Set channels and change conda configuration
-"""
-def setup_conda(conda_activate):
-    conda_metachannel = 'https://metachannel.conda-forge.org/conda-forge/python,setuptools,numpy,pandas,pyarrow,arrow-cpp,boost,hdf5,h5py,wheel,pip'
-    run_command(f'{conda_activate}conda config --set safety_checks disabled')
-    run_command(f'{conda_activate}conda config --set channel_priority strict')
-    run_command(f'{conda_activate}conda config --add channels intel')
-    run_command(f'{conda_activate}conda config --add channels numba')
-    run_command(f'{conda_activate}conda config --add channels defaults')
-    run_command(f'{conda_activate}conda config --add channels conda-forge')
-    # run_command(f'{conda_activate}conda config --add channels {conda_metachannel}')

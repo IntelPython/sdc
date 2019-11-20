@@ -26,11 +26,11 @@
 
 
 import numpy as np
-import hpat
+import sdc
 import time
 
 
-@hpat.jit
+@sdc.jit
 def logistic_regression(iterations):
     t1 = time.time()
     N = 10**8

@@ -27,9 +27,9 @@
 
 import numpy as np
 from math import sqrt
-import hpat
-import hpat.ros
-from hpat import prange, stencil
+import sdc
+import sdc.ros
+from sdc import prange, stencil
 import time
 
 
@@ -42,10 +42,10 @@ def gaussian_blur(a):
             + a[-2, 2] * 0.003 + a[-1, 2] * 0.0133 + a[0, 2] * 0.0219 + a[1, 2] * 0.0133 + a[2, 2] * 0.0030)
 
 
-@hpat.jit
+@sdc.jit
 def read_example():
     t1 = time.time()
-    A = hpat.ros.read_ros_images("image_test.bag")
+    A = sdc.ros.read_ros_images("image_test.bag")
     # crop out dashboard
     B = A[:, :-50, :, :]
     # intensity threshold
@@ -84,4 +84,4 @@ def read_example():
 
 
 print(read_example().sum())
-# hpat.distribution_report()
+# sdc.distribution_report()

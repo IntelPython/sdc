@@ -1,0 +1,14 @@
+..
+    **********************************************************
+    THESE ARE EXTERNAL PROJECT LINKS USED IN THE DOCUMENTATION
+    **********************************************************
+.. _NumPy*: https://numpy.org/
+.. _Numba*: https://numba.pydata.org/
+.. _Pandas*: https://pandas.pydata.org/
+.. _LLVM* Compiler: http://llvm.org/docs/
+.. _Intel® TBB: https://github.com/intel/tbb/
+.. _OpenMP*: https://openmp.org/
+.. _Dask*: https://dask.org/
+.. _Ray*: https://ray.readthedocs.io/
+.. _Spark*: https://spark.apache.org/
+
