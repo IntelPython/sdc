@@ -28,71 +28,37 @@
 | Procedures are required for SDC DataFrameType handling in Numba
 '''
 
+from numba.untyped_passes import InlineClosureLikes
+from numba.typed_passes import AnnotateTypes
+
 import sdc
 
 
-def sdc_dataframepassimpl_overload(*args, **kwargs):
+def sdc_nopython_pipeline_lite_register(state, name='nopython'):
     """
-    This is a pointer intended to use as Numba AnnotateTypes run_pass() function
-    A hook made to overload Numba function and:
-    - call original function
-    - call hiframes.dataframe_pass.DataFramePass
-    - call compiler.PostprocessorPass
-    - call hiframes.hiframes_typed.HiFramesTypedPass
+    This is to register some sub set of Intel SDC compiler passes in Numba NoPython pipeline
+    Each pass, enabled here, is expected to be called many times on every decorated function including
+    functions which are not related to Pandas.
 
-    return True if any passes mutated original Numba IR
+    Test: SDC_CONFIG_PIPELINE_SDC=0 python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_sort_values1
 
     This function needs to be removed if SDC DataFrame support
     no more needs Numba IR transformations via DataFramePass
     """
 
-    if sdc.config.numba_typed_passes_annotatetypes_orig is None:
-        """
-        Unexpected usage of this function
-        """
+    if sdc.config.numba_compiler_define_nopython_pipeline_orig is None:
+        raise ValueError("Intel SDC. Unexpected usage of DataFrame passes registration function.")
 
-        return False
+    numba_pass_manager = sdc.config.numba_compiler_define_nopython_pipeline_orig(state, name)
 
-    status_numba_pass = sdc.config.numba_typed_passes_annotatetypes_orig(*args, **kwargs)
+    # numba_pass_manager.add_pass_after(sdc.compiler.InlinePass, InlineClosureLikes)
+    # numba_pass_manager.add_pass_after(sdc.hiframes.hiframes_untyped.HiFramesPass, sdc.compiler.InlinePass)
+    numba_pass_manager.add_pass_after(sdc.hiframes.hiframes_untyped.HiFramesPass, InlineClosureLikes)
 
-    numba_state_var = args[1]
+    numba_pass_manager.add_pass_after(sdc.hiframes.dataframe_pass.DataFramePass, AnnotateTypes)
+    numba_pass_manager.add_pass_after(sdc.compiler.PostprocessorPass, AnnotateTypes)
+    # numba_pass_manager.add_pass_after(sdc.hiframes.hiframes_typed.HiFramesTypedPass, sdc.hiframes.dataframe_pass.DataFramePass)
 
-    status_dataframe_pass = sdc.hiframes.dataframe_pass.DataFramePassImpl(numba_state_var).run_pass()
-    status_postprocess_pass = sdc.compiler.PostprocessorPass().run_pass(numba_state_var)
-    status_dataframe_typed_pass = sdc.hiframes.hiframes_typed.HiFramesTypedPassImpl(numba_state_var).run_pass()
+    numba_pass_manager.finalize()
 
-    is_ir_mutated = status_numba_pass or status_dataframe_pass or status_postprocess_pass or status_dataframe_typed_pass
-
-    return is_ir_mutated
-
-def sdc_hiframespassimpl_overload(*args, **kwargs):
-    """
-    This is a pointer intended to use as Numba InlineClosureLikes run_pass() function
-    A hook made to overload Numba function and:
-    - call compiler.InlinePass
-    - call hiframes.hiframes_untyped.HiFramesPass
-    - call original function
-
-    return True if any passes mutated original Numba IR
-
-    This function needs to be removed if SDC DataFrame support
-    no more needs Numba IR transformations via DataFramePass
-    """
-
-    if sdc.config.numba_untyped_passes_inlineclosurelikes_orig is None:
-        """
-        Unexpected usage of this function
-        """
-
-        return False
-
-    numba_state_var = args[1]
-
-    status_inlinepass_pass = sdc.compiler.InlinePass().run_pass(numba_state_var)
-    status_hiframespass_pass = sdc.hiframes.hiframes_untyped.HiFramesPassImpl(numba_state_var).run_pass()
-
-    status_numba_pass = sdc.config.numba_untyped_passes_inlineclosurelikes_orig(*args, **kwargs)
-
-    is_ir_mutated = status_inlinepass_pass or status_hiframespass_pass or status_numba_pass
-
-    return is_ir_mutated
+    return numba_pass_manager
