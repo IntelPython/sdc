@@ -28,6 +28,7 @@
 # *****************************************************************************
 
 import gc
+import logging
 import sys
 from pathlib import Path
 
@@ -46,6 +47,19 @@ Data handling:
     print_results() print all timing results from global storage
 
 """
+
+
+def setup_logging():
+    """Setup logger"""
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+    logger = logging.getLogger(__name__)
+    logger.setLevel(level=logging.INFO)
+    logger.addHandler(stream_handler)
+
+    return logger
+
 
 
 def is_true(input_string):
@@ -131,6 +145,7 @@ class TestResults:
     raw_perf_results_xlsx = 'raw_perf_results.xlsx'
     index = ['name', 'N', 'type', 'size', 'width']
     test_results_data = pandas.DataFrame(index=index)
+    logger = setup_logging()
 
     @property
     def grouped_data(self):
@@ -202,11 +217,20 @@ class TestResults:
         Dump performance testing results from global data storage to excel
         """
         # openpyxl need to be installed
-        with pandas.ExcelWriter(self.perf_results_xlsx) as writer:
-            self.grouped_data.to_excel(writer)
 
-        with pandas.ExcelWriter(self.raw_perf_results_xlsx) as writer:
-            self.test_results_data.to_excel(writer, index=False)
+        try:
+            with pandas.ExcelWriter(self.perf_results_xlsx) as writer:
+                self.grouped_data.to_excel(writer)
+        except ModuleNotFoundError as e:
+            msg = 'Could not dump the results to "%s": %s'
+            self.logger.warning(msg, self.perf_results_xlsx, e)
+
+        try:
+            with pandas.ExcelWriter(self.raw_perf_results_xlsx) as writer:
+                self.test_results_data.to_excel(writer, index=False)
+        except ModuleNotFoundError as e:
+            msg = 'Could not dump raw results to "%s": %s'
+            self.logger.warning(msg, self.raw_perf_results_xlsx, e)
 
     def load(self):
         """
@@ -216,7 +240,11 @@ class TestResults:
         if raw_perf_results_xlsx.exists():
             with raw_perf_results_xlsx.open('rb') as fd:
                 # xlrd need to be installed
-                self.test_results_data = pandas.read_excel(fd)
+                try:
+                    self.test_results_data = pandas.read_excel(fd)
+                except ModuleNotFoundError as e:
+                    msg = 'Could not load previous results from %s: %s'
+                    self.logger.warning(msg, raw_perf_results_xlsx, e)
 
 
 if __name__ == "__main__":
