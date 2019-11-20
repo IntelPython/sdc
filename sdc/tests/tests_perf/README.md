@@ -1,6 +1,6 @@
 ### Performance testing
 based on Python unit testing framework where typical test suite looks like:
-```
+```python
 class TestSuite(unittest.TestCase):
     # how many times function will be executed for more accurate measurements
     iter_number = 5
