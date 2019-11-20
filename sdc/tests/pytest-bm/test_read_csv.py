@@ -6,7 +6,7 @@ def pandas_read_csv():
     """
     pandas.read_csv()
     """
-    df = pandas.read_csv('/localdisk/spokhode/sdc/data_100000.csv')
+    df = pandas.read_csv('data_100000.csv')
     return df
 
 
