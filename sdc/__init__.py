@@ -66,22 +66,15 @@ del get_versions
 
 if not sdc.config.config_pipeline_hpat_default:
     """
-    Overload Numba functions to allow call SDC pass in Numba compiler pipeline
+    Overload Numba function to allow call SDC pass in Numba compiler pipeline
     Functions are:
-    - AnnotateTypes run_pass()
-    - InlineClosureLikes run_pass()
+    - Numba DefaultPassBuilder define_nopython_pipeline()
 
     TODO: Needs to detect 'import Pandas' and align initialization according to it
     """
 
-# Need more work since Series tests failed
-# Test: SDC_CONFIG_PIPELINE_SDC=0 python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_sort_values1
-
-#    sdc.config.numba_typed_passes_annotatetypes_orig = numba.typed_passes.AnnotateTypes.run_pass
-#    numba.typed_passes.AnnotateTypes.run_pass = sdc.datatypes.hpat_pandas_dataframe_pass.sdc_dataframepassimpl_overload
-
-#    sdc.config.numba_untyped_passes_inlineclosurelikes_orig = numba.untyped_passes.InlineClosureLikes.run_pass
-#    numba.untyped_passes.InlineClosureLikes.run_pass = sdc.datatypes.hpat_pandas_dataframe_pass.sdc_hiframespassimpl_overload
+    sdc.config.numba_compiler_define_nopython_pipeline_orig = numba.compiler.DefaultPassBuilder.define_nopython_pipeline
+    numba.compiler.DefaultPassBuilder.define_nopython_pipeline = sdc.datatypes.hpat_pandas_dataframe_pass.sdc_nopython_pipeline_lite_register
 
 def _init_extension():
     '''Register Pandas classes and functions with Numba.
