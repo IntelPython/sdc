@@ -752,12 +752,12 @@ class SeriesAttribute(AttributeTemplate):
 
 #     return typer
 
-str2str_methods = ['capitalize', 'lstrip', 'rstrip', 'strip', 'swapcase', 'title']
+str2str_methods = ['capitalize', 'swapcase', 'title']
 """
     Functions which are still overloaded by HPAT compiler pipeline
 """
 
-str2str_methods_excluded = ['upper', 'lower']
+str2str_methods_excluded = ['upper', 'lower', 'lstrip', 'rstrip', 'strip']
 """
     Functions which are used from Numba directly by calling from StringMethodsType
 
