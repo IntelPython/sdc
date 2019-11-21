@@ -30,12 +30,13 @@
 import gc
 import sys
 import sdc
+import time
+from contextlib import contextmanager
+from copy import copy
 from pathlib import Path
 
 import pandas
 from numba import config
-import time
-from contextlib import contextmanager
 
 """
 Utility functions collection to support performance testing of
@@ -74,22 +75,60 @@ def get_size(obj):
     return size
 
 
+def multiply_oneds_data(tmpl, max_len):
+    """Multiply specified 1D like data."""
+    result = copy(tmpl)
+    while len(result) < max_len:
+        result += tmpl
+
+    # Trim result to max_len
+    return result[:max_len]
+
+
 def multiply_data(tmpl, max_item_len):
     """Multiply specified 2D like data."""
     result = []
     for item in tmpl:
-        local_item = item
-        local_item_len = len(local_item)
-
-        while (local_item_len < max_item_len) and (local_item_len >= 0):
-            local_item += item
-            local_item_len = len(local_item)
-
-        # Trim local_item to max_item_len
-        local_item = local_item[:max_item_len]
-        result.append(local_item)
+        result += multiply_oneds_data(item, max_item_len)
 
     return result
+
+
+def perf_data_gen(tmpl, max_item_len, max_bytes_size):
+    """
+    Data generator produces 2D like data.
+                  tmpl: list of input template string
+          max_item_len: length (in elements) of resulted string in an element of the result array
+        max_bytes_size: maximum size in bytes of the return data
+
+                return: list of iterable data
+    """
+    result = []
+    while get_size(result) < max_bytes_size:
+        result.extend(multiply_data(tmpl, max_item_len))
+
+    # Trim result to max_bytes_size
+    while result and get_size(result) > max_bytes_size:
+        del result[-1]
+
+    return result
+
+
+def perf_data_gen_fixed_len(tmpl, max_item_len, max_obj_len):
+    """
+    Data generator produces 2D like data.
+                  tmpl: list of input template string
+          max_item_len: length (in elements) of resulted string in an element of the result array
+           max_obj_len: maximum length of the return data
+
+                return: list of iterable data
+    """
+    result = []
+    while len(result) < max_obj_len:
+        result.extend(multiply_data(tmpl, max_item_len))
+
+    # Trim result to max_obj_len
+    return result[:max_obj_len]
 
 
 @contextmanager
@@ -140,56 +179,6 @@ def get_times(f, test_data, iter_number=5):
         boxing_times.append(max(ext_finish - ext_start - int_result, 0))
 
     return exec_times, boxing_times
-
-
-def perf_data_gen(tmpl, max_item_len, max_bytes_size):
-    """
-    Data generator produces 2D like data.
-                  tmpl: list of input template string
-          max_item_len: length (in elements) of resulted string in an element of the result array
-        max_bytes_size: maximum size in bytes of the return data
-
-                return: list of strings
-    """
-    result = []
-    while get_size(result) < max_bytes_size:
-        result.extend(multiply_data(tmpl, max_item_len))
-
-    # Trim result to max_bytes_size
-    while result and get_size(result) > max_bytes_size:
-        del result[-1]
-
-    return result
-
-
-def perf_data_gen_fixed_len(tmpl, max_item_len, max_obj_len):
-    """
-    Data generator produces 2D like data.
-                  tmpl: list of input template string
-          max_item_len: length (in elements) of resulted string in an element of the result array
-           max_obj_len: maximum length of the return data
-
-                return: list of strings
-    """
-    result = []
-    while len(result) < max_obj_len:
-        result.extend(multiply_data(tmpl, max_item_len))
-
-    # Trim result to max_obj_len
-    return result[:max_obj_len]
-
-
-def perf_data_gen_float(input, maxlen):
-    """
-    """
-    result = []
-    i = 0
-    N = len(input)
-    while len(result) < maxlen:
-        n = (i - i // 2) % N
-        result.extend(input[n])
-        i += 1
-    return result[:maxlen]
 
 
 class TestResults:

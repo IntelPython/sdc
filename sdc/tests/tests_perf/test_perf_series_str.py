@@ -118,7 +118,7 @@ class TestSeriesStringMethods(unittest.TestCase):
         if is_true(os.environ.get('LOAD_PREV_RESULTS')):
             cls.test_results.load()
 
-        cls.total_data_length = [10**4 + 513, 10**5 + 2025]
+        cls.total_data_length = [10**4, 10**5]
         cls.width = [16, 64, 512, 1024]
         cls.num_threads = int(os.environ.get('NUMBA_NUM_THREADS', config.NUMBA_NUM_THREADS))
         cls.threading_layer = os.environ.get('NUMBA_THREADING_LAYER', config.THREADING_LAYER)

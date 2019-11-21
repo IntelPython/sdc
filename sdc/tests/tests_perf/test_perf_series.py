@@ -47,19 +47,18 @@ def usecase_series_max(input_data):
     return finish_time - start_time, res
 
 
-# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesFloatMethods
-class TestSeriesFloatMethods(TestBase):
+# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods
+class TestSeriesMethods(TestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.total_data_length = [5 * 10 ** 8]
 
-    def _test_series_float(self, pyfunc, name, input_data=None):
-
-        input_data = input_data or test_global_input_data_float64
+    def _test_series(self, pyfunc, name):
+        input_data = test_global_input_data_float64
         hpat_func = sdc.jit(pyfunc)
         for data_length in self.total_data_length:
-            data = perf_data_gen_float(input_data, data_length)
+            data, = perf_data_gen_fixed_len(input_data, data_length, 1)
             test_data = pd.Series(data)
 
             compile_results = calc_compilation(pyfunc, test_data, iter_number=self.iter_number)
@@ -67,15 +66,14 @@ class TestSeriesFloatMethods(TestBase):
             hpat_func(test_data)
 
             exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)
-            self.test_results.add(test_name=name, test_type='JIT', data_size=test_data.size, test_results=exec_times,
-                                  boxing_results=boxing_times, compile_results=compile_results)
+            self.test_results.add(name, 'JIT', test_data.size, exec_times, boxing_results=boxing_times,
+                                  compile_results=compile_results)
 
             exec_times, _ = get_times(pyfunc, test_data, iter_number=self.iter_number)
-            self.test_results.add(test_name=name, test_type='Reference', data_size=test_data.size,
-                                  test_results=exec_times)
+            self.test_results.add(name, 'Reference', test_data.size, test_results=exec_times)
 
     def test_series_float_min(self):
-        self._test_series_float(usecase_series_min, 'series_float_min')
+        self._test_series(usecase_series_min, 'series_float_min')
 
     def test_series_float_max(self):
-        self._test_series_float(usecase_series_max, 'series_float_max')
+        self._test_series(usecase_series_max, 'series_float_max')
