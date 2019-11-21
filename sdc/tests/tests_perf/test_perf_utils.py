@@ -115,7 +115,7 @@ def perf_data_gen(tmpl, max_item_len, max_bytes_size):
           max_item_len: length (in elements) of resulted string in an element of the result array
         max_bytes_size: maximum size in bytes of the return data
 
-                return: list of iterable data
+                return: list of data
     """
     result = []
     while get_size(result) < max_bytes_size:
@@ -135,7 +135,7 @@ def perf_data_gen_fixed_len(tmpl, max_item_len, max_obj_len):
           max_item_len: length (in elements) of resulted string in an element of the result array
            max_obj_len: maximum length of the return data
 
-                return: list of iterable data
+                return: list of data
     """
     result = []
     while len(result) < max_obj_len:
