@@ -56,9 +56,10 @@ class TestSeriesMethods(TestBase):
 
     def _test_series(self, pyfunc, name):
         input_data = test_global_input_data_float64
+        full_input_data_length = sum(len(i) for i in input_data)
         hpat_func = sdc.jit(pyfunc)
         for data_length in self.total_data_length:
-            data, = perf_data_gen_fixed_len(input_data, data_length, 1)
+            data = perf_data_gen_fixed_len(input_data, full_input_data_length, data_length)
             test_data = pd.Series(data)
 
             compile_results = calc_compilation(pyfunc, test_data, iter_number=self.iter_number)
