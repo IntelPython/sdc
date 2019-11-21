@@ -26,6 +26,7 @@
 # *****************************************************************************
 
 import itertools
+import os
 import time
 import unittest
 from contextlib import contextmanager
@@ -33,138 +34,99 @@ from contextlib import contextmanager
 import pandas as pd
 
 from sdc.tests.test_utils import *
-from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import *
 
 
 def usecase_series_len(input_data):
     start_time = time.time()
-    input_data.str.len()
+    res = input_data.str.len()
     finish_time = time.time()
 
-    return finish_time - start_time
+    return finish_time - start_time, res
 
 
 def usecase_series_capitalize(input_data):
     start_time = time.time()
-    input_data.str.capitalize()
+    res = input_data.str.capitalize()
     finish_time = time.time()
 
-    return finish_time - start_time
+    return finish_time - start_time, res
 
 
 def usecase_series_lower(input_data):
     start_time = time.time()
-    input_data.str.lower()
+    res = input_data.str.lower()
     finish_time = time.time()
 
-    return finish_time - start_time
+    return finish_time - start_time, res
 
 
 def usecase_series_swapcase(input_data):
     start_time = time.time()
-    input_data.str.swapcase()
+    res = input_data.str.swapcase()
     finish_time = time.time()
 
-    return finish_time - start_time
+    return finish_time - start_time, res
 
 
 def usecase_series_title(input_data):
     start_time = time.time()
-    input_data.str.title()
+    res = input_data.str.title()
     finish_time = time.time()
 
-    return finish_time - start_time
+    return finish_time - start_time, res
 
 
 def usecase_series_upper(input_data):
     start_time = time.time()
-    input_data.str.upper()
+    res = input_data.str.upper()
     finish_time = time.time()
 
-    return finish_time - start_time
+    return finish_time - start_time, res
 
 
 def usecase_series_lstrip(input_data):
     start_time = time.time()
-    input_data.str.lstrip()
+    res = input_data.str.lstrip()
     finish_time = time.time()
 
-    return finish_time - start_time
+    return finish_time - start_time, res
 
 
 def usecase_series_rstrip(input_data):
     start_time = time.time()
-    input_data.str.rstrip()
+    res = input_data.str.rstrip()
     finish_time = time.time()
 
-    return finish_time - start_time
+    return finish_time - start_time, res
 
 
 def usecase_series_strip(input_data):
     start_time = time.time()
-    input_data.str.strip()
+    res = input_data.str.strip()
     finish_time = time.time()
 
-    return finish_time - start_time
+    return finish_time - start_time, res
 
 
-@contextmanager
-def do_jit(f):
-    """Context manager to jit function"""
-    cfunc = sdc.jit(f)
-    try:
-        yield cfunc
-    finally:
-        del cfunc
+class TestSeriesStringMethods(unittest.TestCase):
+    iter_number = 5
 
-
-def calc_time(func, *args, **kwargs):
-    """Calculate execution time of specified function."""
-    start_time = time.time()
-    func(*args, **kwargs)
-    finish_time = time.time()
-
-    return finish_time - start_time
-
-
-def calc_compile_time(func, *args, **kwargs):
-    """Calculate compile time as difference between first 2 runs."""
-    return calc_time(func, *args, **kwargs) - calc_time(func, *args, **kwargs)
-
-
-def calc_compilation(pyfunc, data, iter_number=5):
-    """Calculate compile time several times."""
-    compile_times = []
-    for _ in range(iter_number):
-        with do_jit(pyfunc) as cfunc:
-            compile_time = calc_compile_time(cfunc, data)
-            compile_times.append(compile_time)
-
-    return compile_times
-
-
-def get_times(f, test_data, iter_number=5):
-    """Get time of boxing+unboxing and internal execution"""
-    exec_times = []
-    boxing_times = []
-    for _ in range(iter_number):
-        ext_start = time.time()
-        int_result = f(test_data)
-        ext_finish = time.time()
-
-        exec_times.append(int_result)
-        boxing_times.append(max(ext_finish - ext_start - int_result, 0))
-
-    return exec_times, boxing_times
-
-
-class TestSeriesStringMethods(TestBase):
     @classmethod
     def setUpClass(cls):
-        super().setUpClass()
+        cls.test_results = TestResultsStr()
+        if is_true(os.environ.get('LOAD_PREV_RESULTS')):
+            cls.test_results.load()
+
         cls.total_data_length = [10**4 + 513, 10**5 + 2025]
         cls.width = [16, 64, 512, 1024]
+        cls.num_threads = int(os.environ.get('NUMBA_NUM_THREADS', config.NUMBA_NUM_THREADS))
+        cls.threading_layer = os.environ.get('NUMBA_THREADING_LAYER', config.THREADING_LAYER)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.test_results.print()
+        cls.test_results.dump()
 
     def _test_series_str(self, pyfunc, name, input_data=None):
         input_data = input_data or test_global_input_data_unicode_kind4

@@ -29,10 +29,13 @@
 
 import gc
 import sys
+import sdc
 from pathlib import Path
 
 import pandas
 from numba import config
+import time
+from contextlib import contextmanager
 
 """
 Utility functions collection to support performance testing of
@@ -89,6 +92,56 @@ def multiply_data(tmpl, max_item_len):
     return result
 
 
+@contextmanager
+def do_jit(f):
+    """Context manager to jit function"""
+    cfunc = sdc.jit(f)
+    try:
+        yield cfunc
+    finally:
+        del cfunc
+
+
+def calc_time(func, *args, **kwargs):
+    """Calculate execution time of specified function."""
+    start_time = time.time()
+    func(*args, **kwargs)
+    finish_time = time.time()
+
+    return finish_time - start_time
+
+
+def calc_compile_time(func, *args, **kwargs):
+    """Calculate compile time as difference between first 2 runs."""
+    return calc_time(func, *args, **kwargs) - calc_time(func, *args, **kwargs)
+
+
+def calc_compilation(pyfunc, data, iter_number=5):
+    """Calculate compile time several times."""
+    compile_times = []
+    for _ in range(iter_number):
+        with do_jit(pyfunc) as cfunc:
+            compile_time = calc_compile_time(cfunc, data)
+            compile_times.append(compile_time)
+
+    return compile_times
+
+
+def get_times(f, test_data, iter_number=5):
+    """Get time of boxing+unboxing and internal execution"""
+    exec_times = []
+    boxing_times = []
+    for _ in range(iter_number):
+        ext_start = time.time()
+        int_result, _ = f(test_data)
+        ext_finish = time.time()
+
+        exec_times.append(int_result)
+        boxing_times.append(max(ext_finish - ext_start - int_result, 0))
+
+    return exec_times, boxing_times
+
+
 def perf_data_gen(tmpl, max_item_len, max_bytes_size):
     """
     Data generator produces 2D like data.
@@ -126,10 +179,23 @@ def perf_data_gen_fixed_len(tmpl, max_item_len, max_obj_len):
     return result[:max_obj_len]
 
 
+def perf_data_gen_float(input, maxlen):
+    """
+    """
+    result = []
+    i = 0
+    N = len(input)
+    while len(result) < maxlen:
+        n = (i - i // 2) % N
+        result.extend(input[n])
+        i += 1
+    return result[:maxlen]
+
+
 class TestResults:
     perf_results_xlsx = 'perf_results.xlsx'
     raw_perf_results_xlsx = 'raw_perf_results.xlsx'
-    index = ['name', 'N', 'type', 'size', 'width']
+    index = ['name', 'N', 'type', 'size']
     test_results_data = pandas.DataFrame(index=index)
 
     @property
@@ -168,7 +234,7 @@ class TestResults:
         columns = ['median', 'min', 'max', 'compile', 'boxing']
         return test_results_data.groupby(self.index)[columns].first().sort_values(self.index)
 
-    def add(self, test_name, test_type, data_size, test_results, data_width=None,
+    def add(self, test_name, test_type, data_size, test_results,
             boxing_results=None, compile_results=None, num_threads=config.NUMBA_NUM_THREADS):
         """
         Add performance testing timing results into global storage
@@ -176,19 +242,20 @@ class TestResults:
                   test_type: Type of test (3rd column in grouped result)
                   data_size: Size of input data (4s column in grouped result)
                test_results: List of timing results of the experiment
-                 data_width: Scalability attribute for str input data (5s column in grouped result)
              boxing_results: List of timing results of the overhead (boxing/unboxing)
            compilation_time: Timing result of compilation
                 num_threads: Value from NUMBA_NUM_THREADS (2nd column in grouped result)
         """
-        local_results = pandas.DataFrame({'name': test_name,
-                                          'N': num_threads,
-                                          'type': test_type,
-                                          'size': data_size,
-                                          'width': data_width,
-                                          'Time(s)': test_results,
-                                          'Compile(s)': compile_results,
-                                          'Boxing(s)': boxing_results}, index=self.index)
+        data = {
+            'name': test_name,
+            'N': num_threads,
+            'type': test_type,
+            'size': data_size,
+            'Time(s)': test_results,
+            'Compile(s)': compile_results,
+            'Boxing(s)': boxing_results
+        }
+        local_results = pandas.DataFrame(data)
         self.test_results_data = self.test_results_data.append(local_results, sort=False)
 
     def print(self):
@@ -217,6 +284,36 @@ class TestResults:
             with raw_perf_results_xlsx.open('rb') as fd:
                 # xlrd need to be installed
                 self.test_results_data = pandas.read_excel(fd)
+
+
+class TestResultsStr(TestResults):
+    index = ['name', 'N', 'type', 'size', 'width']
+
+    def add(self, test_name, test_type, data_size, test_results, data_width=None,
+            boxing_results=None, compile_results=None, num_threads=config.NUMBA_NUM_THREADS):
+        """
+        Add performance testing timing results into global storage
+                  test_name: Name of test (1st column in grouped result)
+                  test_type: Type of test (3rd column in grouped result)
+                  data_size: Size of input data (4s column in grouped result)
+               test_results: List of timing results of the experiment
+                 data_width: Scalability attribute for str input data (5s column in grouped result)
+             boxing_results: List of timing results of the overhead (boxing/unboxing)
+           compilation_time: Timing result of compilation
+                num_threads: Value from NUMBA_NUM_THREADS (2nd column in grouped result)
+        """
+        data = {
+            'name': test_name,
+            'N': num_threads,
+            'type': test_type,
+            'size': data_size,
+            'width': data_width,
+            'Time(s)': test_results,
+            'Compile(s)': compile_results,
+            'Boxing(s)': boxing_results
+        }
+        local_results = pandas.DataFrame(data, index=self.index)
+        self.test_results_data = self.test_results_data.append(local_results, sort=False)
 
 
 if __name__ == "__main__":
