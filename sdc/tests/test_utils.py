@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2019, Intel Corporation All rights reserved.
 #
@@ -46,15 +47,21 @@ test_global_input_data_float64 = [
 
 
 def count_array_REPs():
-    from sdc.distributed import Distribution
-    vals = sdc.distributed.dist_analysis.array_dists.values()
-    return sum([v == Distribution.REP for v in vals])
+    if sdc.config.config_pipeline_hpat_default:
+        from sdc.distributed import Distribution
+        vals = sdc.distributed.dist_analysis.array_dists.values()
+        return sum([v == Distribution.REP for v in vals])
+    else:
+        return 0
 
 
 def count_parfor_REPs():
-    from sdc.distributed import Distribution
-    vals = sdc.distributed.dist_analysis.parfor_dists.values()
-    return sum([v == Distribution.REP for v in vals])
+    if sdc.config.config_pipeline_hpat_default:
+        from sdc.distributed import Distribution
+        vals = sdc.distributed.dist_analysis.parfor_dists.values()
+        return sum([v == Distribution.REP for v in vals])
+    else:
+        return 0
 
 
 def count_parfor_OneDs():

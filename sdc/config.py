@@ -87,12 +87,7 @@ config_pipeline_hpat_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_PI
 Default value used to select compiler pipeline in a function decorator
 '''
 
-numba_typed_passes_annotatetypes_orig = None
+numba_compiler_define_nopython_pipeline_orig = None
 '''
-Default value for a pointer intended to use as Numba AnnotateTypes run_pass() in overloaded function
-'''
-
-numba_untyped_passes_inlineclosurelikes_orig = None
-'''
-Default value for a pointer intended to use as Numba InlineClosureLikes run_pass() in overloaded function
+Default value for a pointer intended to use as Numba.DefaultPassBuilder.define_nopython_pipeline() in overloaded function
 '''
