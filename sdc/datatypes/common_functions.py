@@ -121,7 +121,7 @@ def hpat_arrays_append(A, B):
 
 @overload(hpat_arrays_append)
 def hpat_arrays_append_overload(A, B):
-    '''Function for appending underlying arrays (A and B) or list/tuple of arrays B to an array A'''
+    """Function for appending underlying arrays (A and B) or list/tuple of arrays B to an array A"""
 
     if isinstance(A, types.Array):
         if isinstance(B, types.Array):
@@ -186,8 +186,7 @@ def hpat_arrays_append_overload(A, B):
 
 @numba.njit
 def _hpat_ensure_array_capacity(new_size, arr):
-    '''Function creating a copy of numpy array with a size more than specified'''
-    # TODO: replace this function with np.resize when supported by Numba
+    """Function creating a copy of numpy array with a size more than specified"""
     k = len(arr)
     if k > new_size:
         return arr

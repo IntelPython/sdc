@@ -3730,6 +3730,7 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
 def hpat_join_series_indexes(left, right):
     pass
 
+
 @overload(hpat_join_series_indexes)
 def hpat_join_series_indexes_overload(left, right):
     '''Function for joining arrays left and right in a way similar to pandas.join 'outer' algorithm'''
@@ -3784,7 +3785,7 @@ def hpat_join_series_indexes_overload(left, right):
                         while (nj < rsize and right[sorted_right[nj]] == right_index):
                             nj += 1
 
-                        # join the blocks found into results  
+                        # join the blocks found into results
                         for s in numpy.arange(i, ni, 1):
                             block_size = nj - j
                             to_joined = numpy.repeat(left_index, block_size)
@@ -3972,12 +3973,11 @@ def hpat_pandas_series_operator_add(self, other):
 
     _func_name = 'Operator add().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker('Operator add().')
+    ty_checker.check(self, SeriesType)
 
-    if not (isinstance(other, SeriesType)
-                or isinstance(other, types.Number)):
-        raise TypingError('{} The object must be a pandas.series or a scalar. Given: {}'.format(_func_name, other))
+    if not isinstance(other, (SeriesType, types.Number)):
+        ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
     series_indexes_alignable = False
     if isinstance(other, SeriesType):
@@ -3985,15 +3985,16 @@ def hpat_pandas_series_operator_add(self, other):
             series_indexes_alignable = True
 
         if ((isinstance(self.index, types.NoneType) or
-                isinstance(self.index, types.Array) and isinstance(self.index.dtype, types.Number))
+             isinstance(self.index, types.Array) and isinstance(self.index.dtype, types.Number))
             and (isinstance(other.index, types.NoneType) or
-                    isinstance(other.index, types.Array) and isinstance(other.index.dtype, types.Number))):
+                 isinstance(other.index, types.Array) and isinstance(other.index.dtype, types.Number))):
             series_indexes_alignable = True
 
     if isinstance(other, SeriesType) and not series_indexes_alignable:
         raise TypingError('{} Not implemented for series with not-alignable indexes. \
         Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
+    # specializations for numeric series - TODO: support arithmetic operation on StringArrays
     if (isinstance(other, types.Number)):
         def hpat_pandas_series_add_scalar_impl(self, other):
             return pandas.Series(self._data + other, self._index)
@@ -4006,7 +4007,8 @@ def hpat_pandas_series_operator_add(self, other):
         if is_numeric_index:
             ty_left_index_dtype = types.int64 if isinstance(self.index, types.NoneType) else self.index.dtype
             ty_right_index_dtype = types.int64 if isinstance(other.index, types.NoneType) else other.index.dtype
-            np_index_dtypes = [numpy_support.as_dtype(ty_left_index_dtype), numpy_support.as_dtype(ty_right_index_dtype)]
+            np_index_dtypes = [numpy_support.as_dtype(ty_left_index_dtype),
+                               numpy_support.as_dtype(ty_right_index_dtype)]
             np_index_common_dtype = numpy.find_common_type([], np_index_dtypes)
             numba_index_common_dtype = numpy_support.from_dtype(np_index_common_dtype)
 
@@ -4062,6 +4064,5 @@ def hpat_pandas_series_operator_add(self, other):
                 right_values[right_indexer == -1] = numpy.nan
 
                 return pandas.Series(left_values + right_values, joined_index)
-
 
     return hpat_pandas_series_add_impl
