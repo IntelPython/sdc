@@ -37,6 +37,7 @@ from numba.extending import register_model, models, infer_getattr, infer, intrin
 
 import sdc
 import sdc.io
+import sdc.distributed_api
 from sdc.str_ext import string_type
 from sdc.utils import unliteral_all
 
