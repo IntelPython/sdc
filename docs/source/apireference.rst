@@ -1,11 +1,11 @@
 .. _apireference:
 
-API Reference: Supported Pandas APIs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+API Reference
+~~~~~~~~~~~~~
 
-This page gives an overview of all Pandas APIs supported currently by Intel® SDC
+This page gives an overview of all Pandas APIs supported currently by Intel® Scalable Dataframe Compiler
 
-.. toctree::
-   :maxdepth: 2
-   
-   series
+.. autosummary::
+    :toctree: _autosummary
+
+    pandas.Series
