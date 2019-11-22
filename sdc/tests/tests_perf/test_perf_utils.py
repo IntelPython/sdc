@@ -169,24 +169,24 @@ def calc_compile_time(func, *args, **kwargs):
     return calc_time(func, *args, **kwargs) - calc_time(func, *args, **kwargs)
 
 
-def calc_compilation(pyfunc, data, iter_number=5):
+def calc_compilation(pyfunc, *args, iter_number=5):
     """Calculate compile time several times."""
     compile_times = []
     for _ in range(iter_number):
         with do_jit(pyfunc) as cfunc:
-            compile_time = calc_compile_time(cfunc, data)
+            compile_time = calc_compile_time(cfunc, *args)
             compile_times.append(compile_time)
 
     return compile_times
 
 
-def get_times(f, test_data, iter_number=5):
+def get_times(f, *args, iter_number=5):
     """Get time of boxing+unboxing and internal execution"""
     exec_times = []
     boxing_times = []
     for _ in range(iter_number):
         ext_start = time.time()
-        int_result, _ = f(test_data)
+        int_result, _ = f(*args)
         ext_finish = time.time()
 
         exec_times.append(int_result)
