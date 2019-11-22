@@ -6,7 +6,7 @@ Other Intel projects for high-performance Python
 Intel provides a number of Python* packages which allow you to get the best performance and scalability of
 numercial, scientific, and data analytics applications. Some of these projects listed below.
 
-.. list-table:: Intel optimized Python* packages
+.. list-table:: **Intel-optimized Python* packages**
    :widths: 20 70
    :header-rows: 1
 
