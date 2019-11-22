@@ -51,11 +51,11 @@ if SDC_DOC_NO_API_REF_STR in os.environ:
 
 if not sdc_doc_no_api_ref:
     try:
-        import sdc  # TODO: Rename hpat module name to sdc
+        import sdc
     except ImportError:
-        print('IMPORT EXCEPTION: Cannot import sdc. ')
+        print('IMPORT EXCEPTION: Cannot import SDC. ')
         print('Documentation generator for API Reference for a given module expects that module '
-              'to be installed. Use conda/pip install hpat to install it prior to using API Reference generation')
+              'to be installed. Use conda/pip install SDC to install it prior to using API Reference generation')
         print('If you want to disable API Reference generation, set the environment variable SDC_DOC_NO_API_REF=1')
 
         raise
@@ -77,15 +77,15 @@ release = '0.1'
 # ones.
 extensions = [
     'sphinx.ext.todo',
-    'sphinx.ext.autosummary',
+#    'sphinx.ext.autosummary',
     'sphinx.ext.intersphinx',
-    'sphinx.ext.autodoc',
+#    'sphinx.ext.autodoc',
     'sphinx.ext.extlinks',
     'sphinx.ext.githubpages',
     'sphinx.ext.napoleon',
-    'sphinx.ext.autosectionlabel',
-    'sphinx.ext.graphviz',
-    'sphinx.ext.coverage'
+#    'sphinx.ext.autosectionlabel',
+#    'sphinx.ext.graphviz',
+#    'sphinx.ext.coverage'
 ]
 
 
@@ -149,94 +149,15 @@ napoleon_use_rtype = True
 
 
 # -- Auto-section label configuration -----------------------------------------------
-autosectionlabel_prefix_document = True
+#autosectionlabel_prefix_document = True
 
 
 # -- Autodoc configuration ----------------------------------------------------------
-autodoc_docstring_signature = True
+#autodoc_docstring_signature = True
 
 
 # -- Auto-summary configuration -----------------------------------------------------
-autosummary_generate = True
+#autosummary_generate = True
 
 # -- Prepend module name to an object name or not -----------------------------------
 add_module_names = False
-
-
-"""
-import API_Doc
-
-# List of patterns, relative to source directory, that match files and
-# directories to ignore when looking for source files.
-# This patterns also effect to html_static_path and html_extra_path
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
-# -- Options for HTMLHelp output ------------------------------------------
-
-# Output file base name for HTML help builder.
-htmlhelp_basename = 'HPATdoc'
-
-# -- Options for LaTeX output ---------------------------------------------
-
-latex_engine = 'pdflatex'
-latex_elements = {
-    # The paper size ('letterpaper' or 'a4paper').
-    #
-    # 'papersize': 'letterpaper',
-
-    # The font size ('10pt', '11pt' or '12pt').
-    #
-    # 'pointsize': '10pt',
-
-    # Additional stuff for the LaTeX preamble.
-    #
-    # 'preamble': '',
-
-    # Latex figure (float) alignment
-    #
-    # 'figure_align': 'htbp',
-}
-
-# Grouping the document tree into LaTeX files. List of tuples
-# (source start file, target name, title,
-#  author, documentclass [howto, manual, or own class]).
-latex_documents = [
-    (master_doc, 'HPAT.tex', 'HPAT Documentation',
-     'Intel', 'manual'),
-]
-
-pdf_documents = [
-    ('index', u'HPATDocumentation', u'HPAT Documentation', u'Rujal Desai'),
-]
-
-# -- Options for manual page output ---------------------------------------
-
-# One entry per manual page. List of tuples
-# (source start file, name, description, authors, manual section).
-man_pages = [
-    (master_doc, 'sdc', 'HPAT Documentation',
-     [author], 1)
-]
-
-
-# -- Options for Texinfo output -------------------------------------------
-
-# Grouping the document tree into Texinfo files. List of tuples
-# (source start file, target name, title, author,
-#  dir menu entry, description, category)
-texinfo_documents = [
-    (master_doc, 'HPAT', 'HPAT Documentation',
-     author, 'HPAT', 'One line description of project.',
-     'Miscellaneous'),
-]
-
-numfig = True
-
-# configuration for intersphinx
-intersphinx_mapping = {
-    'python': ('https://docs.python.org/', None),
-    'numba': ('https://numba.pydata.org/numba-doc/dev', None),
-    'numpy': ('http://docs.scipy.org/doc/numpy', None),
-    'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
-}
-"""
