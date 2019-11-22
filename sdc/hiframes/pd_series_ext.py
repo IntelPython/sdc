@@ -564,18 +564,30 @@ class SeriesAttribute(AttributeTemplate):
         # getitem returns Timestamp for dt_index and series(dt64)
         if dtype == types.NPDatetime('ns'):
             dtype = pandas_timestamp_type
-        code = args[0].literal_value.code
-        _globals = {'np': np}
-        # XXX hack in hiframes_typed to make globals available
-        if hasattr(args[0].literal_value, 'globals'):
-            # TODO: use code.co_names to find globals actually used?
-            _globals = args[0].literal_value.globals
+        # print('aaaaaa')
+        # print(self.context)
+        # print(dir(self.context))
+        # print(dir(args[0]))
+        # # print(args[0].get_call_type())
+        # # print(args[0].get_call_signatures())
+        # # print(args[0].get_call_type.literal_value)
+        # print(dir(args[0].get_call_type))
+        # print(args[0].get_call_type(self.context, (dtype,), {}))
+        # print('bbbbbb')
+        # code = args[0].literal_value.code
+        # _globals = {'np': np}
+        # # XXX hack in hiframes_typed to make globals available
+        # # if hasattr(args[0].literal_value, 'globals'):
+        # #     # TODO: use code.co_names to find globals actually used?
+        # #     _globals = args[0].literal_value.globals
 
-        f_ir = numba.ir_utils.get_ir_of_code(_globals, code)
-        f_typemap, f_return_type, f_calltypes = numba.typed_passes.type_inference_stage(
-            self.context, f_ir, (dtype,), None)
+        # f_ir = numba.ir_utils.get_ir_of_code(_globals, code)
+        # f_typemap, f_return_type, f_calltypes = numba.typed_passes.type_inference_stage(
+        #     self.context, f_ir, (dtype,), None)
 
-        return signature(SeriesType(f_return_type), *args)
+        # return signature(SeriesType(f_return_type), *args)
+        t = args[0].get_call_type(self.context, (dtype,), {});
+        return signature(SeriesType(t.return_type), *args)
 
     @bound_function("series.map")
     def resolve_map(self, ary, args, kws):
