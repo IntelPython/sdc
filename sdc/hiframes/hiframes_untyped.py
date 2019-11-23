@@ -322,6 +322,9 @@ class HiFramesPassImpl(object):
                 # TODO: add proper metadata to Numba types
                 # XXX: when constants are used, all the uses of the list object
                 # have to be checked since lists are mutable
+                # Tests:
+                # SDC_CONFIG_PIPELINE_SDC=0 python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_df_drop_inplace2
+                # SDC_CONFIG_PIPELINE_SDC=0 python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_df_drop1
                 try:
                     vals = tuple(find_const(self.state.func_ir, v) for v in rhs.items)
                     # a = ['A', 'B'] ->
