@@ -49,13 +49,6 @@ else:
     _has_pyarrow = True
 
 try:
-    from . import ros_cpp
-except ImportError:
-    _has_ros = False
-else:
-    _has_ros = True
-
-try:
     from . import cv_wrapper
 except ImportError:
     _has_opencv = False

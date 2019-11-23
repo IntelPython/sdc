@@ -476,9 +476,6 @@ class DistributedAnalysis(object):
         if fdef == ('file_read', 'sdc.io.np_io'):
             return
 
-        if sdc.config._has_ros and fdef == ('read_ros_images_inner', 'sdc.ros'):
-            return
-
         if sdc.config._has_pyarrow and fdef == ('read_parquet', 'sdc.io.parquet_pio'):
             return
 

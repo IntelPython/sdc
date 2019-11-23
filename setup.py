@@ -111,11 +111,6 @@ if 'DAALROOT' in os.environ:
     _has_daal = True
     DAALROOT = os.environ['DAALROOT']
 
-_has_ros = False
-if 'ROS_PACKAGE_PATH' in os.environ:
-    _has_ros = True
-
-
 _has_opencv = False
 OPENCV_DIR = ""
 
@@ -300,40 +295,6 @@ ext_parquet = Extension(name="sdc.parquet_cpp",
 #                             sources=["sdc/_daal.cpp"]
 #                             )
 
-ext_ros = Extension(name="sdc.ros_cpp",
-                    sources=["sdc/_ros.cpp"],
-                    include_dirs=['/opt/ros/lunar/include',
-                                  '/opt/ros/lunar/include/xmlrpcpp',
-                                  PREFIX_DIR + '/include/',
-                                  './ros_include'],
-                    extra_compile_args=eca,
-                    extra_link_args=ela + ['-rdynamic',
-                                           '/opt/ros/lunar/lib/librosbag.so',
-                                           '/opt/ros/lunar/lib/librosbag_storage.so',
-                                           '-lboost_program_options',
-                                           '/opt/ros/lunar/lib/libroslz4.so',
-                                           '/opt/ros/lunar/lib/libtopic_tools.so',
-                                           '/opt/ros/lunar/lib/libroscpp.so',
-                                           '-lboost_filesystem',
-                                           '-lboost_signals',
-                                           '/opt/ros/lunar/lib/librosconsole.so',
-                                           '/opt/ros/lunar/lib/librosconsole_log4cxx.so',
-                                           '/opt/ros/lunar/lib/librosconsole_backend_interface.so',
-                                           '-lboost_regex',
-                                           '/opt/ros/lunar/lib/libroscpp_serialization.so',
-                                           '/opt/ros/lunar/lib/librostime.so',
-                                           '/opt/ros/lunar/lib/libxmlrpcpp.so',
-                                           '/opt/ros/lunar/lib/libcpp_common.so',
-                                           '-lboost_system',
-                                           '-lboost_thread',
-                                           '-lboost_chrono',
-                                           '-lboost_date_time',
-                                           '-lboost_atomic',
-                                           '-lpthread',
-                                           '-Wl,-rpath,/opt/ros/lunar/lib'],
-                    library_dirs=lid,
-                    )
-
 cv_libs = ['opencv_core', 'opencv_imgproc', 'opencv_imgcodecs', 'opencv_highgui']
 # XXX cv lib file name needs version on Windows
 if is_win:
@@ -356,8 +317,6 @@ if _has_pyarrow:
     _ext_mods.append(ext_parquet)
 # if _has_daal:
 #    _ext_mods.append(ext_daal_wrapper)
-if _has_ros:
-    _ext_mods.append(ext_ros)
 if _has_opencv:
     _ext_mods.append(ext_cv_wrapper)
 
