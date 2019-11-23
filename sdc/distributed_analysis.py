@@ -485,18 +485,6 @@ class DistributedAnalysis(object):
                 array_dists[lhs] = Distribution.OneD
             return
 
-        # TODO: fix "numba.extending" in function def
-        if sdc.config._has_xenon and fdef == ('read_xenon_col', 'numba.extending'):
-            array_dists[args[4].name] = Distribution.REP
-            return
-
-        if sdc.config._has_xenon and fdef == ('read_xenon_str', 'numba.extending'):
-            array_dists[args[4].name] = Distribution.REP
-            # string read creates array in output
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD
-            return
-
         if func_name == 'train' and isinstance(func_mod, ir.Var):
             if self.typemap[func_mod.name] == sdc.ml.svc.svc_type:
                 self._meet_array_dists(

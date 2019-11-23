@@ -56,14 +56,6 @@ else:
     _has_opencv = True
     import sdc.cv_ext
 
-try:
-    from . import hxe_ext
-except ImportError:
-    _has_xenon = False
-else:
-    _has_xenon = True
-    import sdc.io.xenon_ext
-
 config_transport_mpi_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_MPI', 'True'))
 '''
 Default value for transport used if no function decorator controls the transport
