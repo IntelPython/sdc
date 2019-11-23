@@ -113,7 +113,7 @@ if __name__ == '__main__':
             sys.exit(0)
 
         os.environ['HDF5_DIR'] = conda_prefix
-        coverage_omit = './sdc/ml/*,./sdc/xenon_ext.py,./sdc/ros.py,./sdc/cv_ext.py,./sdc/tests/*'
+        coverage_omit = './sdc/ml/*,./sdc/cv_ext.py,./sdc/tests/*'
         coverage_cmd = ' && '.join(['coverage erase',
                                    f'coverage run --source=./sdc --omit {coverage_omit} ./sdc/runtests.py',
                                    'coveralls -v'])

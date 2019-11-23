@@ -127,11 +127,6 @@ if 'OPENCV_DIR' in os.environ:
     # p_cvconf = subprocess.run(["pkg-config", "--libs", "--static","opencv"], stdout=subprocess.PIPE)
     # cv_link_args = p_cvconf.stdout.decode().split()
 
-_has_xenon = False
-
-if 'SDC_XE_SUPPORT' in os.environ and os.environ['SDC_XE_SUPPORT'] != "0":
-    _has_xenon = True
-
 ind = [PREFIX_DIR + '/include', ]
 lid = [PREFIX_DIR + '/lib', ]
 eca = ['-std=c++11', ]  # '-g', '-O0']
@@ -353,16 +348,6 @@ ext_cv_wrapper = Extension(name="sdc.cv_wrapper",
                            language="c++",
                            )
 
-ext_xenon_wrapper = Extension(name="sdc.hxe_ext",
-                              sources=["sdc/io/_xe_wrapper.cpp"],
-                              #include_dirs = ['/usr/include'],
-                              include_dirs=['.'] + ind,
-                              library_dirs=['.'] + lid,
-                              libraries=['xe'],
-                              extra_compile_args=eca,
-                              extra_link_args=ela,
-                              )
-
 _ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_dt, ext_io, ext_transport_mpi, ext_transport_seq]
 
 if _has_h5py:
@@ -375,9 +360,6 @@ if _has_ros:
     _ext_mods.append(ext_ros)
 if _has_opencv:
     _ext_mods.append(ext_cv_wrapper)
-
-if _has_xenon:
-    _ext_mods.append(ext_xenon_wrapper)
 
 # Custom build commands
 #

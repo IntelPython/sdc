@@ -457,13 +457,6 @@ class HiFramesPassImpl(object):
         if fdef == ('fromfile', 'numpy'):
             return sdc.io.np_io._handle_np_fromfile(assign, lhs, rhs)
 
-        if fdef == ('read_xenon', 'sdc.xenon_ext'):
-            col_items, nodes = sdc.xenon_ext._handle_read(assign, lhs, rhs, self.state.func_ir)
-            df_nodes, col_map = self._process_df_build_map(col_items)
-            self._create_df(lhs.name, col_map, label)
-            nodes += df_nodes
-            return nodes
-
         return [assign]
 
     def _run_call_df(self, assign, lhs, rhs, df_var, func_name, label):
