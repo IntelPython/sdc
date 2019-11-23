@@ -36,12 +36,8 @@ from numba.types import *
 import sdc.dict_ext
 import sdc.set_ext
 from sdc.set_ext import init_set_string
-# legacy for STAC A3, TODO: remove
-from sdc.dict_ext import (DictIntInt, DictInt32Int32, dict_int_int_type,
-                           dict_int32_int32_type)
 from sdc.str_ext import string_type
 from sdc.str_arr_ext import string_array_type
-from numba.types import List
 import sdc.compiler
 import sdc.io
 import sdc.io.np_io
