@@ -49,27 +49,12 @@ else:
     _has_pyarrow = True
 
 try:
-    from . import ros_cpp
-except ImportError:
-    _has_ros = False
-else:
-    _has_ros = True
-
-try:
     from . import cv_wrapper
 except ImportError:
     _has_opencv = False
 else:
     _has_opencv = True
     import sdc.cv_ext
-
-try:
-    from . import hxe_ext
-except ImportError:
-    _has_xenon = False
-else:
-    _has_xenon = True
-    import sdc.io.xenon_ext
 
 config_transport_mpi_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_MPI', 'True'))
 '''

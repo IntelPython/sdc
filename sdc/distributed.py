@@ -591,69 +591,6 @@ class DistributedPassImpl(object):
             out += f_block.body[:-2]
             out[-1].target = assign.target
 
-        # TODO: fix numba.extending
-        if sdc.config._has_xenon and (fdef == ('read_xenon_col', 'numba.extending')
-                                       and self._is_1D_arr(rhs.args[3].name)):
-            arr = rhs.args[3].name
-            assert len(self._array_starts[arr]) == 1, "only 1D arrs in Xenon"
-            start_var = self._array_starts[arr][0]
-            count_var = self._array_counts[arr][0]
-            rhs.args += [start_var, count_var]
-
-            def f(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count):  # pragma: no cover
-                return sdc.io.xenon_ext.read_xenon_col_parallel(
-                    connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count)
-
-            return self._replace_func(f, rhs.args)
-
-        if sdc.config._has_xenon and (fdef == ('read_xenon_str', 'numba.extending')
-                                       and self._is_1D_arr(lhs)):
-            arr = lhs
-            size_var = rhs.args[3]
-            assert self.state.typemap[size_var.name] == types.intp
-            self._array_sizes[arr] = [size_var]
-            out, start_var, count_var = self._gen_1D_div(size_var, scope, loc,
-                                                         "$alloc", "get_node_portion", distributed_api.get_node_portion)
-            self._array_starts[lhs] = [start_var]
-            self._array_counts[lhs] = [count_var]
-            rhs.args.remove(size_var)
-            rhs.args.append(start_var)
-            rhs.args.append(count_var)
-
-            def f(connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp):  # pragma: no cover
-                return sdc.io.xenon_ext.read_xenon_str_parallel(
-                    connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp)
-
-            f_block = compile_to_numba_ir(f,
-                                          {'sdc': sdc},
-                                          self.state.typingctx,
-                                          (sdc.io.xenon_ext.xe_connect_type,
-                                           sdc.io.xenon_ext.xe_dset_type,
-                                           types.intp,
-                                           self.state.typemap[rhs.args[3].name],
-                                              types.intp,
-                                              types.intp),
-                                          self.state.typemap,
-                                          self.state.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, rhs.args)
-            out += f_block.body[:-2]
-            out[-1].target = assign.target
-
-        if (sdc.config._has_ros
-                and fdef == ('read_ros_images_inner', 'sdc.ros')
-                and self._is_1D_arr(rhs.args[0].name)):
-            arr = rhs.args[0].name
-            assert len(self._array_starts[arr]) == 4, "only 4D arrs in ros"
-            start_var = self._array_starts[arr][0]
-            count_var = self._array_counts[arr][0]
-            rhs.args += [start_var, count_var]
-
-            def f(arr, bag, start, count):  # pragma: no cover
-                return sdc.ros.read_ros_images_inner_parallel(arr, bag,
-                                                               start, count)
-
-            return self._replace_func(f, rhs.args)
-
         if (func_mod == 'sdc.hiframes.api' and func_name in (
                 'to_arr_from_series', 'ts_series_to_arr_typ',
                 'to_date_series_type', 'init_series')

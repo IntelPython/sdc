@@ -47,9 +47,6 @@ import sdc.config
 import sdc.timsort
 from sdc.decorators import jit
 
-if sdc.config._has_xenon:
-    from sdc.io.xenon_ext import read_xenon, xe_connect, xe_open, xe_close
-
 multithread_mode = False
 
 

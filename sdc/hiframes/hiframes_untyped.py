@@ -432,9 +432,6 @@ class HiFramesPassImpl(object):
         if fdef == ('to_numeric', 'pandas'):
             return self._handle_pd_to_numeric(assign, lhs, rhs)
 
-        if fdef == ('read_ros_images', 'sdc.ros'):
-            return self._handle_ros(assign, lhs, rhs)
-
         if isinstance(func_mod, ir.Var) and self._is_df_var(func_mod):
             return self._run_call_df(
                 assign, lhs, rhs, func_mod, func_name, label)
@@ -459,13 +456,6 @@ class HiFramesPassImpl(object):
 
         if fdef == ('fromfile', 'numpy'):
             return sdc.io.np_io._handle_np_fromfile(assign, lhs, rhs)
-
-        if fdef == ('read_xenon', 'sdc.xenon_ext'):
-            col_items, nodes = sdc.xenon_ext._handle_read(assign, lhs, rhs, self.state.func_ir)
-            df_nodes, col_map = self._process_df_build_map(col_items)
-            self._create_df(lhs.name, col_map, label)
-            nodes += df_nodes
-            return nodes
 
         return [assign]
 
@@ -1087,12 +1077,6 @@ class HiFramesPassImpl(object):
         def f(arr_list):  # pragma: no cover
             return sdc.hiframes.api.init_series(sdc.hiframes.api.concat(arr_list))
         return self._replace_func(f, rhs.args)
-
-    def _handle_ros(self, assign, lhs, rhs):
-        if len(rhs.args) != 1:  # pragma: no cover
-            raise ValueError("Invalid read_ros_images() arguments")
-        import sdc.ros
-        return sdc.ros._handle_read_images(lhs, rhs)
 
     def _fix_df_arrays(self, items_list):
         nodes = []

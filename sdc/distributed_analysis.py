@@ -476,25 +476,10 @@ class DistributedAnalysis(object):
         if fdef == ('file_read', 'sdc.io.np_io'):
             return
 
-        if sdc.config._has_ros and fdef == ('read_ros_images_inner', 'sdc.ros'):
-            return
-
         if sdc.config._has_pyarrow and fdef == ('read_parquet', 'sdc.io.parquet_pio'):
             return
 
         if sdc.config._has_pyarrow and fdef == ('read_parquet_str', 'sdc.io.parquet_pio'):
-            # string read creates array in output
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD
-            return
-
-        # TODO: fix "numba.extending" in function def
-        if sdc.config._has_xenon and fdef == ('read_xenon_col', 'numba.extending'):
-            array_dists[args[4].name] = Distribution.REP
-            return
-
-        if sdc.config._has_xenon and fdef == ('read_xenon_str', 'numba.extending'):
-            array_dists[args[4].name] = Distribution.REP
             # string read creates array in output
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
