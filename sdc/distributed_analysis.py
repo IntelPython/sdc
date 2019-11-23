@@ -485,24 +485,6 @@ class DistributedAnalysis(object):
                 array_dists[lhs] = Distribution.OneD
             return
 
-        if func_name == 'train' and isinstance(func_mod, ir.Var):
-            if self.typemap[func_mod.name] == sdc.ml.svc.svc_type:
-                self._meet_array_dists(
-                    args[0].name, args[1].name, array_dists, Distribution.Thread)
-                return
-            if self.typemap[func_mod.name] == sdc.ml.naive_bayes.mnb_type:
-                self._meet_array_dists(args[0].name, args[1].name, array_dists)
-                return
-
-        if func_name == 'predict' and isinstance(func_mod, ir.Var):
-            if self.typemap[func_mod.name] == sdc.ml.svc.svc_type:
-                self._meet_array_dists(
-                    lhs, args[0].name, array_dists, Distribution.Thread)
-                return
-            if self.typemap[func_mod.name] == sdc.ml.naive_bayes.mnb_type:
-                self._meet_array_dists(lhs, args[0].name, array_dists)
-                return
-
         # TODO: make sure assert_equiv is not generated unnecessarily
         # TODO: fix assert_equiv for np.stack from df.value
         if fdef == ('assert_equiv', 'numba.array_analysis'):
