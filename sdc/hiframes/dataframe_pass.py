@@ -52,7 +52,6 @@ from sdc.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
 from sdc.str_ext import string_type
 from sdc.str_arr_ext import (string_array_type, StringArrayType,
                               is_str_arr_typ, pre_alloc_string_array)
-from sdc.io.pio_api import h5dataset_type
 from sdc.hiframes.rolling import get_rolling_setup_args
 from sdc.hiframes.pd_dataframe_ext import (DataFrameType, DataFrameLocType,
                                             DataFrameILocType, DataFrameIatType)

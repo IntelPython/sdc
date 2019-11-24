@@ -68,7 +68,6 @@ from sdc.hiframes.series_kernels import series_replace_funcs
 from sdc.hiframes.split_impl import (string_array_split_view_type,
                                       StringArraySplitViewType, getitem_c_arr, get_array_ctypes_ptr,
                                       get_split_view_index, get_split_view_data_ptr)
-from sdc.io.pio_api import h5dataset_type
 
 
 _dt_index_binops = ('==', '!=', '>=', '>', '<=', '<', '-',
@@ -304,9 +303,6 @@ class HiFramesTypedPassImpl(object):
                 and isinstance(self.state.typemap[inst.value.name], SeriesType)):
             inst.value = self._get_series_data(inst.value, nodes)
 
-        if target_typ == h5dataset_type:
-            return self._handle_h5_write(inst.target, inst.index, inst.value)
-
         if isinstance(target_typ, SeriesIatType):
             val_def = guard(get_definition, self.state.func_ir, inst.target)
             assert (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
@@ -509,41 +505,6 @@ class HiFramesTypedPassImpl(object):
             return self._replace_func(
                 lambda d: numba.targets.builtins.get_type_max_value(
                     d), rhs.args)
-
-        if fdef == ('h5_read_dummy', 'sdc.io.pio_api'):
-            ndim = guard(find_const, self.state.func_ir, rhs.args[1])
-            dtype_str = guard(find_const, self.state.func_ir, rhs.args[2])
-            index_var = rhs.args[3]
-            filter_read = False
-
-            func_text = "def _h5_read_impl(dset_id, ndim, dtype_str, index):\n"
-            if guard(is_whole_slice, self.state.typemap, self.state.func_ir, index_var):
-                func_text += "  size_0 = sdc.io.pio_api.h5size(dset_id, np.int32(0))\n"
-            else:
-                # TODO: check index format for this case
-                filter_read = True
-                assert isinstance(self.state.typemap[index_var.name], types.BaseTuple)
-                func_text += "  read_indices = sdc.io.pio_api.get_filter_read_indices(index[0])\n"
-                func_text += "  size_0 = len(read_indices)\n"
-            for i in range(1, ndim):
-                func_text += "  size_{} = sdc.io.pio_api.h5size(dset_id, np.int32({}))\n".format(i, i)
-            func_text += "  arr_shape = ({},)\n".format(
-                ", ".join(["size_{}".format(i) for i in range(ndim)]))
-            func_text += "  zero_tup = ({},)\n".format(", ".join(["0"] * ndim))
-            func_text += "  A = np.empty(arr_shape, np.{})\n".format(
-                dtype_str)
-            if filter_read:
-                func_text += "  err = sdc.io.pio_api.h5read_filter(dset_id, np.int32({}),\n".format(ndim)
-                func_text += "                                      zero_tup, arr_shape, 0, A, read_indices)\n"
-            else:
-                func_text += "  err = sdc.io.pio_api.h5read(dset_id, np.int32({}),\n".format(ndim)
-                func_text += "                               zero_tup, arr_shape, 0, A)\n"
-            func_text += "  return A\n"
-
-            loc_vars = {}
-            exec(func_text, {'sdc': sdc, 'np': np}, loc_vars)
-            _h5_read_impl = loc_vars['_h5_read_impl']
-            return self._replace_func(_h5_read_impl, rhs.args)
 
         if fdef == ('DatetimeIndex', 'pandas'):
             return self._run_pd_DatetimeIndex(assign, assign.target, rhs)
@@ -2192,34 +2153,6 @@ class HiFramesTypedPassImpl(object):
         return self._replace_func(
             lambda arr_list: sdc.hiframes.api.init_series(sdc.hiframes.api.concat(arr_list)),
             [arr_tup], pre_nodes=nodes)
-
-    def _handle_h5_write(self, dset, index, arr):
-        if index != slice(None):
-            raise ValueError("Only HDF5 write of full array supported")
-        assert isinstance(self.state.typemap[arr.name], types.Array)
-        ndim = self.state.typemap[arr.name].ndim
-
-        func_text = "def _h5_write_impl(dset_id, arr):\n"
-        func_text += "  zero_tup = ({},)\n".format(", ".join(["0"] * ndim))
-        # TODO: remove after support arr.shape in parallel
-        func_text += "  arr_shape = ({},)\n".format(", ".join(["arr.shape[{}]".format(i) for i in range(ndim)]))
-        func_text += "  err = sdc.io.pio_api.h5write(dset_id, np.int32({}),\n".format(ndim)
-        func_text += "                                zero_tup, arr_shape, 0, arr)\n"
-
-        loc_vars = {}
-        exec(func_text, {'sdc': sdc, 'np': np}, loc_vars)
-        _h5_write_impl = loc_vars['_h5_write_impl']
-        f_block = compile_to_numba_ir(_h5_write_impl,
-                                      {'np': np,
-                                       'sdc': sdc},
-                                      self.state.typingctx,
-                                      (self.state.typemap[dset.name],
-                                       self.state.typemap[arr.name]),
-                                      self.state.typemap,
-                                      self.state.calltypes).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [dset, arr])
-        nodes = f_block.body[:-3]  # remove none return
-        return nodes
 
     def _handle_sorted_by_key(self, rhs):
         """generate a sort function with the given key lambda
