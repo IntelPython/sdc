@@ -48,6 +48,24 @@ class TestIO(unittest.TestCase):
 
     def setUp(self):
         if get_rank() == 0:
+            # test_csv_cat1
+            data = ("2,B,SA\n"
+                    "3,A,SBC\n"
+                    "4,C,S123\n"
+                    "5,B,BCD\n")
+
+            with open("csv_data_cat1.csv", "w") as f:
+                f.write(data)
+
+            # test_csv_single_dtype1
+            data = ("2,4.1\n"
+                    "3,3.4\n"
+                    "4,1.3\n"
+                    "5,1.1\n")
+
+            with open("csv_data_dtype1.csv", "w") as f:
+                f.write(data)
+
             # test_np_io1
             n = 111
             A = np.random.ranf(n)
