@@ -51,7 +51,7 @@ from numba.compiler_machinery import FunctionPass, register_pass
 import sdc
 from sdc import utils, config
 import sdc.io
-from sdc.io import pio, parquet_pio
+from sdc.io import parquet_pio
 from sdc.hiframes import filter, join, aggregate, sort
 from sdc.utils import (get_constant, NOT_CONSTANT, debug_prints,
                         inline_new_blocks, ReplaceFunc, is_call, is_assign, update_globals)
@@ -165,7 +165,6 @@ class HiFramesPassImpl(object):
 
         self.pq_handler = ParquetHandler(
             self.state.func_ir, self.state.typingctx, self.state.args, self.state.locals, self.reverse_copies)
-        self.h5_handler = pio.PIO(self.state.func_ir, self.state.locals, self.reverse_copies)
 
         # FIXME: see why this breaks test_kmeans
         # remove_dels(self.state.func_ir.blocks)
@@ -269,13 +268,6 @@ class HiFramesPassImpl(object):
         if isinstance(rhs, ir.Expr):
             if rhs.op == 'call':
                 return self._run_call(assign, label)
-
-            # fix type for f['A'][:] dset reads
-            if config._has_h5py and rhs.op in ('getitem', 'static_getitem'):
-                h5_nodes = self.h5_handler.handle_possible_h5_read(
-                    assign, lhs, rhs)
-                if h5_nodes is not None:
-                    return h5_nodes
 
             # HACK: delete pd.DataFrame({}) nodes to avoid typing errors
             # TODO: remove when dictionaries are implemented and typing works
@@ -450,9 +442,6 @@ class HiFramesPassImpl(object):
         # e.g. df.rolling(2).sum
         if isinstance(func_mod, ir.Var) and self._is_df_obj_call(func_mod, 'rolling'):
             return self._handle_rolling(lhs, rhs, func_mod, func_name, label)
-
-        if config._has_h5py and fdef == ('File', 'h5py'):
-            return self.h5_handler._handle_h5_File_call(assign, lhs, rhs)
 
         if fdef == ('fromfile', 'numpy'):
             return sdc.io.np_io._handle_np_fromfile(assign, lhs, rhs)
