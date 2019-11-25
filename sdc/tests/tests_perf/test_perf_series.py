@@ -24,11 +24,11 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
+import pandas as pd
 
+from sdc.tests.test_utils import *
 from sdc.tests.tests_perf.test_perf_base import *
 from sdc.tests.tests_perf.test_perf_utils import *
-from sdc.tests.test_utils import *
-import pandas as pd
 
 
 def usecase_series_min(input_data):
@@ -221,29 +221,29 @@ class TestSeriesMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
         cls.total_data_length = {
-            'series_float_min': [10 ** 9],
-            'series_float_max': [10 ** 9],
-            'series_float_abs': [3 * 10 ** 8],
-            'series_float_value_counts': [3 * 10 ** 5],
-            'series_float_nsmallest': [10 ** 9],
-            'series_float_nlargest': [10 ** 9],
-            'series_float_var': [5 * 10 ** 8],
-            'series_float_shift': [5 * 10 ** 8],
-            'series_float_copy': [10 ** 8],
-            'series_float_sum': [10 ** 9],
-            'series_float_idxmax': [10 ** 9],
-            'series_float_idxmin': [10 ** 9],
-            'series_float_prod': [5 * 10 ** 8],
-            'series_float_quantile': [10 ** 8],
-            'series_float_mean': [10 ** 8],
-            'series_float_unique': [10 ** 5],
-            'series_float_cumsum': [2 * 10 ** 8],
-            'series_float_nunique': [10 ** 5],
-            'series_float_count': [2 * 10 ** 9],
-            'series_float_median': [10 ** 8],
-            'series_float_argsort': [10 ** 5],
-            'series_float_sort_values': [10 ** 5],
-            'series_float_dropna': [2 * 10 ** 8]
+            'series_min': [10 ** 9],
+            'series_max': [10 ** 9],
+            'series_abs': [3 * 10 ** 8],
+            'series_value_counts': [3 * 10 ** 5],
+            'series_nsmallest': [10 ** 9],
+            'series_nlargest': [10 ** 9],
+            'series_var': [5 * 10 ** 8],
+            'series_shift': [5 * 10 ** 8],
+            'series_copy': [10 ** 8],
+            'series_sum': [10 ** 9],
+            'series_idxmax': [10 ** 9],
+            'series_idxmin': [10 ** 9],
+            'series_prod': [5 * 10 ** 8],
+            'series_quantile': [10 ** 8],
+            'series_mean': [10 ** 8],
+            'series_unique': [10 ** 5],
+            'series_cumsum': [2 * 10 ** 8],
+            'series_nunique': [10 ** 5],
+            'series_count': [2 * 10 ** 9],
+            'series_median': [10 ** 8],
+            'series_argsort': [10 ** 5],
+            'series_sort_values': [10 ** 5],
+            'series_dropna': [2 * 10 ** 8]
         }
 
     def _test_series(self, pyfunc, name, input_data=None):
@@ -266,70 +266,70 @@ class TestSeriesMethods(TestBase):
             self.test_results.add(name, 'Reference', test_data.size, test_results=exec_times)
 
     def test_series_float_min(self):
-        self._test_series(usecase_series_min, 'series_float_min')
+        self._test_series(usecase_series_min, 'series_min')
 
     def test_series_float_max(self):
-        self._test_series(usecase_series_max, 'series_float_max')
+        self._test_series(usecase_series_max, 'series_max')
 
     def test_series_float_abs(self):
-        self._test_series(usecase_series_abs, 'series_float_abs')
+        self._test_series(usecase_series_abs, 'series_abs')
 
     def test_series_float_value_counts(self):
-        self._test_series(usecase_series_value_counts, 'series_float_value_counts')
+        self._test_series(usecase_series_value_counts, 'series_value_counts')
 
     def test_series_float_nsmallest(self):
-        self._test_series(usecase_series_nsmallest, 'series_float_nsmallest')
+        self._test_series(usecase_series_nsmallest, 'series_nsmallest')
 
     def test_series_float_nlargest(self):
-        self._test_series(usecase_series_nlargest, 'series_float_nlargest')
+        self._test_series(usecase_series_nlargest, 'series_nlargest')
 
     def test_series_float_var(self):
-        self._test_series(usecase_series_var, 'series_float_var')
+        self._test_series(usecase_series_var, 'series_var')
 
     def test_series_float_shift(self):
-        self._test_series(usecase_series_shift, 'series_float_shift')
+        self._test_series(usecase_series_shift, 'series_shift')
 
     def test_series_float_copy(self):
-        self._test_series(usecase_series_shift, 'series_float_copy')
+        self._test_series(usecase_series_shift, 'series_copy')
 
     def test_series_float_sum(self):
-        self._test_series(usecase_series_sum, 'series_float_sum')
+        self._test_series(usecase_series_sum, 'series_sum')
 
     def test_series_float_idxmax(self):
-        self._test_series(usecase_series_idxmax, 'series_float_idxmax')
+        self._test_series(usecase_series_idxmax, 'series_idxmax')
 
     def test_series_float_idxmin(self):
-        self._test_series(usecase_series_idxmin, 'series_float_idxmin')
+        self._test_series(usecase_series_idxmin, 'series_idxmin')
 
     def test_series_float_prod(self):
-        self._test_series(usecase_series_prod, 'series_float_prod')
+        self._test_series(usecase_series_prod, 'series_prod')
 
     def test_series_float_quantile(self):
-        self._test_series(usecase_series_quantile, 'series_float_quantile')
+        self._test_series(usecase_series_quantile, 'series_quantile')
 
     def test_series_float_mean(self):
-        self._test_series(usecase_series_quantile, 'series_float_mean')
+        self._test_series(usecase_series_quantile, 'series_mean')
 
     def test_series_float_unique(self):
-        self._test_series(usecase_series_unique, 'series_float_unique')
+        self._test_series(usecase_series_unique, 'series_unique')
 
     def test_series_float_cumsum(self):
-        self._test_series(usecase_series_cumsum, 'series_float_cumsum')
+        self._test_series(usecase_series_cumsum, 'series_cumsum')
 
     def test_series_float_nunique(self):
-        self._test_series(usecase_series_nunique, 'series_float_nunique')
+        self._test_series(usecase_series_nunique, 'series_nunique')
 
     def test_series_float_count(self):
-        self._test_series(usecase_series_count, 'series_float_count')
+        self._test_series(usecase_series_count, 'series_count')
 
     def test_series_float_median(self):
-        self._test_series(usecase_series_median, 'series_float_median')
+        self._test_series(usecase_series_median, 'series_median')
 
     def test_series_float_argsort(self):
-        self._test_series(usecase_series_argsort, 'series_float_argsort')
+        self._test_series(usecase_series_argsort, 'series_argsort')
 
     def test_series_float_sort_values(self):
-        self._test_series(usecase_series_sort_values, 'series_float_sort_values')
+        self._test_series(usecase_series_sort_values, 'series_sort_values')
 
     def test_series_float_dropna(self):
-        self._test_series(usecase_series_dropna, 'series_float_dropna')
+        self._test_series(usecase_series_dropna, 'series_dropna')
