@@ -93,13 +93,6 @@ except ImportError:
 else:
     _has_pyarrow = True
 
-_has_daal = False
-DAALROOT = ""
-
-if 'DAALROOT' in os.environ:
-    _has_daal = True
-    DAALROOT = os.environ['DAALROOT']
-
 _has_opencv = False
 OPENCV_DIR = ""
 
@@ -256,12 +249,6 @@ ext_parquet = Extension(name="sdc.parquet_cpp",
                         library_dirs=lid,
                         )
 
-# ext_daal_wrapper = Extension(name="sdc.daal_wrapper",
-#                             include_dirs = [DAALROOT+'/include'],
-#                             libraries = ['daal_core', 'daal_thread']+MPI_LIBS,
-#                             sources=["sdc/_daal.cpp"]
-#                             )
-
 cv_libs = ['opencv_core', 'opencv_imgproc', 'opencv_imgcodecs', 'opencv_highgui']
 # XXX cv lib file name needs version on Windows
 if is_win:
@@ -280,8 +267,7 @@ _ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_dt, ext_i
 
 if _has_pyarrow:
     _ext_mods.append(ext_parquet)
-# if _has_daal:
-#    _ext_mods.append(ext_daal_wrapper)
+
 if _has_opencv:
     _ext_mods.append(ext_cv_wrapper)
 
