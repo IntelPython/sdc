@@ -229,6 +229,7 @@ class TestSeriesMethods(TestBase):
             'series_float_nlargest': [10 ** 9],
             'series_float_var': [5 * 10 ** 8],
             'series_float_shift': [5 * 10 ** 8],
+            'series_float_copy': [10 ** 8],
             'series_float_sum': [10 ** 9],
             'series_float_idxmax': [10 ** 9],
             'series_float_idxmin': [10 ** 9],
@@ -287,6 +288,9 @@ class TestSeriesMethods(TestBase):
 
     def test_series_float_shift(self):
         self._test_series(usecase_series_shift, 'series_float_shift')
+
+    def test_series_float_copy(self):
+        self._test_series(usecase_series_shift, 'series_float_copy')
 
     def test_series_float_sum(self):
         self._test_series(usecase_series_sum, 'series_float_sum')
