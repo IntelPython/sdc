@@ -33,15 +33,6 @@ import os
 from distutils import util as distutils_util
 
 try:
-    from .io import _hdf5
-    import h5py
-    # TODO: make sure h5py/hdf5 supports parallel
-except ImportError:
-    _has_h5py = False
-else:
-    _has_h5py = True
-
-try:
     import pyarrow
 except ImportError:
     _has_pyarrow = False

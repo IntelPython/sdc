@@ -327,16 +327,6 @@ class DistributedAnalysis(object):
         if func_name == 'len' and func_mod in ('__builtin__', 'builtins'):
             return
 
-        if sdc.config._has_h5py and (func_mod == 'sdc.io.pio_api'
-                                      and func_name in ('h5read', 'h5write', 'h5read_filter')):
-            return
-
-        if sdc.config._has_h5py and (func_mod == 'sdc.io.pio_api'
-                                      and func_name == 'get_filter_read_indices'):
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD
-            return
-
         if fdef == ('quantile', 'sdc.hiframes.api'):
             # quantile doesn't affect input's distribution
             return

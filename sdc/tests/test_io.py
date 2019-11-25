@@ -31,7 +31,6 @@ import platform
 import pandas as pd
 from pandas.api.types import CategoricalDtype
 import numpy as np
-import h5py
 import pyarrow.parquet as pq
 import sdc
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
@@ -49,14 +48,6 @@ class TestIO(unittest.TestCase):
 
     def setUp(self):
         if get_rank() == 0:
-            # h5 filter test
-            n = 11
-            size = (n, 13, 21, 3)
-            A = np.random.randint(0, 120, size, np.uint8)
-            f = h5py.File('h5_test_filter.h5', "w")
-            f.create_dataset('test', data=A)
-            f.close()
-
             # test_csv_cat1
             data = ("2,B,SA\n"
                     "3,A,SBC\n"
@@ -79,153 +70,6 @@ class TestIO(unittest.TestCase):
             n = 111
             A = np.random.ranf(n)
             A.tofile("np_file1.dat")
-
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
-    def test_h5_read_seq(self):
-        def test_impl():
-            f = h5py.File("lr.hdf5", "r")
-            X = f['points'][:]
-            f.close()
-            return X
-
-        hpat_func = sdc.jit(test_impl)
-        np.testing.assert_allclose(hpat_func(), test_impl())
-
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
-    def test_h5_read_const_infer_seq(self):
-        def test_impl():
-            p = 'lr'
-            f = h5py.File(p + ".hdf5", "r")
-            s = 'po'
-            X = f[s + 'ints'][:]
-            f.close()
-            return X
-
-        hpat_func = sdc.jit(test_impl)
-        np.testing.assert_allclose(hpat_func(), test_impl())
-
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
-    def test_h5_read_parallel(self):
-        def test_impl():
-            f = h5py.File("lr.hdf5", "r")
-            X = f['points'][:]
-            Y = f['responses'][:]
-            f.close()
-            return X.sum() + Y.sum()
-
-        hpat_func = sdc.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl(), decimal=2)
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @unittest.skip("fix collective create dataset")
-    def test_h5_write_parallel(self):
-        def test_impl(N, D):
-            points = np.ones((N, D))
-            responses = np.arange(N) + 1.0
-            f = h5py.File("lr_w.hdf5", "w")
-            dset1 = f.create_dataset("points", (N, D), dtype='f8')
-            dset1[:] = points
-            dset2 = f.create_dataset("responses", (N,), dtype='f8')
-            dset2[:] = responses
-            f.close()
-
-        N = 101
-        D = 10
-        hpat_func = sdc.jit(test_impl)
-        hpat_func(N, D)
-        f = h5py.File("lr_w.hdf5", "r")
-        X = f['points'][:]
-        Y = f['responses'][:]
-        f.close()
-        np.testing.assert_almost_equal(X, np.ones((N, D)))
-        np.testing.assert_almost_equal(Y, np.arange(N) + 1.0)
-
-    @unittest.skip("fix collective create dataset and group")
-    def test_h5_write_group(self):
-        def test_impl(n, fname):
-            arr = np.arange(n)
-            n = len(arr)
-            f = h5py.File(fname, "w")
-            g1 = f.create_group("G")
-            dset1 = g1.create_dataset("data", (n,), dtype='i8')
-            dset1[:] = arr
-            f.close()
-
-        n = 101
-        arr = np.arange(n)
-        fname = "test_group.hdf5"
-        hpat_func = sdc.jit(test_impl)
-        hpat_func(n, fname)
-        f = h5py.File(fname, "r")
-        X = f['G']['data'][:]
-        f.close()
-        np.testing.assert_almost_equal(X, arr)
-
-    @unittest.skipIf(os.getenv('RUN_COVERAGE', 'False') == 'True',
-                               'Test fails on coverage run if SDC installed in develop mode\n')
-    def test_h5_read_group(self):
-        def test_impl():
-            f = h5py.File("test_group_read.hdf5", "r")
-            g1 = f['G']
-            X = g1['data'][:]
-            f.close()
-            return X.sum()
-
-        hpat_func = sdc.jit(test_impl)
-        self.assertEqual(hpat_func(), test_impl())
-
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
-    def test_h5_file_keys(self):
-        def test_impl():
-            f = h5py.File("test_group_read.hdf5", "r")
-            s = 0
-            for gname in f.keys():
-                X = f[gname]['data'][:]
-                s += X.sum()
-            f.close()
-            return s
-
-        hpat_func = sdc.jit(test_impl, h5_types={'X': sdc.int64[:]})
-        self.assertEqual(hpat_func(), test_impl())
-        # test using locals for typing
-        hpat_func = sdc.jit(test_impl, locals={'X': sdc.int64[:]})
-        self.assertEqual(hpat_func(), test_impl())
-
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
-    def test_h5_group_keys(self):
-        def test_impl():
-            f = h5py.File("test_group_read.hdf5", "r")
-            g1 = f['G']
-            s = 0
-            for dname in g1.keys():
-                X = g1[dname][:]
-                s += X.sum()
-            f.close()
-            return s
-
-        hpat_func = sdc.jit(test_impl, h5_types={'X': sdc.int64[:]})
-        self.assertEqual(hpat_func(), test_impl())
-
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
-    def test_h5_filter(self):
-        def test_impl():
-            f = h5py.File("h5_test_filter.h5", "r")
-            b = np.arange(11) % 3 == 0
-            X = f['test'][b, :, :, :]
-            f.close()
-            return X
-
-        hpat_func = sdc.jit(locals={'X:return': 'distributed'})(test_impl)
-        n = 4  # len(test_impl())
-        start, end = get_start_end(n)
-        np.testing.assert_allclose(hpat_func(), test_impl()[start:end])
 
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')

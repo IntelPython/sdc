@@ -79,7 +79,6 @@ from numba.compiler_machinery import FunctionPass, register_pass
 import sdc
 import sdc.utils
 from sdc import distributed_api, distributed_lower
-from sdc.io.pio_api import h5file_type, h5group_type
 from sdc.str_ext import string_type
 from sdc.str_arr_ext import string_array_type
 from sdc.distributed_api import Reduce_Type
@@ -510,45 +509,6 @@ class DistributedPassImpl(object):
             out = self._gen_1D_Var_len(arr_var)
             out[-1].target = assign.target
             self.oneDVar_len_vars[assign.target.name] = arr_var
-
-        if (sdc.config._has_h5py and (func_mod == 'sdc.io.pio_api'
-                                       and func_name in ('h5read', 'h5write', 'h5read_filter'))
-                and self._is_1D_arr(rhs.args[5].name)):
-            # TODO: make create_dataset/create_group collective
-            arr = rhs.args[5].name
-            ndims = len(self._array_starts[arr])
-            starts_var = ir.Var(scope, mk_unique_var("$h5_starts"), loc)
-            self.state.typemap[starts_var.name] = types.UniTuple(
-                types.int64, ndims)
-            start_tuple_call = ir.Expr.build_tuple(
-                self._array_starts[arr], loc)
-            starts_assign = ir.Assign(start_tuple_call, starts_var, loc)
-            rhs.args[2] = starts_var
-            counts_var = ir.Var(scope, mk_unique_var("$h5_counts"), loc)
-            self.state.typemap[counts_var.name] = types.UniTuple(
-                types.int64, ndims)
-            count_tuple_call = ir.Expr.build_tuple(
-                self._array_counts[arr], loc)
-            counts_assign = ir.Assign(count_tuple_call, counts_var, loc)
-            out = [starts_assign, counts_assign, assign]
-            rhs.args[3] = counts_var
-            rhs.args[4] = self._set1_var
-            # set parallel arg in file open
-            file_varname = rhs.args[0].name
-            self._file_open_set_parallel(file_varname)
-
-        if sdc.config._has_h5py and (func_mod == 'sdc.io.pio_api'
-                                      and func_name == 'get_filter_read_indices'):
-            #
-            out += self._gen_1D_Var_len(assign.target)
-            size_var = out[-1].target
-            self._array_sizes[lhs] = [size_var]
-            g_out, start_var, count_var = self._gen_1D_div(
-                size_var, scope, loc, "$alloc", "get_node_portion",
-                distributed_api.get_node_portion)
-            self._array_starts[lhs] = [start_var]
-            self._array_counts[lhs] = [count_var]
-            out += g_out
 
         if (sdc.config._has_pyarrow
                 and fdef == ('read_parquet', 'sdc.io.parquet_pio')
@@ -1951,42 +1911,6 @@ class DistributedPassImpl(object):
                 i = _find_first_print(block.body)
             new_blocks[block_label] = block
         return new_blocks
-
-    def _file_open_set_parallel(self, file_varname):
-        var = file_varname
-        while True:
-            var_def = get_definition(self.state.func_ir, var)
-            require(isinstance(var_def, ir.Expr))
-            if var_def.op == 'call':
-                fdef = find_callname(self.state.func_ir, var_def)
-                if (fdef[0] in ('create_dataset', 'create_group')
-                        and isinstance(fdef[1], ir.Var)
-                        and self.state.typemap[fdef[1].name] in (h5file_type, h5group_type)):
-                    self._file_open_set_parallel(fdef[1].name)
-                    return
-                else:
-                    assert fdef == ('File', 'h5py')
-                    var_def.args[2] = self._set1_var
-                    return
-            # TODO: handle control flow
-            require(var_def.op in ('getitem', 'static_getitem'))
-            var = var_def.value.name
-
-        # for label, block in self.state.func_ir.blocks.items():
-        #     for stmt in block.body:
-        #         if (isinstance(stmt, ir.Assign)
-        #                 and stmt.target.name == file_varname):
-        #             rhs = stmt.value
-        #             assert isinstance(rhs, ir.Expr) and rhs.op == 'call'
-        #             call_name = self._call_table[rhs.func.name][0]
-        #             if call_name == 'h5create_group':
-        #                 # if read/write call is on a group, find its actual file
-        #                 f_varname = rhs.args[0].name
-        #                 self._file_open_set_parallel(f_varname)
-        #                 return
-        #             else:
-        #                 assert call_name == 'File'
-        #                 rhs.args[2] = self._set1_var
 
     def _gen_barrier(self):
         def f():  # pragma: no cover
