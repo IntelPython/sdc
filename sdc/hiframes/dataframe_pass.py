@@ -26,7 +26,7 @@
 
 
 import operator
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 import numpy as np
 import pandas as pd
 import warnings
@@ -40,22 +40,16 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             build_definitions, find_build_sequence,
                             GuardException, compute_cfg_from_blocks)
 from numba.inline_closurecall import inline_closure_call
-from numba.typing.templates import Signature, bound_function, signature
-from numba.typing.arraydecl import ArrayAttribute
-from numba.extending import overload
-from numba.typing.templates import infer_global, AbstractTemplate, signature
 from numba.compiler_machinery import FunctionPass, register_pass
 import sdc
 from sdc import hiframes
 from sdc.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
                         is_whole_slice, is_array, is_assign, sanitize_varname, update_globals)
-from sdc.str_ext import string_type
 from sdc.str_arr_ext import (string_array_type, StringArrayType,
                               is_str_arr_typ, pre_alloc_string_array)
-from sdc.hiframes.rolling import get_rolling_setup_args
 from sdc.hiframes.pd_dataframe_ext import (DataFrameType, DataFrameLocType,
                                             DataFrameILocType, DataFrameIatType)
-from sdc.hiframes.pd_series_ext import SeriesType, is_series_type
+from sdc.hiframes.pd_series_ext import SeriesType
 import sdc.hiframes.pd_groupby_ext
 from sdc.hiframes.pd_groupby_ext import DataFrameGroupByType
 import sdc.hiframes.pd_rolling_ext

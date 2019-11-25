@@ -39,7 +39,7 @@ from numba.compiler import DefaultPassBuilder
 from numba import ir_utils, ir, postproc
 from numba.targets.registry import CPUDispatcher
 from numba.ir_utils import guard, get_definition
-from numba.inline_closurecall import inline_closure_call, InlineClosureCallPass
+from numba.inline_closurecall import inline_closure_call
 from numba.typed_passes import (NopythonTypeInference, AnnotateTypes, ParforPass, IRLegalization)
 from numba.untyped_passes import (DeadBranchPrune, InlineInlinables, InlineClosureLikes)
 from sdc import config
