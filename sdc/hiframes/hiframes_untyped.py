@@ -704,6 +704,8 @@ class HiFramesPassImpl(object):
     def _handle_pd_DataFrame(self, assign, lhs, rhs, label):
         """transform pd.DataFrame({'A': A}) call
         """
+        
+        print("====================transform pd.DataFrame({'A': A}) call=============================")
         kws = dict(rhs.kws)
         if 'data' in kws:
             data = kws['data']
@@ -734,6 +736,7 @@ class HiFramesPassImpl(object):
         func_text += "  return sdc.hiframes.pd_dataframe_ext.init_dataframe({}, index, {})\n".format(
             data_args, col_args)
         loc_vars = {}
+        print(func_text)
         exec(func_text, {'sdc': sdc}, loc_vars)
         _init_df = loc_vars['_init_df']
 

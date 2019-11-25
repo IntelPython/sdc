@@ -63,8 +63,8 @@ if not sdc.config.config_pipeline_hpat_default:
     TODO: Needs to detect 'import Pandas' and align initialization according to it
     """
 
-    sdc.config.numba_compiler_define_nopython_pipeline_orig = numba.compiler.DefaultPassBuilder.define_nopython_pipeline
-    numba.compiler.DefaultPassBuilder.define_nopython_pipeline = sdc.datatypes.hpat_pandas_dataframe_pass.sdc_nopython_pipeline_lite_register
+    #sdc.config.numba_compiler_define_nopython_pipeline_orig = numba.compiler.DefaultPassBuilder.define_nopython_pipeline
+    #numba.compiler.DefaultPassBuilder.define_nopython_pipeline = sdc.datatypes.hpat_pandas_dataframe_pass.sdc_nopython_pipeline_lite_register
 
 def _init_extension():
     '''Register Pandas classes and functions with Numba.

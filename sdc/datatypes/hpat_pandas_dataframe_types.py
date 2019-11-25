@@ -169,7 +169,8 @@ if config_pipeline_hpat_default is 0:
         """
         Special Numba procedure to overload Python type pandas.DataFrame::ctor() with Numba registered model
         """
-
+        print("====================@overload(pandas.DataFrame)=======================")
+        print("data:", data)
         if isinstance(data, types.DictType):
             def hpat_pandas_dataframe_impl(data=None, index=None, columns=None, dtype=None, copy=False):
                 series_dict = {}
