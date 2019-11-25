@@ -214,6 +214,8 @@ class TestSeries(unittest.TestCase):
     def jit(self, *args, **kwargs):
         return sdc.jit(*args, **kwargs)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function eq>')
     def test_create1(self):
         def test_impl():
             df = pd.DataFrame({'A': [1, 2, 3]})
@@ -264,6 +266,8 @@ class TestSeries(unittest.TestCase):
         result = hpat_func()
         pd.testing.assert_series_equal(result, result_ref)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function eq>')
     def test_create2(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n)})
@@ -314,6 +318,8 @@ class TestSeries(unittest.TestCase):
 
         pd.testing.assert_series_equal(hpat_func('A'), test_impl('A'))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function eq>')
     def test_create_str(self):
         def test_impl():
             df = pd.DataFrame({'A': ['a', 'b', 'c']})
@@ -322,6 +328,8 @@ class TestSeries(unittest.TestCase):
 
         self.assertEqual(hpat_func(), test_impl())
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function eq>')
     def test_pass_df1(self):
         def test_impl(df):
             return (df.A == 2).sum()
@@ -331,6 +339,8 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df), test_impl(df))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function eq>')
     def test_pass_df_str(self):
         def test_impl(df):
             return (df.A == 'a').sum()
@@ -339,6 +349,8 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': ['a', 'b', 'c']})
         self.assertEqual(hpat_func(df), test_impl(df))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function eq>')
     def test_pass_series1(self):
         # TODO: check to make sure it is series type
         def test_impl(A):
@@ -349,6 +361,8 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function eq>')
     def test_pass_series2(self):
         # test creating dataframe from passed series
         def test_impl(A):
@@ -360,6 +374,8 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function eq>')
     def test_pass_series_str(self):
         def test_impl(A):
             return (A == 'a').sum()
@@ -844,6 +860,8 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(['aa', 'bb', 'cc'], index=[2, 3, 5])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering')
     def test_np_call_on_series1(self):
         def test_impl(A):
             return np.min(A)
@@ -862,6 +880,8 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     "Error in DataFrame_TransformationPass")
     def test_series_values1(self):
         def test_impl(A):
             return (A == 2).values
@@ -880,6 +900,8 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series static setitem unsupported')
     def test_static_setitem_series1(self):
         def test_impl(A):
             A[0] = 2
@@ -890,6 +912,8 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series setitem unsupported')
     def test_setitem_series1(self):
         def test_impl(A, i):
             A[i] = 2
@@ -900,6 +924,8 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df.A.copy(), 0), test_impl(df.A.copy(), 0))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series setitem unsupported')
     def test_setitem_series2(self):
         def test_impl(A, i):
             A[i] = 100
@@ -928,6 +954,8 @@ class TestSeries(unittest.TestCase):
         test_impl(A2, 0)
         np.testing.assert_array_equal(A1, A2)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series setitem unsupported')
     def test_setitem_series_bool1(self):
         def test_impl(A):
             A[A > 3] = 100
@@ -941,6 +969,8 @@ class TestSeries(unittest.TestCase):
         test_impl(A2)
         pd.testing.assert_series_equal(A1, A2)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series setitem unsupported')
     def test_setitem_series_bool2(self):
         def test_impl(A, B):
             A[A > 3] = B[A > 3]
@@ -954,6 +984,8 @@ class TestSeries(unittest.TestCase):
         test_impl(A2, df.B)
         pd.testing.assert_series_equal(A1, A2)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series static getitem unsupported')
     def test_static_getitem_series1(self):
         def test_impl(A):
             return A[0]
@@ -963,6 +995,8 @@ class TestSeries(unittest.TestCase):
         A = pd.Series(np.arange(n))
         self.assertEqual(hpat_func(A), test_impl(A))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function getitem>')
     def test_getitem_series1(self):
         def test_impl(A, i):
             return A[i]
@@ -972,6 +1006,8 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function getitem>')
     def test_getitem_series_str1(self):
         def test_impl(A, i):
             return A[i]
@@ -980,6 +1016,8 @@ class TestSeries(unittest.TestCase):
         df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
         self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Failed in lowering SeriesIatType')
     def test_series_iat1(self):
         def test_impl(A):
             return A.iat[3]
@@ -989,6 +1027,8 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.arange(n)**2)
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Failed in lowering SeriesIatType')
     def test_series_iat2(self):
         def test_impl(A):
             A.iat[3] = 1
@@ -999,6 +1039,8 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.arange(n)**2)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Failed in lowering SeriesIatType')
     def test_series_iloc1(self):
         def test_impl(A):
             return A.iloc[3]
@@ -1008,6 +1050,8 @@ class TestSeries(unittest.TestCase):
         S = pd.Series(np.arange(n)**2)
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Failed in lowering SeriesIatType')
     def test_series_iloc2(self):
         def test_impl(A):
             return A.iloc[3:8]
@@ -1018,6 +1062,8 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(
             hpat_func(S), test_impl(S).reset_index(drop=True))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function add>')
     def test_series_op1(self):
         arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
         for operator in arithmetic_binops:
@@ -1028,6 +1074,8 @@ class TestSeries(unittest.TestCase):
             df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
             pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function add>')
     def test_series_op2(self):
         arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
 
@@ -1111,6 +1159,8 @@ class TestSeries(unittest.TestCase):
                 test_impl(operand_series, operand_scalar),
                 check_names=False)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function neg>')
     def test_series_op6(self):
         def test_impl(A):
             return -A
@@ -1120,6 +1170,8 @@ class TestSeries(unittest.TestCase):
         A = pd.Series(np.arange(n))
         pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function lt>')
     def test_series_op7(self):
         comparison_binops = ('<', '>', '<=', '>=', '!=', '==')
 
@@ -1175,6 +1227,8 @@ class TestSeries(unittest.TestCase):
                 test_impl(operand_series, operand_scalar),
                 check_names=False)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Unsupported series for input operand with +=')
     def test_series_inplace_binop_array(self):
         def test_impl(A, B):
             A += B
@@ -1186,6 +1240,8 @@ class TestSeries(unittest.TestCase):
         B = pd.Series(np.ones(n))
         np.testing.assert_array_equal(hpat_func(A.copy(), B), test_impl(A, B))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function add>')
     def test_series_fusion1(self):
         def test_impl(A, B):
             return A + B + 1
@@ -1201,6 +1257,8 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
         self.assertEqual(count_parfor_REPs(), 1)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'No definition for lowering <built-in function add>')
     def test_series_fusion2(self):
         # make sure getting data var avoids incorrect single def assumption
         def test_impl(A, B):
@@ -1245,6 +1303,8 @@ class TestSeries(unittest.TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Failed in lowering SeriesIatType')
     def test_series_list_str_unbox1(self):
         def test_impl(A):
             return A.iloc[0]
@@ -1265,6 +1325,8 @@ class TestSeries(unittest.TestCase):
 
         self.assertEqual(hpat_func(1), test_impl(1))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     "Error in DataFrame_TransformationPass")
     def test_series_ufunc1(self):
         def test_impl(A, i):
             return np.isinf(A).values
@@ -1708,6 +1770,8 @@ class TestSeries(unittest.TestCase):
         self.assertIsNone(test_impl(S2))
         pd.testing.assert_series_equal(S1, S2)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.dropna() parallelism unsupported')
     def test_series_dropna_str_parallel1(self):
         '''Verifies Series.dropna() distributed work for series of strings with default index'''
         def test_impl(A):
@@ -2064,6 +2128,8 @@ class TestSeries(unittest.TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     "distribution not implemented")
     def test_series_dist_input1(self):
         '''Verify distribution of a Series without index'''
         def test_impl(S):
@@ -2077,6 +2143,8 @@ class TestSeries(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     "distribution not implemented")
     def test_series_dist_input2(self):
         '''Verify distribution of a Series with integer index'''
         def test_impl(S):
@@ -2129,6 +2197,8 @@ class TestSeries(unittest.TestCase):
         h_s_tup = (S[start:end], 1, S2[start:end])
         self.assertEqual(hpat_func(h_s_tup), test_impl(s_tup))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.rolling() unsupported')
     def test_series_rolling1(self):
         def test_impl(S):
             return S.rolling(3).sum()
@@ -2137,6 +2207,8 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, 2., 3., 4., 5.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     "Error in DataFrame_TransformationPass")
     def test_series_concat1(self):
         def test_impl(S1, S2):
             return pd.concat([S1, S2]).values
@@ -2146,6 +2218,8 @@ class TestSeries(unittest.TestCase):
         S2 = pd.Series([6., 7.])
         np.testing.assert_array_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.map() unsupported')
     def test_series_map1(self):
         def test_impl(S):
             return S.map(lambda a: 2 * a)
@@ -2154,6 +2228,8 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, 2., 3., 4., 5.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.map() unsupported')
     def test_series_map_global1(self):
         def test_impl(S):
             return S.map(lambda a: a + GLOBAL_VAL)
@@ -2162,6 +2238,8 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, 2., 3., 4., 5.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.map() unsupported')
     def test_series_map_tup1(self):
         def test_impl(S):
             return S.map(lambda a: (a, 2 * a))
@@ -2170,6 +2248,8 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, 2., 3., 4., 5.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.map() unsupported')
     def test_series_map_tup_map1(self):
         def test_impl(S):
             A = S.map(lambda a: (a, 2 * a))
@@ -2179,6 +2259,8 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([1.0, 2., 3., 4., 5.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.combine() unsupported')
     def test_series_combine(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
@@ -2188,6 +2270,8 @@ class TestSeries(unittest.TestCase):
         S2 = pd.Series([6.0, 21., 3.6, 5.])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.combine() unsupported')
     def test_series_combine_float3264(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
@@ -2199,6 +2283,8 @@ class TestSeries(unittest.TestCase):
                         np.float32(3), np.float32(4), np.float32(5)])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.combine() unsupported')
     def test_series_combine_assert1(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
@@ -2209,6 +2295,8 @@ class TestSeries(unittest.TestCase):
         with self.assertRaises(AssertionError):
             hpat_func(S1, S2)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.combine() unsupported')
     def test_series_combine_assert2(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
@@ -2219,6 +2307,8 @@ class TestSeries(unittest.TestCase):
         with self.assertRaises(AssertionError):
             hpat_func(S1, S2)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.combine() unsupported')
     def test_series_combine_integer(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b, 16)
@@ -2228,6 +2318,8 @@ class TestSeries(unittest.TestCase):
         S2 = pd.Series([6, 21, 3, 5])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.combine() unsupported')
     def test_series_combine_different_types(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
@@ -2237,6 +2329,8 @@ class TestSeries(unittest.TestCase):
         S2 = pd.Series([1, 2, 3, 4, 5])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.combine() unsupported')
     def test_series_combine_integer_samelen(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
@@ -2246,6 +2340,8 @@ class TestSeries(unittest.TestCase):
         S2 = pd.Series([6, 21, 17, -5, 4])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.combine() unsupported')
     def test_series_combine_samelen(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
@@ -2255,6 +2351,8 @@ class TestSeries(unittest.TestCase):
         S2 = pd.Series([6.0, 21., 3.6, 5., 0.0])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.combine() unsupported')
     def test_series_combine_value(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b, 1237.56)
@@ -2264,6 +2362,8 @@ class TestSeries(unittest.TestCase):
         S2 = pd.Series([6.0, 21., 3.6, 5.])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.combine() unsupported')
     def test_series_combine_value_samelen(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b, 1237.56)
@@ -2273,6 +2373,8 @@ class TestSeries(unittest.TestCase):
         S2 = pd.Series([6.0, 21., 3.6, 5., 0.0])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.apply() unsupported')
     def test_series_apply1(self):
         def test_impl(S):
             return S.apply(lambda a: 2 * a)
@@ -2311,6 +2413,8 @@ class TestSeries(unittest.TestCase):
                 hpat_func(S1, S2), test_impl(S1, S2),
                 err_msg='S1={}\nS2={}'.format(S1, S2))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.str.len() unsupported>')
     def test_series_str_len1(self):
         def test_impl(S):
             return S.str.len()
@@ -3094,6 +3198,8 @@ class TestSeries(unittest.TestCase):
         S = pd.Series([6, 9, 2, 4, 6, 4, 5], ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     "distribution not implemented")
     def test_series_head_parallel1(self):
         '''Verifies head method for distributed Series with string data and no index'''
         def test_impl(S):
@@ -3109,6 +3215,8 @@ class TestSeries(unittest.TestCase):
             pd.testing.assert_series_equal(hpat_func(S[start:end]), test_impl(S))
             self.assertTrue(count_array_OneDs() > 0)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     "distribution not implemented")
     def test_series_head_index_parallel1(self):
         '''Verifies head method for distributed Series with integer index'''
         def test_impl(S):
@@ -3262,6 +3370,8 @@ class TestSeries(unittest.TestCase):
         S2 = pd.Series([2., 3., 5., np.nan, 5., 6., 7.])
         self.assertEqual(np.isnan(hpat_func(S2)), np.isnan(test_impl(S2)))
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.median() parallelism unsupported')
     def test_series_median_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -3277,6 +3387,8 @@ class TestSeries(unittest.TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertTrue(count_array_OneDs() > 0)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.argsort() parallelism unsupported')
     def test_series_argsort_parallel(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -3542,6 +3654,8 @@ class TestSeries(unittest.TestCase):
                             np.testing.assert_array_equal(ref_result.data, jit_result.data)
                             self.assertEqual(ref, jit)
 
+    @unittest.skipIf(not sdc.config.config_pipeline_hpat_default,
+                     'Series.sort_values() parallelism unsupported')
     def test_series_sort_values_parallel1(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
