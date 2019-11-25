@@ -25,7 +25,6 @@
 # *****************************************************************************
 
 
-import numba
 from numba import types
 from numba.extending import (typeof_impl, unbox, register_model, models,
                              NativeValue, box)
@@ -34,7 +33,6 @@ from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
                                     lower_builtin)
 from numba.typing import signature
 
-import sdc
 from sdc.hiframes.pd_timestamp_ext import (datetime_date_type,
                                             box_datetime_date_array)
 

@@ -40,7 +40,7 @@ from collections import defaultdict
 import numpy as np
 
 import numba
-from numba import ir, types, typing, config, numpy_support, ir_utils, postproc
+from numba import ir, ir_utils, postproc, types
 from numba.ir_utils import (
     mk_unique_var,
     replace_vars_inner,
@@ -65,7 +65,6 @@ from numba.ir_utils import (
     find_const,
     is_get_setitem)
 from numba.inline_closurecall import inline_closure_call
-from numba.typing import signature
 from numba.parfor import (
     Parfor,
     lower_parfor_sequential,

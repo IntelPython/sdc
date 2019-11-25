@@ -35,13 +35,10 @@ from numba.extending import (typeof_impl, unbox, register_model, models,
                              NativeValue, box, intrinsic)
 from numba import numpy_support, types, cgutils
 from numba.typing import signature
-from numba.typing.templates import infer_global, AbstractTemplate, CallableTemplate
 from numba.targets.boxing import box_array, unbox_array, box_list
-from numba.targets.imputils import lower_builtin
 from numba.targets.boxing import _NumbaTypeHelper
 from numba.targets import listobj
 
-import sdc
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.hiframes.pd_timestamp_ext import (datetime_date_type,
                                             unbox_datetime_date_array, box_datetime_date_array)

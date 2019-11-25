@@ -39,7 +39,6 @@ from numba.ir_utils import (find_topo_order, guard, get_definition, require,
 from numba.parfor import Parfor
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
-import numpy as np
 import sdc
 import sdc.io
 import sdc.io.np_io
