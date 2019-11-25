@@ -815,16 +815,6 @@ class DistributedPassImpl(object):
         if fdef == ('rebalance_array', 'sdc.distributed_api'):
             return self._run_call_rebalance_array(lhs, assign, rhs.args)
 
-        # output of mnb.predict is 1D with same size as 1st dimension of input
-        # TODO: remove ml module and use new Intel(R) Data Analytics Acceleration Library (Intel(R) DAAL) API
-        if func_name == 'predict':
-            getattr_call = guard(get_definition, self.state.func_ir, func_var)
-            if (getattr_call and self.state.typemap[getattr_call.value.name] == sdc.ml.naive_bayes.mnb_type):
-                in_arr = rhs.args[0].name
-                self._array_starts[lhs] = [self._array_starts[in_arr][0]]
-                self._array_counts[lhs] = [self._array_counts[in_arr][0]]
-                self._array_sizes[lhs] = [self._array_sizes[in_arr][0]]
-
         if fdef == ('file_read', 'sdc.io.np_io') and rhs.args[1].name in self._array_starts:
             _fname = rhs.args[0]
             _data_ptr = rhs.args[1]
