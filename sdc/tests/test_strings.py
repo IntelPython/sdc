@@ -39,7 +39,7 @@ import pyarrow.parquet as pq
 from sdc.str_arr_ext import StringArray
 from sdc.str_ext import unicode_to_std_str, std_str_to_unicode
 from sdc.tests.gen_test_data import ParquetGenerator
-from sdc.tests.test_utils import TestCase
+from sdc.tests.test_utils import skip_numba_jit, TestCase
 
 class TestStrings(TestCase):
 
@@ -62,6 +62,7 @@ class TestStrings(TestCase):
         hpat_func = sdc.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    @skip_numba_jit
     def test_str2str(self):
         str2str_methods = ['capitalize', 'casefold', 'lower', 'lstrip',
                            'rstrip', 'strip', 'swapcase', 'title', 'upper']
@@ -212,6 +213,7 @@ class TestStrings(TestCase):
 
         self.assertTrue(np.array_equal(hpat_func(), ['ABC', 'BB', 'CDEF']))
 
+    @skip_numba_jit
     def test_string_array_comp(self):
         def test_impl():
             A = StringArray(['ABC', 'BB', 'CDEF'])
@@ -221,6 +223,7 @@ class TestStrings(TestCase):
 
         self.assertEqual(hpat_func(), 1)
 
+    @skip_numba_jit
     def test_string_series(self):
         def test_impl(ds):
             rs = ds == 'one'
@@ -238,6 +241,7 @@ class TestStrings(TestCase):
         self.assertTrue(isinstance(ds, pd.Series) and isinstance(rs, pd.Series))
         self.assertTrue(ds[0] == 'one' and ds[2] == 'three' and rs[0] and not rs[2])
 
+    @skip_numba_jit
     def test_string_array_bool_getitem(self):
         def test_impl():
             A = StringArray(['ABC', 'BB', 'CDEF'])
@@ -248,6 +252,7 @@ class TestStrings(TestCase):
 
         self.assertEqual(hpat_func(), True)
 
+    @skip_numba_jit
     def test_string_NA_box(self):
         # create `example.parquet` file
         ParquetGenerator.gen_pq_test()
@@ -262,6 +267,7 @@ class TestStrings(TestCase):
         np.testing.assert_array_equal(hpat_func().isna(), test_impl().isna())
 
     # test utf8 decode
+    @skip_numba_jit
     def test_decode_empty1(self):
         def test_impl(S):
             return S[0]
@@ -270,6 +276,7 @@ class TestStrings(TestCase):
         S = pd.Series([''])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    @skip_numba_jit
     def test_decode_single_ascii_char1(self):
         def test_impl(S):
             return S[0]
@@ -278,6 +285,7 @@ class TestStrings(TestCase):
         S = pd.Series(['A'])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    @skip_numba_jit
     def test_decode_ascii1(self):
         def test_impl(S):
             return S[0]
@@ -286,6 +294,7 @@ class TestStrings(TestCase):
         S = pd.Series(['Abc12', 'bcd', '345'])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    @skip_numba_jit
     def test_decode_unicode1(self):
         def test_impl(S):
             return S[0], S[1], S[2]
@@ -295,6 +304,7 @@ class TestStrings(TestCase):
                        '🐍⚡', '大处着眼，小处着手。', ])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    @skip_numba_jit
     def test_decode_unicode2(self):
         # test strings that start with ascii
         def test_impl(S):
