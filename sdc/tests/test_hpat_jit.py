@@ -34,7 +34,7 @@ import pandas as pd
 from sdc import *
 from numba.typed import Dict
 from collections import defaultdict
-from sdc.tests.test_utils import TestCase
+from sdc.tests.test_utils import skip_numba_jit, TestCase
 
 
 class TestHpatJitIssues(TestCase):
@@ -343,6 +343,7 @@ class TestHpatJitIssues(TestCase):
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
         self.assertEqual(count_parfor_REPs(), 3)
 
+    @skip_numba_jit
     @unittest.skipIf(platform.system() == 'Windows',
                      'AssertionError: Attributes are different'
                      'Attribute "dtype" are different'
@@ -357,6 +358,7 @@ class TestHpatJitIssues(TestCase):
         hpat_func = sdc.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @skip_numba_jit
     @unittest.skipIf(platform.system() == 'Windows',
                      'AssertionError: Attributes are different'
                      'Attribute "dtype" are different'
@@ -372,6 +374,7 @@ class TestHpatJitIssues(TestCase):
         hpat_func = sdc.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @skip_numba_jit
     @unittest.skipIf(platform.system() == 'Windows',
                      'AssertionError: Attributes are different'
                      'Attribute "dtype" are different'
@@ -387,6 +390,7 @@ class TestHpatJitIssues(TestCase):
         hpat_func = sdc.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @skip_numba_jit
     @unittest.skipIf(platform.system() == 'Windows',
                      'AssertionError: Attributes are different'
                      'Attribute "dtype" are different'
@@ -402,6 +406,7 @@ class TestHpatJitIssues(TestCase):
         hpat_func = sdc.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @skip_numba_jit
     @unittest.skipIf(platform.system() == 'Windows',
                      'AssertionError: Attributes are different'
                      'Attribute "dtype" are different'
@@ -416,6 +421,7 @@ class TestHpatJitIssues(TestCase):
         hpat_func = sdc.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @skip_numba_jit
     @unittest.skipIf(platform.system() == 'Windows',
                      'AssertionError: Attributes are different'
                      'Attribute "dtype" are different'
