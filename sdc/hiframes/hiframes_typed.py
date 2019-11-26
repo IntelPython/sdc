@@ -1389,10 +1389,10 @@ class HiFramesTypedPassImpl(object):
             raise ValueError("not enough arguments in call to combine")
         if len(rhs.args) > 3:
             raise ValueError("too many arguments in call to combine")
-        func = guard(get_definition, self.state.func_ir, rhs.args[1])
-        if func is None or not (isinstance(func, ir.Expr)
-                                and func.op == 'make_function'):
-            raise ValueError("lambda for combine not found")
+        func = guard(get_definition, self.state.func_ir, rhs.args[1]).value.py_func
+        # if func is None or not (isinstance(func, ir.Expr)
+        #                         and func.op == 'make_function'):
+        #     raise ValueError("lambda for combine not found")
 
         out_typ = self.state.typemap[lhs.name].dtype
         other = rhs.args[0]

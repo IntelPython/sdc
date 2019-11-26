@@ -606,11 +606,13 @@ class SeriesAttribute(AttributeTemplate):
         dtype2 = args[0].dtype
         if dtype2 == types.NPDatetime('ns'):
             dtype2 = pandas_timestamp_type
-        code = args[1].literal_value.code
-        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
-        f_typemap, f_return_type, f_calltypes = numba.typed_passes.type_inference_stage(
-            self.context, f_ir, (dtype1, dtype2,), None)
-        return signature(SeriesType(f_return_type), *args)
+        # code = args[1].literal_value.code
+        # f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
+        # f_typemap, f_return_type, f_calltypes = numba.typed_passes.type_inference_stage(
+        #     self.context, f_ir, (dtype1, dtype2,), None)
+        # return signature(SeriesType(f_return_type), *args)
+        t = args[1].get_call_type(self.context, (dtype1, dtype2,), {});
+        return signature(SeriesType(t.return_type), *args)
 
     @bound_function("series.combine")
     def resolve_combine(self, ary, args, kws):
