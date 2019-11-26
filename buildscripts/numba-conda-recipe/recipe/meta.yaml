@@ -1,0 +1,114 @@
+{% set name = "numba" %}
+{% set version = "0.46.0" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  git_url: https://github.com/numba/numba
+  git_tag: master
+
+build:
+  number: 0
+  entry_points:
+    - pycc = numba.pycc:main
+    - numba = numba.numba_entry:main
+  script_env:
+    - PY_VCRUNTIME_REDIST
+  missing_dso_whitelist:  # [osx]
+    # optional dependency: required only when omp is chosen as the backend for
+    # the threading layer
+    - lib/libiomp5.dylib  # [osx]
+
+requirements:
+  # build and run dependencies are duplicated to avoid setuptools issues
+  # when we also set install_requires in setup.py
+  build:
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}
+    # both of these are needed on osx, llvm for the headers, Intel for the lib
+    - llvm-openmp              # [osx]
+    - intel-openmp             # [osx]
+  host:
+    - python
+    - numpy
+    - setuptools
+    - llvmlite 0.30.*
+    - funcsigs                 # [py27]
+    - singledispatch           # [py27]
+    - tbb-devel >=2018.0.5     # [not (win and py27)]
+  run:
+    - python
+    - {{ pin_compatible('numpy') }}
+    - {{ pin_compatible('llvmlite', max_pin='x.x') }}
+    - llvmlite >=0.30.0
+    - funcsigs                 # [py27]
+    - singledispatch           # [py27]
+  run_constrained:
+    # If TBB is present it must be at least this version from Anaconda due to
+    # build flag issues triggering UB
+    - tbb >=2018.0.5           # [not (win and py27)]
+
+test:
+  requires:
+    - jinja2
+    # Required to test optional Numba features
+    - cffi
+    - scipy
+    - ipython
+    - setuptools
+    - faulthandler             # [py27]
+    - tbb >=2018.0.5           # [not (win and py27)]
+    - intel-openmp             # [osx]
+    # Need these for AOT. Do not init msvc as it may not be present
+    - {{ compiler('c') }}      # [not win]
+    - {{ compiler('cxx') }}    # [not win]
+  imports:
+    - numba
+    - numba.annotations
+    - numba.cuda
+    - numba.cuda.cudadrv
+    - numba.cuda.kernels
+    - numba.cuda.simulator
+    - numba.cuda.simulator.cudadrv
+    - numba.cuda.tests
+    - numba.cuda.tests.cudadrv
+    - numba.cuda.tests.cudadrv.data
+    - numba.cuda.tests.cudapy
+    - numba.cuda.tests.cudasim
+    - numba.cuda.tests.nocuda
+    - numba.datamodel
+    - numba.jitclass
+    - numba.npyufunc
+    - numba.pycc
+    - numba.rewrites
+    - numba.runtime
+    - numba.scripts
+    - numba.servicelib
+    - numba.targets
+    - numba.testing
+    - numba.tests
+    - numba.tests.npyufunc
+    - numba.typeconv
+    - numba.types
+    - numba.typing
+    - numba.unsafe
+  files:
+    - mandel.py
+about:
+  home: http://numba.github.com
+  license: BSD 2-clause
+  license_family: BSD
+  license_file: LICENSE
+  summary: NumPy aware dynamic Python compiler using LLVM
+  description: |
+    Numba is an Open Source NumPy-aware optimizing compiler for Python
+    sponsored by Anaconda, Inc. It uses the remarkable LLVM compiler
+    infrastructure to compile Python syntax to machine code."
+  doc_url: http://numba.pydata.org/
+  dev_url: https://github.com/numba/numba
+
+extra:
+  recipe-maintainers:
+    - souravsingh
