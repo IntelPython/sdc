@@ -43,11 +43,12 @@ from sdc.str_arr_ext import StringArray
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
                                    get_start_end,
-                                   TestCase)
+                                   skip_numba_jit, TestCase)
 
 
 class TestHiFrames(TestCase):
 
+    @skip_numba_jit
     def test_column_list_select2(self):
         # make sure SDC copies the columns like Pandas does
         def test_impl(df):
@@ -61,6 +62,7 @@ class TestHiFrames(TestCase):
             {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
         np.testing.assert_array_equal(hpat_func(df.copy())[1], test_impl(df)[1])
 
+    @skip_numba_jit
     def test_pd_DataFrame_from_series_par(self):
         def test_impl(n):
             S1 = pd.Series(np.ones(n))
@@ -75,6 +77,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
+    @skip_numba_jit
     def test_getitem_bool_series(self):
         def test_impl(df):
             return df['A'][df['B']].values
@@ -135,6 +138,7 @@ class TestHiFrames(TestCase):
         hpat_func = sdc.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
+    @skip_numba_jit
     def test_column_map(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n)})
@@ -145,6 +149,7 @@ class TestHiFrames(TestCase):
         hpat_func = sdc.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
+    @skip_numba_jit
     def test_column_map_arg(self):
         def test_impl(df):
             df['B'] = df.A.map(lambda a: 2 * a)
@@ -159,6 +164,7 @@ class TestHiFrames(TestCase):
         test_impl(df2)
         np.testing.assert_equal(df1.B.values, df2.B.values)
 
+    @skip_numba_jit
     def test_cumsum(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
@@ -174,6 +180,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_parfor_OneDs(), 2)
         self.assertTrue(dist_IR_contains('dist_cumsum'))
 
+    @skip_numba_jit
     def test_column_distribution(self):
         # make sure all column calls are distributed
         def test_impl(n):
@@ -245,6 +252,7 @@ class TestHiFrames(TestCase):
         A = np.arange(0, n, 1, np.float64)
         np.testing.assert_almost_equal(hpat_func(A), test_impl(A))
 
+    @skip_numba_jit
     def test_nunique(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n)})
@@ -258,6 +266,7 @@ class TestHiFrames(TestCase):
         hpat_func = sdc.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
+    @skip_numba_jit
     def test_nunique_parallel(self):
         # TODO: test without file
         def test_impl():
@@ -300,6 +309,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
 
+    @skip_numba_jit
     def test_unique_parallel(self):
         # TODO: test without file
         def test_impl():
@@ -322,6 +332,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
 
+    @skip_numba_jit
     def test_describe(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float64)})
@@ -334,6 +345,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_str_contains_regex(self):
         def test_impl():
             A = StringArray(['ABC', 'BB', 'ADEF'])
@@ -344,6 +356,7 @@ class TestHiFrames(TestCase):
         hpat_func = sdc.jit(test_impl)
         self.assertEqual(hpat_func(), 2)
 
+    @skip_numba_jit
     def test_str_contains_noregex(self):
         def test_impl():
             A = StringArray(['ABC', 'BB', 'ADEF'])
@@ -354,6 +367,7 @@ class TestHiFrames(TestCase):
         hpat_func = sdc.jit(test_impl)
         self.assertEqual(hpat_func(), 1)
 
+    @skip_numba_jit
     def test_str_replace_regex(self):
         def test_impl(df):
             return df.A.str.replace('AB*', 'EE', regex=True)
@@ -363,6 +377,7 @@ class TestHiFrames(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    @skip_numba_jit
     def test_str_replace_noregex(self):
         def test_impl(df):
             return df.A.str.replace('AB', 'EE', regex=False)
@@ -372,6 +387,7 @@ class TestHiFrames(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    @skip_numba_jit
     def test_str_replace_regex_parallel(self):
         def test_impl(df):
             B = df.A.str.replace('AB*', 'EE', regex=True)
@@ -387,6 +403,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 3)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_str_split(self):
         def test_impl(df):
             return df.A.str.split(',')
@@ -396,6 +413,7 @@ class TestHiFrames(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    @skip_numba_jit
     def test_str_split_default(self):
         def test_impl(df):
             return df.A.str.split()
@@ -405,6 +423,7 @@ class TestHiFrames(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    @skip_numba_jit
     def test_str_split_filter(self):
         def test_impl(df):
             B = df.A.str.split(',')
@@ -416,6 +435,7 @@ class TestHiFrames(TestCase):
         pd.testing.assert_frame_equal(
             hpat_func(df), test_impl(df).reset_index(drop=True))
 
+    @skip_numba_jit
     def test_str_split_box_df(self):
         def test_impl(df):
             return pd.DataFrame({'B': df.A.str.split(',')})
@@ -425,6 +445,7 @@ class TestHiFrames(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df).B, test_impl(df).B, check_names=False)
 
+    @skip_numba_jit
     def test_str_split_unbox_df(self):
         def test_impl(df):
             return df.A.iloc[0]
@@ -434,6 +455,7 @@ class TestHiFrames(TestCase):
         hpat_func = sdc.jit(test_impl)
         self.assertEqual(hpat_func(df2), test_impl(df2))
 
+    @skip_numba_jit
     def test_str_split_bool_index(self):
         def test_impl(df):
             C = df.A.str.split(',')
@@ -444,6 +466,7 @@ class TestHiFrames(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    @skip_numba_jit
     def test_str_split_parallel(self):
         def test_impl(df):
             B = df.A.str.split(',')
@@ -459,6 +482,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 3)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_str_get(self):
         def test_impl(df):
             B = df.A.str.split(',')
@@ -469,6 +493,7 @@ class TestHiFrames(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    @skip_numba_jit
     def test_str_split(self):
         def test_impl(df):
             return df.A.str.split(',')
@@ -477,6 +502,7 @@ class TestHiFrames(TestCase):
         hpat_func = sdc.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df), check_names=False)
 
+    @skip_numba_jit
     def test_str_get_parallel(self):
         def test_impl(df):
             A = df.A.str.split(',')
@@ -493,6 +519,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 3)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_str_get_to_numeric(self):
         def test_impl(df):
             B = df.A.str.split(',')
@@ -504,6 +531,7 @@ class TestHiFrames(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    @skip_numba_jit
     def test_str_flatten(self):
         def test_impl(df):
             A = df.A.str.split(',')
@@ -514,6 +542,7 @@ class TestHiFrames(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    @skip_numba_jit
     def test_str_flatten_parallel(self):
         def test_impl(df):
             A = df.A.str.split(',')
@@ -530,6 +559,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 3)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_to_numeric(self):
         def test_impl(df):
             B = pd.to_numeric(df.A, errors='coerce')
@@ -540,6 +570,7 @@ class TestHiFrames(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    @skip_numba_jit
     def test_1D_Var_len(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) + 1.0})
@@ -552,6 +583,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_rolling1(self):
         # size 3 without unroll
         def test_impl(n):
@@ -577,6 +609,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_rolling2(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
@@ -589,6 +622,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_rolling3(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
@@ -638,6 +672,7 @@ class TestHiFrames(TestCase):
         hpat_func = sdc.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_df_input2(self):
         def test_impl(df):
             C = df.B == 'two'
@@ -648,6 +683,7 @@ class TestHiFrames(TestCase):
         hpat_func = sdc.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_df_input_dist1(self):
         def test_impl(df):
             return df.B.sum()
@@ -664,6 +700,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_concat(self):
         def test_impl(n):
             df1 = pd.DataFrame({'key1': np.arange(n), 'A': np.arange(n) + 1.0})
@@ -679,6 +716,7 @@ class TestHiFrames(TestCase):
         n = 11111
         self.assertEqual(hpat_func(n), test_impl(n))
 
+    @skip_numba_jit
     def test_concat_str(self):
         def test_impl():
             df1 = pq.read_table('example.parquet').to_pandas()
@@ -691,6 +729,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_concat_series(self):
         def test_impl(n):
             df1 = pd.DataFrame({'key1': np.arange(n), 'A': np.arange(n) + 1.0})
@@ -706,6 +745,7 @@ class TestHiFrames(TestCase):
         n = 11111
         self.assertEqual(hpat_func(n), test_impl(n))
 
+    @skip_numba_jit
     def test_concat_series_str(self):
         def test_impl():
             df1 = pq.read_table('example.parquet').to_pandas()
@@ -718,6 +758,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     @unittest.skipIf(int(os.getenv('SDC_NP_MPI', '0')) > 1, 'Test hangs on NP=2 and NP=3 on all platforms')
     def test_intraday(self):
         def test_impl(nsyms):
@@ -744,6 +785,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_OneDs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
+    @skip_numba_jit
     def test_var_dist1(self):
         def test_impl(A, B):
             df = pd.DataFrame({'A': A, 'B': B})
