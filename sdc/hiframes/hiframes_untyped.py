@@ -51,7 +51,7 @@ from numba.compiler_machinery import FunctionPass, register_pass
 import sdc
 from sdc import utils, config
 import sdc.io
-from sdc.io import pio, parquet_pio
+from sdc.io import parquet_pio
 from sdc.hiframes import filter, join, aggregate, sort
 from sdc.utils import (get_constant, NOT_CONSTANT, debug_prints,
                         inline_new_blocks, ReplaceFunc, is_call, is_assign, update_globals)
@@ -165,7 +165,6 @@ class HiFramesPassImpl(object):
 
         self.pq_handler = ParquetHandler(
             self.state.func_ir, self.state.typingctx, self.state.args, self.state.locals, self.reverse_copies)
-        self.h5_handler = pio.PIO(self.state.func_ir, self.state.locals, self.reverse_copies)
 
         # FIXME: see why this breaks test_kmeans
         # remove_dels(self.state.func_ir.blocks)
@@ -270,13 +269,6 @@ class HiFramesPassImpl(object):
             if rhs.op == 'call':
                 return self._run_call(assign, label)
 
-            # fix type for f['A'][:] dset reads
-            if config._has_h5py and rhs.op in ('getitem', 'static_getitem'):
-                h5_nodes = self.h5_handler.handle_possible_h5_read(
-                    assign, lhs, rhs)
-                if h5_nodes is not None:
-                    return h5_nodes
-
             # HACK: delete pd.DataFrame({}) nodes to avoid typing errors
             # TODO: remove when dictionaries are implemented and typing works
             if rhs.op == 'getattr':
@@ -322,6 +314,9 @@ class HiFramesPassImpl(object):
                 # TODO: add proper metadata to Numba types
                 # XXX: when constants are used, all the uses of the list object
                 # have to be checked since lists are mutable
+                # Tests:
+                # SDC_CONFIG_PIPELINE_SDC=0 python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_df_drop_inplace2
+                # SDC_CONFIG_PIPELINE_SDC=0 python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_df_drop1
                 try:
                     vals = tuple(find_const(self.state.func_ir, v) for v in rhs.items)
                     # a = ['A', 'B'] ->
@@ -429,9 +424,6 @@ class HiFramesPassImpl(object):
         if fdef == ('to_numeric', 'pandas'):
             return self._handle_pd_to_numeric(assign, lhs, rhs)
 
-        if fdef == ('read_ros_images', 'sdc.ros'):
-            return self._handle_ros(assign, lhs, rhs)
-
         if isinstance(func_mod, ir.Var) and self._is_df_var(func_mod):
             return self._run_call_df(
                 assign, lhs, rhs, func_mod, func_name, label)
@@ -451,18 +443,8 @@ class HiFramesPassImpl(object):
         if isinstance(func_mod, ir.Var) and self._is_df_obj_call(func_mod, 'rolling'):
             return self._handle_rolling(lhs, rhs, func_mod, func_name, label)
 
-        if config._has_h5py and fdef == ('File', 'h5py'):
-            return self.h5_handler._handle_h5_File_call(assign, lhs, rhs)
-
         if fdef == ('fromfile', 'numpy'):
             return sdc.io.np_io._handle_np_fromfile(assign, lhs, rhs)
-
-        if fdef == ('read_xenon', 'sdc.xenon_ext'):
-            col_items, nodes = sdc.xenon_ext._handle_read(assign, lhs, rhs, self.state.func_ir)
-            df_nodes, col_map = self._process_df_build_map(col_items)
-            self._create_df(lhs.name, col_map, label)
-            nodes += df_nodes
-            return nodes
 
         return [assign]
 
@@ -1084,12 +1066,6 @@ class HiFramesPassImpl(object):
         def f(arr_list):  # pragma: no cover
             return sdc.hiframes.api.init_series(sdc.hiframes.api.concat(arr_list))
         return self._replace_func(f, rhs.args)
-
-    def _handle_ros(self, assign, lhs, rhs):
-        if len(rhs.args) != 1:  # pragma: no cover
-            raise ValueError("Invalid read_ros_images() arguments")
-        import sdc.ros
-        return sdc.ros._handle_read_images(lhs, rhs)
 
     def _fix_df_arrays(self, items_list):
         nodes = []

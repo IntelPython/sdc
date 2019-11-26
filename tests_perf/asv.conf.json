@@ -77,7 +77,6 @@
         "gfortran_linux-64": ["7.3.0", null],
         "gitpython": ["2.1.13"],
         "gxx_linux-64": ["7.3.0", null],
-        "h5py": ["2.9.0"],
         "impi_rt": ["2019.4"],
         "mkl-devel": ["2019.4"],
         "mpi": ["1.0", null],

@@ -25,13 +25,16 @@
 # *****************************************************************************
 
 
-import unittest
-import pandas as pd
-import numpy as np
 import itertools
-import numba
-import sdc
+import numpy as np
+import pandas as pd
 import random
+import unittest
+
+import numba
+from numba import types
+
+import sdc
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, count_array_OneD_Vars,
                                    dist_IR_contains, get_rank, get_start_end, check_numba_version)
@@ -213,7 +216,7 @@ class TestBasic(BaseTest):
 
     def test_inline_locals(self):
         # make sure locals in inlined function works
-        @sdc.jit(locals={'B': sdc.float64[:]})
+        @sdc.jit(locals={'B': types.float64[:]})
         def g(S):
             B = pd.to_numeric(S, errors='coerce')
             return B
@@ -324,8 +327,7 @@ class TestBasic(BaseTest):
             self.assertEqual(count_array_OneDs(), 0)
             self.assertEqual(count_parfor_OneDs(), 1)
 
-    @unittest.skipIf(check_numba_version('0.46.0'),
-                     "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
+    @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
     def test_dist_return(self):
         def test_impl(N):
             A = np.arange(N)
@@ -342,8 +344,7 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_OneDs(), 1)
         self.assertEqual(count_parfor_OneDs(), 1)
 
-    @unittest.skipIf(check_numba_version('0.46.0'),
-                     "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
+    @unittest.expectedFailure # https://github.com/numba/numba/issues/4690
     def test_dist_return_tuple(self):
         def test_impl(N):
             A = np.arange(N)
@@ -372,8 +373,7 @@ class TestBasic(BaseTest):
         np.testing.assert_allclose(hpat_func(arr) / self.num_ranks, test_impl(arr))
         self.assertEqual(count_array_OneDs(), 1)
 
-    @unittest.skipIf(check_numba_version('0.46.0'),
-                     "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
+    @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
     def test_rebalance(self):
         def test_impl(N):
             A = np.arange(n)
@@ -391,8 +391,7 @@ class TestBasic(BaseTest):
         finally:
             sdc.distributed_analysis.auto_rebalance = False
 
-    @unittest.skipIf(check_numba_version('0.46.0'),
-                     "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
+    @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
     def test_rebalance_loop(self):
         def test_impl(N):
             A = np.arange(n)

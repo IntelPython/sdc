@@ -25,7 +25,6 @@
 # *****************************************************************************
 
 
-# from .pio import PIO
 from llvmlite import binding
 import sdc
 import sdc.hiframes
@@ -40,14 +39,11 @@ from numba.compiler import DefaultPassBuilder
 from numba import ir_utils, ir, postproc
 from numba.targets.registry import CPUDispatcher
 from numba.ir_utils import guard, get_definition
-from numba.inline_closurecall import inline_closure_call, InlineClosureCallPass
+from numba.inline_closurecall import inline_closure_call
 from numba.typed_passes import (NopythonTypeInference, AnnotateTypes, ParforPass, IRLegalization)
 from numba.untyped_passes import (DeadBranchPrune, InlineInlinables, InlineClosureLikes)
 from sdc import config
 from sdc.distributed import DistributedPass
-import sdc.io
-if config._has_h5py:
-    from sdc.io import pio
 
 from numba.compiler_machinery import FunctionPass, register_pass
 

@@ -29,11 +29,9 @@ from __future__ import print_function, division, absolute_import
 
 import operator
 from collections import namedtuple, defaultdict
-from functools import reduce
-import copy
 import numpy as np
 import numba
-from numba import typeinfer, ir, ir_utils, config, types, compiler, typed_passes
+from numba import compiler, ir, ir_utils, typed_passes, typeinfer, types
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner, remove_dead,
                             compile_to_numba_ir, replace_arg_nodes,
                             replace_vars_stmt, find_callname, guard,
@@ -51,7 +49,7 @@ from sdc.utils import (is_call_assign, is_var_assign, is_assign, debug_prints,
                         alloc_arr_tup, empty_like_type)
 from sdc import distributed, distributed_analysis
 from sdc.distributed_analysis import Distribution
-from sdc.utils import _numba_to_c_type_map, unliteral_all
+from sdc.utils import unliteral_all
 from sdc.str_ext import string_type
 from sdc.set_ext import num_total_chars_set_string, build_set
 from sdc.str_arr_ext import (string_array_type, pre_alloc_string_array,
@@ -440,7 +438,7 @@ def aggregate_array_analysis(aggregate_node, equiv_set, typemap,
         equiv_set.insert_equiv(col_var, shape)
         post.extend(c_post)
         all_shapes.append(shape[0])
-        equiv_set.define(col_var)
+        equiv_set.define(col_var, {})
 
     if len(all_shapes) > 1:
         equiv_set.insert_equiv(*all_shapes)

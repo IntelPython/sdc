@@ -31,20 +31,9 @@ import numba
 # re-export from Numba
 from numba import (typeof, prange, pndindex, gdb, gdb_breakpoint, gdb_init,
                    stencil, threading_layer, jitclass, objmode)
-from numba.types import *
 
 import sdc.dict_ext
 import sdc.set_ext
-from sdc.set_ext import init_set_string
-import sdc.distributed_api
-from sdc.distributed_api import dist_time
-# legacy for STAC A3, TODO: remove
-from sdc.dict_ext import (DictIntInt, DictInt32Int32, dict_int_int_type,
-                           dict_int32_int32_type)
-from sdc.str_ext import string_type
-from sdc.str_arr_ext import string_array_type
-from numba.types import List
-from sdc.utils import cprint, distribution_report
 import sdc.compiler
 import sdc.io
 import sdc.io.np_io
@@ -53,9 +42,6 @@ import sdc.hiframes.boxing
 import sdc.config
 import sdc.timsort
 from sdc.decorators import jit
-
-if sdc.config._has_xenon:
-    from sdc.io.xenon_ext import read_xenon, xe_connect, xe_open, xe_close
 
 multithread_mode = False
 

@@ -31,13 +31,12 @@ import sdc
 import numba
 from numba import types
 from numba.extending import lower_builtin, overload
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
+from numba.targets.imputils import impl_ret_borrowed
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.ir_utils import guard, find_const
 
 from sdc.distributed_api import Reduce_Type
-from sdc.hiframes.pd_timestamp_ext import integer_to_dt64
 from sdc.utils import unliteral_all
 
 
