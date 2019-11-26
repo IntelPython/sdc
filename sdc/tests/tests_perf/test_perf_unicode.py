@@ -25,8 +25,8 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import os
 import unittest
+import os
 import time
 import numba
 
@@ -95,7 +95,7 @@ def usecase_center(input_data):
 class TestStringMethods(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.test_results = TestResults()
+        cls.test_results = TestResultsStr()
         if is_true(os.environ.get('LOAD_PREV_RESULTS')):
             cls.test_results.load()
 
@@ -111,8 +111,8 @@ class TestStringMethods(unittest.TestCase):
         for data_size in self.total_data_size_bytes:
             for data_width in self.width:
                 test_data = perf_data_gen(test_global_input_data_unicode_kind4, data_width, data_size)
-                self.test_results.add(name, 'JIT', len(test_data), data_width, hpat_func(test_data))
-                self.test_results.add(name, 'Reference', len(test_data), data_width, pyfunc(test_data))
+                self.test_results.add(name, 'JIT', len(test_data), hpat_func(test_data), data_width)
+                self.test_results.add(name, 'Reference', len(test_data), pyfunc(test_data), data_width)
 
     def test_unicode_split(self):
         self._test_unicode(usecase_split, 'unicode_split')

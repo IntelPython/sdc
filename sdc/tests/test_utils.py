@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2019, Intel Corporation All rights reserved.
 #
@@ -24,6 +25,7 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy as np
 
 import sdc
 import numba
@@ -35,17 +37,31 @@ test_global_input_data_unicode_kind4 = [
     '大处 着眼，c小处着手c。大大c大处',
 ]
 
+min_float64 = np.finfo('float64').min
+max_float64 = np.finfo('float64').max
+
+test_global_input_data_float64 = [
+    [1., np.nan, -1., 0., min_float64, max_float64, max_float64, min_float64],
+    [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
+]
+
 
 def count_array_REPs():
-    from sdc.distributed import Distribution
-    vals = sdc.distributed.dist_analysis.array_dists.values()
-    return sum([v == Distribution.REP for v in vals])
+    if sdc.config.config_pipeline_hpat_default:
+        from sdc.distributed import Distribution
+        vals = sdc.distributed.dist_analysis.array_dists.values()
+        return sum([v == Distribution.REP for v in vals])
+    else:
+        return 0
 
 
 def count_parfor_REPs():
-    from sdc.distributed import Distribution
-    vals = sdc.distributed.dist_analysis.parfor_dists.values()
-    return sum([v == Distribution.REP for v in vals])
+    if sdc.config.config_pipeline_hpat_default:
+        from sdc.distributed import Distribution
+        vals = sdc.distributed.dist_analysis.parfor_dists.values()
+        return sum([v == Distribution.REP for v in vals])
+    else:
+        return 0
 
 
 def count_parfor_OneDs():

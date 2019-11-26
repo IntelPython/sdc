@@ -53,28 +53,6 @@ _file_write_parallel = types.ExternalFunction(
         types.intp,
         types.intp))
 
-# @overload(np.fromfile)
-# def fromfile_overload(fname, dtype):
-#     if fname != string_type:
-#         raise("np.fromfile() invalid filename type")
-#     if dtype is not None and not isinstance(dtype, types.DTypeSpec):
-#         raise("np.fromfile() invalid dtype")
-#
-#     # FIXME: import here since hio has hdf5 which might not be available
-#     from .. import hio
-#     import llvmlite.binding as ll
-#     ll.add_symbol('get_file_size', hio.get_file_size)
-#     ll.add_symbol('file_read', hio.file_read)
-#
-#     def fromfile_impl(fname, dtype):
-#         size = get_file_size(fname)
-#         dtype_size = get_dtype_size(dtype)
-#         A = np.empty(size//dtype_size, dtype=dtype)
-#         file_read(fname, A.ctypes, size)
-#         return A
-#
-#     return fromfile_impl
-
 
 def _handle_np_fromfile(assign, lhs, rhs):
     """translate np.fromfile() to native

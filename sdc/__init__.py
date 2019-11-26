@@ -31,20 +31,9 @@ import numba
 # re-export from Numba
 from numba import (typeof, prange, pndindex, gdb, gdb_breakpoint, gdb_init,
                    stencil, threading_layer, jitclass, objmode)
-from numba.types import *
 
 import sdc.dict_ext
 import sdc.set_ext
-from sdc.set_ext import init_set_string
-import sdc.distributed_api
-from sdc.distributed_api import dist_time
-# legacy for STAC A3, TODO: remove
-from sdc.dict_ext import (DictIntInt, DictInt32Int32, dict_int_int_type,
-                           dict_int32_int32_type)
-from sdc.str_ext import string_type
-from sdc.str_arr_ext import string_array_type
-from numba.types import List
-from sdc.utils import cprint, distribution_report
 import sdc.compiler
 import sdc.io
 import sdc.io.np_io
@@ -53,9 +42,6 @@ import sdc.hiframes.boxing
 import sdc.config
 import sdc.timsort
 from sdc.decorators import jit
-
-if sdc.config._has_xenon:
-    from sdc.io.xenon_ext import read_xenon, xe_connect, xe_open, xe_close
 
 multithread_mode = False
 
@@ -66,19 +52,15 @@ del get_versions
 
 if not sdc.config.config_pipeline_hpat_default:
     """
-    Overload Numba functions to allow call SDC pass in Numba compiler pipeline
+    Overload Numba function to allow call SDC pass in Numba compiler pipeline
     Functions are:
-    - AnnotateTypes run_pass()
-    - InlineClosureLikes run_pass()
+    - Numba DefaultPassBuilder define_nopython_pipeline()
 
     TODO: Needs to detect 'import Pandas' and align initialization according to it
     """
 
-    sdc.config.numba_typed_passes_annotatetypes_orig = numba.typed_passes.AnnotateTypes.run_pass
-    numba.typed_passes.AnnotateTypes.run_pass = sdc.datatypes.hpat_pandas_dataframe_pass.sdc_dataframepassimpl_overload
-
-    sdc.config.numba_untyped_passes_inlineclosurelikes_orig = numba.untyped_passes.InlineClosureLikes.run_pass
-    numba.untyped_passes.InlineClosureLikes.run_pass = sdc.datatypes.hpat_pandas_dataframe_pass.sdc_hiframespassimpl_overload
+    sdc.config.numba_compiler_define_nopython_pipeline_orig = numba.compiler.DefaultPassBuilder.define_nopython_pipeline
+    numba.compiler.DefaultPassBuilder.define_nopython_pipeline = sdc.datatypes.hpat_pandas_dataframe_pass.sdc_nopython_pipeline_lite_register
 
 def _init_extension():
     '''Register Pandas classes and functions with Numba.

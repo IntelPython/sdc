@@ -40,7 +40,7 @@ from collections import defaultdict
 import numpy as np
 
 import numba
-from numba import ir, types, typing, config, numpy_support, ir_utils, postproc
+from numba import ir, ir_utils, postproc, types
 from numba.ir_utils import (
     mk_unique_var,
     replace_vars_inner,
@@ -65,7 +65,6 @@ from numba.ir_utils import (
     find_const,
     is_get_setitem)
 from numba.inline_closurecall import inline_closure_call
-from numba.typing import signature
 from numba.parfor import (
     Parfor,
     lower_parfor_sequential,
@@ -79,7 +78,6 @@ from numba.compiler_machinery import FunctionPass, register_pass
 import sdc
 import sdc.utils
 from sdc import distributed_api, distributed_lower
-from sdc.io.pio_api import h5file_type, h5group_type
 from sdc.str_ext import string_type
 from sdc.str_arr_ext import string_array_type
 from sdc.distributed_api import Reduce_Type
@@ -511,45 +509,6 @@ class DistributedPassImpl(object):
             out[-1].target = assign.target
             self.oneDVar_len_vars[assign.target.name] = arr_var
 
-        if (sdc.config._has_h5py and (func_mod == 'sdc.io.pio_api'
-                                       and func_name in ('h5read', 'h5write', 'h5read_filter'))
-                and self._is_1D_arr(rhs.args[5].name)):
-            # TODO: make create_dataset/create_group collective
-            arr = rhs.args[5].name
-            ndims = len(self._array_starts[arr])
-            starts_var = ir.Var(scope, mk_unique_var("$h5_starts"), loc)
-            self.state.typemap[starts_var.name] = types.UniTuple(
-                types.int64, ndims)
-            start_tuple_call = ir.Expr.build_tuple(
-                self._array_starts[arr], loc)
-            starts_assign = ir.Assign(start_tuple_call, starts_var, loc)
-            rhs.args[2] = starts_var
-            counts_var = ir.Var(scope, mk_unique_var("$h5_counts"), loc)
-            self.state.typemap[counts_var.name] = types.UniTuple(
-                types.int64, ndims)
-            count_tuple_call = ir.Expr.build_tuple(
-                self._array_counts[arr], loc)
-            counts_assign = ir.Assign(count_tuple_call, counts_var, loc)
-            out = [starts_assign, counts_assign, assign]
-            rhs.args[3] = counts_var
-            rhs.args[4] = self._set1_var
-            # set parallel arg in file open
-            file_varname = rhs.args[0].name
-            self._file_open_set_parallel(file_varname)
-
-        if sdc.config._has_h5py and (func_mod == 'sdc.io.pio_api'
-                                      and func_name == 'get_filter_read_indices'):
-            #
-            out += self._gen_1D_Var_len(assign.target)
-            size_var = out[-1].target
-            self._array_sizes[lhs] = [size_var]
-            g_out, start_var, count_var = self._gen_1D_div(
-                size_var, scope, loc, "$alloc", "get_node_portion",
-                distributed_api.get_node_portion)
-            self._array_starts[lhs] = [start_var]
-            self._array_counts[lhs] = [count_var]
-            out += g_out
-
         if (sdc.config._has_pyarrow
                 and fdef == ('read_parquet', 'sdc.io.parquet_pio')
                 and self._is_1D_arr(rhs.args[2].name)):
@@ -590,69 +549,6 @@ class DistributedPassImpl(object):
             replace_arg_nodes(f_block, rhs.args)
             out += f_block.body[:-2]
             out[-1].target = assign.target
-
-        # TODO: fix numba.extending
-        if sdc.config._has_xenon and (fdef == ('read_xenon_col', 'numba.extending')
-                                       and self._is_1D_arr(rhs.args[3].name)):
-            arr = rhs.args[3].name
-            assert len(self._array_starts[arr]) == 1, "only 1D arrs in Xenon"
-            start_var = self._array_starts[arr][0]
-            count_var = self._array_counts[arr][0]
-            rhs.args += [start_var, count_var]
-
-            def f(connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count):  # pragma: no cover
-                return sdc.io.xenon_ext.read_xenon_col_parallel(
-                    connect_tp, dset_tp, col_id_tp, column_tp, schema_arr_tp, start, count)
-
-            return self._replace_func(f, rhs.args)
-
-        if sdc.config._has_xenon and (fdef == ('read_xenon_str', 'numba.extending')
-                                       and self._is_1D_arr(lhs)):
-            arr = lhs
-            size_var = rhs.args[3]
-            assert self.state.typemap[size_var.name] == types.intp
-            self._array_sizes[arr] = [size_var]
-            out, start_var, count_var = self._gen_1D_div(size_var, scope, loc,
-                                                         "$alloc", "get_node_portion", distributed_api.get_node_portion)
-            self._array_starts[lhs] = [start_var]
-            self._array_counts[lhs] = [count_var]
-            rhs.args.remove(size_var)
-            rhs.args.append(start_var)
-            rhs.args.append(count_var)
-
-            def f(connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp):  # pragma: no cover
-                return sdc.io.xenon_ext.read_xenon_str_parallel(
-                    connect_tp, dset_tp, col_id_tp, schema_arr_tp, start_tp, count_tp)
-
-            f_block = compile_to_numba_ir(f,
-                                          {'sdc': sdc},
-                                          self.state.typingctx,
-                                          (sdc.io.xenon_ext.xe_connect_type,
-                                           sdc.io.xenon_ext.xe_dset_type,
-                                           types.intp,
-                                           self.state.typemap[rhs.args[3].name],
-                                              types.intp,
-                                              types.intp),
-                                          self.state.typemap,
-                                          self.state.calltypes).blocks.popitem()[1]
-            replace_arg_nodes(f_block, rhs.args)
-            out += f_block.body[:-2]
-            out[-1].target = assign.target
-
-        if (sdc.config._has_ros
-                and fdef == ('read_ros_images_inner', 'sdc.ros')
-                and self._is_1D_arr(rhs.args[0].name)):
-            arr = rhs.args[0].name
-            assert len(self._array_starts[arr]) == 4, "only 4D arrs in ros"
-            start_var = self._array_starts[arr][0]
-            count_var = self._array_counts[arr][0]
-            rhs.args += [start_var, count_var]
-
-            def f(arr, bag, start, count):  # pragma: no cover
-                return sdc.ros.read_ros_images_inner_parallel(arr, bag,
-                                                               start, count)
-
-            return self._replace_func(f, rhs.args)
 
         if (func_mod == 'sdc.hiframes.api' and func_name in (
                 'to_arr_from_series', 'ts_series_to_arr_typ',
@@ -877,16 +773,6 @@ class DistributedPassImpl(object):
 
         if fdef == ('rebalance_array', 'sdc.distributed_api'):
             return self._run_call_rebalance_array(lhs, assign, rhs.args)
-
-        # output of mnb.predict is 1D with same size as 1st dimension of input
-        # TODO: remove ml module and use new DAAL API
-        if func_name == 'predict':
-            getattr_call = guard(get_definition, self.state.func_ir, func_var)
-            if (getattr_call and self.state.typemap[getattr_call.value.name] == sdc.ml.naive_bayes.mnb_type):
-                in_arr = rhs.args[0].name
-                self._array_starts[lhs] = [self._array_starts[in_arr][0]]
-                self._array_counts[lhs] = [self._array_counts[in_arr][0]]
-                self._array_sizes[lhs] = [self._array_sizes[in_arr][0]]
 
         if fdef == ('file_read', 'sdc.io.np_io') and rhs.args[1].name in self._array_starts:
             _fname = rhs.args[0]
@@ -2024,42 +1910,6 @@ class DistributedPassImpl(object):
                 i = _find_first_print(block.body)
             new_blocks[block_label] = block
         return new_blocks
-
-    def _file_open_set_parallel(self, file_varname):
-        var = file_varname
-        while True:
-            var_def = get_definition(self.state.func_ir, var)
-            require(isinstance(var_def, ir.Expr))
-            if var_def.op == 'call':
-                fdef = find_callname(self.state.func_ir, var_def)
-                if (fdef[0] in ('create_dataset', 'create_group')
-                        and isinstance(fdef[1], ir.Var)
-                        and self.state.typemap[fdef[1].name] in (h5file_type, h5group_type)):
-                    self._file_open_set_parallel(fdef[1].name)
-                    return
-                else:
-                    assert fdef == ('File', 'h5py')
-                    var_def.args[2] = self._set1_var
-                    return
-            # TODO: handle control flow
-            require(var_def.op in ('getitem', 'static_getitem'))
-            var = var_def.value.name
-
-        # for label, block in self.state.func_ir.blocks.items():
-        #     for stmt in block.body:
-        #         if (isinstance(stmt, ir.Assign)
-        #                 and stmt.target.name == file_varname):
-        #             rhs = stmt.value
-        #             assert isinstance(rhs, ir.Expr) and rhs.op == 'call'
-        #             call_name = self._call_table[rhs.func.name][0]
-        #             if call_name == 'h5create_group':
-        #                 # if read/write call is on a group, find its actual file
-        #                 f_varname = rhs.args[0].name
-        #                 self._file_open_set_parallel(f_varname)
-        #                 return
-        #             else:
-        #                 assert call_name == 'File'
-        #                 rhs.args[2] = self._set1_var
 
     def _gen_barrier(self):
         def f():  # pragma: no cover

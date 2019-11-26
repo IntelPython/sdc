@@ -4,9 +4,15 @@ Intel® Scalable Dataframe Compiler
 
 .. image:: https://travis-ci.com/IntelPython/sdc.svg?branch=master
     :target: https://travis-ci.com/IntelPython/sdc
+    :alt: Travis CI
+
+.. image:: https://dev.azure.com/IntelPython/HPAT/_apis/build/status/IntelPython.sdc?branchName=master
+    :target: https://dev.azure.com/IntelPython/HPAT/_build/latest?definitionId=2&branchName=master
+    :alt: Azure Pipelines
 
 .. image:: https://coveralls.io/repos/github/IntelPython/sdc/badge.svg?branch=master
     :target: https://coveralls.io/github/IntelPython/sdc?branch=master
+    :alt: Coveralls
 
 A compiler-based framework for big data in Python
 #################################################
@@ -162,6 +168,5 @@ Running unit tests
 ------------------
 ::
 
-    conda install h5py
     python sdc/tests/gen_test_data.py
     python -m unittest

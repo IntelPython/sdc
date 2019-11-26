@@ -25,16 +25,19 @@
 # *****************************************************************************
 
 
-import unittest
 import itertools
-import pandas as pd
 import numpy as np
-import random
-import string
-import pyarrow.parquet as pq
-import numba
-import sdc
 import os
+import pandas as pd
+import pyarrow.parquet as pq
+import random
+import sdc
+import string
+import unittest
+
+import numba
+from numba import types
+
 from sdc import hiframes
 from sdc.str_arr_ext import StringArray
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
@@ -496,7 +499,7 @@ class TestHiFrames(unittest.TestCase):
             return C
 
         df = pd.DataFrame({'A': ['AB,12', 'C,321,D']})
-        hpat_func = sdc.jit(locals={'C': sdc.int64[:]})(test_impl)
+        hpat_func = sdc.jit(locals={'C': types.int64[:]})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
@@ -532,7 +535,7 @@ class TestHiFrames(unittest.TestCase):
             return B
 
         df = pd.DataFrame({'A': ['123.1', '331.2']})
-        hpat_func = sdc.jit(locals={'B': sdc.float64[:]})(test_impl)
+        hpat_func = sdc.jit(locals={'B': types.float64[:]})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 

@@ -90,7 +90,6 @@ def _build_win(cwd, env_dir):
         set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\\Library\\include
         set LIB=%LIB%;%CONDA_PREFIX%\\Library\\lib
         "%I_MPI_ROOT%"\\intel64\\bin\\mpivars.bat
-        set HDF5_DIR=%CONDA_PREFIX%\\Library
         python setup.py develop
 
     :param cwd: current working directory
@@ -111,8 +110,6 @@ def _build_win(cwd, env_dir):
     lib_dirs.append(f'{env_library_dir / "lib"}')
     env['LIB'] = os.pathsep.join(lib_dirs)
 
-    env['HDF5_DIR'] = f'{env_library_dir}'
-
     mpivars_cmd = [f'{get_mpivars_path()}']
     build_cmd = ['python', 'setup.py', 'develop']
     common_cmd = mpivars_cmd + ['&&'] + build_cmd
@@ -122,14 +119,12 @@ def _build_win(cwd, env_dir):
 def _build_lin(cwd, env_dir):
     """
     Build HPAT on Linux via the following commands:
-        set HDF5_DIR=%CONDA_PREFIX%
         python setup.py develop
 
     :param cwd: current working directory
     :param env_dir: conda environment directory
     """
     env = os.environ.copy()
-    env['HDF5_DIR'] = f'{env_dir}'
 
     cmd = ['python', 'setup.py', 'develop']
     run_cmd(cmd, cwd=cwd, env=env)

@@ -1,8 +1,8 @@
 ﻿.. _compilation:
 .. include:: ./ext_links.txt
 
-Compiling With Intel® SDC
-=========================
+Compiling With Intel® Scalable Dataframe Compiler
+=================================================
 
 .. todo::
      Basic compilation controls. What can be compiled and what cannot. How to work around compilation issues.
@@ -10,7 +10,7 @@ Compiling With Intel® SDC
      data structures
  
 What if I get a compilation error
-=================================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There are a few reasons why Intel SDC cannot compile your code out-of-the-box.
  
