@@ -161,7 +161,7 @@ class DataFrameAttribute(AttributeTemplate):
             dtypes.append(el_typ)
 
         row_typ = types.NamedTuple(dtypes, Row)
-        t = func.get_call_type(self.context, (row_typ,), {});
+        t = func.get_call_type(self.context, (row_typ,), {})
         return signature(SeriesType(t.return_type), *args)
 
     @bound_function("df.describe")

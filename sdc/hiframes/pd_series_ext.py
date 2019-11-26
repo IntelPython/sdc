@@ -564,7 +564,7 @@ class SeriesAttribute(AttributeTemplate):
         # getitem returns Timestamp for dt_index and series(dt64)
         if dtype == types.NPDatetime('ns'):
             dtype = pandas_timestamp_type
-        t = args[0].get_call_type(self.context, (dtype,), {});
+        t = args[0].get_call_type(self.context, (dtype,), {})
         return signature(SeriesType(t.return_type), *args)
 
     @bound_function("series.map")
@@ -584,7 +584,7 @@ class SeriesAttribute(AttributeTemplate):
         dtype2 = args[0].dtype
         if dtype2 == types.NPDatetime('ns'):
             dtype2 = pandas_timestamp_type
-        t = args[1].get_call_type(self.context, (dtype1, dtype2,), {});
+        t = args[1].get_call_type(self.context, (dtype1, dtype2,), {})
         return signature(SeriesType(t.return_type), *args)
 
     @bound_function("series.combine")
