@@ -34,7 +34,8 @@ import numpy as np
 import numba
 import sdc
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                   count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
+                                   count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
+                                   TestCase)
 from sdc.hiframes.rolling import supported_rolling_funcs
 
 LONG_TEST = (int(os.environ['SDC_LONG_ROLLING_TEST']) != 0
@@ -46,7 +47,7 @@ if LONG_TEST:
     test_funcs = supported_rolling_funcs[:-3]
 
 
-class TestRolling(unittest.TestCase):
+class TestRolling(TestCase):
     def test_fixed1(self):
         # test sequentially with manually created dfs
         wins = (3,)

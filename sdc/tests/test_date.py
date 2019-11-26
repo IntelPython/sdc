@@ -34,12 +34,13 @@ import sdc
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs,
                                    count_parfor_OneD_Vars, count_array_OneD_Vars,
-                                   dist_IR_contains)
+                                   dist_IR_contains,
+                                   TestCase)
 from datetime import datetime
 import random
 
 
-class TestDate(unittest.TestCase):
+class TestDate(TestCase):
     @unittest.skip("needs support for boxing/unboxing DatetimeIndex")
     def test_datetime_index_in(self):
         def test_impl(dti):

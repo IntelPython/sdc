@@ -33,7 +33,8 @@ import numba
 import sdc
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
-                                   get_start_end)
+                                   get_start_end,
+                                   TestCase)
 
 
 _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
@@ -46,7 +47,7 @@ _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
                            "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
 
 
-class TestGroupBy(unittest.TestCase):
+class TestGroupBy(TestCase):
     def test_agg_seq(self):
         def test_impl(df):
             A = df.groupby('A')['B'].agg(lambda x: x.max() - x.min())

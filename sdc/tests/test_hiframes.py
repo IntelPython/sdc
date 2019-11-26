@@ -42,10 +42,11 @@ from sdc import hiframes
 from sdc.str_arr_ext import StringArray
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
-                                   get_start_end)
+                                   get_start_end,
+                                   TestCase)
 
 
-class TestHiFrames(unittest.TestCase):
+class TestHiFrames(TestCase):
 
     def test_column_list_select2(self):
         # make sure SDC copies the columns like Pandas does

@@ -36,7 +36,8 @@ import numpy as np
 import numba
 import sdc
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs,
-                                   count_array_OneDs, dist_IR_contains, get_start_end, check_numba_version)
+                                   count_array_OneDs, dist_IR_contains, get_start_end, check_numba_version,
+                                   TestCase)
 
 from sdc.tests.gen_test_data import ParquetGenerator
 from numba.config import IS_32BITS
@@ -52,7 +53,7 @@ def inner_get_column(df):
 COL_IND = 0
 
 
-class TestDataFrame(unittest.TestCase):
+class TestDataFrame(TestCase):
 
     def test_create1(self):
         def test_impl(n):

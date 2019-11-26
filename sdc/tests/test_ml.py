@@ -34,10 +34,11 @@ import sdc
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs,
                                    count_parfor_OneD_Vars, count_array_OneD_Vars,
-                                   dist_IR_contains, check_numba_version)
+                                   dist_IR_contains, check_numba_version,
+                                   TestCase)
 
 
-class TestML(unittest.TestCase):
+class TestML(TestCase):
 
     def test_logistic_regression(self):
         def test_impl(n, d):

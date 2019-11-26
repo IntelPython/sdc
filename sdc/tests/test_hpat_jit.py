@@ -34,9 +34,10 @@ import pandas as pd
 from sdc import *
 from numba.typed import Dict
 from collections import defaultdict
+from sdc.tests.test_utils import TestCase
 
 
-class TestHpatJitIssues(unittest.TestCase):
+class TestHpatJitIssues(TestCase):
 
     @unittest.skip("Dict is not supported as class member")
     def test_class_with_dict(self):

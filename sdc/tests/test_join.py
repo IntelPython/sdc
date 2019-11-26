@@ -38,10 +38,11 @@ import sdc
 from sdc.str_arr_ext import StringArray
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
-                                   get_start_end)
+                                   get_start_end,
+                                   TestCase)
 
 
-class TestJoin(unittest.TestCase):
+class TestJoin(TestCase):
 
     def test_join1(self):
         def test_impl(n):
