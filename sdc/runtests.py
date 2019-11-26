@@ -62,8 +62,7 @@ def load_tests(loader, tests, pattern):
 
 
 if __name__ == '__main__':
-    if sdc.config.config_pipeline_hpat_default:
-        # initialize MPI
-        get_rank()
+    # initialize MPI to avoid "Attempting to use an MPI routine before initializing MPICH" in any pipeline
+    get_rank()
 
     unittest.main()

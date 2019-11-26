@@ -33,8 +33,6 @@ requirements:
     - pyarrow {{ PYARROW_VERSION }}
     - arrow-cpp {{ ARROW_CPP_VERSION }}
     - boost
-    - hdf5
-    - h5py
     - mpich                           # [not win]
     - impi_rt                         # [win]
     - impi-devel                      # [win]
@@ -55,7 +53,6 @@ requirements:
 
 test:
   requires:
-    - h5py
     - scipy
   imports:
     - sdc
@@ -78,8 +75,6 @@ outputs:
         - pyarrow {{ PYARROW_VERSION }}
         - arrow-cpp {{ PYARROW_VERSION }}
         - boost
-        - hdf5
-        - h5py
         - mpich                           # [not win]
         - impi_rt                         # [win]
         - impi-devel                      # [win]

@@ -38,12 +38,11 @@ import numpy as np
 
 import numba
 from numba import types
-from numba.extending import models, register_model, intrinsic, overload
+from numba.extending import models, overload, register_model
 from numba.typing import signature
-from numba.typing.templates import infer_global, AbstractTemplate, infer
+from numba.typing.templates import AbstractTemplate, infer_global
 
 import sdc
-from sdc import config
 from sdc.str_arr_ext import (string_array_type, num_total_chars, StringArray,
                               pre_alloc_string_array, get_offset_ptr,
                               get_data_ptr, convert_len_arr_to_offset)

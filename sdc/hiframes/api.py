@@ -35,9 +35,9 @@ from llvmlite import ir as lir
 import llvmlite.llvmpy.core as lc
 
 import numba
-from numba import ir, ir_utils
-from numba import numpy_support, types, cgutils
-from numba.ir_utils import require, mk_unique_var
+from numba import ir
+from numba import cgutils, types
+from numba.ir_utils import mk_unique_var
 import numba.array_analysis
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate, CallableTemplate
@@ -50,7 +50,7 @@ from numba.targets.imputils import (
     impl_ret_borrowed,
     iternext_impl,
     RefType)
-from numba.targets.arrayobj import make_array, _getitem_array1d
+from numba.targets.arrayobj import make_array
 
 import sdc
 from sdc.utils import _numba_to_c_type_map, unliteral_all

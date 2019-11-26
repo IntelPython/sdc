@@ -33,14 +33,13 @@ from numba.extending import (typeof_impl, type_callable, models, register_model,
                              lower_getattr, infer_getattr, overload_method, overload, intrinsic)
 from numba import cgutils
 from numba.targets.arrayobj import make_array, _empty_nd_impl, store_item, basic_indexing
-from numba.targets.boxing import unbox_array, box_array
+from numba.targets.boxing import box_array
 from numba.typing.templates import (infer_getattr, AttributeTemplate,
                                     bound_function, signature, infer_global, AbstractTemplate,
                                     ConcreteTemplate)
 
 import numpy as np
 import ctypes
-import inspect
 import sdc.str_ext
 import sdc.utils
 

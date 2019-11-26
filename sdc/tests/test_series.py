@@ -2320,8 +2320,8 @@ class TestSeries(unittest.TestCase):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_str2str(self):
-        common_methods = ['lower', 'upper']
-        sdc_methods = ['capitalize', 'lstrip', 'rstrip', 'strip', 'swapcase', 'title']
+        common_methods = ['lower', 'upper', 'lstrip', 'rstrip', 'strip']
+        sdc_methods = ['capitalize', 'swapcase', 'title']
         str2str_methods = common_methods[:]
         if sdc.config.config_pipeline_hpat_default:
             str2str_methods += sdc_methods
@@ -2341,8 +2341,7 @@ class TestSeries(unittest.TestCase):
     @unittest.skipIf(sdc.config.config_pipeline_hpat_default,
                      'Series.str.<method>() unsupported')
     def test_series_str2str_unsupported(self):
-        unsupported_methods = ['capitalize', 'lstrip', 'rstrip',
-                               'strip', 'swapcase', 'title']
+        unsupported_methods = ['capitalize', 'swapcase', 'title']
         for method in unsupported_methods:
             func_lines = ['def test_impl(S):',
                           '  return S.str.{}()'.format(method)]

@@ -25,8 +25,8 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import os
 import unittest
+import os
 import time
 import numba
 
@@ -95,7 +95,7 @@ def usecase_center(input_data):
 class TestStringMethods(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.test_results = TestResults()
+        cls.test_results = TestResultsStr()
         if is_true(os.environ.get('LOAD_PREV_RESULTS')):
             cls.test_results.load()
 

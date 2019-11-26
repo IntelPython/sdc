@@ -26,19 +26,17 @@
 # *****************************************************************************
 
 
-import pandas
+import sdc
 import logging
 from datetime import datetime
 from module_info import get_submodules_of, print_modules_classes_methods_attributes, get_doc
 
 # -- Debug logging --------------------------------------------------------------------------------------------------
-log_file_name = '../build/pandas_info.log'
+log_file_name = '../build/sdc_info.log'
+
 
 # -- Submodules, classes, and methods to be excluded from API Reference ---------------------------------------------
 exclude_modules = [
-    'pandas.core',    # This is PRIVATE submodule
-    'pandas.compat',  # This is PRIVATE submodule
-    'pandas.util'     # This is PRIVATE submodule
 ]
 
 exclude_classes = [
@@ -52,19 +50,19 @@ exclude_attributes = [
 
 
 # -- Implements custom skip functions for the parser ----------------------------------------------------------------
-def _skip_pandas_module(mod, mod_name):
-    return mod_name in exclude_modules or not mod_name.startswith('pandas')
+def _skip_sdc_module(mod, mod_name):
+    return mod_name in exclude_modules or (not mod_name.startswith('sdc') and not mod_name.startswith('hpat'))
 
 
-def _skip_pandas_class(cls, cls_name):
+def _skip_sdc_class(cls, cls_name):
     return cls_name in exclude_classes
 
 
-def _skip_pandas_method(method_name):
+def _skip_sdc_method(method_name):
     return method_name in exclude_methods
 
 
-def _skip_pandas_attribute(attr_name):
+def _skip_sdc_attribute(attr_name):
     return attr_name in exclude_attributes
 
 
@@ -74,11 +72,11 @@ if __name__ == "__main__":
     logging.debug('****************** STARTING THE LOG *************************')
     logging.debug(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
 
-    # Execute parser for Pandas
+    # Execute parser for SDC
     inspected_modules = set()
     modules = []
-    get_submodules_of(pandas, inspected_modules, modules, _skip_pandas_module, _skip_pandas_class,
-                      _skip_pandas_method, _skip_pandas_attribute)
+    get_submodules_of(sdc, inspected_modules, modules, _skip_sdc_module, _skip_sdc_class,
+                      _skip_sdc_method, _skip_sdc_attribute)
 
     # You may uncomment this line in case you want to print out generated methods and attributes
-#    print_modules_classes_methods_attributes(modules)
+    print_modules_classes_methods_attributes(modules)

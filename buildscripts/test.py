@@ -108,17 +108,21 @@ if __name__ == '__main__':
 
 
     if run_coverage == 'True':
+        if platform.system() == 'Windows':
+            format_print('Coverage can be run only on Linux of mac for now')
+            sys.exit(0)
+
+        coverage_omit = './sdc/tests/*'
+        coverage_cmd = ' && '.join(['coverage erase',
+                                   f'coverage run --source=./sdc --omit {coverage_omit} ./sdc/runtests.py',
+                                   'coveralls -v'])
+
         format_print('Run coverage')
         format_print(f'Assume that SDC is installed in develop build-mode to {develop_env} environment', new_block=False)
         format_print('Install scipy and coveralls')
         run_command(f'{develop_env_activate} && conda install -q -y scipy coveralls')
-        os.environ['PYTHONPATH'] = '.'
-        os.environ['HDF5_DIR'] = conda_prefix
-        try:
-            run_command(f'{develop_env_activate} && python -m sdc.tests.gen_test_data && coverage erase && coverage run -m sdc.runtests && coveralls -v')
-        except:
-            format_print('Coverage fails')
-            print(traceback.format_exc())
+        run_command(f'{develop_env_activate} && python -m sdc.tests.gen_test_data')
+        run_command(f'{develop_env_activate} && {coverage_cmd}')
         sys.exit(0)
 
     if test_mode == 'develop':

@@ -24,7 +24,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import datetime
 import operator
 import numpy as np
 import pandas as pd
@@ -752,12 +751,12 @@ class SeriesAttribute(AttributeTemplate):
 
 #     return typer
 
-str2str_methods = ['capitalize', 'lstrip', 'rstrip', 'strip', 'swapcase', 'title']
+str2str_methods = ['capitalize', 'swapcase', 'title']
 """
     Functions which are still overloaded by HPAT compiler pipeline
 """
 
-str2str_methods_excluded = ['upper', 'lower']
+str2str_methods_excluded = ['upper', 'lower', 'lstrip', 'rstrip', 'strip']
 """
     Functions which are used from Numba directly by calling from StringMethodsType
 
@@ -1014,7 +1013,11 @@ if not sdc.config.config_pipeline_hpat_default:
     for attr in ['resolve_std', 'resolve_var']:
         _not_series_array_attrs.append(attr)
 
-_non_hpat_pipeline_attrs = ['resolve_nsmallest', 'resolve_nlargest', 'resolve_cov', 'resolve_corr', 'resolve_pct_change']
+_non_hpat_pipeline_attrs = [
+    'resolve_append', 'resolve_combine', 'resolve_corr', 'resolve_cov',
+    'resolve_dropna', 'resolve_fillna', 'resolve_head', 'resolve_nlargest',
+    'resolve_nsmallest', 'resolve_pct_change'
+]
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
 for attr, func in numba.typing.arraydecl.ArrayAttribute.__dict__.items():

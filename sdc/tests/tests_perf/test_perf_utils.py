@@ -28,7 +28,12 @@
 # *****************************************************************************
 
 import gc
+import logging
 import sys
+import sdc
+import time
+from contextlib import contextmanager
+from copy import copy
 from pathlib import Path
 
 import pandas
@@ -46,6 +51,19 @@ Data handling:
     print_results() print all timing results from global storage
 
 """
+
+
+def setup_logging():
+    """Setup logger"""
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+    logger = logging.getLogger(__name__)
+    logger.setLevel(level=logging.INFO)
+    logger.addHandler(stream_handler)
+
+    return logger
+
 
 
 def is_true(input_string):
@@ -71,20 +89,21 @@ def get_size(obj):
     return size
 
 
+def multiply_oneds_data(tmpl, max_len):
+    """Multiply specified 1D like data."""
+    result = copy(tmpl)
+    while len(result) < max_len:
+        result += tmpl
+
+    # Trim result to max_len
+    return result[:max_len]
+
+
 def multiply_data(tmpl, max_item_len):
     """Multiply specified 2D like data."""
     result = []
     for item in tmpl:
-        local_item = item
-        local_item_len = len(local_item)
-
-        while (local_item_len < max_item_len) and (local_item_len >= 0):
-            local_item += item
-            local_item_len = len(local_item)
-
-        # Trim local_item to max_item_len
-        local_item = local_item[:max_item_len]
-        result.append(local_item)
+        result += multiply_oneds_data(item, max_item_len)
 
     return result
 
@@ -96,7 +115,7 @@ def perf_data_gen(tmpl, max_item_len, max_bytes_size):
           max_item_len: length (in elements) of resulted string in an element of the result array
         max_bytes_size: maximum size in bytes of the return data
 
-                return: list of strings
+                return: list of data
     """
     result = []
     while get_size(result) < max_bytes_size:
@@ -116,7 +135,7 @@ def perf_data_gen_fixed_len(tmpl, max_item_len, max_obj_len):
           max_item_len: length (in elements) of resulted string in an element of the result array
            max_obj_len: maximum length of the return data
 
-                return: list of strings
+                return: list of data
     """
     result = []
     while len(result) < max_obj_len:
@@ -126,11 +145,62 @@ def perf_data_gen_fixed_len(tmpl, max_item_len, max_obj_len):
     return result[:max_obj_len]
 
 
+@contextmanager
+def do_jit(f):
+    """Context manager to jit function"""
+    cfunc = sdc.jit(f)
+    try:
+        yield cfunc
+    finally:
+        del cfunc
+
+
+def calc_time(func, *args, **kwargs):
+    """Calculate execution time of specified function."""
+    start_time = time.time()
+    func(*args, **kwargs)
+    finish_time = time.time()
+
+    return finish_time - start_time
+
+
+def calc_compile_time(func, *args, **kwargs):
+    """Calculate compile time as difference between first 2 runs."""
+    return calc_time(func, *args, **kwargs) - calc_time(func, *args, **kwargs)
+
+
+def calc_compilation(pyfunc, *args, iter_number=5):
+    """Calculate compile time several times."""
+    compile_times = []
+    for _ in range(iter_number):
+        with do_jit(pyfunc) as cfunc:
+            compile_time = calc_compile_time(cfunc, *args)
+            compile_times.append(compile_time)
+
+    return compile_times
+
+
+def get_times(f, *args, iter_number=5):
+    """Get time of boxing+unboxing and internal execution"""
+    exec_times = []
+    boxing_times = []
+    for _ in range(iter_number):
+        ext_start = time.time()
+        int_result, _ = f(*args)
+        ext_finish = time.time()
+
+        exec_times.append(int_result)
+        boxing_times.append(max(ext_finish - ext_start - int_result, 0))
+
+    return exec_times, boxing_times
+
+
 class TestResults:
     perf_results_xlsx = 'perf_results.xlsx'
     raw_perf_results_xlsx = 'raw_perf_results.xlsx'
-    index = ['name', 'N', 'type', 'size', 'width']
+    index = ['name', 'N', 'type', 'size']
     test_results_data = pandas.DataFrame(index=index)
+    logger = setup_logging()
 
     @property
     def grouped_data(self):
@@ -168,7 +238,7 @@ class TestResults:
         columns = ['median', 'min', 'max', 'compile', 'boxing']
         return test_results_data.groupby(self.index)[columns].first().sort_values(self.index)
 
-    def add(self, test_name, test_type, data_size, test_results, data_width=None,
+    def add(self, test_name, test_type, data_size, test_results,
             boxing_results=None, compile_results=None, num_threads=config.NUMBA_NUM_THREADS):
         """
         Add performance testing timing results into global storage
@@ -176,19 +246,20 @@ class TestResults:
                   test_type: Type of test (3rd column in grouped result)
                   data_size: Size of input data (4s column in grouped result)
                test_results: List of timing results of the experiment
-                 data_width: Scalability attribute for str input data (5s column in grouped result)
              boxing_results: List of timing results of the overhead (boxing/unboxing)
            compilation_time: Timing result of compilation
                 num_threads: Value from NUMBA_NUM_THREADS (2nd column in grouped result)
         """
-        local_results = pandas.DataFrame({'name': test_name,
-                                          'N': num_threads,
-                                          'type': test_type,
-                                          'size': data_size,
-                                          'width': data_width,
-                                          'Time(s)': test_results,
-                                          'Compile(s)': compile_results,
-                                          'Boxing(s)': boxing_results}, index=self.index)
+        data = {
+            'name': test_name,
+            'N': num_threads,
+            'type': test_type,
+            'size': data_size,
+            'Time(s)': test_results,
+            'Compile(s)': compile_results,
+            'Boxing(s)': boxing_results
+        }
+        local_results = pandas.DataFrame(data)
         self.test_results_data = self.test_results_data.append(local_results, sort=False)
 
     def print(self):
@@ -202,11 +273,20 @@ class TestResults:
         Dump performance testing results from global data storage to excel
         """
         # openpyxl need to be installed
-        with pandas.ExcelWriter(self.perf_results_xlsx) as writer:
-            self.grouped_data.to_excel(writer)
 
-        with pandas.ExcelWriter(self.raw_perf_results_xlsx) as writer:
-            self.test_results_data.to_excel(writer, index=False)
+        try:
+            with pandas.ExcelWriter(self.perf_results_xlsx) as writer:
+                self.grouped_data.to_excel(writer)
+        except ModuleNotFoundError as e:
+            msg = 'Could not dump the results to "%s": %s'
+            self.logger.warning(msg, self.perf_results_xlsx, e)
+
+        try:
+            with pandas.ExcelWriter(self.raw_perf_results_xlsx) as writer:
+                self.test_results_data.to_excel(writer, index=False)
+        except ModuleNotFoundError as e:
+            msg = 'Could not dump raw results to "%s": %s'
+            self.logger.warning(msg, self.raw_perf_results_xlsx, e)
 
     def load(self):
         """
@@ -216,7 +296,41 @@ class TestResults:
         if raw_perf_results_xlsx.exists():
             with raw_perf_results_xlsx.open('rb') as fd:
                 # xlrd need to be installed
-                self.test_results_data = pandas.read_excel(fd)
+                try:
+                    self.test_results_data = pandas.read_excel(fd)
+                except ModuleNotFoundError as e:
+                    msg = 'Could not load previous results from %s: %s'
+                    self.logger.warning(msg, raw_perf_results_xlsx, e)
+
+
+class TestResultsStr(TestResults):
+    index = ['name', 'N', 'type', 'size', 'width']
+
+    def add(self, test_name, test_type, data_size, test_results, data_width=None,
+            boxing_results=None, compile_results=None, num_threads=config.NUMBA_NUM_THREADS):
+        """
+        Add performance testing timing results into global storage
+                  test_name: Name of test (1st column in grouped result)
+                  test_type: Type of test (3rd column in grouped result)
+                  data_size: Size of input data (4s column in grouped result)
+               test_results: List of timing results of the experiment
+                 data_width: Scalability attribute for str input data (5s column in grouped result)
+             boxing_results: List of timing results of the overhead (boxing/unboxing)
+           compilation_time: Timing result of compilation
+                num_threads: Value from NUMBA_NUM_THREADS (2nd column in grouped result)
+        """
+        data = {
+            'name': test_name,
+            'N': num_threads,
+            'type': test_type,
+            'size': data_size,
+            'width': data_width,
+            'Time(s)': test_results,
+            'Compile(s)': compile_results,
+            'Boxing(s)': boxing_results
+        }
+        local_results = pandas.DataFrame(data, index=self.index)
+        self.test_results_data = self.test_results_data.append(local_results, sort=False)
 
 
 if __name__ == "__main__":

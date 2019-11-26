@@ -25,14 +25,12 @@
 # *****************************************************************************
 
 
-import operator
 import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
                              type_callable, overload_method, intrinsic)
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
-from numba.typing.templates import infer_global, AbstractTemplate
-from numba import types, typing, cgutils
+from numba.targets.imputils import impl_ret_borrowed
+from numba import types
 from numba.targets.boxing import box_array, unbox_array
 
 import numpy as np

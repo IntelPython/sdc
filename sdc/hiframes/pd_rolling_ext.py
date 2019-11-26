@@ -25,21 +25,15 @@
 # *****************************************************************************
 
 
-import operator
-import pandas as pd
-import numpy as np
-import numba
-from numba import types, cgutils
+from numba import types
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
                              type_callable, infer, overload, make_attribute_wrapper, intrinsic,
                              lower_builtin, overload_method)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
                                     AttributeTemplate, bound_function)
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 import sdc
 from sdc.hiframes.pd_series_ext import (SeriesType, _get_series_array_type,
                                          arr_to_series_type)
-from sdc.str_ext import string_type
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.hiframes.rolling import supported_rolling_funcs
 
