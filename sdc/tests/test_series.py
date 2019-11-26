@@ -36,7 +36,7 @@ import sdc
 from itertools import islice, permutations
 from sdc.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end,
-    skip_numba_jit, skip_sdc_jit)
+    skip_numba_jit, skip_sdc_jit, TestCase)
 from sdc.tests.gen_test_data import ParquetGenerator
 from numba import types
 from numba.config import IS_32BITS
@@ -208,28 +208,6 @@ def _make_func_use_method_arg1(method):
 
 
 GLOBAL_VAL = 2
-
-
-class TestCase(unittest.TestCase):
-
-    def numba_jit(self, *args, **kwargs):
-        import numba
-        import warnings
-        if 'nopython' in kwargs:
-            warnings.warn('nopython is set to True and is ignored', RuntimeWarning)
-        if 'parallel' in kwargs:
-            warnings.warn('parallel is set to True and is ignored', RuntimeWarning)
-        kwargs.update({'nopython': True, 'parallel': True})
-        return numba.jit(*args, **kwargs)
-
-    def sdc_jit(self, *args, **kwargs):
-        return sdc.jit(*args, **kwargs)
-
-    def jit(self, *args, **kwargs):
-        if sdc.config.config_pipeline_hpat_default:
-            return self.sdc_jit(*args, **kwargs)
-        else:
-            return self.numba_jit(*args, **kwargs)
 
 
 class TestSeries(TestCase):
