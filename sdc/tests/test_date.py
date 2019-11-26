@@ -35,7 +35,7 @@ from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs,
                                    count_parfor_OneD_Vars, count_array_OneD_Vars,
                                    dist_IR_contains,
-                                   TestCase)
+                                   skip_numba_jit, TestCase)
 from datetime import datetime
 import random
 
@@ -51,6 +51,7 @@ class TestDate(TestCase):
         dti = pd.DatetimeIndex(df['str_date'])
         np.testing.assert_array_equal(hpat_func(dti).values, test_impl(dti).values)
 
+    @skip_numba_jit
     def test_datetime_index(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).values
@@ -59,6 +60,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_kw(self):
         def test_impl(df):
             return pd.DatetimeIndex(data=df['str_date']).values
@@ -76,6 +78,7 @@ class TestDate(TestCase):
         A = pd.DatetimeIndex(df['str_date']).to_series()
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
+    @skip_numba_jit
     def test_datetime_getitem(self):
         def test_impl(A):
             return A[0]
@@ -85,6 +88,7 @@ class TestDate(TestCase):
         A = pd.DatetimeIndex(df['str_date']).to_series()
         self.assertEqual(hpat_func(A), test_impl(A))
 
+    @skip_numba_jit
     def test_ts_map(self):
         def test_impl(A):
             return A.map(lambda x: x.hour)
@@ -94,6 +98,7 @@ class TestDate(TestCase):
         A = pd.DatetimeIndex(df['str_date']).to_series()
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
+    @skip_numba_jit
     def test_ts_map_date(self):
         def test_impl(A):
             return A.map(lambda x: x.date())[0]
@@ -103,6 +108,7 @@ class TestDate(TestCase):
         A = pd.DatetimeIndex(df['str_date']).to_series()
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
+    @skip_numba_jit
     def test_ts_map_date2(self):
         def test_impl(df):
             return df.apply(lambda row: row.dt_ind.date(), axis=1)[0]
@@ -112,6 +118,7 @@ class TestDate(TestCase):
         df['dt_ind'] = pd.DatetimeIndex(df['str_date'])
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_ts_map_date_set(self):
         def test_impl(df):
             df['hpat_date'] = df.dt_ind.map(lambda x: x.date())
@@ -123,6 +130,7 @@ class TestDate(TestCase):
         df['pd_date'] = df.dt_ind.map(lambda x: x.date())
         np.testing.assert_array_equal(df['hpat_date'], df['pd_date'])
 
+    @skip_numba_jit
     def test_date_series_unbox(self):
         def test_impl(A):
             return A[0]
@@ -132,6 +140,7 @@ class TestDate(TestCase):
         A = pd.DatetimeIndex(df['str_date']).to_series().map(lambda x: x.date())
         self.assertEqual(hpat_func(A), test_impl(A))
 
+    @skip_numba_jit
     def test_date_series_unbox2(self):
         def test_impl(A):
             return A[0]
@@ -141,6 +150,7 @@ class TestDate(TestCase):
         A = pd.DatetimeIndex(df['str_date']).map(lambda x: x.date())
         self.assertEqual(hpat_func(A), test_impl(A))
 
+    @skip_numba_jit
     def test_datetime_index_set(self):
         def test_impl(df):
             df['sdc'] = pd.DatetimeIndex(df['str_date']).values
@@ -178,6 +188,7 @@ class TestDate(TestCase):
         ts = pd.Timestamp(datetime(2017, 4, 26).isoformat())
         self.assertEqual(hpat_func(ts), test_impl(ts))
 
+    @skip_numba_jit
     def test_datetimeindex_str_comp(self):
         def test_impl(df):
             return (df.A >= '2011-10-23').values
@@ -186,6 +197,7 @@ class TestDate(TestCase):
         hpat_func = sdc.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetimeindex_str_comp2(self):
         def test_impl(df):
             return ('2011-10-23' <= df.A).values
@@ -194,6 +206,7 @@ class TestDate(TestCase):
         hpat_func = sdc.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_df(self):
         def test_impl(df):
             df = pd.DataFrame({'A': pd.DatetimeIndex(df['str_date'])})
@@ -203,6 +216,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_date(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).date
@@ -211,6 +225,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_max(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).max()
@@ -219,6 +234,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         self.assertEqual(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_min(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).min()
@@ -227,6 +243,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         self.assertEqual(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_timedelta_days(self):
         def test_impl(df):
             s = pd.DatetimeIndex(df['str_date'])
@@ -237,6 +254,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_timedelta_seconds(self):
         def test_impl(df):
             s = pd.DatetimeIndex(df['str_date'])
@@ -247,6 +265,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_timedelta_microseconds(self):
         def test_impl(df):
             s = pd.DatetimeIndex(df['str_date'])
@@ -257,6 +276,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_timedelta_nanoseconds(self):
         def test_impl(df):
             s = pd.DatetimeIndex(df['str_date'])
@@ -267,6 +287,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_ret(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date'])
@@ -276,6 +297,7 @@ class TestDate(TestCase):
         pd.testing.assert_index_equal(hpat_func(df), test_impl(df),
                                       check_names=False)
 
+    @skip_numba_jit
     def test_datetime_index_year(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).year
@@ -284,6 +306,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_month(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).month
@@ -292,6 +315,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_day(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).day
@@ -300,6 +324,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_hour(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).hour
@@ -308,6 +333,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_minute(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).minute
@@ -316,6 +342,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_second(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).second
@@ -324,6 +351,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_microsecond(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).microsecond
@@ -332,6 +360,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_index_nanosecond(self):
         def test_impl(df):
             return pd.DatetimeIndex(df['str_date']).nanosecond
@@ -340,6 +369,7 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_datetime_series_dt_date(self):
         def test_impl(A):
             return A.dt.date
@@ -352,6 +382,7 @@ class TestDate(TestCase):
             hpat_func(A), test_impl(A).reset_index(drop=True),
             check_names=False)
 
+    @skip_numba_jit
     def test_datetime_series_dt_year(self):
         def test_impl(A):
             return A.dt.year
