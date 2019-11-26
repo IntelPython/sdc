@@ -1540,19 +1540,20 @@ class HiFramesTypedPassImpl(object):
     def _handle_rolling_apply_func(self, func_node, dtype, out_dtype):
         if func_node is None:
             raise ValueError("cannot find kernel function for rolling.apply() call")
+        func_node = func_node.value.py_func
         # TODO: more error checking on the kernel to make sure it doesn't
         # use global/closure variables
-        if func_node.closure is not None:
-            raise ValueError("rolling apply kernel functions cannot have closure variables")
-        if func_node.defaults is not None:
-            raise ValueError("rolling apply kernel functions cannot have default arguments")
+        # if func_node.closure is not None:
+        #     raise ValueError("rolling apply kernel functions cannot have closure variables")
+        # if func_node.defaults is not None:
+        #     raise ValueError("rolling apply kernel functions cannot have default arguments")
         # create a function from the code object
         glbs = self.state.func_ir.func_id.func.__globals__
         lcs = {}
         exec("def f(A): return A", glbs, lcs)
         kernel_func = lcs['f']
-        kernel_func.__code__ = func_node.code
-        kernel_func.__name__ = func_node.code.co_name
+        kernel_func.__code__ = func_node.__code__
+        kernel_func.__name__ = func_node.__code__.co_name
         # use hpat's sequential pipeline to enable pandas operations
         # XXX seq pipeline used since dist pass causes a hang
         m = numba.ir_utils._max_label
