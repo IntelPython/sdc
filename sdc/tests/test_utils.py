@@ -25,6 +25,8 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import unittest
+
 import numpy as np
 
 import sdc
@@ -108,3 +110,33 @@ def get_start_end(n):
 
 def check_numba_version(version):
     return numba.__version__ == version
+
+
+def msg_and_func(msg_or_func=None):
+    if msg_or_func is None:
+        # No signature, no function
+        func = None
+        msg = None
+    elif isinstance(msg_or_func, str):
+        # A message is passed
+        func = None
+        msg = msg_or_func
+    else:
+        # A function is passed
+        func = msg_or_func
+        msg = None
+    return msg, func
+
+
+def skip_numba_jit(msg_or_func=None):
+    msg, func = msg_and_func(msg_or_func)
+    wrapper = unittest.skipUnless(sdc.config.config_pipeline_hpat_default, msg or "numba pipeline not supported")
+    # wrapper = lambda f: f  # disable skipping
+    return wrapper(func) if func else wrapper
+
+
+def skip_sdc_jit(msg_or_func=None):
+    msg, func = msg_and_func(msg_or_func)
+    wrapper = unittest.skipIf(sdc.config.config_pipeline_hpat_default, msg or "sdc pipeline not supported")
+    # wrapper = lambda f: f  # disable skipping
+    return wrapper(func) if func else wrapper

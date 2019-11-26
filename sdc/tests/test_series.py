@@ -35,7 +35,8 @@ import pyarrow.parquet as pq
 import sdc
 from itertools import islice, permutations
 from sdc.tests.test_utils import (
-    count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end)
+    count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end,
+    skip_numba_jit, skip_sdc_jit)
 from sdc.tests.gen_test_data import ParquetGenerator
 from numba import types
 from numba.config import IS_32BITS
@@ -207,36 +208,6 @@ def _make_func_use_method_arg1(method):
 
 
 GLOBAL_VAL = 2
-
-
-def msg_and_func(msg_or_func=None):
-    if msg_or_func is None:
-        # No signature, no function
-        func = None
-        msg = None
-    elif isinstance(msg_or_func, str):
-        # A message is passed
-        func = None
-        msg = msg_or_func
-    else:
-        # A function is passed
-        func = msg_or_func
-        msg = None
-    return msg, func
-
-
-def skip_numba_jit(msg_or_func=None):
-    msg, func = msg_and_func(msg_or_func)
-    wrapper = unittest.skipUnless(sdc.config.config_pipeline_hpat_default, msg or "numba pipeline not supported")
-    # wrapper = lambda f: f  # disable skipping
-    return wrapper(func) if func else wrapper
-
-
-def skip_sdc_jit(msg_or_func=None):
-    msg, func = msg_and_func(msg_or_func)
-    wrapper = unittest.skipIf(sdc.config.config_pipeline_hpat_default, msg or "sdc pipeline not supported")
-    # wrapper = lambda f: f  # disable skipping
-    return wrapper(func) if func else wrapper
 
 
 class TestSeries(unittest.TestCase):
