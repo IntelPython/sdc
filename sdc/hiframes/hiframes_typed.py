@@ -1213,16 +1213,6 @@ class HiFramesTypedPassImpl(object):
         if len(rhs.args) != 1:
             raise ValueError("map expects 1 argument")
         func = guard(get_definition, self.state.func_ir, rhs.args[0]).value.py_func
-        # print('VVVVVVVVVVV')
-        # print(func)
-        # print(func.value)
-        # print(func.value.py_func)
-        # print(dir(func))
-        # print(dir(func.value))
-        # print(dir(func.value.py_func))
-        # if func is None or not (isinstance(func, ir.Expr)
-        #                         and func.op == 'make_function'):
-        #     raise ValueError("lambda for map not found")
 
         dtype = self.state.typemap[series_var.name].dtype
         nodes = []
@@ -1390,10 +1380,6 @@ class HiFramesTypedPassImpl(object):
         if len(rhs.args) > 3:
             raise ValueError("too many arguments in call to combine")
         func = guard(get_definition, self.state.func_ir, rhs.args[1]).value.py_func
-        # if func is None or not (isinstance(func, ir.Expr)
-        #                         and func.op == 'make_function'):
-        #     raise ValueError("lambda for combine not found")
-
         out_typ = self.state.typemap[lhs.name].dtype
         other = rhs.args[0]
         nodes = []
@@ -1543,10 +1529,6 @@ class HiFramesTypedPassImpl(object):
         func_node = func_node.value.py_func
         # TODO: more error checking on the kernel to make sure it doesn't
         # use global/closure variables
-        # if func_node.closure is not None:
-        #     raise ValueError("rolling apply kernel functions cannot have closure variables")
-        # if func_node.defaults is not None:
-        #     raise ValueError("rolling apply kernel functions cannot have default arguments")
         # create a function from the code object
         glbs = self.state.func_ir.func_id.func.__globals__
         lcs = {}
