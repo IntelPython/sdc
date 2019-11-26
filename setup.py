@@ -76,17 +76,6 @@ def readme():
         return f.read()
 
 
-_has_h5py = False
-HDF5_DIR = ""
-
-if 'HDF5_DIR' in os.environ:
-    _has_h5py = True
-    HDF5_DIR = os.environ['HDF5_DIR']
-
-#PANDAS_DIR = ""
-# if 'PANDAS_DIR' in os.environ:
-#    PANDAS_DIR = os.environ['PANDAS_DIR']
-
 # package environment variable is PREFIX during build time
 if 'CONDA_BUILD' in os.environ:
     PREFIX_DIR = os.environ['PREFIX']
@@ -103,13 +92,6 @@ except ImportError:
     _has_pyarrow = False
 else:
     _has_pyarrow = True
-
-_has_daal = False
-DAALROOT = ""
-
-if 'DAALROOT' in os.environ:
-    _has_daal = True
-    DAALROOT = os.environ['DAALROOT']
 
 _has_opencv = False
 OPENCV_DIR = ""
@@ -128,7 +110,6 @@ eca = ['-std=c++11', ]  # '-g', '-O0']
 ela = ['-std=c++11', ]
 
 MPI_LIBS = ['mpi']
-H5_CPP_FLAGS = []
 
 use_impi = False
 if use_impi:
@@ -142,10 +123,7 @@ if use_impi:
 if is_win:
     # use Intel MPI on Windows
     MPI_LIBS = ['impi']
-    # hdf5-parallel Windows build uses CMake which needs this flag
-    H5_CPP_FLAGS = [('H5_BUILT_AS_DYNAMIC_LIB', None)]
 
-hdf5_libs = MPI_LIBS + ['hdf5']
 io_libs = MPI_LIBS
 boost_libs = []
 
@@ -161,7 +139,6 @@ ext_io = Extension(name="sdc.hio",
                    libraries=boost_libs,
                    include_dirs=ind + np_compile_args['include_dirs'],
                    library_dirs=lid,
-                   define_macros=H5_CPP_FLAGS,
                    extra_compile_args=eca,
                    extra_link_args=ela,
                    language="c++"
@@ -187,18 +164,6 @@ ext_transport_seq = Extension(name="sdc.transport_seq",
                               extra_link_args=ela,
                               language="c++"
                               )
-
-ext_hdf5 = Extension(name="sdc.io._hdf5",
-                     sources=["sdc/io/_hdf5.cpp"],
-                     depends=[],
-                     libraries=hdf5_libs,
-                     include_dirs=[HDF5_DIR + '/include', ] + ind,
-                     library_dirs=[HDF5_DIR + '/lib', ] + lid,
-                     define_macros=H5_CPP_FLAGS,
-                     extra_compile_args=eca,
-                     extra_link_args=ela,
-                     language="c++"
-                     )
 
 ext_hdist = Extension(name="sdc.hdist",
                       sources=["sdc/_distributed.cpp"],
@@ -250,11 +215,6 @@ ext_str = Extension(name="sdc.hstr_ext",
                     library_dirs=np_compile_args['library_dirs'] + lid,
                     )
 
-#dt_args = copy.copy(np_compile_args)
-#dt_args['include_dirs'] = dt_args['include_dirs'] + [PANDAS_DIR+'/_libs/src/datetime/']
-#dt_args['library_dirs'] = dt_args['library_dirs'] + [PANDAS_DIR+'/_libs/tslibs']
-#dt_args['libraries'] = dt_args['libraries'] + ['np_datetime']
-
 ext_dt = Extension(name="sdc.hdatetime_ext",
                    sources=["sdc/_datetime_ext.cpp"],
                    libraries=np_compile_args['libraries'],
@@ -289,12 +249,6 @@ ext_parquet = Extension(name="sdc.parquet_cpp",
                         library_dirs=lid,
                         )
 
-# ext_daal_wrapper = Extension(name="sdc.daal_wrapper",
-#                             include_dirs = [DAALROOT+'/include'],
-#                             libraries = ['daal_core', 'daal_thread']+MPI_LIBS,
-#                             sources=["sdc/_daal.cpp"]
-#                             )
-
 cv_libs = ['opencv_core', 'opencv_imgproc', 'opencv_imgcodecs', 'opencv_highgui']
 # XXX cv lib file name needs version on Windows
 if is_win:
@@ -311,12 +265,9 @@ ext_cv_wrapper = Extension(name="sdc.cv_wrapper",
 
 _ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_dt, ext_io, ext_transport_mpi, ext_transport_seq]
 
-if _has_h5py:
-    _ext_mods.append(ext_hdf5)
 if _has_pyarrow:
     _ext_mods.append(ext_parquet)
-# if _has_daal:
-#    _ext_mods.append(ext_daal_wrapper)
+
 if _has_opencv:
     _ext_mods.append(ext_cv_wrapper)
 
@@ -467,7 +418,7 @@ setup(name='sdc',
       packages=find_packages(),
       package_data={'sdc.tests': ['*.bz2'], },
       install_requires=['numba'],
-      extras_require={'HDF5': ["h5py"], 'Parquet': ["pyarrow"]},
+      extras_require={'Parquet': ["pyarrow"], },
       cmdclass=sdc_build_commands,
       ext_modules=_ext_mods,
       entry_points={

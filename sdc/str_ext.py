@@ -32,7 +32,7 @@ from llvmlite import ir as lir
 import llvmlite.binding as ll
 
 import numba
-from numba import cgutils, types, typing
+from numba import cgutils, types
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
                              type_callable, overload_method, intrinsic)
