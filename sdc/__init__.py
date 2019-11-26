@@ -31,13 +31,9 @@ import numba
 # re-export from Numba
 from numba import (typeof, prange, pndindex, gdb, gdb_breakpoint, gdb_init,
                    stencil, threading_layer, jitclass, objmode)
-from numba.types import *
 
 import sdc.dict_ext
 import sdc.set_ext
-from sdc.set_ext import init_set_string
-from sdc.str_ext import string_type
-from sdc.str_arr_ext import string_array_type
 import sdc.compiler
 import sdc.io
 import sdc.io.np_io

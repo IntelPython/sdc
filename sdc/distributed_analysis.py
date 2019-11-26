@@ -39,7 +39,6 @@ from numba.ir_utils import (find_topo_order, guard, get_definition, require,
 from numba.parfor import Parfor
 from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 
-import numpy as np
 import sdc
 import sdc.io
 import sdc.io.np_io
@@ -327,16 +326,6 @@ class DistributedAnalysis(object):
         if func_name == 'len' and func_mod in ('__builtin__', 'builtins'):
             return
 
-        if sdc.config._has_h5py and (func_mod == 'sdc.io.pio_api'
-                                      and func_name in ('h5read', 'h5write', 'h5read_filter')):
-            return
-
-        if sdc.config._has_h5py and (func_mod == 'sdc.io.pio_api'
-                                      and func_name == 'get_filter_read_indices'):
-            if lhs not in array_dists:
-                array_dists[lhs] = Distribution.OneD
-            return
-
         if fdef == ('quantile', 'sdc.hiframes.api'):
             # quantile doesn't affect input's distribution
             return
@@ -484,24 +473,6 @@ class DistributedAnalysis(object):
             if lhs not in array_dists:
                 array_dists[lhs] = Distribution.OneD
             return
-
-        if func_name == 'train' and isinstance(func_mod, ir.Var):
-            if self.typemap[func_mod.name] == sdc.ml.svc.svc_type:
-                self._meet_array_dists(
-                    args[0].name, args[1].name, array_dists, Distribution.Thread)
-                return
-            if self.typemap[func_mod.name] == sdc.ml.naive_bayes.mnb_type:
-                self._meet_array_dists(args[0].name, args[1].name, array_dists)
-                return
-
-        if func_name == 'predict' and isinstance(func_mod, ir.Var):
-            if self.typemap[func_mod.name] == sdc.ml.svc.svc_type:
-                self._meet_array_dists(
-                    lhs, args[0].name, array_dists, Distribution.Thread)
-                return
-            if self.typemap[func_mod.name] == sdc.ml.naive_bayes.mnb_type:
-                self._meet_array_dists(lhs, args[0].name, array_dists)
-                return
 
         # TODO: make sure assert_equiv is not generated unnecessarily
         # TODO: fix assert_equiv for np.stack from df.value

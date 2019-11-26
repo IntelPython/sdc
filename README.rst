@@ -168,6 +168,5 @@ Running unit tests
 ------------------
 ::
 
-    conda install h5py
     python sdc/tests/gen_test_data.py
     python -m unittest

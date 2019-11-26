@@ -32,10 +32,8 @@ import re
 import numba
 from numba import types
 from numba.extending import overload
-from numba.typing.templates import infer_global, AbstractTemplate, signature
 
 import sdc
-from sdc.str_ext import string_type, unicode_to_std_str, std_str_to_unicode
 from sdc.str_arr_ext import (string_array_type, StringArrayType,
                               is_str_arr_typ, pre_alloc_string_array, get_utf8_size)
 

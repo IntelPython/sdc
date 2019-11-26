@@ -25,9 +25,7 @@
 # *****************************************************************************
 
 
-import operator
 import pandas as pd
-import numpy as np
 import numba
 from numba import types
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
@@ -41,7 +39,7 @@ from sdc.str_ext import string_type
 import sdc.hiframes
 from sdc.hiframes.pd_series_ext import (is_str_series_typ, string_array_type,
                                          SeriesType)
-from sdc.hiframes.pd_timestamp_ext import pandas_timestamp_type, datetime_date_type
+from sdc.hiframes.pd_timestamp_ext import pandas_timestamp_type
 from sdc.hiframes.datetime_date_ext import array_datetime_date
 
 _dt_index_data_typ = types.Array(types.NPDatetime('ns'), 1, 'C')

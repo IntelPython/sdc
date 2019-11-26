@@ -26,7 +26,6 @@
 
 
 import operator
-import numpy as np
 import numba
 import sdc
 from numba import types
@@ -43,7 +42,6 @@ from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
 from sdc.str_arr_ext import (string_array_type, get_data_ptr,
                               is_str_arr_typ, pre_alloc_string_array, _memcpy)
 
-import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 from llvmlite.llvmpy.core import Type as LLType

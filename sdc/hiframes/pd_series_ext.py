@@ -24,7 +24,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import datetime
 import operator
 import numpy as np
 import pandas as pd
@@ -565,18 +564,8 @@ class SeriesAttribute(AttributeTemplate):
         # getitem returns Timestamp for dt_index and series(dt64)
         if dtype == types.NPDatetime('ns'):
             dtype = pandas_timestamp_type
-        code = args[0].literal_value.code
-        _globals = {'np': np}
-        # XXX hack in hiframes_typed to make globals available
-        if hasattr(args[0].literal_value, 'globals'):
-            # TODO: use code.co_names to find globals actually used?
-            _globals = args[0].literal_value.globals
-
-        f_ir = numba.ir_utils.get_ir_of_code(_globals, code)
-        f_typemap, f_return_type, f_calltypes = numba.typed_passes.type_inference_stage(
-            self.context, f_ir, (dtype,), None)
-
-        return signature(SeriesType(f_return_type), *args)
+        t = args[0].get_call_type(self.context, (dtype,), {})
+        return signature(SeriesType(t.return_type), *args)
 
     @bound_function("series.map")
     def resolve_map(self, ary, args, kws):
@@ -595,11 +584,8 @@ class SeriesAttribute(AttributeTemplate):
         dtype2 = args[0].dtype
         if dtype2 == types.NPDatetime('ns'):
             dtype2 = pandas_timestamp_type
-        code = args[1].literal_value.code
-        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
-        f_typemap, f_return_type, f_calltypes = numba.typed_passes.type_inference_stage(
-            self.context, f_ir, (dtype1, dtype2,), None)
-        return signature(SeriesType(f_return_type), *args)
+        t = args[1].get_call_type(self.context, (dtype1, dtype2,), {})
+        return signature(SeriesType(t.return_type), *args)
 
     @bound_function("series.combine")
     def resolve_combine(self, ary, args, kws):

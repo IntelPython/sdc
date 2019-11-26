@@ -29,16 +29,13 @@ import numpy as np
 import math
 from collections import defaultdict
 import numba
-from numba import typeinfer, ir, ir_utils, config, types
+from numba import ir, ir_utils, typeinfer, types
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes,
                             mk_unique_var)
-from numba.typing import signature
-from numba.extending import overload
 import sdc
 import sdc.timsort
 from sdc.timsort import getitem_arr_tup
-from sdc.utils import _numba_to_c_type_map
 from sdc import distributed, distributed_analysis
 from sdc.distributed_api import Reduce_Type
 from sdc.distributed_analysis import Distribution
@@ -53,7 +50,6 @@ from sdc.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
                               get_offset_ptr, get_data_ptr, convert_len_arr_to_offset,
                               pre_alloc_string_array, num_total_chars)
-from sdc.str_ext import string_type
 
 
 MIN_SAMPLES = 1000000
