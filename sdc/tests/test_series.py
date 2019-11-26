@@ -210,7 +210,7 @@ def _make_func_use_method_arg1(method):
 GLOBAL_VAL = 2
 
 
-class TestSeries(unittest.TestCase):
+class TestCase(unittest.TestCase):
 
     def numba_jit(self, *args, **kwargs):
         import numba
@@ -230,6 +230,9 @@ class TestSeries(unittest.TestCase):
             return self.sdc_jit(*args, **kwargs)
         else:
             return self.numba_jit(*args, **kwargs)
+
+
+class TestSeries(TestCase):
 
     @skip_numba_jit
     def test_create1(self):
