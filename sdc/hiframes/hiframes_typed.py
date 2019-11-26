@@ -1212,10 +1212,17 @@ class HiFramesTypedPassImpl(object):
         # error checking: make sure there is function input only
         if len(rhs.args) != 1:
             raise ValueError("map expects 1 argument")
-        func = guard(get_definition, self.state.func_ir, rhs.args[0])
-        if func is None or not (isinstance(func, ir.Expr)
-                                and func.op == 'make_function'):
-            raise ValueError("lambda for map not found")
+        func = guard(get_definition, self.state.func_ir, rhs.args[0]).value.py_func
+        # print('VVVVVVVVVVV')
+        # print(func)
+        # print(func.value)
+        # print(func.value.py_func)
+        # print(dir(func))
+        # print(dir(func.value))
+        # print(dir(func.value.py_func))
+        # if func is None or not (isinstance(func, ir.Expr)
+        #                         and func.op == 'make_function'):
+        #     raise ValueError("lambda for map not found")
 
         dtype = self.state.typemap[series_var.name].dtype
         nodes = []
