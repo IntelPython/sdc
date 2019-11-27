@@ -1121,6 +1121,29 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = sdc.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
+    def test_dataframe_min(self):
+        def test_impl(df):
+            return df.min()
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [12, 4, 5, 44, 1],
+                           "B": [5, 2, 54, 3, 2],
+                           "C": [20, 16, 7, 3, 8],
+                           "D": [14, 3, 17, 2, 6]})
+        print(sdc_func(df))
+        pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
+
+    def test_dataframe_min2(self):
+        def test_impl(df):
+            return df.min()
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [12, 4, 5, None, 1],
+                           "B": [5, 2, 54, 3, None],
+                           "C": [20, 16, 7, 3, 8],
+                           "D": [14, 3, None, 2, 6]})
+        print(sdc_func(df))
+        pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
+
+
 
 if __name__ == "__main__":
     unittest.main()

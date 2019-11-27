@@ -92,3 +92,55 @@ def sdc_pandas_dataframe_count(self, axis=0, level=None, numeric_only=False):
         return pandas.Series(data=result_data, index=result_index)
 
     return sdc_pandas_dataframe_count_impl
+
+
+@overload_method(DataFrameType, 'min')
+def sdc_pandas_dataframe_min(self, axis=None, skipna=True, level=None, numeric_only=None):
+    """
+       Pandas DataFrame method :meth:`pandas.DataFrame.min` implementation.
+
+       .. only:: developer
+
+           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_min1
+
+       Parameters
+       -----------
+       self: :class:`pandas.DataFrame`
+           input arg
+       axis:: Axis for the function to be applied on.
+            {index (0), columns (1)}
+       skipna:
+           *unsupported*
+       level:
+           *unsupported*
+       numeric_only:
+           *unsupported*
+
+       Returns
+       -------
+       :obj:`pandas.Series` or `pandas.DataFrame`
+               returns: the minimum of the values for the requested axis.
+       """
+
+    _func_name = 'Method pandas.dataframe.min().'
+
+    if not isinstance(self, DataFrameType):
+        raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(_func_name, self))
+
+    if not (isinstance(axis, (types.Integer, types.Omitted)) or axis is None):
+        raise TypingError("{} 'axis' must be int64. Given: {}".format(_func_name, axis))
+
+    if not isinstance(skipna, (types.Boolean, types.Omitted)):
+        raise TypingError("{} 'skipna' unsupported. Given: {}".format(_func_name, skipna))
+
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError("{} 'level' unsupported. Given: {}".format(_func_name, level))
+
+    if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
+        raise TypingError("{} 'numeric_only' unsupported. Given: {}".format(_func_name, numeric_only))
+
+    def sdc_pandas_dataframe_min_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
+
+        return self._data.min()
+
+    return sdc_pandas_dataframe_min_impl
