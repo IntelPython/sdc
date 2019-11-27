@@ -10,8 +10,9 @@ env:
         - NUMPY_VER=1.16
         - CONDA_PREFIX_PATH=$HOME/miniconda3
     matrix:
-        - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=1
-        - BUILD_MODE=develop TEST_MODE=develop RUN_COVERAGE=True
+        - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_CONFIG_PIPELINE_SDC=True
+        - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_CONFIG_PIPELINE_SDC=True SDC_NP_MPI=1
+        - BUILD_MODE=develop TEST_MODE=develop RUN_COVERAGE=True SDC_CONFIG_PIPELINE_SDC=True
 
 before_install:
     - chmod 777 buildscripts/install_conda.sh
