@@ -1178,7 +1178,7 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
     if not isinstance(other.data.dtype, types.Number):
         ty_checker.raise_exc(other.data, 'number', 'other.data')
 
-    if not isinstance(min_periods, (types.Integer, types.Omitted, types.NoneType)):
+    if not isinstance(min_periods, (types.Integer, types.Omitted, types.NoneType)) and min_periods is not None:
         ty_checker.raise_exc(min_periods, 'int64', 'min_periods')
 
     def hpat_pandas_series_corr_impl(self, other, method='pearson', min_periods=None):
