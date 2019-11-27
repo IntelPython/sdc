@@ -160,7 +160,8 @@ class TestDataFrame(unittest.TestCase):
                                           dtype=pd.api.types.CategoricalDtype(['N', 'Y']))})
         pd.testing.assert_frame_equal(hpat_func(df.copy(deep=True)), test_impl(df))
 
-    @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
+    @unittest.skipIf(check_numba_version('0.46.0'),
+                     "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
     def test_box_dist_return(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
