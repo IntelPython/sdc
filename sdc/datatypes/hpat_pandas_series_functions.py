@@ -2954,8 +2954,8 @@ def hpat_pandas_series_count(self, level=None):
     if isinstance(self.data, StringArrayType):
         def hpat_pandas_series_count_str_impl(self, level=None):
 
-            isna = self.isna()
-            return numpy.sum(isna._data == 0)
+            nan_mask = self.isna()
+            return numpy.sum(nan_mask._data == 0)
 
         return hpat_pandas_series_count_str_impl
 
