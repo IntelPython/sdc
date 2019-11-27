@@ -2896,11 +2896,13 @@ def hpat_pandas_series_nunique(self, dropna=True):
             It is better to merge with Numeric branch
             """
 
-            str_set = set(self._data)
-            if dropna == False:
-                return len(str_set) - 1
-            else:
-                return len(str_set)
+            data = self._data
+            if dropna:
+                data_mask_for_nan = self.isna()
+                data_no_nan = self._data[~data_mask_for_nan._data]
+                data = data_no_nan
+            str_set = set(data)
+            return len(str_set)
 
         return hpat_pandas_series_nunique_str_impl
 
