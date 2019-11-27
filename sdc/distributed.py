@@ -1768,7 +1768,7 @@ class DistributedPassImpl(object):
         pre = []
         out = []
         _, reductions = get_parfor_reductions(
-            parfor, parfor.params, self.state.calltypes)
+            self.state.func_ir, parfor, parfor.params, self.state.calltypes)
 
         for reduce_varname, (init_val, reduce_nodes, _) in reductions.items():
             reduce_op = guard(self._get_reduce_op, reduce_nodes)
