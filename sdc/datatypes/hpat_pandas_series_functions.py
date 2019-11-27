@@ -2898,11 +2898,10 @@ def hpat_pandas_series_nunique(self, dropna=True):
 
             data = self._data
             if dropna:
-                data_mask_for_nan = self.isna()
-                data_no_nan = self._data[~data_mask_for_nan._data]
-                data = data_no_nan
-            str_set = set(data)
-            return len(str_set)
+                nan_mask = self.isna()
+                data = self._data[~nan_mask._data]
+            unique_values = set(data)
+            return len(unique_values)
 
         return hpat_pandas_series_nunique_str_impl
 
