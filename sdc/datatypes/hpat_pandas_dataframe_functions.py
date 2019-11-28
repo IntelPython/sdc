@@ -99,7 +99,7 @@ if not sdc.config.use_default_dataframe:
         return sdc_pandas_dataframe_count_impl
 
 else:
-    def reduce(df, name):
+    def reduce(df, name, *args, **kwargs):
         saved_columns = df.columns
         n_cols = len(saved_columns)
         data_args = tuple('data{}'.format(i) for i in range(n_cols))
