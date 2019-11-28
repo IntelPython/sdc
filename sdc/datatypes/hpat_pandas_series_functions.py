@@ -3104,10 +3104,10 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
                 sort_nona = numpy.argsort(self._data[~na_data_arr])
             q = 0
             for id, i in enumerate(sort):
-                if id in list(sort[len(self._data) - na:]):
+                if id in set(sort[len(self._data) - na:]):
                     q += 1
                 else:
-                    result[id] = sort_nona[id-q]
+                    result[id] = sort_nona[id - q]
             for i in sort[len(self._data) - na:]:
                 result[i] = -1
 
@@ -3131,7 +3131,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
             sort_nona = numpy.argsort(self._data[~na_data_arr])
         q = 0
         for id, i in enumerate(sort):
-            if id in list(sort[len(self._data) - na:]):
+            if id in set(sort[len(self._data) - na:]):
                 q += 1
             else:
                 result[id] = sort_nona[id - q]
