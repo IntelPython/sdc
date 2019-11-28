@@ -54,7 +54,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].agg(lambda x: x.max() - x.min())
             return A.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         # np.testing.assert_array_equal(hpat_func(df), test_impl(df))
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
@@ -65,7 +65,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].sum()
             return A.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
@@ -75,7 +75,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].count()
             return A.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
@@ -85,7 +85,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].mean()
             return A.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
@@ -95,7 +95,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].min()
             return A.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
@@ -105,7 +105,7 @@ class TestGroupBy(TestCase):
             df2 = df.groupby('A', as_index=False).min()
             return df2
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': pd.date_range('2019-1-3', '2019-1-9')})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
@@ -115,7 +115,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].max()
             return A.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
@@ -125,7 +125,7 @@ class TestGroupBy(TestCase):
             df2 = df.groupby('A').mean()
             return df2.B.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
@@ -135,7 +135,7 @@ class TestGroupBy(TestCase):
             df2 = df.groupby('A', as_index=False).mean()
             return df2.A.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
@@ -145,7 +145,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].prod()
             return A.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
@@ -155,7 +155,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].var()
             return A.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
@@ -165,7 +165,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].std()
             return A.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
@@ -175,7 +175,7 @@ class TestGroupBy(TestCase):
             df2 = df.groupby('A')['B', 'C'].sum()
             return df2.C.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7],
                            'C': [3, 5, 6, 5, 4, 4, 3]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
@@ -186,7 +186,7 @@ class TestGroupBy(TestCase):
             A = df.groupby(['A', 'C'])['B'].sum()
             return A.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7],
                            'C': [3, 5, 6, 5, 4, 4, 3]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
@@ -198,7 +198,7 @@ class TestGroupBy(TestCase):
             A = df.groupby(['A', 'C'])['B'].sum()
             return A.sum()
 
-        hpat_func = sdc.jit(locals={'in_A:input': 'distributed',
+        hpat_func = self.jit(locals={'in_A:input': 'distributed',
                                      'in_B:input': 'distributed',
                                      'in_C:input': 'distributed'})(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7],
@@ -221,7 +221,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].agg(lambda x: x.max() - x.min())
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -234,7 +234,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].sum()
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -247,7 +247,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].count()
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -260,7 +260,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].mean()
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -273,7 +273,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].min()
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -286,7 +286,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].max()
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -299,7 +299,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].var()
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -312,7 +312,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].std()
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -326,7 +326,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].agg(lambda x: x.max() - x.min())
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -338,7 +338,7 @@ class TestGroupBy(TestCase):
             df2 = df.groupby('A').max()
             return df2.B.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -351,7 +351,7 @@ class TestGroupBy(TestCase):
             df2 = df.groupby('A', as_index=False).max()
             return df2.A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -364,7 +364,7 @@ class TestGroupBy(TestCase):
             c = df2.groupby('A')['B'].count()
             return df2.C, c
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7], 'C': [2, 3, -1, 1, 2, 3, -1]})
         cond = df.A > 1
         res = test_impl(df, cond)
@@ -378,7 +378,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].agg(lambda x: (x == 'aa').sum())
             return A.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': ['aa', 'b', 'b', 'b', 'aa', 'aa', 'b'],
                            'B': ['ccc', 'a', 'bb', 'aa', 'dd', 'ggg', 'rr']})
         # np.testing.assert_array_equal(hpat_func(df), test_impl(df))
@@ -390,7 +390,7 @@ class TestGroupBy(TestCase):
             A = df.groupby('A')['B'].count()
             return A.values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': ['aa', 'b', 'b', 'b', 'aa', 'aa', 'b'],
                            'B': ['ccc', 'a', 'bb', 'aa', 'dd', 'ggg', 'rr']})
         # np.testing.assert_array_equal(hpat_func(df), test_impl(df))
@@ -402,7 +402,7 @@ class TestGroupBy(TestCase):
             pt = df.pivot_table(index='A', columns='C', values='D', aggfunc='sum')
             return (pt.small.values, pt.large.values)
 
-        hpat_func = sdc.jit(pivots={'pt': ['small', 'large']})(test_impl)
+        hpat_func = self.jit(pivots={'pt': ['small', 'large']})(test_impl)
         self.assertEqual(
             set(hpat_func(_pivot_df1)[0]), set(test_impl(_pivot_df1)[0]))
         self.assertEqual(
@@ -416,7 +416,7 @@ class TestGroupBy(TestCase):
             res = pt.small.values.sum()
             return res
 
-        hpat_func = sdc.jit(
+        hpat_func = self.jit(
             pivots={'pt': ['small', 'large']})(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
@@ -426,7 +426,7 @@ class TestGroupBy(TestCase):
             pt = pd.crosstab(df.A, df.C)
             return (pt.small.values, pt.large.values)
 
-        hpat_func = sdc.jit(pivots={'pt': ['small', 'large']})(test_impl)
+        hpat_func = self.jit(pivots={'pt': ['small', 'large']})(test_impl)
         self.assertEqual(
             set(hpat_func(_pivot_df1)[0]), set(test_impl(_pivot_df1)[0]))
         self.assertEqual(
@@ -440,7 +440,7 @@ class TestGroupBy(TestCase):
             res = pt.small.values.sum()
             return res
 
-        hpat_func = sdc.jit(
+        hpat_func = self.jit(
             pivots={'pt': ['small', 'large']})(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
@@ -451,7 +451,7 @@ class TestGroupBy(TestCase):
             return group.count()
 
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
 

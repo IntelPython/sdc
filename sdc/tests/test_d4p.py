@@ -66,8 +66,8 @@ else:
                 )
                 return algo.compute(w, model)
 
-            train_hpat = sdc.jit(train_impl)
-            prdct_hpat = sdc.jit(prdct_impl)
+            train_hpat = self.jit(train_impl)
+            prdct_hpat = self.jit(prdct_impl)
             n = 11
             d = 4
             pred_impl = prdct_impl(n, d, train_impl(n, d).model).prediction

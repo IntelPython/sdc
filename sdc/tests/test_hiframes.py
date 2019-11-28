@@ -56,7 +56,7 @@ class TestHiFrames(TestCase):
             df2['A'] += 10
             return df2.A, df.A
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         df = pd.DataFrame(
             {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
@@ -70,7 +70,7 @@ class TestHiFrames(TestCase):
             df = pd.DataFrame({'A': S1, 'B': S2})
             return df.A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -82,7 +82,7 @@ class TestHiFrames(TestCase):
         def test_impl(df):
             return df['A'][df['B']].values
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [1, 2, 3], 'B': [True, False, True]})
         np.testing.assert_array_equal(test_impl(df), hpat_func(df))
 
@@ -94,7 +94,7 @@ class TestHiFrames(TestCase):
             B = df.A.fillna(5.0)
             return B.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
     def test_fillna_inplace(self):
@@ -105,7 +105,7 @@ class TestHiFrames(TestCase):
             df.A.fillna(5.0, inplace=True)
             return df.A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
     def test_column_mean(self):
@@ -115,7 +115,7 @@ class TestHiFrames(TestCase):
             df = pd.DataFrame({'A': A})
             return df.A.mean()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
     def test_column_var(self):
@@ -125,7 +125,7 @@ class TestHiFrames(TestCase):
             df = pd.DataFrame({'A': A})
             return df.A.var()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
     def test_column_std(self):
@@ -135,7 +135,7 @@ class TestHiFrames(TestCase):
             df = pd.DataFrame({'A': A})
             return df.A.std()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
     @skip_numba_jit
@@ -146,7 +146,7 @@ class TestHiFrames(TestCase):
             return df.B.sum()
 
         n = 121
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
     @skip_numba_jit
@@ -158,7 +158,7 @@ class TestHiFrames(TestCase):
         n = 121
         df1 = pd.DataFrame({'A': np.arange(n)})
         df2 = pd.DataFrame({'A': np.arange(n)})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         hpat_func(df1)
         self.assertTrue(hasattr(df1, 'B'))
         test_impl(df2)
@@ -171,7 +171,7 @@ class TestHiFrames(TestCase):
             Ac = df.A.cumsum()
             return Ac.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -194,7 +194,7 @@ class TestHiFrames(TestCase):
             Ac = df.A.cumsum()
             return Ac.sum() + s + m + v + t
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -206,7 +206,7 @@ class TestHiFrames(TestCase):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float64)})
             return df.A.quantile(.25)
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 1001
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -221,7 +221,7 @@ class TestHiFrames(TestCase):
             df.A[200:331] = np.nan
             return df.A.quantile(.25)
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 1001
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -234,7 +234,7 @@ class TestHiFrames(TestCase):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.int32)})
             return df.A.quantile(.25)
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 1001
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -247,7 +247,7 @@ class TestHiFrames(TestCase):
             df = pd.DataFrame({'A': A})
             return df.A.quantile(.25)
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 1001
         A = np.arange(0, n, 1, np.float64)
         np.testing.assert_almost_equal(hpat_func(A), test_impl(A))
@@ -259,11 +259,11 @@ class TestHiFrames(TestCase):
             df.A[2] = 0
             return df.A.nunique()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 1001
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
         # test compile again for overload related issues
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
     @skip_numba_jit
@@ -273,11 +273,11 @@ class TestHiFrames(TestCase):
             df = pq.read_table('example.parquet').to_pandas()
             return df.four.nunique()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         # test compile again for overload related issues
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
 
@@ -286,11 +286,11 @@ class TestHiFrames(TestCase):
             df = pd.DataFrame({'A': ['aa', 'bb', 'aa', 'cc', 'cc']})
             return df.A.nunique()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 1001
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
         # test compile again for overload related issues
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
     @unittest.skip('AssertionError - fix needed\n'
@@ -301,11 +301,11 @@ class TestHiFrames(TestCase):
             df = pq.read_table('example.parquet').to_pandas()
             return df.two.nunique()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         # test compile again for overload related issues
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
 
@@ -316,7 +316,7 @@ class TestHiFrames(TestCase):
             df = pq.read_table('example.parquet').to_pandas()
             return (df.four.unique() == 3.0).sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
 
@@ -328,7 +328,7 @@ class TestHiFrames(TestCase):
             df = pq.read_table('example.parquet').to_pandas()
             return (df.two.unique() == 'foo').sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
 
@@ -338,7 +338,7 @@ class TestHiFrames(TestCase):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float64)})
             return df.A.describe()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 1001
         hpat_func(n)
         # XXX: test actual output
@@ -353,7 +353,7 @@ class TestHiFrames(TestCase):
             B = df.A.str.contains('AB*', regex=True)
             return B.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), 2)
 
     @skip_numba_jit
@@ -364,7 +364,7 @@ class TestHiFrames(TestCase):
             B = df.A.str.contains('BB', regex=False)
             return B.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), 1)
 
     @skip_numba_jit
@@ -373,7 +373,7 @@ class TestHiFrames(TestCase):
             return df.A.str.replace('AB*', 'EE', regex=True)
 
         df = pd.DataFrame({'A': ['ABCC', 'CABBD']})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
@@ -383,7 +383,7 @@ class TestHiFrames(TestCase):
             return df.A.str.replace('AB', 'EE', regex=False)
 
         df = pd.DataFrame({'A': ['ABCC', 'CABBD']})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
@@ -397,7 +397,7 @@ class TestHiFrames(TestCase):
         A = ['ABCC', 'CABBD', 'CCD', 'CCDAABB', 'ED']
         start, end = get_start_end(n)
         df = pd.DataFrame({'A': A[start:end]})
-        hpat_func = sdc.jit(distributed={'df', 'B'})(test_impl)
+        hpat_func = self.jit(distributed={'df', 'B'})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
         self.assertEqual(count_array_REPs(), 3)
@@ -409,7 +409,7 @@ class TestHiFrames(TestCase):
             return df.A.str.split(',')
 
         df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D', 'G', '', 'g,f']})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
@@ -419,7 +419,7 @@ class TestHiFrames(TestCase):
             return df.A.str.split()
 
         df = pd.DataFrame({'A': ['AB CC', 'C ABB D', 'G ', ' ', 'g\t f']})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
@@ -431,7 +431,7 @@ class TestHiFrames(TestCase):
             return df2[df2.B.str.len() > 1]
 
         df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D', 'G', '', 'g,f']})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(
             hpat_func(df), test_impl(df).reset_index(drop=True))
 
@@ -441,7 +441,7 @@ class TestHiFrames(TestCase):
             return pd.DataFrame({'B': df.A.str.split(',')})
 
         df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D']})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df).B, test_impl(df).B, check_names=False)
 
@@ -452,7 +452,7 @@ class TestHiFrames(TestCase):
 
         df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D']})
         df2 = pd.DataFrame({'A': df.A.str.split(',')})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(df2), test_impl(df2))
 
     @skip_numba_jit
@@ -462,7 +462,7 @@ class TestHiFrames(TestCase):
             return C[df.B == 'aa']
 
         df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D'], 'B': ['aa', 'bb']})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
@@ -476,7 +476,7 @@ class TestHiFrames(TestCase):
         start, end = get_start_end(n)
         A = ['AB,CC', 'C,ABB,D', 'CAD', 'CA,D', 'AA,,D']
         df = pd.DataFrame({'A': A[start:end]})
-        hpat_func = sdc.jit(distributed={'df', 'B'})(test_impl)
+        hpat_func = self.jit(distributed={'df', 'B'})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
         self.assertEqual(count_array_REPs(), 3)
@@ -489,7 +489,7 @@ class TestHiFrames(TestCase):
             return B.str.get(1)
 
         df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D']})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
@@ -499,7 +499,7 @@ class TestHiFrames(TestCase):
             return df.A.str.split(',')
 
         df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D']})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df), check_names=False)
 
     @skip_numba_jit
@@ -513,7 +513,7 @@ class TestHiFrames(TestCase):
         start, end = get_start_end(n)
         A = ['AB,CC', 'C,ABB,D', 'CAD,F', 'CA,D', 'AA,,D']
         df = pd.DataFrame({'A': A[start:end]})
-        hpat_func = sdc.jit(distributed={'df', 'B'})(test_impl)
+        hpat_func = self.jit(distributed={'df', 'B'})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
         self.assertEqual(count_array_REPs(), 3)
@@ -527,7 +527,7 @@ class TestHiFrames(TestCase):
             return C
 
         df = pd.DataFrame({'A': ['AB,12', 'C,321,D']})
-        hpat_func = sdc.jit(locals={'C': types.int64[:]})(test_impl)
+        hpat_func = self.jit(locals={'C': types.int64[:]})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
@@ -538,7 +538,7 @@ class TestHiFrames(TestCase):
             return pd.Series(list(itertools.chain(*A)))
 
         df = pd.DataFrame({'A': ['AB,CC', 'C,ABB,D']})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
@@ -553,7 +553,7 @@ class TestHiFrames(TestCase):
         start, end = get_start_end(n)
         A = ['AB,CC', 'C,ABB,D', 'CAD', 'CA,D', 'AA,,D']
         df = pd.DataFrame({'A': A[start:end]})
-        hpat_func = sdc.jit(distributed={'df', 'B'})(test_impl)
+        hpat_func = self.jit(distributed={'df', 'B'})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
         self.assertEqual(count_array_REPs(), 3)
@@ -566,7 +566,7 @@ class TestHiFrames(TestCase):
             return B
 
         df = pd.DataFrame({'A': ['123.1', '331.2']})
-        hpat_func = sdc.jit(locals={'B': types.float64[:]})(test_impl)
+        hpat_func = self.jit(locals={'B': types.float64[:]})(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
@@ -577,7 +577,7 @@ class TestHiFrames(TestCase):
             df1 = df[df.A > 5]
             return len(df1.B)
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -591,7 +591,7 @@ class TestHiFrames(TestCase):
             Ac = df.A.rolling(3).sum()
             return Ac.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 121
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -603,7 +603,7 @@ class TestHiFrames(TestCase):
             Ac = df.A.rolling(7).sum()
             return Ac.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 121
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -616,7 +616,7 @@ class TestHiFrames(TestCase):
             df['moving average'] = df.A.rolling(window=5, center=True).mean()
             return df['moving average'].sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 121
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -629,7 +629,7 @@ class TestHiFrames(TestCase):
             Ac = df.A.rolling(3, center=True).apply(lambda a: a[0] + 2 * a[1] + a[2])
             return Ac.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 121
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -643,7 +643,7 @@ class TestHiFrames(TestCase):
             Ac = df.A.shift(1)
             return Ac.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -657,7 +657,7 @@ class TestHiFrames(TestCase):
             Ac = df.A.pct_change(1)
             return Ac.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -669,7 +669,7 @@ class TestHiFrames(TestCase):
 
         n = 121
         df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df), test_impl(df))
 
     @skip_numba_jit
@@ -680,7 +680,7 @@ class TestHiFrames(TestCase):
 
         n = 11
         df = pd.DataFrame({'A': np.random.ranf(3 * n), 'B': ['one', 'two', 'three'] * n})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df), test_impl(df))
 
     @skip_numba_jit
@@ -695,7 +695,7 @@ class TestHiFrames(TestCase):
         start, end = get_start_end(n)
         df = pd.DataFrame({'A': A, 'B': B})
         df_h = pd.DataFrame({'A': A[start:end], 'B': B[start:end]})
-        hpat_func = sdc.jit(distributed={'df'})(test_impl)
+        hpat_func = self.jit(distributed={'df'})(test_impl)
         np.testing.assert_almost_equal(hpat_func(df_h), test_impl(df))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -708,7 +708,7 @@ class TestHiFrames(TestCase):
             df3 = pd.concat([df1, df2])
             return df3.A.sum() + df3.key2.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -724,7 +724,7 @@ class TestHiFrames(TestCase):
             A3 = pd.concat([df1, df2])
             return (A3.two == 'foo').sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -737,7 +737,7 @@ class TestHiFrames(TestCase):
             A3 = pd.concat([df1.A, df2.A])
             return A3.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -753,7 +753,7 @@ class TestHiFrames(TestCase):
             A3 = pd.concat([df1.two, df2.two])
             return (A3 == 'foo').sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -779,7 +779,7 @@ class TestHiFrames(TestCase):
                 all_res += df['Rets'].mean()
             return all_res
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_OneDs(), 0)
@@ -799,7 +799,7 @@ class TestHiFrames(TestCase):
 
         A = np.array([1, 1, 2, 3])
         B = np.array([3, 4, 5, 6])
-        hpat_func = sdc.jit(locals={'A:input': 'distributed',
+        hpat_func = self.jit(locals={'A:input': 'distributed',
                                      'B:input': 'distributed', 'df2:return': 'distributed'})(test_impl)
         start, end = get_start_end(len(A))
         df2 = hpat_func(A[start:end], B[start:end])

@@ -81,7 +81,7 @@ class TestIO(TestCase):
             X = df['points']
             return X.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -93,7 +93,7 @@ class TestIO(TestCase):
             X = df['points']
             return X.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -108,7 +108,7 @@ class TestIO(TestCase):
             X = df['points']
             return X.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -121,7 +121,7 @@ class TestIO(TestCase):
             X = df['points']
             return X.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -134,7 +134,7 @@ class TestIO(TestCase):
             A = df.two.values == 'foo'
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -147,7 +147,7 @@ class TestIO(TestCase):
             A = df.five.values == 'foo'
             return A
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
     @unittest.skip('Error - fix needed\n'
@@ -158,7 +158,7 @@ class TestIO(TestCase):
             A = df.five.values == 'foo'
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -170,7 +170,7 @@ class TestIO(TestCase):
             A = df.five.values == 'foo'
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -182,7 +182,7 @@ class TestIO(TestCase):
             df = pq.read_table('example.parquet').to_pandas()
             return df.three.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -194,7 +194,7 @@ class TestIO(TestCase):
             df = pq.read_table('example.parquet').to_pandas()
             return df.one.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -206,7 +206,7 @@ class TestIO(TestCase):
             df = pq.read_table('example.parquet').to_pandas()
             return df.four.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -217,7 +217,7 @@ class TestIO(TestCase):
             df = pd.read_parquet('pandas_dt.pq')
             return pd.DataFrame({'DT64': df.DT64, 'col2': df.DATE})
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     @unittest.skip('Error: Attribute "dtype" are different\n'
@@ -228,7 +228,7 @@ class TestIO(TestCase):
             df = pd.read_parquet('sdf_dt.pq')
             return pd.DataFrame({'DT64': df.DT64, 'col2': df.DATE})
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def test_pyarrow(self):
@@ -305,7 +305,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv1(self):
         test_impl = self.pd_csv1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def pd_csv_keys1(self):
@@ -345,7 +345,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_keys1(self):
         test_impl = self.pd_csv_keys1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def pd_csv_const_dtype1(self):
@@ -385,7 +385,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_const_dtype1(self):
         test_impl = self.pd_csv_const_dtype1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def pd_csv_infer1(self):
@@ -401,7 +401,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_infer1(self):
         test_impl = self.pd_csv_infer1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def pd_csv_infer_parallel1(self):
@@ -419,7 +419,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_infer_parallel1(self):
         test_impl = self.pd_csv_infer_parallel1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
     def pd_csv_skip1(self):
@@ -459,7 +459,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_skip1(self):
         test_impl = self.pd_csv_skip1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def pd_csv_infer_skip1(self):
@@ -475,7 +475,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_infer_skip1(self):
         test_impl = self.pd_csv_infer_skip1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def pd_csv_infer_skip_parallel1(self):
@@ -495,7 +495,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_infer_skip_parallel1(self):
         test_impl = self.pd_csv_infer_skip_parallel1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
     def pd_csv_rm_dead1(self):
@@ -517,7 +517,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_rm_dead1(self):
         test_impl = self.pd_csv_rm_dead1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
     def pd_csv_date1(self):
@@ -553,7 +553,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_date1(self):
         test_impl = self.pd_csv_date1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def pd_csv_str1(self):
@@ -585,7 +585,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_str1(self):
         test_impl = self.pd_csv_str1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def pd_csv_parallel1(self):
@@ -607,7 +607,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_parallel1(self):
         test_impl = self.pd_csv_parallel1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
     def pd_csv_str_parallel1(self):
@@ -631,7 +631,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_str_parallel1(self):
         test_impl = self.pd_csv_str_parallel1()
-        hpat_func = sdc.jit(locals={'df:return': 'distributed'})(test_impl)
+        hpat_func = self.jit(locals={'df:return': 'distributed'})(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
     def pd_csv_usecols1(self):
@@ -655,7 +655,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_usecols1(self):
         test_impl = self.pd_csv_usecols1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def pd_csv_cat1(self):
@@ -687,7 +687,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_cat1(self):
         test_impl = self.pd_csv_cat1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(
             hpat_func(), test_impl(), check_names=False)
 
@@ -732,7 +732,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_cat2(self):
         test_impl = self.pd_csv_cat2()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def pd_csv_single_dtype1(self):
@@ -756,7 +756,7 @@ class TestIO(TestCase):
     @skip_numba_jit
     def test_csv_single_dtype1(self):
         test_impl = self.pd_csv_single_dtype1()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     @unittest.skip('TypeError: to_csv() takes from 1 to 20 positional arguments but 21 were given)\n'
@@ -765,7 +765,7 @@ class TestIO(TestCase):
         def test_impl(df, fname):
             df.to_csv(fname)
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 111
         df = pd.DataFrame({'A': np.arange(n)})
         hp_fname = 'test_write_csv1_sdc.csv'
@@ -782,7 +782,7 @@ class TestIO(TestCase):
             df = pd.DataFrame({'A': np.arange(n)})
             df.to_csv(fname)
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 111
         hp_fname = 'test_write_csv1_hpat_par.csv'
         pd_fname = 'test_write_csv1_pd_par.csv'
@@ -801,7 +801,7 @@ class TestIO(TestCase):
             A = np.fromfile("np_file1.dat", np.float64)
             return A
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
     @skip_numba_jit
@@ -811,7 +811,7 @@ class TestIO(TestCase):
             A = np.fromfile("np_file1.dat", np.float64)
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -821,7 +821,7 @@ class TestIO(TestCase):
             if get_rank() == 0:
                 A.tofile("np_file_3.dat")
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 111
         A = np.random.ranf(n)
         hpat_func(A)
@@ -835,7 +835,7 @@ class TestIO(TestCase):
             A = np.arange(n)
             A.tofile("np_file_3.dat")
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 111
         A = np.arange(n)
         hpat_func(n)
