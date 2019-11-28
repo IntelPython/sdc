@@ -1455,38 +1455,38 @@ def lower_max_dummy(context, builder, sig, args):
         sig.return_type)(context, builder)
     return out_obj._getvalue()
 
-# # TODO: refactor since copy of max
-# @overload_method(DataFrameType, 'min')
-# def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
-#     # TODO: kwargs
-#     # TODO: avoid dummy and generate func here when inlining is possible
-#     def _impl(df, axis=None, skipna=None, level=None, numeric_only=None):
-#         return sdc.hiframes.pd_dataframe_ext.min_dummy(df)
-#
-#     return _impl
-#
-#
-# def min_dummy(df, n):
-#     return df
-#
-#
-# @infer_global(min_dummy)
-# class MinDummyTyper(AbstractTemplate):
-#     def generic(self, args, kws):
-#         df = args[0]
-#         # TODO: ignore non-numerics
-#         # output is series with column names as string index
-#         # unify types for output series, TODO: check Pandas unify rules
-#         dtype = self.context.unify_types(*tuple(d.dtype for d in df.data))
-#         out = SeriesType(dtype, types.Array(dtype, 1, 'C'), string_array_type)
-#         return signature(out, *args)
-#
-#
-# @lower_builtin(min_dummy, types.VarArg(types.Any))
-# def lower_min_dummy(context, builder, sig, args):
-#     out_obj = cgutils.create_struct_proxy(
-#         sig.return_type)(context, builder)
-#     return out_obj._getvalue()
+# TODO: refactor since copy of max
+@overload_method(DataFrameType, 'min')
+def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
+    # TODO: kwargs
+    # TODO: avoid dummy and generate func here when inlining is possible
+    def _impl(df, axis=None, skipna=None, level=None, numeric_only=None):
+        return sdc.hiframes.pd_dataframe_ext.min_dummy(df)
+
+    return _impl
+
+
+def min_dummy(df, n):
+    return df
+
+
+@infer_global(min_dummy)
+class MinDummyTyper(AbstractTemplate):
+    def generic(self, args, kws):
+        df = args[0]
+        # TODO: ignore non-numerics
+        # output is series with column names as string index
+        # unify types for output series, TODO: check Pandas unify rules
+        dtype = self.context.unify_types(*tuple(d.dtype for d in df.data))
+        out = SeriesType(dtype, types.Array(dtype, 1, 'C'), string_array_type)
+        return signature(out, *args)
+
+
+@lower_builtin(min_dummy, types.VarArg(types.Any))
+def lower_min_dummy(context, builder, sig, args):
+    out_obj = cgutils.create_struct_proxy(
+        sig.return_type)(context, builder)
+    return out_obj._getvalue()
 
 
 @overload_method(DataFrameType, 'sum')
@@ -1636,3 +1636,6 @@ def to_csv_overload(df, path_or_buf=None, sep=',', na_rep='', float_format=None,
                       date_format, doublequote, escapechar, decimal)
 
     return _impl
+
+
+from sdc.datatypes.hpat_pandas_dataframe_functions import *
