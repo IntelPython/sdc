@@ -1881,7 +1881,6 @@ class TestSeries(TestCase):
         S = pd.Series([np.nan, 2, 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_count1(self):
         def test_impl(S):
             return S.count()
@@ -3989,7 +3988,7 @@ class TestSeries(TestCase):
             cfunc(series, axis=None, level=None, numeric_only=True)
         self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
 
-    @skip_numba_jit
+
     def test_series_nunique(self):
         def test_series_nunique_impl(S):
             return S.nunique()
