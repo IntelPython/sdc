@@ -2895,11 +2895,12 @@ def hpat_pandas_series_nunique(self, dropna=True):
             It is better to merge with Numeric branch
             """
 
-            str_set = set(self._data)
-            if dropna == False:
-                return len(str_set) - 1
-            else:
-                return len(str_set)
+            data = self._data
+            if dropna:
+                nan_mask = self.isna()
+                data = self._data[~nan_mask._data]
+            unique_values = set(data)
+            return len(unique_values)
 
         return hpat_pandas_series_nunique_str_impl
 
@@ -2953,7 +2954,8 @@ def hpat_pandas_series_count(self, level=None):
     if isinstance(self.data, StringArrayType):
         def hpat_pandas_series_count_str_impl(self, level=None):
 
-            return len(self._data)
+            nan_mask = self.isna()
+            return numpy.sum(nan_mask._data == 0)
 
         return hpat_pandas_series_count_str_impl
 

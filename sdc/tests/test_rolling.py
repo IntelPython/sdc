@@ -34,7 +34,8 @@ import numpy as np
 import numba
 import sdc
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                   count_parfor_OneDs, count_array_OneDs, dist_IR_contains)
+                                   count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
+                                   skip_numba_jit, TestCase)
 from sdc.hiframes.rolling import supported_rolling_funcs
 
 LONG_TEST = (int(os.environ['SDC_LONG_ROLLING_TEST']) != 0
@@ -46,7 +47,7 @@ if LONG_TEST:
     test_funcs = supported_rolling_funcs[:-3]
 
 
-class TestRolling(unittest.TestCase):
+class TestRolling(TestCase):
     def test_fixed1(self):
         # test sequentially with manually created dfs
         wins = (3,)
@@ -85,6 +86,7 @@ class TestRolling(unittest.TestCase):
                 df = pd.DataFrame({'B': np.arange(n)})
                 pd.testing.assert_frame_equal(hpat_func(df, w, c), test_impl(df, w, c))
 
+    @skip_numba_jit
     def test_fixed_apply1(self):
         # test sequentially with manually created dfs
         def test_impl(df, w, c):
@@ -100,6 +102,7 @@ class TestRolling(unittest.TestCase):
             df = pd.DataFrame({'B': [0, 1, 2, -2, 4]})
             pd.testing.assert_frame_equal(hpat_func(df, *args), test_impl(df, *args))
 
+    @skip_numba_jit
     def test_fixed_apply2(self):
         # test sequentially with generated dfs
         def test_impl(df, w, c):
@@ -134,6 +137,7 @@ class TestRolling(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_fixed_parallel_apply1(self):
         def test_impl(n, w, center):
             df = pd.DataFrame({'B': np.arange(n)})
@@ -202,6 +206,7 @@ class TestRolling(unittest.TestCase):
                 df = pd.DataFrame({'B': np.arange(n), 'time': time})
                 pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_variable_apply1(self):
         # test sequentially with manually created dfs
         df1 = pd.DataFrame({'B': [0, 1, 2, np.nan, 4],
@@ -229,6 +234,7 @@ class TestRolling(unittest.TestCase):
             pd.testing.assert_frame_equal(hpat_func(df1), test_impl(df1))
             pd.testing.assert_frame_equal(hpat_func(df2), test_impl(df2))
 
+    @skip_numba_jit
     def test_variable_apply2(self):
         # test sequentially with generated dfs
         wins = ('2s',)
@@ -273,6 +279,7 @@ class TestRolling(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     @unittest.skipIf(platform.system() == 'Windows', "ValueError: time must be monotonic")
     def test_variable_apply_parallel1(self):
         wins = ('2s',)
@@ -297,6 +304,7 @@ class TestRolling(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_series_fixed1(self):
         # test series rolling functions
         # all functions except apply
@@ -324,6 +332,7 @@ class TestRolling(unittest.TestCase):
             pd.testing.assert_series_equal(hpat_func(S1, *args), apply_test_impl(S1, *args))
             pd.testing.assert_series_equal(hpat_func(S2, *args), apply_test_impl(S2, *args))
 
+    @skip_numba_jit
     def test_series_cov1(self):
         # test series rolling functions
         # all functions except apply
@@ -348,6 +357,7 @@ class TestRolling(unittest.TestCase):
             pd.testing.assert_series_equal(hpat_func(*args), test_impl2(*args))
             pd.testing.assert_series_equal(hpat_func(*args), test_impl2(*args))
 
+    @skip_numba_jit
     def test_df_cov1(self):
         # test series rolling functions
         # all functions except apply
