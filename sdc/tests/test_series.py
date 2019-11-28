@@ -2338,7 +2338,6 @@ class TestSeries(TestCase):
         S = pd.Series([np.nan, -2., 3., 0.5E-01, 0xFF, 0o7, 0b101])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_cov1(self):
         def test_impl(S1, S2):
             return S1.cov(S2)
