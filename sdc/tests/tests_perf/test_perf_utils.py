@@ -198,9 +198,17 @@ def get_times(f, *args, iter_number=5):
 class TestResults:
     perf_results_xlsx = 'perf_results.xlsx'
     raw_perf_results_xlsx = 'raw_perf_results.xlsx'
+
+    perf_results_csv = 'perf_results.csv'
+    raw_perf_results_csv = 'raw_perf_results.csv'
+
     index = ['name', 'N', 'type', 'size']
     test_results_data = pandas.DataFrame(index=index)
     logger = setup_logging()
+
+    def __init__(self, use_excel=True, use_csv=False):
+        self.use_excel = use_excel
+        self.use_csv = use_csv
 
     @property
     def grouped_data(self):
@@ -274,33 +282,52 @@ class TestResults:
         """
         # openpyxl need to be installed
 
-        try:
-            with pandas.ExcelWriter(self.perf_results_xlsx) as writer:
-                self.grouped_data.to_excel(writer)
-        except ModuleNotFoundError as e:
-            msg = 'Could not dump the results to "%s": %s'
-            self.logger.warning(msg, self.perf_results_xlsx, e)
+        if self.use_excel:
+            try:
+                with pandas.ExcelWriter(self.perf_results_xlsx) as writer:
+                    self.grouped_data.to_excel(writer)
+            except ModuleNotFoundError as e:
+                msg = 'Could not dump the results to "%s": %s'
+                self.logger.warning(msg, self.perf_results_xlsx, e)
 
-        try:
-            with pandas.ExcelWriter(self.raw_perf_results_xlsx) as writer:
-                self.test_results_data.to_excel(writer, index=False)
-        except ModuleNotFoundError as e:
-            msg = 'Could not dump raw results to "%s": %s'
-            self.logger.warning(msg, self.raw_perf_results_xlsx, e)
+            try:
+                with pandas.ExcelWriter(self.raw_perf_results_xlsx) as writer:
+                    self.test_results_data.to_excel(writer, index=False)
+            except ModuleNotFoundError as e:
+                msg = 'Could not dump raw results to "%s": %s'
+                self.logger.warning(msg, self.raw_perf_results_xlsx, e)
+
+        if self.use_csv:
+            self.grouped_data.to_csv(self.perf_results_csv)
+            self.test_results_data.to_csv(self.raw_perf_results_csv)
 
     def load(self):
         """
         Load existing performance testing results from excel to global data storage
         """
-        raw_perf_results_xlsx = Path(self.raw_perf_results_xlsx)
-        if raw_perf_results_xlsx.exists():
-            with raw_perf_results_xlsx.open('rb') as fd:
-                # xlrd need to be installed
-                try:
-                    self.test_results_data = pandas.read_excel(fd)
-                except ModuleNotFoundError as e:
-                    msg = 'Could not load previous results from %s: %s'
-                    self.logger.warning(msg, raw_perf_results_xlsx, e)
+        if self.use_excel:
+            raw_perf_results_xlsx = Path(self.raw_perf_results_xlsx)
+            if raw_perf_results_xlsx.exists():
+                with raw_perf_results_xlsx.open('rb') as fd:
+                    # xlrd need to be installed
+                    try:
+                        self.test_results_data = pandas.read_excel(fd)
+                    except ModuleNotFoundError as e:
+                        msg = 'Could not load previous results from %s: %s'
+                        self.logger.warning(msg, raw_perf_results_xlsx, e)
+
+        # Excel loader is default
+        elif self.use_csv:
+            raw_perf_results_csv = Path(self.raw_perf_results_csv)
+            if raw_perf_results_csv.exists():
+                with raw_perf_results_csv.open('rb') as fd:
+                    # xlrd need to be installed
+                    try:
+                        self.test_results_data = pandas.read_csv(fd)
+                    except ModuleNotFoundError as e:
+                        msg = 'Could not load previous results from %s: %s'
+                        self.logger.warning(msg, raw_perf_results_csv, e)
+
 
 
 class TestResultsStr(TestResults):
