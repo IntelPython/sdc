@@ -37,7 +37,8 @@ from numba import types
 import sdc
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, count_array_OneD_Vars,
-                                   dist_IR_contains, get_rank, get_start_end, check_numba_version)
+                                   dist_IR_contains, get_rank, get_start_end, check_numba_version,
+                                   skip_numba_jit, TestCase)
 
 
 def get_np_state_ptr():
@@ -54,7 +55,7 @@ def _copy_py_state(r, ptr):
     return ints, index
 
 
-class BaseTest(unittest.TestCase):
+class BaseTest(TestCase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -214,6 +215,7 @@ class TestBasic(BaseTest):
         hpat_f = sdc.jit(f)
         hpat_f()
 
+    @skip_numba_jit
     def test_inline_locals(self):
         # make sure locals in inlined function works
         @sdc.jit(locals={'B': types.float64[:]})
@@ -250,6 +252,7 @@ class TestBasic(BaseTest):
             self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_reduce2(self):
         import sys
         dtypes = ['float32', 'float64', 'int32', 'int64']
@@ -277,6 +280,7 @@ class TestBasic(BaseTest):
             self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_reduce_filter1(self):
         import sys
         dtypes = ['float32', 'float64', 'int32', 'int64']
@@ -306,6 +310,7 @@ class TestBasic(BaseTest):
             self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_array_reduce(self):
         binops = ['+=', '*=', '+=', '*=', '|=', '|=']
         dtypes = ['np.float32', 'np.float32', 'np.float64', 'np.float64', 'np.int32', 'np.int64']
@@ -327,7 +332,8 @@ class TestBasic(BaseTest):
             self.assertEqual(count_array_OneDs(), 0)
             self.assertEqual(count_parfor_OneDs(), 1)
 
-    @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
+    @unittest.skipIf(check_numba_version('0.46.0'),
+                     "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
     def test_dist_return(self):
         def test_impl(N):
             A = np.arange(N)
@@ -344,7 +350,8 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_OneDs(), 1)
         self.assertEqual(count_parfor_OneDs(), 1)
 
-    @unittest.expectedFailure # https://github.com/numba/numba/issues/4690
+    @unittest.skipIf(check_numba_version('0.46.0'),
+                     "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
     def test_dist_return_tuple(self):
         def test_impl(N):
             A = np.arange(N)
@@ -363,6 +370,7 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_OneDs(), 2)
         self.assertEqual(count_parfor_OneDs(), 2)
 
+    @skip_numba_jit
     def test_dist_input(self):
         def test_impl(A):
             return len(A)
@@ -373,7 +381,8 @@ class TestBasic(BaseTest):
         np.testing.assert_allclose(hpat_func(arr) / self.num_ranks, test_impl(arr))
         self.assertEqual(count_array_OneDs(), 1)
 
-    @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
+    @unittest.skipIf(check_numba_version('0.46.0'),
+                     "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
     def test_rebalance(self):
         def test_impl(N):
             A = np.arange(n)
@@ -391,7 +400,8 @@ class TestBasic(BaseTest):
         finally:
             sdc.distributed_analysis.auto_rebalance = False
 
-    @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
+    @unittest.skipIf(check_numba_version('0.46.0'),
+                     "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
     def test_rebalance_loop(self):
         def test_impl(N):
             A = np.arange(n)

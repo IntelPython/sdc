@@ -140,8 +140,7 @@ class DataFramePassImpl(object):
                 out_nodes = [inst]
 
                 if isinstance(inst, ir.Assign):
-                    if inst.value in self.state.func_ir._definitions[inst.target.name]:
-                        self.state.func_ir._definitions[inst.target.name].remove(inst.value)
+                    self.state.func_ir._definitions[inst.target.name].remove(inst.value)
                     out_nodes = self._run_assign(inst)
                 elif isinstance(inst, (ir.SetItem, ir.StaticSetItem)):
                     out_nodes = self._run_setitem(inst)

@@ -25,6 +25,9 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+import numpy as np
+
 import time
 import random
 
@@ -217,9 +220,19 @@ def usecase_series_dropna(input_data):
     finish_time = time.time()
 
     return finish_time - start_time, res
+  
+  
+def usecase_series_chain_add_and_sum(A, B):
+    start_time = time.time()
+    res = (A + B).sum()
+    finish_time = time.time()
+    res_time = finish_time - start_time
 
+    return res_time, res
 
-class TestSeries(TestBase):
+  
+# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods
+class TestSeriesMethods(TestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -246,7 +259,8 @@ class TestSeries(TestBase):
             'series_median': [10 ** 8],
             'series_argsort': [10 ** 5],
             'series_sort_values': [10 ** 5],
-            'series_dropna': [2 * 10 ** 8]
+            'series_dropna': [2 * 10 ** 8],
+            'series_chain_add_and_sum': [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7],
         }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
@@ -287,6 +301,28 @@ class TestSeries(TestBase):
             record["test_type"] = 'Python'
             self._test_python(pyfunc, record, test_data)
             self.test_results.add(**record)
+
+    def _test_series_binary_operations(self, pyfunc, name, input_data=None):
+        np.random.seed(0)
+        hpat_func = sdc.jit(pyfunc)
+        for data_length in self.total_data_length[name]:
+
+            # TODO: replace with generic function to generate random sequence of floats
+            data1 = np.random.ranf(data_length)
+            data2 = np.random.ranf(data_length)
+            A = pd.Series(data1)
+            B = pd.Series(data2)
+
+            compile_results = calc_compilation(pyfunc, A, B, iter_number=self.iter_number)
+
+            # Warming up
+            hpat_func(A, B)
+
+            exec_times, boxing_times = get_times(hpat_func, A, B, iter_number=self.iter_number)
+            self.test_results.add(name, 'JIT', A.size, exec_times, boxing_times,
+                                  compile_results=compile_results, num_threads=self.num_threads)
+            exec_times, _ = get_times(pyfunc, A, B, iter_number=self.iter_number)
+            self.test_results.add(name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
 
     def test_series_float_min(self):
         self._test_case(usecase_series_min, 'series_min')
@@ -356,3 +392,7 @@ class TestSeries(TestBase):
 
     def test_series_float_dropna(self):
         self._test_case(usecase_series_dropna, 'series_dropna')
+
+    def test_series_chain_add_and_sum(self):
+        self._test_series_binary_operations(usecase_series_chain_add_and_sum, 'series_chain_add_and_sum')
+
