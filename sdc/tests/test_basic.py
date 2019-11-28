@@ -35,10 +35,11 @@ import numba
 from numba import types
 
 import sdc
+from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, count_array_OneD_Vars,
                                    dist_IR_contains, get_rank, get_start_end, check_numba_version,
-                                   skip_numba_jit, TestCase)
+                                   skip_numba_jit)
 
 
 def get_np_state_ptr():
