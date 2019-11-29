@@ -73,6 +73,26 @@ class TestIO(TestCase):
             A = np.random.ranf(n)
             A.tofile("np_file1.dat")
 
+    def assertDataEqual(self, left, right):
+        if isinstance(right, pd.Series):
+            pd.testing.assert_series_equal(left, right,
+                check_categorical=False
+            )
+        elif isinstance(right, pd.DataFrame):
+            pd.testing.assert_frame_equal(left, right,
+                check_categorical=False
+            )
+        elif isinstance(right, np.ndarray):
+            np.testing.assert_array_equal(left, right)
+        elif isinstance(right, tuple):
+            self.assertEqual(left, right)
+        else:
+            self.fail(f"Unknown data type: {type(right)}")
+
+    def check_jitted(self, func):
+        jitted = self.jit(func)
+        self.assertDataEqual(jitted(), func())
+
 
 class TestParquet(TestIO):
 
@@ -223,9 +243,7 @@ class TestParquet(TestIO):
         def test_impl():
             df = pd.read_parquet('sdf_dt.pq')
             return pd.DataFrame({'DT64': df.DT64, 'col2': df.DATE})
-
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+        self.check_jitted(test_impl)
 
 
 class TestCSV(TestIO):
@@ -254,20 +272,7 @@ class TestCSV(TestIO):
             with self.subTest(test=test):
                 pa_val = getattr(self, f"pa_{test}")()()
                 pd_val = getattr(self, f"pd_{test}")()()
-                if isinstance(pd_val, pd.Series):
-                    pd.testing.assert_series_equal(pa_val, pd_val,
-                        check_categorical=False
-                    )
-                elif isinstance(pd_val, pd.DataFrame):
-                    pd.testing.assert_frame_equal(pa_val, pd_val,
-                        check_categorical=False
-                    )
-                elif isinstance(pd_val, np.ndarray):
-                    np.testing.assert_array_equal(pa_val, pd_val)
-                elif isinstance(pd_val, tuple):
-                    self.assertEqual(pa_val, pd_val)
-                else:
-                    self.fail(f"Unknown Pandas type: {type(pd_val)}")
+                self.assertDataEqual(pa_val, pd_val)
 
     def pd_csv1(self):
         # TODO: w/a for Numba issue with int typing rules infering intp for integers literals
