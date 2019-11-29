@@ -76,6 +76,7 @@ class TestIO(TestCase):
 
 class TestParquet(TestIO):
 
+    @skip_numba_jit
     def test_pq_read(self):
         def test_impl():
             t = pq.read_table('kde.parquet')
@@ -100,6 +101,7 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_pq_read_freevar_str1(self):
         kde_file2 = 'kde.parquet'
 
@@ -113,6 +115,7 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_pd_read_parquet(self):
         def test_impl():
             df = pd.read_parquet('kde.parquet')
@@ -124,6 +127,7 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_pq_str(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
@@ -135,6 +139,7 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_pq_str_with_nan_seq(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
@@ -144,6 +149,7 @@ class TestParquet(TestIO):
         hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
+    @skip_numba_jit
     def test_pq_str_with_nan_par(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
@@ -167,6 +173,7 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_pq_bool(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
@@ -177,6 +184,7 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_pq_nan(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
@@ -187,6 +195,7 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_pq_float_no_nan(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
@@ -209,6 +218,7 @@ class TestParquet(TestIO):
     @skip_sdc_jit('Error: Attribute "dtype" are different\n'
                   '[left]:  datetime64[ns]\n'
                   '[right]: object')
+    @skip_numba_jit
     def test_pq_spark_date(self):
         def test_impl():
             df = pd.read_parquet('sdf_dt.pq')
@@ -748,6 +758,7 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @skip_numba_jit
     @skip_sdc_jit('TypeError: to_csv() takes from 1 to 20 positional arguments but 21 were given)\n'
                   'Notice: Not seen with Pandas 0.24.2')
     def test_write_csv1(self):
@@ -764,6 +775,7 @@ class TestCSV(TestIO):
         # TODO: delete files
         pd.testing.assert_frame_equal(pd.read_csv(hp_fname), pd.read_csv(pd_fname))
 
+    @skip_numba_jit
     @skip_sdc_jit('AttributeError: Failed in hpat mode pipeline (step: convert to distributed)\n'
                   'module \'sdc.hio\' has no attribute \'file_write_parallel\'')
     def test_write_csv_parallel1(self):
@@ -821,6 +833,7 @@ class TestNumpy(TestIO):
             B = np.fromfile("np_file_3.dat", np.float64)
             np.testing.assert_almost_equal(A, B)
 
+    @skip_numba_jit("AssertionError: Failed in nopython mode pipeline (step: Preprocessing for parfors)")
     def test_np_io4(self):
         # parallel version
         def test_impl(n):
