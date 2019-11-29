@@ -94,5 +94,5 @@ Default value for a pointer intended to use as Numba.DefaultPassBuilder.define_n
 
 use_default_dataframe = distutils_util.strtobool(os.getenv('SDC_CONFIG_USE_DEFAULT_DATAFRAME', 'True'))
 '''
-Default value used to select compiler pipeline in a function decorator
+Config variable used to select DataFrameType model (default is legacy model)
 '''

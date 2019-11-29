@@ -39,6 +39,7 @@ from numba import types
 from numba.extending import (overload, overload_method, overload_attribute)
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from numba.errors import TypingError
+from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
 
 if not sdc.config.use_default_dataframe:
     from sdc.datatypes.hpat_pandas_dataframe_types import DataFrameType
@@ -99,7 +100,7 @@ if not sdc.config.use_default_dataframe:
         return sdc_pandas_dataframe_count_impl
 
 else:
-    def reduce(df, name, *args, **kwargs):
+    def sdc_pandas_dataframe_reduce_columns(df, name, *args, **kwargs):
         saved_columns = df.columns
         n_cols = len(saved_columns)
         data_args = tuple('data{}'.format(i) for i in range(n_cols))
@@ -114,10 +115,6 @@ else:
             ", ".join("'{}'".format(c) for c in saved_columns))
         func_text += "  return hpat.hiframes.api.init_series(data, index)\n"
         loc_vars = {}
-
-        print()
-        print(func_text)
-        print()
 
         exec(func_text, {'hpat': sdc, 'np': numpy}, loc_vars)
         _reduce_impl = loc_vars['_reduce_impl']
@@ -155,22 +152,22 @@ else:
 
         name = 'median'
 
-        if not isinstance(df, DataFrameType):
-            raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(name, df))
+        ty_checker = TypeChecker('Method {}().'.format(name))
+        ty_checker.check(df, DataFrameType)
 
         if not (isinstance(axis, types.Omitted) or axis is None):
-            raise TypingError("{} 'axis' unsupported. Given: {}".format(name, axis))
+            ty_checker.raise_exc(axis, 'unsupported', 'axis')
 
         if not (isinstance(skipna, types.Omitted) or skipna is None):
-            raise TypingError("{} 'skipna' unsupported. Given: {}".format(name, skipna))
+            ty_checker.raise_exc(skipna, 'unsupported', 'skipna')
 
         if not (isinstance(level, types.Omitted) or level is None):
-            raise TypingError("{} 'level' unsupported. Given: {}".format(name, level))
+            ty_checker.raise_exc(level, 'unsupported', 'level')
 
         if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            raise TypingError("{} 'numeric_only' unsupported. Given: {}".format(name, numeric_only))
+            ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-        return reduce(df, name)
+        return sdc_pandas_dataframe_reduce_columns(df, name)
 
 
     @overload_method(DataFrameType, 'mean')
@@ -203,22 +200,22 @@ else:
 
         name = 'mean'
 
-        if not isinstance(df, DataFrameType):
-            raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(name, df))
+        ty_checker = TypeChecker('Method {}().'.format(name))
+        ty_checker.check(df, DataFrameType)
 
         if not (isinstance(axis, types.Omitted) or axis is None):
-            raise TypingError("{} 'axis' unsupported. Given: {}".format(name, axis))
+            ty_checker.raise_exc(axis, 'unsupported', 'axis')
 
         if not (isinstance(skipna, types.Omitted) or skipna is None):
-            raise TypingError("{} 'skipna' unsupported. Given: {}".format(name, skipna))
+            ty_checker.raise_exc(skipna, 'unsupported', 'skipna')
 
         if not (isinstance(level, types.Omitted) or level is None):
-            raise TypingError("{} 'level' unsupported. Given: {}".format(name, level))
+            ty_checker.raise_exc(level, 'unsupported', 'level')
 
         if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            raise TypingError("{} 'numeric_only' unsupported. Given: {}".format(name, numeric_only))
+            ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-        return reduce(df, name)
+        return sdc_pandas_dataframe_reduce_columns(df, name)
 
 
     @overload_method(DataFrameType, 'max')
@@ -251,22 +248,22 @@ else:
 
         name = 'max'
 
-        if not isinstance(df, DataFrameType):
-            raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(name, df))
+        ty_checker = TypeChecker('Method {}().'.format(name))
+        ty_checker.check(df, DataFrameType)
 
         if not (isinstance(axis, types.Omitted) or axis is None):
-            raise TypingError("{} 'axis' unsupported. Given: {}".format(name, axis))
+            ty_checker.raise_exc(axis, 'unsupported', 'axis')
 
         if not (isinstance(skipna, types.Omitted) or skipna is None):
-            raise TypingError("{} 'skipna' unsupported. Given: {}".format(name, skipna))
+            ty_checker.raise_exc(skipna, 'unsupported', 'skipna')
 
         if not (isinstance(level, types.Omitted) or level is None):
-            raise TypingError("{} 'level' unsupported. Given: {}".format(name, level))
+            ty_checker.raise_exc(level, 'unsupported', 'level')
 
         if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            raise TypingError("{} 'numeric_only' unsupported. Given: {}".format(name, numeric_only))
+            ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-        return reduce(df, name)
+        return sdc_pandas_dataframe_reduce_columns(df, name)
 
 
     @overload_method(DataFrameType, 'min')
@@ -299,22 +296,22 @@ else:
 
         name = 'min'
 
-        if not isinstance(df, DataFrameType):
-            raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(name, df))
+        ty_checker = TypeChecker('Method {}().'.format(name))
+        ty_checker.check(df, DataFrameType)
 
         if not (isinstance(axis, types.Omitted) or axis is None):
-            raise TypingError("{} 'axis' unsupported. Given: {}".format(name, axis))
+            ty_checker.raise_exc(axis, 'unsupported', 'axis')
 
         if not (isinstance(skipna, types.Omitted) or skipna is None):
-            raise TypingError("{} 'skipna' unsupported. Given: {}".format(name, skipna))
+            ty_checker.raise_exc(skipna, 'unsupported', 'skipna')
 
         if not (isinstance(level, types.Omitted) or level is None):
-            raise TypingError("{} 'level' unsupported. Given: {}".format(name, level))
+            ty_checker.raise_exc(level, 'unsupported', 'level')
 
         if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            raise TypingError("{} 'numeric_only' unsupported. Given: {}".format(name, numeric_only))
+            ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-        return reduce(df, name)
+        return sdc_pandas_dataframe_reduce_columns(df, name)
 
 
     @overload_method(DataFrameType, 'sum')
@@ -349,22 +346,22 @@ else:
 
         name = 'sum'
 
-        if not isinstance(df, DataFrameType):
-            raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(name, df))
+        ty_checker = TypeChecker('Method {}().'.format(name))
+        ty_checker.check(df, DataFrameType)
 
         if not (isinstance(axis, types.Omitted) or axis is None):
-            raise TypingError("{} 'axis' unsupported. Given: {}".format(name, axis))
+            ty_checker.raise_exc(axis, 'unsupported', 'axis')
 
         if not (isinstance(skipna, types.Omitted) or skipna is None):
-            raise TypingError("{} 'skipna' unsupported. Given: {}".format(name, skipna))
+            ty_checker.raise_exc(skipna, 'unsupported', 'skipna')
 
         if not (isinstance(level, types.Omitted) or level is None):
-            raise TypingError("{} 'level' unsupported. Given: {}".format(name, level))
+            ty_checker.raise_exc(level, 'unsupported', 'level')
 
         if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            raise TypingError("{} 'numeric_only' unsupported. Given: {}".format(name, numeric_only))
+            ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
         if not (isinstance(min_count, types.Omitted) or min_count == 0):
-            raise TypingError("{} 'min_count' unsupported. Given: {}".format(name, min_count))
+            ty_checker.raise_exc(min_count, 'unsupported', 'min_count')
 
-        return reduce(df, name)
+        return sdc_pandas_dataframe_reduce_columns(df, name)
