@@ -37,7 +37,7 @@ from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_rank,
                                    get_start_end,
-                                   skip_numba_jit)
+                                   skip_numba_jit, skip_sdc_jit)
 from numba.config import IS_32BITS
 
 from sdc.io.csv_ext import pandas_read_csv as pd_read_csv
@@ -224,9 +224,9 @@ class TestParquet(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @unittest.skip('Error: Attribute "dtype" are different\n'
-                   '[left]:  datetime64[ns]\n'
-                   '[right]: object')
+    @skip_sdc_jit('Error: Attribute "dtype" are different\n'
+                  '[left]:  datetime64[ns]\n'
+                  '[right]: object')
     def test_pq_spark_date(self):
         def test_impl():
             df = pd.read_parquet('sdf_dt.pq')
@@ -766,8 +766,8 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @unittest.skip('TypeError: to_csv() takes from 1 to 20 positional arguments but 21 were given)\n'
-                   'Notice: Not seen with Pandas 0.24.2')
+    @skip_sdc_jit('TypeError: to_csv() takes from 1 to 20 positional arguments but 21 were given)\n'
+                  'Notice: Not seen with Pandas 0.24.2')
     def test_write_csv1(self):
         def test_impl(df, fname):
             df.to_csv(fname)
@@ -782,8 +782,8 @@ class TestCSV(TestIO):
         # TODO: delete files
         pd.testing.assert_frame_equal(pd.read_csv(hp_fname), pd.read_csv(pd_fname))
 
-    @unittest.skip('AttributeError: Failed in hpat mode pipeline (step: convert to distributed)\n'
-                   'module \'sdc.hio\' has no attribute \'file_write_parallel\'')
+    @skip_sdc_jit('AttributeError: Failed in hpat mode pipeline (step: convert to distributed)\n'
+                  'module \'sdc.hio\' has no attribute \'file_write_parallel\'')
     def test_write_csv_parallel1(self):
         def test_impl(n, fname):
             df = pd.DataFrame({'A': np.arange(n)})
