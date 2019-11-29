@@ -198,34 +198,33 @@ def get_times(f, *args, iter_number=5):
 class ResultsDriver:
     """Base class. Load and dump results."""
 
-    def __init__(self, file_name, raw_file_name=None, logger=None):
+    def __init__(self, file_name, raw_file_name=None):
         self.file_name = file_name
         self.raw_file_name = raw_file_name if raw_file_name else f'raw_{file_name}'
-        self.logger = logger
 
 
 class ExcelResultsDriver(ResultsDriver):
     # openpyxl need to be installed
 
-    def dump_grouped_data(self, grouped_data):
+    def dump_grouped_data(self, grouped_data, logger=None):
         try:
             with pandas.ExcelWriter(self.file_name) as writer:
                 grouped_data.to_excel(writer)
         except ModuleNotFoundError as e:
-            if self.logger:
+            if logger:
                 msg = 'Could not dump the results to "%s": %s'
-                self.logger.warning(msg, self.file_name, e)
+                logger.warning(msg, self.file_name, e)
 
-    def dump_test_results_data(self, test_results_data):
+    def dump_test_results_data(self, test_results_data, logger=None):
         try:
             with pandas.ExcelWriter(self.raw_file_name) as writer:
                 test_results_data.to_excel(writer, index=False)
         except ModuleNotFoundError as e:
-            if self.logger:
+            if logger:
                 msg = 'Could not dump raw results to "%s": %s'
-                self.logger.warning(msg, self.raw_file_name, e)
+                logger.warning(msg, self.raw_file_name, e)
 
-    def load(self):
+    def load(self, logger=None):
         raw_perf_results_xlsx = Path(self.raw_file_name)
         if raw_perf_results_xlsx.exists():
             with raw_perf_results_xlsx.open('rb') as fd:
@@ -233,18 +232,20 @@ class ExcelResultsDriver(ResultsDriver):
                 try:
                     return pandas.read_excel(fd)
                 except ModuleNotFoundError as e:
-                    msg = 'Could not load previous results from %s: %s'
-                    self.logger.warning(msg, self.raw_file_name, e)
+                    if logger:
+                        msg = 'Could not load previous results from %s: %s'
+                        logger.warning(msg, self.raw_file_name, e)
+
 
 class CSVResultsDriver(ResultsDriver):
 
-    def dump_grouped_data(self, grouped_data):
+    def dump_grouped_data(self, grouped_data, logger=None):
         grouped_data.to_csv(self.file_name)
 
-    def dump_test_results_data(self, test_results_data):
+    def dump_test_results_data(self, test_results_data, logger=None):
         test_results_data.to_csv(self.raw_file_name)
 
-    def load(self):
+    def load(self, logger=None):
         raw_perf_results_csv = Path(self.raw_file_name)
         if raw_perf_results_csv.exists():
             with raw_perf_results_csv.open('rb') as fd:
@@ -252,8 +253,9 @@ class CSVResultsDriver(ResultsDriver):
                 try:
                     return pandas.read_csv(fd)
                 except ModuleNotFoundError as e:
-                    msg = 'Could not load previous results from %s: %s'
-                    self.logger.warning(msg, self.raw_file_name, e)
+                    if logger:
+                        msg = 'Could not load previous results from %s: %s'
+                        logger.warning(msg, self.raw_file_name, e)
 
 
 class TestResults:
@@ -262,10 +264,8 @@ class TestResults:
     logger = setup_logging()
 
     def __init__(self, drivers=None):
-        if drivers is None:
-            drivers = [ExcelResultsDriver('perf_results.xlsx', logger=self.logger)]
         self.drivers = drivers
-        self.default_driver = drivers[0]
+        self.default_driver = drivers[0] if drivers else None
 
     @property
     def grouped_data(self):
@@ -338,16 +338,17 @@ class TestResults:
         Dump performance testing results from global data storage to excel
         """
         for d in self.drivers:
-            d.dump_grouped_data(self.grouped_data)
-            d.dump_test_results_data(self.test_results_data)
+            d.dump_grouped_data(self.grouped_data, self.logger)
+            d.dump_test_results_data(self.test_results_data, self.logger)
 
     def load(self):
         """
         Load existing performance testing results from excel to global data storage
         """
-        test_results_data = self.default_driver.load()
-        if test_results_data is not None:
-            self.test_results_data = test_results_data
+        if self.default_driver:
+            test_results_data = self.default_driver.load(self.logger)
+            if test_results_data is not None:
+                self.test_results_data = test_results_data
 
 
 class TestResultsStr(TestResults):
