@@ -44,7 +44,6 @@ from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
 if not sdc.config.use_default_dataframe:
     from sdc.datatypes.hpat_pandas_dataframe_types import DataFrameType
 
-
     @overload_method(DataFrameType, 'count')
     def sdc_pandas_dataframe_count(self, axis=0, level=None, numeric_only=False):
         """
@@ -68,7 +67,8 @@ if not sdc.config.use_default_dataframe:
         Returns
         -------
         :obj:`pandas.Series` or `pandas.DataFrame`
-                returns: For each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
+                returns: For each column/row the number of non-NA/null entries. If level is specified returns
+                a DataFrame.
         """
 
         _func_name = 'Method pandas.dataframe.count().'
@@ -100,27 +100,50 @@ if not sdc.config.use_default_dataframe:
         return sdc_pandas_dataframe_count_impl
 
 else:
-    def sdc_pandas_dataframe_reduce_columns(df, name, *args, **kwargs):
+    def sdc_pandas_dataframe_reduce_columns(df, name, func_text):
         saved_columns = df.columns
         n_cols = len(saved_columns)
         data_args = tuple('data{}'.format(i) for i in range(n_cols))
-        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None):\n"
+        func_lines = [func_text]
         for i, d in enumerate(data_args):
-            func_text += "  {} = hpat.hiframes.api.init_series(hpat.hiframes.pd_dataframe_ext.get_dataframe_data(df, {}))\n".format(
-                d + '_S', i)
-            func_text += "  {} = {}.{}()\n".format(d + '_O', d + '_S', name)
-        func_text += "  data = np.array(({},))\n".format(
-            ", ".join(d + '_O' for d in data_args))
-        func_text += "  index = hpat.str_arr_ext.StringArray(({},))\n".format(
-            ", ".join("'{}'".format(c) for c in saved_columns))
-        func_text += "  return hpat.hiframes.api.init_series(data, index)\n"
+            func_lines.append(
+                "  {} = hpat.hiframes.api.init_series(hpat.hiframes.pd_dataframe_ext.get_dataframe_data(df, {}))".format(
+                d + '_S', i))
+            func_lines.append("  {} = {}.{}()".format(d + '_O', d + '_S', name))
+        func_lines.append("  data = np.array(({},))".format(
+            ", ".join(d + '_O' for d in data_args)))
+        func_lines.append("  index = hpat.str_arr_ext.StringArray(({},))".format(
+            ", ".join("'{}'".format(c) for c in saved_columns)))
+        func_lines.append("  return hpat.hiframes.api.init_series(data, index)")
         loc_vars = {}
+        func_text = '\n'.join(func_lines)
 
         exec(func_text, {'hpat': sdc, 'np': numpy}, loc_vars)
         _reduce_impl = loc_vars['_reduce_impl']
 
         return _reduce_impl
 
+    def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, ddof=1, min_count=0):
+        ty_checker = TypeChecker('Method {}().'.format(name))
+        ty_checker.check(df, DataFrameType)
+
+        if not (isinstance(axis, types.Omitted) or axis is None):
+            ty_checker.raise_exc(axis, 'unsupported', 'axis')
+
+        if not (isinstance(skipna, types.Omitted) or skipna is None):
+            ty_checker.raise_exc(skipna, 'unsupported', 'skipna')
+
+        if not (isinstance(level, types.Omitted) or level is None):
+            ty_checker.raise_exc(level, 'unsupported', 'level')
+
+        if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
+            ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
+
+        if not (isinstance(ddof, types.Omitted) or ddof == 1):
+            ty_checker.raise_exc(ddof, 'unsupported', 'ddof')
+
+        if not (isinstance(min_count, types.Omitted) or min_count == 0):
+            ty_checker.raise_exc(min_count, 'unsupported', 'min_count')
 
     @overload_method(DataFrameType, 'median')
     def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
@@ -152,23 +175,11 @@ else:
 
         name = 'median'
 
-        ty_checker = TypeChecker('Method {}().'.format(name))
-        ty_checker.check(df, DataFrameType)
+        check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        if not (isinstance(axis, types.Omitted) or axis is None):
-            ty_checker.raise_exc(axis, 'unsupported', 'axis')
+        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None):"
 
-        if not (isinstance(skipna, types.Omitted) or skipna is None):
-            ty_checker.raise_exc(skipna, 'unsupported', 'skipna')
-
-        if not (isinstance(level, types.Omitted) or level is None):
-            ty_checker.raise_exc(level, 'unsupported', 'level')
-
-        if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
-
-        return sdc_pandas_dataframe_reduce_columns(df, name)
-
+        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
 
     @overload_method(DataFrameType, 'mean')
     def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
@@ -200,23 +211,87 @@ else:
 
         name = 'mean'
 
-        ty_checker = TypeChecker('Method {}().'.format(name))
-        ty_checker.check(df, DataFrameType)
+        check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        if not (isinstance(axis, types.Omitted) or axis is None):
-            ty_checker.raise_exc(axis, 'unsupported', 'axis')
+        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None):"
 
-        if not (isinstance(skipna, types.Omitted) or skipna is None):
-            ty_checker.raise_exc(skipna, 'unsupported', 'skipna')
+        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
 
-        if not (isinstance(level, types.Omitted) or level is None):
-            ty_checker.raise_exc(level, 'unsupported', 'level')
+    @overload_method(DataFrameType, 'std')
+    def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
+        """
+           Pandas DataFrame method :meth:`pandas.DataFrame.std` implementation.
 
-        if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
+           .. only:: developer
 
-        return sdc_pandas_dataframe_reduce_columns(df, name)
+               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_std1
 
+           Parameters
+           -----------
+           self: :class:`pandas.DataFrame`
+               input arg
+           axis:
+                *unsupported*
+           skipna:
+               *unsupported*
+           level:
+               *unsupported*
+           ddof:
+               *unsupported*
+           numeric_only:
+               *unsupported*
+
+           Returns
+           -------
+           :obj:`pandas.Series` or `pandas.DataFrame`
+                   return sample standard deviation over requested axis.
+           """
+
+        name = 'std'
+
+        check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, ddof=ddof)
+
+        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):"
+
+        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
+
+    @overload_method(DataFrameType, 'var')
+    def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
+        """
+           Pandas DataFrame method :meth:`pandas.DataFrame.var` implementation.
+
+           .. only:: developer
+
+               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_var1
+
+           Parameters
+           -----------
+           self: :class:`pandas.DataFrame`
+               input arg
+           axis:
+                *unsupported*
+           skipna:
+               *unsupported*
+           level:
+               *unsupported*
+           ddof:
+               *unsupported*
+           numeric_only:
+               *unsupported*
+
+           Returns
+           -------
+           :obj:`pandas.Series` or `pandas.DataFrame`
+                   return sample standard deviation over requested axis.
+           """
+
+        name = 'var'
+
+        check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, ddof=ddof)
+
+        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):"
+
+        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
 
     @overload_method(DataFrameType, 'max')
     def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
@@ -248,23 +323,11 @@ else:
 
         name = 'max'
 
-        ty_checker = TypeChecker('Method {}().'.format(name))
-        ty_checker.check(df, DataFrameType)
+        check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        if not (isinstance(axis, types.Omitted) or axis is None):
-            ty_checker.raise_exc(axis, 'unsupported', 'axis')
+        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None):"
 
-        if not (isinstance(skipna, types.Omitted) or skipna is None):
-            ty_checker.raise_exc(skipna, 'unsupported', 'skipna')
-
-        if not (isinstance(level, types.Omitted) or level is None):
-            ty_checker.raise_exc(level, 'unsupported', 'level')
-
-        if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
-
-        return sdc_pandas_dataframe_reduce_columns(df, name)
-
+        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
 
     @overload_method(DataFrameType, 'min')
     def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
@@ -296,23 +359,11 @@ else:
 
         name = 'min'
 
-        ty_checker = TypeChecker('Method {}().'.format(name))
-        ty_checker.check(df, DataFrameType)
+        check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        if not (isinstance(axis, types.Omitted) or axis is None):
-            ty_checker.raise_exc(axis, 'unsupported', 'axis')
+        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None):"
 
-        if not (isinstance(skipna, types.Omitted) or skipna is None):
-            ty_checker.raise_exc(skipna, 'unsupported', 'skipna')
-
-        if not (isinstance(level, types.Omitted) or level is None):
-            ty_checker.raise_exc(level, 'unsupported', 'level')
-
-        if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
-
-        return sdc_pandas_dataframe_reduce_columns(df, name)
-
+        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
 
     @overload_method(DataFrameType, 'sum')
     def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
@@ -346,22 +397,91 @@ else:
 
         name = 'sum'
 
+        check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
+
+        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):"
+
+        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
+
+    @overload_method(DataFrameType, 'prod')
+    def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
+        """
+           Pandas DataFrame method :meth:`pandas.DataFrame.prod` implementation.
+
+           .. only:: developer
+
+               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_prod1
+
+           Parameters
+           -----------
+           self: :class:`pandas.DataFrame`
+               input arg
+           axis:
+                *unsupported*
+           skipna:
+               *unsupported*
+           level:
+               *unsupported*
+           numeric_only:
+               *unsupported*
+           min_count:
+                *unsupported*
+
+           Returns
+           -------
+           :obj:`pandas.Series` or `pandas.DataFrame`
+                   return the product of the values for the requested axis.
+           """
+
+        name = 'prod'
+
+        check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
+
+        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):"
+
+        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
+
+
+    @overload_method(DataFrameType, 'count')
+    def count_overload(df, axis=0, level=None, numeric_only=False):
+        """
+           Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.
+
+           .. only:: developer
+
+               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count
+
+           Parameters
+           -----------
+           self: :class:`pandas.DataFrame`
+               input arg
+           axis:
+                *unsupported*
+           level:
+               *unsupported*
+           numeric_only:
+               *unsupported*
+
+           Returns
+           -------
+           :obj:`pandas.Series` or `pandas.DataFrame`
+                   for each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
+           """
+
+        name = 'count'
+
         ty_checker = TypeChecker('Method {}().'.format(name))
         ty_checker.check(df, DataFrameType)
 
-        if not (isinstance(axis, types.Omitted) or axis is None):
+        if not (isinstance(axis, types.Omitted) or axis == 0):
             ty_checker.raise_exc(axis, 'unsupported', 'axis')
-
-        if not (isinstance(skipna, types.Omitted) or skipna is None):
-            ty_checker.raise_exc(skipna, 'unsupported', 'skipna')
 
         if not (isinstance(level, types.Omitted) or level is None):
             ty_checker.raise_exc(level, 'unsupported', 'level')
 
-        if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
+        if not (isinstance(numeric_only, types.Omitted) or numeric_only is False):
             ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-        if not (isinstance(min_count, types.Omitted) or min_count == 0):
-            ty_checker.raise_exc(min_count, 'unsupported', 'min_count')
+        func_text = "def _reduce_impl(df, axis=0, level=None, numeric_only=False):"
 
-        return sdc_pandas_dataframe_reduce_columns(df, name)
+        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
