@@ -73,6 +73,9 @@ class TestIO(TestCase):
             A = np.random.ranf(n)
             A.tofile("np_file1.dat")
 
+
+class TestParquet(TestIO):
+
     @unittest.skip('Error - fix needed\n'
                    'NUMA_PES=3 build')
     def test_pq_read(self):
@@ -231,6 +234,9 @@ class TestIO(TestCase):
 
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+
+class TestCSV(TestIO):
 
     def test_pyarrow(self):
         tests = [
@@ -795,6 +801,9 @@ class TestIO(TestCase):
         if get_rank() == 0:
             pd.testing.assert_frame_equal(
                 pd.read_csv(hp_fname), pd.read_csv(pd_fname))
+
+
+class TestNumpy(TestIO):
 
     @skip_numba_jit
     def test_np_io1(self):
