@@ -612,7 +612,7 @@ class TestSeries(unittest.TestCase):
                      'Series.corr() parameter "min_periods" unsupported')
     def test_series_corr_unsupported_period(self):
         def test_series_corr_impl(S1, S2, min_periods=None):
-            return S1.corr(S2, min_periods)
+            return S1.corr(S2, min_periods=min_periods)
 
         hpat_func = self.jit(test_series_corr_impl)
         S1 = pd.Series([.2, .0, .6, .2])
