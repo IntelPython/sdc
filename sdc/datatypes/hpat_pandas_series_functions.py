@@ -37,11 +37,15 @@ import pandas
 from numba.errors import TypingError
 from numba.extending import overload, overload_method, overload_attribute
 from numba import types
+from numba import cgutils
+from numba.typing import signature
+from numba.extending import intrinsic
+
 
 import sdc
 import sdc.datatypes.common_functions as common_functions
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
-from sdc.hiframes.pd_series_ext import SeriesType
+from sdc.hiframes.pd_series_ext import SeriesType, SeriesOperatorTypeIloc
 from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars)
 from sdc.utils import to_array
 
@@ -117,8 +121,13 @@ def hpat_pandas_series_getitem(self, idx):
 
     _func_name = 'Operator getitem().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    if isinstance(self, SeriesOperatorTypeIloc):
+        print("DEBUG: getitem typing - recognized SeriesOperatorTypeIloc instance")
+        def hpat_pandas_series_getitem_idx_integer_impl(self, idx):
+            result = self._data[idx]
+            return result
+
+        return hpat_pandas_series_getitem_idx_integer_impl
 
     if isinstance(idx, types.Integer):
         def hpat_pandas_series_getitem_idx_integer_impl(self, idx):
@@ -156,10 +165,10 @@ def hpat_pandas_series_getitem(self, idx):
     raise TypingError('{} The index must be an Integer, Slice or a pandas.series. Given: {}'.format(_func_name, idx))
 
 
-@overload_attribute(SeriesType, 'at')
-@overload_attribute(SeriesType, 'iat')
+# @overload_attribute(SeriesType, 'at')
+# @overload_attribute(SeriesType, 'iat')
 @overload_attribute(SeriesType, 'iloc')
-@overload_attribute(SeriesType, 'loc')
+# @overload_attribute(SeriesType, 'loc')
 def hpat_pandas_series_iloc(self):
     """
     Pandas Series operators :attr:`pandas.Series.at`, :attr:`pandas.Series.iat`, :attr:`pandas.Series.iloc`, :attr:`pandas.Series.loc` implementation.
@@ -184,7 +193,7 @@ def hpat_pandas_series_iloc(self):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     def hpat_pandas_series_iloc_impl(self):
-        return self
+        return sdc.hiframes.api.init_series_iloc(self)
 
     return hpat_pandas_series_iloc_impl
 

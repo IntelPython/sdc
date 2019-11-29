@@ -1312,6 +1312,26 @@ def lower_parse_datetimes_from_strings(context, builder, sig, args):
     return impl_ret_borrowed(context, builder, sig.return_type, res._getvalue())
 
 
+from sdc.hiframes.pd_series_ext import SeriesType, SeriesOperatorTypeIloc
+@intrinsic
+def init_series_iloc(typingctx, series):
+
+    def codegen(context, builder, signature, args):
+        series_val, = args
+        if context.enable_nrt:
+            context.nrt.incref(builder, signature.args[0], series_val)
+
+        return series_val
+
+    dtype = series.dtype
+    ty_data = series.data
+    ty_index = series.index
+    ty_name = series.is_named
+    ret_typ = SeriesOperatorTypeIloc(dtype, ty_data, ty_index, ty_name)
+    sig = signature(ret_typ, series)
+    return sig, codegen
+
+
 @intrinsic
 def init_series(typingctx, data, index=None, name=None):
     """Create a Series with provided data, index and name values.

@@ -1033,7 +1033,7 @@ class TestSeries(TestCase):
         S = pd.Series(np.arange(n)**2)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
+    # @skip_numba_jit
     def test_series_iloc1(self):
         def test_impl(A):
             return A.iloc[3]
