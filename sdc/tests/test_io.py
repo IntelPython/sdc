@@ -76,8 +76,6 @@ class TestIO(TestCase):
 
 class TestParquet(TestIO):
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_pq_read(self):
         def test_impl():
             t = pq.read_table('kde.parquet')
@@ -102,8 +100,6 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_pq_read_freevar_str1(self):
         kde_file2 = 'kde.parquet'
 
@@ -117,8 +113,6 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_pd_read_parquet(self):
         def test_impl():
             df = pd.read_parquet('kde.parquet')
@@ -130,8 +124,6 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_pq_str(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
@@ -143,8 +135,6 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_pq_str_with_nan_seq(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
@@ -154,8 +144,6 @@ class TestParquet(TestIO):
         hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_pq_str_with_nan_par(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
@@ -179,8 +167,6 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_pq_bool(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
@@ -191,8 +177,6 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_pq_nan(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
@@ -203,8 +187,6 @@ class TestParquet(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @unittest.skip('Error - fix needed\n'
-                   'NUMA_PES=3 build')
     def test_pq_float_no_nan(self):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
