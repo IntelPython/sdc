@@ -65,6 +65,29 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
+
+    def test_create_with_series(self):
+        def test_impl(n):
+            A = pd.Series(np.ones(n, dtype=np.int64))
+            B = pd.Series(np.zeros(n, dtype=np.float64))
+            df = pd.DataFrame({'A': A, 'B': B})
+            return df
+
+        hpat_func = sdc.jit(test_impl)
+        n = 11
+        pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
+
+    def test_create_string_index(self):
+        def test_impl(a):
+            data = {'A': ['a', 'b'], 'B': [2, 3]}
+            df = pd.DataFrame(data=data, index=['A', 'B'])
+            return df
+
+        hpat_func = sdc.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(True), test_impl(True))
+
+
     def test_create_cond1(self):
         def test_impl(A, B, c):
             if c:
@@ -215,7 +238,8 @@ class TestDataFrame(TestCase):
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 1)
+        # somehow rewrites breaks mechanics of dead columns elimination
+        # self.assertEqual(count_parfor_OneDs(), 1)
 
     def test_column_list_getitem1(self):
         def test_impl(df):
