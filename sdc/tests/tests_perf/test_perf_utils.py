@@ -285,7 +285,7 @@ class TestResults:
 
         try:
             with open(self.perf_results_html, 'w') as the_file:
-                the_file.write(self.grouped_data.to_html())
+                the_file.write(self.grouped_data.to_html(na_rep=''))
         except IOError as e:
             msg = 'Could not dump raw results to "%s": %s'
             self.logger.warning(msg, self.perf_results_html, e)
@@ -299,7 +299,7 @@ class TestResults:
 
         try:
             with open(self.raw_perf_results_html, 'w') as the_file:
-                the_file.write(self.test_results_data.to_html())
+                the_file.write(self.test_results_data.to_html(index=False, na_rep=''))
         except IOError as e:
             msg = 'Could not dump raw results to "%s": %s'
             self.logger.warning(msg, self.raw_perf_results_html, e)
