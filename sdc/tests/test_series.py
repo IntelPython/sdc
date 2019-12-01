@@ -2378,7 +2378,7 @@ class TestSeries(TestCase):
                           '  return S.str.{}()'.format(method)]
             func_text = '\n'.join(func_lines)
             test_impl = _make_func_from_text(func_text)
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
 
             S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'])
             # TypingError with expected message is raised internally by Numba
@@ -4240,7 +4240,7 @@ class TestSeries(TestCase):
         def test_series_pct_change_impl(S, periods, method):
             return S.pct_change(periods=periods, fill_method=method, limit=None, freq=None)
 
-        hpat_func = sdc.jit(test_series_pct_change_impl)
+        hpat_func = self.jit(test_series_pct_change_impl)
         test_input_data = [
             [],
             [np.nan, np.nan, np.nan],
@@ -4263,7 +4263,7 @@ class TestSeries(TestCase):
         def test_series_pct_change_impl(S):
             return S.pct_change(periods=1, fill_method='pad', limit=None, freq=None)
 
-        hpat_func = sdc.jit(test_series_pct_change_impl)
+        hpat_func = self.jit(test_series_pct_change_impl)
         S = pd.Series(test_global_input_data_unicode_kind4)
 
         with self.assertRaises(TypingError) as raises:
@@ -4276,7 +4276,7 @@ class TestSeries(TestCase):
         def test_series_pct_change_impl(S, periods=1, fill_method='pad', limit=None, freq=None):
             return S.pct_change(periods=periods, fill_method=fill_method, limit=limit, freq=freq)
 
-        hpat_func = sdc.jit(test_series_pct_change_impl)
+        hpat_func = self.jit(test_series_pct_change_impl)
         S = pd.Series([0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf])
         with self.assertRaises(ValueError) as raises:
             hpat_func(S, fill_method='ababa')

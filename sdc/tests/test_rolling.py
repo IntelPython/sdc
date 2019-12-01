@@ -61,7 +61,7 @@ class TestRolling(TestCase):
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             test_impl = loc_vars['test_impl']
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
 
             for args in itertools.product(wins, centers):
                 df = pd.DataFrame({'B': [0, 1, 2, np.nan, 4]})
@@ -82,7 +82,7 @@ class TestRolling(TestCase):
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             test_impl = loc_vars['test_impl']
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
             for n, w, c in itertools.product(sizes, wins, centers):
                 df = pd.DataFrame({'B': np.arange(n)})
                 pd.testing.assert_frame_equal(hpat_func(df, w, c), test_impl(df, w, c))
@@ -92,7 +92,7 @@ class TestRolling(TestCase):
         # test sequentially with manually created dfs
         def test_impl(df, w, c):
             return df.rolling(w, center=c).apply(lambda a: a.sum())
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         wins = (3,)
         if LONG_TEST:
             wins = (2, 3, 5)
@@ -108,7 +108,7 @@ class TestRolling(TestCase):
         # test sequentially with generated dfs
         def test_impl(df, w, c):
             return df.rolling(w, center=c).apply(lambda a: a.sum())
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         sizes = (121,)
         wins = (3,)
         if LONG_TEST:
@@ -125,7 +125,7 @@ class TestRolling(TestCase):
             R = df.rolling(w, center=center).sum()
             return R.B.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         sizes = (121,)
         wins = (5,)
         if LONG_TEST:
@@ -145,7 +145,7 @@ class TestRolling(TestCase):
             R = df.rolling(w, center=center).apply(lambda a: a.sum())
             return R.B.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         sizes = (121,)
         wins = (5,)
         if LONG_TEST:
@@ -181,7 +181,7 @@ class TestRolling(TestCase):
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             test_impl = loc_vars['test_impl']
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
             # XXX: skipping min/max for this test since the behavior of Pandas
             # is inconsistent: it assigns NaN to last output instead of 4!
             if func_name not in ('min', 'max'):
@@ -201,7 +201,7 @@ class TestRolling(TestCase):
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             test_impl = loc_vars['test_impl']
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
             for n in sizes:
                 time = pd.date_range(start='1/1/2018', periods=n, freq='s')
                 df = pd.DataFrame({'B': np.arange(n), 'time': time})
@@ -231,7 +231,7 @@ class TestRolling(TestCase):
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             test_impl = loc_vars['test_impl']
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
             pd.testing.assert_frame_equal(hpat_func(df1), test_impl(df1))
             pd.testing.assert_frame_equal(hpat_func(df2), test_impl(df2))
 
@@ -250,7 +250,7 @@ class TestRolling(TestCase):
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             test_impl = loc_vars['test_impl']
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
             for n in sizes:
                 time = pd.date_range(start='1/1/2018', periods=n, freq='s')
                 df = pd.DataFrame({'B': np.arange(n), 'time': time})
@@ -274,7 +274,7 @@ class TestRolling(TestCase):
             loc_vars = {}
             exec(func_text, {'pd': pd, 'np': np}, loc_vars)
             test_impl = loc_vars['test_impl']
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
             for n in sizes:
                 np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -299,7 +299,7 @@ class TestRolling(TestCase):
             loc_vars = {}
             exec(func_text, {'pd': pd, 'np': np}, loc_vars)
             test_impl = loc_vars['test_impl']
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
             for n in sizes:
                 np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -320,7 +320,7 @@ class TestRolling(TestCase):
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             test_impl = loc_vars['test_impl']
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
             for args in itertools.product(wins, centers):
                 pd.testing.assert_series_equal(hpat_func(S1, *args), test_impl(S1, *args))
                 pd.testing.assert_series_equal(hpat_func(S2, *args), test_impl(S2, *args))
@@ -328,7 +328,7 @@ class TestRolling(TestCase):
 
         def apply_test_impl(S, w, c):
             return S.rolling(w, center=c).apply(lambda a: a.sum())
-        hpat_func = sdc.jit(apply_test_impl)
+        hpat_func = self.jit(apply_test_impl)
         for args in itertools.product(wins, centers):
             pd.testing.assert_series_equal(hpat_func(S1, *args), apply_test_impl(S1, *args))
             pd.testing.assert_series_equal(hpat_func(S2, *args), apply_test_impl(S2, *args))
@@ -346,14 +346,14 @@ class TestRolling(TestCase):
 
         def test_impl(S, S2, w, c):
             return S.rolling(w, center=c).cov(S2)
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         for args in itertools.product([S1, S2], [S1, S2], wins, centers):
             pd.testing.assert_series_equal(hpat_func(*args), test_impl(*args))
             pd.testing.assert_series_equal(hpat_func(*args), test_impl(*args))
 
         def test_impl2(S, S2, w, c):
             return S.rolling(w, center=c).corr(S2)
-        hpat_func = sdc.jit(test_impl2)
+        hpat_func = self.jit(test_impl2)
         for args in itertools.product([S1, S2], [S1, S2], wins, centers):
             pd.testing.assert_series_equal(hpat_func(*args), test_impl2(*args))
             pd.testing.assert_series_equal(hpat_func(*args), test_impl2(*args))
@@ -371,14 +371,14 @@ class TestRolling(TestCase):
 
         def test_impl(df, df2, w, c):
             return df.rolling(w, center=c).cov(df2)
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         for args in itertools.product([df1, df2], [df1, df2], wins, centers):
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl(*args))
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl(*args))
 
         def test_impl2(df, df2, w, c):
             return df.rolling(w, center=c).corr(df2)
-        hpat_func = sdc.jit(test_impl2)
+        hpat_func = self.jit(test_impl2)
         for args in itertools.product([df1, df2], [df1, df2], wins, centers):
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl2(*args))
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl2(*args))

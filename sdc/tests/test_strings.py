@@ -47,7 +47,7 @@ class TestStrings(TestCase):
     def test_pass_return(self):
         def test_impl(_str):
             return _str
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         # pass single string and return
         arg = 'test_str'
@@ -60,7 +60,7 @@ class TestStrings(TestCase):
     def test_const(self):
         def test_impl():
             return 'test_str'
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
     @skip_numba_jit
@@ -73,7 +73,7 @@ class TestStrings(TestCase):
             loc_vars = {}
             exec(func_text, {}, loc_vars)
             test_impl = loc_vars['test_impl']
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
 
             arg = ' \tbbCD\t '
             self.assertEqual(hpat_func(arg), test_impl(arg))
@@ -83,20 +83,20 @@ class TestStrings(TestCase):
 
         def test_impl(_str):
             return (_str == 'test_str')
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         self.assertEqual(hpat_func(arg), test_impl(arg))
 
         def test_impl(_str):
             return (_str != 'test_str')
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         self.assertEqual(hpat_func(arg), test_impl(arg))
 
     def test_concat(self):
         def test_impl(_str):
             return (_str + 'test_str')
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         arg = 'a_'
         self.assertEqual(hpat_func(arg), test_impl(arg))
@@ -104,7 +104,7 @@ class TestStrings(TestCase):
     def test_split(self):
         def test_impl(_str):
             return _str.split('/')
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         arg = 'aa/bb/cc'
         self.assertEqual(hpat_func(arg), test_impl(arg))
@@ -112,7 +112,7 @@ class TestStrings(TestCase):
     def test_replace(self):
         def test_impl(_str):
             return _str.replace('/', ';')
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         arg = 'aa/bb/cc'
         self.assertEqual(hpat_func(arg), test_impl(arg))
@@ -120,7 +120,7 @@ class TestStrings(TestCase):
     def test_getitem_int(self):
         def test_impl(_str):
             return _str[3]
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         arg = 'aa/bb/cc'
         self.assertEqual(hpat_func(arg), test_impl(arg))
@@ -128,7 +128,7 @@ class TestStrings(TestCase):
     def test_string_int_cast(self):
         def test_impl(_str):
             return int(_str)
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         arg = '12'
         self.assertEqual(hpat_func(arg), test_impl(arg))
@@ -136,7 +136,7 @@ class TestStrings(TestCase):
     def test_string_float_cast(self):
         def test_impl(_str):
             return float(_str)
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         arg = '12.2'
         self.assertEqual(hpat_func(arg), test_impl(arg))
@@ -144,7 +144,7 @@ class TestStrings(TestCase):
     def test_string_str_cast(self):
         def test_impl(a):
             return str(a)
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         for arg in [np.int32(45), 43, np.float32(1.4), 4.5]:
             py_res = test_impl(arg)
@@ -156,7 +156,7 @@ class TestStrings(TestCase):
         def test_impl(_str):
             p = re.compile('ab*')
             return p.sub('ff', _str)
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         arg = 'aabbcc'
         self.assertEqual(hpat_func(arg), test_impl(arg))
@@ -165,7 +165,7 @@ class TestStrings(TestCase):
         def test_impl(_str, _pat):
             return sdc.str_ext.contains_regex(
                 _str, sdc.str_ext.compile_regex(_pat))
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         self.assertEqual(hpat_func('What does the fox say',
                                    r'd.*(the |fox ){2}'), True)
@@ -178,7 +178,7 @@ class TestStrings(TestCase):
             val = unicode_to_std_str(val)
             out = sdc.str_ext.str_replace_regex(s, e, val)
             return std_str_to_unicode(out)
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         _str = 'What does the fox say'
         pat = r'd.*(the |fox ){2}'
@@ -195,7 +195,7 @@ class TestStrings(TestCase):
             val = unicode_to_std_str(val)
             out = sdc.str_ext.str_replace_noregex(s, e, val)
             return std_str_to_unicode(out)
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         _str = 'What does the fox say'
         pat = 'does the fox'
@@ -210,7 +210,7 @@ class TestStrings(TestCase):
         # create StringArray and return as list of strings
         def test_impl():
             return StringArray(['ABC', 'BB', 'CDEF'])
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         self.assertTrue(np.array_equal(hpat_func(), ['ABC', 'BB', 'CDEF']))
 
@@ -220,7 +220,7 @@ class TestStrings(TestCase):
             A = StringArray(['ABC', 'BB', 'CDEF'])
             B = A == 'ABC'
             return B.sum()
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         self.assertEqual(hpat_func(), 1)
 
@@ -229,7 +229,7 @@ class TestStrings(TestCase):
         def test_impl(ds):
             rs = ds == 'one'
             return ds, rs
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         df = pd.DataFrame(
             {
@@ -249,7 +249,7 @@ class TestStrings(TestCase):
             B = A == 'ABC'
             C = A[B]
             return len(C) == 1 and C[0] == 'ABC'
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         self.assertEqual(hpat_func(), True)
 
@@ -261,7 +261,7 @@ class TestStrings(TestCase):
         def test_impl():
             df = pq.read_table('example.parquet').to_pandas()
             return df.five
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         # XXX just checking isna() since Pandas uses None in this case
         # instead of nan for some reason
@@ -272,7 +272,7 @@ class TestStrings(TestCase):
     def test_decode_empty1(self):
         def test_impl(S):
             return S[0]
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         S = pd.Series([''])
         self.assertEqual(hpat_func(S), test_impl(S))
@@ -281,7 +281,7 @@ class TestStrings(TestCase):
     def test_decode_single_ascii_char1(self):
         def test_impl(S):
             return S[0]
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         S = pd.Series(['A'])
         self.assertEqual(hpat_func(S), test_impl(S))
@@ -290,7 +290,7 @@ class TestStrings(TestCase):
     def test_decode_ascii1(self):
         def test_impl(S):
             return S[0]
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         S = pd.Series(['Abc12', 'bcd', '345'])
         self.assertEqual(hpat_func(S), test_impl(S))
@@ -299,7 +299,7 @@ class TestStrings(TestCase):
     def test_decode_unicode1(self):
         def test_impl(S):
             return S[0], S[1], S[2]
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         S = pd.Series(['¡Y tú quién te crees?',
                        '🐍⚡', '大处着眼，小处着手。', ])
@@ -310,7 +310,7 @@ class TestStrings(TestCase):
         # test strings that start with ascii
         def test_impl(S):
             return S[0], S[1], S[2]
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         S = pd.Series(['abc¡Y tú quién te crees?',
                        'dd2🐍⚡', '22 大处着眼，小处着手。', ])
@@ -320,7 +320,7 @@ class TestStrings(TestCase):
         def test_impl():
             return pd.Series(['¡Y tú quién te crees?',
                               '🐍⚡', '大处着眼，小处着手。', ])
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
@@ -328,7 +328,7 @@ class TestStrings(TestCase):
     def test_box_np_arr_string(self):
         def test_impl(A):
             return A[0]
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         A = np.array(['AA', 'B'])
         self.assertEqual(hpat_func(A), test_impl(A))
@@ -337,7 +337,7 @@ class TestStrings(TestCase):
     def test_glob(self):
         def test_impl():
             glob.glob("*py")
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         self.assertEqual(hpat_func(), test_impl())
 
@@ -348,7 +348,7 @@ class TestStrings(TestCase):
             for v in s:
                 pass
             return v
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         self.assertEqual(hpat_func(), test_impl())
 
@@ -357,7 +357,7 @@ class TestStrings(TestCase):
             s = sdc.dict_ext.dict_unicode_type_unicode_type_init()
             s['aa'] = 'bb'
             return s['aa'], ('aa' in s)
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         self.assertEqual(hpat_func(), ('bb', True))
 
