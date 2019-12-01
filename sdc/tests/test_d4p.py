@@ -39,9 +39,10 @@ else:
     from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                        count_parfor_OneDs, count_array_OneDs,
                                        count_parfor_OneD_Vars, count_array_OneD_Vars,
-                                       dist_IR_contains)
+                                       dist_IR_contains,
+                                       TestCase)
 
-    class TestD4P(unittest.TestCase):
+    class TestD4P(TestCase):
         def test_logistic_regression(self):
             '''
             Testing logistic regression including

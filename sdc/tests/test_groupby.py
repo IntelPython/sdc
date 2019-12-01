@@ -33,7 +33,8 @@ import numba
 import sdc
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
-                                   get_start_end)
+                                   get_start_end,
+                                   skip_numba_jit, TestCase)
 
 
 _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
@@ -46,7 +47,8 @@ _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
                            "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
 
 
-class TestGroupBy(unittest.TestCase):
+class TestGroupBy(TestCase):
+    @skip_numba_jit
     def test_agg_seq(self):
         def test_impl(df):
             A = df.groupby('A')['B'].agg(lambda x: x.max() - x.min())
@@ -57,6 +59,7 @@ class TestGroupBy(unittest.TestCase):
         # np.testing.assert_array_equal(hpat_func(df), test_impl(df))
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_seq_sum(self):
         def test_impl(df):
             A = df.groupby('A')['B'].sum()
@@ -66,6 +69,7 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_seq_count(self):
         def test_impl(df):
             A = df.groupby('A')['B'].count()
@@ -75,6 +79,7 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_seq_mean(self):
         def test_impl(df):
             A = df.groupby('A')['B'].mean()
@@ -84,6 +89,7 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_seq_min(self):
         def test_impl(df):
             A = df.groupby('A')['B'].min()
@@ -93,6 +99,7 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_seq_min_date(self):
         def test_impl(df):
             df2 = df.groupby('A', as_index=False).min()
@@ -102,6 +109,7 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': pd.date_range('2019-1-3', '2019-1-9')})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_seq_max(self):
         def test_impl(df):
             A = df.groupby('A')['B'].max()
@@ -111,6 +119,7 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_seq_all_col(self):
         def test_impl(df):
             df2 = df.groupby('A').mean()
@@ -120,6 +129,7 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_seq_as_index(self):
         def test_impl(df):
             df2 = df.groupby('A', as_index=False).mean()
@@ -129,6 +139,7 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_seq_prod(self):
         def test_impl(df):
             A = df.groupby('A')['B'].prod()
@@ -138,6 +149,7 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_seq_var(self):
         def test_impl(df):
             A = df.groupby('A')['B'].var()
@@ -147,6 +159,7 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_seq_std(self):
         def test_impl(df):
             A = df.groupby('A')['B'].std()
@@ -156,6 +169,7 @@ class TestGroupBy(unittest.TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_seq_multiselect(self):
         def test_impl(df):
             df2 = df.groupby('A')['B', 'C'].sum()
@@ -166,6 +180,7 @@ class TestGroupBy(unittest.TestCase):
                            'C': [3, 5, 6, 5, 4, 4, 3]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_multikey_seq(self):
         def test_impl(df):
             A = df.groupby(['A', 'C'])['B'].sum()
@@ -176,6 +191,7 @@ class TestGroupBy(unittest.TestCase):
                            'C': [3, 5, 6, 5, 4, 4, 3]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_multikey_parallel(self):
         def test_impl(in_A, in_B, in_C):
             df = pd.DataFrame({'A': in_A, 'B': in_B, 'C': in_C})
@@ -198,6 +214,7 @@ class TestGroupBy(unittest.TestCase):
         p_res = test_impl(p_A, p_B, p_C)
         self.assertEqual(h_res, p_res)
 
+    @skip_numba_jit
     def test_agg_parallel(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -210,6 +227,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_agg_parallel_sum(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -222,6 +240,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_agg_parallel_count(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -234,6 +253,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_agg_parallel_mean(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -246,6 +266,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_agg_parallel_min(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -258,6 +279,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_agg_parallel_max(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -270,6 +292,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_agg_parallel_var(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -282,6 +305,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_agg_parallel_std(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -307,6 +331,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_agg_parallel_all_col(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -319,6 +344,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_agg_parallel_as_index(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n)})
@@ -331,6 +357,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_muti_hiframes_node_filter_agg(self):
         def test_impl(df, cond):
             df2 = df[cond]
@@ -345,6 +372,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(set(res[1]), set(h_res[1]))
         np.testing.assert_array_equal(res[0], h_res[0])
 
+    @skip_numba_jit
     def test_agg_seq_str(self):
         def test_impl(df):
             A = df.groupby('A')['B'].agg(lambda x: (x == 'aa').sum())
@@ -356,6 +384,7 @@ class TestGroupBy(unittest.TestCase):
         # np.testing.assert_array_equal(hpat_func(df), test_impl(df))
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_agg_seq_count_str(self):
         def test_impl(df):
             A = df.groupby('A')['B'].count()
@@ -367,6 +396,7 @@ class TestGroupBy(unittest.TestCase):
         # np.testing.assert_array_equal(hpat_func(df), test_impl(df))
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_numba_jit
     def test_pivot(self):
         def test_impl(df):
             pt = df.pivot_table(index='A', columns='C', values='D', aggfunc='sum')
@@ -378,6 +408,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(
             set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
 
+    @skip_numba_jit
     def test_pivot_parallel(self):
         def test_impl():
             df = pd.read_parquet("pivot2.pq")
@@ -389,6 +420,7 @@ class TestGroupBy(unittest.TestCase):
             pivots={'pt': ['small', 'large']})(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    @skip_numba_jit
     def test_crosstab1(self):
         def test_impl(df):
             pt = pd.crosstab(df.A, df.C)
@@ -400,6 +432,7 @@ class TestGroupBy(unittest.TestCase):
         self.assertEqual(
             set(hpat_func(_pivot_df1)[1]), set(test_impl(_pivot_df1)[1]))
 
+    @skip_numba_jit
     def test_crosstab_parallel1(self):
         def test_impl():
             df = pd.read_parquet("pivot2.pq")
