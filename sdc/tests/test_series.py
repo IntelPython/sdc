@@ -34,9 +34,10 @@ import numpy as np
 import pyarrow.parquet as pq
 import sdc
 from itertools import islice, permutations
+from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end,
-    skip_numba_jit, skip_sdc_jit, TestCase)
+    skip_numba_jit, skip_sdc_jit)
 from sdc.tests.gen_test_data import ParquetGenerator
 from numba import types
 from numba.config import IS_32BITS

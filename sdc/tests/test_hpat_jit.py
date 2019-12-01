@@ -34,7 +34,8 @@ import pandas as pd
 from sdc import *
 from numba.typed import Dict
 from collections import defaultdict
-from sdc.tests.test_utils import skip_numba_jit, TestCase
+from sdc.tests.test_base import TestCase
+from sdc.tests.test_utils import skip_numba_jit
 
 
 class TestHpatJitIssues(TestCase):

@@ -38,8 +38,9 @@ import re
 import pyarrow.parquet as pq
 from sdc.str_arr_ext import StringArray
 from sdc.str_ext import unicode_to_std_str, std_str_to_unicode
+from sdc.tests.test_base import TestCase
 from sdc.tests.gen_test_data import ParquetGenerator
-from sdc.tests.test_utils import skip_numba_jit, TestCase
+from sdc.tests.test_utils import skip_numba_jit
 
 class TestStrings(TestCase):
 
