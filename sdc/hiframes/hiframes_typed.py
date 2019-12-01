@@ -1212,7 +1212,10 @@ class HiFramesTypedPassImpl(object):
         # error checking: make sure there is function input only
         if len(rhs.args) != 1:
             raise ValueError("map expects 1 argument")
-        func = guard(get_definition, self.state.func_ir, rhs.args[0]).value.py_func
+        func = guard(get_definition, self.state.func_ir, rhs.args[0])
+        if func is None or not (isinstance(func, ir.Expr)
+                                and func.op == 'make_function'):
+            raise ValueError("lambda for map not found")
 
         dtype = self.state.typemap[series_var.name].dtype
         nodes = []
@@ -1379,7 +1382,11 @@ class HiFramesTypedPassImpl(object):
             raise ValueError("not enough arguments in call to combine")
         if len(rhs.args) > 3:
             raise ValueError("too many arguments in call to combine")
-        func = guard(get_definition, self.state.func_ir, rhs.args[1]).value.py_func
+        func = guard(get_definition, self.state.func_ir, rhs.args[1])
+        if func is None or not (isinstance(func, ir.Expr)
+                                and func.op == 'make_function'):
+            raise ValueError("lambda for combine not found")
+
         out_typ = self.state.typemap[lhs.name].dtype
         other = rhs.args[0]
         nodes = []
@@ -1526,16 +1533,19 @@ class HiFramesTypedPassImpl(object):
     def _handle_rolling_apply_func(self, func_node, dtype, out_dtype):
         if func_node is None:
             raise ValueError("cannot find kernel function for rolling.apply() call")
-        func_node = func_node.value.py_func
         # TODO: more error checking on the kernel to make sure it doesn't
         # use global/closure variables
+        if func_node.closure is not None:
+            raise ValueError("rolling apply kernel functions cannot have closure variables")
+        if func_node.defaults is not None:
+            raise ValueError("rolling apply kernel functions cannot have default arguments")
         # create a function from the code object
         glbs = self.state.func_ir.func_id.func.__globals__
         lcs = {}
         exec("def f(A): return A", glbs, lcs)
         kernel_func = lcs['f']
-        kernel_func.__code__ = func_node.__code__
-        kernel_func.__name__ = func_node.__code__.co_name
+        kernel_func.__code__ = func_node.code
+        kernel_func.__name__ = func_node.code.co_name
         # use hpat's sequential pipeline to enable pandas operations
         # XXX seq pipeline used since dist pass causes a hang
         m = numba.ir_utils._max_label
