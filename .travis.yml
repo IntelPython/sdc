@@ -2,6 +2,10 @@
 
 dist: trusty
 
+branches:
+  only:
+  - master
+
 env:
     global:
         - GIT_DESCRIBE_TAG=0.29.2
