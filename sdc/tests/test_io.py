@@ -33,10 +33,11 @@ from pandas.api.types import CategoricalDtype
 import numpy as np
 import pyarrow.parquet as pq
 import sdc
+from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_rank,
                                    get_start_end,
-                                   skip_numba_jit, TestCase)
+                                   skip_numba_jit)
 from numba.config import IS_32BITS
 
 from sdc.io.csv_ext import pandas_read_csv as pd_read_csv

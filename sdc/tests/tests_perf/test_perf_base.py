@@ -9,7 +9,14 @@ class TestBase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.test_results = TestResults()
+        drivers = []
+        if is_true(os.environ.get('SDC_TEST_PERF_EXCEL', True)):
+            drivers.append(ExcelResultsDriver('perf_results.xlsx'))
+        if is_true(os.environ.get('SDC_TEST_PERF_CSV', False)):
+            drivers.append(CSVResultsDriver('perf_results.csv'))
+
+        cls.test_results = TestResults(drivers)
+
         if is_true(os.environ.get('LOAD_PREV_RESULTS')):
             cls.test_results.load()
 

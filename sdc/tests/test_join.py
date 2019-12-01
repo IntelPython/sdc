@@ -36,10 +36,11 @@ from pandas.api.types import CategoricalDtype
 import numba
 import sdc
 from sdc.str_arr_ext import StringArray
+from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
                                    get_start_end,
-                                   skip_numba_jit, TestCase)
+                                   skip_numba_jit)
 
 
 class TestJoin(TestCase):

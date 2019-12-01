@@ -35,9 +35,10 @@ import numpy as np
 
 import numba
 import sdc
+from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs,
                                    count_array_OneDs, dist_IR_contains, get_start_end, check_numba_version,
-                                   skip_numba_jit, TestCase)
+                                   skip_numba_jit)
 
 from sdc.tests.gen_test_data import ParquetGenerator
 from numba.config import IS_32BITS
@@ -748,7 +749,6 @@ class TestDataFrame(TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit
     def test_itertuples_analysis(self):
         """tests array analysis handling of generated tuples, shapes going
         through blocks and getting used in an array dimension
