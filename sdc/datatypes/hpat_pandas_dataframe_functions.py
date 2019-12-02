@@ -100,21 +100,26 @@ if not sdc.config.use_default_dataframe:
         return sdc_pandas_dataframe_count_impl
 
 else:
-    def sdc_pandas_dataframe_reduce_columns(df, name, func_text):
+    def sdc_pandas_dataframe_reduce_columns(df, name, param):
         saved_columns = df.columns
         n_cols = len(saved_columns)
         data_args = tuple('data{}'.format(i) for i in range(n_cols))
+        help_param = ', {}={}):'
+        func_text = 'def _reduce_impl(df):'
+        for key, value in param:
+            func_text = func_text[:-2]
+            func_text = func_text + help_param
+            func_text = func_text.format(key, value)
         func_lines = [func_text]
         for i, d in enumerate(data_args):
-            func_lines.append(
-                "  {} = hpat.hiframes.api.init_series(hpat.hiframes.pd_dataframe_ext.get_dataframe_data(df, {}))".format(
-                d + '_S', i))
-            func_lines.append("  {} = {}.{}()".format(d + '_O', d + '_S', name))
-        func_lines.append("  data = np.array(({},))".format(
+            line = '  {} = hpat.hiframes.api.init_series(hpat.hiframes.pd_dataframe_ext.get_dataframe_data(df, {}))'
+            func_lines.append(line.format(d + '_S', i))
+            func_lines.append('  {} = {}.{}()'.format(d + '_O', d + '_S', name))
+        func_lines.append('  data = np.array(({},))'.format(
             ", ".join(d + '_O' for d in data_args)))
-        func_lines.append("  index = hpat.str_arr_ext.StringArray(({},))".format(
-            ", ".join("'{}'".format(c) for c in saved_columns)))
-        func_lines.append("  return hpat.hiframes.api.init_series(data, index)")
+        func_lines.append('  index = hpat.str_arr_ext.StringArray(({},))'.format(
+            ', '.join('"{}"'.format(c) for c in saved_columns)))
+        func_lines.append('  return hpat.hiframes.api.init_series(data, index)')
         loc_vars = {}
         func_text = '\n'.join(func_lines)
 
@@ -130,8 +135,8 @@ else:
         if not (isinstance(axis, types.Omitted) or axis is None):
             ty_checker.raise_exc(axis, 'unsupported', 'axis')
 
-        if not (isinstance(skipna, types.Omitted) or skipna is None):
-            ty_checker.raise_exc(skipna, 'unsupported', 'skipna')
+        if not (isinstance(skipna, (types.Omitted, types.NoneType, types.Boolean)) or skipna is None):
+            ty_checker.raise_exc(skipna, 'bool', 'skipna')
 
         if not (isinstance(level, types.Omitted) or level is None):
             ty_checker.raise_exc(level, 'unsupported', 'level')
@@ -153,6 +158,7 @@ else:
            .. only:: developer
 
                Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_median1
+               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_median
 
            Parameters
            -----------
@@ -177,9 +183,9 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None):"
+        params = [('axis', axis), ('skipna', skipna), ('level', level), ('numeric_only', numeric_only)]
 
-        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
+        return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
     @overload_method(DataFrameType, 'mean')
     def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
@@ -189,6 +195,7 @@ else:
            .. only:: developer
 
                Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_mean1
+               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_mean
 
            Parameters
            -----------
@@ -213,9 +220,9 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None):"
+        params = [('axis', axis), ('skipna', skipna), ('level', level), ('numeric_only', numeric_only)]
 
-        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
+        return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
     @overload_method(DataFrameType, 'std')
     def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
@@ -225,6 +232,7 @@ else:
            .. only:: developer
 
                Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_std1
+               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_std
 
            Parameters
            -----------
@@ -251,9 +259,9 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, ddof=ddof)
 
-        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):"
+        params = [('axis', axis), ('skipna', skipna), ('level', level), ('ddof', ddof), ('numeric_only', numeric_only)]
 
-        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
+        return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
     @overload_method(DataFrameType, 'var')
     def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
@@ -263,6 +271,7 @@ else:
            .. only:: developer
 
                Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_var1
+               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_var
 
            Parameters
            -----------
@@ -289,9 +298,9 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, ddof=ddof)
 
-        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):"
+        params = [('axis', axis), ('skipna', skipna), ('level', level), ('ddof', ddof), ('numeric_only', numeric_only)]
 
-        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
+        return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
     @overload_method(DataFrameType, 'max')
     def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
@@ -301,6 +310,7 @@ else:
            .. only:: developer
 
                Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_max1
+               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_max
 
            Parameters
            -----------
@@ -325,9 +335,9 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None):"
+        params = [('axis', axis), ('skipna', skipna), ('level', level), ('numeric_only', numeric_only)]
 
-        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
+        return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
     @overload_method(DataFrameType, 'min')
     def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
@@ -337,6 +347,7 @@ else:
            .. only:: developer
 
                Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_min1
+               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_min
 
            Parameters
            -----------
@@ -361,9 +372,9 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None):"
+        params = [('axis', axis), ('skipna', skipna), ('level', level), ('numeric_only', numeric_only)]
 
-        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
+        return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
     @overload_method(DataFrameType, 'sum')
     def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
@@ -373,6 +384,7 @@ else:
            .. only:: developer
 
                Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_sum1
+               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_sum
 
            Parameters
            -----------
@@ -399,9 +411,10 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
 
-        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):"
+        params = [('axis', axis), ('skipna', skipna), ('level', level), ('numeric_only', numeric_only),
+                  ('min_count', min_count)]
 
-        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
+        return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
     @overload_method(DataFrameType, 'prod')
     def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
@@ -411,6 +424,7 @@ else:
            .. only:: developer
 
                Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_prod1
+               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_prod
 
            Parameters
            -----------
@@ -437,9 +451,10 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
 
-        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):"
+        params = [('axis', axis), ('skipna', skipna), ('level', level), ('numeric_only', numeric_only),
+                  ('min_count', min_count)]
 
-        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
+        return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
 
     @overload_method(DataFrameType, 'count')
@@ -450,6 +465,7 @@ else:
            .. only:: developer
 
                Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count
+               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count1
 
            Parameters
            -----------
@@ -482,6 +498,6 @@ else:
         if not (isinstance(numeric_only, types.Omitted) or numeric_only is False):
             ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-        func_text = "def _reduce_impl(df, axis=0, level=None, numeric_only=False):"
+        params = [('axis', axis), ('level', level), ('numeric_only', numeric_only)]
 
-        return sdc_pandas_dataframe_reduce_columns(df, name, func_text)
+        return sdc_pandas_dataframe_reduce_columns(df, name, params)
