@@ -36,11 +36,11 @@ else:
     from math import sqrt
     import numba
     import sdc
+    from sdc.tests.test_base import TestCase
     from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                        count_parfor_OneDs, count_array_OneDs,
                                        count_parfor_OneD_Vars, count_array_OneD_Vars,
-                                       dist_IR_contains,
-                                       TestCase)
+                                       dist_IR_contains)
 
     class TestD4P(TestCase):
         def test_logistic_regression(self):
@@ -66,8 +66,8 @@ else:
                 )
                 return algo.compute(w, model)
 
-            train_hpat = sdc.jit(train_impl)
-            prdct_hpat = sdc.jit(prdct_impl)
+            train_hpat = self.jit(train_impl)
+            prdct_hpat = self.jit(prdct_impl)
             n = 11
             d = 4
             pred_impl = prdct_impl(n, d, train_impl(n, d).model).prediction
