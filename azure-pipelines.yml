@@ -9,6 +9,7 @@ jobs:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
         USE_NUMBA_MASTER: 'False'
+        SDC_CONFIG_PIPELINE_SDC: 'False'
 
 - template: buildscripts/azure/template-linux-macos.yml
   parameters:
@@ -20,6 +21,7 @@ jobs:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
         USE_NUMBA_MASTER: 'False'
+        SDC_CONFIG_PIPELINE_SDC: 'False'
 
 - template: buildscripts/azure/template-linux-macos.yml
   parameters:
@@ -31,6 +33,7 @@ jobs:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
         USE_NUMBA_MASTER: 'False'
+        SDC_CONFIG_PIPELINE_SDC: 'False'
 
 - template: buildscripts/azure/template-windows.yml
   parameters:
@@ -42,6 +45,7 @@ jobs:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
         USE_NUMBA_MASTER: 'True'
+        SDC_CONFIG_PIPELINE_SDC: 'False'
 
 - template: buildscripts/azure/template-linux-macos.yml
   parameters:
@@ -53,6 +57,7 @@ jobs:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
         USE_NUMBA_MASTER: 'True'
+        SDC_CONFIG_PIPELINE_SDC: 'False'
 
 - template: buildscripts/azure/template-linux-macos.yml
   parameters:
@@ -64,3 +69,4 @@ jobs:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.16'
         USE_NUMBA_MASTER: 'True'
+        SDC_CONFIG_PIPELINE_SDC: 'False'

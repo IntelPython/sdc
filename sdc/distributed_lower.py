@@ -36,7 +36,7 @@ import llvmlite.binding as ll
 import numba.targets.arrayobj
 from numba import types, cgutils
 from numba.extending import overload
-from numba.targets.imputils import lower_builtin, impl_ret_new_ref, impl_ret_borrowed
+from numba.targets.imputils import impl_ret_borrowed, lower_builtin
 from numba.targets.arrayobj import make_array
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate

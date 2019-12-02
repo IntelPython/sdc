@@ -25,29 +25,23 @@
 # *****************************************************************************
 
 
-from .. import hdist
 from .. import chiframes
 from sdc import config as hpat_config
-from sdc.utils import _numba_to_c_type_map
-from numba.targets.arrayobj import make_array
 import llvmlite.binding as ll
-from llvmlite import ir as lir
-from numba import cgutils
 from numba.extending import (register_model, models, lower_builtin)
 from numba.typing.templates import (signature, AbstractTemplate, infer_global, infer)
-import operator
 from collections import defaultdict
 import numpy as np
 
 import numba
-from numba import typeinfer, ir, ir_utils, config, types, generated_jit
+from numba import generated_jit, ir, ir_utils, typeinfer, types
 from numba.extending import overload
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes,
                             mk_unique_var)
 import sdc
 from sdc import distributed, distributed_analysis
-from sdc.utils import debug_prints, alloc_arr_tup, empty_like_type
+from sdc.utils import alloc_arr_tup, debug_prints
 from sdc.distributed_analysis import Distribution
 
 from sdc.str_arr_ext import (string_array_type, to_string_list,
@@ -58,7 +52,7 @@ from sdc.str_arr_ext import (string_array_type, to_string_list,
                               str_copy_ptr, get_utf8_size,
                               setitem_str_offset, str_arr_set_na)
 from sdc.str_ext import string_type
-from sdc.timsort import copyElement_tup, getitem_arr_tup, setitem_arr_tup
+from sdc.timsort import getitem_arr_tup, setitem_arr_tup
 from sdc.shuffle_utils import (
     getitem_arr_tup_single,
     val_to_tup,

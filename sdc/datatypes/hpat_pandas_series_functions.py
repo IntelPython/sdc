@@ -2909,11 +2909,12 @@ def hpat_pandas_series_nunique(self, dropna=True):
             It is better to merge with Numeric branch
             """
 
-            str_set = set(self._data)
-            if dropna == False:
-                return len(str_set) - 1
-            else:
-                return len(str_set)
+            data = self._data
+            if dropna:
+                nan_mask = self.isna()
+                data = self._data[~nan_mask._data]
+            unique_values = set(data)
+            return len(unique_values)
 
         return hpat_pandas_series_nunique_str_impl
 
@@ -2967,7 +2968,8 @@ def hpat_pandas_series_count(self, level=None):
     if isinstance(self.data, StringArrayType):
         def hpat_pandas_series_count_str_impl(self, level=None):
 
-            return len(self._data)
+            nan_mask = self.isna()
+            return numpy.sum(nan_mask._data == 0)
 
         return hpat_pandas_series_count_str_impl
 
@@ -3117,10 +3119,10 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
                 sort_nona = numpy.argsort(self._data[~na_data_arr])
             q = 0
             for id, i in enumerate(sort):
-                if id not in list(sort[len(self._data) - na:]):
-                    result[id] = sort_nona[id-q]
-                else:
+                if id in set(sort[len(self._data) - na:]):
                     q += 1
+                else:
+                    result[id] = sort_nona[id - q]
             for i in sort[len(self._data) - na:]:
                 result[i] = -1
 
@@ -3144,10 +3146,10 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
             sort_nona = numpy.argsort(self._data[~na_data_arr])
         q = 0
         for id, i in enumerate(sort):
-            if id not in list(sort[len(self._data) - na:]):
-                result[id] = sort_nona[id - q]
-            else:
+            if id in set(sort[len(self._data) - na:]):
                 q += 1
+            else:
+                result[id] = sort_nona[id - q]
         for i in sort[len(self._data) - na:]:
             result[i] = -1
 
@@ -3554,7 +3556,15 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
         if len(self_arr) < min_periods:
             return numpy.nan
 
-        return numpy.cov(self_arr, other_arr)[0, 1]
+        new_self = pandas.Series(self_arr)
+
+        ma = new_self.mean()
+        mb = other.mean()
+
+        if numpy.isinf(mb):
+            return numpy.nan
+
+        return ((self_arr - ma) * (other_arr - mb)).sum() / (new_self.count() - 1.0)
 
     return hpat_pandas_series_cov_impl
 

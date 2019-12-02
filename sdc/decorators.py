@@ -55,11 +55,6 @@ def jit(signature_or_function=None, **options):
     for var, vals in pivots.items():
         _locals[var + ":pivot"] = vals
 
-    h5_types = options.pop('h5_types', {})
-    assert isinstance(h5_types, dict)
-    for var, vals in h5_types.items():
-        _locals[var + ":h5_types"] = vals
-
     distributed = set(options.pop('distributed', set()))
     assert isinstance(distributed, (set, list))
     _locals["##distributed"] = distributed

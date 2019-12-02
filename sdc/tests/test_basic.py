@@ -25,16 +25,21 @@
 # *****************************************************************************
 
 
-import unittest
-import pandas as pd
-import numpy as np
 import itertools
-import numba
-import sdc
+import numpy as np
+import pandas as pd
 import random
+import unittest
+
+import numba
+from numba import types
+
+import sdc
+from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, count_array_OneD_Vars,
-                                   dist_IR_contains, get_rank, get_start_end, check_numba_version)
+                                   dist_IR_contains, get_rank, get_start_end, check_numba_version,
+                                   skip_numba_jit)
 
 
 def get_np_state_ptr():
@@ -51,21 +56,21 @@ def _copy_py_state(r, ptr):
     return ints, index
 
 
-class BaseTest(unittest.TestCase):
+class BaseTest(TestCase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.rank = sdc.jit(lambda: sdc.distributed_api.get_rank())()
-        self.num_ranks = sdc.jit(lambda: sdc.distributed_api.get_size())()
+        self.rank = self.jit(lambda: sdc.distributed_api.get_rank())()
+        self.num_ranks = self.jit(lambda: sdc.distributed_api.get_size())()
 
     def _rank_begin(self, arr_len):
-        f = sdc.jit(
+        f = self.jit(
             lambda arr_len, num_ranks, rank: sdc.distributed_api.get_start(
                 arr_len, np.int32(num_ranks), np.int32(rank)))
         return f(arr_len, self.num_ranks, self.rank)
 
     def _rank_end(self, arr_len):
-        f = sdc.jit(
+        f = self.jit(
             lambda arr_len, num_ranks, rank: sdc.distributed_api.get_end(
                 arr_len, np.int32(num_ranks), np.int32(rank)))
         return f(arr_len, self.num_ranks, self.rank)
@@ -88,7 +93,7 @@ class TestBasic(BaseTest):
             C = A[B]
             return C.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 128
         np.testing.assert_allclose(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -100,7 +105,7 @@ class TestBasic(BaseTest):
             A[0] = 30
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 128
         np.testing.assert_allclose(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -112,7 +117,7 @@ class TestBasic(BaseTest):
             A[0:4] = 30
             return A.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 128
         np.testing.assert_allclose(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -122,7 +127,7 @@ class TestBasic(BaseTest):
         def test_impl(N):
             return np.ones(N).astype(np.int32).sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 128
         np.testing.assert_allclose(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -132,7 +137,7 @@ class TestBasic(BaseTest):
         def test_impl(N):
             return np.ones(N).shape[0]
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 128
         np.testing.assert_allclose(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -141,7 +146,7 @@ class TestBasic(BaseTest):
         # def test_impl(N):
         #     return np.ones((N, 3, 4)).shape
         #
-        # hpat_func = sdc.jit(test_impl)
+        # hpat_func = self.jit(test_impl)
         # n = 128
         # np.testing.assert_allclose(hpat_func(n), test_impl(n))
         # self.assertEqual(count_array_REPs(), 0)
@@ -154,7 +159,7 @@ class TestBasic(BaseTest):
             B += A
             return B.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 128
         np.testing.assert_allclose(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -167,7 +172,7 @@ class TestBasic(BaseTest):
             C = A[B, 2]
             return C.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 128
         np.testing.assert_allclose(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -179,7 +184,7 @@ class TestBasic(BaseTest):
             X[:, 3] = (X[:, 3]) / (np.max(X[:, 3]) - np.min(X[:, 3]))
             return X.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 128
         np.testing.assert_allclose(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -191,7 +196,7 @@ class TestBasic(BaseTest):
             B = A[::7]
             return B.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 128
         np.testing.assert_allclose(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -203,17 +208,18 @@ class TestBasic(BaseTest):
         def g(a):
             assert a == 0
 
-        hpat_g = sdc.jit(g)
+        hpat_g = self.jit(g)
 
         def f():
             hpat_g(0)
 
-        hpat_f = sdc.jit(f)
+        hpat_f = self.jit(f)
         hpat_f()
 
+    @skip_numba_jit
     def test_inline_locals(self):
         # make sure locals in inlined function works
-        @sdc.jit(locals={'B': sdc.float64[:]})
+        @self.jit(locals={'B': types.float64[:]})
         def g(S):
             B = pd.to_numeric(S, errors='coerce')
             return B
@@ -221,7 +227,7 @@ class TestBasic(BaseTest):
         def f():
             return g(pd.Series(['1.2']))
 
-        pd.testing.assert_series_equal(sdc.jit(f)(), f())
+        pd.testing.assert_series_equal(self.jit(f)(), f())
 
     def test_reduce(self):
         import sys
@@ -241,12 +247,13 @@ class TestBasic(BaseTest):
             exec(func_text, {'np': np}, loc_vars)
             test_impl = loc_vars['f']
 
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
             n = 21  # XXX arange() on float32 has overflow issues on large n
             np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
             self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_reduce2(self):
         import sys
         dtypes = ['float32', 'float64', 'int32', 'int64']
@@ -264,7 +271,7 @@ class TestBasic(BaseTest):
             exec(func_text, {'np': np}, loc_vars)
             test_impl = loc_vars['f']
 
-            hpat_func = sdc.jit(locals={'A:input': 'distributed'})(test_impl)
+            hpat_func = self.jit(locals={'A:input': 'distributed'})(test_impl)
             n = 21
             start, end = get_start_end(n)
             np.random.seed(0)
@@ -274,6 +281,7 @@ class TestBasic(BaseTest):
             self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_reduce_filter1(self):
         import sys
         dtypes = ['float32', 'float64', 'int32', 'int64']
@@ -292,7 +300,7 @@ class TestBasic(BaseTest):
             exec(func_text, {'np': np}, loc_vars)
             test_impl = loc_vars['f']
 
-            hpat_func = sdc.jit(locals={'A:input': 'distributed'})(test_impl)
+            hpat_func = self.jit(locals={'A:input': 'distributed'})(test_impl)
             n = 21
             start, end = get_start_end(n)
             np.random.seed(0)
@@ -303,6 +311,7 @@ class TestBasic(BaseTest):
             self.assertEqual(count_array_REPs(), 0)
             self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_array_reduce(self):
         binops = ['+=', '*=', '+=', '*=', '|=', '|=']
         dtypes = ['np.float32', 'np.float32', 'np.float64', 'np.float64', 'np.int32', 'np.int64']
@@ -318,7 +327,7 @@ class TestBasic(BaseTest):
             exec(func_text, {'np': np, 'numba': numba}, loc_vars)
             test_impl = loc_vars['f']
 
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
             n = 128
             np.testing.assert_allclose(hpat_func(n), test_impl(n))
             self.assertEqual(count_array_OneDs(), 0)
@@ -331,9 +340,9 @@ class TestBasic(BaseTest):
             A = np.arange(N)
             return A
 
-        hpat_func = sdc.jit(locals={'A:return': 'distributed'})(test_impl)
+        hpat_func = self.jit(locals={'A:return': 'distributed'})(test_impl)
         n = 128
-        dist_sum = sdc.jit(
+        dist_sum = self.jit(
             lambda a: sdc.distributed_api.dist_reduce(
                 a, np.int32(sdc.distributed_api.Reduce_Type.Sum.value)))
         dist_sum(1)  # run to compile
@@ -350,10 +359,10 @@ class TestBasic(BaseTest):
             B = np.arange(N) + 1.5
             return A, B
 
-        hpat_func = sdc.jit(locals={'A:return': 'distributed',
+        hpat_func = self.jit(locals={'A:return': 'distributed',
                                      'B:return': 'distributed'})(test_impl)
         n = 128
-        dist_sum = sdc.jit(
+        dist_sum = self.jit(
             lambda a: sdc.distributed_api.dist_reduce(
                 a, np.int32(sdc.distributed_api.Reduce_Type.Sum.value)))
         dist_sum(1.0)  # run to compile
@@ -362,11 +371,12 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_OneDs(), 2)
         self.assertEqual(count_parfor_OneDs(), 2)
 
+    @skip_numba_jit
     def test_dist_input(self):
         def test_impl(A):
             return len(A)
 
-        hpat_func = sdc.jit(distributed=['A'])(test_impl)
+        hpat_func = self.jit(distributed=['A'])(test_impl)
         n = 128
         arr = np.ones(n)
         np.testing.assert_allclose(hpat_func(arr) / self.num_ranks, test_impl(arr))
@@ -383,7 +393,7 @@ class TestBasic(BaseTest):
 
         try:
             sdc.distributed_analysis.auto_rebalance = True
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
             n = 128
             np.testing.assert_allclose(hpat_func(n), test_impl(n))
             self.assertEqual(count_array_OneDs(), 3)
@@ -404,7 +414,7 @@ class TestBasic(BaseTest):
 
         try:
             sdc.distributed_analysis.auto_rebalance = True
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
             n = 128
             np.testing.assert_allclose(hpat_func(n), test_impl(n))
             self.assertEqual(count_array_OneDs(), 4)
@@ -420,7 +430,7 @@ class TestBasic(BaseTest):
             C = A.transpose(0, 2, 1)
             return B.sum() + C.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 128
         np.testing.assert_allclose(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -462,7 +472,7 @@ class TestBasic(BaseTest):
         # details please see https://github.com/numba/numba/issues/2782.
         r = self._follow_cpython(get_np_state_ptr())
 
-        hpat_func1 = sdc.jit(locals={'A:return': 'distributed',
+        hpat_func1 = self.jit(locals={'A:return': 'distributed',
                                       'B:return': 'distributed'})(test_one_dim)
 
         # Test one-dimensional array indexing.
@@ -492,7 +502,7 @@ class TestBasic(BaseTest):
             A, B = A[P], B[P]
             return A, B
 
-        hpat_func2 = sdc.jit(locals={'A:return': 'distributed',
+        hpat_func2 = self.jit(locals={'A:return': 'distributed',
                                       'B:return': 'distributed'})(test_two_dim)
 
         for arr_len in [18, 66, 128]:
@@ -511,7 +521,7 @@ class TestBasic(BaseTest):
             C = A[P]
             return A, B, C
 
-        hpat_func3 = sdc.jit(locals={'A:return': 'distributed',
+        hpat_func3 = self.jit(locals={'A:return': 'distributed',
                                       'B:return': 'distributed',
                                       'C:return': 'distributed'})(test_rhs)
 
