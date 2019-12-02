@@ -423,9 +423,9 @@ class SeriesAttribute(AttributeTemplate):
 #     def resolve_index(self, ary):
 #         return ary.index
 
-    def resolve_str(self, ary):
-        assert ary.dtype in (string_type, types.List(string_type))
-        return StringMethodsType(ary)
+    # def resolve_str(self, ary):
+    #     assert ary.dtype in (string_type, types.List(string_type))
+    #     return StringMethodsType(ary)
 
     def resolve_dt(self, ary):
         assert ary.dtype == types.NPDatetime('ns')
