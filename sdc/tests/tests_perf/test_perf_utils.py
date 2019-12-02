@@ -197,9 +197,7 @@ def get_times(f, *args, iter_number=5):
 
 class TestResults:
     perf_results_xlsx = 'perf_results.xlsx'
-    perf_results_html = 'perf_results.html'
     raw_perf_results_xlsx = 'raw_perf_results.xlsx'
-    raw_perf_results_html = 'raw_perf_results.html'
     index = ['name', 'N', 'type', 'size']
     test_results_data = pandas.DataFrame(index=index)
     logger = setup_logging()
@@ -272,7 +270,7 @@ class TestResults:
 
     def dump(self):
         """
-        Dump performance testing results from global data storage to excel and html
+        Dump performance testing results from global data storage to excel
         """
         # openpyxl need to be installed
 
@@ -284,26 +282,11 @@ class TestResults:
             self.logger.warning(msg, self.perf_results_xlsx, e)
 
         try:
-            with open(self.perf_results_html, 'w') as the_file:
-                the_file.write(self.grouped_data.to_html(na_rep=''))
-        except IOError as e:
-            msg = 'Could not dump raw results to "%s": %s'
-            self.logger.warning(msg, self.perf_results_html, e)
-
-        try:
             with pandas.ExcelWriter(self.raw_perf_results_xlsx) as writer:
                 self.test_results_data.to_excel(writer, index=False)
         except ModuleNotFoundError as e:
             msg = 'Could not dump raw results to "%s": %s'
             self.logger.warning(msg, self.raw_perf_results_xlsx, e)
-
-        try:
-            with open(self.raw_perf_results_html, 'w') as the_file:
-                the_file.write(self.test_results_data.to_html(index=False, na_rep=''))
-        except IOError as e:
-            msg = 'Could not dump raw results to "%s": %s'
-            self.logger.warning(msg, self.raw_perf_results_html, e)
-
 
     def load(self):
         """
