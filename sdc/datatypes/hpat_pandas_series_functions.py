@@ -3543,7 +3543,15 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
         if len(self_arr) < min_periods:
             return numpy.nan
 
-        return numpy.cov(self_arr, other_arr)[0, 1]
+        new_self = pandas.Series(self_arr)
+
+        ma = new_self.mean()
+        mb = other.mean()
+
+        if numpy.isinf(mb):
+            return numpy.nan
+
+        return ((self_arr - ma) * (other_arr - mb)).sum() / (new_self.count() - 1.0)
 
     return hpat_pandas_series_cov_impl
 
