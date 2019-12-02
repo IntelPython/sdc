@@ -2347,7 +2347,8 @@ class TestSeries(TestCase):
             return S.str.len()
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series(['aa', 'abc', 'c', 'cccd'])
+        # TODO: fix issue occurred if name is not assigned
+        S = pd.Series(['aa', 'abc', 'c', 'cccd'], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @skip_numba_jit
