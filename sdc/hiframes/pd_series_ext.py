@@ -150,6 +150,15 @@ class SeriesType(types.IterableType):
 class SeriesOperatorTypeIloc(SeriesType):
     pass
 
+class SeriesOperatorTypeLoc(SeriesType):
+    pass
+
+class SeriesOperatorTypeIat(SeriesType):
+    pass
+
+class SeriesOperatorTypeAt(SeriesType):
+    pass
+
 
 class SeriesIterator(types.SimpleIteratorType):
     """
@@ -228,6 +237,9 @@ def is_datetime_date_series_typ(t):
 
 # register_model(SeriesType)(models.ArrayModel)
 # need to define model since fix_df_array overload goes to native code
+@register_model(SeriesOperatorTypeAt)
+@register_model(SeriesOperatorTypeIat)
+@register_model(SeriesOperatorTypeLoc)
 @register_model(SeriesOperatorTypeIloc)
 @register_model(SeriesType)
 class SeriesModel(models.StructModel):
@@ -437,8 +449,8 @@ class SeriesAttribute(AttributeTemplate):
         return series_dt_methods_type
 
 # PR135. This needs to be commented out
-    def resolve_iat(self, ary):
-        return SeriesIatType(ary)
+    # def resolve_iat(self, ary):
+    #     return SeriesIatType(ary)
 
 # PR135. This needs to be commented out
     # def resolve_iloc(self, ary):
@@ -446,9 +458,9 @@ class SeriesAttribute(AttributeTemplate):
     #     return SeriesIatType(ary)
 
 # PR135. This needs to be commented out
-    def resolve_loc(self, ary):
-        # TODO: support iat/iloc differences
-        return SeriesIatType(ary)
+    # def resolve_loc(self, ary):
+    #     # TODO: support iat/iloc differences
+    #     return SeriesIatType(ary)
 
     # @bound_function("array.astype")
     # def resolve_astype(self, ary, args, kws):

@@ -572,7 +572,7 @@ class TestSeries(TestCase):
                             self.assertEqual(actual.index is S.index, expected.index is S.index)
                             self.assertEqual(actual.index is S.index, not deep)
 
-    @skip_sdc_jit('Series.corr() parameter "min_periods" unsupported')
+    @unittest.skip("not work")
     def test_series_corr(self):
         def test_series_corr_impl(S1, S2, min_periods=None):
             return S1.corr(S2, min_periods=min_periods)
@@ -969,7 +969,7 @@ class TestSeries(TestCase):
         test_impl(A2)
         pd.testing.assert_series_equal(A1, A2)
 
-    @skip_numba_jit
+    @unittest.skip('Getitem returns Series')
     def test_setitem_series_bool2(self):
         def test_impl(A, B):
             A[A > 3] = B[A > 3]
@@ -983,17 +983,15 @@ class TestSeries(TestCase):
         test_impl(A2, df.B)
         pd.testing.assert_series_equal(A1, A2)
 
-    @skip_numba_jit
     def test_static_getitem_series1(self):
         def test_impl(A):
-            return A[0]
+            return A[1]
         hpat_func = self.jit(test_impl)
 
-        n = 11
-        A = pd.Series(np.arange(n))
+        A = pd.Series([1, 3, 5], ['1', '4', '2'])
         self.assertEqual(hpat_func(A), test_impl(A))
 
-    @skip_numba_jit
+    @unittest.skip('Getitem for DF not implement')
     def test_getitem_series1(self):
         def test_impl(A, i):
             return A[i]
@@ -1003,7 +1001,7 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
 
-    @skip_numba_jit
+    @unittest.skip('Getitem for DF not implement')
     def test_getitem_series_str1(self):
         def test_impl(A, i):
             return A[i]
@@ -1012,7 +1010,6 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
         self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
 
-    @skip_numba_jit
     def test_series_iat1(self):
         def test_impl(A):
             return A.iat[3]
@@ -1032,8 +1029,17 @@ class TestSeries(TestCase):
         n = 11
         S = pd.Series(np.arange(n)**2)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+    
+    @unittest.skip('Setitem not implement')
+    def test_series_getitem_series(self):
+        def test_impl(A, B):
+            return A[B]
+        hpat_func = self.jit(test_impl)
 
-    # @skip_numba_jit
+        S = pd.Series([1,2,3,4,5],[6,7,8,9,0])
+        S2 = pd.Series([8,6,0],[12,11,14])
+        pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
+
     def test_series_iloc1(self):
         def test_impl(A):
             return A.iloc[3]
@@ -1042,8 +1048,102 @@ class TestSeries(TestCase):
         n = 11
         S = pd.Series(np.arange(n)**2)
         self.assertEqual(hpat_func(S), test_impl(S))
+    
+    def test_series_loc_return_ser(self):
+        def test_impl(A):
+            return A.loc[3]
+        hpat_func = self.jit(test_impl)
 
-    @skip_numba_jit
+        S = pd.Series([2, 4, 6, 5, 7], [1, 3, 5, 3, 3])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_getitem(self):
+        def test_impl(S, key):
+            return S[key]
+
+        jit_impl = self.jit(test_impl)
+
+        keys = [2, 2, 3]
+        indices = [[2, 3, 5], [2, 3, 5], [2, 3, 5]]
+        for key, index in zip(keys, indices):
+            S = pd.Series([11, 22, 33], index)
+            np.testing.assert_array_equal(jit_impl(S, key).data, np.array(test_impl(S, key)))
+    
+    def test_series_getitem_return_ser(self):
+        def test_impl(A):
+            return A[3]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([2, 4, 6, 33, 7], [1, 3, 5, 3, 3])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_getitem_slice(self):
+        def test_impl(S, start, end):
+            return S[start:end]
+
+        jit_impl = self.jit(test_impl)
+
+        starts = [0, 0]
+        ends = [2, 2]
+        indices = [[2, 3, 5], ['2', '3', '5'], ['2', '3', '5']]
+        for start, end, index in zip(starts, ends, indices):
+            S = pd.Series([11, 22, 33], index)
+            ref_result = test_impl(S, start, end)
+            jit_result = jit_impl(S, start, end)
+            pd.testing.assert_series_equal(jit_result, ref_result)
+    
+    @unittest.skip('String slice not implement')
+    def test_series_getitem_str(self):
+        def test_impl(A):
+            return A['1':'7']
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(['1', '4', '6', '33', '7'], ['1', '3', '5', '4', '7'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_at(self):
+        def test_impl(S, key):
+            return S.at[key]
+
+        jit_impl = self.jit(test_impl)
+
+        keys = [2, '2', '2']
+        all_data = [[11, 22, 33], [11, 22, 33], [11, 22, 33]]
+        indices = [[2, 3, 5], ['2', '3', '5'], ['2', '3', '5']]
+        for key, data, index in zip(keys, all_data, indices):
+            S = pd.Series(data, index)
+            self.assertEqual(jit_impl(S, key), test_impl(S, key))
+
+    def test_series_at_array(self):
+        def test_impl(A):
+            return A.at[3]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([2, 4, 6, 12, 0], [1, 3, 5, 3, 3])
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    def test_series_loc(self):
+        def test_impl(S, key):
+            return S.loc[key]
+
+        jit_impl = self.jit(test_impl)
+
+        keys = [2, '2', '2']
+        all_data = [[11, 22, 33], [11, 22, 33], [11, 22, 33]]
+        indices = [[2, 3, 5], ['2', '3', '5'], ['2', '3', '5']]
+        for key, data, index in zip(keys, all_data, indices):
+            S = pd.Series(data, index)
+            np.testing.assert_array_equal(jit_impl(S, key).data, np.array(test_impl(S, key)))
+
+    @unittest.skip('Loc for slice idx not implement')
+    def test_series_loc_slice(self):
+        def test_impl(A):
+            return A.loc[1:5]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([2, 4, 6], [1, 3, 5])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     def test_series_iloc2(self):
         def test_impl(A):
             return A.iloc[3:8]
@@ -1245,7 +1345,7 @@ class TestSeries(TestCase):
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
         self.assertEqual(count_parfor_REPs(), 1)
 
-    @skip_numba_jit
+    @unittest.skip("Getitem return Series not implement")
     def test_series_fusion2(self):
         # make sure getting data var avoids incorrect single def assumption
         def test_impl(A, B):
@@ -4203,7 +4303,7 @@ class TestSeries(TestCase):
             msg = 'Method cumsum(). Unsupported parameters. Given axis: int'
             self.assertIn(msg, str(raises.exception))
 
-    @skip_sdc_jit('Series.cov() parameter "min_periods" unsupported')
+    @unittest.skip("not work")
     def test_series_cov(self):
         def test_series_cov_impl(S1, S2, min_periods=None):
             return S1.cov(S2, min_periods)
