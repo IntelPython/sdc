@@ -86,6 +86,7 @@ class BaseTest(TestCase):
 
 class TestBasic(BaseTest):
 
+    @skip_numba_jit("hang with numba.jit. ok with sdc.jit")
     def test_getitem(self):
         def test_impl(N):
             A = np.ones(N)
@@ -99,6 +100,7 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit("Failed in nopython mode pipeline (step: Preprocessing for parfors)")
     def test_setitem1(self):
         def test_impl(N):
             A = np.arange(10) + 1.0
@@ -111,6 +113,7 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit("Failed in nopython mode pipeline (step: Preprocessing for parfors)")
     def test_setitem2(self):
         def test_impl(N):
             A = np.arange(10) + 1.0
@@ -123,6 +126,7 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit("hang with numba.jit. ok with sdc.jit")
     def test_astype(self):
         def test_impl(N):
             return np.ones(N).astype(np.int32).sum()
@@ -152,6 +156,7 @@ class TestBasic(BaseTest):
         # self.assertEqual(count_array_REPs(), 0)
         # self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit("hang with numba.jit. ok with sdc.jit")
     def test_inplace_binop(self):
         def test_impl(N):
             A = np.ones(N)
@@ -165,6 +170,7 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit("hang with numba.jit. ok with sdc.jit")
     def test_getitem_multidim(self):
         def test_impl(N):
             A = np.ones((N, 3))
@@ -178,6 +184,7 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit("Failed in nopython mode pipeline (step: Preprocessing for parfors)")
     def test_whole_slice(self):
         def test_impl(N):
             X = np.ones((N, 4))
@@ -190,6 +197,7 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit("hang with numba.jit. ok with sdc.jit")
     def test_strided_getitem(self):
         def test_impl(N):
             A = np.ones(N)
@@ -229,6 +237,7 @@ class TestBasic(BaseTest):
 
         pd.testing.assert_series_equal(self.jit(f)(), f())
 
+    @skip_numba_jit("Failed in nopython mode pipeline (step: Preprocessing for parfors)")
     def test_reduce(self):
         import sys
         dtypes = ['float32', 'float64', 'int32', 'int64']
@@ -423,6 +432,7 @@ class TestBasic(BaseTest):
         finally:
             sdc.distributed_analysis.auto_rebalance = False
 
+    @skip_numba_jit("Failed in nopython mode pipeline (step: Preprocessing for parfors)")
     def test_transpose(self):
         def test_impl(n):
             A = np.ones((30, 40, 50))
