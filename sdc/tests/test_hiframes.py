@@ -44,7 +44,7 @@ from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
                                    get_start_end,
-                                   skip_numba_jit)
+                                   skip_sdc_jit, skip_numba_jit)
 
 
 class TestHiFrames(TestCase):
@@ -424,6 +424,7 @@ class TestHiFrames(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
+    @skip_sdc_jit("Could not get length of Series(StringArraySplitView)")
     @skip_numba_jit
     def test_str_split_filter(self):
         def test_impl(df):
