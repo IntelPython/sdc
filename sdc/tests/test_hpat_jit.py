@@ -34,7 +34,8 @@ import pandas as pd
 from sdc import *
 from numba.typed import Dict
 from collections import defaultdict
-from sdc.tests.test_utils import skip_numba_jit, TestCase
+from sdc.tests.test_base import TestCase
+from sdc.tests.test_utils import skip_numba_jit
 
 
 class TestHpatJitIssues(TestCase):
@@ -178,7 +179,7 @@ class TestHpatJitIssues(TestCase):
         def test_impl(A):
             res = A + 42
             return res.dtype
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         A = np.ones(1, dtype='int32')
         self.assertEqual(hpat_func(A), test_impl(A))
@@ -192,7 +193,7 @@ class TestHpatJitIssues(TestCase):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
             return df
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
@@ -207,7 +208,7 @@ class TestHpatJitIssues(TestCase):
             df['A'] = np.arange(n)
             return df
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
@@ -220,7 +221,7 @@ class TestHpatJitIssues(TestCase):
         def test_impl(df, n):
             df['A'] = np.arange(n)
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         df1 = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n) + 3.0})
         df2 = df1.copy()
@@ -239,7 +240,7 @@ class TestHpatJitIssues(TestCase):
             df['A'] = np.arange(n)
             return df
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
@@ -254,7 +255,7 @@ class TestHpatJitIssues(TestCase):
             df['C'] = np.arange(n)
             return df
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
@@ -267,7 +268,7 @@ class TestHpatJitIssues(TestCase):
         def test_impl(df, n):
             df['C'] = np.arange(n)
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         df1 = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.arange(n) + 3.0})
         df2 = df1.copy()
@@ -284,7 +285,7 @@ class TestHpatJitIssues(TestCase):
 
         for operator in arithmetic_binops:
             test_impl = _make_func_use_binop1(operator)
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
 
             n = 11
             df = pd.DataFrame({'A': np.arange(1, n)})
@@ -299,7 +300,7 @@ class TestHpatJitIssues(TestCase):
 
         for method in arithmetic_methods:
             test_impl = _make_func_use_method_arg1(method)
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
 
             n = 11
             operand_series = pd.Series(np.arange(1, n))
@@ -316,7 +317,7 @@ class TestHpatJitIssues(TestCase):
     def test_series_fusion1_issue(self):
         def test_impl(A, B):
             return A + B + 1
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         n = 11
         A = pd.Series(np.arange(n))
@@ -335,7 +336,7 @@ class TestHpatJitIssues(TestCase):
             if A[0] == 0:
                 S = A + 1
             return S + B
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         n = 11
         A = pd.Series(np.arange(n))
@@ -355,7 +356,7 @@ class TestHpatJitIssues(TestCase):
                                names=['A', 'B', 'C', 'D'],
                                dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},
                                )
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     @skip_numba_jit
@@ -371,7 +372,7 @@ class TestHpatJitIssues(TestCase):
                                names=dtype.keys(),
                                dtype=dtype,
                                )
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     @skip_numba_jit
@@ -387,7 +388,7 @@ class TestHpatJitIssues(TestCase):
                                names=dtype.keys(),
                                dtype=dtype,
                                )
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     @skip_numba_jit
@@ -403,7 +404,7 @@ class TestHpatJitIssues(TestCase):
                                dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},
                                skiprows=2,
                                )
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     @skip_numba_jit
@@ -418,7 +419,7 @@ class TestHpatJitIssues(TestCase):
                                names=['A', 'B', 'C', 'D'],
                                dtype={'A': np.int, 'B': np.float, 'C': str, 'D': np.int},
                                parse_dates=[2])
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     @skip_numba_jit
@@ -432,7 +433,7 @@ class TestHpatJitIssues(TestCase):
             return pd.read_csv("csv_data_date1.csv",
                                names=['A', 'B', 'C', 'D'],
                                dtype={'A': np.int, 'B': np.float, 'C': str, 'D': np.int})
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
 
