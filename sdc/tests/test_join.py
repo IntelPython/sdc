@@ -36,10 +36,11 @@ from pandas.api.types import CategoricalDtype
 import numba
 import sdc
 from sdc.str_arr_ext import StringArray
+from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
                                    get_start_end,
-                                   skip_numba_jit, TestCase)
+                                   skip_numba_jit)
 
 
 class TestJoin(TestCase):
@@ -52,7 +53,7 @@ class TestJoin(TestCase):
             df3 = pd.merge(df1, df2, left_on='key1', right_on='key2')
             return df3.B.sum()
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_REPs(), 0)
@@ -66,7 +67,7 @@ class TestJoin(TestCase):
             df3 = df1.merge(df2, left_on='key1', right_on='key2')
             return df3
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         df1 = pd.DataFrame({'key1': np.arange(n) + 3, 'A': np.arange(n) + 1.0})
         df2 = pd.DataFrame({'key2': 2 * np.arange(n) + 1, 'B': n + np.arange(n) + 1.0})
@@ -84,7 +85,7 @@ class TestJoin(TestCase):
             df3 = pd.merge(df1, df2, left_on='key1', right_on='key2')
             return df3.B
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(set(hpat_func()), set(test_impl()))
 
     @skip_numba_jit
@@ -96,7 +97,7 @@ class TestJoin(TestCase):
             df3 = df1.merge(df2, left_on='key1', right_on='key2', how='left')
             return df3.B
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(set(hpat_func()), set(test_impl()))
 
     @skip_numba_jit
@@ -104,7 +105,7 @@ class TestJoin(TestCase):
         def test_impl(df1, df2):
             return df1.merge(df2, on=['A', 'B'])
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df1 = pd.DataFrame({'A': [3, 1, 1, 3, 4],
                             'B': [1, 2, 3, 2, 3],
                             'C': [7, 8, 9, 4, 5]})
@@ -123,7 +124,7 @@ class TestJoin(TestCase):
             df3 = df1.merge(df2, on=['A', 'B'])
             return df3.C.sum() + df3.D.sum()
 
-        hpat_func = sdc.jit(locals={
+        hpat_func = self.jit(locals={
             'A1:input': 'distributed',
             'B1:input': 'distributed',
             'C1:input': 'distributed',
@@ -165,7 +166,7 @@ class TestJoin(TestCase):
             df3 = df1.merge(df2, on=('A', 'B'))
             return df3.C.sum() + df3.D.sum()
 
-        hpat_func = sdc.jit(locals={
+        hpat_func = self.jit(locals={
             'A1:input': 'distributed',
             'B1:input': 'distributed',
             'C1:input': 'distributed', })(test_impl)
@@ -200,7 +201,7 @@ class TestJoin(TestCase):
         def test_impl(df1, df2):
             return pd.merge(df1, df2, on='time')
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df1 = pd.DataFrame(
             {'time': pd.DatetimeIndex(
                 ['2017-01-03', '2017-01-06', '2017-02-21']), 'B': [4, 5, 6]})
@@ -215,7 +216,7 @@ class TestJoin(TestCase):
             df3 = pd.merge(df1, df2, on='time')
             return (df3.A.sum(), df3.time.max(), df3.B.sum())
 
-        hpat_func = sdc.jit(distributed=['df1', 'df2'])(test_impl)
+        hpat_func = self.jit(distributed=['df1', 'df2'])(test_impl)
         df1 = pd.DataFrame(
             {'time': pd.DatetimeIndex(
                 ['2017-01-03', '2017-01-06', '2017-02-21']), 'B': [4, 5, 6]})
@@ -235,7 +236,7 @@ class TestJoin(TestCase):
         def test_impl(df1, df2):
             return pd.merge_asof(df1, df2, on='time')
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df1 = pd.DataFrame(
             {'time': pd.DatetimeIndex(
                 ['2017-01-03', '2017-01-06', '2017-02-21']), 'B': [4, 5, 6]})
@@ -253,7 +254,7 @@ class TestJoin(TestCase):
             df3 = pd.merge_asof(df1, df2, on='time')
             return (df3.A.sum(), df3.time.max(), df3.B.sum())
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
     @skip_numba_jit
@@ -261,7 +262,7 @@ class TestJoin(TestCase):
         def test_impl(df1, df2):
             return pd.merge(df1, df2, how='left', on='key')
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df1 = pd.DataFrame(
             {'key': [2, 3, 5, 1, 2, 8], 'A': np.array([4, 6, 3, 9, 9, -1], np.float)})
         df2 = pd.DataFrame(
@@ -279,7 +280,7 @@ class TestJoin(TestCase):
         def test_impl(df1, df2):
             return pd.merge(df1, df2, how='left', on='key')
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         # test left run where a key is repeated on left but not right side
         df1 = pd.DataFrame(
             {'key': [2, 3, 5, 3, 2, 8], 'A': np.array([4, 6, 3, 9, 9, -1], np.float)})
@@ -298,7 +299,7 @@ class TestJoin(TestCase):
         def test_impl(df1, df2):
             return pd.merge(df1, df2, how='right', on='key')
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df1 = pd.DataFrame(
             {'key': [2, 3, 5, 1, 2, 8], 'A': np.array([4, 6, 3, 9, 9, -1], np.float)})
         df2 = pd.DataFrame(
@@ -316,7 +317,7 @@ class TestJoin(TestCase):
         def test_impl(df1, df2):
             return pd.merge(df1, df2, how='outer', on='key')
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         df1 = pd.DataFrame(
             {'key': [2, 3, 5, 1, 2, 8], 'A': np.array([4, 6, 3, 9, 9, -1], np.float)})
         df2 = pd.DataFrame(
@@ -338,7 +339,7 @@ class TestJoin(TestCase):
             o2 = df3.merge(df4, on=['B'])
             return o1, o2
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         df1 = pd.DataFrame({'A': np.arange(n) + 3, 'AA': np.arange(n) + 1.0})
         df2 = pd.DataFrame({'A': 2 * np.arange(n) + 1, 'AAA': n + np.arange(n) + 1.0})
@@ -361,7 +362,7 @@ class TestJoin(TestCase):
             df3 = df1.merge(df2, on='C1')
             return df3
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     @skip_numba_jit
@@ -380,7 +381,7 @@ class TestJoin(TestCase):
             df3 = df1.merge(df2, on='C1', how='right')
             return df3
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(
             hpat_func().sort_values('C1').reset_index(drop=True),
             test_impl().sort_values('C1').reset_index(drop=True))
@@ -401,7 +402,7 @@ class TestJoin(TestCase):
             df3 = df1.merge(df2, on='C1')
             return df3
 
-        hpat_func = sdc.jit(distributed=['df3'])(test_impl)
+        hpat_func = self.jit(distributed=['df3'])(test_impl)
         # TODO: check results
         self.assertTrue((hpat_func().columns == test_impl().columns).all())
 
