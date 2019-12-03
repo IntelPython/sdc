@@ -199,16 +199,29 @@ class DistributedAnalysis(object):
         elif isinstance(rhs, ir.Expr) and rhs.op in ('getiter', 'iternext'):
             # analyze array container access in pair_first
             return
+
         elif isinstance(rhs, ir.Arg):
-            if rhs.name in self.metadata['distributed']:
+            distributed_key = 'distributed'
+            threaded_key = 'threaded'
+
+            if distributed_key not in self.metadata.keys():
+                self.metadata[distributed_key] = {}
+
+            if threaded_key not in self.metadata.keys():
+                self.metadata[threaded_key] = {}
+
+            if rhs.name in self.metadata[distributed_key]:
                 if lhs not in array_dists:
                     array_dists[lhs] = Distribution.OneD
-            elif rhs.name in self.metadata['threaded']:
+
+            elif rhs.name in self.metadata[threaded_key]:
                 if lhs not in array_dists:
                     array_dists[lhs] = Distribution.Thread
+
             else:
                 dprint("replicated input ", rhs.name, lhs)
                 self._set_REP([inst.target], array_dists)
+
         else:
             self._set_REP(inst.list_vars(), array_dists)
         return
