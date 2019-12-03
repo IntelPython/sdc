@@ -7,7 +7,7 @@ package:
 
 source:
   git_url: https://github.com/numba/numba
-  git_tag: master
+  git_tag: ceab10620764d1ff29e0c0e550d1d5975674819b
 
 build:
   number: 0
@@ -34,7 +34,7 @@ requirements:
     - python
     - numpy
     - setuptools
-    - llvmlite 0.30.*
+    - llvmlite 0.31.*
     - funcsigs                 # [py27]
     - singledispatch           # [py27]
     - tbb-devel >=2018.0.5     # [not (win and py27)]
@@ -42,7 +42,7 @@ requirements:
     - python
     - {{ pin_compatible('numpy') }}
     - {{ pin_compatible('llvmlite', max_pin='x.x') }}
-    - llvmlite >=0.30.0
+    - llvmlite
     - funcsigs                 # [py27]
     - singledispatch           # [py27]
   run_constrained:
