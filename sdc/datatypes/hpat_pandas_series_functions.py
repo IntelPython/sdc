@@ -1178,7 +1178,7 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
     if not isinstance(other.data.dtype, types.Number):
         ty_checker.raise_exc(other.data, 'number', 'other.data')
 
-    if not isinstance(min_periods, (types.Integer, types.Omitted, types.NoneType)):
+    if not isinstance(min_periods, (int, types.Integer, types.Omitted, types.NoneType)) and min_periods is not None:
         ty_checker.raise_exc(min_periods, 'int64', 'min_periods')
 
     def hpat_pandas_series_corr_impl(self, other, method='pearson', min_periods=None):
@@ -1200,7 +1200,20 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
         if len(self_arr) < min_periods:
             return numpy.nan
 
-        return numpy.corrcoef(self_arr, other_arr)[0, 1]
+        new_self = pandas.Series(self_arr)
+        new_other = pandas.Series(other_arr)
+
+        n = new_self.count()
+        ma = new_self.sum()
+        mb = new_other.sum()
+        a = n * (self_arr * other_arr).sum() - ma * mb
+        b1 = n * (self_arr * self_arr).sum() - ma * ma
+        b2 = n * (other_arr * other_arr).sum() - mb * mb
+
+        if b1 == 0 or b2 == 0:
+            return numpy.nan
+
+        return a / numpy.sqrt(b1 * b2)
 
     return hpat_pandas_series_corr_impl
 
@@ -3106,10 +3119,10 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
                 sort_nona = numpy.argsort(self._data[~na_data_arr])
             q = 0
             for id, i in enumerate(sort):
-                if id not in list(sort[len(self._data) - na:]):
-                    result[id] = sort_nona[id-q]
-                else:
+                if id in set(sort[len(self._data) - na:]):
                     q += 1
+                else:
+                    result[id] = sort_nona[id - q]
             for i in sort[len(self._data) - na:]:
                 result[i] = -1
 
@@ -3133,10 +3146,10 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
             sort_nona = numpy.argsort(self._data[~na_data_arr])
         q = 0
         for id, i in enumerate(sort):
-            if id not in list(sort[len(self._data) - na:]):
-                result[id] = sort_nona[id - q]
-            else:
+            if id in set(sort[len(self._data) - na:]):
                 q += 1
+            else:
+                result[id] = sort_nona[id - q]
         for i in sort[len(self._data) - na:]:
             result[i] = -1
 
@@ -3543,7 +3556,15 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
         if len(self_arr) < min_periods:
             return numpy.nan
 
-        return numpy.cov(self_arr, other_arr)[0, 1]
+        new_self = pandas.Series(self_arr)
+
+        ma = new_self.mean()
+        mb = other.mean()
+
+        if numpy.isinf(mb):
+            return numpy.nan
+
+        return ((self_arr - ma) * (other_arr - mb)).sum() / (new_self.count() - 1.0)
 
     return hpat_pandas_series_cov_impl
 
