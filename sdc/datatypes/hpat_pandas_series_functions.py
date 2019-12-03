@@ -4489,3 +4489,148 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
         return pandas.Series(result)
 
     return hpat_pandas_series_pct_change_impl
+
+
+@overload_method(SeriesType, 'describe')
+def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=None):
+    """
+    Pandas Series method :meth:`pandas.Series.describe` implementation.
+
+    Note: Differs from Pandas in returning statistics as Series of strings when applied to
+        Series of strings or date-time values
+
+    .. only:: developer
+
+       Tests: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_describe*
+
+    Parameters
+    ----------
+    self: :obj:`pandas.Series`
+        Input series
+    percentiles: :obj:`list-like`
+        The percentiles to include in the output. The default is [.25, .5, .75]
+        All should fall between 0 and 1 and no duplicates are allowed.
+    include: 'all', :obj:`list-like` of dtypes or None, default None
+        A white list of data types to include in the result. Ignored for Series.
+    exclude: :obj:`list-like` of dtypes or None, default None
+        A black list of data types to omit from the result. Ignored for Series.
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+        returns :obj:`pandas.Series` object containing summary statistics of the Series
+    """
+
+    ty_checker = TypeChecker('Method describe().')
+    ty_checker.check(self, SeriesType)
+
+    if not (isinstance(percentiles, (types.List, types.Array, types.UniTuple))
+            and isinstance(percentiles.dtype, types.Number)
+            or isinstance(percentiles, (types.Omitted, types.NoneType))
+            or percentiles is None):
+        ty_checker.raise_exc(percentiles, 'list-like', 'percentiles')
+
+    is_percentiles_none = percentiles is None or isinstance(percentiles, (types.Omitted, types.NoneType))
+
+    if isinstance(self.dtype, types.Number):
+        def hpat_pandas_series_describe_numeric_impl(self, percentiles=None, include=None, exclude=None):
+
+            if is_percentiles_none == False:  # noqa
+                percentiles_list = list(percentiles)
+                median_in_percentiles = 0.5 in percentiles_list
+                if not median_in_percentiles:
+                    percentiles_list.append(0.5)
+                sorted_percentiles = sorted(percentiles_list)
+
+                # check percentiles have correct values:
+                arr = numpy.asarray(sorted_percentiles)
+                if len(numpy.unique(arr)) != len(arr):
+                    raise ValueError("percentiles cannot contain duplicates")
+                if numpy.any(arr[(arr < 0) * (arr > 1)]):
+                    raise ValueError("percentiles should all be in the interval [0, 1].")
+
+                # TODO: support proper rounding of percentiles like in pandas.io.formats.format.format_percentiles
+                # requires numpy.round(precision), numpy.isclose to be supported by Numba
+                percentiles_indexes = []
+                for percentile in arr:
+                    p_as_string = str(percentile * 100)
+
+                    trim_index = len(p_as_string) - 1
+                    while trim_index >= 0:
+                        if p_as_string[trim_index] == '0':
+                            trim_index -= 1
+                            continue
+                        elif p_as_string[trim_index] == '.':
+                            break
+
+                        trim_index += 1
+                        break
+
+                    if trim_index < 0:
+                        p_as_string_trimmed = '0'
+                    else:
+                        p_as_string_trimmed = p_as_string[:trim_index]
+
+                    percentiles_indexes.append(p_as_string_trimmed + '%')
+            else:
+                sorted_percentiles = [0.25, 0.5, 0.75]
+                percentiles_indexes = ['25%', '50%', '75%']
+
+            index_strings = ['count', 'mean', 'std', 'min']
+            index_strings.extend(percentiles_indexes)
+            index_strings.append('max')
+
+            total_index_chars = numpy.sum(numpy.array([len(s) for s in index_strings]))
+            result_index = sdc.str_arr_ext.pre_alloc_string_array(len(index_strings), total_index_chars)
+            sdc.str_arr_ext.cp_str_list_to_array(result_index, index_strings)
+
+            values = []
+            values.append(numpy.float64(self.count()))
+            values.append(self.mean())
+            values.append(self.std())
+            values.append(self.min())
+            for p in sorted_percentiles:
+                values.append(self.quantile(p))
+            values.append(self.max())
+
+            return pandas.Series(values, result_index)
+
+        return hpat_pandas_series_describe_numeric_impl
+
+    elif isinstance(self.dtype, types.UnicodeType):
+        def hpat_pandas_series_describe_string_impl(self, percentiles=None, include=None, exclude=None):
+
+            objcounts = self.value_counts()
+
+            # temporary workaround for problem in Series.count not skipping Nones
+            # TODO: delete this and use self.count() in append below when test_series_count_string_with_none is fixed
+            dropna_series = self.dropna()
+
+            index_strings = ['count', 'unique', 'top', 'freq']
+
+            total_index_chars = numpy.sum(numpy.array([len(s) for s in index_strings]))
+            result_index = sdc.str_arr_ext.pre_alloc_string_array(len(index_strings), total_index_chars)
+            sdc.str_arr_ext.cp_str_list_to_array(result_index, index_strings)
+
+            # use list of strings for the output series, since Numba doesn't support np.arrays with object dtype
+            values = []
+            # TODO: change the arg in the next line with 'str(self.count())'
+            values.append(str(dropna_series.count()))
+
+            # TODO: change the arg in the next line with 'str(len(objcounts[objcounts != 0]))'
+            # when operator.ne is supported in new-style
+            values.append(str(len(self.unique())))
+            values.append(str(objcounts.index[0]))
+            values.append(str(objcounts.iloc[0]))
+
+            return pandas.Series(values, index_strings)
+
+        return hpat_pandas_series_describe_string_impl
+
+    elif isinstance(self.dtype, (types.NPDatetime, types.NPTimedelta)):
+        # TODO: provide specialization for (types.NPDatetime, types.NPTimedelta)
+        # needs dropna for date-time series, conversion to int and tz_convert to be implemented
+        return None
+
+    return None
+
