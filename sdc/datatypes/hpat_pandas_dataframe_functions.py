@@ -104,13 +104,12 @@ else:
         saved_columns = df.columns
         n_cols = len(saved_columns)
         data_args = tuple('data{}'.format(i) for i in range(n_cols))
-        help_param = ', {}={}):'
-        func_text = 'def _reduce_impl(df):'
+        all_params = ['df']
         for key, value in params:
-            func_text = func_text[:-2]
-            func_text = func_text + help_param
-            func_text = func_text.format(key, value)
-        func_lines = [func_text]
+            all_params.append('{}={}'.format(key, value))
+        func_definition = 'def _reduce_impl({}):'.format(', '.join(all_params))
+        func_lines = [func_definition]
+        print(func_lines)
         for i, d in enumerate(data_args):
             line = '  {} = hpat.hiframes.api.init_series(hpat.hiframes.pd_dataframe_ext.get_dataframe_data(df, {}))'
             func_lines.append(line.format(d + '_S', i))
