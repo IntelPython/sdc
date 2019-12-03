@@ -36,7 +36,8 @@ import numpy as np
 import numba
 import sdc
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs,
-                                   count_array_OneDs, dist_IR_contains, get_start_end, check_numba_version)
+                                   count_array_OneDs, dist_IR_contains, get_start_end, check_numba_version,
+                                   skip_numba_jit, TestCase)
 
 from sdc.tests.gen_test_data import ParquetGenerator
 from numba.config import IS_32BITS
@@ -52,7 +53,7 @@ def inner_get_column(df):
 COL_IND = 0
 
 
-class TestDataFrame(unittest.TestCase):
+class TestDataFrame(TestCase):
 
     def test_create1(self):
         def test_impl(n):
@@ -149,6 +150,7 @@ class TestDataFrame(unittest.TestCase):
         df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_box_categorical(self):
         def test_impl(df):
             df['A'] = df['A'] + 1
@@ -200,6 +202,7 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_column_getitem1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
@@ -223,6 +226,7 @@ class TestDataFrame(unittest.TestCase):
             {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_filter1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -235,6 +239,7 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_filter2(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -247,6 +252,7 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_filter3(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -259,6 +265,7 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_iloc1(self):
         def test_impl(df, n):
             return df.iloc[1:n].B.values
@@ -268,6 +275,7 @@ class TestDataFrame(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         np.testing.assert_array_equal(hpat_func(df, n), test_impl(df, n))
 
+    @skip_numba_jit
     def test_iloc2(self):
         def test_impl(df, n):
             return df.iloc[np.array([1, 4, 9])].B.values
@@ -423,6 +431,7 @@ class TestDataFrame(unittest.TestCase):
         do_check = False if platform.system() == 'Windows' and not IS_32BITS else True
         pd.testing.assert_frame_equal(df1, df2, check_dtype=do_check)
 
+    @skip_numba_jit
     def test_set_column_bool1(self):
         def test_impl(df):
             df['C'] = df['A'][df['B']]
@@ -488,6 +497,7 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_df_apply(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)})
@@ -498,6 +508,7 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = sdc.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
+    @skip_numba_jit
     def test_df_apply_branch(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)})
@@ -522,6 +533,7 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_sort_values(self):
         def test_impl(df):
             df.sort_values('A', inplace=True)
@@ -533,6 +545,7 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = sdc.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
 
+    @skip_numba_jit
     def test_sort_values_copy(self):
         def test_impl(df):
             df2 = df.sort_values('A')
@@ -544,6 +557,7 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = sdc.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
 
+    @skip_numba_jit
     def test_sort_values_single_col(self):
         def test_impl(df):
             df.sort_values('A', inplace=True)
@@ -555,6 +569,7 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = sdc.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(df.copy()), test_impl(df))
 
+    @skip_numba_jit
     def test_sort_values_single_col_str(self):
         def test_impl(df):
             df.sort_values('A', inplace=True)
@@ -572,6 +587,7 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = sdc.jit(test_impl)
         self.assertTrue((hpat_func(df.copy()) == test_impl(df)).all())
 
+    @skip_numba_jit
     def test_sort_values_str(self):
         def test_impl(df):
             df.sort_values('A', inplace=True)
@@ -595,6 +611,7 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = sdc.jit(test_impl)
         self.assertTrue((hpat_func(df) == sorted_df.B.values).all())
 
+    @skip_numba_jit
     def test_sort_parallel_single_col(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -670,6 +687,7 @@ class TestDataFrame(unittest.TestCase):
                            })
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_sort_parallel(self):
         # create `kde.parquet` file
         ParquetGenerator.gen_kde_pq()
@@ -729,6 +747,7 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
+    @skip_numba_jit
     def test_itertuples_analysis(self):
         """tests array analysis handling of generated tuples, shapes going
         through blocks and getting used in an array dimension
@@ -756,6 +775,7 @@ class TestDataFrame(unittest.TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
+    @skip_numba_jit
     def test_pct_change1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
@@ -908,6 +928,7 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = sdc.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @skip_numba_jit
     def test_df_dropna1(self):
         def test_impl(df):
             return df.dropna()
@@ -918,6 +939,7 @@ class TestDataFrame(unittest.TestCase):
         h_out = hpat_func(df)
         pd.testing.assert_frame_equal(out, h_out)
 
+    @skip_numba_jit
     def test_df_dropna2(self):
         def test_impl(df):
             return df.dropna()
@@ -928,6 +950,7 @@ class TestDataFrame(unittest.TestCase):
         h_out = hpat_func(df)
         pd.testing.assert_frame_equal(out, h_out)
 
+    @skip_numba_jit
     def test_df_dropna_inplace1(self):
         # TODO: fix error when no df is returned
         def test_impl(df):
@@ -941,6 +964,7 @@ class TestDataFrame(unittest.TestCase):
         h_out = hpat_func(df2)
         pd.testing.assert_frame_equal(out, h_out)
 
+    @skip_numba_jit
     def test_df_dropna_str1(self):
         def test_impl(df):
             return df.dropna()
@@ -951,6 +975,7 @@ class TestDataFrame(unittest.TestCase):
         h_out = hpat_func(df)
         pd.testing.assert_frame_equal(out, h_out)
 
+    @skip_numba_jit
     def test_df_drop1(self):
         def test_impl(df):
             return df.drop(columns=['A'])
@@ -959,6 +984,7 @@ class TestDataFrame(unittest.TestCase):
         hpat_func = sdc.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_df_drop_inplace2(self):
         # test droping after setting the column
         def test_impl(df):
@@ -1013,6 +1039,7 @@ class TestDataFrame(unittest.TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_append1(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)
@@ -1024,6 +1051,7 @@ class TestDataFrame(unittest.TestCase):
         df2.A[n // 2:] = n
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
+    @skip_numba_jit
     def test_append2(self):
         def test_impl(df, df2, df3):
             return df.append([df2, df3], ignore_index=True)
@@ -1037,6 +1065,7 @@ class TestDataFrame(unittest.TestCase):
         pd.testing.assert_frame_equal(
             hpat_func(df, df2, df3), test_impl(df, df2, df3))
 
+    @skip_numba_jit
     def test_concat_columns1(self):
         def test_impl(S1, S2):
             return pd.concat([S1, S2], axis=1)

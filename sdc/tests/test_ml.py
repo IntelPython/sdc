@@ -34,11 +34,13 @@ import sdc
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs,
                                    count_parfor_OneD_Vars, count_array_OneD_Vars,
-                                   dist_IR_contains, check_numba_version)
+                                   dist_IR_contains, check_numba_version,
+                                   skip_numba_jit, TestCase)
 
 
-class TestML(unittest.TestCase):
+class TestML(TestCase):
 
+    @skip_numba_jit
     def test_logistic_regression(self):
         def test_impl(n, d):
             iterations = 3
@@ -57,6 +59,7 @@ class TestML(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 3)
         self.assertEqual(count_parfor_OneDs(), 3)
 
+    @skip_numba_jit
     def test_logistic_regression_acc(self):
         def test_impl(N, D):
             iterations = 3
@@ -78,6 +81,7 @@ class TestML(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 3)
         self.assertEqual(count_parfor_OneDs(), 4)
 
+    @skip_numba_jit
     def test_linear_regression(self):
         def test_impl(N, D):
             p = 2
@@ -97,6 +101,7 @@ class TestML(unittest.TestCase):
         self.assertEqual(count_array_OneDs(), 5)
         self.assertEqual(count_parfor_OneDs(), 3)
 
+    @skip_numba_jit
     def test_kde(self):
         def test_impl(n):
             X = np.ones(n)
