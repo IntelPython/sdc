@@ -42,7 +42,7 @@ requirements:
     - python
     - {{ pin_compatible('numpy') }}
     - {{ pin_compatible('llvmlite', max_pin='x.x') }}
-    - llvmlite >=0.31.0
+    - llvmlite
     - funcsigs                 # [py27]
     - singledispatch           # [py27]
   run_constrained:
