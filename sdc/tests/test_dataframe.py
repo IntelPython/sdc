@@ -40,6 +40,9 @@ from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_par
                                    skip_numba_jit, TestCase)
 
 from sdc.tests.gen_test_data import ParquetGenerator
+from sdc.tests.test_utils import (min_float64, max_float64, test_global_input_data_float64,
+                                    test_global_input_data_unicode_kind4, test_datatime,
+                                    min_int64, max_int64, test_global_input_data_int64)
 from numba.config import IS_32BITS
 
 
@@ -1150,28 +1153,16 @@ class TestDataFrame(TestCase):
         hpat_func = sdc.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-
-    def test_dataframe_min(self):
-        def test_impl(df):
-            return df.min()
+    def test_dataframe_head1(self):
+        def test_impl(df, n):
+            return df.head(n)
         sdc_func = sdc.jit(test_impl)
-        df = pd.DataFrame({"A": [12, 4, 5, 44, 1],
-                           "B": [5, 2, 54, 3, 2],
-                           "C": [20, 16, 7, 3, 8],
-                           "D": [14, 3, 17, 2, 6]})
-        print(sdc_func(df))
-        pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
-
-    def test_dataframe_min2(self):
-        def test_impl(df):
-            return df.min()
-        sdc_func = sdc.jit(test_impl)
-        df = pd.DataFrame({"A": [12, 4, 5, None, 1],
-                           "B": [5, 2, 54, 3, None],
-                           "C": [20, 16, 7, 3, 8],
-                           "D": [14, 3, None, 2, 6]})
-        print(sdc_func(df))
-        pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
-
+        df = pd.DataFrame({"FLOAT": test_global_input_data_float64[0][:5],
+                           "DATATIME": test_datatime,
+                           "INT": test_global_input_data_int64[:5],
+                           "STRING": ['a', 'dd', 'c', '12', 'ddf']})
+        for n in [-1, 0, 2, 5]:
+            pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
+ 
 if __name__ == "__main__":
     unittest.main()

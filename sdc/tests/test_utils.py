@@ -37,16 +37,24 @@ test_global_input_data_unicode_kind4 = [
     '¡Y tú quién te crees?',
     '🐍⚡',
     '大处 着眼，c小处着手c。大大c大处',
+    'c小处着手c。',
+    'te crees?'
 ]
 
 min_float64 = np.finfo('float64').min
 max_float64 = np.finfo('float64').max
+min_int64 = np.iinfo(np.int64).min
+max_int64 = np.iinfo(np.int64).max
 
 test_global_input_data_float64 = [
     [1., np.nan, -1., 0., min_float64, max_float64, max_float64, min_float64],
     [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
 ]
 
+test_datatime = np.array(['2007-07-13', '2006-01-13', '2010-08-13',
+                         '2005-02-27', '2005-02-28'], dtype='datetime64')
+
+test_global_input_data_int64 = [min_int64, 0, 1, -23, max_int64, min_int64, max_int64]
 
 def count_array_REPs():
     if sdc.config.config_pipeline_hpat_default:

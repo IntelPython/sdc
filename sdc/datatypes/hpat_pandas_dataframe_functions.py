@@ -34,6 +34,7 @@ import pandas
 import numpy
 
 import sdc
+from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
 
 from numba import types
 from numba.extending import (overload, overload_method, overload_attribute)
@@ -95,252 +96,83 @@ if not sdc.config.use_default_dataframe:
         return sdc_pandas_dataframe_count_impl
 
 else:
-    def reduce(df, name):
+    def sdc_pandas_dataframe_reduce_columns(df, name, param):
         saved_columns = df.columns
         n_cols = len(saved_columns)
         data_args = tuple('data{}'.format(i) for i in range(n_cols))
-        func_text = "def _reduce_impl(df, axis=None, skipna=None, level=None, numeric_only=None):\n"
+        help_param = ', {}={}):'
+        func_text = 'def _reduce_impl(df):'
+        all_params = ['df']
+        for name, value in param:
+            all_params.append('{}={}'.format(name, value))
+        func_definition =  'def _reduce_impl({}):'.format(', '.join(all_params))
+        func_lines = [func_definition]
         for i, d in enumerate(data_args):
-            func_text += "  {} = hpat.hiframes.api.init_series(hpat.hiframes.pd_dataframe_ext.get_dataframe_data(df, {}))\n".format(
-                d + '_S', i)
-            func_text += "  {} = {}.{}()\n".format(d + '_O', d + '_S', name)
-        func_text += "  data = np.array(({},))\n".format(
-            ", ".join(d + '_O' for d in data_args))
-        func_text += "  index = hpat.str_arr_ext.StringArray(({},))\n".format(
-            ", ".join("'{}'".format(c) for c in saved_columns))
-        func_text += "  return hpat.hiframes.api.init_series(data, index)\n"
+            line = '  {} = hpat.hiframes.api.init_series(hpat.hiframes.pd_dataframe_ext.get_dataframe_data(df, {}))'
+            func_lines.append(line.format(d + '_S', i))
+            func_lines.append('  {} = {}.{}()'.format(d + '_O', d + '_S', name))
+        func_lines.append('  data = np.array(({},))'.format(
+            ", ".join(d + '_O' for d in data_args)))
+        func_lines.append('  index = hpat.str_arr_ext.StringArray(({},))'.format(
+            ', '.join('"{}"'.format(c) for c in saved_columns)))
+        func_lines.append('  return hpat.hiframes.api.init_series(data, index)')
         loc_vars = {}
-
-        print()
-        print(func_text)
-        print()
+        func_text = '\n'.join(func_lines)
 
         exec(func_text, {'hpat': sdc, 'np': numpy}, loc_vars)
         _reduce_impl = loc_vars['_reduce_impl']
 
         return _reduce_impl
 
-
-    @overload_method(DataFrameType, 'median')
-    def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
-        """
-           Pandas DataFrame method :meth:`pandas.DataFrame.median` implementation.
-           .. only:: developer
-               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_median1
-           Parameters
-           -----------
-           self: :class:`pandas.DataFrame`
-               input arg
-           axis:
-                *unsupported*
-           skipna:
-               *unsupported*
-           level:
-               *unsupported*
-           numeric_only:
-               *unsupported*
-           Returns
-           -------
-           :obj:`pandas.Series` or `pandas.DataFrame`
-                   return the median of the values for the requested axis.
-           """
-
-        name = 'median'
-
-        if not isinstance(df, DataFrameType):
-            raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(name, df))
+    
+    def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, ddof=1, min_count=0):
+        ty_checker = TypeChecker('Method {}().'.format(name))
+        ty_checker.check(df, DataFrameType)
 
         if not (isinstance(axis, types.Omitted) or axis is None):
-            raise TypingError("{} 'axis' unsupported. Given: {}".format(name, axis))
+            ty_checker.raise_exc(axis, 'unsupported', 'axis')
 
-        if not (isinstance(skipna, types.Omitted) or skipna is None):
-            raise TypingError("{} 'skipna' unsupported. Given: {}".format(name, skipna))
-
-        if not (isinstance(level, types.Omitted) or level is None):
-            raise TypingError("{} 'level' unsupported. Given: {}".format(name, level))
-
-        if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            raise TypingError("{} 'numeric_only' unsupported. Given: {}".format(name, numeric_only))
-
-        return reduce(df, name)
-
-
-    @overload_method(DataFrameType, 'mean')
-    def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
-        """
-           Pandas DataFrame method :meth:`pandas.DataFrame.mean` implementation.
-           .. only:: developer
-               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_mean1
-           Parameters
-           -----------
-           self: :class:`pandas.DataFrame`
-               input arg
-           axis:
-                *unsupported*
-           skipna:
-               *unsupported*
-           level:
-               *unsupported*
-           numeric_only:
-               *unsupported*
-           Returns
-           -------
-           :obj:`pandas.Series` or `pandas.DataFrame`
-                   return the mean of the values for the requested axis.
-           """
-
-        name = 'mean'
-
-        if not isinstance(df, DataFrameType):
-            raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(name, df))
-
-        if not (isinstance(axis, types.Omitted) or axis is None):
-            raise TypingError("{} 'axis' unsupported. Given: {}".format(name, axis))
-
-        if not (isinstance(skipna, types.Omitted) or skipna is None):
-            raise TypingError("{} 'skipna' unsupported. Given: {}".format(name, skipna))
+        if not (isinstance(skipna, (types.Omitted, types.NoneType, types.Boolean)) or skipna is None):
+            ty_checker.raise_exc(skipna, 'bool', 'skipna')
 
         if not (isinstance(level, types.Omitted) or level is None):
-            raise TypingError("{} 'level' unsupported. Given: {}".format(name, level))
+            ty_checker.raise_exc(level, 'unsupported', 'level')
 
         if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            raise TypingError("{} 'numeric_only' unsupported. Given: {}".format(name, numeric_only))
+            ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-        return reduce(df, name)
-
-
-    @overload_method(DataFrameType, 'max')
-    def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
-        """
-           Pandas DataFrame method :meth:`pandas.DataFrame.max` implementation.
-           .. only:: developer
-               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_max1
-           Parameters
-           -----------
-           self: :class:`pandas.DataFrame`
-               input arg
-           axis:
-                *unsupported*
-           skipna:
-               *unsupported*
-           level:
-               *unsupported*
-           numeric_only:
-               *unsupported*
-           Returns
-           -------
-           :obj:`pandas.Series` or `pandas.DataFrame`
-                   return the maximum of the values for the requested axis.
-           """
-
-        name = 'max'
-
-        if not isinstance(df, DataFrameType):
-            raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(name, df))
-
-        if not (isinstance(axis, types.Omitted) or axis is None):
-            raise TypingError("{} 'axis' unsupported. Given: {}".format(name, axis))
-
-        if not (isinstance(skipna, types.Omitted) or skipna is None):
-            raise TypingError("{} 'skipna' unsupported. Given: {}".format(name, skipna))
-
-        if not (isinstance(level, types.Omitted) or level is None):
-            raise TypingError("{} 'level' unsupported. Given: {}".format(name, level))
-
-        if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            raise TypingError("{} 'numeric_only' unsupported. Given: {}".format(name, numeric_only))
-
-        return reduce(df, name)
-
-
-    @overload_method(DataFrameType, 'min')
-    def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
-        """
-           Pandas DataFrame method :meth:`pandas.DataFrame.min` implementation.
-           .. only:: developer
-               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_min1
-           Parameters
-           -----------
-           self: :class:`pandas.DataFrame`
-               input arg
-           axis:
-                *unsupported*
-           skipna:
-               *unsupported*
-           level:
-               *unsupported*
-           numeric_only:
-               *unsupported*
-           Returns
-           -------
-           :obj:`pandas.Series` or `pandas.DataFrame`
-                   returns: the minimum of the values for the requested axis.
-           """
-
-        name = 'min'
-        
-        if not isinstance(df, DataFrameType):
-            raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(name, df))
-
-        if not (isinstance(axis, types.Omitted) or axis is None):
-            raise TypingError("{} 'axis' unsupported. Given: {}".format(name, axis))
-
-        if not (isinstance(skipna, types.Omitted) or skipna is None):
-            raise TypingError("{} 'skipna' unsupported. Given: {}".format(name, skipna))
-
-        if not (isinstance(level, types.Omitted) or level is None):
-            raise TypingError("{} 'level' unsupported. Given: {}".format(name, level))
-
-        if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            raise TypingError("{} 'numeric_only' unsupported. Given: {}".format(name, numeric_only))
-        
-        return reduce(df, name)
-
-
-    @overload_method(DataFrameType, 'sum')
-    def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
-        """
-           Pandas DataFrame method :meth:`pandas.DataFrame.sum` implementation.
-           .. only:: developer
-               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_sum1
-           Parameters
-           -----------
-           self: :class:`pandas.DataFrame`
-               input arg
-           axis:
-                *unsupported*
-           skipna:
-               *unsupported*
-           level:
-               *unsupported*
-           numeric_only:
-               *unsupported*
-           min_count:
-                *unsupported*
-           Returns
-           -------
-           :obj:`pandas.Series` or `pandas.DataFrame`
-                   return the sum of the values for the requested axis.
-           """
-
-        name = 'sum'
-
-        if not isinstance(df, DataFrameType):
-            raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(name, df))
-
-        if not (isinstance(axis, types.Omitted) or axis is None):
-            raise TypingError("{} 'axis' unsupported. Given: {}".format(name, axis))
-
-        if not (isinstance(skipna, types.Omitted) or skipna is None):
-            raise TypingError("{} 'skipna' unsupported. Given: {}".format(name, skipna))
-
-        if not (isinstance(level, types.Omitted) or level is None):
-            raise TypingError("{} 'level' unsupported. Given: {}".format(name, level))
-
-        if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-            raise TypingError("{} 'numeric_only' unsupported. Given: {}".format(name, numeric_only))
+        if not (isinstance(ddof, types.Omitted) or ddof == 1):
+            ty_checker.raise_exc(ddof, 'unsupported', 'ddof')
 
         if not (isinstance(min_count, types.Omitted) or min_count == 0):
-            raise TypingError("{} 'min_count' unsupported. Given: {}".format(name, min_count))
+            ty_checker.raise_exc(min_count, 'unsupported', 'min_count')
+        
+        if not isinstance(n, (types.Integer, types.Omitted)) and n != 5:
+            ty_checker.raise_exc(n, 'integer', 'n')
 
-        return reduce(df, name)
+
+    @overload_method(DataFrameType, 'head')
+    def median_overload(df, n=5):
+        """
+        Pandas DataFrame method :meth:`pandas.DataFrame.head` implementation.
+        .. only:: developer
+            Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_head1
+        Parameters
+        -----------
+        self: :class:`pandas.DataFrame`
+            input arg
+        n: :obj:`int`, default 5
+            input arg, default 5
+        Returns
+        -------
+        :obj:`pandas.Series`
+        returns: The first n rows of the caller object.
+        """
+
+        name = 'head'
+
+        check_type(name, df, n=n)
+
+        params = [('n', n)]
+
+        return sdc_pandas_dataframe_reduce_columns(df, name, params)
