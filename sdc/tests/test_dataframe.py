@@ -37,13 +37,13 @@ import numba
 import sdc
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs,
-                                   count_array_OneDs, dist_IR_contains, get_start_end, check_numba_version,
-                                   skip_numba_jit)
+                                  count_array_OneDs, dist_IR_contains, get_start_end, check_numba_version,
+                                  skip_numba_jit)
 
 from sdc.tests.gen_test_data import ParquetGenerator
 from sdc.tests.test_utils import (min_float64, max_float64, test_global_input_data_float64,
-                                    test_global_input_data_unicode_kind4, test_datatime,
-                                    min_int64, max_int64, test_global_input_data_int64)
+                                  test_global_input_data_unicode_kind4, test_datatime,
+                                  min_int64, max_int64, test_global_input_data_int64)
 from numba.config import IS_32BITS
 
 
@@ -1163,6 +1163,6 @@ class TestDataFrame(TestCase):
                            "STRING": ['a', 'dd', 'c', '12', 'ddf']})
         for n in [-1, 0, 2, 5]:
             pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
- 
+
 if __name__ == "__main__":
     unittest.main()

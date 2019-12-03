@@ -44,7 +44,6 @@ from numba.errors import TypingError
 if not sdc.config.use_default_dataframe:
     from sdc.datatypes.hpat_pandas_dataframe_types import DataFrameType
 
-
     @overload_method(DataFrameType, 'count')
     def sdc_pandas_dataframe_count(self, axis=0, level=None, numeric_only=False):
         """
@@ -64,7 +63,8 @@ if not sdc.config.use_default_dataframe:
         Returns
         -------
         :obj:`pandas.Series` or `pandas.DataFrame`
-                returns: For each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
+                returns: For each column/row the number of non-NA/null entries.\
+                     If level is specified returns a DataFrame.
         """
 
         _func_name = 'Method pandas.dataframe.count().'
@@ -105,7 +105,7 @@ else:
         all_params = ['df']
         for name, value in param:
             all_params.append('{}={}'.format(name, value))
-        func_definition =  'def _reduce_impl({}):'.format(', '.join(all_params))
+        func_definition = 'def _reduce_impl({}):'.format(', '.join(all_params))
         func_lines = [func_definition]
         for i, d in enumerate(data_args):
             line = '  {} = hpat.hiframes.api.init_series(hpat.hiframes.pd_dataframe_ext.get_dataframe_data(df, {}))'
@@ -124,7 +124,6 @@ else:
 
         return _reduce_impl
 
-    
     def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, ddof=1, min_count=0):
         ty_checker = TypeChecker('Method {}().'.format(name))
         ty_checker.check(df, DataFrameType)
@@ -146,10 +145,9 @@ else:
 
         if not (isinstance(min_count, types.Omitted) or min_count == 0):
             ty_checker.raise_exc(min_count, 'unsupported', 'min_count')
-        
+
         if not isinstance(n, (types.Integer, types.Omitted)) and n != 5:
             ty_checker.raise_exc(n, 'integer', 'n')
-
 
     @overload_method(DataFrameType, 'head')
     def median_overload(df, n=5):
