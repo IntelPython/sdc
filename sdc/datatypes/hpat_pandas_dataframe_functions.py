@@ -100,13 +100,13 @@ if not sdc.config.use_default_dataframe:
         return sdc_pandas_dataframe_count_impl
 
 else:
-    def sdc_pandas_dataframe_reduce_columns(df, name, param):
+    def sdc_pandas_dataframe_reduce_columns(df, name, params):
         saved_columns = df.columns
         n_cols = len(saved_columns)
         data_args = tuple('data{}'.format(i) for i in range(n_cols))
         help_param = ', {}={}):'
         func_text = 'def _reduce_impl(df):'
-        for key, value in param:
+        for key, value in params:
             func_text = func_text[:-2]
             func_text = func_text + help_param
             func_text = func_text.format(key, value)
