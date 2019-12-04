@@ -182,7 +182,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        params = [('axis', axis), ('skipna', skipna), ('level', level), ('numeric_only', numeric_only)]
+        params = [('skipna', skipna), ('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -219,7 +219,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        params = [('axis', axis), ('skipna', skipna), ('level', level), ('numeric_only', numeric_only)]
+        params = [('skipna', skipna), ('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -258,7 +258,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, ddof=ddof)
 
-        params = [('axis', axis), ('skipna', skipna), ('level', level), ('ddof', ddof), ('numeric_only', numeric_only)]
+        params = [('skipna', skipna), ('ddof', ddof), ('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -297,7 +297,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, ddof=ddof)
 
-        params = [('axis', axis), ('skipna', skipna), ('level', level), ('ddof', ddof), ('numeric_only', numeric_only)]
+        params = [('skipna', skipna), ('ddof', ddof), ('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -334,7 +334,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        params = [('axis', axis), ('skipna', skipna), ('level', level), ('numeric_only', numeric_only)]
+        params = [('skipna', skipna), ('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -371,7 +371,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        params = [('axis', axis), ('skipna', skipna), ('level', level), ('numeric_only', numeric_only)]
+        params = [('skipna', skipna), ('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -410,8 +410,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
 
-        params = [('axis', axis), ('skipna', skipna), ('level', level), ('numeric_only', numeric_only),
-                  ('min_count', min_count)]
+        params = [('skipna', skipna), ('numeric_only', numeric_only), ('min_count', min_count)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -450,8 +449,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
 
-        params = [('axis', axis), ('skipna', skipna), ('level', level), ('numeric_only', numeric_only),
-                  ('min_count', min_count)]
+        params = [('skipna', skipna), ('numeric_only', numeric_only), ('min_count', min_count)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -497,6 +495,6 @@ else:
         if not (isinstance(numeric_only, types.Omitted) or numeric_only is False):
             ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-        params = [('axis', axis), ('level', level), ('numeric_only', numeric_only)]
+        params = [('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
