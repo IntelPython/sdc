@@ -47,6 +47,10 @@ test_global_input_data_float64 = [
     [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
 ]
 
+test_global_input_data_float_finite = [
+    [1., .2, 10 ** (-100), 5.],
+]
+
 
 def count_array_REPs():
     if sdc.config.config_pipeline_hpat_default:
