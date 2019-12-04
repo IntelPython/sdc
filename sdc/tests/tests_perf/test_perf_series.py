@@ -418,8 +418,7 @@ class TestSeriesMethods(TestBase):
         self._test_series_binary_operations(usecase_series_chain_add_and_sum, 'series_chain_add_and_sum')
 
     def test_series_float_astype_int(self):
-        self._test_case(usecase_series_astype_int, 'series_astype_int', input_data=test_global_input_data_float_finite)
+        self._test_case(usecase_series_astype_int, 'series_astype_int', input_data=[test_global_input_data_float64[0]])
 
     def test_series_float_fillna(self):
         self._test_case(usecase_series_fillna, 'usecase_series_fillna')
-
