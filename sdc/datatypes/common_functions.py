@@ -92,7 +92,7 @@ class TypeChecker:
 
 
 def has_literal_value(var, value):
-    '''Used during typing to check that variable var is a Numba literal value equal to value'''
+    """Used during typing to check that variable var is a Numba literal value equal to value"""
 
     if not isinstance(var, types.Literal):
         return False
@@ -104,7 +104,7 @@ def has_literal_value(var, value):
 
 
 def has_python_value(var, value):
-    '''Used during typing to check that variable var was resolved as Python type and has specific value'''
+    """Used during typing to check that variable var was resolved as Python type and has specific value"""
 
     if not isinstance(var, type(value)):
         return False
@@ -113,6 +113,11 @@ def has_python_value(var, value):
         return var is value
     else:
         return var == value
+
+
+def check_index_is_numeric(ty_series):
+    """Used during typing to check that series has numeric index"""
+    return isinstance(ty_series.index, types.Array) and isinstance(ty_series.index.dtype, types.Number)
 
 
 def hpat_arrays_append(A, B):
@@ -197,3 +202,12 @@ def _hpat_ensure_array_capacity(new_size, arr):
     res = numpy.empty(n, arr.dtype)
     res[:k] = arr[:k]
     return res
+
+def find_common_dtype_for_scalar_numpy_types(dtype1, dtype2):
+    """Used to find common numba dtype for two numba dtypes each representing some scalar numpy dtype"""
+    np_dtypes = [numpy_support.as_dtype(dtype1),
+                 numpy_support.as_dtype(dtype2)]
+    np_common_dtype = numpy.find_common_type([], np_dtypes)
+    numba_common_dtype = numpy_support.from_dtype(np_common_dtype)
+
+    return numba_common_dtype

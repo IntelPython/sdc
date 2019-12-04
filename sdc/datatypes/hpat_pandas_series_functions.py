@@ -42,7 +42,8 @@ from numba import numpy_support
 import sdc
 import sdc.datatypes.common_functions as common_functions
 from sdc.datatypes.common_functions import TypeChecker
-from sdc.datatypes.common_functions import _hpat_ensure_array_capacity
+from sdc.datatypes.common_functions import (_hpat_ensure_array_capacity, check_index_is_numeric,
+                                            find_common_dtype_for_scalar_numpy_types)
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars, string_array_type,
