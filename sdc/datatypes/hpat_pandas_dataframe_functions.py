@@ -109,7 +109,6 @@ else:
             all_params.append('{}={}'.format(key, value))
         func_definition = 'def _reduce_impl({}):'.format(', '.join(all_params))
         func_lines = [func_definition]
-        print(func_lines)
         for i, d in enumerate(data_args):
             line = '  {} = hpat.hiframes.api.init_series(hpat.hiframes.pd_dataframe_ext.get_dataframe_data(df, {}))'
             func_lines.append(line.format(d + '_S', i))
@@ -182,7 +181,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        params = [('skipna', skipna), ('numeric_only', numeric_only)]
+        params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -219,7 +218,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        params = [('skipna', skipna), ('numeric_only', numeric_only)]
+        params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -258,7 +257,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, ddof=ddof)
 
-        params = [('skipna', skipna), ('ddof', ddof), ('numeric_only', numeric_only)]
+        params = [('axis', None), ('skipna', skipna), ('level', None), ('ddof', ddof), ('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -297,7 +296,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, ddof=ddof)
 
-        params = [('skipna', skipna), ('ddof', ddof), ('numeric_only', numeric_only)]
+        params = [('axis', None), ('skipna', skipna), ('level', None), ('ddof', ddof), ('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -334,7 +333,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        params = [('skipna', skipna), ('numeric_only', numeric_only)]
+        params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -371,7 +370,7 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        params = [('skipna', skipna), ('numeric_only', numeric_only)]
+        params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -410,7 +409,8 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
 
-        params = [('skipna', skipna), ('numeric_only', numeric_only), ('min_count', min_count)]
+        params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only),
+                  ('min_count', min_count)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -449,7 +449,8 @@ else:
 
         check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
 
-        params = [('skipna', skipna), ('numeric_only', numeric_only), ('min_count', min_count)]
+        params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only),
+                  ('min_count', min_count)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
@@ -495,6 +496,6 @@ else:
         if not (isinstance(numeric_only, types.Omitted) or numeric_only is False):
             ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-        params = [('numeric_only', numeric_only)]
+        params = [('axis', None), ('level', None), ('numeric_only', numeric_only)]
 
         return sdc_pandas_dataframe_reduce_columns(df, name, params)
