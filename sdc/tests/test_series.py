@@ -1019,7 +1019,7 @@ class TestSeries(TestCase):
         S = pd.Series(np.arange(n)**2)
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
+    @unittest.skip('Setitem not implement')
     def test_series_iat2(self):
         def test_impl(A):
             A.iat[3] = 1
@@ -1107,9 +1107,9 @@ class TestSeries(TestCase):
 
         jit_impl = self.jit(test_impl)
 
-        keys = [2, '2', '2']
-        all_data = [[11, 22, 33], [11, 22, 33], [11, 22, 33]]
-        indices = [[2, 3, 5], ['2', '3', '5'], ['2', '3', '5']]
+        keys = ['2', '2']
+        all_data = [[11, 22, 33], [11, 22, 33]]
+        indices = [['2', '22', '0'], ['2', '3', '5']]
         for key, data, index in zip(keys, all_data, indices):
             S = pd.Series(data, index)
             self.assertEqual(jit_impl(S, key), test_impl(S, key))
@@ -1128,12 +1128,20 @@ class TestSeries(TestCase):
 
         jit_impl = self.jit(test_impl)
 
-        keys = [2, '2', '2']
+        keys = [2, 2, 2]
         all_data = [[11, 22, 33], [11, 22, 33], [11, 22, 33]]
-        indices = [[2, 3, 5], ['2', '3', '5'], ['2', '3', '5']]
+        indices = [[2, 3, 5], [2, 2, 2], [2, 4, 15]]
         for key, data, index in zip(keys, all_data, indices):
             S = pd.Series(data, index)
             np.testing.assert_array_equal(jit_impl(S, key).data, np.array(test_impl(S, key)))
+
+    def test_series_loc_str(self):
+        def test_impl(A):
+            return A.loc['1']
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([2, 4, 6], ['1', '3', '5'])
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
     @unittest.skip('Loc for slice idx not implement')
     def test_series_loc_slice(self):

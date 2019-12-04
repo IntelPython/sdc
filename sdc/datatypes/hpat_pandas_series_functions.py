@@ -45,6 +45,7 @@ from numba.extending import intrinsic
 import sdc
 import sdc.datatypes.common_functions as common_functions
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
+from sdc.datatypes.hpat_pandas_getitem_types import SeriesGetitemSelectorType
 from sdc.hiframes.pd_series_ext import (
     SeriesType, SeriesOperatorTypeIloc, SeriesOperatorTypeLoc,
     SeriesOperatorTypeIat, SeriesOperatorTypeAt)
@@ -123,52 +124,48 @@ def hpat_pandas_series_getitem(self, idx):
 
     _func_name = 'Operator getitem().'
 
-    if isinstance(self, SeriesOperatorTypeIloc):
+    if isinstance(self, SeriesGetitemSelectorType) and self.selector.literal_value == 1:
         if isinstance(idx, types.SliceType):
             def hpat_pandas_series_iloc_slice_impl(self, idx):
-                return pandas.Series(self._data[idx])
+                return pandas.Series(self._data._data[idx])
 
             return hpat_pandas_series_iloc_slice_impl
 
         def hpat_pandas_series_iloc_impl(self, idx):
-            return self._data[idx]
+            return self._data._data[idx]
 
         return hpat_pandas_series_iloc_impl
 
-    if isinstance(self, SeriesOperatorTypeIat):
-        if isinstance(idx, types.Number):
-            def hpat_pandas_series_iat_impl(self, idx):
-                return self._data[idx]
+    if isinstance(self, SeriesGetitemSelectorType) and self.selector.literal_value == 2:
+        def hpat_pandas_series_iat_impl(self, idx):
+            return self._data._data[idx]
 
-            return hpat_pandas_series_iat_impl
+        return hpat_pandas_series_iat_impl
 
         raise TypingError('{} The index must be a Number. Given: {}'.format(_func_name, idx))
 
     #Loc for slice idx not implement
     #note: Loc return Series
-    if isinstance(self, SeriesOperatorTypeLoc):
+    if isinstance(self, SeriesGetitemSelectorType) and self.selector.literal_value == 3:
         # if isinstance(idx, types.SliceType):
         #     def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
         #         return 
 
         # return hpat_pandas_series_getitem_idx_slice_impl
         def hpat_pandas_series_loc_impl(self, idx):
-            mask = numpy.empty(len(self._data), numpy.bool_)
-            for i in range(len(self._index)):
-                mask[i] = self._index[i] == idx
-            return pandas.Series(self._data[mask], self._index[mask])
+            mask = numpy.empty(len(self._data._data), numpy.bool_)
+            for i in range(len(self._data._index)):
+                mask[i] = self._data._index[i] == idx
+            return pandas.Series(self._data._data[mask], self._data._index[mask])
 
         return hpat_pandas_series_loc_impl
     
-    if isinstance(self, SeriesOperatorTypeAt):
+    if isinstance(self, SeriesGetitemSelectorType) and self.selector.literal_value == 4:
         def hpat_pandas_series_at_impl(self, idx):
-            mask = numpy.empty(len(self._data), numpy.bool_)
-            for i in range(len(self._index)):
-                mask[i] = self._index[i] == idx
-            if len(self._index[mask]) == 1:
-                return self._data[mask]
-            if len(self._index[mask]) > 1:
-                return self._data[mask]
+            mask = numpy.empty(len(self._data._data), numpy.bool_)
+            for i in range(len(self._data._index)):
+                mask[i] = self._data._index[i] == idx
+            return self._data._data[mask]
 
         return hpat_pandas_series_at_impl
 
@@ -239,7 +236,7 @@ def hpat_pandas_series_iloc(self):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     def hpat_pandas_series_iloc_impl(self):
-        return sdc.hiframes.api.init_series_iloc(self)
+        return sdc.datatypes.hpat_pandas_getitem_types.series_getitem_selector_init(self, 1)
 
     return hpat_pandas_series_iloc_impl
 
@@ -269,7 +266,7 @@ def hpat_pandas_series_loc(self):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     def hpat_pandas_series_loc_impl(self):
-        return sdc.hiframes.api.init_series_loc(self)
+        return sdc.datatypes.hpat_pandas_getitem_types.series_getitem_selector_init(self, 3)
 
     return hpat_pandas_series_loc_impl
 
@@ -299,7 +296,7 @@ def hpat_pandas_series_iat(self):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     def hpat_pandas_series_iat_impl(self):
-        return sdc.hiframes.api.init_series_iat(self)
+        return sdc.datatypes.hpat_pandas_getitem_types.series_getitem_selector_init(self, 2)
 
     return hpat_pandas_series_iat_impl
 
@@ -329,7 +326,7 @@ def hpat_pandas_series_at(self):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     def hpat_pandas_series_at_impl(self):
-        return sdc.hiframes.api.init_series_at(self)
+        return sdc.datatypes.hpat_pandas_getitem_types.series_getitem_selector_init(self, 4)
 
     return hpat_pandas_series_at_impl
 
