@@ -884,7 +884,7 @@ class HiFramesTypedPassImpl(object):
 
     def _run_call_series(self, assign, lhs, rhs, series_var, func_name):
         # single arg functions
-        if func_name in ('sum', 'count', 'mean', 'var', 'min', 'max'):
+        if func_name in ('sum', 'count', 'mean', 'var', 'max'):
             if rhs.args or rhs.kws:
                 raise ValueError("SDC pipeline does not support arguments for Series.{}()".format(func_name))
 
@@ -899,7 +899,7 @@ class HiFramesTypedPassImpl(object):
             return self._replace_func(func, [data], pre_nodes=nodes)
 
         if func_name in ('std', 'nunique', 'describe',
-                         'isnull', 'median', 'unique'):
+                         'isnull', 'unique'):
             if rhs.args or rhs.kws:
                 raise ValueError("unsupported Series.{}() arguments".format(
                     func_name))
