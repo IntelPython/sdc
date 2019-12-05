@@ -1784,6 +1784,86 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
         pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A))
 
+    def test_series_rename_str_noidx(self):
+        def test_impl(S):
+            return S.rename('Name')
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3])
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_str_idx(self):
+        def test_impl(S):
+            return S.rename('Name')
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'])
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_no_name_str_noidx(self):
+        def test_impl(S):
+            return S.rename()
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_no_name_str_idx(self):
+        def test_impl(S):
+            return S.rename()
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_str_noidx_no_copy(self):
+        def test_impl(S):
+            return S.rename('Another Name', copy=False)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_str_idx_no_copy(self):
+        def test_impl(S):
+            return S.rename('Another Name', copy=False)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_int_noidx(self):
+        def test_impl(S):
+            return S.rename(1)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_int_idx(self):
+        def test_impl(S):
+            return S.rename(1)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_float_noidx(self):
+        def test_impl(S):
+            return S.rename(1.1)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_float_idx(self):
+        def test_impl(S):
+            return S.rename(1.1)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
     def test_series_sum_default(self):
         def test_impl(S):
             return S.sum()
