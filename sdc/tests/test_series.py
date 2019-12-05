@@ -3956,6 +3956,7 @@ class TestSeries(TestCase):
             cfunc(series, axis=None, level=None, numeric_only=True)
         self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
 
+
     def test_series_nunique(self):
         def test_series_nunique_impl(S):
             return S.nunique()
