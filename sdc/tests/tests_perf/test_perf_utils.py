@@ -264,7 +264,7 @@ class TestResults:
     logger = setup_logging()
 
     def __init__(self, drivers=None):
-        self.drivers = drivers
+        self.drivers = drivers or []
         self.default_driver = drivers[0] if drivers else None
 
     @property
