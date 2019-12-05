@@ -1410,6 +1410,8 @@ def sdc_nopython_pipeline_lite_register(state, name='nopython'):
 
     numba_pass_manager.add_pass_after(SDC_Pandas_DataFrame_TransformationPass_Stage2, sdc.hiframes.dataframe_pass.DataFramePass)
 
+    numba_pass_manager.add_pass_after(sdc.distributed.DistributedPass, numba.typed_passes.InlineOverloads)
+
     numba_pass_manager.finalize()
 
     return numba_pass_manager
