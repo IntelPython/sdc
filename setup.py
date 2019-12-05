@@ -423,7 +423,9 @@ setup(name='sdc',
       ext_modules=_ext_mods,
       entry_points={
           "numba_extensions": [
-              "init = sdc:_init_extension",
+            #   "init = sdc.numba_extension:_init_extension",
+            #   "init = sdc:_init_extension",
+              "init = numba_sdc:_init_extension",
           ],
       },
 )
