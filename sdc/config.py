@@ -67,8 +67,3 @@ numba_compiler_define_nopython_pipeline_orig = None
 '''
 Default value for a pointer intended to use as Numba.DefaultPassBuilder.define_nopython_pipeline() in overloaded function
 '''
-
-use_default_dataframe = distutils_util.strtobool(os.getenv('SDC_CONFIG_USE_DEFAULT_DATAFRAME', 'True'))
-'''
-Config variable used to select DataFrameType model (default is legacy model)
-'''
