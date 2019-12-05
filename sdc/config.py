@@ -63,6 +63,11 @@ config_pipeline_hpat_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_PI
 Default value used to select compiler pipeline in a function decorator
 '''
 
+if not config_pipeline_hpat_default:
+    # avoid using MPI transport if no SDC compiler pipeline used
+    config_transport_mpi_default = False
+    config_transport_mpi = config_transport_mpi_default
+
 numba_compiler_define_nopython_pipeline_orig = None
 '''
 Default value for a pointer intended to use as Numba.DefaultPassBuilder.define_nopython_pipeline() in overloaded function
