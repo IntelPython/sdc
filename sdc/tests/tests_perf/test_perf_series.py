@@ -35,7 +35,7 @@ import pandas
 import sdc
 
 from .test_perf_base import TestBase
-from sdc.tests.test_utils import test_global_input_data_float64, test_global_input_data_float_finite
+from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 
 def usecase_series_min(input_data):
@@ -250,7 +250,15 @@ def usecase_series_fillna(input_data):
     return res_time, res
 
 
-  
+def usecase_series_isna(input_data):
+    start_time = time.time()
+    res = input_data.isna()
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods
 class TestSeriesMethods(TestBase):
     @classmethod
@@ -282,7 +290,8 @@ class TestSeriesMethods(TestBase):
             'series_dropna': [2 * 10 ** 8],
             'series_chain_add_and_sum': [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7],
             'series_astype_int': [2 * 10 ** 7],
-            'usecase_series_fillna': [2 * 10 ** 7],
+            'series_fillna': [2 * 10 ** 7],
+            'series_isna': [2 * 10 ** 7],
         }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
@@ -421,4 +430,7 @@ class TestSeriesMethods(TestBase):
         self._test_case(usecase_series_astype_int, 'series_astype_int', input_data=[test_global_input_data_float64[0]])
 
     def test_series_float_fillna(self):
-        self._test_case(usecase_series_fillna, 'usecase_series_fillna')
+        self._test_case(usecase_series_fillna, 'series_fillna')
+
+    def test_series_float_isna(self):
+        self._test_case(usecase_series_fillna, 'series_isna')
