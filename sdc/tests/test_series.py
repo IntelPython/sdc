@@ -34,9 +34,10 @@ import numpy as np
 import pyarrow.parquet as pq
 import sdc
 from itertools import islice, permutations
+from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end,
-    skip_numba_jit, skip_sdc_jit, TestCase)
+    skip_numba_jit, skip_sdc_jit)
 from sdc.tests.gen_test_data import ParquetGenerator
 from numba import types
 from numba.config import IS_32BITS
@@ -501,7 +502,6 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
-    @skip_numba_jit
     def test_series_attr7(self):
         def test_impl(A):
             return A.astype(np.float64)
@@ -623,7 +623,7 @@ class TestSeries(TestCase):
     @skip_sdc_jit('Series.corr() parameter "min_periods" unsupported')
     def test_series_corr_unsupported_period(self):
         def test_series_corr_impl(S1, S2, min_periods=None):
-            return S1.corr(S2, min_periods)
+            return S1.corr(S2, min_periods=min_periods)
 
         hpat_func = self.jit(test_series_corr_impl)
         S1 = pd.Series([.2, .0, .6, .2])
@@ -639,7 +639,6 @@ class TestSeries(TestCase):
         msg = 'Method corr(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
-    @skip_numba_jit
     def test_series_astype_int_to_str1(self):
         '''Verifies Series.astype implementation with function 'str' as argument
            converts integer series to series of strings
@@ -652,7 +651,6 @@ class TestSeries(TestCase):
         S = pd.Series(np.arange(n))
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_astype_int_to_str2(self):
         '''Verifies Series.astype implementation with a string literal dtype argument
            converts integer series to series of strings
@@ -665,7 +663,6 @@ class TestSeries(TestCase):
         S = pd.Series(np.arange(n))
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_astype_str_to_str1(self):
         '''Verifies Series.astype implementation with function 'str' as argument
            handles string series not changing it
@@ -677,7 +674,6 @@ class TestSeries(TestCase):
         S = pd.Series(['aa', 'bb', 'cc'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_astype_str_to_str2(self):
         '''Verifies Series.astype implementation with a string literal dtype argument
            handles string series not changing it
@@ -689,7 +685,6 @@ class TestSeries(TestCase):
         S = pd.Series(['aa', 'bb', 'cc'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_astype_str_to_str_index_str(self):
         '''Verifies Series.astype implementation with function 'str' as argument
            handles string series not changing it
@@ -703,7 +698,6 @@ class TestSeries(TestCase):
         S = pd.Series(['aa', 'bb', 'cc'], index=['d', 'e', 'f'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_astype_str_to_str_index_int(self):
         '''Verifies Series.astype implementation with function 'str' as argument
            handles string series not changing it
@@ -748,7 +742,6 @@ class TestSeries(TestCase):
         S = pd.Series(np.arange(n))
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_astype_int32_to_int64(self):
         '''Verifies Series.astype implementation with NumPy dtype argument
            converts series with dtype=int32 to series with dtype=int64
@@ -761,7 +754,6 @@ class TestSeries(TestCase):
         S = pd.Series(np.arange(n), dtype=np.int32)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_astype_int_to_float64(self):
         '''Verifies Series.astype implementation with NumPy dtype argument
            converts integer series to series of float
@@ -774,7 +766,6 @@ class TestSeries(TestCase):
         S = pd.Series(np.arange(n))
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_astype_float_to_int32(self):
         '''Verifies Series.astype implementation with NumPy dtype argument
            converts float series to series of integers
@@ -826,7 +817,6 @@ class TestSeries(TestCase):
         S = pd.Series(['3.24', '1E+05', '-1', '-1.3E-01', 'nan', 'inf'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_astype_str_index_str(self):
         '''Verifies Series.astype implementation with function 'str' as argument
            handles string series not changing it
@@ -839,7 +829,6 @@ class TestSeries(TestCase):
         S = pd.Series(['aa', 'bb', 'cc'], index=['a', 'b', 'c'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_astype_str_index_int(self):
         '''Verifies Series.astype implementation with function 'str' as argument
            handles string series not changing it
@@ -1080,7 +1069,6 @@ class TestSeries(TestCase):
                 df = pd.DataFrame({'A': np.arange(1, n)})
             pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1), check_names=False)
 
-    @skip_numba_jit
     def test_series_op3(self):
         arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
 
@@ -1092,7 +1080,6 @@ class TestSeries(TestCase):
             df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
             pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
 
-    @skip_numba_jit
     def test_series_op4(self):
         arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
 
@@ -1321,7 +1308,6 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         np.testing.assert_array_equal(hpat_func(df.A, 1), test_impl(df.A, 1))
 
-    @skip_numba_jit
     def test_list_convert(self):
         def test_impl():
             df = pd.DataFrame({'one': np.array([-1, np.nan, 2.5]),
@@ -1483,7 +1469,6 @@ class TestSeries(TestCase):
         self.assertIsNone(test_impl(S2))
         pd.testing.assert_series_equal(S1, S2)
 
-    @skip_numba_jit
     def test_series_fillna_float_inplace3(self):
         '''Verifies Series.fillna() implementation correcly handles omitted inplace argument as default False'''
         def test_impl(S):
@@ -1495,7 +1480,6 @@ class TestSeries(TestCase):
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S1))
         pd.testing.assert_series_equal(S1, S2)
 
-    @skip_numba_jit
     def test_series_fillna_inplace_non_literal(self):
         '''Verifies Series.fillna() implementation handles only Boolean literals as inplace argument'''
         def test_impl(S, param):
@@ -1571,7 +1555,6 @@ class TestSeries(TestCase):
         S = pd.Series([pd.NaT, pd.Timestamp('1970-12-01'), pd.Timestamp('2012-07-25')])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_fillna_bool_no_index1(self):
         '''Verifies Series.fillna() implementation for bool series with default index'''
         def test_impl(S):
@@ -1766,7 +1749,6 @@ class TestSeries(TestCase):
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
-    @skip_numba_jit
     def test_series_dropna_bool_no_index1(self):
         '''Verifies Series.dropna() implementation for bool series with default index'''
         def test_impl(S):
@@ -1881,7 +1863,6 @@ class TestSeries(TestCase):
         S = pd.Series([np.nan, 2, 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_count1(self):
         def test_impl(S):
             return S.count()
@@ -1949,7 +1930,6 @@ class TestSeries(TestCase):
                 else:
                     self.assertEqual(actual, expected)
 
-    @skip_numba_jit
     def test_series_var1(self):
         def test_impl(S):
             return S.var()
@@ -2338,7 +2318,6 @@ class TestSeries(TestCase):
         S = pd.Series([np.nan, -2., 3., 0.5E-01, 0xFF, 0o7, 0b101])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_cov1(self):
         def test_impl(S1, S2):
             return S1.cov(S2)
@@ -2368,7 +2347,8 @@ class TestSeries(TestCase):
             return S.str.len()
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series(['aa', 'abc', 'c', 'cccd'])
+        # TODO: fix issue occurred if name is not assigned
+        S = pd.Series(['aa', 'abc', 'c', 'cccd'], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @skip_numba_jit
@@ -2399,7 +2379,7 @@ class TestSeries(TestCase):
                           '  return S.str.{}()'.format(method)]
             func_text = '\n'.join(func_lines)
             test_impl = _make_func_from_text(func_text)
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
 
             S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'])
             # TypingError with expected message is raised internally by Numba
@@ -2824,7 +2804,6 @@ class TestSeries(TestCase):
         S = pd.Series([pd.NaT, pd.Timestamp('1970-12-01'), pd.Timestamp('2012-07-25')])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_nlargest(self):
         def test_impl():
             series = pd.Series([1., np.nan, -1., 0., min_float64, max_float64])
@@ -2836,7 +2815,6 @@ class TestSeries(TestCase):
         else:
             pd.testing.assert_series_equal(test_impl(), hpat_func())
 
-    @skip_numba_jit
     def test_series_nlargest_unboxing(self):
         def test_impl(series, n):
             return series.nlargest(n)
@@ -2884,7 +2862,6 @@ class TestSeries(TestCase):
                 jit_result = hpat_func(series, n, keep)
                 pd.testing.assert_series_equal(ref_result, jit_result)
 
-    @skip_numba_jit
     def test_series_nlargest_index(self):
         def test_impl(series, n):
             return series.nlargest(n)
@@ -2949,7 +2926,6 @@ class TestSeries(TestCase):
             hpat_func(series, n=5, keep='last')
         self.assertIn(msg, str(raises.exception))
 
-    @skip_numba_jit
     def test_series_nsmallest(self):
         def test_impl():
             series = pd.Series([1., np.nan, -1., 0., min_float64, max_float64])
@@ -2961,7 +2937,6 @@ class TestSeries(TestCase):
         else:
             pd.testing.assert_series_equal(test_impl(), hpat_func())
 
-    @skip_numba_jit
     def test_series_nsmallest_unboxing(self):
         def test_impl(series, n):
             return series.nsmallest(n)
@@ -3009,7 +2984,6 @@ class TestSeries(TestCase):
                 jit_result = hpat_func(series, n, keep)
                 pd.testing.assert_series_equal(ref_result, jit_result)
 
-    @skip_numba_jit
     def test_series_nsmallest_index(self):
         def test_impl(series, n):
             return series.nsmallest(n)
@@ -3074,7 +3048,6 @@ class TestSeries(TestCase):
             hpat_func(series, n=5, keep='last')
         self.assertIn(msg, str(raises.exception))
 
-    @skip_numba_jit
     def test_series_head1(self):
         def test_impl(S):
             return S.head(4)
@@ -3085,7 +3058,6 @@ class TestSeries(TestCase):
         S = pd.Series(np.random.randint(-30, 30, m))
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_head_default1(self):
         '''Verifies default head method for non-distributed pass of Series with no index'''
         def test_impl(S):
@@ -3097,7 +3069,6 @@ class TestSeries(TestCase):
         S = pd.Series(np.random.randint(-30, 30, m))
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_head_index1(self):
         '''Verifies head method for Series with integer index created inside jitted function'''
         def test_impl():
@@ -3107,7 +3078,6 @@ class TestSeries(TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
-    @skip_numba_jit
     def test_series_head_index2(self):
         '''Verifies head method for Series with string index created inside jitted function'''
         def test_impl():
@@ -3117,7 +3087,6 @@ class TestSeries(TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
-    @skip_numba_jit
     def test_series_head_index3(self):
         '''Verifies head method for non-distributed pass of Series with integer index'''
         def test_impl(S):
@@ -3177,7 +3146,6 @@ class TestSeries(TestCase):
         pd.testing.assert_series_equal(hpat_func(S[start:end]), test_impl(S))
         self.assertTrue(count_array_OneDs() > 0)
 
-    @skip_numba_jit
     def test_series_head_noidx_float(self):
         def test_impl(S, n):
             return S.head(n)
@@ -3932,7 +3900,6 @@ class TestSeries(TestCase):
         result = hpat_func()
         np.testing.assert_array_equal(result, ref_result)
 
-    @skip_numba_jit
     def test_series_std(self):
         def pyfunc():
             series = pd.Series([1.0, np.nan, -1.0, 0.0, 5e-324])
@@ -3989,7 +3956,7 @@ class TestSeries(TestCase):
             cfunc(series, axis=None, level=None, numeric_only=True)
         self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
 
-    @skip_numba_jit
+
     def test_series_nunique(self):
         def test_series_nunique_impl(S):
             return S.nunique()
@@ -4046,7 +4013,6 @@ class TestSeries(TestCase):
                     result_param1 = hpat_func_param1(S, param1)
                     self.assertEqual(result_param1, result_param1_ref)
 
-    @skip_numba_jit
     def test_series_var(self):
         def pyfunc():
             series = pd.Series([1.0, np.nan, -1.0, 0.0, 5e-324])
@@ -4276,7 +4242,7 @@ class TestSeries(TestCase):
         def test_series_pct_change_impl(S, periods, method):
             return S.pct_change(periods=periods, fill_method=method, limit=None, freq=None)
 
-        hpat_func = sdc.jit(test_series_pct_change_impl)
+        hpat_func = self.jit(test_series_pct_change_impl)
         test_input_data = [
             [],
             [np.nan, np.nan, np.nan],
@@ -4299,7 +4265,7 @@ class TestSeries(TestCase):
         def test_series_pct_change_impl(S):
             return S.pct_change(periods=1, fill_method='pad', limit=None, freq=None)
 
-        hpat_func = sdc.jit(test_series_pct_change_impl)
+        hpat_func = self.jit(test_series_pct_change_impl)
         S = pd.Series(test_global_input_data_unicode_kind4)
 
         with self.assertRaises(TypingError) as raises:
@@ -4312,7 +4278,7 @@ class TestSeries(TestCase):
         def test_series_pct_change_impl(S, periods=1, fill_method='pad', limit=None, freq=None):
             return S.pct_change(periods=periods, fill_method=fill_method, limit=limit, freq=freq)
 
-        hpat_func = sdc.jit(test_series_pct_change_impl)
+        hpat_func = self.jit(test_series_pct_change_impl)
         S = pd.Series([0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf])
         with self.assertRaises(ValueError) as raises:
             hpat_func(S, fill_method='ababa')

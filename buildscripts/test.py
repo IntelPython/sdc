@@ -54,11 +54,12 @@ if __name__ == '__main__':
 
     # Parse input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--test-mode', default='conda', choices=['conda', 'package', 'develop'],
+    parser.add_argument('--test-mode', default='conda', choices=['conda', 'package', 'develop', 'benchmark'],
                         help="""Test mode:
                         conda:   use conda-build to run tests (default and valid for conda package-type)
                         package: create test environment, install package there and run tests
-                        develop: run tests for sdc package already installed in develop mode""")
+                        develop: run tests for sdc package already installed in develop mode
+                        benchmark: run benchmark tests for sdc""")
     parser.add_argument('--package-type', default='conda', choices=['conda', 'wheel'],
                         help='Package to test: conda or wheel, default = conda')
     parser.add_argument('--python', default='3.7', choices=['3.6', '3.7', '3.8'],
@@ -75,6 +76,8 @@ if __name__ == '__main__':
     parser.add_argument('--use-numba-master', action='store_true',
                         help=f'Test with Numba master from {numba_master_channel}')
     parser.add_argument('--channel-list', default=None, help='List of channels to use: "-c <channel> -c <channel>"')
+    parser.add_argument('--benchmark-argv', default='sdc.tests.tests_perf',
+                        help='Run performance testing for all or a sigle one"')
 
     args = parser.parse_args()
 
@@ -87,6 +90,7 @@ if __name__ == '__main__':
     run_coverage = args.run_coverage
     channel_list = args.channel_list
     use_numba_master = args.use_numba_master
+    benchmark_argv = args.benchmark_argv
     numba_channel = numba_master_channel if use_numba_master is True else args.numba_channel
     assert conda_prefix is not None, 'CONDA_PREFIX is not defined; Please use --conda-prefix option or activate your conda'
 
@@ -188,3 +192,14 @@ if __name__ == '__main__':
                 run_command(f'{test_env_activate} && {test_script}')
 
         format_print(f'Tests for {package_type} packages are PASSED')
+
+    # Benchmark tests
+    if test_mode == 'benchmark':
+        os.chdir(os.path.dirname(sdc_src))
+        sdc_packages = get_sdc_build_packages(build_folder)
+        for package in sdc_packages:
+            if '.tar.bz2' in package and package_type == 'conda':
+                format_print(f'Run benchmark tests for sdc conda package: {package}')
+                create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['openpyxl'], conda_channels)
+                run_command(f'{test_env_activate} && conda install -y {package}')
+                run_command(f'{test_env_activate} && python -W ignore -m sdc.runtests {benchmark_argv}')
