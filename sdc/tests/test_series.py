@@ -1771,12 +1771,7 @@ class TestSeries(TestCase):
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
-    @unittest.skip('numba.errors.TypingError - fix needed\n'
-                   'Failed in hpat mode pipeline'
-                   '(step: convert to distributed)\n'
-                   'Invalid use of Function(<built-in function len>)'
-                   'with argument(s) of type(s): (none)\n')
-    def test_series_rename1(self):
+    def test_series_rename_str_df_noidx(self):
         def test_impl(A):
             return A.rename('B')
         hpat_func = self.jit(test_impl)
@@ -1832,6 +1827,8 @@ class TestSeries(TestCase):
         S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
         pd.testing.assert_series_equal(jit_func(S), test_impl(S))
 
+    @skip_sdc_jit("Requires full scalar types (not only str) support as Series name")
+    @skip_numba_jit("Requires full scalar types (not only str) support as Series name")
     def test_series_rename_int_noidx(self):
         def test_impl(S):
             return S.rename(1)
@@ -1840,6 +1837,8 @@ class TestSeries(TestCase):
         S = pd.Series([1, 2, 3], name='Name')
         pd.testing.assert_series_equal(jit_func(S), test_impl(S))
 
+    @skip_sdc_jit("Requires full scalar types (not only str) support as Series name")
+    @skip_numba_jit("Requires full scalar types (not only str) support as Series name")
     def test_series_rename_int_idx(self):
         def test_impl(S):
             return S.rename(1)
@@ -1848,6 +1847,8 @@ class TestSeries(TestCase):
         S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
         pd.testing.assert_series_equal(jit_func(S), test_impl(S))
 
+    @skip_sdc_jit("Requires full scalar types (not only str) support as Series name")
+    @skip_numba_jit("Requires full scalar types (not only str) support as Series name")
     def test_series_rename_float_noidx(self):
         def test_impl(S):
             return S.rename(1.1)
@@ -1856,6 +1857,8 @@ class TestSeries(TestCase):
         S = pd.Series([1, 2, 3], name='Name')
         pd.testing.assert_series_equal(jit_func(S), test_impl(S))
 
+    @skip_sdc_jit("Requires full scalar types (not only str) support as Series name")
+    @skip_numba_jit("Requires full scalar types (not only str) support as Series name")
     def test_series_rename_float_idx(self):
         def test_impl(S):
             return S.rename(1.1)
