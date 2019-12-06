@@ -51,7 +51,8 @@ class StringMethodsType(types.IterableType):
 
     def __init__(self, data):
         self.data = data
-        super(StringMethodsType, self).__init__('StringMethodsType')
+        name = 'StringMethodsType({})'.format(self.data)
+        super(StringMethodsType, self).__init__(name)
 
     @property
     def iterator_type(self):

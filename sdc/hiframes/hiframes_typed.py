@@ -65,9 +65,10 @@ from sdc.hiframes.pd_index_ext import DatetimeIndexType
 from sdc.hiframes.rolling import get_rolling_setup_args
 from sdc.hiframes.aggregate import Aggregate
 from sdc.hiframes.series_kernels import series_replace_funcs
-from sdc.hiframes.split_impl import (string_array_split_view_type,
-                                      StringArraySplitViewType, getitem_c_arr, get_array_ctypes_ptr,
-                                      get_split_view_index, get_split_view_data_ptr)
+from sdc.hiframes.split_impl import (SplitViewStringMethodsType,
+                                     string_array_split_view_type, StringArraySplitViewType,
+                                     getitem_c_arr, get_array_ctypes_ptr,
+                                     get_split_view_index, get_split_view_data_ptr)
 
 
 _dt_index_binops = ('==', '!=', '>=', '>', '<=', '<', '-',
@@ -480,7 +481,8 @@ class HiFramesTypedPassImpl(object):
         else:
             func_name, func_mod = fdef
 
-        if (isinstance(func_mod, ir.Var) and isinstance(self.state.typemap[func_mod.name], StringMethodsType)):
+        string_methods_types = (SplitViewStringMethodsType, StringMethodsType)
+        if isinstance(func_mod, ir.Var) and isinstance(self.state.typemap[func_mod.name], string_methods_types):
             f_def = guard(get_definition, self.state.func_ir, rhs.func)
             str_def = guard(get_definition, self.state.func_ir, f_def.value)
             if str_def is None:  # TODO: check for errors

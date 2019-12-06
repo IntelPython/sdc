@@ -147,7 +147,8 @@ class SplitViewStringMethodsType(types.IterableType):
 
     def __init__(self, data):
         self.data = data
-        super(SplitViewStringMethodsType, self).__init__('SplitViewStringMethodsType')
+        name = 'SplitViewStringMethodsType({})'.format(self.data)
+        super(SplitViewStringMethodsType, self).__init__(name)
 
     @property
     def iterator_type(self):
@@ -467,9 +468,8 @@ def hpat_pandas_spliview_stringmethods_len(self):
     """
 
     if not isinstance(self, SplitViewStringMethodsType):
-        raise TypingError(
-            'Method len(). The object must be a pandas.core.strings. Given: {}'.format(
-                self))
+        msg = 'Method len(). The object must be a pandas.core.strings. Given: {}'
+        raise TypingError(msg.format(self))
 
     def hpat_pandas_spliview_stringmethods_len_impl(self):
         item_count = len(self._data)

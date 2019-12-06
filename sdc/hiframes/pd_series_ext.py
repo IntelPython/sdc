@@ -57,7 +57,9 @@ from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype, CategoricalArray)
 from sdc.hiframes.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type)
 from sdc.hiframes.rolling import supported_rolling_funcs
-from sdc.hiframes.split_impl import (string_array_split_view_type, GetItemStringArraySplitView)
+from sdc.hiframes.split_impl import (SplitViewStringMethodsType,
+                                     string_array_split_view_type,
+                                     GetItemStringArraySplitView)
 from sdc.str_arr_ext import (
     string_array_type,
     iternext_str_array,
@@ -780,9 +782,9 @@ class SeriesStrMethodAttribute(AttributeTemplate):
     def resolve_contains(self, ary, args, kws):
         return signature(SeriesType(types.bool_), *args)
 
-    @bound_function("strmethod.len")
-    def resolve_len(self, ary, args, kws):
-        return signature(SeriesType(types.int64), *args)
+    # @bound_function("strmethod.len")
+    # def resolve_len(self, ary, args, kws):
+    #     return signature(SeriesType(types.int64), *args)
 
     @bound_function("strmethod.replace")
     def resolve_replace(self, ary, args, kws):
@@ -818,6 +820,16 @@ class SeriesStrMethodAttribute(AttributeTemplate):
             return
 
         raise NotImplementedError('Series.str.{} is not supported yet'.format(func_name))
+
+
+@infer_getattr
+class SplitViewSeriesStrMethodAttribute(AttributeTemplate):
+    key = SplitViewStringMethodsType
+
+    @bound_function('strmethod.get')
+    def resolve_get(self, ary, args, kws):
+        # XXX only list(list(str)) supported
+        return signature(SeriesType(string_type), *args)
 
 
 class SeriesDtMethodType(types.Type):
