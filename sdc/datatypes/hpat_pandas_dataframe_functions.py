@@ -61,6 +61,7 @@ def sdc_pandas_dataframe_reduce_columns(df, name, params):
     func_lines.append('  return hpat.hiframes.api.init_series(data, index)')
     loc_vars = {}
     func_text = '\n'.join(func_lines)
+    print(func_text)
 
     exec(func_text, {'hpat': sdc, 'np': numpy}, loc_vars)
     _reduce_impl = loc_vars['_reduce_impl']
@@ -278,165 +279,165 @@ def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
-    @overload_method(DataFrameType, 'min')
-    def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
-        """
-           Pandas DataFrame method :meth:`pandas.DataFrame.min` implementation.
+@overload_method(DataFrameType, 'min')
+def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
+    """
+       Pandas DataFrame method :meth:`pandas.DataFrame.min` implementation.
 
-           .. only:: developer
+       .. only:: developer
 
-               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_min1
-               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_min
+           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_min1
+           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_min
 
-           Parameters
-           -----------
-           self: :class:`pandas.DataFrame`
-               input arg
-           axis:
-                *unsupported*
-           skipna:
-               *unsupported*
-           level:
-               *unsupported*
-           numeric_only:
-               *unsupported*
+       Parameters
+       -----------
+       self: :class:`pandas.DataFrame`
+           input arg
+       axis:
+            *unsupported*
+       skipna:
+           *unsupported*
+       level:
+           *unsupported*
+       numeric_only:
+           *unsupported*
 
-           Returns
-           -------
-           :obj:`pandas.Series` or `pandas.DataFrame`
-                   returns: the minimum of the values for the requested axis.
-           """
+       Returns
+       -------
+       :obj:`pandas.Series` or `pandas.DataFrame`
+               returns: the minimum of the values for the requested axis.
+       """
 
-        name = 'min'
+    name = 'min'
 
-        check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
+    check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-        params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only)]
+    params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only)]
 
-        return sdc_pandas_dataframe_reduce_columns(df, name, params)
+    return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
-    @overload_method(DataFrameType, 'sum')
-    def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
-        """
-           Pandas DataFrame method :meth:`pandas.DataFrame.sum` implementation.
+@overload_method(DataFrameType, 'sum')
+def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
+    """
+       Pandas DataFrame method :meth:`pandas.DataFrame.sum` implementation.
 
-           .. only:: developer
+       .. only:: developer
 
-               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_sum1
-               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_sum
+           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_sum1
+           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_sum
 
-           Parameters
-           -----------
-           self: :class:`pandas.DataFrame`
-               input arg
-           axis:
-                *unsupported*
-           skipna:
-               *unsupported*
-           level:
-               *unsupported*
-           numeric_only:
-               *unsupported*
-           min_count:
-                *unsupported*
+       Parameters
+       -----------
+       self: :class:`pandas.DataFrame`
+           input arg
+       axis:
+            *unsupported*
+       skipna:
+           *unsupported*
+       level:
+           *unsupported*
+       numeric_only:
+           *unsupported*
+       min_count:
+            *unsupported*
 
-           Returns
-           -------
-           :obj:`pandas.Series` or `pandas.DataFrame`
-                   return the sum of the values for the requested axis.
-           """
+       Returns
+       -------
+       :obj:`pandas.Series` or `pandas.DataFrame`
+               return the sum of the values for the requested axis.
+       """
 
-        name = 'sum'
+    name = 'sum'
 
-        check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
+    check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
 
-        params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only),
-                  ('min_count', min_count)]
+    params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only),
+              ('min_count', min_count)]
 
-        return sdc_pandas_dataframe_reduce_columns(df, name, params)
+    return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
-    @overload_method(DataFrameType, 'prod')
-    def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
-        """
-           Pandas DataFrame method :meth:`pandas.DataFrame.prod` implementation.
+@overload_method(DataFrameType, 'prod')
+def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
+    """
+       Pandas DataFrame method :meth:`pandas.DataFrame.prod` implementation.
 
-           .. only:: developer
+       .. only:: developer
 
-               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_prod1
-               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_prod
+           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_prod1
+           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_prod
 
-           Parameters
-           -----------
-           self: :class:`pandas.DataFrame`
-               input arg
-           axis:
-                *unsupported*
-           skipna:
-               *unsupported*
-           level:
-               *unsupported*
-           numeric_only:
-               *unsupported*
-           min_count:
-                *unsupported*
+       Parameters
+       -----------
+       self: :class:`pandas.DataFrame`
+           input arg
+       axis:
+            *unsupported*
+       skipna:
+           *unsupported*
+       level:
+           *unsupported*
+       numeric_only:
+           *unsupported*
+       min_count:
+            *unsupported*
 
-           Returns
-           -------
-           :obj:`pandas.Series` or `pandas.DataFrame`
-                   return the product of the values for the requested axis.
-           """
+       Returns
+       -------
+       :obj:`pandas.Series` or `pandas.DataFrame`
+               return the product of the values for the requested axis.
+       """
 
-        name = 'prod'
+    name = 'prod'
 
-        check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
+    check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
 
-        params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only),
-                  ('min_count', min_count)]
+    params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only),
+              ('min_count', min_count)]
 
-        return sdc_pandas_dataframe_reduce_columns(df, name, params)
+    return sdc_pandas_dataframe_reduce_columns(df, name, params)
 
 
-    @overload_method(DataFrameType, 'count')
-    def count_overload(df, axis=0, level=None, numeric_only=False):
-        """
-           Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.
+@overload_method(DataFrameType, 'count')
+def count_overload(df, axis=0, level=None, numeric_only=False):
+    """
+       Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.
 
-           .. only:: developer
+       .. only:: developer
 
-               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count
-               Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count1
+           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count
+           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count1
 
-           Parameters
-           -----------
-           self: :class:`pandas.DataFrame`
-               input arg
-           axis:
-                *unsupported*
-           level:
-               *unsupported*
-           numeric_only:
-               *unsupported*
+       Parameters
+       -----------
+       self: :class:`pandas.DataFrame`
+           input arg
+       axis:
+            *unsupported*
+       level:
+           *unsupported*
+       numeric_only:
+           *unsupported*
 
-           Returns
-           -------
-           :obj:`pandas.Series` or `pandas.DataFrame`
-                   for each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
-           """
+       Returns
+       -------
+       :obj:`pandas.Series` or `pandas.DataFrame`
+               for each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
+       """
 
-        name = 'count'
+    name = 'count'
 
-        ty_checker = TypeChecker('Method {}().'.format(name))
-        ty_checker.check(df, DataFrameType)
+    ty_checker = TypeChecker('Method {}().'.format(name))
+    ty_checker.check(df, DataFrameType)
 
-        if not (isinstance(axis, types.Omitted) or axis == 0):
-            ty_checker.raise_exc(axis, 'unsupported', 'axis')
+    if not (isinstance(axis, types.Omitted) or axis == 0):
+        ty_checker.raise_exc(axis, 'unsupported', 'axis')
 
-        if not (isinstance(level, types.Omitted) or level is None):
-            ty_checker.raise_exc(level, 'unsupported', 'level')
+    if not (isinstance(level, types.Omitted) or level is None):
+        ty_checker.raise_exc(level, 'unsupported', 'level')
 
-        if not (isinstance(numeric_only, types.Omitted) or numeric_only is False):
-            ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
+    if not (isinstance(numeric_only, types.Omitted) or numeric_only is False):
+        ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-        params = [('axis', None), ('level', None), ('numeric_only', numeric_only)]
+    params = [('axis', None), ('level', None), ('numeric_only', numeric_only)]
 
-        return sdc_pandas_dataframe_reduce_columns(df, name, params)
+    return sdc_pandas_dataframe_reduce_columns(df, name, params)
