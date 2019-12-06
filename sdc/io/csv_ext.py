@@ -25,6 +25,8 @@
 # *****************************************************************************
 
 
+import functools
+
 import llvmlite.binding as ll
 from llvmlite import ir as lir
 from .. import hio
@@ -413,6 +415,7 @@ class pyarrow_cpu_count(object):
 
 def pyarrow_cpu_count_equal_numba_num_treads(func):
     """Decorator. Set pyarrow cpu_count the same as NUMBA_NUM_THREADS."""
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         with pyarrow_cpu_count(numba.config.NUMBA_NUM_THREADS):
             return func(*args, **kwargs)
