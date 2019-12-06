@@ -182,7 +182,8 @@ def hpat_pandas_series_setitem(self, idx, value):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     if not isinstance(self.dtype, type(value)):
-        raise TypingError('{} Value must be one type with series. Given: {}, self.dtype={}'.format(_func_name, value, self.dtype))
+        raise TypingError('{} Value must be one type with series. Given: {}, self.dtype={}'.format(_func_name,
+                                                                                                   value, self.dtype))
 
     if isinstance(idx, types.Integer) or isinstance(idx, types.SliceType):
         def hpat_pandas_series_setitem_idx_integer_impl(self, idx, value):
