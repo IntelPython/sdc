@@ -47,7 +47,7 @@ from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars, string_array_type,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na)
-from sdc.utils import to_array, sdc_overload_method
+from sdc.utils import to_array, sdc_overload, sdc_overload_method
 
 
 @overload(operator.getitem)
@@ -748,7 +748,7 @@ def hpat_pandas_series_T(self):
     return hpat_pandas_series_T_impl
 
 
-@overload(len)
+@sdc_overload(len)
 def hpat_pandas_series_len(self):
     """
     Pandas Series operator :func:`len` implementation
