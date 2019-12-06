@@ -969,7 +969,7 @@ class TestSeries(TestCase):
         test_impl(A2)
         pd.testing.assert_series_equal(A1, A2)
 
-    @unittest.skip('Getitem returns Series')
+    @unittest.skip('cannot assign slice from input of different size')
     def test_setitem_series_bool2(self):
         def test_impl(A, B):
             A[A > 3] = B[A > 3]
@@ -991,7 +991,6 @@ class TestSeries(TestCase):
         A = pd.Series([1, 3, 5], ['1', '4', '2'])
         self.assertEqual(hpat_func(A), test_impl(A))
 
-    @unittest.skip('Getitem for DF not implement')
     def test_getitem_series1(self):
         def test_impl(A, i):
             return A[i]
@@ -999,16 +998,15 @@ class TestSeries(TestCase):
 
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
-        self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
+        pd.testing.assert_series_equal(hpat_func(df.A, 0), pd.Series(test_impl(df.A, 0)))
 
-    @unittest.skip('Getitem for DF not implement')
     def test_getitem_series_str1(self):
         def test_impl(A, i):
             return A[i]
         hpat_func = self.jit(test_impl)
 
         df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
-        self.assertEqual(hpat_func(df.A, 0), test_impl(df.A, 0))
+        pd.testing.assert_series_equal(hpat_func(df.A, 0), pd.Series(test_impl(df.A, 0)))
 
     def test_series_iat1(self):
         def test_impl(A):
@@ -1353,7 +1351,7 @@ class TestSeries(TestCase):
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
         self.assertEqual(count_parfor_REPs(), 1)
 
-    @unittest.skip("Getitem return Series not implement")
+    @unittest.skip("Operator add not implement")
     def test_series_fusion2(self):
         # make sure getting data var avoids incorrect single def assumption
         def test_impl(A, B):

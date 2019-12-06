@@ -79,11 +79,6 @@ from sdc.hiframes.sort import (
     alloc_pre_shuffle_metadata)
 from sdc.hiframes.join import write_send_buff
 from sdc.hiframes.split_impl import string_array_split_view_type
-from sdc.hiframes.pd_series_ext import (
-    SeriesOperatorTypeIloc,
-    SeriesOperatorTypeLoc,
-    SeriesOperatorTypeIat,
-    SeriesOperatorTypeAt)
 from numba.errors import TypingError
 
 # XXX: used in agg func output to avoid mutating filter, agg, join, etc.
@@ -1315,81 +1310,6 @@ def lower_parse_datetimes_from_strings(context, builder, sig, args):
     # replaced in hiframes_typed pass
     res = make_array(sig.return_type)(context, builder)
     return impl_ret_borrowed(context, builder, sig.return_type, res._getvalue())
-
-
-@intrinsic
-def init_series_iloc(typingctx, series):
-
-    def codegen(context, builder, signature, args):
-        series_val, = args
-        if context.enable_nrt:
-            context.nrt.incref(builder, signature.args[0], series_val)
-
-        return series_val
-
-    dtype = series.dtype
-    ty_data = series.data
-    ty_index = series.index
-    ty_name = series.is_named
-    ret_typ = SeriesOperatorTypeIloc(dtype, ty_data, ty_index, ty_name)
-    sig = signature(ret_typ, series)
-    return sig, codegen
-
-
-@intrinsic
-def init_series_loc(typingctx, series):
-
-    def codegen(context, builder, signature, args):
-        series_val, = args
-        if context.enable_nrt:
-            context.nrt.incref(builder, signature.args[0], series_val)
-
-        return series_val
-
-    dtype = series.dtype
-    ty_data = series.data
-    ty_index = series.index
-    ty_name = series.is_named
-    ret_typ = SeriesOperatorTypeLoc(dtype, ty_data, ty_index, ty_name)
-    sig = signature(ret_typ, series)
-    return sig, codegen
-
-@intrinsic
-def init_series_iat(typingctx, series):
-
-    def codegen(context, builder, signature, args):
-        series_val, = args
-        if context.enable_nrt:
-            context.nrt.incref(builder, signature.args[0], series_val)
-
-        return series_val
-
-    dtype = series.dtype
-    ty_data = series.data
-    ty_index = series.index
-    ty_name = series.is_named
-    ret_typ = SeriesOperatorTypeIat(dtype, ty_data, ty_index, ty_name)
-    sig = signature(ret_typ, series)
-    return sig, codegen
-
-
-@intrinsic
-def init_series_at(typingctx, series):
-
-    def codegen(context, builder, signature, args):
-        series_val, = args
-        if context.enable_nrt:
-            context.nrt.incref(builder, signature.args[0], series_val)
-
-        return series_val
-
-    dtype = series.dtype
-    ty_data = series.data
-    ty_index = series.index
-    ty_name = series.is_named
-    ret_typ = SeriesOperatorTypeAt(dtype, ty_data, ty_index, ty_name)
-    sig = signature(ret_typ, series)
-    return sig, codegen
 
 
 @intrinsic

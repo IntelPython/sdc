@@ -33,48 +33,44 @@ from numba.datamodel import (register_default, StructModel)
 from numba.typing.templates import signature
 
 
-class SeriesGetitemSelectorType(types.IterableType):
-    def __init__(self, data, selector):
-        self.data = data
-        self.selector = selector
-        super(SeriesGetitemSelectorType, self).__init__('SeriesGetitemSelectorType')
+class SeriesGetitemAccessorType(types.IterableType):
+    def __init__(self, series, accessor):
+        self.series = series
+        self.accessor = accessor
+        super(SeriesGetitemAccessorType, self).__init__('SeriesGetitemAccessorType({}, {})\
+            '.format(series, accessor))
 
     @property
     def iterator_type(self):
         return None
 
 
-@register_model(SeriesGetitemSelectorType)
-class SeriesGetitemSelectorTypeModel(StructModel):
+@register_model(SeriesGetitemAccessorType)
+class SeriesGetitemAccessorTypeModel(StructModel):
     def __init__(self, dmm, fe_type):
-        selector_typ = types.uint64
         members = [
-            ('data', fe_type.data),
-            ('selector', selector_typ),
+            ('series', fe_type.series),
         ]
         models.StructModel.__init__(self, dmm, fe_type, members)
 
 
-make_attribute_wrapper(SeriesGetitemSelectorType, 'data', '_data')
-make_attribute_wrapper(SeriesGetitemSelectorType, 'selector', '_selector')
+make_attribute_wrapper(SeriesGetitemAccessorType, 'series', '_series')
 
 
 @intrinsic
-def series_getitem_selector_init(typingctx, data, selector=0):
-    def series_getitem_selector_init_codegen(context, builder, signature, args):
-        data_val, selector_val = args
-        getitem_selector = cgutils.create_struct_proxy(
+def series_getitem_accessor_init(typingctx, series, accessor):
+    def series_getitem_accessor_init_codegen(context, builder, signature, args):
+        series_val, accessor_val = args
+        getitem_accessor = cgutils.create_struct_proxy(
             signature.return_type)(context, builder)
-        getitem_selector.data = data_val
-        getitem_selector.selector = selector_val
+        getitem_accessor.series = series_val
 
         if context.enable_nrt:
-            context.nrt.incref(builder, signature.args[0], data_val)
-            context.nrt.incref(builder, signature.args[1], selector_val)
+            context.nrt.incref(builder, signature.args[0], series_val)
 
-        return getitem_selector._getvalue()
+        return getitem_accessor._getvalue()
 
-    ret_typ = SeriesGetitemSelectorType(data, selector)
-    sig = signature(ret_typ, data, selector)
+    ret_typ = SeriesGetitemAccessorType(series, accessor)
+    sig = signature(ret_typ, series, accessor)
 
-    return sig, series_getitem_selector_init_codegen
+    return sig, series_getitem_accessor_init_codegen

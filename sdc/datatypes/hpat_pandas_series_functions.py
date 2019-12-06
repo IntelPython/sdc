@@ -45,12 +45,11 @@ from numba.extending import intrinsic
 import sdc
 import sdc.datatypes.common_functions as common_functions
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
-from sdc.datatypes.hpat_pandas_getitem_types import SeriesGetitemSelectorType
-from sdc.hiframes.pd_series_ext import (
-    SeriesType, SeriesOperatorTypeIloc, SeriesOperatorTypeLoc,
-    SeriesOperatorTypeIat, SeriesOperatorTypeAt)
+from sdc.datatypes.hpat_pandas_getitem_types import SeriesGetitemAccessorType
+from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars)
 from sdc.utils import to_array
+
 
 class TypeChecker:
     """
@@ -102,6 +101,84 @@ class TypeChecker:
 
 
 @overload(operator.getitem)
+def hpat_pandas_series_accessor_getitem(self, idx):
+    """
+    Pandas Series operator :attr:`pandas.Series.get` implementation
+    **Algorithm**: result = series[idx]
+
+    **Test**: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_static_getitem_series1
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+           input series
+    idx: :obj:`int`, :obj:`slice` or :obj:`pandas.Series`
+        input index
+
+    Returns
+    -------
+    :class:`pandas.Series` or an element of the underneath type
+            object of :class:`pandas.Series`
+    """
+
+    _func_name = 'Operator getitem().'
+
+    if not isinstance(self, SeriesGetitemAccessorType):
+        return None
+
+    accessor = self.accessor.literal_value
+
+    if accessor == 'iloc':
+        if isinstance(idx, types.SliceType):
+            def hpat_pandas_series_iloc_slice_impl(self, idx):
+                return pandas.Series(self._series._data[idx])
+
+            return hpat_pandas_series_iloc_slice_impl
+
+        def hpat_pandas_series_iloc_impl(self, idx):
+            return self._series._data[idx]
+
+        return hpat_pandas_series_iloc_impl
+
+    if accessor == 'iat':
+        if isinstance(idx, (int, types.Integer)):
+            def hpat_pandas_series_iat_impl(self, idx):
+                return self._series._data[idx]
+
+            return hpat_pandas_series_iat_impl
+
+        raise TypingError('{} The index must be a Integer. Given: {}'.format(_func_name, idx))
+
+    #Loc for slice idx not implement
+    #note: Loc return Series
+    if accessor == 'loc':
+        # if isinstance(idx, types.SliceType):
+        #     def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
+        #         return
+        # return hpat_pandas_series_getitem_idx_slice_impl
+
+        def hpat_pandas_series_loc_impl(self, idx):
+            mask = numpy.empty(len(self._series._data), numpy.bool_)
+            for i in range(len(self._series.index)):
+                mask[i] = self._series.index[i] == idx
+            return pandas.Series(self._series._data[mask], self._series.index[mask])
+
+        return hpat_pandas_series_loc_impl
+
+    if accessor == 'at':
+        def hpat_pandas_series_at_impl(self, idx):
+            mask = numpy.empty(len(self._series._data), numpy.bool_)
+            for i in range(len(self._series.index)):
+                mask[i] = self._series.index[i] == idx
+            return self._series._data[mask]
+
+        return hpat_pandas_series_at_impl
+
+    raise TypingError('{} Unknown accessor. Only "loc", "iloc", "at", "iat" are supported.\
+                      Given: {}'.format(_func_name, accessor))
+
+
+@overload(operator.getitem)
 def hpat_pandas_series_getitem(self, idx):
     """
     Pandas Series operator :attr:`pandas.Series.get` implementation
@@ -124,65 +201,25 @@ def hpat_pandas_series_getitem(self, idx):
 
     _func_name = 'Operator getitem().'
 
-    if isinstance(self, SeriesGetitemSelectorType) and self.selector.literal_value == 1:
-        if isinstance(idx, types.SliceType):
-            def hpat_pandas_series_iloc_slice_impl(self, idx):
-                return pandas.Series(self._data._data[idx])
-
-            return hpat_pandas_series_iloc_slice_impl
-
-        def hpat_pandas_series_iloc_impl(self, idx):
-            return self._data._data[idx]
-
-        return hpat_pandas_series_iloc_impl
-
-    if isinstance(self, SeriesGetitemSelectorType) and self.selector.literal_value == 2:
-        def hpat_pandas_series_iat_impl(self, idx):
-            return self._data._data[idx]
-
-        return hpat_pandas_series_iat_impl
-
-        raise TypingError('{} The index must be a Number. Given: {}'.format(_func_name, idx))
-
-    #Loc for slice idx not implement
-    #note: Loc return Series
-    if isinstance(self, SeriesGetitemSelectorType) and self.selector.literal_value == 3:
-        # if isinstance(idx, types.SliceType):
-        #     def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
-        #         return 
-
-        # return hpat_pandas_series_getitem_idx_slice_impl
-        def hpat_pandas_series_loc_impl(self, idx):
-            mask = numpy.empty(len(self._data._data), numpy.bool_)
-            for i in range(len(self._data._index)):
-                mask[i] = self._data._index[i] == idx
-            return pandas.Series(self._data._data[mask], self._data._index[mask])
-
-        return hpat_pandas_series_loc_impl
-    
-    if isinstance(self, SeriesGetitemSelectorType) and self.selector.literal_value == 4:
-        def hpat_pandas_series_at_impl(self, idx):
-            mask = numpy.empty(len(self._data._data), numpy.bool_)
-            for i in range(len(self._data._index)):
-                mask[i] = self._data._index[i] == idx
-            return self._data._data[mask]
-
-        return hpat_pandas_series_at_impl
+    if not isinstance(self, SeriesType):
+        return None
 
     #note: Getitem return Series
-    if (isinstance(idx, types.Number) and isinstance(self.index.dtype, types.Number) or
-        isinstance(idx, (str, types.UnicodeType, types.StringLiteral)) 
-        and isinstance(self.index.dtype, (types.UnicodeType, types.StringLiteral))):
+    index_is_none = self.index is None or isinstance(self.index, numba.types.misc.NoneType)
+    index_is_number = index_is_none or (self.index and isinstance(self.index.dtype, types.Number))
+    index_is_string = not index_is_none and isinstance(self.index.dtype, (types.UnicodeType, types.StringLiteral))
+
+    if (isinstance(idx, types.Number) and index_is_number or
+        (isinstance(idx, (str, types.UnicodeType, types.StringLiteral)) and index_is_string)):
         def hpat_pandas_series_getitem_index_impl(self, idx):
             mask = numpy.empty(len(self._data), numpy.bool_)
-            for i in range(len(self._index)):
-                mask[i] = self._index[i] == idx
-            return pandas.Series(self._data[mask], self._index[mask])
+            for i in range(len(self.index)):
+                mask[i] = self.index[i] == idx
+            return pandas.Series(self._data[mask], self.index[mask])
 
         return hpat_pandas_series_getitem_index_impl
 
-    if (isinstance(idx, types.Integer) and 
-        isinstance(self.index.dtype, (types.UnicodeType, types.StringLiteral))):
+    if (isinstance(idx, types.Integer) and index_is_string):
         def hpat_pandas_series_idx_impl(self, idx):
             return self._data[idx]
 
@@ -191,24 +228,23 @@ def hpat_pandas_series_getitem(self, idx):
     #Return slice for str values not implement
     if isinstance(idx, types.SliceType):
         def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
-            return pandas.Series(self._data[idx], self._index[idx])
+            return pandas.Series(self._data[idx], self.index[idx])
 
         return hpat_pandas_series_getitem_idx_slice_impl
 
     if isinstance(idx, SeriesType):
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
-            mask = numpy.empty(len(self._data), numpy.bool_)
-            mask = False
-            for i in range(len(self._index)):
+            mask = numpy.zeros(len(self._data), numpy.bool_)
+            for i in range(len(self.index)):
                 for j in range(len(idx._data)):
-                    if self._index[i] == idx._data[j]:
+                    if self.index[i] == idx._data[j]:
                         mask[i] = True
-            return pandas.Series(self._data[mask], self._index[mask])
+            return pandas.Series(self._data[mask], self.index[mask])
 
         return hpat_pandas_series_getitem_idx_series_impl
 
     raise TypingError('{} The index must be an Integer, Slice, String or a Series.\
-                      Given: {}'.format(_func_name, idx))
+                    Given: {}'.format(_func_name, idx))
 
 
 @overload_attribute(SeriesType, 'iloc')
@@ -223,7 +259,7 @@ def hpat_pandas_series_iloc(self):
     ----------
     self: :obj:`pandas.Series`
         input series
-    
+
     Returns
     -------
     :obj:`series`
@@ -236,7 +272,7 @@ def hpat_pandas_series_iloc(self):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     def hpat_pandas_series_iloc_impl(self):
-        return sdc.datatypes.hpat_pandas_getitem_types.series_getitem_selector_init(self, 1)
+        return sdc.datatypes.hpat_pandas_getitem_types.series_getitem_accessor_init(self, 'iloc')
 
     return hpat_pandas_series_iloc_impl
 
@@ -253,7 +289,7 @@ def hpat_pandas_series_loc(self):
     ----------
     self: :obj:`pandas.Series`
         input series
-    
+
     Returns
     -------
     :obj:`series`
@@ -266,7 +302,7 @@ def hpat_pandas_series_loc(self):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     def hpat_pandas_series_loc_impl(self):
-        return sdc.datatypes.hpat_pandas_getitem_types.series_getitem_selector_init(self, 3)
+        return sdc.datatypes.hpat_pandas_getitem_types.series_getitem_accessor_init(self, 'loc')
 
     return hpat_pandas_series_loc_impl
 
@@ -296,7 +332,7 @@ def hpat_pandas_series_iat(self):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     def hpat_pandas_series_iat_impl(self):
-        return sdc.datatypes.hpat_pandas_getitem_types.series_getitem_selector_init(self, 2)
+        return sdc.datatypes.hpat_pandas_getitem_types.series_getitem_accessor_init(self, 'iat')
 
     return hpat_pandas_series_iat_impl
 
@@ -326,7 +362,7 @@ def hpat_pandas_series_at(self):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
     def hpat_pandas_series_at_impl(self):
-        return sdc.datatypes.hpat_pandas_getitem_types.series_getitem_selector_init(self, 4)
+        return sdc.datatypes.hpat_pandas_getitem_types.series_getitem_accessor_init(self, 'at')
 
     return hpat_pandas_series_at_impl
 
@@ -601,7 +637,8 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
         ty_checker.raise_exc(dropna, 'boolean', 'dropna')
 
     if isinstance(self.data, StringArrayType):
-        def hpat_pandas_series_value_counts_str_impl(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
+        def hpat_pandas_series_value_counts_str_impl(self, normalize=False, sort=True,
+                                                     ascending=False, bins=None, dropna=True):
             # TODO: if dropna add nan handling
 
             value_counts_dict = {}
@@ -636,7 +673,8 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
 
         return hpat_pandas_series_value_counts_str_impl
 
-    def hpat_pandas_series_value_counts_number_impl(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
+    def hpat_pandas_series_value_counts_number_impl(self, normalize=False, sort=True, ascending=False,
+                                                    bins=None, dropna=True):
         unique_values = self.unique()
 
         if dropna:
@@ -3559,7 +3597,7 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
     if not ((method is None or isinstance(method, types.Omitted))
             and (limit is None or isinstance(limit, types.Omitted))
             and (downcast is None or isinstance(downcast, types.Omitted))
-    ):
+           ):
         raise TypingError('{} Unsupported parameters. Given method: {}, limit: {}, downcast: {}'.format(
                 _func_name, method, limit, downcast))
 
@@ -3569,16 +3607,19 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
         # do operation inplace, fill the NA/NaNs in the same array and return None
         if isinstance(self.dtype, types.UnicodeType):
             # TODO: StringArrayType cannot resize inplace, and assigning a copy back to self._data is not possible now
-            raise TypingError('{} Not implemented when Series dtype is {} and inplace={}'.format(_func_name, self.dtype, inplace))
+            raise TypingError('{} Not implemented when Series dtype is {} and\
+                 inplace={}'.format(_func_name, self.dtype, inplace))
 
         elif isinstance(self.dtype, (types.Integer, types.Boolean)):
-            def hpat_pandas_series_no_nan_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
+            def hpat_pandas_series_no_nan_fillna_impl(self, value=None, method=None, axis=None, inplace=False,
+                                                      limit=None, downcast=None):
                 # no NaNs in series of Integers or Booleans
                 return None
 
             return hpat_pandas_series_no_nan_fillna_impl
         else:
-            def hpat_pandas_series_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
+            def hpat_pandas_series_fillna_impl(self, value=None, method=None, axis=None, inplace=False,
+                                               limit=None, downcast=None):
                 na_data_arr = sdc.hiframes.api.get_nan_mask(self._data)
                 self._data[na_data_arr] = value
                 return None
@@ -3589,7 +3630,8 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
         if isinstance(self.dtype, types.UnicodeType):
             # For StringArrayType implementation is taken from _series_fillna_str_alloc_impl
             # (can be called directly when it's index handling is fixed)
-            def hpat_pandas_series_str_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
+            def hpat_pandas_series_str_fillna_impl(self, value=None, method=None, axis=None,
+                                                   inplace=False, limit=None, downcast=None):
 
                 n = len(self._data)
                 num_chars = 0
