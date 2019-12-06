@@ -226,15 +226,16 @@ class ExcelResultsDriver(ResultsDriver):
 
     def load(self, logger=None):
         raw_perf_results_xlsx = Path(self.raw_file_name)
-        if raw_perf_results_xlsx.exists():
-            with raw_perf_results_xlsx.open('rb') as fd:
-                # xlrd need to be installed
-                try:
-                    return pandas.read_excel(fd)
-                except ModuleNotFoundError as e:
-                    if logger:
-                        msg = 'Could not load previous results from %s: %s'
-                        logger.warning(msg, self.raw_file_name, e)
+        if not raw_perf_results_xlsx.exists():
+            return
+        with raw_perf_results_xlsx.open('rb') as fd:
+            # xlrd need to be installed
+            try:
+                return pandas.read_excel(fd)
+            except ModuleNotFoundError as e:
+                if logger:
+                    msg = 'Could not load previous results from %s: %s'
+                    logger.warning(msg, self.raw_file_name, e)
 
 
 class CSVResultsDriver(ResultsDriver):
@@ -247,15 +248,15 @@ class CSVResultsDriver(ResultsDriver):
 
     def load(self, logger=None):
         raw_perf_results_csv = Path(self.raw_file_name)
-        if raw_perf_results_csv.exists():
-            with raw_perf_results_csv.open('rb') as fd:
-                # xlrd need to be installed
-                try:
-                    return pandas.read_csv(fd)
-                except ModuleNotFoundError as e:
-                    if logger:
-                        msg = 'Could not load previous results from %s: %s'
-                        logger.warning(msg, self.raw_file_name, e)
+        if not raw_perf_results_csv.exists():
+            return
+        with raw_perf_results_csv.open('rb') as fd:
+            try:
+                return pandas.read_csv(fd)
+            except ModuleNotFoundError as e:
+                if logger:
+                    msg = 'Could not load previous results from %s: %s'
+                    logger.warning(msg, self.raw_file_name, e)
 
 
 class TestResults:
