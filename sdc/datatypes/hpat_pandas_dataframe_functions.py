@@ -42,9 +42,9 @@ from numba.errors import TypingError
 from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
 
 def sdc_pandas_dataframe_reduce_columns(df, name, params):
+
     saved_columns = df.columns
-    n_cols = len(saved_columns)
-    data_args = tuple('data{}'.format(i) for i in range(n_cols))
+    data_args = tuple('data{}'.format(i) for i in range(len(saved_columns)))
     all_params = ['df']
     for key, value in params:
         all_params.append('{}={}'.format(key, value))
@@ -62,7 +62,7 @@ def sdc_pandas_dataframe_reduce_columns(df, name, params):
     loc_vars = {}
     func_text = '\n'.join(func_lines)
 
-    exec(func_text, {'hpat': sdc, 'np': numpy}, loc_vars)
+    exec(func_text, {'sdc': sdc, 'np': numpy}, loc_vars)
     _reduce_impl = loc_vars['_reduce_impl']
 
     return _reduce_impl
