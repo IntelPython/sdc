@@ -37,9 +37,10 @@ from numba.extending import (overload, overload_method, overload_attribute)
 from numba.errors import TypingError
 
 from sdc.datatypes.hpat_pandas_dataframe_types import DataFrameType
+from sdc.utils import sdc_overload_method
 
 
-@overload_method(DataFrameType, 'count')
+@sdc_overload_method(DataFrameType, 'count')
 def sdc_pandas_dataframe_count(self, axis=0, level=None, numeric_only=False):
     """
     Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.

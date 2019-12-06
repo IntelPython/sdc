@@ -44,6 +44,7 @@ from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import string_array_type, num_total_chars, pre_alloc_string_array
 from enum import Enum
 import types as pytypes
+from numba.extending import overload_method
 
 
 # int values for types to pass to C code
@@ -562,3 +563,7 @@ def debug_prints():
 def update_globals(func, glbls):
     if isinstance(func, pytypes.FunctionType):
         func.__globals__.update(glbls)
+
+
+def sdc_overload_method(typ, name):
+    return overload_method(typ, name)
