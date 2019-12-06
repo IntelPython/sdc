@@ -266,7 +266,6 @@ class TestResults:
 
     def __init__(self, drivers=None):
         self.drivers = drivers or []
-        self.default_driver = drivers[0] if drivers else None
 
     @property
     def grouped_data(self):
@@ -346,10 +345,11 @@ class TestResults:
         """
         Load existing performance testing results from excel to global data storage
         """
-        if self.default_driver:
-            test_results_data = self.default_driver.load(self.logger)
-            if test_results_data is not None:
+        for d in self.drivers:
+            test_results_data = d.load(self.logger)
+            if test_results_data:
                 self.test_results_data = test_results_data
+                break
 
 
 class TestResultsStr(TestResults):
