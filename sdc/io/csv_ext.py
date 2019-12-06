@@ -398,6 +398,28 @@ def to_varname(string):
     return re.sub(r'\W|^(?=\d)','_', string)
 
 
+class pyarrow_cpu_count(object):
+
+    def __init__(self, cpu_count=pyarrow.cpu_count()):
+        self.cpu_count = cpu_count
+
+    def __enter__(self):
+        self.old_cpu_count = pyarrow.cpu_count()
+        pyarrow.set_cpu_count(self.cpu_count)
+
+    def __exit__(self, type, value, traceback):
+        pyarrow.set_cpu_count(self.old_cpu_count)
+
+
+def pyarrow_cpu_count_equal_numba_num_treads(func):
+    """Decorator. Set pyarrow cpu_count the same as NUMBA_NUM_THREADS."""
+    def wrapper(*args, **kwargs):
+        with pyarrow_cpu_count(numba.config.NUMBA_NUM_THREADS):
+            return func(*args, **kwargs)
+    return wrapper
+
+
+@pyarrow_cpu_count_equal_numba_num_treads
 def pandas_read_csv(
     filepath_or_buffer,
     sep=",",
