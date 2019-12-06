@@ -1050,6 +1050,7 @@ class TestSeries(TestCase):
             test_impl = _make_func_use_binop1(operator)
             hpat_func = self.jit(test_impl)
 
+            # TODO: extend to test arithmetic operations between numeric Series of different dtypes
             n = 11
             df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
             pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
@@ -1062,6 +1063,7 @@ class TestSeries(TestCase):
             test_impl = _make_func_use_binop1(operator)
             hpat_func = self.jit(test_impl)
 
+            # TODO: extend to test arithmetic operations between numeric Series of different dtypes
             n = 11
             if platform.system() == 'Windows' and not IS_32BITS:
                 df = pd.DataFrame({'A': np.arange(1, n, dtype=np.int64)})
@@ -1069,26 +1071,30 @@ class TestSeries(TestCase):
                 df = pd.DataFrame({'A': np.arange(1, n)})
             pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1), check_names=False)
 
+    @skip_numba_jit('Not implemented in new-pipeline yet')
     def test_series_op3(self):
-        arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
+        arithmetic_binops = ('+=', '-=', '*=', '/=', '//=', '%=', '**=')
 
         for operator in arithmetic_binops:
             test_impl = _make_func_use_binop2(operator)
             hpat_func = self.jit(test_impl)
 
+            # TODO: extend to test arithmetic operations between numeric Series of different dtypes
             n = 11
-            df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
+            df = pd.DataFrame({'A': np.arange(1, n, dtype=np.float64), 'B': np.ones(n - 1)})
             pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
 
+    @skip_numba_jit('Not implemented in new-pipeline yet')
     def test_series_op4(self):
-        arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
+        arithmetic_binops = ('+=', '-=', '*=', '/=', '//=', '%=', '**=')
 
         for operator in arithmetic_binops:
             test_impl = _make_func_use_binop2(operator)
             hpat_func = self.jit(test_impl)
 
+            # TODO: extend to test arithmetic operations between numeric Series of different dtypes
             n = 11
-            df = pd.DataFrame({'A': np.arange(1, n)})
+            df = pd.DataFrame({'A': np.arange(1, n, dtype=np.float64)})
             pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1), check_names=False)
 
     def test_series_op5(self):
@@ -4579,66 +4585,6 @@ class TestSeries(TestCase):
         msg = 'Method pct_change(). The object periods'
         self.assertIn(msg, str(raises.exception))
 
-    def test_series_setitem_for_value(self):
-        def test_impl(S, val):
-            S[3] = val
-            return S
-
-        hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4])
-        value = 50
-        result_ref = test_impl(S, value)
-        result = hpat_func(S, value)
-        pd.testing.assert_series_equal(result_ref, result)
-
-    def test_series_setitem_for_slice(self):
-        def test_impl(S, val):
-            S[2:] = val
-            return S
-
-        hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4])
-        value = 50
-        result_ref = test_impl(S, value)
-        result = hpat_func(S, value)
-        pd.testing.assert_series_equal(result_ref, result)
-
-    def test_series_setitem_for_series(self):
-        def test_impl(S, ind, val):
-            S[ind] = val
-            return S
-
-        hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4])
-        ind = pd.Series([0, 2, 4])
-        value = 50
-        result_ref = test_impl(S, ind, value)
-        result = hpat_func(S, ind, value)
-        pd.testing.assert_series_equal(result_ref, result)
-
-    def test_series_setitem_unsupported(self):
-        def test_impl(S, ind, val):
-            S[ind] = val
-            return S
-
-        hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4, 5])
-        ind1 = 5
-        ind2 = '3'
-        value1 = 'ababa'
-        value2 = 101
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(S, ind1, value1)
-        msg = 'Operator setitem(). Value must be one type with series.'
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(S, ind2, value2)
-        msg = 'Operator setitem(). The index must be an Integer, Slice or a pandas.series.'
-        self.assertIn(msg, str(raises.exception))
-
-
     @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
     def test_series_operator_add_numeric_scalar(self):
         """Verifies Series.operator.add implementation for numeric series and scalar second operand"""
@@ -4685,24 +4631,6 @@ class TestSeries(TestCase):
             with self.subTest(left_series_dtype=dtype_left, right_series_dtype=dtype_right):
                 A = pd.Series(np.arange(n), dtype=dtype_left)
                 B = pd.Series(np.arange(n)**2, dtype=dtype_right)
-                pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False)
-
-    def test_series_operator_add_series_dtype_promotion(self):
-        """Verifies implementation of Series.operator.add between two numeric Series of different dtypes"""
-        def test_impl(A, B):
-            return A + B
-        hpat_func = self.jit(test_impl)
-
-        n = 7
-        A = pd.Series(np.array(np.arange(n), dtype=np.int32))
-        B = pd.Series(np.array(np.arange(n)**2, dtype=np.float32))
-        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False)
-
-        dtypes_to_test = (np.int32, np.int64, np.float32, np.float64)
-        for dtype_left, dtype_right in combinations(dtypes_to_test, 2):
-            with self.subTest(left_series_dtype=dtype_left, right_series_dtype=dtype_right):
-                A = pd.Series(np.array(np.arange(n), dtype=dtype_left))
-                B = pd.Series(np.array(np.arange(n)**2, dtype=dtype_right))
                 pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False)
 
     @skip_numba_jit
@@ -4791,7 +4719,8 @@ class TestSeries(TestCase):
         B = pd.Series(np.arange(n)**2, index=index_B)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
-    @skip_sdc_jit("TODO: fix Series.sort_values to handle both None and '' in string series")
+    @skip_numba_jit('TODO: fix Series.sort_values to handle both None and '' in string series')
+    @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
     def test_series_operator_add_numeric_align_index_str_fixme(self):
         """Same as test_series_operator_add_align_index_str but with None values in string indexes"""
         def test_impl(A, B):
@@ -4864,7 +4793,8 @@ class TestSeries(TestCase):
         B = pd.Series(np.random.ranf(n), index=index2)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
-    @unittest.skip("TODO: support arithemetic operations on StringArrays and extend Series.operator.add overload")
+    @skip_numba_jit
+    @skip_sdc_jit("TODO: support arithemetic operations on StringArrays and extend Series.operator.add overload")
     def test_series_operator_add_str_same_index_default(self):
         """Verifies implementation of Series.operator.add between two string Series
         with default indexes and same size"""
