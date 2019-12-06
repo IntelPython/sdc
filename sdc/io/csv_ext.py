@@ -25,6 +25,7 @@
 # *****************************************************************************
 
 
+import contextlib
 import functools
 
 import llvmlite.binding as ll
@@ -400,17 +401,14 @@ def to_varname(string):
     return re.sub(r'\W|^(?=\d)','_', string)
 
 
-class pyarrow_cpu_count(object):
-
-    def __init__(self, cpu_count=pyarrow.cpu_count()):
-        self.cpu_count = cpu_count
-
-    def __enter__(self):
-        self.old_cpu_count = pyarrow.cpu_count()
-        pyarrow.set_cpu_count(self.cpu_count)
-
-    def __exit__(self, type, value, traceback):
-        pyarrow.set_cpu_count(self.old_cpu_count)
+@contextlib.contextmanager
+def pyarrow_cpu_count(cpu_count=pyarrow.cpu_count()):
+    old_cpu_count = pyarrow.cpu_count()
+    pyarrow.set_cpu_count(cpu_count)
+    try:
+        yield
+    finally:
+        pyarrow.set_cpu_count(old_cpu_count)
 
 
 def pyarrow_cpu_count_equal_numba_num_treads(func):
