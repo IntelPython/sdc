@@ -259,12 +259,12 @@ class CSVResultsDriver(ResultsDriver):
 
 
 class TestResults:
-    index = ['name', 'N', 'type', 'size']
+    index = ['name', 'nthreads', 'type', 'size']
     test_results_data = pandas.DataFrame(index=index)
     logger = setup_logging()
 
     def __init__(self, drivers=None):
-        self.drivers = drivers
+        self.drivers = drivers or []
         self.default_driver = drivers[0] if drivers else None
 
     @property
@@ -317,7 +317,7 @@ class TestResults:
         """
         data = {
             'name': test_name,
-            'N': num_threads,
+            'nthreads': num_threads,
             'type': test_type,
             'size': data_size,
             'Time(s)': test_results,
@@ -352,7 +352,7 @@ class TestResults:
 
 
 class TestResultsStr(TestResults):
-    index = ['name', 'N', 'type', 'size', 'width']
+    index = ['name', 'nthreads', 'type', 'size', 'width']
 
     def add(self, test_name, test_type, data_size, test_results, data_width=None,
             boxing_results=None, compile_results=None, num_threads=config.NUMBA_NUM_THREADS):
@@ -369,7 +369,7 @@ class TestResultsStr(TestResults):
         """
         data = {
             'name': test_name,
-            'N': num_threads,
+            'nthreads': num_threads,
             'type': test_type,
             'size': data_size,
             'width': data_width,
