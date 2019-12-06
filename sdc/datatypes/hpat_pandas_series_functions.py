@@ -156,6 +156,61 @@ def hpat_pandas_series_getitem(self, idx):
     raise TypingError('{} The index must be an Integer, Slice or a pandas.series. Given: {}'.format(_func_name, idx))
 
 
+@overload(operator.setitem)
+def hpat_pandas_series_setitem(self, idx, value):
+    """
+        Pandas Series operator :attr:`pandas.Series.get` implementation
+        '''
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_unsupported
+        '''
+        Parameters
+        ----------
+        series: :obj:`pandas.Series`
+               input series
+        idx: :obj:`int`, :obj:`slice` or :obj:`pandas.Series`
+            input index
+        value: :object
+            input value
+        Returns
+        -------
+        :class:`pandas.Series` or an element of the underneath type
+                object of :class:`pandas.Series`
+        """
+
+    _func_name = 'Operator setitem().'
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not isinstance(self.dtype, type(value)):
+        raise TypingError('{} Value must be one type with series. Given: {}, self.dtype={}'.format(_func_name,
+                                                                                                   value, self.dtype))
+
+    if isinstance(idx, types.Integer) or isinstance(idx, types.SliceType):
+        def hpat_pandas_series_setitem_idx_integer_impl(self, idx, value):
+            """
+            Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_value
+            Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_slice
+            """
+
+            self._data[idx] = value
+            return self
+
+        return hpat_pandas_series_setitem_idx_integer_impl
+
+    if isinstance(idx, SeriesType):
+        def hpat_pandas_series_getitem_idx_series_impl(self, idx, value):
+            """
+            Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_series
+            """
+            super_index = idx._data
+            self._data[super_index] = value
+            return self
+
+        return hpat_pandas_series_getitem_idx_series_impl
+
+    raise TypingError('{} The index must be an Integer, Slice or a pandas.series. Given: {}'.format(_func_name, idx))
+
+
 @overload_attribute(SeriesType, 'at')
 @overload_attribute(SeriesType, 'iat')
 @overload_attribute(SeriesType, 'iloc')
@@ -2145,6 +2200,77 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
         return numpy.quantile(self._data, q)
 
     return hpat_pandas_series_quantile_impl
+
+
+@overload_method(SeriesType, 'rename')
+def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=None):
+    """
+    Pandas Series method :meth:`pandas.Series.rename` implementation.
+    Alter Series index labels or name.
+    .. only:: developer
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_rename
+
+    Parameters
+    -----------
+    index : :obj:`scalar` or `hashable sequence` or `dict` or `function`
+               Dict-like or functions are transformations to apply to the index.
+               Scalar or hashable sequence-like will alter the Series.name attribute.
+               Only scalar value is supported.
+    copy : :obj:`bool`, default :obj:`True`
+               Whether to copy underlying data.
+    inplace : :obj:`bool`, default :obj:`False`
+               Whether to return a new Series. If True then value of copy is ignored.
+    level : :obj:`int` or `str`
+               In case of a MultiIndex, only rename labels in the specified level.
+               *Not supported*
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` with index labels or name altered.
+    """
+
+    ty_checker = TypeChecker('Method rename().')
+    ty_checker.check(self, SeriesType)
+
+    if not isinstance(index, (types.Omitted, types.UnicodeType,
+                              types.StringLiteral, str,
+                              types.Integer, types.Boolean,
+                              types.Hashable, types.Float,
+                              types.NPDatetime, types.NPTimedelta,
+                              types.Number)) and index is not None:
+        ty_checker.raise_exc(index, 'string', 'index')
+
+    if not isinstance(copy, (types.Omitted, types.Boolean, bool)):
+        ty_checker.raise_exc(copy, 'boolean', 'copy')
+
+    if not isinstance(inplace, (types.Omitted, types.Boolean, bool)):
+        ty_checker.raise_exc(inplace, 'boolean', 'inplace')
+
+    if not isinstance(level, (types.Omitted, types.UnicodeType,
+                              types.StringLiteral, types.Integer)) and level is not None:
+        ty_checker.raise_exc(level, 'Integer or srting', 'level')
+
+    def hpat_pandas_series_rename_idx_impl(self, index=None, copy=True, inplace=False, level=None):
+        if copy is True:
+            series_data = self._data.copy()
+            series_index = self._index.copy()
+        else:
+            series_data = self._data
+            series_index = self._index
+
+        return pandas.Series(data=series_data, index=series_index, name=index)
+
+    def hpat_pandas_series_rename_noidx_impl(self, index=None, copy=True, inplace=False, level=None):
+        if copy is True:
+            series_data = self._data.copy()
+        else:
+            series_data = self._data
+
+        return pandas.Series(data=series_data, index=self._index, name=index)
+
+    if isinstance(self.index, types.NoneType):
+        return hpat_pandas_series_rename_noidx_impl
+    return hpat_pandas_series_rename_idx_impl
 
 
 @overload_method(SeriesType, 'min')

@@ -1771,18 +1771,101 @@ class TestSeries(TestCase):
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
-    @unittest.skip('numba.errors.TypingError - fix needed\n'
-                   'Failed in hpat mode pipeline'
-                   '(step: convert to distributed)\n'
-                   'Invalid use of Function(<built-in function len>)'
-                   'with argument(s) of type(s): (none)\n')
-    def test_series_rename1(self):
+    def test_series_rename_str_df_noidx(self):
         def test_impl(A):
             return A.rename('B')
         hpat_func = self.jit(test_impl)
 
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
         pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A))
+
+    def test_series_rename_str_noidx(self):
+        def test_impl(S):
+            return S.rename('Name')
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3])
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_str_idx(self):
+        def test_impl(S):
+            return S.rename('Name')
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'])
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_no_name_str_noidx(self):
+        def test_impl(S):
+            return S.rename()
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_no_name_str_idx(self):
+        def test_impl(S):
+            return S.rename()
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_str_noidx_no_copy(self):
+        def test_impl(S):
+            return S.rename('Another Name', copy=False)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_str_idx_no_copy(self):
+        def test_impl(S):
+            return S.rename('Another Name', copy=False)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    @skip_sdc_jit("Requires full scalar types (not only str) support as Series name")
+    @skip_numba_jit("Requires full scalar types (not only str) support as Series name")
+    def test_series_rename_int_noidx(self):
+        def test_impl(S):
+            return S.rename(1)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    @skip_sdc_jit("Requires full scalar types (not only str) support as Series name")
+    @skip_numba_jit("Requires full scalar types (not only str) support as Series name")
+    def test_series_rename_int_idx(self):
+        def test_impl(S):
+            return S.rename(1)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    @skip_sdc_jit("Requires full scalar types (not only str) support as Series name")
+    @skip_numba_jit("Requires full scalar types (not only str) support as Series name")
+    def test_series_rename_float_noidx(self):
+        def test_impl(S):
+            return S.rename(1.1)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    @skip_sdc_jit("Requires full scalar types (not only str) support as Series name")
+    @skip_numba_jit("Requires full scalar types (not only str) support as Series name")
+    def test_series_rename_float_idx(self):
+        def test_impl(S):
+            return S.rename(1.1)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
 
     def test_series_sum_default(self):
         def test_impl(S):
@@ -4303,6 +4386,65 @@ class TestSeries(TestCase):
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, periods=1.6)
         msg = 'Method pct_change(). The object periods'
+        self.assertIn(msg, str(raises.exception))
+
+    def test_series_setitem_for_value(self):
+        def test_impl(S, val):
+            S[3] = val
+            return S
+
+        hpat_func = self.jit(test_impl)
+        S = pd.Series([0, 1, 2, 3, 4])
+        value = 50
+        result_ref = test_impl(S, value)
+        result = hpat_func(S, value)
+        pd.testing.assert_series_equal(result_ref, result)
+
+    def test_series_setitem_for_slice(self):
+        def test_impl(S, val):
+            S[2:] = val
+            return S
+
+        hpat_func = self.jit(test_impl)
+        S = pd.Series([0, 1, 2, 3, 4])
+        value = 50
+        result_ref = test_impl(S, value)
+        result = hpat_func(S, value)
+        pd.testing.assert_series_equal(result_ref, result)
+
+    def test_series_setitem_for_series(self):
+        def test_impl(S, ind, val):
+            S[ind] = val
+            return S
+
+        hpat_func = self.jit(test_impl)
+        S = pd.Series([0, 1, 2, 3, 4])
+        ind = pd.Series([0, 2, 4])
+        value = 50
+        result_ref = test_impl(S, ind, value)
+        result = hpat_func(S, ind, value)
+        pd.testing.assert_series_equal(result_ref, result)
+
+    def test_series_setitem_unsupported(self):
+        def test_impl(S, ind, val):
+            S[ind] = val
+            return S
+
+        hpat_func = self.jit(test_impl)
+        S = pd.Series([0, 1, 2, 3, 4, 5])
+        ind1 = 5
+        ind2 = '3'
+        value1 = 'ababa'
+        value2 = 101
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S, ind1, value1)
+        msg = 'Operator setitem(). Value must be one type with series.'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(S, ind2, value2)
+        msg = 'Operator setitem(). The index must be an Integer, Slice or a pandas.series.'
         self.assertIn(msg, str(raises.exception))
 
 
