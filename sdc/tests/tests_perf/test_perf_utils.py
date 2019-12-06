@@ -200,7 +200,7 @@ class ResultsDriver:
 
     def __init__(self, file_name, raw_file_name=None):
         self.file_name = file_name
-        self.raw_file_name = raw_file_name if raw_file_name else f'raw_{file_name}'
+        self.raw_file_name = raw_file_name or f'raw_{file_name}'
 
 
 class ExcelResultsDriver(ResultsDriver):
