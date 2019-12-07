@@ -2424,20 +2424,16 @@ class TestSeries(TestCase):
                 hpat_func(S1, S2), test_impl(S1, S2),
                 err_msg='S1={}\nS2={}'.format(S1, S2))
 
-    @skip_numba_jit
     def test_series_str_len1(self):
         def test_impl(S):
             return S.str.len()
         hpat_func = self.jit(test_impl)
 
         data = ['aa', 'abc', 'c', 'cccd']
-        indices = [None]
-        if not sdc.config.config_pipeline_hpat_default:
-            indices += [[1, 3, 2, 0], data]
-
-        for index in indices:
-            # TODO: fix issue occurred if name is not assigned
-            S = pd.Series(data, index, name='A')
+        indices = [None, [1, 3, 2, 0], data]
+        names = [None, 'A']
+        for index, name in product(indices, names):
+            S = pd.Series(data, index, name=name)
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_str2str(self):
@@ -2448,12 +2444,11 @@ class TestSeries(TestCase):
 
         data = [' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc']
         indices = [None]
-        names = [None]
+        names = [None, 'A']
         if sdc.config.config_pipeline_hpat_default:
             str2str_methods += sdc_methods
         else:
             indices += [[1, 3, 2, 0], data]
-            indices.append('A')
 
         for method in str2str_methods:
             func_lines = ['def test_impl(S):',
