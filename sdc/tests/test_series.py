@@ -33,7 +33,7 @@ import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
 import sdc
-from itertools import islice, permutations
+from itertools import islice, permutations, product
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end,
@@ -2424,23 +2424,31 @@ class TestSeries(TestCase):
                 hpat_func(S1, S2), test_impl(S1, S2),
                 err_msg='S1={}\nS2={}'.format(S1, S2))
 
-    @skip_numba_jit
     def test_series_str_len1(self):
         def test_impl(S):
             return S.str.len()
         hpat_func = self.jit(test_impl)
 
-        # TODO: fix issue occurred if name is not assigned
-        S = pd.Series(['aa', 'abc', 'c', 'cccd'], name='A')
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        data = ['aa', 'abc', 'c', 'cccd']
+        indices = [None, [1, 3, 2, 0], data]
+        names = [None, 'A']
+        for index, name in product(indices, names):
+            S = pd.Series(data, index, name=name)
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_str2str(self):
-        common_methods = ['lower', 'upper', 'lstrip', 'rstrip', 'strip']
-        sdc_methods = ['capitalize', 'swapcase', 'title']
+        common_methods = ['lower', 'upper', 'isupper']
+        sdc_methods = ['capitalize', 'swapcase', 'title',
+                       'lstrip', 'rstrip', 'strip']
         str2str_methods = common_methods[:]
+
+        data = [' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc']
+        indices = [None]
+        names = [None, 'A']
         if sdc.config.config_pipeline_hpat_default:
             str2str_methods += sdc_methods
+        else:
+            indices += [[1, 3, 2, 0], data]
 
         for method in str2str_methods:
             func_lines = ['def test_impl(S):',
@@ -2449,10 +2457,11 @@ class TestSeries(TestCase):
             test_impl = _make_func_from_text(func_text)
             hpat_func = self.jit(test_impl)
 
-            # TODO: fix issue occurred if name is not assigned
-            S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'], name='A')
-            pd.testing.assert_series_equal(hpat_func(S), test_impl(S),
-                                           check_names=method in common_methods)
+            check_names = method in common_methods
+            for index, name in product(indices, names):
+                S = pd.Series(data, index, name=name)
+                pd.testing.assert_series_equal(hpat_func(S), test_impl(S),
+                                               check_names=check_names)
 
     @skip_sdc_jit('Series.str.<method>() unsupported')
     def test_series_str2str_unsupported(self):
@@ -4386,65 +4395,6 @@ class TestSeries(TestCase):
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, periods=1.6)
         msg = 'Method pct_change(). The object periods'
-        self.assertIn(msg, str(raises.exception))
-
-    def test_series_setitem_for_value(self):
-        def test_impl(S, val):
-            S[3] = val
-            return S
-
-        hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4])
-        value = 50
-        result_ref = test_impl(S, value)
-        result = hpat_func(S, value)
-        pd.testing.assert_series_equal(result_ref, result)
-
-    def test_series_setitem_for_slice(self):
-        def test_impl(S, val):
-            S[2:] = val
-            return S
-
-        hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4])
-        value = 50
-        result_ref = test_impl(S, value)
-        result = hpat_func(S, value)
-        pd.testing.assert_series_equal(result_ref, result)
-
-    def test_series_setitem_for_series(self):
-        def test_impl(S, ind, val):
-            S[ind] = val
-            return S
-
-        hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4])
-        ind = pd.Series([0, 2, 4])
-        value = 50
-        result_ref = test_impl(S, ind, value)
-        result = hpat_func(S, ind, value)
-        pd.testing.assert_series_equal(result_ref, result)
-
-    def test_series_setitem_unsupported(self):
-        def test_impl(S, ind, val):
-            S[ind] = val
-            return S
-
-        hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4, 5])
-        ind1 = 5
-        ind2 = '3'
-        value1 = 'ababa'
-        value2 = 101
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(S, ind1, value1)
-        msg = 'Operator setitem(). Value must be one type with series.'
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(S, ind2, value2)
-        msg = 'Operator setitem(). The index must be an Integer, Slice or a pandas.series.'
         self.assertIn(msg, str(raises.exception))
 
 
