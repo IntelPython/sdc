@@ -40,10 +40,9 @@
 
     @overload_method(StringMethodsType, 'upper')
     def hpat_pandas_stringmethods_upper(self):
-        _func_name = 'Method stringmethods.upper().'
 
-        if not isinstance(self, StringMethodsType):
-            raise TypingError('{} The object must be a pandas.core.strings. Given: {}'.format(_func_name, self))
+        ty_checker = TypeChecker('Method stringmethods.upper().')
+        ty_checker.check(self, StringMethodsType)
 
         def hpat_pandas_stringmethods_upper_parallel_impl(self):
             from numba.parfor import (init_prange, min_checker, internal_prange)
@@ -83,8 +82,8 @@ import pandas
 
 import numba
 from numba.extending import overload_method
-from numba.errors import TypingError
 
+from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 
 
@@ -92,7 +91,8 @@ _hpat_pandas_stringmethods_autogen_global_dict = {
     'pandas': pandas,
     'numpy': numpy,
     'numba': numba,
-    'StringMethodsType': StringMethodsType
+    'StringMethodsType': StringMethodsType,
+    'TypeChecker': TypeChecker
 }
 
 _hpat_pandas_stringmethods_functions_params = {
@@ -166,8 +166,8 @@ def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
          returns :obj:`pandas.Series` object
     \"\"\"
 
-    if not isinstance(self, StringMethodsType):
-        raise TypingError('Method {methodname}(). The object must be a pandas.core.strings. Given: ' % self)
+    ty_checker = TypeChecker('Method {methodname}().')
+    ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_{methodname}_impl(self{methodparams}):
         item_count = len(self._data)
@@ -185,6 +185,42 @@ def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
 
     return hpat_pandas_stringmethods_{methodname}_impl
 """
+
+
+@overload_method(StringMethodsType, 'isupper')
+def hpat_pandas_stringmethods_isupper(self):
+    """
+    Pandas Series method :meth:`pandas.core.strings.StringMethods.isupper()` implementation.
+
+    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_str2str
+
+    Parameters
+    ----------
+    self: :class:`pandas.core.strings.StringMethods`
+        input arg
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method isupper().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isupper_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isupper()
+
+        return pandas.Series(result, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isupper_impl
 
 
 @overload_method(StringMethodsType, 'len')
@@ -209,8 +245,8 @@ def hpat_pandas_stringmethods_len(self):
          returns :obj:`pandas.Series` object
     """
 
-    if not isinstance(self, StringMethodsType):
-        raise TypingError('Method len(). The object must be a pandas.core.strings. Given: {}'.format(self))
+    ty_checker = TypeChecker('Method len().')
+    ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_len_impl(self):
         item_count = len(self._data)

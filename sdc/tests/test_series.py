@@ -2434,10 +2434,10 @@ class TestSeries(TestCase):
         S = pd.Series(['aa', 'abc', 'c', 'cccd'], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_str2str(self):
-        common_methods = ['lower', 'upper', 'lstrip', 'rstrip', 'strip']
-        sdc_methods = ['capitalize', 'swapcase', 'title']
+        common_methods = ['lower', 'upper', 'isupper']
+        sdc_methods = ['capitalize', 'swapcase', 'title',
+                       'lstrip', 'rstrip', 'strip']
         str2str_methods = common_methods[:]
         if sdc.config.config_pipeline_hpat_default:
             str2str_methods += sdc_methods
