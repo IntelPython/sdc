@@ -200,6 +200,7 @@ if __name__ == '__main__':
         for package in sdc_packages:
             if '.tar.bz2' in package and package_type == 'conda':
                 format_print(f'Run benchmark tests for sdc conda package: {package}')
-                create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['openpyxl'], conda_channels)
+                create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['openpyxl'] + ['xlrd'],
+                                 conda_channels)
                 run_command(f'{test_env_activate} && conda install -y {package}')
                 run_command(f'{test_env_activate} && python -W ignore -m sdc.runtests {benchmark_argv}')
