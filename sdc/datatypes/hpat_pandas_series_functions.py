@@ -40,58 +40,11 @@ from numba import types
 
 import sdc
 import sdc.datatypes.common_functions as common_functions
+from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars)
 from sdc.utils import to_array
-
-class TypeChecker:
-    """
-        Validate object type and raise TypingError if the type is invalid, e.g.:
-            Method nsmallest(). The object n
-             given: bool
-             expected: int
-        """
-    msg_template = '{} The object {}\n given: {}\n expected: {}'
-
-    def __init__(self, func_name):
-        """
-        Parameters
-        ----------
-        func_name: :obj:`str`
-            name of the function where types checking
-        """
-        self.func_name = func_name
-
-    def raise_exc(self, data, expected_types, name=''):
-        """
-        Raise exception with unified message
-        Parameters
-        ----------
-        data: :obj:`any`
-            real type of the data
-        expected_types: :obj:`str`
-            expected types inserting directly to the exception
-        name: :obj:`str`
-            name of the parameter
-        """
-        msg = self.msg_template.format(self.func_name, name, data, expected_types)
-        raise TypingError(msg)
-
-    def check(self, data, accepted_type, name=''):
-        """
-        Check data type belongs to specified type
-        Parameters
-        ----------
-        data: :obj:`any`
-            real type of the data
-        accepted_type: :obj:`type`
-            accepted type
-        name: :obj:`str`
-            name of the parameter
-        """
-        if not isinstance(data, accepted_type):
-            self.raise_exc(data, accepted_type.__name__, name=name)
 
 
 @overload(operator.getitem)

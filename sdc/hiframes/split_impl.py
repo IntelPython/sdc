@@ -478,7 +478,7 @@ def hpat_pandas_spliview_stringmethods_len(self):
         for i in range(len(local_data)):
             result[i] = len(local_data[i])
 
-        return pandas.Series(result, name=self._data._name)
+        return pandas.Series(result, self._data._index, name=self._data._name)
 
     return hpat_pandas_spliview_stringmethods_len_impl
 
