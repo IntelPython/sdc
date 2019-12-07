@@ -181,7 +181,7 @@ def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
             else:
                 result[it] = item
 
-        return pandas.Series(result, name=self._data._name)
+        return pandas.Series(result, self._data._index, name=self._data._name)
 
     return hpat_pandas_stringmethods_{methodname}_impl
 """
@@ -218,7 +218,7 @@ def hpat_pandas_stringmethods_isupper(self):
         for idx, item in enumerate(self._data._data):
             result[idx] = item.isupper()
 
-        return pandas.Series(result, name=self._data._name)
+        return pandas.Series(result, self._data._index, name=self._data._name)
 
     return hpat_pandas_stringmethods_isupper_impl
 
@@ -254,7 +254,7 @@ def hpat_pandas_stringmethods_len(self):
         for idx, item in enumerate(self._data._data):
             result[idx] = len(item)
 
-        return pandas.Series(result, name=self._data._name)
+        return pandas.Series(result, self._data._index, name=self._data._name)
 
     return hpat_pandas_stringmethods_len_impl
 
