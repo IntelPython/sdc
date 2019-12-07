@@ -33,7 +33,7 @@ import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
 import sdc
-from itertools import islice, permutations
+from itertools import islice, permutations, product
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end,
@@ -2430,17 +2430,30 @@ class TestSeries(TestCase):
             return S.str.len()
         hpat_func = self.jit(test_impl)
 
-        # TODO: fix issue occurred if name is not assigned
-        S = pd.Series(['aa', 'abc', 'c', 'cccd'], name='A')
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        data = ['aa', 'abc', 'c', 'cccd']
+        indices = [None]
+        if not sdc.config.config_pipeline_hpat_default:
+            indices += [[1, 3, 2, 0], data]
+
+        for index in indices:
+            # TODO: fix issue occurred if name is not assigned
+            S = pd.Series(data, index, name='A')
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_str2str(self):
         common_methods = ['lower', 'upper', 'isupper']
         sdc_methods = ['capitalize', 'swapcase', 'title',
                        'lstrip', 'rstrip', 'strip']
         str2str_methods = common_methods[:]
+
+        data = [' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc']
+        indices = [None]
+        names = [None]
         if sdc.config.config_pipeline_hpat_default:
             str2str_methods += sdc_methods
+        else:
+            indices += [[1, 3, 2, 0], data]
+            indices.append('A')
 
         for method in str2str_methods:
             func_lines = ['def test_impl(S):',
@@ -2449,10 +2462,11 @@ class TestSeries(TestCase):
             test_impl = _make_func_from_text(func_text)
             hpat_func = self.jit(test_impl)
 
-            # TODO: fix issue occurred if name is not assigned
-            S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'], name='A')
-            pd.testing.assert_series_equal(hpat_func(S), test_impl(S),
-                                           check_names=method in common_methods)
+            check_names = method in common_methods
+            for index, name in product(indices, names):
+                S = pd.Series(data, index, name=name)
+                pd.testing.assert_series_equal(hpat_func(S), test_impl(S),
+                                               check_names=check_names)
 
     @skip_sdc_jit('Series.str.<method>() unsupported')
     def test_series_str2str_unsupported(self):
