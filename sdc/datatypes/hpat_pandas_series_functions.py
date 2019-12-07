@@ -156,61 +156,6 @@ def hpat_pandas_series_getitem(self, idx):
     raise TypingError('{} The index must be an Integer, Slice or a pandas.series. Given: {}'.format(_func_name, idx))
 
 
-@overload(operator.setitem)
-def hpat_pandas_series_setitem(self, idx, value):
-    """
-        Pandas Series operator :attr:`pandas.Series.get` implementation
-        '''
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_unsupported
-        '''
-        Parameters
-        ----------
-        series: :obj:`pandas.Series`
-               input series
-        idx: :obj:`int`, :obj:`slice` or :obj:`pandas.Series`
-            input index
-        value: :object
-            input value
-        Returns
-        -------
-        :class:`pandas.Series` or an element of the underneath type
-                object of :class:`pandas.Series`
-        """
-
-    _func_name = 'Operator setitem().'
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
-
-    if not isinstance(self.dtype, type(value)):
-        raise TypingError('{} Value must be one type with series. Given: {}, self.dtype={}'.format(_func_name,
-                                                                                                   value, self.dtype))
-
-    if isinstance(idx, types.Integer) or isinstance(idx, types.SliceType):
-        def hpat_pandas_series_setitem_idx_integer_impl(self, idx, value):
-            """
-            Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_value
-            Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_slice
-            """
-
-            self._data[idx] = value
-            return self
-
-        return hpat_pandas_series_setitem_idx_integer_impl
-
-    if isinstance(idx, SeriesType):
-        def hpat_pandas_series_getitem_idx_series_impl(self, idx, value):
-            """
-            Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_series
-            """
-            super_index = idx._data
-            self._data[super_index] = value
-            return self
-
-        return hpat_pandas_series_getitem_idx_series_impl
-
-    raise TypingError('{} The index must be an Integer, Slice or a pandas.series. Given: {}'.format(_func_name, idx))
-
-
 @overload_attribute(SeriesType, 'at')
 @overload_attribute(SeriesType, 'iat')
 @overload_attribute(SeriesType, 'iloc')
