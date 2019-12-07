@@ -4388,65 +4388,6 @@ class TestSeries(TestCase):
         msg = 'Method pct_change(). The object periods'
         self.assertIn(msg, str(raises.exception))
 
-    def test_series_setitem_for_value(self):
-        def test_impl(S, val):
-            S[3] = val
-            return S
-
-        hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4])
-        value = 50
-        result_ref = test_impl(S, value)
-        result = hpat_func(S, value)
-        pd.testing.assert_series_equal(result_ref, result)
-
-    def test_series_setitem_for_slice(self):
-        def test_impl(S, val):
-            S[2:] = val
-            return S
-
-        hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4])
-        value = 50
-        result_ref = test_impl(S, value)
-        result = hpat_func(S, value)
-        pd.testing.assert_series_equal(result_ref, result)
-
-    def test_series_setitem_for_series(self):
-        def test_impl(S, ind, val):
-            S[ind] = val
-            return S
-
-        hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4])
-        ind = pd.Series([0, 2, 4])
-        value = 50
-        result_ref = test_impl(S, ind, value)
-        result = hpat_func(S, ind, value)
-        pd.testing.assert_series_equal(result_ref, result)
-
-    def test_series_setitem_unsupported(self):
-        def test_impl(S, ind, val):
-            S[ind] = val
-            return S
-
-        hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4, 5])
-        ind1 = 5
-        ind2 = '3'
-        value1 = 'ababa'
-        value2 = 101
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(S, ind1, value1)
-        msg = 'Operator setitem(). Value must be one type with series.'
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(S, ind2, value2)
-        msg = 'Operator setitem(). The index must be an Integer, Slice or a pandas.series.'
-        self.assertIn(msg, str(raises.exception))
-
 
 if __name__ == "__main__":
     unittest.main()
