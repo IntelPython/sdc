@@ -2424,6 +2424,153 @@ class TestSeries(TestCase):
                 hpat_func(S1, S2), test_impl(S1, S2),
                 err_msg='S1={}\nS2={}'.format(S1, S2))
 
+    def test_series_str_center_default_fillchar(self):
+        def test_impl(series, width):
+            return series.str.center(width)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind1
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 10
+
+        pd.testing.assert_series_equal(hpat_func(series, width),
+                                       test_impl(series, width))
+
+    def test_series_str_center(self):
+        def test_impl(series, width, fillchar):
+            return series.str.center(width, fillchar)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind1
+        data_lengths = [len(s) for s in data]
+        widths = [max(data_lengths) + 10, min(data_lengths)]
+
+        for index in [None, list(range(len(data)))[::-1], data[::-1]]:
+            series = pd.Series(data, index, name='A')
+            for width, fillchar in product(widths, ['\t']):
+                jit_result = hpat_func(series, width, fillchar)
+                ref_result = test_impl(series, width, fillchar)
+                pd.testing.assert_series_equal(jit_result, ref_result)
+
+    def test_series_str_center_exception_unsupported_fillchar(self):
+        def test_impl(series, width, fillchar):
+            return series.str.center(width, fillchar)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind1
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 10
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(series, width, 10)
+        msg_tmpl = 'Method center(). The object fillchar\n {}'
+        msg = msg_tmpl.format('given: int64\n expected: str')
+        self.assertIn(msg, str(raises.exception))
+
+    def test_series_str_center_exception_unsupported_kind4(self):
+        def test_impl(series, width):
+            return series.str.center(width)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind4
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 10
+
+        with self.assertRaises(SystemError) as raises:
+            hpat_func(series, width)
+        msg = 'NULL object passed to Py_BuildValue'
+        self.assertIn(msg, str(raises.exception))
+
+    def test_series_str_endswith(self):
+        def test_impl(series, pat):
+            return series.str.endswith(pat)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind4
+        pats = [''] + [s[-min(len(s) for s in data):] for s in data] + data
+        indices = [None, list(range(len(data)))[::-1], data[::-1]]
+        names = [None, 'A']
+        for index, name in product(indices, names):
+            series = pd.Series(data, index, name=name)
+            for pat in pats:
+                pd.testing.assert_series_equal(hpat_func(series, pat),
+                                               test_impl(series, pat))
+
+    def test_series_str_endswith_exception_unsupported_na(self):
+        def test_impl(series, pat, na):
+            return series.str.endswith(pat, na)
+
+        hpat_func = self.jit(test_impl)
+
+        series = pd.Series(test_global_input_data_unicode_kind4)
+        msg_tmpl = 'Method endswith(). The object na\n {}'
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(series, '', 'None')
+        msg = msg_tmpl.format('given: unicode_type\n expected: bool')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(series, '', False)
+        msg = msg_tmpl.format('expected: None')
+        self.assertIn(msg, str(raises.exception))
+
+    def test_series_str_find(self):
+        def test_impl(series, sub):
+            return series.str.find(sub)
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind4
+        subs = [''] + [s[:min(len(s) for s in data)] for s in data] + data
+        indices = [None, list(range(len(data)))[::-1], data[::-1]]
+        names = [None, 'A']
+        for index, name in product(indices, names):
+            series = pd.Series(data, index, name=name)
+            for sub in subs:
+                pd.testing.assert_series_equal(hpat_func(series, sub),
+                                               test_impl(series, sub))
+
+    def test_series_str_find_exception_unsupported_start(self):
+        def test_impl(series, sub, start):
+            return series.str.find(sub, start)
+        hpat_func = self.jit(test_impl)
+
+        series = pd.Series(test_global_input_data_unicode_kind4)
+        msg_tmpl = 'Method find(). The object start\n {}'
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(series, '', '0')
+        msg = msg_tmpl.format('given: unicode_type\n expected: None, int')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(series, '', 1)
+        msg = msg_tmpl.format('expected: 0')
+        self.assertIn(msg, str(raises.exception))
+
+    def test_series_str_find_exception_unsupported_end(self):
+        def test_impl(series, sub, start, end):
+            return series.str.find(sub, start, end)
+        hpat_func = self.jit(test_impl)
+
+        series = pd.Series(test_global_input_data_unicode_kind4)
+        msg_tmpl = 'Method find(). The object end\n {}'
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(series, '', 0, 'None')
+        msg = msg_tmpl.format('given: unicode_type\n expected: None, int')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(series, '', 0, 0)
+        msg = msg_tmpl.format('expected: None')
+        self.assertIn(msg, str(raises.exception))
+
     def test_series_str_len1(self):
         def test_impl(S):
             return S.str.len()
@@ -2435,6 +2582,41 @@ class TestSeries(TestCase):
         for index, name in product(indices, names):
             S = pd.Series(data, index, name=name)
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_str_startswith(self):
+        def test_impl(series, pat):
+            return series.str.startswith(pat)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind4
+        pats = [''] + [s[:min(len(s) for s in data)] for s in data] + data
+        indices = [None, list(range(len(data)))[::-1], data[::-1]]
+        names = [None, 'A']
+        for index, name in product(indices, names):
+            series = pd.Series(data, index, name=name)
+            for pat in pats:
+                pd.testing.assert_series_equal(hpat_func(series, pat),
+                                               test_impl(series, pat))
+
+    def test_series_str_startswith_exception_unsupported_na(self):
+        def test_impl(series, pat, na):
+            return series.str.startswith(pat, na)
+
+        hpat_func = self.jit(test_impl)
+
+        series = pd.Series(test_global_input_data_unicode_kind4)
+        msg_tmpl = 'Method startswith(). The object na\n {}'
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(series, '', 'None')
+        msg = msg_tmpl.format('given: unicode_type\n expected: bool')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(series, '', False)
+        msg = msg_tmpl.format('expected: None')
+        self.assertIn(msg, str(raises.exception))
 
     def test_series_str2str(self):
         common_methods = ['lower', 'upper', 'isupper']
