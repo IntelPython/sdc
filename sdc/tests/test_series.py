@@ -2424,6 +2424,67 @@ class TestSeries(TestCase):
                 hpat_func(S1, S2), test_impl(S1, S2),
                 err_msg='S1={}\nS2={}'.format(S1, S2))
 
+    def test_series_str_center_default_fillchar(self):
+        def test_impl(series, width):
+            return series.str.center(width)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind1
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 10
+
+        pd.testing.assert_series_equal(hpat_func(series, width),
+                                       test_impl(series, width))
+
+    def test_series_str_center(self):
+        def test_impl(series, width, fillchar):
+            return series.str.center(width, fillchar)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind1
+        data_lengths = [len(s) for s in data]
+        widths = [max(data_lengths) + 10, min(data_lengths)]
+
+        for index in [None, list(range(len(data)))[::-1], data[::-1]]:
+            series = pd.Series(data, index, name='A')
+            for width, fillchar in product(widths, ['\t']):
+                jit_result = hpat_func(series, width, fillchar)
+                ref_result = test_impl(series, width, fillchar)
+                pd.testing.assert_series_equal(jit_result, ref_result)
+
+    def test_series_str_center_exception_unsupported_fillchar(self):
+        def test_impl(series, width, fillchar):
+            return series.str.center(width, fillchar)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind1
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 10
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(series, width, 10)
+        msg_tmpl = 'Method center(). The object fillchar\n {}'
+        msg = msg_tmpl.format('given: int64\n expected: str')
+        self.assertIn(msg, str(raises.exception))
+
+    def test_series_str_center_exception_unsupported_kind4(self):
+        def test_impl(series, width):
+            return series.str.center(width)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind4
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 10
+
+        with self.assertRaises(SystemError) as raises:
+            hpat_func(series, width)
+        msg = 'NULL object passed to Py_BuildValue'
+        self.assertIn(msg, str(raises.exception))
+
     def test_series_str_endswith(self):
         def test_impl(series, pat):
             return series.str.endswith(pat)
