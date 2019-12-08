@@ -82,7 +82,8 @@ import pandas
 
 import numba
 from numba.extending import overload_method
-from numba.types import (Boolean, NoneType, Omitted, StringLiteral, UnicodeType)
+from numba.types import (Boolean, Integer, NoneType,
+                         Omitted, StringLiteral, UnicodeType)
 
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
@@ -186,6 +187,65 @@ def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
 
     return hpat_pandas_stringmethods_{methodname}_impl
 """
+
+
+@overload_method(StringMethodsType, 'find')
+def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
+    """
+    Pandas Series method :meth:`pandas.core.strings.StringMethods.find()` implementation.
+
+    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_find
+
+    Parameters
+    ----------
+    self: :class:`pandas.core.strings.StringMethods`
+        input arg
+    sub: :obj:`str`
+        Substring being searched
+    start: :obj:`int`
+        Left edge index
+        *unsupported*
+    end: :obj:`int`
+        Right edge index
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method find().')
+    ty_checker.check(self, StringMethodsType)
+
+    if not isinstance(sub, (StringLiteral, UnicodeType)):
+        ty_checker.raise_exc(sub, 'str', 'sub')
+
+    accepted_types = (Integer, NoneType, Omitted)
+    if not isinstance(start, accepted_types) and start != 0:
+        ty_checker.raise_exc(start, 'None, int', 'start')
+
+    if not isinstance(end, accepted_types) and end is not None:
+        ty_checker.raise_exc(end, 'None, int', 'end')
+
+    def hpat_pandas_stringmethods_find_impl(self, sub, start=0, end=None):
+        if start != 0:
+            raise ValueError('Method find(). The object start\n expected: 0')
+        if end is not None:
+            raise ValueError('Method find(). The object end\n expected: None')
+
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.int64)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.find(sub)
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_find_impl
 
 
 @overload_method(StringMethodsType, 'isupper')

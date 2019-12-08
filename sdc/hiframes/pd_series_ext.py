@@ -758,7 +758,7 @@ str2str_methods = ['capitalize', 'swapcase', 'title']
     Functions which are still overloaded by HPAT compiler pipeline
 """
 
-str2str_methods_excluded = ['upper', 'isupper', 'len', 'lower',
+str2str_methods_excluded = ['upper', 'find', 'isupper', 'len', 'lower',
                             'lstrip', 'rstrip', 'startswith', 'strip']
 """
     Functions which are used from Numba directly by calling from StringMethodsType
