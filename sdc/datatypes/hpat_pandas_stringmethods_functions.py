@@ -82,8 +82,7 @@ import pandas
 
 import numba
 from numba.extending import overload_method
-from numba.types import (Integer, IntegerLiteral, NoneType,
-                         Omitted, StringLiteral, UnicodeType)
+from numba.types import (Integer, NoneType, Omitted, StringLiteral, UnicodeType)
 
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
@@ -225,7 +224,7 @@ def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
     if not isinstance(sub, (StringLiteral, UnicodeType)):
         ty_checker.raise_exc(sub, 'str', 'sub')
 
-    accepted_types = (Integer, IntegerLiteral, NoneType, Omitted)
+    accepted_types = (Integer, NoneType, Omitted)
     if not isinstance(start, accepted_types) and start != 0:
         ty_checker.raise_exc(start, 'None, int', 'start')
 
