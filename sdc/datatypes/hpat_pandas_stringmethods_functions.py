@@ -418,6 +418,57 @@ def hpat_pandas_stringmethods_len(self):
     return hpat_pandas_stringmethods_len_impl
 
 
+@overload_method(StringMethodsType, 'startswith')
+def hpat_pandas_stringmethods_startswith(self, pat, na=None):
+    """
+    Pandas Series method :meth:`pandas.core.strings.StringMethods.startswith()` implementation.
+
+    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_startswith
+
+    Parameters
+    ----------
+    self: :class:`pandas.core.strings.StringMethods`
+        input arg
+    pat: :obj:`str`
+        Character sequence
+    na: :obj:`bool`
+        Object shown if element tested is not a string
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method startswith().')
+    ty_checker.check(self, StringMethodsType)
+
+    if not isinstance(pat, (StringLiteral, UnicodeType)):
+        ty_checker.raise_exc(pat, 'str', 'pat')
+
+    if not isinstance(na, (Boolean, NoneType, Omitted)) and na is not None:
+        ty_checker.raise_exc(na, 'bool', 'na')
+
+    def hpat_pandas_stringmethods_startswith_impl(self, pat, na=None):
+        if na is not None:
+            msg = 'Method startswith(). The object na\n expected: None'
+            raise ValueError(msg)
+
+        item_startswith = len(self._data)
+        result = numpy.empty(item_startswith, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.startswith(pat)
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_startswith_impl
+
+
 def _hpat_pandas_stringmethods_autogen(method_name):
     """"
     The function generates a function for 'method_name' from source text that is created on the fly.
