@@ -1,6 +1,6 @@
-*****
+**********************************
 Intel® Scalable Dataframe Compiler
-*****
+**********************************
 
 .. image:: https://travis-ci.com/IntelPython/sdc.svg?branch=master
     :target: https://travis-ci.com/IntelPython/sdc
@@ -14,15 +14,12 @@ Intel® Scalable Dataframe Compiler
     :target: https://coveralls.io/github/IntelPython/sdc?branch=master
     :alt: Coveralls
 
-A compiler-based framework for big data in Python
-#################################################
+Extension for Numba for Pandas  compilation
+###########################################
 
-Intel Scalable Dataframe Compiler (Intel® SDC) scales analytics/ML codes in Python
-to bare-metal cluster/cloud performance automatically.
-It compiles a subset of Python (Pandas/Numpy) to efficient parallel binaries
-with MPI, requiring only minimal code changes.
-Intel SDC is orders of magnitude faster than
-alternatives like `Apache Spark <http://spark.apache.org/>`_.
+Intel® Scalable Dataframe Compiler (Intel® SDC), which is an extension of `Numba* <https://numba.pydata.org/>`_ 
+that enables compilation of `Pandas* <https://pandas.pydata.org/>`_ operations. It automatically vectorizes and parallelizes 
+the code by leveraging modern hardware instructions and by utilizing all available cores. 
 
 Intel SDC's documentation can be found `here <https://intellabs.github.io/sdc-doc/>`_.
 
