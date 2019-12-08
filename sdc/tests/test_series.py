@@ -2445,17 +2445,16 @@ class TestSeries(TestCase):
         hpat_func = self.jit(test_impl)
 
         series = pd.Series(test_global_input_data_unicode_kind4)
-        msg_tmpl = 'Method {}(). The object {}\n {}'
+        msg_tmpl = 'Method find(). The object start\n {}'
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(series, '', '0')
-        msg = msg_tmpl.format('find', 'start', 'given: unicode_type\n '
-                                               'expected: None, int')
+        msg = msg_tmpl.format('given: unicode_type\n expected: None, int')
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(ValueError) as raises:
             hpat_func(series, '', 1)
-        msg = msg_tmpl.format('find', 'start', 'expected: 0')
+        msg = msg_tmpl.format('expected: 0')
         self.assertIn(msg, str(raises.exception))
 
     def test_series_str_find_exception_unsupported_end(self):
@@ -2464,17 +2463,16 @@ class TestSeries(TestCase):
         hpat_func = self.jit(test_impl)
 
         series = pd.Series(test_global_input_data_unicode_kind4)
-        msg_tmpl = 'Method {}(). The object {}\n {}'
+        msg_tmpl = 'Method find(). The object end\n {}'
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(series, '', 0, 'None')
-        msg = msg_tmpl.format('find', 'end', 'given: unicode_type\n '
-                                             'expected: None, int')
+        msg = msg_tmpl.format('given: unicode_type\n expected: None, int')
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(ValueError) as raises:
             hpat_func(series, '', 0, 0)
-        msg = msg_tmpl.format('find', 'end', 'expected: None')
+        msg = msg_tmpl.format('expected: None')
         self.assertIn(msg, str(raises.exception))
 
     def test_series_str_len1(self):
