@@ -759,7 +759,7 @@ str2str_methods = ['capitalize', 'swapcase', 'title']
 """
 
 str2str_methods_excluded = ['upper', 'isupper', 'len', 'lower',
-                            'lstrip', 'rstrip', 'strip']
+                            'lstrip', 'rstrip', 'startswith', 'strip']
 """
     Functions which are used from Numba directly by calling from StringMethodsType
 
