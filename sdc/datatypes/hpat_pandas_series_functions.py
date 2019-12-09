@@ -36,7 +36,7 @@ import pandas
 
 from numba.errors import TypingError
 from numba.extending import overload, overload_method, overload_attribute
-from numba import types
+from numba import (types, numpy_support)
 from numba.typed import Dict
 
 import sdc
@@ -1164,21 +1164,46 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
     if not isinstance(axis, (types.Omitted, int, types.Integer)):
         raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
 
+    fill_is_default = isinstance(fill_value, (types.Omitted, types.NoneType)) or fill_value is None
+    series_np_dtype = [numpy_support.as_dtype(self.data.dtype)]
+    fill_np_dtype = [numpy.float64 if fill_is_default else numpy_support.as_dtype(fill_value)]
+
+    common_dtype = numpy.find_common_type(series_np_dtype, fill_np_dtype)
+
+    if fill_is_default:
+        def hpat_pandas_series_shift_impl(self, periods=1, freq=None, axis=0, fill_value=None):
+            if axis != 0:
+                raise TypingError('Method shift(). Unsupported parameters. Given axis != 0')
+
+            arr = numpy.empty_like(self._data, dtype=common_dtype)
+            if periods > 0:
+                arr[:periods] = numpy.nan
+                arr[periods:] = self._data[:-periods]
+            elif periods < 0:
+                arr[periods:] = numpy.nan
+                arr[:periods] = self._data[-periods:]
+            else:
+                arr[:] = self._data
+
+            return pandas.Series(data=arr, index=self._index, name=self._name)
+
+        return hpat_pandas_series_shift_impl
+
     def hpat_pandas_series_shift_impl(self, periods=1, freq=None, axis=0, fill_value=None):
         if axis != 0:
             raise TypingError('Method shift(). Unsupported parameters. Given axis != 0')
 
-        arr = numpy.empty_like(self._data)
+        arr = numpy.empty_like(self._data, dtype=common_dtype)
         if periods > 0:
-            arr[:periods] = fill_value or numpy.nan
+            arr[:periods] = fill_value
             arr[periods:] = self._data[:-periods]
         elif periods < 0:
-            arr[periods:] = fill_value or numpy.nan
+            arr[periods:] = fill_value
             arr[:periods] = self._data[-periods:]
         else:
             arr[:] = self._data
 
-        return pandas.Series(arr)
+        return pandas.Series(data=arr, index=self._index, name=self._name)
 
     return hpat_pandas_series_shift_impl
 
@@ -1212,7 +1237,7 @@ def hpat_pandas_series_isin(self, values):
     def hpat_pandas_series_isin_impl(self, values):
         # TODO: replace with below line when Numba supports np.isin in nopython mode
         # return pandas.Series(np.isin(self._data, values))
-        return pandas.Series([(x in values) for x in self._data])
+        return pandas.Series(data=[(x in values) for x in self._data], index=self._index, name=self._name)
 
     return hpat_pandas_series_isin_impl
 
@@ -1332,23 +1357,27 @@ def hpat_pandas_series_copy(self, deep=True):
     :obj:`pandas.Series` or :obj:`pandas.DataFrame`
         Object type matches caller.
     """
-    _func_name = 'Method Series.copy().'
 
-    if (isinstance(self, SeriesType) and (isinstance(deep, (types.Omitted, types.Boolean)) or deep)):
-        if isinstance(self.index, types.NoneType):
-            def hpat_pandas_series_copy_impl(self, deep=True):
-                if deep:
-                    return pandas.Series(self._data.copy())
-                else:
-                    return pandas.Series(self._data)
-            return hpat_pandas_series_copy_impl
-        else:
-            def hpat_pandas_series_copy_impl(self, deep=True):
-                if deep:
-                    return pandas.Series(self._data.copy(), index=self._index.copy())
-                else:
-                    return pandas.Series(self._data, index=self._index.copy())
-            return hpat_pandas_series_copy_impl
+    ty_checker = TypeChecker('Method Series.copy().')
+    ty_checker.check(self, SeriesType)
+
+    if not isinstance(deep, (types.Omitted, types.Boolean)) and not deep:
+        ty_checker.raise_exc(self.data, 'boolean', 'deep')
+
+    if isinstance(self.index, types.NoneType):
+        def hpat_pandas_series_copy_impl(self, deep=True):
+            if deep:
+                return pandas.Series(data=self._data.copy(), name=self._name)
+            else:
+                return pandas.Series(data=self._data, name=self._name)
+        return hpat_pandas_series_copy_impl
+    else:
+        def hpat_pandas_series_copy_impl(self, deep=True):
+            if deep:
+                return pandas.Series(data=self._data.copy(), index=self._index.copy(), name=self._name)
+            else:
+                return pandas.Series(data=self._data, index=self._index.copy(), name=self._name)
+        return hpat_pandas_series_copy_impl
 
 
 @sdc_overload_method(SeriesType, 'corr')
@@ -1460,12 +1489,12 @@ def hpat_pandas_series_head(self, n=5):
 
     if isinstance(self.index, types.NoneType):
         def hpat_pandas_series_head_impl(self, n=5):
-            return pandas.Series(self._data[:n])
+            return pandas.Series(data=self._data[:n], name=self._name)
 
         return hpat_pandas_series_head_impl
     else:
         def hpat_pandas_series_head_index_impl(self, n=5):
-            return pandas.Series(self._data[:n], self._index[:n], self._name)
+            return pandas.Series(data=self._data[:n], index=self._index[:n], name=self._name)
 
         return hpat_pandas_series_head_index_impl
 
@@ -1573,7 +1602,7 @@ def hpat_pandas_series_isna(self):
     if isinstance(self.data.dtype, (types.Integer, types.Float)):
 
         def hpat_pandas_series_isna_impl(self):
-            return pandas.Series(numpy.isnan(self._data))
+            return pandas.Series(data=numpy.isnan(self._data), index=self._index, name=self._name)
 
         return hpat_pandas_series_isna_impl
 
@@ -1589,7 +1618,7 @@ def hpat_pandas_series_isna(self):
                 bmap = self._data.null_bitmap[bmap_idx]
                 bit_value = (bmap >> bit_idx) & 1
                 result[i] = bit_value == 0
-            return pandas.Series(result)
+            return pandas.Series(result, index=self._index, name=self._name)
 
         return hpat_pandas_series_isna_impl
 
@@ -1621,14 +1650,14 @@ def hpat_pandas_series_notna(self):
 
     if isinstance(self.data.dtype, types.Number):
         def hpat_pandas_series_notna_impl(self):
-            return pandas.Series(numpy.invert(numpy.isnan(self._data)))
+            return pandas.Series(numpy.invert(numpy.isnan(self._data)), index=self._index, name=self._name)
 
         return hpat_pandas_series_notna_impl
 
     if isinstance(self.data.dtype, types.UnicodeType):
         def hpat_pandas_series_notna_impl(self):
             result = self.isna()
-            return pandas.Series(numpy.invert(result._data))
+            return pandas.Series(numpy.invert(result._data), index=self._index, name=self._name)
 
         return hpat_pandas_series_notna_impl
 

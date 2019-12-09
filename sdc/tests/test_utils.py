@@ -144,3 +144,7 @@ def skip_sdc_jit(msg_or_func=None):
     # wrapper = lambda f: f  # disable skipping
     # wrapper = unittest.expectedFailure
     return wrapper(func) if func else wrapper
+
+
+def sdc_limitation(func):
+    return unittest.expectedFailure(func)
