@@ -319,7 +319,7 @@ def hpat_pandas_series_iat(self):
     ----------
     self: :obj:`pandas.Series`
         input series
-    
+
     Returns
     -------
     :obj:`series`
@@ -349,7 +349,7 @@ def hpat_pandas_series_at(self):
     ----------
     self: :obj:`pandas.Series`
         input series
-    
+
     Returns
     -------
     :obj:`series`
