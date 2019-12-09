@@ -65,7 +65,8 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
                 out_nodes = [inst]
 
                 if isinstance(inst, ir.Assign):
-                    self.state.func_ir._definitions[inst.target.name].remove(inst.value)
+                    if inst.value in self.state.func_ir._definitions[inst.target.name]:
+                        self.state.func_ir._definitions[inst.target.name].remove(inst.value)
                     out_nodes = self._run_assign(inst)
 
                 if isinstance(out_nodes, list):

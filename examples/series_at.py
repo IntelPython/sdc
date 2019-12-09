@@ -24,4 +24,14 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy as np
+import pandas as pd
 
+
+@njit
+def series_at(i):
+    series = pd.Series([5, 4, 3, 2, 1], index=[0, 2, 4, 6, 8])
+    return series.at[i]
+
+
+print(series_at(4))

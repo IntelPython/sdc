@@ -57,7 +57,9 @@ from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype, CategoricalArray)
 from sdc.hiframes.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type)
 from sdc.hiframes.rolling import supported_rolling_funcs
-from sdc.hiframes.split_impl import (string_array_split_view_type, GetItemStringArraySplitView)
+from sdc.hiframes.split_impl import (SplitViewStringMethodsType,
+                                     string_array_split_view_type,
+                                     GetItemStringArraySplitView)
 from sdc.str_arr_ext import (
     string_array_type,
     iternext_str_array,
@@ -423,9 +425,9 @@ class SeriesAttribute(AttributeTemplate):
 #     def resolve_index(self, ary):
 #         return ary.index
 
-    def resolve_str(self, ary):
-        assert ary.dtype in (string_type, types.List(string_type))
-        return StringMethodsType(ary)
+    # def resolve_str(self, ary):
+    #     assert ary.dtype in (string_type, types.List(string_type))
+    #     return StringMethodsType(ary)
 
     def resolve_dt(self, ary):
         assert ary.dtype == types.NPDatetime('ns')
@@ -716,13 +718,13 @@ class SeriesAttribute(AttributeTemplate):
     #         types.int64, types.Array(types.int64, 1, 'C'), ary.data)
     #     return signature(out, *args)
 
-    @bound_function("series.rename")
-    def resolve_rename(self, ary, args, kws):
-        # TODO: support index rename, kws
-        assert len(args) == 1 and isinstance(
-            args[0], (types.UnicodeType, types.StringLiteral))
-        out = SeriesType(ary.dtype, ary.data, ary.index, True)
-        return signature(out, *args)
+    # @bound_function("series.rename")
+    # def resolve_rename(self, ary, args, kws):
+    #     # TODO: support index rename, kws
+    #     assert len(args) == 1 and isinstance(
+    #         args[0], (types.UnicodeType, types.StringLiteral))
+    #     out = SeriesType(ary.dtype, ary.data, ary.index, True)
+    #     return signature(out, *args)
 
 
 # TODO: use ops logic from pandas/core/ops.py
@@ -743,7 +745,10 @@ str2str_methods = ['capitalize', 'swapcase', 'title']
     Functions which are still overloaded by HPAT compiler pipeline
 """
 
-str2str_methods_excluded = ['upper', 'lower', 'lstrip', 'rstrip', 'strip']
+str2str_methods_excluded = [
+    'upper', 'center', 'endswith', 'find', 'isupper', 'len',
+    'lower', 'lstrip', 'rstrip', 'startswith', 'strip'
+]
 """
     Functions which are used from Numba directly by calling from StringMethodsType
 
@@ -767,9 +772,9 @@ class SeriesStrMethodAttribute(AttributeTemplate):
     def resolve_contains(self, ary, args, kws):
         return signature(SeriesType(types.bool_), *args)
 
-    @bound_function("strmethod.len")
-    def resolve_len(self, ary, args, kws):
-        return signature(SeriesType(types.int64), *args)
+    # @bound_function("strmethod.len")
+    # def resolve_len(self, ary, args, kws):
+    #     return signature(SeriesType(types.int64), *args)
 
     @bound_function("strmethod.replace")
     def resolve_replace(self, ary, args, kws):
@@ -805,6 +810,16 @@ class SeriesStrMethodAttribute(AttributeTemplate):
             return
 
         raise NotImplementedError('Series.str.{} is not supported yet'.format(func_name))
+
+
+@infer_getattr
+class SplitViewSeriesStrMethodAttribute(AttributeTemplate):
+    key = SplitViewStringMethodsType
+
+    @bound_function('strmethod.get')
+    def resolve_get(self, ary, args, kws):
+        # XXX only list(list(str)) supported
+        return signature(SeriesType(string_type), *args)
 
 
 class SeriesDtMethodType(types.Type):

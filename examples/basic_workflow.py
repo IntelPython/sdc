@@ -24,33 +24,25 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from numba import njit
 
-import sdc
-
-from ..common import BaseIO, Implementation as Impl
-from ..data_generator import DataGenerator
+# Dataset for analysis
+FNAME = "employees.csv"
 
 
-class ToCSV(BaseIO):
-    fname = '__test__.csv'
-    params = [
-        [Impl.interpreted_python.value, Impl.compiled_python.value]
-    ]
-    pparam_names = ['implementation']
+# This function gets compiled by Numba*
+@njit
+def get_analyzed_data():
+    df = pd.read_csv(FNAME)
+    s_bonus = pd.Series(df['Bonus %'])
+    s_first_name = pd.Series(df['First Name'])
+    m = s_bonus.mean()
+    names = s_first_name.sort_values()
+    return m, names
 
-    def setup(self, implementation):
-        N = 10 ** 4
-        data_generator = DataGenerator()
-        self.df = data_generator.make_numeric_dataframe(5 * N)
 
-    @staticmethod
-    @sdc.jit
-    def _to_csv(df, fname):
-        return df.to_csv(fname)
-
-    def time_to_csv(self, implementation):
-        """Time both interpreted and compiled DataFrame.to_csv"""
-        if implementation == Impl.compiled_python.value:
-            return self._to_csv(self.df, self.fname)
-        if implementation == Impl.interpreted_python.value:
-            return self.df.to_csv(self.fname)
+# Printing names and their average bonus percent
+mean_bonus, sorted_first_names = get_analyzed_data()
+print(sorted_first_names)
+print('Average Bonus %:', mean_bonus)
