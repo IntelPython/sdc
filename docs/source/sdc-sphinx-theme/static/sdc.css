@@ -11,6 +11,12 @@
 
 @import url("basic.css");
 
+/* Caption text --------------------------------------------------------------*/
+span-caption-text {
+  font-weight: bold;
+}
+
+/* Body text -----------------------------------------------------------------*/
 body {
   background-color: #ffffff;
   margin: 0;
@@ -43,11 +49,11 @@ h1,h2,h3,h4,h5,h6 {
   line-height: 1.5em;
 }
 h1 {
-  font-size: 24px;
+  font-size: 26px;
   margin: 0;
 }
 h2 {
-  font-size: 21px;
+  font-size: 20px;
   line-height: 1.2em;
   margin: 1em 0 0.5em 0;
   border-bottom: 1px solid #0070c5;
