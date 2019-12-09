@@ -33,11 +33,61 @@
 import numpy
 
 from numba import types
+from numba.errors import TypingError
 from numba.extending import overload
 from numba import numpy_support
 
 import sdc
 from sdc.str_arr_ext import (string_array_type, num_total_chars, append_string_array_to)
+
+
+class TypeChecker:
+    """
+        Validate object type and raise TypingError if the type is invalid, e.g.:
+            Method nsmallest(). The object n
+             given: bool
+             expected: int
+    """
+    msg_template = '{} The object {}\n given: {}\n expected: {}'
+
+    def __init__(self, func_name):
+        """
+        Parameters
+        ----------
+        func_name: :obj:`str`
+            name of the function where types checking
+        """
+        self.func_name = func_name
+
+    def raise_exc(self, data, expected_types, name=''):
+        """
+        Raise exception with unified message
+        Parameters
+        ----------
+        data: :obj:`any`
+            real type of the data
+        expected_types: :obj:`str`
+            expected types inserting directly to the exception
+        name: :obj:`str`
+            name of the parameter
+        """
+        msg = self.msg_template.format(self.func_name, name, data, expected_types)
+        raise TypingError(msg)
+
+    def check(self, data, accepted_type, name=''):
+        """
+        Check data type belongs to specified type
+        Parameters
+        ----------
+        data: :obj:`any`
+            real type of the data
+        accepted_type: :obj:`type`
+            accepted type
+        name: :obj:`str`
+            name of the parameter
+        """
+        if not isinstance(data, accepted_type):
+            self.raise_exc(data, accepted_type.__name__, name=name)
 
 
 def has_literal_value(var, value):

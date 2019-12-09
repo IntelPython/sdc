@@ -24,51 +24,32 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-'''
-This is a set of configuration variables in SDC initialized at startup
-'''
+
+import pandas as pd
+import numpy as np
+import sdc
 
 
-import os
-from distutils import util as distutils_util
+@sdc.jit
+def get_mean(df):
+    ser = pd.Series(df['Bonus %'])
+    m = ser.mean()
+    return m
 
-try:
-    import pyarrow
-except ImportError:
-    _has_pyarrow = False
-else:
-    _has_pyarrow = True
 
-try:
-    from . import cv_wrapper
-except ImportError:
-    _has_opencv = False
-else:
-    _has_opencv = True
-    import sdc.cv_ext
+@sdc.jit
+def sort_name(df):
+    ser = pd.Series(df['First Name'])
+    m = ser.sort_values()
+    return m
 
-config_transport_mpi_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_MPI', 'True'))
-'''
-Default value for transport used if no function decorator controls the transport
-'''
 
-config_transport_mpi = config_transport_mpi_default
-'''
-Current value for transport controlled by decorator need to initialize this here
-because decorator called later then modules have been initialized
-'''
+file = "employees.csv"
+df = pd.read_csv(file)
 
-config_pipeline_hpat_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_PIPELINE_SDC', 'True'))
-'''
-Default value used to select compiler pipeline in a function decorator
-'''
 
-if not config_pipeline_hpat_default:
-    # avoid using MPI transport if no SDC compiler pipeline used
-    config_transport_mpi_default = False
-    config_transport_mpi = config_transport_mpi_default
+# find mean of one column
+print(get_mean(df))
 
-numba_compiler_define_nopython_pipeline_orig = None
-'''
-Default value for a pointer intended to use as Numba.DefaultPassBuilder.define_nopython_pipeline() in overloaded function
-'''
+# Sort the names in ascending order
+print(sort_name(df))

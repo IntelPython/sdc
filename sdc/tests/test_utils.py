@@ -43,8 +43,9 @@ min_float64 = np.finfo('float64').min
 max_float64 = np.finfo('float64').max
 
 test_global_input_data_float64 = [
+    [1., -1., 0.1, min_float64, max_float64, max_float64, min_float64, -0.1],
     [1., np.nan, -1., 0., min_float64, max_float64, max_float64, min_float64],
-    [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
+    [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO],
 ]
 
 
@@ -140,25 +141,3 @@ def skip_sdc_jit(msg_or_func=None):
     wrapper = unittest.skipIf(sdc.config.config_pipeline_hpat_default, msg or "sdc pipeline not supported")
     # wrapper = lambda f: f  # disable skipping
     return wrapper(func) if func else wrapper
-
-
-class TestCase(unittest.TestCase):
-
-    def numba_jit(self, *args, **kwargs):
-        import numba
-        import warnings
-        if 'nopython' in kwargs:
-            warnings.warn('nopython is set to True and is ignored', RuntimeWarning)
-        if 'parallel' in kwargs:
-            warnings.warn('parallel is set to True and is ignored', RuntimeWarning)
-        kwargs.update({'nopython': True, 'parallel': True})
-        return numba.jit(*args, **kwargs)
-
-    def sdc_jit(self, *args, **kwargs):
-        return sdc.jit(*args, **kwargs)
-
-    def jit(self, *args, **kwargs):
-        if sdc.config.config_pipeline_hpat_default:
-            return self.sdc_jit(*args, **kwargs)
-        else:
-            return self.numba_jit(*args, **kwargs)

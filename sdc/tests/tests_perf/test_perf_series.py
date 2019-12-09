@@ -24,13 +24,19 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
+
 import pandas as pd
 import numpy as np
 
-from sdc.tests.test_utils import *
-from sdc.tests.tests_perf.test_perf_base import *
-from sdc.tests.tests_perf.test_perf_utils import *
+import time
+import random
 
+import pandas
+import sdc
+
+from .test_perf_base import TestBase
+from sdc.tests.test_utils import test_global_input_data_float64
+from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 
 def usecase_series_min(input_data):
     start_time = time.time()
@@ -214,11 +220,39 @@ def usecase_series_dropna(input_data):
     finish_time = time.time()
 
     return finish_time - start_time, res
-
-
+  
+  
 def usecase_series_chain_add_and_sum(A, B):
     start_time = time.time()
     res = (A + B).sum()
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
+def usecase_series_astype_int(input_data):
+    # astype to int8
+    start_time = time.time()
+    input_data.astype(np.int8)
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, input_data
+
+
+def usecase_series_fillna(input_data):
+    start_time = time.time()
+    res = input_data.fillna(-1)
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
+def usecase_series_isna(input_data):
+    start_time = time.time()
+    res = input_data.isna()
     finish_time = time.time()
     res_time = finish_time - start_time
 
@@ -255,26 +289,48 @@ class TestSeriesMethods(TestBase):
             'series_sort_values': [10 ** 5],
             'series_dropna': [2 * 10 ** 8],
             'series_chain_add_and_sum': [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7],
+            'series_astype_int': [2 * 10 ** 7],
+            'series_fillna': [2 * 10 ** 7],
+            'series_isna': [2 * 10 ** 7],
         }
 
-    def _test_series(self, pyfunc, name, input_data=None):
-        input_data = input_data or test_global_input_data_float64
+    def _test_jitted(self, pyfunc, record, *args, **kwargs):
+        # compilation time
+        record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
+
+        sdc_func = sdc.jit(pyfunc)
+
+        # Warming up
+        sdc_func(*args, **kwargs)
+
+        # execution and boxing time
+        record["test_results"], record["boxing_results"] = \
+            get_times(sdc_func, *args, **kwargs)
+
+    def _test_python(self, pyfunc, record, *args, **kwargs):
+        record["test_results"], _ = \
+            get_times(pyfunc, *args, **kwargs)
+
+    def _test_case(self, pyfunc, name, input_data=test_global_input_data_float64):
         full_input_data_length = sum(len(i) for i in input_data)
-        hpat_func = sdc.jit(pyfunc)
         for data_length in self.total_data_length[name]:
-            data = perf_data_gen_fixed_len(input_data, full_input_data_length, data_length)
-            test_data = pd.Series(data)
+            base = {
+                "test_name": name,
+                "data_size": data_length,
+            }
+            data = perf_data_gen_fixed_len(input_data, full_input_data_length,
+                                           data_length)
+            test_data = pandas.Series(data)
 
-            compile_results = calc_compilation(pyfunc, test_data, iter_number=self.iter_number)
-            # Warming up
-            hpat_func(test_data)
+            record = base.copy()
+            record["test_type"] = 'SDC'
+            self._test_jitted(pyfunc, record, test_data)
+            self.test_results.add(**record)
 
-            exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)
-            self.test_results.add(name, 'JIT', test_data.size, exec_times, boxing_results=boxing_times,
-                                  compile_results=compile_results)
-
-            exec_times, _ = get_times(pyfunc, test_data, iter_number=self.iter_number)
-            self.test_results.add(name, 'Reference', test_data.size, test_results=exec_times)
+            record = base.copy()
+            record["test_type"] = 'Python'
+            self._test_python(pyfunc, record, test_data)
+            self.test_results.add(**record)
 
     def _test_series_binary_operations(self, pyfunc, name, input_data=None):
         np.random.seed(0)
@@ -299,73 +355,82 @@ class TestSeriesMethods(TestBase):
             self.test_results.add(name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
 
     def test_series_float_min(self):
-        self._test_series(usecase_series_min, 'series_min')
+        self._test_case(usecase_series_min, 'series_min')
 
     def test_series_float_max(self):
-        self._test_series(usecase_series_max, 'series_max')
+        self._test_case(usecase_series_max, 'series_max')
 
     def test_series_float_abs(self):
-        self._test_series(usecase_series_abs, 'series_abs')
+        self._test_case(usecase_series_abs, 'series_abs')
 
     def test_series_float_value_counts(self):
-        self._test_series(usecase_series_value_counts, 'series_value_counts')
+        self._test_case(usecase_series_value_counts, 'series_value_counts')
 
     def test_series_float_nsmallest(self):
-        self._test_series(usecase_series_nsmallest, 'series_nsmallest')
+        self._test_case(usecase_series_nsmallest, 'series_nsmallest')
 
     def test_series_float_nlargest(self):
-        self._test_series(usecase_series_nlargest, 'series_nlargest')
+        self._test_case(usecase_series_nlargest, 'series_nlargest')
 
     def test_series_float_var(self):
-        self._test_series(usecase_series_var, 'series_var')
+        self._test_case(usecase_series_var, 'series_var')
 
     def test_series_float_shift(self):
-        self._test_series(usecase_series_shift, 'series_shift')
+        self._test_case(usecase_series_shift, 'series_shift')
 
     def test_series_float_copy(self):
-        self._test_series(usecase_series_shift, 'series_copy')
+        self._test_case(usecase_series_shift, 'series_copy')
 
     def test_series_float_sum(self):
-        self._test_series(usecase_series_sum, 'series_sum')
+        self._test_case(usecase_series_sum, 'series_sum')
 
     def test_series_float_idxmax(self):
-        self._test_series(usecase_series_idxmax, 'series_idxmax')
+        self._test_case(usecase_series_idxmax, 'series_idxmax')
 
     def test_series_float_idxmin(self):
-        self._test_series(usecase_series_idxmin, 'series_idxmin')
+        self._test_case(usecase_series_idxmin, 'series_idxmin')
 
     def test_series_float_prod(self):
-        self._test_series(usecase_series_prod, 'series_prod')
+        self._test_case(usecase_series_prod, 'series_prod')
 
     def test_series_float_quantile(self):
-        self._test_series(usecase_series_quantile, 'series_quantile')
+        self._test_case(usecase_series_quantile, 'series_quantile')
 
     def test_series_float_mean(self):
-        self._test_series(usecase_series_quantile, 'series_mean')
+        self._test_case(usecase_series_quantile, 'series_mean')
 
     def test_series_float_unique(self):
-        self._test_series(usecase_series_unique, 'series_unique')
+        self._test_case(usecase_series_unique, 'series_unique')
 
     def test_series_float_cumsum(self):
-        self._test_series(usecase_series_cumsum, 'series_cumsum')
+        self._test_case(usecase_series_cumsum, 'series_cumsum')
 
     def test_series_float_nunique(self):
-        self._test_series(usecase_series_nunique, 'series_nunique')
+        self._test_case(usecase_series_nunique, 'series_nunique')
 
     def test_series_float_count(self):
-        self._test_series(usecase_series_count, 'series_count')
+        self._test_case(usecase_series_count, 'series_count')
 
     def test_series_float_median(self):
-        self._test_series(usecase_series_median, 'series_median')
+        self._test_case(usecase_series_median, 'series_median')
 
     def test_series_float_argsort(self):
-        self._test_series(usecase_series_argsort, 'series_argsort')
+        self._test_case(usecase_series_argsort, 'series_argsort')
 
     def test_series_float_sort_values(self):
-        self._test_series(usecase_series_sort_values, 'series_sort_values')
+        self._test_case(usecase_series_sort_values, 'series_sort_values')
 
     def test_series_float_dropna(self):
-        self._test_series(usecase_series_dropna, 'series_dropna')
+        self._test_case(usecase_series_dropna, 'series_dropna')
 
     def test_series_chain_add_and_sum(self):
         self._test_series_binary_operations(usecase_series_chain_add_and_sum, 'series_chain_add_and_sum')
+
+    def test_series_float_astype_int(self):
+        self._test_case(usecase_series_astype_int, 'series_astype_int', input_data=[test_global_input_data_float64[0]])
+
+    def test_series_float_fillna(self):
+        self._test_case(usecase_series_fillna, 'series_fillna')
+
+    def test_series_float_isna(self):
+        self._test_case(usecase_series_fillna, 'series_isna')
