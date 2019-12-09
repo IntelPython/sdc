@@ -33,10 +33,11 @@ import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
 import sdc
-from itertools import islice, permutations
+from itertools import islice, permutations, product
+from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end,
-    skip_numba_jit, skip_sdc_jit, TestCase)
+    skip_numba_jit, skip_sdc_jit)
 from sdc.tests.gen_test_data import ParquetGenerator
 from numba import types
 from numba.config import IS_32BITS
@@ -623,7 +624,7 @@ class TestSeries(TestCase):
     @skip_sdc_jit('Series.corr() parameter "min_periods" unsupported')
     def test_series_corr_unsupported_period(self):
         def test_series_corr_impl(S1, S2, min_periods=None):
-            return S1.corr(S2, min_periods)
+            return S1.corr(S2, min_periods=min_periods)
 
         hpat_func = self.jit(test_series_corr_impl)
         S1 = pd.Series([.2, .0, .6, .2])
@@ -1789,18 +1790,101 @@ class TestSeries(TestCase):
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
-    @unittest.skip('numba.errors.TypingError - fix needed\n'
-                   'Failed in hpat mode pipeline'
-                   '(step: convert to distributed)\n'
-                   'Invalid use of Function(<built-in function len>)'
-                   'with argument(s) of type(s): (none)\n')
-    def test_series_rename1(self):
+    def test_series_rename_str_df_noidx(self):
         def test_impl(A):
             return A.rename('B')
         hpat_func = self.jit(test_impl)
 
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
         pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A))
+
+    def test_series_rename_str_noidx(self):
+        def test_impl(S):
+            return S.rename('Name')
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3])
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_str_idx(self):
+        def test_impl(S):
+            return S.rename('Name')
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'])
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_no_name_str_noidx(self):
+        def test_impl(S):
+            return S.rename()
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_no_name_str_idx(self):
+        def test_impl(S):
+            return S.rename()
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_str_noidx_no_copy(self):
+        def test_impl(S):
+            return S.rename('Another Name', copy=False)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    def test_series_rename_str_idx_no_copy(self):
+        def test_impl(S):
+            return S.rename('Another Name', copy=False)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    @skip_sdc_jit("Requires full scalar types (not only str) support as Series name")
+    @skip_numba_jit("Requires full scalar types (not only str) support as Series name")
+    def test_series_rename_int_noidx(self):
+        def test_impl(S):
+            return S.rename(1)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    @skip_sdc_jit("Requires full scalar types (not only str) support as Series name")
+    @skip_numba_jit("Requires full scalar types (not only str) support as Series name")
+    def test_series_rename_int_idx(self):
+        def test_impl(S):
+            return S.rename(1)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    @skip_sdc_jit("Requires full scalar types (not only str) support as Series name")
+    @skip_numba_jit("Requires full scalar types (not only str) support as Series name")
+    def test_series_rename_float_noidx(self):
+        def test_impl(S):
+            return S.rename(1.1)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
+
+    @skip_sdc_jit("Requires full scalar types (not only str) support as Series name")
+    @skip_numba_jit("Requires full scalar types (not only str) support as Series name")
+    def test_series_rename_float_idx(self):
+        def test_impl(S):
+            return S.rename(1.1)
+        jit_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 3], index=['a', 'b', 'c'], name='Name')
+        pd.testing.assert_series_equal(jit_func(S), test_impl(S))
 
     def test_series_sum_default(self):
         def test_impl(S):
@@ -2363,21 +2447,214 @@ class TestSeries(TestCase):
                 err_msg='S1={}\nS2={}'.format(S1, S2))
 
     @skip_numba_jit
+    def test_series_str_center_default_fillchar(self):
+        def test_impl(series, width):
+            return series.str.center(width)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind1
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 10
+
+        pd.testing.assert_series_equal(hpat_func(series, width),
+                                       test_impl(series, width))
+
+    def test_series_str_center(self):
+        def test_impl(series, width, fillchar):
+            return series.str.center(width, fillchar)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind1
+        data_lengths = [len(s) for s in data]
+        widths = [max(data_lengths) + 10, min(data_lengths)]
+
+        for index in [None, list(range(len(data)))[::-1], data[::-1]]:
+            series = pd.Series(data, index, name='A')
+            for width, fillchar in product(widths, ['\t']):
+                jit_result = hpat_func(series, width, fillchar)
+                ref_result = test_impl(series, width, fillchar)
+                pd.testing.assert_series_equal(jit_result, ref_result)
+
+    def test_series_str_center_exception_unsupported_fillchar(self):
+        def test_impl(series, width, fillchar):
+            return series.str.center(width, fillchar)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind1
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 10
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(series, width, 10)
+        msg_tmpl = 'Method center(). The object fillchar\n {}'
+        msg = msg_tmpl.format('given: int64\n expected: str')
+        self.assertIn(msg, str(raises.exception))
+
+    def test_series_str_center_exception_unsupported_kind4(self):
+        def test_impl(series, width):
+            return series.str.center(width)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind4
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 10
+
+        with self.assertRaises(SystemError) as raises:
+            hpat_func(series, width)
+        msg = 'NULL object passed to Py_BuildValue'
+        self.assertIn(msg, str(raises.exception))
+
+    def test_series_str_endswith(self):
+        def test_impl(series, pat):
+            return series.str.endswith(pat)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind4
+        pats = [''] + [s[-min(len(s) for s in data):] for s in data] + data
+        indices = [None, list(range(len(data)))[::-1], data[::-1]]
+        names = [None, 'A']
+        for index, name in product(indices, names):
+            series = pd.Series(data, index, name=name)
+            for pat in pats:
+                pd.testing.assert_series_equal(hpat_func(series, pat),
+                                               test_impl(series, pat))
+
+    def test_series_str_endswith_exception_unsupported_na(self):
+        def test_impl(series, pat, na):
+            return series.str.endswith(pat, na)
+
+        hpat_func = self.jit(test_impl)
+
+        series = pd.Series(test_global_input_data_unicode_kind4)
+        msg_tmpl = 'Method endswith(). The object na\n {}'
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(series, '', 'None')
+        msg = msg_tmpl.format('given: unicode_type\n expected: bool')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(series, '', False)
+        msg = msg_tmpl.format('expected: None')
+        self.assertIn(msg, str(raises.exception))
+
+    def test_series_str_find(self):
+        def test_impl(series, sub):
+            return series.str.find(sub)
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind4
+        subs = [''] + [s[:min(len(s) for s in data)] for s in data] + data
+        indices = [None, list(range(len(data)))[::-1], data[::-1]]
+        names = [None, 'A']
+        for index, name in product(indices, names):
+            series = pd.Series(data, index, name=name)
+            for sub in subs:
+                pd.testing.assert_series_equal(hpat_func(series, sub),
+                                               test_impl(series, sub))
+
+    def test_series_str_find_exception_unsupported_start(self):
+        def test_impl(series, sub, start):
+            return series.str.find(sub, start)
+        hpat_func = self.jit(test_impl)
+
+        series = pd.Series(test_global_input_data_unicode_kind4)
+        msg_tmpl = 'Method find(). The object start\n {}'
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(series, '', '0')
+        msg = msg_tmpl.format('given: unicode_type\n expected: None, int')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(series, '', 1)
+        msg = msg_tmpl.format('expected: 0')
+        self.assertIn(msg, str(raises.exception))
+
+    def test_series_str_find_exception_unsupported_end(self):
+        def test_impl(series, sub, start, end):
+            return series.str.find(sub, start, end)
+        hpat_func = self.jit(test_impl)
+
+        series = pd.Series(test_global_input_data_unicode_kind4)
+        msg_tmpl = 'Method find(). The object end\n {}'
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(series, '', 0, 'None')
+        msg = msg_tmpl.format('given: unicode_type\n expected: None, int')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(series, '', 0, 0)
+        msg = msg_tmpl.format('expected: None')
+        self.assertIn(msg, str(raises.exception))
+
     def test_series_str_len1(self):
         def test_impl(S):
             return S.str.len()
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series(['aa', 'abc', 'c', 'cccd'])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        data = ['aa', 'abc', 'c', 'cccd']
+        indices = [None, [1, 3, 2, 0], data]
+        names = [None, 'A']
+        for index, name in product(indices, names):
+            S = pd.Series(data, index, name=name)
+            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_str_startswith(self):
+        def test_impl(series, pat):
+            return series.str.startswith(pat)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind4
+        pats = [''] + [s[:min(len(s) for s in data)] for s in data] + data
+        indices = [None, list(range(len(data)))[::-1], data[::-1]]
+        names = [None, 'A']
+        for index, name in product(indices, names):
+            series = pd.Series(data, index, name=name)
+            for pat in pats:
+                pd.testing.assert_series_equal(hpat_func(series, pat),
+                                               test_impl(series, pat))
+
+    def test_series_str_startswith_exception_unsupported_na(self):
+        def test_impl(series, pat, na):
+            return series.str.startswith(pat, na)
+
+        hpat_func = self.jit(test_impl)
+
+        series = pd.Series(test_global_input_data_unicode_kind4)
+        msg_tmpl = 'Method startswith(). The object na\n {}'
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(series, '', 'None')
+        msg = msg_tmpl.format('given: unicode_type\n expected: bool')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(series, '', False)
+        msg = msg_tmpl.format('expected: None')
+        self.assertIn(msg, str(raises.exception))
 
     @skip_numba_jit
     def test_series_str2str(self):
-        common_methods = ['lower', 'upper', 'lstrip', 'rstrip', 'strip']
-        sdc_methods = ['capitalize', 'swapcase', 'title']
+        common_methods = ['lower', 'upper', 'isupper']
+        sdc_methods = ['capitalize', 'swapcase', 'title',
+                       'lstrip', 'rstrip', 'strip']
         str2str_methods = common_methods[:]
+
+        data = [' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc']
+        indices = [None]
+        names = [None, 'A']
         if sdc.config.config_pipeline_hpat_default:
             str2str_methods += sdc_methods
+        else:
+            indices += [[1, 3, 2, 0], data]
 
         for method in str2str_methods:
             func_lines = ['def test_impl(S):',
@@ -2386,10 +2663,11 @@ class TestSeries(TestCase):
             test_impl = _make_func_from_text(func_text)
             hpat_func = self.jit(test_impl)
 
-            # TODO: fix issue occurred if name is not assigned
-            S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'], name='A')
-            pd.testing.assert_series_equal(hpat_func(S), test_impl(S),
-                                           check_names=method in common_methods)
+            check_names = method in common_methods
+            for index, name in product(indices, names):
+                S = pd.Series(data, index, name=name)
+                pd.testing.assert_series_equal(hpat_func(S), test_impl(S),
+                                               check_names=check_names)
 
     @skip_sdc_jit('Series.str.<method>() unsupported')
     def test_series_str2str_unsupported(self):
@@ -2399,7 +2677,7 @@ class TestSeries(TestCase):
                           '  return S.str.{}()'.format(method)]
             func_text = '\n'.join(func_lines)
             test_impl = _make_func_from_text(func_text)
-            hpat_func = sdc.jit(test_impl)
+            hpat_func = self.jit(test_impl)
 
             S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'])
             # TypingError with expected message is raised internally by Numba
@@ -4276,7 +4554,7 @@ class TestSeries(TestCase):
         def test_series_pct_change_impl(S, periods, method):
             return S.pct_change(periods=periods, fill_method=method, limit=None, freq=None)
 
-        hpat_func = sdc.jit(test_series_pct_change_impl)
+        hpat_func = self.jit(test_series_pct_change_impl)
         test_input_data = [
             [],
             [np.nan, np.nan, np.nan],
@@ -4299,7 +4577,7 @@ class TestSeries(TestCase):
         def test_series_pct_change_impl(S):
             return S.pct_change(periods=1, fill_method='pad', limit=None, freq=None)
 
-        hpat_func = sdc.jit(test_series_pct_change_impl)
+        hpat_func = self.jit(test_series_pct_change_impl)
         S = pd.Series(test_global_input_data_unicode_kind4)
 
         with self.assertRaises(TypingError) as raises:
@@ -4312,7 +4590,7 @@ class TestSeries(TestCase):
         def test_series_pct_change_impl(S, periods=1, fill_method='pad', limit=None, freq=None):
             return S.pct_change(periods=periods, fill_method=fill_method, limit=limit, freq=freq)
 
-        hpat_func = sdc.jit(test_series_pct_change_impl)
+        hpat_func = self.jit(test_series_pct_change_impl)
         S = pd.Series([0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf])
         with self.assertRaises(ValueError) as raises:
             hpat_func(S, fill_method='ababa')

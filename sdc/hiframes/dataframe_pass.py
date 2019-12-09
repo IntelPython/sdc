@@ -76,6 +76,18 @@ class DataFramePassImpl(object):
         self.state = state
 
     def run_pass(self):
+        """
+        The function could return exxeption. It means that the IR transformation can not be completed.
+        This is acceptable behaviour.
+        """
+
+        try:
+            self.run_pass_throw()
+            return True
+        except ValueError:
+            return False
+
+    def run_pass_throw(self):
         blocks = self.state.func_ir.blocks
         # topo_order necessary so DataFrame data replacement optimization can
         # be performed in one pass
@@ -109,8 +121,7 @@ class DataFramePassImpl(object):
                         # TODO: add this to dead_branch_prune pass
                         for inst in self.state.func_ir.blocks[dead_label].body:
                             if is_assign(inst):
-                                self.state.func_ir._definitions[inst.target.name].remove(
-                                    inst.value)
+                                self.state.func_ir._definitions[inst.target.name].remove(inst.value)
 
                         del self.state.func_ir.blocks[dead_label]
                     else:
@@ -124,9 +135,7 @@ class DataFramePassImpl(object):
                         used_vars = set()
                         new_body = []
                         for inst in reversed(block.body):
-                            if (is_assign(inst)
-                                    and inst.target.name not in used_vars
-                                    and inst.target.name in jmp_defs):
+                            if (is_assign(inst) and inst.target.name not in used_vars and inst.target.name in jmp_defs):
                                 self.state.func_ir._definitions[inst.target.name].remove(inst.value)
                                 continue
                             used_vars.update(v.name for v in inst.list_vars())

@@ -97,6 +97,35 @@ class TypeChecker:
 @overload(operator.getitem)
 def hpat_pandas_series_getitem(self, idx):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.get
+
+    Limitations
+    -----------
+    Supported ``key`` can be one of the following:
+        - Integer scalar, e.g. :obj:`series[0]`
+        - A slice, e.g. :obj:`series[2:5]`
+        - Another series
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series_getitem.py
+       :language: python
+       :lines: 27-
+       :caption: Getting Pandas Series elements
+       :name: ex_series_getitem
+
+    .. code-block:: console
+
+        > python ./series_getitem.py
+        55
+
+    .. todo:: Fix SDC behavior and add the expected output of the > python ./series_getitem.py to the docstring
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series operator :attr:`pandas.Series.get` implementation
     **Algorithm**: result = series[idx]
 

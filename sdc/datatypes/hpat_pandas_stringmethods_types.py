@@ -36,6 +36,7 @@ from numba import types, cgutils
 from numba.extending import (models, overload, register_model, make_attribute_wrapper, intrinsic)
 from numba.datamodel import (register_default, StructModel)
 from numba.typing.templates import signature
+from sdc.hiframes.split_impl import SplitViewStringMethodsType, StringArraySplitViewType
 
 
 class StringMethodsType(types.IterableType):
@@ -50,7 +51,8 @@ class StringMethodsType(types.IterableType):
 
     def __init__(self, data):
         self.data = data
-        super(StringMethodsType, self).__init__('StringMethodsType')
+        name = 'StringMethodsType({})'.format(self.data)
+        super(StringMethodsType, self).__init__(name)
 
     @property
     def iterator_type(self):
@@ -74,37 +76,47 @@ class StringMethodsTypeModel(StructModel):
 make_attribute_wrapper(StringMethodsType, 'data', '_data')
 
 
-@intrinsic
-def _hpat_pandas_stringmethods_init(typingctx, data):
-    """
-    Internal Numba required function to register StringMethodsType and
-    connect it with corresponding Python type mentioned in @overload(pandas.core.strings.StringMethods)
-    """
+def _gen_hpat_pandas_stringmethods_init(string_methods_type=None):
+    string_methods_type = string_methods_type or StringMethodsType
 
-    def _hpat_pandas_stringmethods_init_codegen(context, builder, signature, args):
+    def _hpat_pandas_stringmethods_init(typingctx, data):
         """
-        It is looks like it creates StringMethodsModel structure
-
-        - Fixed number of parameters. Must be 4
-        - increase reference count for the data
+        Internal Numba required function to register StringMethodsType and
+        connect it with corresponding Python type mentioned in @overload(pandas.core.strings.StringMethods)
         """
 
-        [data_val] = args
-        stringmethod = cgutils.create_struct_proxy(signature.return_type)(context, builder)
-        stringmethod.data = data_val
+        def _hpat_pandas_stringmethods_init_codegen(context, builder, signature, args):
+            """
+            It is looks like it creates StringMethodsModel structure
 
-        if context.enable_nrt:
-            context.nrt.incref(builder, data, stringmethod.data)
+            - Fixed number of parameters. Must be 4
+            - increase reference count for the data
+            """
 
-        return stringmethod._getvalue()
+            [data_val] = args
+            stringmethod = cgutils.create_struct_proxy(signature.return_type)(context, builder)
+            stringmethod.data = data_val
 
-    ret_typ = StringMethodsType(data)
-    sig = signature(ret_typ, data)
-    """
-    Construct signature of the Numba SeriesGroupByType::ctor()
-    """
+            if context.enable_nrt:
+                context.nrt.incref(builder, data, stringmethod.data)
 
-    return sig, _hpat_pandas_stringmethods_init_codegen
+            return stringmethod._getvalue()
+
+        ret_typ = string_methods_type(data)
+        sig = signature(ret_typ, data)
+        """
+        Construct signature of the Numba SeriesGroupByType::ctor()
+        """
+
+        return sig, _hpat_pandas_stringmethods_init_codegen
+
+    return _hpat_pandas_stringmethods_init
+
+
+_hpat_pandas_stringmethods_init = intrinsic(
+    _gen_hpat_pandas_stringmethods_init(string_methods_type=StringMethodsType))
+_hpat_pandas_split_view_stringmethods_init = intrinsic(
+    _gen_hpat_pandas_stringmethods_init(string_methods_type=SplitViewStringMethodsType))
 
 
 @overload(pandas.core.strings.StringMethods)
@@ -113,6 +125,11 @@ def hpat_pandas_stringmethods(obj):
     Special Numba procedure to overload Python type pandas.core.strings.StringMethods::ctor()
     with Numba registered model
     """
+    if isinstance(obj.data, StringArraySplitViewType):
+        def hpat_pandas_split_view_stringmethods_impl(obj):
+            return _hpat_pandas_split_view_stringmethods_init(obj)
+
+        return hpat_pandas_split_view_stringmethods_impl
 
     def hpat_pandas_stringmethods_impl(obj):
         return _hpat_pandas_stringmethods_init(obj)

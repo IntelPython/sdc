@@ -1,8 +1,8 @@
 ﻿.. _overview:
 .. include:: ./ext_links.txt
 
-What is Intel® Scalable Dataframe Compiler?
-===========================================
+What is Intel® SDC?
+===================
 
 Intel® Scalable Dataframe Compiler (Intel® SDC) is an extension of
 `Numba*`_ that allows just-in-time and ahead-of-time
