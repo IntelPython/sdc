@@ -31,12 +31,121 @@
 
 import operator
 import pandas
+import numpy
+import sdc
 
 from numba import types
 from numba.extending import (overload, overload_method, overload_attribute)
+from sdc.hiframes.pd_dataframe_ext import DataFrameType
+from sdc.datatypes.common_functions import TypeChecker
 from numba.errors import TypingError
 
-from sdc.datatypes.hpat_pandas_dataframe_types import DataFrameType
+
+
+@overload_method(DataFrameType, 'append')
+def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=False, sort=None):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.append
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe_append.py
+       :language: python
+       :lines: 27-
+       :caption: Pad strings in the Series by prepending '0' characters
+       :name: ex_dataframe_append
+    .. code-block:: console
+        > python ./dataframe_append.py
+            A  B
+         0  1  2
+         1  3  4
+         0  5  6
+         1  7  8
+        dtype: object
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.DataFrame.append` implementation.
+    .. only:: developer
+    Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_append_df_no_index
+    Parameters
+    -----------
+    df: :obj:`pandas.DataFrame`
+        input arg
+    other: :obj:`pandas.DataFrame` object or :obj:`pandas.Series` or :obj:`dict`
+        The data to append
+    ignore_index: :obj:`bool`
+        *unsupported*
+    verify_integrity: :obj:`bool`
+        *unsupported*
+    sort: :obj:`bool`
+        *unsupported*
+
+    Returns
+    -------
+    :obj: `pandas.DataFrame`
+        return DataFrame with appended rows to the end
+    """
+
+    name = 'append'
+
+    ty_checker = TypeChecker('Method {}().'.format(name))
+    ty_checker.check(df, DataFrameType)
+    # TODO: support other array-like types
+    ty_checker.check(other, DataFrameType)
+    # TODO: support index in series from df-columns
+    if not isinstance(ignore_index, (bool, types.Boolean, types.Omitted)) and not ignore_index:
+        ty_checker.raise_exc(ignore_index, 'boolean', 'ignore_index')
+
+    if not isinstance(verify_integrity, (bool, types.Boolean, types.Omitted)) and verify_integrity:
+        ty_checker.raise_exc(verify_integrity, 'boolean', 'verify_integrity')
+
+    if not isinstance(sort, (bool, types.Boolean, types.Omitted)) and verify_integrity:
+        ty_checker.raise_exc(verify_integrity, 'boolean', 'sort')
+
+    args = (('other', other), ('ignore_index', ignore_index), ('verify_integrity', False), ('sort', None))
+
+    def sdc_pandas_dataframe_append_impl(df, name, args):
+        df_columns = df.columns
+        n_cols = len(df_columns)
+        data_args = tuple('data{}'.format(i) for i in range(n_cols))
+        func_args = ['df', 'other']
+
+        for key, value in args:
+            #TODO: improve check
+            if key not in func_args:
+                if isinstance(value, types.Literal):
+                    value = value.literal_value
+                func_args.append('{}={}'.format(key, value))
+
+        func_definition = 'def sdc_pandas_dataframe_{}_impl({}):'.format(name, ', '.join(func_args))
+        func_lines = [func_definition]
+        for i, d in enumerate(data_args):
+            line = '    {} = sdc.hiframes.api.init_series(sdc.hiframes.pd_dataframe_ext.get_dataframe_data(df, {}))'
+            line2 = '    {} = sdc.hiframes.api.init_series(sdc.hiframes.pd_dataframe_ext.get_dataframe_data(other, {}))'
+            func_lines.append(line.format(d + '_S', i))
+            func_lines.append(line2.format('to_append_{}'.format(i) + '_S', i))
+            func_lines.append(
+                '    {} = {}.{}({})._data'.format(d + '_O', d + '_S', name, 'to_append_{}'.format(i) + '_S'))
+        data = ", ".join(d + '_O' for d in data_args)
+        # TODO: Handle index
+        index = None
+        col_names = ", ".join("'{}'".format(c) for c in df_columns)
+        func_lines.append("    return sdc.hiframes.pd_dataframe_ext.init_dataframe({}, {}, {})\n".format(
+            data,
+            index,
+            col_names))
+        loc_vars = {}
+        func_text = '\n'.join(func_lines)
+
+        exec(func_text, {'sdc': sdc, 'np': numpy}, loc_vars)
+        _append_impl = loc_vars['sdc_pandas_dataframe_append_impl']
+
+        return _append_impl
+
+    return sdc_pandas_dataframe_append_impl(df, name, args)
 
 
 @overload_method(DataFrameType, 'count')
@@ -92,3 +201,4 @@ def sdc_pandas_dataframe_count(self, axis=0, level=None, numeric_only=False):
         return pandas.Series(data=result_data, index=result_index)
 
     return sdc_pandas_dataframe_count_impl
+

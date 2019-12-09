@@ -1040,20 +1040,20 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @skip_numba_jit
-    def test_append1(self):
+
+    def test_append_df_no_index(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)
 
         hpat_func = self.jit(test_impl)
         n = 11
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
-        df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n)**2})
+        df2 = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         df2.A[n // 2:] = n
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
     @skip_numba_jit
-    def test_append2(self):
+    def test_append_no_index(self):
         def test_impl(df, df2, df3):
             return df.append([df2, df3], ignore_index=True)
 
