@@ -982,6 +982,7 @@ class TestSeries(TestCase):
         A = pd.Series(np.arange(n))
         self.assertEqual(hpat_func(A), test_impl(A))
 
+
     @skip_numba_jit
     def test_getitem_series1(self):
         def test_impl(A, i):

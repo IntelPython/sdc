@@ -1033,110 +1033,110 @@ if not sdc.config.config_pipeline_hpat_default:
             delattr(SeriesAttribute, attr)
 
 # PR135. This needs to be commented out
-# @infer_global(operator.getitem)
-# class GetItemSeries(AbstractTemplate):
-#     key = operator.getitem
-#
-#     def generic(self, args, kws):
-#         assert not kws
-#         [in_arr, in_idx] = args
-#         is_arr_series = False
-#         is_idx_series = False
-#         is_arr_dt_index = False
-#
-#         if not isinstance(in_arr, SeriesType) and not isinstance(in_idx, SeriesType):
-#             return None
-#
-#         if isinstance(in_arr, SeriesType):
-#             in_arr = series_to_array_type(in_arr)
-#             is_arr_series = True
-#             if in_arr.dtype == types.NPDatetime('ns'):
-#                 is_arr_dt_index = True
-#
-#         if isinstance(in_idx, SeriesType):
-#             in_idx = series_to_array_type(in_idx)
-#             is_idx_series = True
-#
-#         # TODO: dt_index
-#         if in_arr == string_array_type:
-#             # XXX fails due in overload
-#             # compile_internal version results in symbol not found!
-#             # sig = self.context.resolve_function_type(
-#             #     operator.getitem, (in_arr, in_idx), kws)
-#             # HACK to get avoid issues for now
-#             if isinstance(in_idx, (types.Integer, types.IntegerLiteral)):
-#                 sig = string_type(in_arr, in_idx)
-#             else:
-#                 sig = GetItemStringArray.generic(self, (in_arr, in_idx), kws)
-#         elif in_arr == list_string_array_type:
-#             # TODO: split view
-#             # mimic array indexing for list
-#             if (isinstance(in_idx, types.Array) and in_idx.ndim == 1
-#                     and isinstance(
-#                         in_idx.dtype, (types.Integer, types.Boolean))):
-#                 sig = signature(in_arr, in_arr, in_idx)
-#             else:
-#                 sig = numba.typing.collections.GetItemSequence.generic(
-#                     self, (in_arr, in_idx), kws)
-#         elif in_arr == string_array_split_view_type:
-#             sig = GetItemStringArraySplitView.generic(
-#                 self, (in_arr, in_idx), kws)
-#         else:
-#             out = get_array_index_type(in_arr, in_idx)
-#             sig = signature(out.result, in_arr, out.index)
-#
-#         if sig is not None:
-#             arg1 = sig.args[0]
-#             arg2 = sig.args[1]
-#             if is_arr_series:
-#                 sig.return_type = if_arr_to_series_type(sig.return_type)
-#                 arg1 = if_arr_to_series_type(arg1)
-#             if is_idx_series:
-#                 arg2 = if_arr_to_series_type(arg2)
-#             sig.args = (arg1, arg2)
-#             # dt_index and Series(dt64) should return Timestamp
-#             if is_arr_dt_index and sig.return_type == types.NPDatetime('ns'):
-#                 sig.return_type = pandas_timestamp_type
-#         return sig
+@infer_global(operator.getitem)
+class GetItemSeries(AbstractTemplate):
+    key = operator.getitem
+
+    def generic(self, args, kws):
+        assert not kws
+        [in_arr, in_idx] = args
+        is_arr_series = False
+        is_idx_series = False
+        is_arr_dt_index = False
+
+        if not isinstance(in_arr, SeriesType) and not isinstance(in_idx, SeriesType):
+            return None
+
+        if isinstance(in_arr, SeriesType):
+            in_arr = series_to_array_type(in_arr)
+            is_arr_series = True
+            if in_arr.dtype == types.NPDatetime('ns'):
+                is_arr_dt_index = True
+
+        if isinstance(in_idx, SeriesType):
+            in_idx = series_to_array_type(in_idx)
+            is_idx_series = True
+
+        # TODO: dt_index
+        if in_arr == string_array_type:
+            # XXX fails due in overload
+            # compile_internal version results in symbol not found!
+            # sig = self.context.resolve_function_type(
+            #     operator.getitem, (in_arr, in_idx), kws)
+            # HACK to get avoid issues for now
+            if isinstance(in_idx, (types.Integer, types.IntegerLiteral)):
+                sig = string_type(in_arr, in_idx)
+            else:
+                sig = GetItemStringArray.generic(self, (in_arr, in_idx), kws)
+        elif in_arr == list_string_array_type:
+            # TODO: split view
+            # mimic array indexing for list
+            if (isinstance(in_idx, types.Array) and in_idx.ndim == 1
+                    and isinstance(
+                        in_idx.dtype, (types.Integer, types.Boolean))):
+                sig = signature(in_arr, in_arr, in_idx)
+            else:
+                sig = numba.typing.collections.GetItemSequence.generic(
+                    self, (in_arr, in_idx), kws)
+        elif in_arr == string_array_split_view_type:
+            sig = GetItemStringArraySplitView.generic(
+                self, (in_arr, in_idx), kws)
+        else:
+            out = get_array_index_type(in_arr, in_idx)
+            sig = signature(out.result, in_arr, out.index)
+
+        if sig is not None:
+            arg1 = sig.args[0]
+            arg2 = sig.args[1]
+            if is_arr_series:
+                sig.return_type = if_arr_to_series_type(sig.return_type)
+                arg1 = if_arr_to_series_type(arg1)
+            if is_idx_series:
+                arg2 = if_arr_to_series_type(arg2)
+            sig.args = (arg1, arg2)
+            # dt_index and Series(dt64) should return Timestamp
+            if is_arr_dt_index and sig.return_type == types.NPDatetime('ns'):
+                sig.return_type = pandas_timestamp_type
+        return sig
 
 
-# @infer_global(operator.setitem)
-# class SetItemSeries(SetItemBuffer):
-#     def generic(self, args, kws):
-#         assert not kws
-#         series, idx, val = args
-#         if not isinstance(series, SeriesType):
-#             return None
-#         # TODO: handle any of args being Series independently
-#         ary = series_to_array_type(series)
-#         is_idx_series = False
-#         if isinstance(idx, SeriesType):
-#             idx = series_to_array_type(idx)
-#             is_idx_series = True
-#         is_val_series = False
-#         if isinstance(val, SeriesType):
-#             val = series_to_array_type(val)
-#             is_val_series = True
-#         # TODO: strings, dt_index
-#         res = super(SetItemSeries, self).generic((ary, idx, val), kws)
-#         if res is not None:
-#             new_series = if_arr_to_series_type(res.args[0])
-#             idx = res.args[1]
-#             val = res.args[2]
-#             if is_idx_series:
-#                 idx = if_arr_to_series_type(idx)
-#             if is_val_series:
-#                 val = if_arr_to_series_type(val)
-#             res.args = (new_series, idx, val)
-#             return res
-#
-#
-# @infer_global(operator.setitem)
-# class SetItemSeriesIat(SetItemSeries):
-#     def generic(self, args, kws):
-#         # iat[] is the same as regular setitem
-#         if isinstance(args[0], SeriesIatType):
-#             return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
+@infer_global(operator.setitem)
+class SetItemSeries(SetItemBuffer):
+    def generic(self, args, kws):
+        assert not kws
+        series, idx, val = args
+        if not isinstance(series, SeriesType):
+            return None
+        # TODO: handle any of args being Series independently
+        ary = series_to_array_type(series)
+        is_idx_series = False
+        if isinstance(idx, SeriesType):
+            idx = series_to_array_type(idx)
+            is_idx_series = True
+        is_val_series = False
+        if isinstance(val, SeriesType):
+            val = series_to_array_type(val)
+            is_val_series = True
+        # TODO: strings, dt_index
+        res = super(SetItemSeries, self).generic((ary, idx, val), kws)
+        if res is not None:
+            new_series = if_arr_to_series_type(res.args[0])
+            idx = res.args[1]
+            val = res.args[2]
+            if is_idx_series:
+                idx = if_arr_to_series_type(idx)
+            if is_val_series:
+                val = if_arr_to_series_type(val)
+            res.args = (new_series, idx, val)
+            return res
+
+
+@infer_global(operator.setitem)
+class SetItemSeriesIat(SetItemSeries):
+    def generic(self, args, kws):
+        # iat[] is the same as regular setitem
+        if isinstance(args[0], SeriesIatType):
+            return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
 
 
 inplace_ops = [
