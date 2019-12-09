@@ -28,7 +28,7 @@
 import pandas
 from sdc_object_utils import init_pandas_structure, init_sdc_structure, init_pandas_sdc_dict, get_sdc_object, get_obj
 from sdc_object_utils import get_class_methods, get_class_attributes, get_fully_qualified_name
-from sdc_doc_utils import is_sdc_user_guide_header, get_indent, reindent,get_short_description
+from sdc_doc_utils import is_sdc_user_guide_header, get_indent, reindent, get_short_description
 from sdc_doc_utils import split_in_sections, get_docstring, create_heading_str, cut_sdc_dev_guide
 import os
 
@@ -43,7 +43,7 @@ def reformat(text):
     :param text: Original text with warnings
     :return: Modified text that fixes warnings
     """
-    text = reformat_replace_star_list_with_dash_list(text) # Must be called before :func:`reformat_asterisks`
+    text = reformat_replace_star_list_with_dash_list(text)  # Must be called before :func:`reformat_asterisks`
     text = reformat_asterisks(text)  # Fix for * and ** symbols
     text = reformat_explicit_markup(text)  # Fix for explicit markup without a blank line
     text = reformat_bullet_list(text)  # Fix bullet list indentation issues
@@ -214,7 +214,7 @@ def reformat_asterisks(text):
                 if idx2 == -1:
                     # Only one single asterisk in the line - Reformat to `\*`
                     line = line.replace('*', '\\*')
-                    idx = len(line) # Parsed the line. Go to another line
+                    idx = len(line)  # Parsed the line. Go to another line
                 elif idx2 == idx1+1:
                     # First double asterisk met in the line
                     idx2 = line.find('**', idx1+2)
@@ -277,7 +277,6 @@ def reformat_pandas_params(title, text):
             return ':return:'
         elif title == 'Raises':
             return ':raises:'
-
 
     # Internal function. Returns correct markup for Parameters section
     def _reformat_parameters(title, text):
@@ -608,7 +607,7 @@ def parse_templ_rst(fname_templ):
             doc.pop(0)  # Skipping ``.. sdc_toctree``
 
             # Parsing the list of APIs
-            while len(doc) >0 and doc[0].strip() != '':
+            while len(doc) > 0 and doc[0].strip() != '':
                 line = doc[0]
                 indent = get_indent(line)
                 line = line.strip()
@@ -616,7 +615,7 @@ def parse_templ_rst(fname_templ):
                 obj = get_obj(full_name)
                 short_description = generate_simple_object_doc(obj, short_doc_flag=True).strip()
                 new_line = reindent(':ref:`', indent) + line + ' <' + full_name + '>`\n' + \
-                           reindent(short_description, indent+4) + '\n'
+                    reindent(short_description, indent+4) + '\n'
                 fout.write(new_line)
                 doc.pop(0)
 
