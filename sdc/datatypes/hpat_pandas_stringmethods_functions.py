@@ -421,6 +421,31 @@ def hpat_pandas_stringmethods_len(self):
 @overload_method(StringMethodsType, 'ljust')
 def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.ljust
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series_str_ljust.py
+       :language: python
+       :lines: 27-
+       :caption: Filling right side of strings in the Series with an additional character
+       :name: ex_series_str_ljust
+
+    .. code-block:: console
+
+        > python ./series_str_ljust.py
+        0    dog**
+        1    foo**
+        2    bar**
+        dtype: object
+
+    .. todo:: Add support of 32-bit Unicode for `str.ljust()`
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.ljust()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
@@ -468,6 +493,31 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
 @overload_method(StringMethodsType, 'rjust')
 def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.rjust
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series_str_rjust.py
+       :language: python
+       :lines: 27-
+       :caption: Filling left side of strings in the Series with an additional character
+       :name: ex_series_str_rjust
+
+    .. code-block:: console
+
+        > python ./series_str_rjust.py
+        0    **dog
+        1    **foo
+        2    **bar
+        dtype: object
+
+    .. todo:: Add support of 32-bit Unicode for `str.rjust()`
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.rjust()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
