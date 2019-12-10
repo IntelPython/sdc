@@ -41,9 +41,12 @@ from numba import types
 import sdc
 import sdc.datatypes.common_functions as common_functions
 from sdc.datatypes.common_functions import TypeChecker
+from sdc.datatypes.common_functions import (check_index_is_numeric, find_common_dtype_from_numpy_dtypes,
+                                            hpat_join_series_indexes)
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.hiframes.pd_series_ext import SeriesType
-from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars)
+from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars, string_array_type,
+                             str_arr_is_na, pre_alloc_string_array, str_arr_set_na)
 from sdc.utils import to_array
 
 
@@ -3722,3 +3725,132 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
         return pandas.Series(result)
 
     return hpat_pandas_series_pct_change_impl
+
+
+@overload(operator.add)
+def hpat_pandas_series_operator_add(self, other):
+    """
+    Pandas Series operator :attr:`pandas.Series.add` implementation
+
+    Note: Currently implemented for numeric Series only.
+        Differs from Pandas in returning Series with fixed dtype :obj:`float64`
+
+    .. only:: developer
+
+    **Test**: python -m hpat.runtests sdc.tests.test_series.TestSeries.test_series_op1
+              python -m hpat.runtests sdc.tests.test_series.TestSeries.test_series_op2
+              python -m hpat.runtests sdc.tests.test_series.TestSeries.test_series_op3
+              python -m hpat.runtests sdc.tests.test_series.TestSeries.test_series_op4
+              python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_operator_add*
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+        Input series
+    other: :obj:`pandas.Series` or :obj:`scalar`
+        Series or scalar value to be used as a second argument of binary operation
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+        The result of the operation
+    """
+
+    _func_name = 'Operator add().'
+
+    ty_checker = TypeChecker('Operator add().')
+    ty_checker.check(self, SeriesType)
+
+    if not isinstance(other, (SeriesType, types.Number)):
+        ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
+
+    series_indexes_alignable = False
+    none_or_numeric_indexes = False
+    if isinstance(other, SeriesType):
+        if (other.index == string_array_type and self.index == string_array_type):
+            series_indexes_alignable = True
+
+        if ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
+                and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other))):
+            series_indexes_alignable = True
+            none_or_numeric_indexes = True
+
+    if isinstance(other, SeriesType) and not series_indexes_alignable:
+        raise TypingError('{} Not implemented for series with not-alignable indexes. \
+        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
+
+    # specializations for numeric series - TODO: support arithmetic operation on StringArrays
+    if (isinstance(other, types.Number)):
+        def hpat_pandas_series_add_scalar_impl(self, other):
+            return pandas.Series(self._data + other, self._index)
+
+        return hpat_pandas_series_add_scalar_impl
+
+    elif (isinstance(other, SeriesType)):
+
+        # optimization for series with default indexes, that can be aligned differently
+        if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
+            def hpat_pandas_series_add_impl(self, other):
+
+                if (len(self._data) == len(other._data)):
+                    return pandas.Series(numpy.asarray(self._data + other._data, numpy.float64))
+                else:
+                    min_data_size = min(len(self._data), len(other._data))
+                    max_data_size = max(len(self._data), len(other._data))
+                    new_data = numpy.empty(max_data_size, dtype=numpy.float64)
+                    new_data[:min_data_size] = self._data[:min_data_size] + other._data[:min_data_size]
+                    new_data[min_data_size:] = numpy.repeat(numpy.nan, max_data_size - min_data_size)
+
+                    return pandas.Series(new_data, self._index)
+
+            return hpat_pandas_series_add_impl
+        else:
+            # for numeric indexes find common dtype to be used when creating joined index
+            if none_or_numeric_indexes:
+                ty_left_index_dtype = types.int64 if isinstance(self.index, types.NoneType) else self.index.dtype
+                ty_right_index_dtype = types.int64 if isinstance(other.index, types.NoneType) else other.index.dtype
+                numba_index_common_dtype = find_common_dtype_from_numpy_dtypes(
+                    [ty_left_index_dtype, ty_right_index_dtype], [])
+
+            def hpat_pandas_series_add_impl(self, other):
+                left_index, right_index = self.index, other.index
+
+                # check if indexes are equal and series don't have to be aligned
+                if none_or_numeric_indexes == True:  # noqa
+                    if (numpy.array_equal(left_index, right_index)):
+                        return pandas.Series(numpy.asarray(self._data + other._data, numpy.float64),
+                                             numpy.asarray(left_index, numba_index_common_dtype))
+                else:
+                    # TODO: replace with StringArrays comparison
+                    is_index_equal = (len(self._index) == len(other._index)
+                                      and num_total_chars(self._index) == num_total_chars(other._index))
+                    for i in numpy.arange(len(self._index)):
+                        if (self._index[i] != other._index[i]
+                                or str_arr_is_na(self._index, i) is not str_arr_is_na(other._index, i)):
+                            is_index_equal = False
+
+                    if is_index_equal:
+                        return pandas.Series(numpy.asarray(self._data + other._data, numpy.float64),
+                                             self._index)
+
+                # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
+                joined_index, left_indexer, right_indexer = hpat_join_series_indexes(left_index, right_index)
+
+                joined_index_range = numpy.arange(len(joined_index))
+                left_values = numpy.asarray(
+                    [self._data[left_indexer[i]] for i in joined_index_range],
+                    numpy.float64
+                )
+                left_values[left_indexer == -1] = numpy.nan
+
+                right_values = numpy.asarray(
+                    [other._data[right_indexer[i]] for i in joined_index_range],
+                    numpy.float64
+                )
+                right_values[right_indexer == -1] = numpy.nan
+
+                return pandas.Series(left_values + right_values, joined_index)
+
+            return hpat_pandas_series_add_impl
+
+    return None
