@@ -31,11 +31,12 @@ import numpy as np
 from math import sqrt
 import numba
 import sdc
+from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs,
                                    count_parfor_OneD_Vars, count_array_OneD_Vars,
                                    dist_IR_contains, check_numba_version,
-                                   skip_numba_jit, TestCase)
+                                   skip_numba_jit)
 
 
 class TestML(TestCase):
@@ -52,7 +53,7 @@ class TestML(TestCase):
                 w -= np.dot(((1.0 / (1.0 + np.exp(-Y * np.dot(X, w))) - 1.0) * Y), X)
             return w
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         d = 4
         np.testing.assert_allclose(hpat_func(n, d), test_impl(n, d))
@@ -74,7 +75,7 @@ class TestML(TestCase):
                 accuracy = np.sum(R == Y) / N
             return accuracy
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         d = 4
         np.testing.assert_approx_equal(hpat_func(n, d), test_impl(n, d))
@@ -94,7 +95,7 @@ class TestML(TestCase):
                 w -= alphaN * np.dot(X.T, np.dot(X, w) - Y)
             return w
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         d = 4
         np.testing.assert_allclose(hpat_func(n, d), test_impl(n, d))
@@ -116,7 +117,7 @@ class TestML(TestCase):
                 exps += m - np.log(b * N) + np.log(np.sum(np.exp(d - m)))
             return exps
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         np.testing.assert_approx_equal(hpat_func(n), test_impl(n))
         self.assertEqual(count_array_OneDs(), 1)
@@ -138,7 +139,7 @@ class TestML(TestCase):
 
             return centroids
 
-        hpat_func = sdc.jit(test_impl)
+        hpat_func = self.jit(test_impl)
         n = 11
         np.testing.assert_allclose(hpat_func(1, 1, n, 2), test_impl(1, 1, n, 2))
         self.assertEqual(count_array_OneDs(), 4)
