@@ -795,6 +795,72 @@ def hpat_pandas_stringmethods_startswith(self, pat, na=None):
     return hpat_pandas_stringmethods_startswith_impl
 
 
+@overload_method(StringMethodsType, 'zfill')
+def hpat_pandas_stringmethods_zfill(self, width):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.zfill
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series_str_zfill.py
+       :language: python
+       :lines: 27-
+       :caption: Pad strings in the Series by prepending '0' characters
+       :name: ex_series_str_zfill
+
+    .. code-block:: console
+
+        > python ./series_str_zfill.py
+        0    00dog
+        1    00foo
+        2    00bar
+        dtype: object
+
+    .. todo:: Add support of 32-bit Unicode for `str.zfill()`
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas Series method :meth:`pandas.core.strings.StringMethods.zfill()` implementation.
+
+    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_zfill
+
+    Parameters
+    ----------
+    self: :class:`pandas.core.strings.StringMethods`
+        input arg
+    width: :obj:`int`
+        Minimum width of resulting string
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method zfill().')
+    ty_checker.check(self, StringMethodsType)
+
+    if not isinstance(width, Integer):
+        ty_checker.raise_exc(width, 'int', 'width')
+
+    def hpat_pandas_stringmethods_zfill_impl(self, width):
+        item_count = len(self._data)
+        result = [''] * item_count
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.zfill(width)
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_zfill_impl
+
+
 def _hpat_pandas_stringmethods_autogen(method_name):
     """"
     The function generates a function for 'method_name' from source text that is created on the fly.
