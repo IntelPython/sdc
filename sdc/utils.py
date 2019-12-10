@@ -566,12 +566,12 @@ def update_globals(func, glbls):
 
 
 def sdc_overload(func):
-    return overload(func)
+    return overload(func, inline='always')
 
 
 def sdc_overload_method(typ, name):
-    return overload_method(typ, name)
+    return overload_method(typ, name, inline='always')
 
 
 def sdc_overload_attribute(typ, name):
-    return overload_attribute(typ, name)
+    return overload_attribute(typ, name, inline='always')
