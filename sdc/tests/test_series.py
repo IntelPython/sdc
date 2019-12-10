@@ -208,6 +208,22 @@ def _make_func_use_method_arg1(method):
     return _make_func_from_text(func_text)
 
 
+def ljust_usecase(series, width):
+    return series.str.ljust(width)
+
+
+def ljust_with_fillchar_usecase(series, width, fillchar):
+    return series.str.ljust(width, fillchar)
+
+
+def rjust_usecase(series, width):
+    return series.str.rjust(width)
+
+
+def rjust_with_fillchar_usecase(series, width, fillchar):
+    return series.str.rjust(width, fillchar)
+
+
 GLOBAL_VAL = 2
 
 
@@ -2588,6 +2604,58 @@ class TestSeries(TestCase):
         for index, name in product(indices, names):
             S = pd.Series(data, index, name=name)
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_str_just_default_fillchar(self):
+        data = test_global_input_data_unicode_kind1
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 5
+
+        pyfuncs = [ljust_usecase, rjust_usecase]
+        for pyfunc in pyfuncs:
+            cfunc = self.jit(pyfunc)
+            pd.testing.assert_series_equal(cfunc(series, width),
+                                           pyfunc(series, width))
+
+    def test_series_str_just(self):
+        data = test_global_input_data_unicode_kind1
+        data_lengths = [len(s) for s in data]
+        widths = [max(data_lengths) + 5, min(data_lengths)]
+
+        pyfuncs = [ljust_with_fillchar_usecase, rjust_with_fillchar_usecase]
+        for index in [None, list(range(len(data)))[::-1], data[::-1]]:
+            series = pd.Series(data, index, name='A')
+            for width, fillchar in product(widths, ['\t']):
+                for pyfunc in pyfuncs:
+                    cfunc = self.jit(pyfunc)
+                    jit_result = cfunc(series, width, fillchar)
+                    ref_result = pyfunc(series, width, fillchar)
+                    pd.testing.assert_series_equal(jit_result, ref_result)
+
+    def test_series_str_just_exception_unsupported_fillchar(self):
+        data = test_global_input_data_unicode_kind1
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 5
+        msg_tmpl = 'Method {}(). The object fillchar\n given: int64\n expected: str'
+
+        pyfuncs = [('ljust', ljust_with_fillchar_usecase),
+                   ('rjust', rjust_with_fillchar_usecase)]
+        for name, pyfunc in pyfuncs:
+            cfunc = self.jit(pyfunc)
+            with self.assertRaises(TypingError) as raises:
+                cfunc(series, width, 5)
+            self.assertIn(msg_tmpl.format(name), str(raises.exception))
+
+    def test_series_str_just_exception_unsupported_kind4(self):
+        data = test_global_input_data_unicode_kind4
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 5
+        msg = 'NULL object passed to Py_BuildValue'
+
+        for pyfunc in [ljust_usecase, rjust_usecase]:
+            cfunc = self.jit(pyfunc)
+            with self.assertRaises(SystemError) as raises:
+                cfunc(series, width)
+            self.assertIn(msg, str(raises.exception))
 
     def test_series_str_startswith(self):
         def test_impl(series, pat):
