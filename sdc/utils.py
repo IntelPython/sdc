@@ -572,5 +572,6 @@ def sdc_overload(func):
 def sdc_overload_method(typ, name):
     return overload_method(typ, name)
 
+
 def sdc_overload_attribute(typ, name):
     return overload_attribute(typ, name)
