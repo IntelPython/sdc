@@ -44,7 +44,7 @@ from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import string_array_type, num_total_chars, pre_alloc_string_array
 from enum import Enum
 import types as pytypes
-from numba.extending import overload, overload_method
+from numba.extending import overload, overload_method, overload_attribute
 
 
 # int values for types to pass to C code
@@ -571,3 +571,6 @@ def sdc_overload(func):
 
 def sdc_overload_method(typ, name):
     return overload_method(typ, name)
+
+def sdc_overload_attribute(typ, name):
+    return overload_attribute(typ, name)

@@ -47,7 +47,7 @@ from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars, string_array_type,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na)
-from sdc.utils import to_array, sdc_overload, sdc_overload_method
+from sdc.utils import to_array, sdc_overload, sdc_overload_method, sdc_overload_attribute
 
 
 @sdc_overload(operator.getitem)
@@ -141,10 +141,10 @@ def hpat_pandas_series_getitem(self, idx):
     raise TypingError('{} The index must be an Integer, Slice or a pandas.series. Given: {}'.format(_func_name, idx))
 
 
-@overload_attribute(SeriesType, 'at')
-@overload_attribute(SeriesType, 'iat')
-@overload_attribute(SeriesType, 'iloc')
-@overload_attribute(SeriesType, 'loc')
+@sdc_overload_attribute(SeriesType, 'at')
+@sdc_overload_attribute(SeriesType, 'iat')
+@sdc_overload_attribute(SeriesType, 'iloc')
+@sdc_overload_attribute(SeriesType, 'loc')
 def hpat_pandas_series_iloc(self):
     """
     Pandas Series operators :attr:`pandas.Series.at`, :attr:`pandas.Series.iat`, :attr:`pandas.Series.iloc`, :attr:`pandas.Series.loc` implementation.
@@ -276,7 +276,7 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
     return hpat_pandas_series_nlargest_impl
 
 
-@overload_attribute(SeriesType, 'shape')
+@sdc_overload_attribute(SeriesType, 'shape')
 def hpat_pandas_series_shape(self):
     """
     Pandas Series attribute :attr:`pandas.Series.shape` implementation
@@ -371,7 +371,7 @@ def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, num
     return hpat_pandas_series_std_impl
 
 
-@overload_attribute(SeriesType, 'values')
+@sdc_overload_attribute(SeriesType, 'values')
 def hpat_pandas_series_values(self):
     """
     Pandas Series attribute 'values' implementation.
@@ -586,7 +586,7 @@ def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
     return hpat_pandas_series_var_impl
 
 
-@overload_attribute(SeriesType, 'index')
+@sdc_overload_attribute(SeriesType, 'index')
 def hpat_pandas_series_index(self):
     """
     Pandas Series attribute :attr:`pandas.Series.index` implementation
@@ -620,7 +620,7 @@ def hpat_pandas_series_index(self):
         return hpat_pandas_series_index_impl
 
 
-@overload_attribute(SeriesType, 'size')
+@sdc_overload_attribute(SeriesType, 'size')
 def hpat_pandas_series_size(self):
     """
     Pandas Series attribute :attr:`pandas.Series.size` implementation
@@ -651,7 +651,7 @@ def hpat_pandas_series_size(self):
     return hpat_pandas_series_size_impl
 
 
-@overload_attribute(SeriesType, 'str')
+@sdc_overload_attribute(SeriesType, 'str')
 def hpat_pandas_series_str(self):
     """
     Pandas Series attribute :attr:`pandas.Series.str` implementation
@@ -686,7 +686,7 @@ def hpat_pandas_series_str(self):
     return hpat_pandas_series_str_impl
 
 
-@overload_attribute(SeriesType, 'ndim')
+@sdc_overload_attribute(SeriesType, 'ndim')
 def hpat_pandas_series_ndim(self):
     """
     Pandas Series attribute :attr:`pandas.Series.ndim` implementation
@@ -717,7 +717,7 @@ def hpat_pandas_series_ndim(self):
     return hpat_pandas_series_ndim_impl
 
 
-@overload_attribute(SeriesType, 'T')
+@sdc_overload_attribute(SeriesType, 'T')
 def hpat_pandas_series_T(self):
     """
     Pandas Series attribute :attr:`pandas.Series.T` implementation
