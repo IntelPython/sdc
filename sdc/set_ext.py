@@ -135,9 +135,9 @@ def init_set_string_array(A):
 
 
 @overload_method(SetType, 'add')
-def set_add_overload(set_obj_typ, item_typ):
+def set_add_overload(set_obj, item):
     # TODO: expand to other set types
-    assert set_obj_typ == set_string_type and item_typ == string_type
+    assert set_obj == set_string_type and item == string_type
 
     def add_impl(set_obj, item):
         return add_set_string(set_obj, item._data)
