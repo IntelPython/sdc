@@ -2692,6 +2692,37 @@ class TestSeries(TestCase):
         msg = msg_tmpl.format('expected: None')
         self.assertIn(msg, str(raises.exception))
 
+    def test_series_str_zfill(self):
+        def test_impl(series, width):
+            return series.str.zfill(width)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind1
+        data_lengths = [len(s) for s in data]
+
+        for index in [None, list(range(len(data)))[::-1], data[::-1]]:
+            series = pd.Series(data, index, name='A')
+            for width in [max(data_lengths) + 5, min(data_lengths)]:
+                jit_result = hpat_func(series, width)
+                ref_result = test_impl(series, width)
+                pd.testing.assert_series_equal(jit_result, ref_result)
+
+    def test_series_str_zfill_exception_unsupported_kind4(self):
+        def test_impl(series, width):
+            return series.str.zfill(width)
+
+        hpat_func = self.jit(test_impl)
+
+        data = test_global_input_data_unicode_kind4
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 5
+
+        with self.assertRaises(SystemError) as raises:
+            hpat_func(series, width)
+        msg = 'NULL object passed to Py_BuildValue'
+        self.assertIn(msg, str(raises.exception))
+
     def test_series_str2str(self):
         common_methods = ['lower', 'upper', 'isupper']
         sdc_methods = ['capitalize', 'swapcase', 'title',
