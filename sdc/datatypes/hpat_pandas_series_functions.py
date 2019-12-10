@@ -527,14 +527,10 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
                 value_type=types.intp
             )
 
-            nan_counts = 0
             zero_counts = 0
             is_zero_found = False
             for value in self._data:
-                if numpy.isnan(value):
-                    nan_value = value
-                    if not dropna:
-                        nan_counts += 1
+                if (dropna and numpy.isnan(value)):
                     continue
 
                 # Pandas hash-based value_count_float64 function doesn't distinguish between
@@ -551,9 +547,6 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
                     value_counts_dict[value] += 1
                 else:
                     value_counts_dict[value] = 1
-
-            if (not dropna and nan_counts):
-                value_counts_dict[nan_value] = nan_counts
 
             if zero_counts:
                 value_counts_dict[zero_value] = zero_counts

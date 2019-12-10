@@ -71,6 +71,7 @@ min_float64 = np.finfo('float64').min
 max_float64 = np.finfo('float64').max
 
 test_global_input_data_float64 = [
+    [11., 35.2, -24., 0., np.NZERO, np.NINF, np.PZERO, min_float64],
     [1., np.nan, -1., 0., min_float64, max_float64, max_float64, min_float64],
     [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
 ]
