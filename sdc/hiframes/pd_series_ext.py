@@ -759,8 +759,8 @@ str2str_methods = ['capitalize', 'swapcase', 'title']
 """
 
 str2str_methods_excluded = [
-    'upper', 'center', 'endswith', 'find', 'isupper', 'len',
-    'lower', 'lstrip', 'rstrip', 'startswith', 'strip'
+    'upper', 'center', 'endswith', 'find', 'isupper', 'len', 'ljust',
+    'lower', 'lstrip', 'rjust', 'rstrip', 'startswith', 'strip', 'zfill'
 ]
 """
     Functions which are used from Numba directly by calling from StringMethodsType
@@ -1031,7 +1031,7 @@ if not sdc.config.config_pipeline_hpat_default:
 _non_hpat_pipeline_attrs = [
     'resolve_append', 'resolve_combine', 'resolve_corr', 'resolve_cov',
     'resolve_dropna', 'resolve_fillna', 'resolve_head', 'resolve_nlargest',
-    'resolve_nsmallest', 'resolve_pct_change'
+    'resolve_nsmallest', 'resolve_pct_change', 'resolve_loc'
 ]
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
@@ -1239,10 +1239,11 @@ class SeriesUnaryOpUfuncs(NumpyRulesUnaryArrayOperator):
         return series_op_generic(SeriesUnaryOpUfuncs, self, args, kws)
 
 
-# TODO: change class name to Series in install_operations
-SeriesOpUfuncs.install_operations()
-SeriesInplaceOpUfuncs.install_operations()
-SeriesUnaryOpUfuncs.install_operations()
+if sdc.config.config_pipeline_hpat_default:
+    # TODO: change class name to Series in install_operations
+    SeriesOpUfuncs.install_operations()
+    SeriesInplaceOpUfuncs.install_operations()
+    SeriesUnaryOpUfuncs.install_operations()
 
 
 class Series_Numpy_rules_ufunc(Numpy_rules_ufunc):
