@@ -50,7 +50,7 @@ from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_ch
 from sdc.utils import to_array, sdc_overload, sdc_overload_method
 
 
-@overload(operator.getitem)
+@sdc_overload(operator.getitem)
 def hpat_pandas_series_getitem(self, idx):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -3727,7 +3727,7 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
     return hpat_pandas_series_pct_change_impl
 
 
-@overload(operator.add)
+@sdc_overload(operator.add)
 def hpat_pandas_series_operator_add(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.add` implementation

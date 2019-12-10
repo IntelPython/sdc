@@ -418,7 +418,7 @@ def hpat_pandas_stringmethods_len(self):
     return hpat_pandas_stringmethods_len_impl
 
 
-@overload_method(StringMethodsType, 'ljust')
+@sdc_overload_method(StringMethodsType, 'ljust')
 def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -490,7 +490,7 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
     return hpat_pandas_stringmethods_ljust_impl
 
 
-@overload_method(StringMethodsType, 'rjust')
+@sdc_overload_method(StringMethodsType, 'rjust')
 def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -562,7 +562,7 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
     return hpat_pandas_stringmethods_rjust_impl
 
 
-@overload_method(StringMethodsType, 'startswith')
+@sdc_overload_method(StringMethodsType, 'startswith')
 def hpat_pandas_stringmethods_startswith(self, pat, na=None):
     """
     Pandas Series method :meth:`pandas.core.strings.StringMethods.startswith()` implementation.
