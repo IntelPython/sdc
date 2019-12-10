@@ -560,6 +560,150 @@ def hpat_pandas_stringmethods_len(self):
     return hpat_pandas_stringmethods_len_impl
 
 
+@overload_method(StringMethodsType, 'ljust')
+def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.ljust
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series_str_ljust.py
+       :language: python
+       :lines: 27-
+       :caption: Filling right side of strings in the Series with an additional character
+       :name: ex_series_str_ljust
+
+    .. code-block:: console
+
+        > python ./series_str_ljust.py
+        0    dog**
+        1    foo**
+        2    bar**
+        dtype: object
+
+    .. todo:: Add support of 32-bit Unicode for `str.ljust()`
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas Series method :meth:`pandas.core.strings.StringMethods.ljust()` implementation.
+
+    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_ljust
+
+    Parameters
+    ----------
+    self: :class:`pandas.core.strings.StringMethods`
+        input arg
+    width: :obj:`int`
+        Minimum width of resulting string
+    fillchar: :obj:`str`
+        Additional character for filling, default is whitespace
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method ljust().')
+    ty_checker.check(self, StringMethodsType)
+
+    if not isinstance(width, Integer):
+        ty_checker.raise_exc(width, 'int', 'width')
+
+    accepted_types = (Omitted, StringLiteral, UnicodeType)
+    if not isinstance(fillchar, accepted_types) and fillchar != ' ':
+        ty_checker.raise_exc(fillchar, 'str', 'fillchar')
+
+    def hpat_pandas_stringmethods_ljust_impl(self, width, fillchar=' '):
+        item_count = len(self._data)
+        result = [''] * item_count
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.ljust(width, fillchar)
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_ljust_impl
+
+
+@overload_method(StringMethodsType, 'rjust')
+def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.rjust
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series_str_rjust.py
+       :language: python
+       :lines: 27-
+       :caption: Filling left side of strings in the Series with an additional character
+       :name: ex_series_str_rjust
+
+    .. code-block:: console
+
+        > python ./series_str_rjust.py
+        0    **dog
+        1    **foo
+        2    **bar
+        dtype: object
+
+    .. todo:: Add support of 32-bit Unicode for `str.rjust()`
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas Series method :meth:`pandas.core.strings.StringMethods.rjust()` implementation.
+
+    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_rjust
+
+    Parameters
+    ----------
+    self: :class:`pandas.core.strings.StringMethods`
+        input arg
+    width: :obj:`int`
+        Minimum width of resulting string
+    fillchar: :obj:`str`
+        Additional character for filling, default is whitespace
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method rjust().')
+    ty_checker.check(self, StringMethodsType)
+
+    if not isinstance(width, Integer):
+        ty_checker.raise_exc(width, 'int', 'width')
+
+    accepted_types = (Omitted, StringLiteral, UnicodeType)
+    if not isinstance(fillchar, accepted_types) and fillchar != ' ':
+        ty_checker.raise_exc(fillchar, 'str', 'fillchar')
+
+    def hpat_pandas_stringmethods_rjust_impl(self, width, fillchar=' '):
+        item_count = len(self._data)
+        result = [''] * item_count
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.rjust(width, fillchar)
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_rjust_impl
+
+
 @overload_method(StringMethodsType, 'startswith')
 def hpat_pandas_stringmethods_startswith(self, pat, na=None):
     """

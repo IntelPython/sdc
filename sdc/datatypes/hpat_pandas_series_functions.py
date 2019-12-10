@@ -40,58 +40,14 @@ from numba import types
 
 import sdc
 import sdc.datatypes.common_functions as common_functions
+from sdc.datatypes.common_functions import TypeChecker
+from sdc.datatypes.common_functions import (check_index_is_numeric, find_common_dtype_from_numpy_dtypes,
+                                            hpat_join_series_indexes)
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.hiframes.pd_series_ext import SeriesType
-from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars)
+from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars, string_array_type,
+                             str_arr_is_na, pre_alloc_string_array, str_arr_set_na)
 from sdc.utils import to_array
-
-class TypeChecker:
-    """
-        Validate object type and raise TypingError if the type is invalid, e.g.:
-            Method nsmallest(). The object n
-             given: bool
-             expected: int
-        """
-    msg_template = '{} The object {}\n given: {}\n expected: {}'
-
-    def __init__(self, func_name):
-        """
-        Parameters
-        ----------
-        func_name: :obj:`str`
-            name of the function where types checking
-        """
-        self.func_name = func_name
-
-    def raise_exc(self, data, expected_types, name=''):
-        """
-        Raise exception with unified message
-        Parameters
-        ----------
-        data: :obj:`any`
-            real type of the data
-        expected_types: :obj:`str`
-            expected types inserting directly to the exception
-        name: :obj:`str`
-            name of the parameter
-        """
-        msg = self.msg_template.format(self.func_name, name, data, expected_types)
-        raise TypingError(msg)
-
-    def check(self, data, accepted_type, name=''):
-        """
-        Check data type belongs to specified type
-        Parameters
-        ----------
-        data: :obj:`any`
-            real type of the data
-        accepted_type: :obj:`type`
-            accepted type
-        name: :obj:`str`
-            name of the parameter
-        """
-        if not isinstance(data, accepted_type):
-            self.raise_exc(data, accepted_type.__name__, name=name)
 
 
 @overload(operator.getitem)
@@ -1207,7 +1163,7 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
     if not isinstance(other.data.dtype, types.Number):
         ty_checker.raise_exc(other.data, 'number', 'other.data')
 
-    if not isinstance(min_periods, (types.Integer, types.Omitted, types.NoneType)):
+    if not isinstance(min_periods, (int, types.Integer, types.Omitted, types.NoneType)) and min_periods is not None:
         ty_checker.raise_exc(min_periods, 'int64', 'min_periods')
 
     def hpat_pandas_series_corr_impl(self, other, method='pearson', min_periods=None):
@@ -1229,7 +1185,20 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
         if len(self_arr) < min_periods:
             return numpy.nan
 
-        return numpy.corrcoef(self_arr, other_arr)[0, 1]
+        new_self = pandas.Series(self_arr)
+        new_other = pandas.Series(other_arr)
+
+        n = new_self.count()
+        ma = new_self.sum()
+        mb = new_other.sum()
+        a = n * (self_arr * other_arr).sum() - ma * mb
+        b1 = n * (self_arr * self_arr).sum() - ma * ma
+        b2 = n * (other_arr * other_arr).sum() - mb * mb
+
+        if b1 == 0 or b2 == 0:
+            return numpy.nan
+
+        return a / numpy.sqrt(b1 * b2)
 
     return hpat_pandas_series_corr_impl
 
@@ -2163,6 +2132,77 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     return hpat_pandas_series_quantile_impl
 
 
+@overload_method(SeriesType, 'rename')
+def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=None):
+    """
+    Pandas Series method :meth:`pandas.Series.rename` implementation.
+    Alter Series index labels or name.
+    .. only:: developer
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_rename
+
+    Parameters
+    -----------
+    index : :obj:`scalar` or `hashable sequence` or `dict` or `function`
+               Dict-like or functions are transformations to apply to the index.
+               Scalar or hashable sequence-like will alter the Series.name attribute.
+               Only scalar value is supported.
+    copy : :obj:`bool`, default :obj:`True`
+               Whether to copy underlying data.
+    inplace : :obj:`bool`, default :obj:`False`
+               Whether to return a new Series. If True then value of copy is ignored.
+    level : :obj:`int` or `str`
+               In case of a MultiIndex, only rename labels in the specified level.
+               *Not supported*
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` with index labels or name altered.
+    """
+
+    ty_checker = TypeChecker('Method rename().')
+    ty_checker.check(self, SeriesType)
+
+    if not isinstance(index, (types.Omitted, types.UnicodeType,
+                              types.StringLiteral, str,
+                              types.Integer, types.Boolean,
+                              types.Hashable, types.Float,
+                              types.NPDatetime, types.NPTimedelta,
+                              types.Number)) and index is not None:
+        ty_checker.raise_exc(index, 'string', 'index')
+
+    if not isinstance(copy, (types.Omitted, types.Boolean, bool)):
+        ty_checker.raise_exc(copy, 'boolean', 'copy')
+
+    if not isinstance(inplace, (types.Omitted, types.Boolean, bool)):
+        ty_checker.raise_exc(inplace, 'boolean', 'inplace')
+
+    if not isinstance(level, (types.Omitted, types.UnicodeType,
+                              types.StringLiteral, types.Integer)) and level is not None:
+        ty_checker.raise_exc(level, 'Integer or srting', 'level')
+
+    def hpat_pandas_series_rename_idx_impl(self, index=None, copy=True, inplace=False, level=None):
+        if copy is True:
+            series_data = self._data.copy()
+            series_index = self._index.copy()
+        else:
+            series_data = self._data
+            series_index = self._index
+
+        return pandas.Series(data=series_data, index=series_index, name=index)
+
+    def hpat_pandas_series_rename_noidx_impl(self, index=None, copy=True, inplace=False, level=None):
+        if copy is True:
+            series_data = self._data.copy()
+        else:
+            series_data = self._data
+
+        return pandas.Series(data=series_data, index=self._index, name=index)
+
+    if isinstance(self.index, types.NoneType):
+        return hpat_pandas_series_rename_noidx_impl
+    return hpat_pandas_series_rename_idx_impl
+
+
 @overload_method(SeriesType, 'min')
 def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_only=None):
     """
@@ -2925,11 +2965,12 @@ def hpat_pandas_series_nunique(self, dropna=True):
             It is better to merge with Numeric branch
             """
 
-            str_set = set(self._data)
-            if dropna == False:
-                return len(str_set) - 1
-            else:
-                return len(str_set)
+            data = self._data
+            if dropna:
+                nan_mask = self.isna()
+                data = self._data[~nan_mask._data]
+            unique_values = set(data)
+            return len(unique_values)
 
         return hpat_pandas_series_nunique_str_impl
 
@@ -2983,7 +3024,8 @@ def hpat_pandas_series_count(self, level=None):
     if isinstance(self.data, StringArrayType):
         def hpat_pandas_series_count_str_impl(self, level=None):
 
-            return len(self._data)
+            nan_mask = self.isna()
+            return numpy.sum(nan_mask._data == 0)
 
         return hpat_pandas_series_count_str_impl
 
@@ -3133,10 +3175,10 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
                 sort_nona = numpy.argsort(self._data[~na_data_arr])
             q = 0
             for id, i in enumerate(sort):
-                if id not in list(sort[len(self._data) - na:]):
-                    result[id] = sort_nona[id-q]
-                else:
+                if id in set(sort[len(self._data) - na:]):
                     q += 1
+                else:
+                    result[id] = sort_nona[id - q]
             for i in sort[len(self._data) - na:]:
                 result[i] = -1
 
@@ -3160,10 +3202,10 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
             sort_nona = numpy.argsort(self._data[~na_data_arr])
         q = 0
         for id, i in enumerate(sort):
-            if id not in list(sort[len(self._data) - na:]):
-                result[id] = sort_nona[id - q]
-            else:
+            if id in set(sort[len(self._data) - na:]):
                 q += 1
+            else:
+                result[id] = sort_nona[id - q]
         for i in sort[len(self._data) - na:]:
             result[i] = -1
 
@@ -3570,7 +3612,15 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
         if len(self_arr) < min_periods:
             return numpy.nan
 
-        return numpy.cov(self_arr, other_arr)[0, 1]
+        new_self = pandas.Series(self_arr)
+
+        ma = new_self.mean()
+        mb = other.mean()
+
+        if numpy.isinf(mb):
+            return numpy.nan
+
+        return ((self_arr - ma) * (other_arr - mb)).sum() / (new_self.count() - 1.0)
 
     return hpat_pandas_series_cov_impl
 
@@ -3675,3 +3725,132 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
         return pandas.Series(result)
 
     return hpat_pandas_series_pct_change_impl
+
+
+@overload(operator.add)
+def hpat_pandas_series_operator_add(self, other):
+    """
+    Pandas Series operator :attr:`pandas.Series.add` implementation
+
+    Note: Currently implemented for numeric Series only.
+        Differs from Pandas in returning Series with fixed dtype :obj:`float64`
+
+    .. only:: developer
+
+    **Test**: python -m hpat.runtests sdc.tests.test_series.TestSeries.test_series_op1
+              python -m hpat.runtests sdc.tests.test_series.TestSeries.test_series_op2
+              python -m hpat.runtests sdc.tests.test_series.TestSeries.test_series_op3
+              python -m hpat.runtests sdc.tests.test_series.TestSeries.test_series_op4
+              python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_operator_add*
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+        Input series
+    other: :obj:`pandas.Series` or :obj:`scalar`
+        Series or scalar value to be used as a second argument of binary operation
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+        The result of the operation
+    """
+
+    _func_name = 'Operator add().'
+
+    ty_checker = TypeChecker('Operator add().')
+    ty_checker.check(self, SeriesType)
+
+    if not isinstance(other, (SeriesType, types.Number)):
+        ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
+
+    series_indexes_alignable = False
+    none_or_numeric_indexes = False
+    if isinstance(other, SeriesType):
+        if (other.index == string_array_type and self.index == string_array_type):
+            series_indexes_alignable = True
+
+        if ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
+                and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other))):
+            series_indexes_alignable = True
+            none_or_numeric_indexes = True
+
+    if isinstance(other, SeriesType) and not series_indexes_alignable:
+        raise TypingError('{} Not implemented for series with not-alignable indexes. \
+        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
+
+    # specializations for numeric series - TODO: support arithmetic operation on StringArrays
+    if (isinstance(other, types.Number)):
+        def hpat_pandas_series_add_scalar_impl(self, other):
+            return pandas.Series(self._data + other, self._index)
+
+        return hpat_pandas_series_add_scalar_impl
+
+    elif (isinstance(other, SeriesType)):
+
+        # optimization for series with default indexes, that can be aligned differently
+        if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
+            def hpat_pandas_series_add_impl(self, other):
+
+                if (len(self._data) == len(other._data)):
+                    return pandas.Series(numpy.asarray(self._data + other._data, numpy.float64))
+                else:
+                    min_data_size = min(len(self._data), len(other._data))
+                    max_data_size = max(len(self._data), len(other._data))
+                    new_data = numpy.empty(max_data_size, dtype=numpy.float64)
+                    new_data[:min_data_size] = self._data[:min_data_size] + other._data[:min_data_size]
+                    new_data[min_data_size:] = numpy.repeat(numpy.nan, max_data_size - min_data_size)
+
+                    return pandas.Series(new_data, self._index)
+
+            return hpat_pandas_series_add_impl
+        else:
+            # for numeric indexes find common dtype to be used when creating joined index
+            if none_or_numeric_indexes:
+                ty_left_index_dtype = types.int64 if isinstance(self.index, types.NoneType) else self.index.dtype
+                ty_right_index_dtype = types.int64 if isinstance(other.index, types.NoneType) else other.index.dtype
+                numba_index_common_dtype = find_common_dtype_from_numpy_dtypes(
+                    [ty_left_index_dtype, ty_right_index_dtype], [])
+
+            def hpat_pandas_series_add_impl(self, other):
+                left_index, right_index = self.index, other.index
+
+                # check if indexes are equal and series don't have to be aligned
+                if none_or_numeric_indexes == True:  # noqa
+                    if (numpy.array_equal(left_index, right_index)):
+                        return pandas.Series(numpy.asarray(self._data + other._data, numpy.float64),
+                                             numpy.asarray(left_index, numba_index_common_dtype))
+                else:
+                    # TODO: replace with StringArrays comparison
+                    is_index_equal = (len(self._index) == len(other._index)
+                                      and num_total_chars(self._index) == num_total_chars(other._index))
+                    for i in numpy.arange(len(self._index)):
+                        if (self._index[i] != other._index[i]
+                                or str_arr_is_na(self._index, i) is not str_arr_is_na(other._index, i)):
+                            is_index_equal = False
+
+                    if is_index_equal:
+                        return pandas.Series(numpy.asarray(self._data + other._data, numpy.float64),
+                                             self._index)
+
+                # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
+                joined_index, left_indexer, right_indexer = hpat_join_series_indexes(left_index, right_index)
+
+                joined_index_range = numpy.arange(len(joined_index))
+                left_values = numpy.asarray(
+                    [self._data[left_indexer[i]] for i in joined_index_range],
+                    numpy.float64
+                )
+                left_values[left_indexer == -1] = numpy.nan
+
+                right_values = numpy.asarray(
+                    [other._data[right_indexer[i]] for i in joined_index_range],
+                    numpy.float64
+                )
+                right_values[right_indexer == -1] = numpy.nan
+
+                return pandas.Series(left_values + right_values, joined_index)
+
+            return hpat_pandas_series_add_impl
+
+    return None

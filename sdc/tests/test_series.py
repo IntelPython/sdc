@@ -33,7 +33,7 @@ import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
 import sdc
-from itertools import islice, permutations, product
+from itertools import islice, permutations, product, combinations
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (
     count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end,
@@ -206,6 +206,22 @@ def _make_func_use_method_arg1(method):
     func_text = "def test_impl(A, B):\n"
     func_text += "   return A.{}(B)\n".format(method)
     return _make_func_from_text(func_text)
+
+
+def ljust_usecase(series, width):
+    return series.str.ljust(width)
+
+
+def ljust_with_fillchar_usecase(series, width, fillchar):
+    return series.str.ljust(width, fillchar)
+
+
+def rjust_usecase(series, width):
+    return series.str.rjust(width)
+
+
+def rjust_with_fillchar_usecase(series, width, fillchar):
+    return series.str.rjust(width, fillchar)
 
 
 GLOBAL_VAL = 2
@@ -1050,6 +1066,7 @@ class TestSeries(TestCase):
             test_impl = _make_func_use_binop1(operator)
             hpat_func = self.jit(test_impl)
 
+            # TODO: extend to test arithmetic operations between numeric Series of different dtypes
             n = 11
             df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
             pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
@@ -1062,6 +1079,7 @@ class TestSeries(TestCase):
             test_impl = _make_func_use_binop1(operator)
             hpat_func = self.jit(test_impl)
 
+            # TODO: extend to test arithmetic operations between numeric Series of different dtypes
             n = 11
             if platform.system() == 'Windows' and not IS_32BITS:
                 df = pd.DataFrame({'A': np.arange(1, n, dtype=np.int64)})
@@ -1069,26 +1087,30 @@ class TestSeries(TestCase):
                 df = pd.DataFrame({'A': np.arange(1, n)})
             pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1), check_names=False)
 
+    @skip_numba_jit('Not implemented in new-pipeline yet')
     def test_series_op3(self):
-        arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
+        arithmetic_binops = ('+=', '-=', '*=', '/=', '//=', '%=', '**=')
 
         for operator in arithmetic_binops:
             test_impl = _make_func_use_binop2(operator)
             hpat_func = self.jit(test_impl)
 
+            # TODO: extend to test arithmetic operations between numeric Series of different dtypes
             n = 11
-            df = pd.DataFrame({'A': np.arange(1, n), 'B': np.ones(n - 1)})
+            df = pd.DataFrame({'A': np.arange(1, n, dtype=np.float64), 'B': np.ones(n - 1)})
             pd.testing.assert_series_equal(hpat_func(df.A, df.B), test_impl(df.A, df.B), check_names=False)
 
+    @skip_numba_jit('Not implemented in new-pipeline yet')
     def test_series_op4(self):
-        arithmetic_binops = ('+', '-', '*', '/', '//', '%', '**')
+        arithmetic_binops = ('+=', '-=', '*=', '/=', '//=', '%=', '**=')
 
         for operator in arithmetic_binops:
             test_impl = _make_func_use_binop2(operator)
             hpat_func = self.jit(test_impl)
 
+            # TODO: extend to test arithmetic operations between numeric Series of different dtypes
             n = 11
-            df = pd.DataFrame({'A': np.arange(1, n)})
+            df = pd.DataFrame({'A': np.arange(1, n, dtype=np.float64)})
             pd.testing.assert_series_equal(hpat_func(df.A, 1), test_impl(df.A, 1), check_names=False)
 
     def test_series_op5(self):
@@ -2582,6 +2604,58 @@ class TestSeries(TestCase):
         for index, name in product(indices, names):
             S = pd.Series(data, index, name=name)
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_str_just_default_fillchar(self):
+        data = test_global_input_data_unicode_kind1
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 5
+
+        pyfuncs = [ljust_usecase, rjust_usecase]
+        for pyfunc in pyfuncs:
+            cfunc = self.jit(pyfunc)
+            pd.testing.assert_series_equal(cfunc(series, width),
+                                           pyfunc(series, width))
+
+    def test_series_str_just(self):
+        data = test_global_input_data_unicode_kind1
+        data_lengths = [len(s) for s in data]
+        widths = [max(data_lengths) + 5, min(data_lengths)]
+
+        pyfuncs = [ljust_with_fillchar_usecase, rjust_with_fillchar_usecase]
+        for index in [None, list(range(len(data)))[::-1], data[::-1]]:
+            series = pd.Series(data, index, name='A')
+            for width, fillchar in product(widths, ['\t']):
+                for pyfunc in pyfuncs:
+                    cfunc = self.jit(pyfunc)
+                    jit_result = cfunc(series, width, fillchar)
+                    ref_result = pyfunc(series, width, fillchar)
+                    pd.testing.assert_series_equal(jit_result, ref_result)
+
+    def test_series_str_just_exception_unsupported_fillchar(self):
+        data = test_global_input_data_unicode_kind1
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 5
+        msg_tmpl = 'Method {}(). The object fillchar\n given: int64\n expected: str'
+
+        pyfuncs = [('ljust', ljust_with_fillchar_usecase),
+                   ('rjust', rjust_with_fillchar_usecase)]
+        for name, pyfunc in pyfuncs:
+            cfunc = self.jit(pyfunc)
+            with self.assertRaises(TypingError) as raises:
+                cfunc(series, width, 5)
+            self.assertIn(msg_tmpl.format(name), str(raises.exception))
+
+    def test_series_str_just_exception_unsupported_kind4(self):
+        data = test_global_input_data_unicode_kind4
+        series = pd.Series(data)
+        width = max(len(s) for s in data) + 5
+        msg = 'NULL object passed to Py_BuildValue'
+
+        for pyfunc in [ljust_usecase, rjust_usecase]:
+            cfunc = self.jit(pyfunc)
+            with self.assertRaises(SystemError) as raises:
+                cfunc(series, width)
+            self.assertIn(msg, str(raises.exception))
 
     def test_series_str_startswith(self):
         def test_impl(series, pat):
@@ -4578,6 +4652,227 @@ class TestSeries(TestCase):
             hpat_func(S, periods=1.6)
         msg = 'Method pct_change(). The object periods'
         self.assertIn(msg, str(raises.exception))
+
+    @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
+    def test_series_operator_add_numeric_scalar(self):
+        """Verifies Series.operator.add implementation for numeric series and scalar second operand"""
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        n = 7
+        dtype_to_index = {'None': None,
+                          'int': np.arange(n, dtype='int'),
+                          'float': np.arange(n, dtype='float'),
+                          'string': ['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd']}
+
+        int_scalar = 24
+        for dtype, index_data in dtype_to_index.items():
+            with self.subTest(index_dtype=dtype, index=index_data):
+                if platform.system() == 'Windows' and not IS_32BITS:
+                    A = pd.Series(np.arange(n, dtype=np.int64), index=index_data)
+                else:
+                    A = pd.Series(np.arange(n), index=index_data)
+                pd.testing.assert_series_equal(hpat_func(A, int_scalar), test_impl(A, int_scalar), check_names=False)
+
+        float_scalar = 24.0
+        for dtype, index_data in dtype_to_index.items():
+            with self.subTest(index_dtype=dtype, index=index_data):
+                if platform.system() == 'Windows' and not IS_32BITS:
+                    A = pd.Series(np.arange(n, dtype=np.int64), index=index_data)
+                else:
+                    A = pd.Series(np.arange(n), index=index_data)
+                ref_result = test_impl(A, float_scalar)
+                result = hpat_func(A, float_scalar)
+                pd.testing.assert_series_equal(result, ref_result, check_names=False)
+
+    def test_series_operator_add_numeric_same_index_default(self):
+        """Verifies implementation of Series.operator.add between two numeric Series
+        with default indexes and same size"""
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        n = 7
+        dtypes_to_test = (np.int32, np.int64, np.float32, np.float64)
+        for dtype_left, dtype_right in combinations(dtypes_to_test, 2):
+            with self.subTest(left_series_dtype=dtype_left, right_series_dtype=dtype_right):
+                A = pd.Series(np.arange(n), dtype=dtype_left)
+                B = pd.Series(np.arange(n)**2, dtype=dtype_right)
+                pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False)
+
+    @skip_numba_jit
+    @skip_sdc_jit("TODO: find out why pandas aligning series indexes produces Int64Index when common dtype is float\n"
+                  "AssertionError: Series.index are different\n"
+                  "Series.index classes are not equivalent\n"
+                  "[left]:  Float64Index([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], dtype='float64')\n"
+                  "[right]: Int64Index([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], dtype='int64')\n")
+    def test_series_operator_add_numeric_same_index_numeric(self):
+        """Verifies implementation of Series.operator.add between two numeric Series
+           with the same numeric indexes of different dtypes"""
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        n = 7
+        dtypes_to_test = (np.int32, np.int64, np.float32, np.float64)
+        for dtype_left, dtype_right in combinations(dtypes_to_test, 2):
+            with self.subTest(left_series_dtype=dtype_left, right_series_dtype=dtype_right):
+                A = pd.Series(np.arange(n), index=np.arange(n, dtype=dtype_left))
+                B = pd.Series(np.arange(n)**2, index=np.arange(n, dtype=dtype_right))
+                pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False)
+
+    @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
+    def test_series_operator_add_numeric_same_index_numeric_fixme(self):
+        """ Same as test_series_operator_add_same_index_numeric but with w/a for the problem.
+        Can be deleted when the latter is fixed """
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        n = 7
+        int_dtypes_to_test = (np.int32, np.int64, np.float32, np.float64)
+        for dtype_left, dtype_right in combinations(int_dtypes_to_test, 2):
+            # FIXME: skip the sub-test if one of the dtypes is float and the other is integer
+            if not (np.issubdtype(dtype_left, np.integer) and np.issubdtype(dtype_right, np.integer)
+                    or np.issubdtype(dtype_left, np.float) and np.issubdtype(dtype_right, np.float)):
+                continue
+
+            with self.subTest(left_series_dtype=dtype_left, right_series_dtype=dtype_right):
+                A = pd.Series(np.arange(n), index=np.arange(n, dtype=dtype_left))
+                B = pd.Series(np.arange(n)**2, index=np.arange(n, dtype=dtype_right))
+                pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False)
+
+    @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
+    def test_series_operator_add_numeric_same_index_str(self):
+        """Verifies implementation of Series.operator.add between two numeric Series with the same string indexes"""
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        n = 7
+        A = pd.Series(np.arange(n), index=['a', 'c', 'e', 'c', 'b', 'a', 'o'])
+        B = pd.Series(np.arange(n)**2, index=['a', 'c', 'e', 'c', 'b', 'a', 'o'])
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
+
+    @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
+    def test_series_operator_add_numeric_align_index_int(self):
+        """Verifies implementation of Series.operator.add between two numeric Series with non-equal integer indexes"""
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        index_A = [0, 1, 1, 2, 3, 3, 3, 4, 6, 8, 9]
+        index_B = [0, 1, 1, 3, 4, 4, 5, 5, 6, 6, 9]
+        np.random.shuffle(index_A)
+        np.random.shuffle(index_B)
+        A = pd.Series(np.arange(n), index=index_A)
+        B = pd.Series(np.arange(n)**2, index=index_B)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
+
+    @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
+    def test_series_operator_add_numeric_align_index_str(self):
+        """Verifies implementation of Series.operator.add between two numeric Series with non-equal string indexes"""
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        index_A = ['', '', 'aa', 'aa', 'ae', 'ae', 'b', 'ccc', 'cccc', 'oo', 's']
+        index_B = ['', '', 'aa', 'aa', 'cc', 'cccc', 'e', 'f', 'h', 'oo', 's']
+        np.random.shuffle(index_A)
+        np.random.shuffle(index_B)
+        A = pd.Series(np.arange(n), index=index_A)
+        B = pd.Series(np.arange(n)**2, index=index_B)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
+
+    @skip_numba_jit('TODO: fix Series.sort_values to handle both None and '' in string series')
+    @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
+    def test_series_operator_add_numeric_align_index_str_fixme(self):
+        """Same as test_series_operator_add_align_index_str but with None values in string indexes"""
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        index_A = ['', '', 'aa', 'aa', 'ae', 'b', 'ccc', 'cccc', 'oo', None, None]
+        index_B = ['', '', 'aa', 'aa', 'cccc', 'f', 'h', 'oo', 's', None, None]
+        np.random.shuffle(index_A)
+        np.random.shuffle(index_B)
+        A = pd.Series(np.arange(n), index=index_A)
+        B = pd.Series(np.arange(n)**2, index=index_B)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
+
+    @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
+    def test_series_operator_add_numeric_align_index_other_dtype(self):
+        """Verifies implementation of Series.operator.add between two numeric Series
+        with non-equal integer indexes of different dtypes"""
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        n = 7
+        A = pd.Series(np.arange(3*n), index=np.arange(-n, 2*n, 1, dtype=np.int64))
+        B = pd.Series(np.arange(3*n)**2, index=np.arange(0, 3*n, 1, dtype=np.float64))
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
+
+    @skip_sdc_jit('Arithmetic operations on Series with different sizes are not supported in old-style')
+    def test_series_operator_add_numeric_diff_series_sizes(self):
+        """Verifies implementation of Series.operator.add between two numeric Series with different sizes"""
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        size_A, size_B = 7, 25
+        A = pd.Series(np.arange(size_A))
+        B = pd.Series(np.arange(size_B)**2)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
+
+    @skip_sdc_jit('Arithmetic operations on Series requiring alignment of indexes are not supported in old-style')
+    def test_series_operator_add_align_index_int_capacity(self):
+        """Verifies implementation of Series.operator.add and alignment of numeric indexes of large size"""
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        n = 20000
+        np.random.seed(0)
+        index1 = np.random.randint(-30, 30, n)
+        index2 = np.random.randint(-30, 30, n)
+        A = pd.Series(np.random.ranf(n), index=index1)
+        B = pd.Series(np.random.ranf(n), index=index2)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
+
+    @skip_numba_jit
+    @skip_sdc_jit('Test hangs due to a call of Series.sort_values')
+    def test_series_operator_add_align_index_str_capacity(self):
+        """Verifies implementation of Series.operator.add and alignment of string indexes of large size"""
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        n = 20000
+        np.random.seed(0)
+        valid_ids = ['', 'aaa', 'a', 'b', 'ccc', 'ef', 'ff', 'fff', 'fa', 'dddd']
+        index1 = [valid_ids[i] for i in np.random.randint(0, len(valid_ids), n)]
+        index2 = [valid_ids[i] for i in np.random.randint(0, len(valid_ids), n)]
+        A = pd.Series(np.random.ranf(n), index=index1)
+        B = pd.Series(np.random.ranf(n), index=index2)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
+
+    @skip_numba_jit
+    @skip_sdc_jit("TODO: support arithemetic operations on StringArrays and extend Series.operator.add overload")
+    def test_series_operator_add_str_same_index_default(self):
+        """Verifies implementation of Series.operator.add between two string Series
+        with default indexes and same size"""
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        A = pd.Series(['a', '', 'ae', 'b', 'cccc', 'oo', None])
+        B = pd.Series(['b', 'aa', '', 'b', 'o', None, 'oo'])
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
 
 if __name__ == "__main__":
