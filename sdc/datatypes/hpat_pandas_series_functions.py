@@ -37,6 +37,7 @@ import pandas
 from numba.errors import TypingError
 from numba.extending import overload, overload_method, overload_attribute
 from numba import types
+from numba.typed import Dict
 
 import sdc
 import sdc.datatypes.common_functions as common_functions
@@ -46,8 +47,8 @@ from sdc.datatypes.common_functions import (check_index_is_numeric, find_common_
 from sdc.datatypes.hpat_pandas_series_rolling_types import _hpat_pandas_series_rolling_init
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.hiframes.pd_series_ext import SeriesType
-from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars, string_array_type,
-                             str_arr_is_na, pre_alloc_string_array, str_arr_set_na)
+from sdc.str_arr_ext import (StringArrayType, string_array_type, str_arr_is_na, str_arr_set_na,
+                             num_total_chars, pre_alloc_string_array, cp_str_list_to_array)
 from sdc.utils import to_array, sdc_overload, sdc_overload_method, sdc_overload_attribute
 
 
@@ -399,6 +400,9 @@ def hpat_pandas_series_values(self):
 def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
     """
     Pandas Series method :meth:`pandas.Series.value_counts` implementation.
+
+    Note: Elements with the same count might appear in result in a different order than in Pandas
+
     .. only:: developer
 
        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_value_counts*
@@ -417,7 +421,6 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
         *unsupported*
     dropna: :obj:`boolean`, default True
         Skip counts of NaN
-        *unsupported* for String
 
     Returns
     -------
@@ -446,65 +449,138 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
 
     if isinstance(self.data, StringArrayType):
         def hpat_pandas_series_value_counts_str_impl(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
-            # TODO: if dropna add nan handling
 
             value_counts_dict = {}
 
-            for value in self._data:
+            nan_counts = 0
+            empty_str_key_exist = False
+            for i, value in enumerate(self._data):
+                if str_arr_is_na(self._data, i):
+                    if not dropna:
+                        nan_counts += 1
+                    continue
+
                 if value in value_counts_dict:
                     value_counts_dict[value] += 1
                 else:
                     value_counts_dict[value] = 1
 
+                if (not empty_str_key_exist and value == ''):
+                    empty_str_key_exist = True
+
             # TODO: workaround, keys() result can not be casted to array type
             # TODO: use list comprehension instead or self.unique()
             unique_values = [key for key in value_counts_dict]
+
+            if not dropna:
+                # append a separate empty string for NaN elements
+                value = ''
+                unique_values.append(value)
+                if not empty_str_key_exist:
+                    value_counts_dict[value] = 0
+
             unique_values_len = len(unique_values)
 
             value_counts = numpy.empty(unique_values_len, dtype=numpy.intp)
             for i, key in enumerate(value_counts_dict):
                 value_counts[i] = value_counts_dict[key]
 
+            if not dropna:
+                # replace the value for one empty string to refer to NaNs count
+                value_counts[unique_values_len - 1] = nan_counts
+
             # Take initial order as default
             indexes_order = numpy.arange(unique_values_len)
             if sort:
-                # TODO: consider order of values with the same frequency
                 indexes_order = value_counts.argsort()
                 if not ascending:
                     indexes_order = indexes_order[::-1]
 
             sorted_unique_values = [unique_values[i] for i in indexes_order]
+
+            index_string_lengths = numpy.asarray([len(s) for s in sorted_unique_values])
+            index_total_chars = numpy.sum(index_string_lengths)
+            result_index = pre_alloc_string_array(len(sorted_unique_values), index_total_chars)
+            cp_str_list_to_array(result_index, sorted_unique_values)
+
+            if not dropna:
+                # set null bit for StringArray element corresponding to NaN element of initial Series
+                index_previous_nan_pos = unique_values_len - 1
+                for i in numpy.arange(unique_values_len):
+                    if indexes_order[i] == index_previous_nan_pos:
+                        str_arr_set_na(result_index, i)
+                        break
+
+            sorted_value_counts = numpy.take(value_counts, indexes_order)
+
+            return pandas.Series(sorted_value_counts, index=result_index, name=self._name)
+
+        return hpat_pandas_series_value_counts_str_impl
+
+    elif isinstance(self.dtype, types.Number):
+
+        series_values_type = numba.typeof(self.dtype)
+        def hpat_pandas_series_value_counts_number_impl(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
+
+            value_counts_dict = Dict.empty(
+                key_type=series_values_type,
+                value_type=types.intp
+            )
+
+            nan_counts = 0
+            zero_counts = 0
+            is_zero_found = False
+            for value in self._data:
+                if numpy.isnan(value):
+                    nan_value = value
+                    if not dropna:
+                        nan_counts += 1
+                    continue
+
+                # Pandas hash-based value_count_float64 function doesn't distinguish between
+                # positive and negative zeros, hence we count zero values separately and store
+                # as a key the first zero value found in the Series
+                if not value:
+                    zero_counts += 1
+                    if not is_zero_found:
+                        zero_value = value
+                        is_zero_found = True
+                    continue
+
+                if value in value_counts_dict:
+                    value_counts_dict[value] += 1
+                else:
+                    value_counts_dict[value] = 1
+
+            if (not dropna and nan_counts):
+                value_counts_dict[nan_value] = nan_counts
+
+            if zero_counts:
+                value_counts_dict[zero_value] = zero_counts
+
+            unique_values = numpy.asarray(
+                list(value_counts_dict),
+                dtype=self._data.dtype
+            )
+            value_counts = numpy.asarray(
+                [value_counts_dict[key] for key in value_counts_dict],
+                dtype=numpy.intp
+            )
+
+            indexes_order = numpy.arange(len(value_counts))
+            if sort:
+                indexes_order = value_counts.argsort()
+                if not ascending:
+                    indexes_order = indexes_order[::-1]
+
+            sorted_unique_values = numpy.take(unique_values, indexes_order)
             sorted_value_counts = numpy.take(value_counts, indexes_order)
 
             return pandas.Series(sorted_value_counts, index=sorted_unique_values, name=self._name)
 
-        return hpat_pandas_series_value_counts_str_impl
+        return hpat_pandas_series_value_counts_number_impl
 
-    def hpat_pandas_series_value_counts_number_impl(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
-        unique_values = self.unique()
-
-        if dropna:
-            nan_mask = numpy.isnan(unique_values)
-            unique_values = unique_values[~nan_mask]
-        #else:
-        # TODO: unique() can not handle numpy.nan because numpy.nan == numpy.nan is False
-
-        # TODO: not optimal
-        value_counts = numpy.array([numpy.sum(self._data == value) for value in unique_values])
-
-        # Series.unique() returns values in ascending order
-        indexes_order = numpy.arange(len(unique_values))
-        if sort:
-            indexes_order = value_counts.argsort()
-            if not ascending:
-                indexes_order = indexes_order[::-1]
-
-        sorted_unique_values = numpy.take(unique_values, indexes_order)
-        sorted_value_counts = numpy.take(value_counts, indexes_order)
-
-        return pandas.Series(sorted_value_counts, index=sorted_unique_values, name=self._name)
-
-    return hpat_pandas_series_value_counts_number_impl
+    return None
 
 
 @sdc_overload_method(SeriesType, 'var')
