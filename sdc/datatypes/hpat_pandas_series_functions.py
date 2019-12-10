@@ -1764,7 +1764,7 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
 
 
 @sdc_overload_method(SeriesType, 'idxmax')
-def hpat_pandas_series_idxmax(self, axis=None, skipna=True, *args):
+def hpat_pandas_series_idxmax(self, axis=None, skipna=True):
     """
     Pandas Series method :meth:`pandas.Series.idxmax` implementation.
     .. only:: developer
@@ -1807,13 +1807,13 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=True, *args):
         raise TypingError("{} 'skipna' unsupported. Given: {}".format(_func_name, skipna))
 
     if isinstance(self.index, types.NoneType) or self.index is None:
-        def hpat_pandas_series_idxmax_impl(self, axis=None, skipna=True, *args):
+        def hpat_pandas_series_idxmax_impl(self, axis=None, skipna=True):
 
             return numpy.argmax(self._data)
 
         return hpat_pandas_series_idxmax_impl
     else:
-        def hpat_pandas_series_idxmax_index_impl(self, axis=None, skipna=True, *args):
+        def hpat_pandas_series_idxmax_index_impl(self, axis=None, skipna=True):
             # no numpy.nanargmax is supported by Numba at this time
             result = numpy.argmax(self._data)
             return self._index[int(result)]
@@ -2653,7 +2653,7 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
 
 
 @sdc_overload_method(SeriesType, 'idxmin')
-def hpat_pandas_series_idxmin(self, axis=None, skipna=True, *args):
+def hpat_pandas_series_idxmin(self, axis=None, skipna=True):
     """
     Pandas Series method :meth:`pandas.Series.idxmin` implementation.
 
@@ -2702,13 +2702,13 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True, *args):
         raise TypingError("{} 'skipna' unsupported. Given: {}".format(_func_name, skipna))
 
     if isinstance(self.index, types.NoneType) or self.index is None:
-        def hpat_pandas_series_idxmin_impl(self, axis=None, skipna=True, *args):
+        def hpat_pandas_series_idxmin_impl(self, axis=None, skipna=True):
 
             return numpy.argmin(self._data)
 
         return hpat_pandas_series_idxmin_impl
     else:
-        def hpat_pandas_series_idxmin_index_impl(self, axis=None, skipna=True, *args):
+        def hpat_pandas_series_idxmin_index_impl(self, axis=None, skipna=True):
             # no numpy.nanargmin is supported by Numba at this time
             result = numpy.argmin(self._data)
             return self._index[int(result)]
@@ -3012,7 +3012,7 @@ def hpat_pandas_series_unique(self):
 
 
 @sdc_overload_method(SeriesType, 'cumsum')
-def hpat_pandas_series_cumsum(self, axis=None, skipna=True, *args):
+def hpat_pandas_series_cumsum(self, axis=None, skipna=True):
     """
     Pandas Series method :meth:`pandas.Series.cumsum` implementation.
 
