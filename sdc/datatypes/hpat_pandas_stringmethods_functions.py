@@ -192,6 +192,35 @@ def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
 @overload_method(StringMethodsType, 'center')
 def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.center
+
+    Limitations
+    -----------
+    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/str/center.py
+       :language: python
+       :lines: 27-
+       :caption: Filling left and right side of strings in the Series with an additional character
+       :name: ex_series_str_center
+
+    .. code-block:: console
+
+        > python ./series/str/center.py
+        0    *dog*
+        1    *foo*
+        2    *bar*
+        dtype: object
+
+    .. todo:: Add support of 32-bit Unicode for `str.center()`
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.center()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
@@ -239,6 +268,36 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
 @overload_method(StringMethodsType, 'endswith')
 def hpat_pandas_stringmethods_endswith(self, pat, na=None):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.endswith
+
+    Limitations
+    -----------
+    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/str/endswith.py
+       :language: python
+       :lines: 27-
+       :caption: Test if the end of each string element matches a string
+       :name: ex_series_str_endswith
+
+    .. code-block:: console
+
+        > python ./series/str/endswith.py
+        0    False
+        1     True
+        2     True
+        dtype: bool
+
+    .. todo:: Add support of matching the end of each string by a pattern
+    .. todo:: Add support of parameter ``na``
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.endswith()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
@@ -290,6 +349,35 @@ def hpat_pandas_stringmethods_endswith(self, pat, na=None):
 @overload_method(StringMethodsType, 'find')
 def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.find
+
+    Limitations
+    -----------
+    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/str/find.py
+       :language: python
+       :lines: 27-
+       :caption: Return lowest indexes in each strings in the Series
+       :name: ex_series_str_find
+
+    .. code-block:: console
+
+        > python ./series/str/find.py
+        0   -1
+        1    0
+        2    3
+        dtype: int64
+
+    .. todo:: Add support of parameters ``start`` and ``end``
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.find()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
@@ -349,6 +437,33 @@ def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
 @overload_method(StringMethodsType, 'isupper')
 def hpat_pandas_stringmethods_isupper(self):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.isupper
+
+    Limitations
+    -----------
+    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/str/isupper.py
+       :language: python
+       :lines: 27-
+       :caption: Check whether all characters in each string are uppercase
+       :name: ex_series_str_isupper
+
+    .. code-block:: console
+
+        > python ./series/str/isupper.py
+        0     True
+        1    False
+        2    False
+        dtype: bool
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.isupper()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
@@ -385,6 +500,33 @@ def hpat_pandas_stringmethods_isupper(self):
 @overload_method(StringMethodsType, 'len')
 def hpat_pandas_stringmethods_len(self):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.len
+
+    Limitations
+    -----------
+    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/str/len.py
+       :language: python
+       :lines: 27-
+       :caption: Compute the length of each element in the Series
+       :name: ex_series_str_len
+
+    .. code-block:: console
+
+        > python ./series/str/len.py
+        0    3
+        1    3
+        2    6
+        dtype: int64
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.len()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
@@ -421,6 +563,32 @@ def hpat_pandas_stringmethods_len(self):
 @overload_method(StringMethodsType, 'startswith')
 def hpat_pandas_stringmethods_startswith(self, pat, na=None):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.startswith
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/str/startswith.py
+       :language: python
+       :lines: 27-
+       :caption: Test if the start of each string element matches a string
+       :name: ex_series_str_startswith
+
+    .. code-block:: console
+
+        > python ./series/str/startswith.py
+        0     True
+        1    False
+        2     True
+        dtype: bool
+
+    .. todo:: Add support of matching the start of each string by a pattern
+    .. todo:: Add support of parameter ``na``
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.startswith()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.

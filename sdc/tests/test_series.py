@@ -2619,9 +2619,9 @@ class TestSeries(TestCase):
         self.assertIn(msg, str(raises.exception))
 
     def test_series_str2str(self):
-        common_methods = ['lower', 'upper', 'isupper']
-        sdc_methods = ['capitalize', 'swapcase', 'title',
-                       'lstrip', 'rstrip', 'strip']
+        common_methods = ['lower', 'upper', 'isupper',
+                          'lstrip', 'rstrip', 'strip']
+        sdc_methods = ['capitalize', 'swapcase', 'title']
         str2str_methods = common_methods[:]
 
         data = [' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc']
