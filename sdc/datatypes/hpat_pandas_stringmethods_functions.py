@@ -292,8 +292,9 @@ def hpat_pandas_stringmethods_endswith(self, pat, na=None):
         2     True
         dtype: bool
 
-    .. todo:: Add support of matching the end of each string by a pattern
-    .. todo:: Add support of parameter ``na``
+    .. todo::
+        - Add support of matching the end of each string by a pattern
+        - Add support of parameter ``na``
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -567,9 +568,13 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
     ********************************************
     Pandas API: pandas.Series.str.ljust
 
+    Limitations
+    -----------
+    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_str_ljust.py
+    .. literalinclude:: ../../../examples/series/str/ljust.py
        :language: python
        :lines: 27-
        :caption: Filling right side of strings in the Series with an additional character
@@ -577,7 +582,7 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
 
     .. code-block:: console
 
-        > python ./series_str_ljust.py
+        > python ./series/str/ljust.py
         0    dog**
         1    foo**
         2    bar**
@@ -639,9 +644,13 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
     ********************************************
     Pandas API: pandas.Series.str.rjust
 
+    Limitations
+    -----------
+    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_str_rjust.py
+    .. literalinclude:: ../../../examples/series/str/rjust.py
        :language: python
        :lines: 27-
        :caption: Filling left side of strings in the Series with an additional character
@@ -649,7 +658,7 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
 
     .. code-block:: console
 
-        > python ./series_str_rjust.py
+        > python ./series/str/rjust.py
         0    **dog
         1    **foo
         2    **bar
@@ -711,6 +720,10 @@ def hpat_pandas_stringmethods_startswith(self, pat, na=None):
     ********************************************
     Pandas API: pandas.Series.str.startswith
 
+    Limitations
+    -----------
+    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/str/startswith.py
@@ -727,8 +740,9 @@ def hpat_pandas_stringmethods_startswith(self, pat, na=None):
         2     True
         dtype: bool
 
-    .. todo:: Add support of matching the start of each string by a pattern
-    .. todo:: Add support of parameter ``na``
+    .. todo::
+        - Add support of matching the start of each string by a pattern
+        - Add support of parameter ``na``
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
