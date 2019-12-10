@@ -163,8 +163,7 @@ class TestDataFrame(TestCase):
                                           dtype=pd.api.types.CategoricalDtype(['N', 'Y']))})
         pd.testing.assert_frame_equal(hpat_func(df.copy(deep=True)), test_impl(df))
 
-    @unittest.skipIf(check_numba_version('0.46.0'),
-                     "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
+    @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
     def test_box_dist_return(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
@@ -749,6 +748,7 @@ class TestDataFrame(TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
+    @skip_numba_jit
     def test_itertuples_analysis(self):
         """tests array analysis handling of generated tuples, shapes going
         through blocks and getting used in an array dimension
