@@ -1013,7 +1013,7 @@ class TestSeries(TestCase):
 
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
-        self.assertEqual(hpat_func(df.A, 0).data, pd.Series(test_impl(df.A, 0)).data)
+        self.assertEqual(hpat_func(df.A, 0).data[0], test_impl(df.A, 0))
 
     def test_getitem_series_str1(self):
         def test_impl(A, i):
@@ -1043,7 +1043,6 @@ class TestSeries(TestCase):
         S = pd.Series(np.arange(n)**2)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('Setitem not implement')
     def test_series_getitem_series(self):
         def test_impl(A, B):
             return A[B]
@@ -1051,6 +1050,16 @@ class TestSeries(TestCase):
 
         S = pd.Series([1, 2, 3, 4, 5], [6, 7, 8, 9, 0])
         S2 = pd.Series([8, 6, 0], [12, 11, 14])
+        pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
+
+    @unittest.skip('Getitem Series with str index not implement')
+    def test_series_getitem_series1(self):
+        def test_impl(A, B):
+            return A[B]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(['1', '2', '3', '4', '5'], ['6', '7', '8', '9', '0'])
+        S2 = pd.Series(['8', '6', '0'], ['12', '11', '14'])
         pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
     def test_series_iloc1(self):

@@ -216,14 +216,15 @@ def hpat_pandas_series_getitem(self, idx):
 
         return hpat_pandas_series_getitem_idx_slice_impl
 
+    #Series with str index not implement
     if isinstance(idx, SeriesType):
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
-            mask = numpy.zeros(len(self._data), numpy.bool_)
-            for i in range(len(self.index)):
-                for j in range(len(idx._data)):
-                    if self.index[i] == idx._data[j]:
-                        mask[i] = True
-            return pandas.Series(self._data[mask], self.index[mask])
+            res = numpy.copy(self._data[:len(idx._data)])
+            for i in range(len(res)):
+                for j in range(len(self.index)):
+                    if self.index[j] == idx._data[i]:
+                        res[i] = self._data[j]
+            return pandas.Series(res, idx._data)
 
         return hpat_pandas_series_getitem_idx_series_impl
 
