@@ -802,9 +802,13 @@ def hpat_pandas_stringmethods_zfill(self, width):
     ********************************************
     Pandas API: pandas.Series.str.zfill
 
+    Limitations
+    -----------
+    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_str_zfill.py
+    .. literalinclude:: ../../../examples/series/str/zfill.py
        :language: python
        :lines: 27-
        :caption: Pad strings in the Series by prepending '0' characters
@@ -812,7 +816,7 @@ def hpat_pandas_stringmethods_zfill(self, width):
 
     .. code-block:: console
 
-        > python ./series_str_zfill.py
+        > python ./series/str/zfill.py
         0    00dog
         1    00foo
         2    00bar
