@@ -347,7 +347,7 @@ class TestResults:
         """
         for d in self.drivers:
             test_results_data = d.load(self.logger)
-            if test_results_data:
+            if test_results_data is not None:
                 self.test_results_data = test_results_data
                 break
 
