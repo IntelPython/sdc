@@ -397,6 +397,30 @@ def hpat_pandas_series_values(self):
 @overload_method(SeriesType, 'value_counts')
 def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.value_counts
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/value_counts.py
+       :language: python
+       :lines: 27-
+       :caption: Getting the number of not NaN values occurrence
+       :name: ex_series_value_counts
+
+    .. code-block:: console
+
+        > python ./series/value_counts.py
+        3.0    2
+        4.0    1
+        2.0    1
+        1.0    1
+        dtype: int64
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.value_counts` implementation.
     .. only:: developer
 
@@ -1469,6 +1493,30 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
 @overload_method(SeriesType, 'add')
 def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.add
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/add.py
+       :language: python
+       :lines: 27-
+       :caption: Getting the addition of series and other
+       :name: ex_series_add
+
+    .. code-block:: console
+
+        > python ./series/add.py
+        a    4.0
+        b    3.0
+        c    NaN
+        d    NaN
+        dtype: float64
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.add` implementation.
     .. only:: developer
 
@@ -1794,6 +1842,30 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=True, *args):
 @overload_method(SeriesType, 'mul')
 def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.mul
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/mul.py
+       :language: python
+       :lines: 27-
+       :caption: Getting the multiplication of Series and other
+       :name: ex_series_mul
+
+    .. code-block:: console
+
+        > python ./series/mul.py
+        0      0.0
+        1      3.0
+        2    200.0
+        3      NaN
+        dtype: float64
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.mul` implementation.
     .. only:: developer
 
@@ -1852,10 +1924,119 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
 
 @overload_method(SeriesType, 'div')
-@overload_method(SeriesType, 'truediv')
 def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
     """
-    Pandas Series method :meth:`pandas.Series.div` and :meth:`pandas.Series.truediv` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.div
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/div.py
+       :language: python
+       :lines: 27-
+       :caption: Getting Floating division of series and other, element-wise (binary operator truediv)
+       :name: ex_series_div
+
+    .. code-block:: console
+
+        > python ./series/div.py
+        a    1.0
+        b    NaN
+        c    NaN
+        d    NaN
+        e    NaN
+        dtype: float64
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas Series method :meth:`pandas.Series.div` implementation.
+    .. only:: developer
+
+       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
+
+    Parameters
+    ----------
+    self: :class:`pandas.Series`
+        input arg
+    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
+        input arg
+    level: :obj:`int` or name
+         *unsupported*
+    fill_value: :obj:`float` or None, default None
+              *unsupported*
+    axis: default 0
+         *unsupported*
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    _func_name = 'Method div() or truediv().'
+
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if level is not None or fill_value is not None or axis != 0:
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if isinstance(other, SeriesType):
+        def hpat_pandas_series_div_impl(self, other):
+            """
+            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
+            """
+
+            return pandas.Series(self._data / other._data)
+
+        return hpat_pandas_series_div_impl
+
+    if isinstance(other, types.Integer) or isinstance(other, types.Float):
+        def hpat_pandas_series_div_number_impl(self, other):
+            """
+            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_integer_scalar
+            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
+            """
+
+            return pandas.Series(self._data / other)
+
+        return hpat_pandas_series_div_number_impl
+
+    raise TypingError('{} The object must be a pandas.series or scalar. Given other: {}'.format(_func_name, other))
+
+
+@overload_method(SeriesType, 'truediv')
+def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.truediv
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/truediv.py
+       :language: python
+       :lines: 27-
+       :caption: Getting Floating division of series and other, element-wise (binary operator truediv)
+       :name: ex_series_truediv
+
+    .. code-block:: console
+
+        > python ./series/truediv.py
+        a    1.0
+        b    NaN
+        c    NaN
+        d    NaN
+        e    NaN
+        dtype: float64
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas Series :meth:`pandas.Series.truediv` implementation.
     .. only:: developer
 
        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
@@ -2100,6 +2281,26 @@ def hpat_pandas_series_prod(self, axis=None, skipna=True, level=None, numeric_on
 @overload_method(SeriesType, 'quantile')
 def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.quantile
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/quantile.py
+       :language: python
+       :lines: 27-
+       :caption: Getting the value at the given quantile
+       :name: ex_series_quantile
+
+    .. code-block:: console
+
+        > python ./series/quantile.py
+        2.5
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.quantile` implementation.
     .. only:: developer
        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_quantile
@@ -2259,6 +2460,26 @@ def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_onl
 @overload_method(SeriesType, 'max')
 def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_only=None):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.max
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/max.py
+       :language: python
+       :lines: 27-
+       :caption: Getting the maximum value of Series elements
+       :name: ex_series_max
+
+    .. code-block:: console
+
+        > python ./series/max.py
+        4
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.max` implementation.
     .. only:: developer
        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_max
@@ -2799,6 +3020,30 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
 @overload_method(SeriesType, 'abs')
 def hpat_pandas_series_abs(self):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.abs
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/abs.py
+       :language: python
+       :lines: 27-
+       :caption: Getting the absolute value of each Series element
+       :name: ex_series_abs
+
+    .. code-block:: console
+
+        > python ./series/abs.py
+        0     1.10
+        1     2.00
+        2     3.33
+        dtype: float64
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.Series.abs` implementation.
     .. only:: developer
        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_abs1
@@ -2832,6 +3077,26 @@ def hpat_pandas_series_abs(self):
 @overload_method(SeriesType, 'unique')
 def hpat_pandas_series_unique(self):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.unique
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/unique.py
+       :language: python
+       :lines: 27-
+       :caption: Getting unique values in Seriees
+       :name: ex_series_unique
+
+    .. code-block:: console
+
+        > python ./series/unique.py
+        array([2, 1, 3], dtype=int64)
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.unique` implementation.
     Note: Return values order is unspecified
     .. only:: developer
@@ -2995,6 +3260,26 @@ def hpat_pandas_series_nunique(self, dropna=True):
 @overload_method(SeriesType, 'count')
 def hpat_pandas_series_count(self, level=None):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.count
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/count.py
+       :language: python
+       :lines: 27-
+       :caption: Getting the number of not NaN values in Series
+       :name: ex_series_count
+
+    .. code-block:: console
+
+        > python ./series/count.py
+        2
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.count` implementation.
     .. only:: developer
        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_count
