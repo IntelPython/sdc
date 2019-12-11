@@ -41,24 +41,37 @@
 
 # -- Import sdc package to build API Reference -------------------------------
 import os
+import sys
+import shutil
 
 SDC_DOC_NO_API_REF_STR = 'SDC_DOC_NO_API_REF'
+SDC_DOC_APIREF_DIR = '_api_ref'
 
+sys.path.insert(0, os.path.relpath('buildscripts'))
 sdc_doc_no_api_ref = False  # Generate API Reference by default
 
 if SDC_DOC_NO_API_REF_STR in os.environ:
     sdc_doc_no_api_ref = os.environ[SDC_DOC_NO_API_REF_STR] == '1'
 
 if not sdc_doc_no_api_ref:
+    if os.path.exists(SDC_DOC_APIREF_DIR):
+        shutil.rmtree(SDC_DOC_APIREF_DIR)
+
     try:
         import sdc
     except ImportError:
-        print('IMPORT EXCEPTION: Cannot import SDC. ')
-        print('Documentation generator for API Reference for a given module expects that module '
-              'to be installed. Use conda/pip install SDC to install it prior to using API Reference generation')
-        print('If you want to disable API Reference generation, set the environment variable SDC_DOC_NO_API_REF=1')
+        raise ImportError('Cannot import sdc.\n'
+                          'Documentation generator for API Reference for a given module expects that module '
+                          'to be installed. Use conda/pip install SDC to install it prior to using API Reference '
+                          'generation. If you want to disable API Reference generation, set the environment '
+                          'variable SDC_DOC_NO_API_REF=1')
 
-        raise
+    try:
+        from apiref_generator import generate_api_reference
+    except ImportError:
+        raise ImportError('Cannot import apiref_generator', os.getcwd())
+
+    generate_api_reference()
 
 # -- Project information -----------------------------------------------------
 
@@ -77,15 +90,10 @@ release = '0.1'
 # ones.
 extensions = [
     'sphinx.ext.todo',
-#    'sphinx.ext.autosummary',
     'sphinx.ext.intersphinx',
-#    'sphinx.ext.autodoc',
     'sphinx.ext.extlinks',
     'sphinx.ext.githubpages',
     'sphinx.ext.napoleon',
-#    'sphinx.ext.autosectionlabel',
-#    'sphinx.ext.graphviz',
-#    'sphinx.ext.coverage'
 ]
 
 
@@ -130,8 +138,10 @@ todo_link_only = False
 # Each entry of the dictionary has the following format:
 #      'class name': ('link to object.inv file for that class', None)
 intersphinx_mapping = {
-    'pandas.Series': ('https://pandas.pydata.org/pandas-docs/stable/', None),
-    'numpy.array': ('https://docs.scipy.org/doc/numpy', None),
+    'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+    'python': ('http://docs.python.org/2', None),
+    'numpy': ('http://docs.scipy.org/doc/numpy', None),
+    'scipy': ('http://docs.scipy.org/doc/scipy/reference', None),
 }
 
 # -- Napoleon extension configuration (Numpy and Google docstring options) -------
@@ -146,18 +156,6 @@ napoleon_use_admonition_for_references = False
 napoleon_use_ivar = False
 napoleon_use_param = True
 napoleon_use_rtype = True
-
-
-# -- Auto-section label configuration -----------------------------------------------
-#autosectionlabel_prefix_document = True
-
-
-# -- Autodoc configuration ----------------------------------------------------------
-#autodoc_docstring_signature = True
-
-
-# -- Auto-summary configuration -----------------------------------------------------
-#autosummary_generate = True
 
 # -- Prepend module name to an object name or not -----------------------------------
 add_module_names = False

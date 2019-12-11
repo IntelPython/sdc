@@ -424,7 +424,6 @@ class TestHiFrames(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
-    @skip_sdc_jit("Could not get length of Series(StringArraySplitView)")
     @skip_numba_jit
     def test_str_split_filter(self):
         def test_impl(df):
