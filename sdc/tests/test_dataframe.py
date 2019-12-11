@@ -891,7 +891,7 @@ class TestDataFrame(TestCase):
 
     def test_df_fillna1(self):
         def test_impl(df):
-            return df.fillna(5.0)
+            return df.fillna(0.)
 
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
         hpat_func = self.jit(test_impl)
@@ -1153,6 +1153,16 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
+    def test_dataframe_head(self):
+        def test_impl(df):
+            return df.head()
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"FLOAT": test_global_input_data_float64[0][:5],
+                           "DATATIME": test_datatime,
+                           "INT": test_global_input_data_int64[:5],
+                           "STRING": ['a', 'dd', 'c', '12', 'ddf']})
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
     def test_dataframe_head1(self):
         def test_impl(df, n):
             return df.head(n)
@@ -1161,6 +1171,17 @@ class TestDataFrame(TestCase):
                            "DATATIME": test_datatime,
                            "INT": test_global_input_data_int64[:5],
                            "STRING": ['a', 'dd', 'c', '12', 'ddf']})
+        for n in [-1, 0, 2, 5]:
+            pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
+    
+    def test_dataframe_head2(self):
+        def test_impl(df, n):
+            return df.head(n)
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [12, 4, 5, 1, 6, 8],
+                           "B": [5, 2, 54, 3, 6, 4],
+                           "C": [20, 16, 3, 8, 2, 3],
+                           "D": [14, 3, 2, 6, 4, 5]})
         for n in [-1, 0, 2, 5]:
             pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
 
