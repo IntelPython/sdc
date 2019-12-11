@@ -1173,7 +1173,7 @@ class TestDataFrame(TestCase):
                            "STRING": ['a', 'dd', 'c', '12', 'ddf']})
         for n in [-1, 0, 2, 5]:
             pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
-    
+
     def test_dataframe_head2(self):
         def test_impl(df, n):
             return df.head(n)

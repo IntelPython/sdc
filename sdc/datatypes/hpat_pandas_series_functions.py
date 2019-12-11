@@ -3419,7 +3419,8 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if not (isinstance(axis, (types.Integer, types.StringLiteral, types.UnicodeType, types.Omitted, types.NoneType)) or axis is None):
+    if not (isinstance(axis, (types.Integer, types.StringLiteral, types.UnicodeType,
+                              types.Omitted, types.NoneType)) or axis is None):
         raise TypingError('{} The axis must be an Integer or String. Given: {}'.format(_func_name, axis))
 
     if not (isinstance(inplace, types.Literal) and isinstance(inplace, types.Boolean)

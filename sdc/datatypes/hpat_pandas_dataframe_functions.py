@@ -76,7 +76,7 @@ else:
     def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, ddof=1, min_count=0, n=5):
         ty_checker = TypeChecker('Method {}().'.format(name))
         ty_checker.check(df, DataFrameType)
-        
+
         if not (isinstance(axis, types.Omitted) or axis is None):
             ty_checker.raise_exc(axis, 'unsupported', 'axis')
 
@@ -91,7 +91,7 @@ else:
 
         if not (isinstance(ddof, types.Omitted) or ddof == 1):
             ty_checker.raise_exc(ddof, 'unsupported', 'ddof')
-        
+
         if not (isinstance(min_count, types.Omitted) or min_count == 0):
             ty_checker.raise_exc(min_count, 'unsupported', 'min_count')
 
