@@ -914,7 +914,6 @@ class SeriesIatType(types.Type):
         super(SeriesIatType, self).__init__(name)
 
 
-<<<<<<< HEAD
 # PR135. This needs to be commented out
 # @infer_global(operator.getitem)
 # class GetItemSeriesIat(AbstractTemplate):
@@ -924,7 +923,7 @@ class SeriesIatType(types.Type):
 #         # iat[] is the same as regular getitem
 #         if isinstance(args[0], SeriesIatType):
 #             return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
-=======
+
 if sdc.config.config_pipeline_hpat_default:
     @infer_global(operator.getitem)
     class GetItemSeriesIat(AbstractTemplate):
@@ -934,7 +933,7 @@ if sdc.config.config_pipeline_hpat_default:
             # iat[] is the same as regular getitem
             if isinstance(args[0], SeriesIatType):
                 return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
->>>>>>> upstream/master
+
 
 
 @infer
