@@ -1100,43 +1100,43 @@ class GetItemSeries(AbstractTemplate):
         return sig
 
 
-@infer_global(operator.setitem)
-class SetItemSeries(SetItemBuffer):
-    def generic(self, args, kws):
-        assert not kws
-        series, idx, val = args
-        if not isinstance(series, SeriesType):
-            return None
-        # TODO: handle any of args being Series independently
-        ary = series_to_array_type(series)
-        is_idx_series = False
-        if isinstance(idx, SeriesType):
-            idx = series_to_array_type(idx)
-            is_idx_series = True
-        is_val_series = False
-        if isinstance(val, SeriesType):
-            val = series_to_array_type(val)
-            is_val_series = True
-        # TODO: strings, dt_index
-        res = super(SetItemSeries, self).generic((ary, idx, val), kws)
-        if res is not None:
-            new_series = if_arr_to_series_type(res.args[0])
-            idx = res.args[1]
-            val = res.args[2]
-            if is_idx_series:
-                idx = if_arr_to_series_type(idx)
-            if is_val_series:
-                val = if_arr_to_series_type(val)
-            res.args = (new_series, idx, val)
-            return res
-
-
-@infer_global(operator.setitem)
-class SetItemSeriesIat(SetItemSeries):
-    def generic(self, args, kws):
-        # iat[] is the same as regular setitem
-        if isinstance(args[0], SeriesIatType):
-            return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
+# @infer_global(operator.setitem)
+# class SetItemSeries(SetItemBuffer):
+#     def generic(self, args, kws):
+#         assert not kws
+#         series, idx, val = args
+#         if not isinstance(series, SeriesType):
+#             return None
+#         # TODO: handle any of args being Series independently
+#         ary = series_to_array_type(series)
+#         is_idx_series = False
+#         if isinstance(idx, SeriesType):
+#             idx = series_to_array_type(idx)
+#             is_idx_series = True
+#         is_val_series = False
+#         if isinstance(val, SeriesType):
+#             val = series_to_array_type(val)
+#             is_val_series = True
+#         # TODO: strings, dt_index
+#         res = super(SetItemSeries, self).generic((ary, idx, val), kws)
+#         if res is not None:
+#             new_series = if_arr_to_series_type(res.args[0])
+#             idx = res.args[1]
+#             val = res.args[2]
+#             if is_idx_series:
+#                 idx = if_arr_to_series_type(idx)
+#             if is_val_series:
+#                 val = if_arr_to_series_type(val)
+#             res.args = (new_series, idx, val)
+#             return res
+#
+#
+# @infer_global(operator.setitem)
+# class SetItemSeriesIat(SetItemSeries):
+#     def generic(self, args, kws):
+#         # iat[] is the same as regular setitem
+#         if isinstance(args[0], SeriesIatType):
+#             return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
 
 
 inplace_ops = [
