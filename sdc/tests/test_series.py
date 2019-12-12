@@ -975,6 +975,7 @@ class TestSeries(TestCase):
         pd.testing.assert_series_equal(A1, A2)
 
     @skip_numba_jit
+    @skip_sdc_jit
     def test_setitem_series_bool2(self):
         def test_impl(A, B):
             A[A > 3] = B[A > 3]
@@ -1029,6 +1030,7 @@ class TestSeries(TestCase):
         self.assertEqual(hpat_func(S), test_impl(S))
 
     @skip_numba_jit
+    @skip_sdc_jit
     def test_series_iat2(self):
         def test_impl(A):
             A.iat[3] = 1

@@ -166,7 +166,9 @@ def hpat_pandas_series_setitem(self, idx, value):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if not isinstance(self.dtype, type(value)):
+    if (isinstance(value, SeriesType) and not isinstance(self.dtype, value.dtype)) or \
+            not isinstance(self.dtype, type(value)):
+        print("QQQQQ")
         raise TypingError('{} Value must be one type with series. Given: {}, self.dtype={}'.format(_func_name,
                                                                                                    value, self.dtype))
 
@@ -183,7 +185,7 @@ def hpat_pandas_series_setitem(self, idx, value):
         return hpat_pandas_series_setitem_idx_integer_impl
 
     if isinstance(idx, SeriesType):
-        def hpat_pandas_series_getitem_idx_series_impl(self, idx, value):
+        def hpat_pandas_series_setitem_idx_series_impl(self, idx, value):
             """
             Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_series
             """
@@ -191,7 +193,7 @@ def hpat_pandas_series_setitem(self, idx, value):
             self._data[super_index] = value
             return self
 
-        return hpat_pandas_series_getitem_idx_series_impl
+        return hpat_pandas_series_setitem_idx_series_impl
 
     raise TypingError('{} The index must be an Integer, Slice or a pandas.series. Given: {}'.format(_func_name, idx))
 
