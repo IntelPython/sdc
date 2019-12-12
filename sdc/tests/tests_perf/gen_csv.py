@@ -43,3 +43,46 @@ def generate(rows, headers, providers, file_name):
         writer.writeheader()
         for i in range(rows):
             writer.writerow({k: p() for k, p in zip(headers, providers)})
+
+
+def md5(filename):
+    """Return MD5 sum of the file."""
+    import hashlib
+    hash_md5 = hashlib.md5()
+    with open(filename, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
+def csv_file_name(rows=10**5, columns=10, seed=0):
+    """Return file name for given parameters."""
+    return f"data_{rows}_{columns}_{seed}.csv"
+
+
+def generate_csv(rows=10**5, columns=10, seed=0):
+    """Generate CSV file and return file name."""
+    import random
+
+    md5_sums = {
+        (10**6, 10, 0): "6fa2a115dfeaee4f574106b513ad79e6"
+    }
+
+    file_name = csv_file_name(rows, columns, seed)
+
+    try:
+        if md5_sums.get((rows, columns, seed)) == md5(file_name):
+            return file_name
+    except:
+        pass
+
+    r = random.Random(seed)
+    generate(rows,
+        [f"f{c}" for c in range(columns)],
+        [lambda: r.uniform(-1.0, 1.0) for _ in range(columns)],
+        file_name
+    )
+
+    md5_sums[(rows, columns, seed)] = md5(file_name)
+
+    return file_name

@@ -24,4 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from numba import njit
 
+
+@njit
+def series_str_zfill():
+    series = pd.Series(['dog', 'foo', 'bar'])  # Series of 'dog', 'foo', 'bar'
+    out_series = series.str.zfill(5)
+
+    return out_series  # Expect series of '00dog', '00foo', '00bar'
+
+
+print(series_str_zfill())

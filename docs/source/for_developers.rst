@@ -1,4 +1,5 @@
-﻿.. _developers:
+﻿.. _for_developers:
+.. include:: ./ext_links.txt
 
 Contribute to Intel® Scalable Dataframe Compiler Development
 ============================================================

@@ -230,7 +230,35 @@ def usecase_series_chain_add_and_sum(A, B):
 
     return res_time, res
 
-  
+
+def usecase_series_astype_int(input_data):
+    # astype to int8
+    start_time = time.time()
+    input_data.astype(np.int8)
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, input_data
+
+
+def usecase_series_fillna(input_data):
+    start_time = time.time()
+    res = input_data.fillna(-1)
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
+def usecase_series_isna(input_data):
+    start_time = time.time()
+    res = input_data.isna()
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods
 class TestSeriesMethods(TestBase):
     @classmethod
@@ -261,6 +289,9 @@ class TestSeriesMethods(TestBase):
             'series_sort_values': [10 ** 5],
             'series_dropna': [2 * 10 ** 8],
             'series_chain_add_and_sum': [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7],
+            'series_astype_int': [2 * 10 ** 7],
+            'series_fillna': [2 * 10 ** 7],
+            'series_isna': [2 * 10 ** 7],
         }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
@@ -280,8 +311,7 @@ class TestSeriesMethods(TestBase):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, name):
-        input_data = test_global_input_data_float64
+    def _test_case(self, pyfunc, name, input_data=test_global_input_data_float64):
         full_input_data_length = sum(len(i) for i in input_data)
         for data_length in self.total_data_length[name]:
             base = {
@@ -396,3 +426,11 @@ class TestSeriesMethods(TestBase):
     def test_series_chain_add_and_sum(self):
         self._test_series_binary_operations(usecase_series_chain_add_and_sum, 'series_chain_add_and_sum')
 
+    def test_series_float_astype_int(self):
+        self._test_case(usecase_series_astype_int, 'series_astype_int', input_data=[test_global_input_data_float64[0]])
+
+    def test_series_float_fillna(self):
+        self._test_case(usecase_series_fillna, 'series_fillna')
+
+    def test_series_float_isna(self):
+        self._test_case(usecase_series_fillna, 'series_isna')
