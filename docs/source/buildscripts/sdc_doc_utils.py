@@ -320,6 +320,7 @@ def split_in_sections(doc):
     :seealso: NumPy style `example
         <https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html#example-numpy>`_
     """
+    doc = reindent(doc, 0)
     sections = doc.split('\n\n')  # Sections are separated by empty lines
     titled_sections = []
 
