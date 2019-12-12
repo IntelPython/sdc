@@ -38,7 +38,7 @@
     `hpat_pandas_stringmethods_upper_parallel_impl` is paralell version
     (required additional import mentioned in the body)
 
-    @overload_method(StringMethodsType, 'upper')
+    @sdc_overload_method(StringMethodsType, 'upper')
     def hpat_pandas_stringmethods_upper(self):
 
         ty_checker = TypeChecker('Method stringmethods.upper().')
@@ -87,7 +87,7 @@ from numba.types import (Boolean, Integer, NoneType,
 
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
-
+from sdc.utils import sdc_overload_method
 
 _hpat_pandas_stringmethods_autogen_global_dict = {
     'pandas': pandas,
@@ -138,7 +138,7 @@ _hpat_pandas_stringmethods_functions_params = {
 }
 
 _hpat_pandas_stringmethods_functions_template = """
-# @overload_method(StringMethodsType, '{methodname}')
+# @sdc_overload_method(StringMethodsType, '{methodname}')
 def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
     \"\"\"
     Pandas Series method :meth:`pandas.core.strings.StringMethods.{methodname}()` implementation.
@@ -189,7 +189,7 @@ def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
 """
 
 
-@overload_method(StringMethodsType, 'center')
+@sdc_overload_method(StringMethodsType, 'center')
 def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
     """
     Pandas Series method :meth:`pandas.core.strings.StringMethods.center()` implementation.
@@ -236,7 +236,7 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
     return hpat_pandas_stringmethods_center_impl
 
 
-@overload_method(StringMethodsType, 'endswith')
+@sdc_overload_method(StringMethodsType, 'endswith')
 def hpat_pandas_stringmethods_endswith(self, pat, na=None):
     """
     Pandas Series method :meth:`pandas.core.strings.StringMethods.endswith()` implementation.
@@ -287,7 +287,7 @@ def hpat_pandas_stringmethods_endswith(self, pat, na=None):
     return hpat_pandas_stringmethods_endswith_impl
 
 
-@overload_method(StringMethodsType, 'find')
+@sdc_overload_method(StringMethodsType, 'find')
 def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
     """
     Pandas Series method :meth:`pandas.core.strings.StringMethods.find()` implementation.
@@ -346,7 +346,7 @@ def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
     return hpat_pandas_stringmethods_find_impl
 
 
-@overload_method(StringMethodsType, 'isupper')
+@sdc_overload_method(StringMethodsType, 'isupper')
 def hpat_pandas_stringmethods_isupper(self):
     """
     Pandas Series method :meth:`pandas.core.strings.StringMethods.isupper()` implementation.
@@ -382,7 +382,7 @@ def hpat_pandas_stringmethods_isupper(self):
     return hpat_pandas_stringmethods_isupper_impl
 
 
-@overload_method(StringMethodsType, 'len')
+@sdc_overload_method(StringMethodsType, 'len')
 def hpat_pandas_stringmethods_len(self):
     """
     Pandas Series method :meth:`pandas.core.strings.StringMethods.len()` implementation.
@@ -418,7 +418,7 @@ def hpat_pandas_stringmethods_len(self):
     return hpat_pandas_stringmethods_len_impl
 
 
-@overload_method(StringMethodsType, 'ljust')
+@sdc_overload_method(StringMethodsType, 'ljust')
 def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -490,7 +490,7 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
     return hpat_pandas_stringmethods_ljust_impl
 
 
-@overload_method(StringMethodsType, 'rjust')
+@sdc_overload_method(StringMethodsType, 'rjust')
 def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -562,7 +562,7 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
     return hpat_pandas_stringmethods_rjust_impl
 
 
-@overload_method(StringMethodsType, 'startswith')
+@sdc_overload_method(StringMethodsType, 'startswith')
 def hpat_pandas_stringmethods_startswith(self, pat, na=None):
     """
     Pandas Series method :meth:`pandas.core.strings.StringMethods.startswith()` implementation.
