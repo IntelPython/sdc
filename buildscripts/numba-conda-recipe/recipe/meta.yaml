@@ -38,6 +38,8 @@ requirements:
     - funcsigs                 # [py27]
     - singledispatch           # [py27]
     - tbb-devel >=2018.0.5     # [not (win and py27)]
+    - llvm-openmp              # [osx]
+    - intel-openmp             # [osx]
   run:
     - python
     - {{ pin_compatible('numpy') }}
