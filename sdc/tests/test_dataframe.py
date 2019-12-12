@@ -1174,6 +1174,19 @@ class TestDataFrame(TestCase):
         for n in [-1, 0, 2, 5]:
             pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
 
+    @unittest.skip('Dataframe.index not support')
+    def test_dataframe_head1_index(self):
+        def test_impl(df, n):
+            return df.head(n)
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"FLOAT": test_global_input_data_float64[0][:5],
+                           "DATATIME": test_datatime,
+                           "INT": test_global_input_data_int64[:5],
+                           "STRING": ['a', 'dd', 'c', '12', 'ddf']},
+                           index=[32, 3, 6, 17, 23])
+        for n in [-1, 0, 2, 5]:
+            pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
+
     def test_dataframe_head2(self):
         def test_impl(df, n):
             return df.head(n)

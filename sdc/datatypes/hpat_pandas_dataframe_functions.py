@@ -73,7 +73,7 @@ else:
 
         return _reduce_impl
 
-    def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, ddof=1, min_count=0, n=5):
+    def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, ddof=1, min_count=0):
         ty_checker = TypeChecker('Method {}().'.format(name))
         ty_checker.check(df, DataFrameType)
 
@@ -95,9 +95,6 @@ else:
         if not (isinstance(min_count, types.Omitted) or min_count == 0):
             ty_checker.raise_exc(min_count, 'unsupported', 'min_count')
 
-        if not (isinstance(n, (types.Omitted, types.Integer)) or n == 5):
-            ty_checker.raise_exc(n, 'int64', 'n')
-
     @overload_method(DataFrameType, 'head')
     def head_overload(df, n=5):
         """
@@ -118,7 +115,13 @@ else:
 
         name = 'head'
 
-        check_type(name, df, n=n)
+        check_type(name, df)
+
+        ty_checker = TypeChecker('Method {}().'.format(name))
+        ty_checker.check(df, DataFrameType)
+
+        if not (isinstance(n, (types.Omitted, types.Integer)) or n == 5):
+            ty_checker.raise_exc(n, 'int64', 'n')
 
         params = [('n', 5)]
 
