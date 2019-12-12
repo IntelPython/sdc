@@ -38,7 +38,7 @@ import sdc
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs,
                                    count_array_OneDs, dist_IR_contains, get_start_end, check_numba_version,
-                                   skip_numba_jit)
+                                   skip_numba_jit, skip_sdc_jit)
 
 from sdc.tests.gen_test_data import ParquetGenerator
 from numba.config import IS_32BITS
@@ -498,6 +498,7 @@ class TestDataFrame(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_sdc_jit
     @skip_numba_jit
     def test_df_apply(self):
         def test_impl(n):
@@ -509,6 +510,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
+    @skip_sdc_jit
     @skip_numba_jit
     def test_df_apply_branch(self):
         def test_impl(n):
