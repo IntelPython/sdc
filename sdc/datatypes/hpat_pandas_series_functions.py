@@ -404,20 +404,29 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/value_counts.py
+    .. literalinclude:: ../../../examples/series/series_value_counts.py
        :language: python
        :lines: 27-
-       :caption: Getting the number of not NaN values occurrence
+       :caption: Getting the number of values excluding NaNs
        :name: ex_series_value_counts
 
     .. code-block:: console
 
-        > python ./series/value_counts.py
+        > python ./series/series_value_counts.py
         3.0    2
         4.0    1
         2.0    1
         1.0    1
         dtype: int64
+
+     .. note::
+
+        Parameter bins and dropna for Strings are currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        :ref:`Series.count <pandas.Series.count>`
+
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -1498,9 +1507,10 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     Pandas API: pandas.Series.add
 
+
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/add.py
+    .. literalinclude:: ../../../examples/series/series_add.py
        :language: python
        :lines: 27-
        :caption: Getting the addition of series and other
@@ -1508,12 +1518,19 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     .. code-block:: console
 
-        > python ./series/add.py
-        a    4.0
-        b    3.0
-        c    NaN
-        d    NaN
-        dtype: float64
+        > python ./series/series_add.py
+        0    5
+        1    7
+        2    9
+        dtype: int64
+
+    .. note::
+
+        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        :ref:`Series.radd <pandas.Series.radd>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -1532,7 +1549,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
          *unsupported*
     fill_value: :obj:`float` or None, default None
               *unsupported*
-    axis: default 0
+    axis: :obj:`int` default 0
          *unsupported*
     Returns
     -------
@@ -1849,20 +1866,27 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/mul.py
+    .. literalinclude:: ../../../examples/series/series_mul.py
        :language: python
        :lines: 27-
-       :caption: Getting the multiplication of Series and other
+       :caption: Element-wise multiplication of two series
        :name: ex_series_mul
 
     .. code-block:: console
 
-        > python ./series/mul.py
-        0      0.0
-        1      3.0
-        2    200.0
-        3      NaN
-        dtype: float64
+        > python ./series/series_mul.py
+        0      0
+        1      3
+        2    200
+        dtype: int64
+
+     .. note::
+
+        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        :ref:`Series.rmul <pandas.Series.rmul>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -1881,7 +1905,7 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
          *unsupported*
     fill_value: :obj:`float` or None, default None
               *unsupported*
-    axis: default 0
+    axis: :obj:`int` default 0
          *unsupported*
     Returns
     -------
@@ -1933,21 +1957,28 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/div.py
+    .. literalinclude:: ../../../examples/series/series_div.py
        :language: python
        :lines: 27-
-       :caption: Getting Floating division of series and other, element-wise (binary operator truediv)
+       :caption: Element-wise division of one series by another (binary operator div)
        :name: ex_series_div
 
     .. code-block:: console
 
-        > python ./series/div.py
-        a    1.0
-        b    NaN
-        c    NaN
-        d    NaN
-        e    NaN
+        > python ./series/series_div.py
+        0    0.25
+        1    0.50
+        2    0.25
+        3     NaN
         dtype: float64
+
+    .. note::
+
+        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        :ref:`Series.rdiv <pandas.Series.rdiv>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -1966,7 +1997,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
          *unsupported*
     fill_value: :obj:`float` or None, default None
               *unsupported*
-    axis: default 0
+    axis: :obj:`int` default 0
          *unsupported*
     Returns
     -------
@@ -2018,21 +2049,28 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/truediv.py
+    .. literalinclude:: ../../../examples/series/series_truediv.py
        :language: python
        :lines: 27-
-       :caption: Getting Floating division of series and other, element-wise (binary operator truediv)
+       :caption: Element-wise division of one series by another (binary operator truediv)
        :name: ex_series_truediv
 
     .. code-block:: console
 
-        > python ./series/truediv.py
-        a    1.0
-        b    NaN
-        c    NaN
-        d    NaN
-        e    NaN
+        > python ./series/series_div.py
+        0    0.25
+        1    0.50
+        2    0.25
+        3     NaN
         dtype: float64
+
+    .. note::
+
+        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        :ref:`Series.rtruediv <pandas.Series.rtruediv>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -2288,16 +2326,25 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/quantile.py
+    .. literalinclude:: ../../../examples/series/series_quantile.py
        :language: python
        :lines: 27-
-       :caption: Getting the value at the given quantile
+       :caption: Computing quantile for the series
        :name: ex_series_quantile
 
     .. code-block:: console
 
-        > python ./series/quantile.py
+        > python ./series/series_quantile.py
         2.5
+
+    .. note::
+
+        Parameter interpolation is currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        `numpy.absolute <https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html#numpy.percentile>`_
+
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -2467,7 +2514,7 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/max.py
+    .. literalinclude:: ../../../examples/series/series_max.py
        :language: python
        :lines: 27-
        :caption: Getting the maximum value of Series elements
@@ -2475,8 +2522,25 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
 
     .. code-block:: console
 
-        > python ./series/max.py
+        > python ./series/series_max.py
         4
+
+    .. note::
+
+        Parameters axis, level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        :ref:`Series.sum <pandas.Series.sum>`
+            Return the sum.
+        :ref:`Series.min <pandas.Series.min>`
+            Return the minimum.
+        :ref:`Series.max <pandas.Series.max>`
+            Return the maximum.
+        :ref:`Series.idxmin <pandas.Series.idxmin>`
+            Return the index of the minimum.
+        :ref:`Series.idxmax <pandas.Series.idxmax>`
+            Return the index of the maximum.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -3025,21 +3089,27 @@ def hpat_pandas_series_abs(self):
 
     Pandas API: pandas.Series.abs
 
+
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/abs.py
+    .. literalinclude:: ../../../examples/series/series_abs.py
        :language: python
        :lines: 27-
-       :caption: Getting the absolute value of each Series element
+       :caption: Getting the absolute value of each element in series
        :name: ex_series_abs
 
     .. code-block:: console
 
-        > python ./series/abs.py
+        > python ./series/series_abs.py
         0     1.10
         1     2.00
         2     3.33
         dtype: float64
+
+    .. seealso::
+
+        `numpy.absolute <https://docs.scipy.org/doc/numpy/reference/generated/numpy.absolute.html>`_
+            Calculate the absolute value element-wise.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -3084,15 +3154,15 @@ def hpat_pandas_series_unique(self):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/unique.py
+    .. literalinclude:: ../../../examples/series/series_unique.py
        :language: python
        :lines: 27-
-       :caption: Getting unique values in Seriees
+       :caption: Getting unique values in series
        :name: ex_series_unique
 
     .. code-block:: console
 
-        > python ./series/unique.py
+        > python ./series/series_unique.py
         array([2, 1, 3], dtype=int64)
 
     Intel Scalable Dataframe Compiler Developer Guide
@@ -3267,16 +3337,20 @@ def hpat_pandas_series_count(self, level=None):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/count.py
+    .. literalinclude:: ../../../examples/series/series_count.py
        :language: python
        :lines: 27-
-       :caption: Getting the number of not NaN values in Series
+       :caption: Counting non-NaN values in series
        :name: ex_series_count
 
     .. code-block:: console
 
-        > python ./series/count.py
+        > python ./series/series_count.py
         2
+
+    .. note::
+
+        Parameter level is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************

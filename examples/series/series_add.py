@@ -25,17 +25,16 @@
 # *****************************************************************************
 
 import pandas as pd
-import numpy as np
 from numba import njit
 
 
 @njit
 def series_add():
-    s1 = pd.Series([3, 2, 1], index=['a', 'b', 'c'])
-    s2 = pd.Series([1, 1, np.nan], index=['a', 'b', 'd'])
+    s1 = pd.Series([1, 2, 3])
+    s2 = pd.Series([4, 5, 6])
     out_series = s1.add(s2)
 
-    return out_series  # Expect series of '4.0', '3.0', 'NaN', 'NaN'
+    return out_series  # Expect series of 5, 7, 9
 
 
 print(series_add())

@@ -25,16 +25,16 @@
 # *****************************************************************************
 
 import pandas as pd
-import numpy as np
 from numba import njit
 
 
 @njit
-def series_value_counts():
-    s = pd.Series([3, 1, 2, 3, 4, np.nan])
-    out_series = s.value_counts()
+def series_quantile():
+    s = pd.Series([1, 2, 3, 4])
+    median = .5  # compute median
+    out_series = s.quantile(median)
 
-    return out_series   # Expect Series of not NaN values occurrence
+    return out_series # Expect median value == 2.5
 
 
-print(series_value_counts())
+print(series_quantile())

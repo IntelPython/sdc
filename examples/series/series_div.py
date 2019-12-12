@@ -30,12 +30,12 @@ from numba import njit
 
 
 @njit
-def series_truediv():
-    s1 = pd.Series([1, 1, 1, np.nan], index=['a', 'b', 'c', 'd'])
-    s2 = pd.Series([1, np.nan, 1, np.nan], index=['a', 'b', 'd', 'e'])
+def series_div():
+    s1 = pd.Series([1, 2, 4, np.nan])
+    s2 = pd.Series([4, 4, 16, np.nan])
     out_series = s1.div(s2)
 
-    return out_series
+    return out_series  # Expect series of 0.25, 0.50, 0.25
 
 
-print(series_truediv())
+print(series_div())

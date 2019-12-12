@@ -25,17 +25,15 @@
 # *****************************************************************************
 
 import pandas as pd
-import numpy as np
 from numba import njit
 
 
 @njit
-def series_mul():
-    s1 = pd.Series([1, 3, 100, np.nan])
-    s2 = pd.Series([0, 1, 2, np.nan])
-    out_series = s1.mul(s2)
+def series_abs():
+    s = pd.Series([-1.10, 2, -3.33])
+    out_series = s.abs()
 
-    return out_series
+    return out_series  # Expect series of 1.10, 2.00, 3.33
 
 
-print(series_mul())
+print(series_abs())

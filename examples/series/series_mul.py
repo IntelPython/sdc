@@ -25,17 +25,16 @@
 # *****************************************************************************
 
 import pandas as pd
-import numpy as np
 from numba import njit
 
 
 @njit
-def series_div():
-    s1 = pd.Series([1, 1, 1, np.nan], index=['a', 'b', 'c', 'd'])
-    s2 = pd.Series([1, np.nan, 1, np.nan], index=['a', 'b', 'd', 'e'])
-    out_series = s1.div(s2)
+def series_mul():
+    s1 = pd.Series([1, 3, 100])
+    s2 = pd.Series([0, 1, 2])
+    out_series = s1.mul(s2)
 
-    return out_series
+    return out_series  # Expect series of 0, 3, 200
 
 
-print(series_div())
+print(series_mul())

@@ -25,16 +25,16 @@
 # *****************************************************************************
 
 import pandas as pd
+import numpy as np
 from numba import njit
 
 
 @njit
-def series_quantile():
-    s = pd.Series([1, 2, 3, 4])
-    q = .5  # quantile to compute
-    out_series = s.quantile(q)
+def series_value_counts():
+    s = pd.Series([3, 1, 2, 3, 4, np.nan])
+    out_series = s.value_counts()
 
-    return out_series
+    return out_series   # Expect series of non-Nan values occurrence
 
 
-print(series_quantile())
+print(series_value_counts())

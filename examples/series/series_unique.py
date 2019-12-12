@@ -25,16 +25,15 @@
 # *****************************************************************************
 
 import pandas as pd
-import numpy as np
 from numba import njit
 
 
 @njit
-def series_count():
-    s = pd.Series([1, 2, np.nan])
-    out_series = s.count()
+def series_unique():
+    s = pd.Series([2, 1, 3, 3])
+    out_series = s.unique()
 
-    return out_series  # Expect sum of unique values '2'
+    return out_series  # Expect array of unique values [1, 2, 3]
 
 
-print(series_count())
+print(series_unique())
