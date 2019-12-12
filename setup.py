@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2019, Intel Corporation All rights reserved.
 #
@@ -28,8 +28,8 @@
 from setuptools import setup, Extension, find_packages, Command
 import platform
 import os
-from sphinx.setup_command import BuildDoc
 import sys
+from docs.source.buildscripts.sdc_build_doc import SDCBuildDoc
 
 
 # Note we don't import Numpy at the toplevel, since setup.py
@@ -47,48 +47,6 @@ SDC_NAME_STR = 'Intel® Scalable Dataframe Compiler'
 np_compile_args = np_misc.get_info('npymath')
 
 is_win = platform.system() == 'Windows'
-
-
-# Sphinx User's Documentation Build
-
-class BuildUserDoc(BuildDoc):
-
-    def __init__(self, dist):
-        # Remove current working directory from PYTHONPATH to avoid importing SDC from sources vs.
-        # from installed SDC package
-        cwd = os.getcwd()
-
-        removed_flag = True
-        while removed_flag:
-            removed_flag = False
-            if '' in sys.path:
-                sys.path.remove('')
-                removed_flag = True
-
-            if '.' in sys.path:
-                sys.path.remove('.')
-                removed_flag = True
-
-            if './' in sys.path:
-                sys.path.remove('./')
-                removed_flag = True
-
-            if cwd in sys.path:
-                sys.path.remove(cwd)
-                removed_flag = True
-
-        super(BuildUserDoc, self).__init__(dist)
-
-
-# Sphinx Developer's Documentation Build
-
-#class build_devdoc(build.build):
-#    description = "Build developer's documentation"
-#
-#    def run(self):
-#        spawn(['rm', '-rf', 'docs/_builddev'])
-#        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_builddev/docstrees',
-#               '-j1', 'docs/devsource', '-t', 'developer', 'docs/_builddev/html'])
 
 
 def readme():
@@ -414,7 +372,7 @@ class style(Command):
 # These commands extend standard setuptools build procedure
 #
 sdc_build_commands = versioneer.get_cmdclass()
-sdc_build_commands['build_user_doc'] = BuildUserDoc
+sdc_build_commands['build_doc'] = SDCBuildDoc
 sdc_build_commands.update({'style': style})
 sdc_version = versioneer.get_version()
 sdc_release = 'Alpha (' + versioneer.get_version() + ')'
@@ -445,11 +403,4 @@ setup(name=SDC_NAME_STR,
           "numba_extensions": [
               "init = sdc:_init_extension",
           ]},
-      # these are optional and override Sphinx conf.py settings
-      command_options={
-          'build_user_doc': {
-              'project': ('setup.py', SDC_NAME_STR),
-              'version': ('setup.py', sdc_version),
-              'release': ('setup.py', sdc_release),
-              'source_dir': ('setup.py', './docs/source')}},
       )
