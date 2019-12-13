@@ -1942,3 +1942,6 @@ def simple_block_copy_propagate(block):
             for k in lhs_kill:
                 var_dict.pop(k, None)
     return
+
+
+from sdc.datatypes.hpat_pandas_functions import *
