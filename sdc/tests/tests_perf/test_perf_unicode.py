@@ -31,6 +31,7 @@ import time
 import numba
 
 from sdc.tests.test_utils import *
+from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import *
 
 
@@ -92,19 +93,15 @@ def usecase_center(input_data):
     return iter_time
 
 
-class TestStringMethods(unittest.TestCase):
+class TestStringMethods(TestBase):
+    test_results_class = TestResultsStr
+
     @classmethod
     def setUpClass(cls):
-        cls.test_results = TestResultsStr()
-        if is_true(os.environ.get('LOAD_PREV_RESULTS')):
-            cls.test_results.load()
+        super().setUpClass()
 
-        cls.total_data_size_bytes = [1.0E+07]
+        cls.total_data_size_bytes = [1.0E+04]
         cls.width = [16, 64, 512, 1024]
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.test_results.print()
 
     def _test_unicode(self, pyfunc, name):
         hpat_func = numba.njit(pyfunc)

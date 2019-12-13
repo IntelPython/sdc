@@ -40,6 +40,7 @@ from numba import types
 from numba.extending import (overload, overload_method, overload_attribute)
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from numba.errors import TypingError
+
 from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
 
 def sdc_pandas_dataframe_reduce_columns(df, name, params_s, params_df):
@@ -71,3 +72,5 @@ def sdc_pandas_dataframe_reduce_columns(df, name, params_s, params_df):
     _reduce_impl = loc_vars['_reduce_impl']
 
     return _reduce_impl
+
+
