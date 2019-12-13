@@ -1,8 +1,8 @@
 ﻿.. _compilation:
 .. include:: ./ext_links.txt
 
-Compiling With Intel® Scalable Dataframe Compiler
-=================================================
+Compiling With Intel® SDC
+=========================
 
 .. todo::
      Basic compilation controls. What can be compiled and what cannot. How to work around compilation issues.
@@ -85,9 +85,9 @@ should also be deterministic. The below example is not supported since the funct
      Discuss other typical scenarios when Numba or hpat cannot perform type inference
  
 Dealing With Integer NaN Values
-=================================
+-------------------------------
 
-The :py:class:`pandas.Series` are built upon :py:class:`numpy.array`, which does not support
+The :py:class:`pandas.Series` are built upon :py:class:`numpy.ndarray`, which does not support
 ``NaN`` values for integers. For that reason `Pandas*`_ dynamically converts integer columns to floating point ones
 when ``NaN`` values are needed. Intel SDC can perform such a conversion only if enough information about
 ``NaN`` values is available at compilation time. When it is impossible the user is responsible for manual
@@ -98,7 +98,7 @@ conversion of integer data to floating point data.
     ``NaN`` cannot be known at compile time and show how it can be worked around
  
 Type Inference In I/O Operations
-=================================
+--------------------------------
 
 If the filename is constant, the Intel SDC may be able to determine file schema at compilation time. It will allow
 to perform type inference of columns in respective `Pandas*`_ dataframe.

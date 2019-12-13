@@ -200,7 +200,7 @@ class ResultsDriver:
 
     def __init__(self, file_name, raw_file_name=None):
         self.file_name = file_name
-        self.raw_file_name = raw_file_name if raw_file_name else f'raw_{file_name}'
+        self.raw_file_name = raw_file_name or f'raw_{file_name}'
 
 
 class ExcelResultsDriver(ResultsDriver):
@@ -226,15 +226,16 @@ class ExcelResultsDriver(ResultsDriver):
 
     def load(self, logger=None):
         raw_perf_results_xlsx = Path(self.raw_file_name)
-        if raw_perf_results_xlsx.exists():
-            with raw_perf_results_xlsx.open('rb') as fd:
-                # xlrd need to be installed
-                try:
-                    return pandas.read_excel(fd)
-                except ModuleNotFoundError as e:
-                    if logger:
-                        msg = 'Could not load previous results from %s: %s'
-                        logger.warning(msg, self.raw_file_name, e)
+        if not raw_perf_results_xlsx.exists():
+            return
+        with raw_perf_results_xlsx.open('rb') as fd:
+            # xlrd need to be installed
+            try:
+                return pandas.read_excel(fd)
+            except ModuleNotFoundError as e:
+                if logger:
+                    msg = 'Could not load previous results from %s: %s'
+                    logger.warning(msg, self.raw_file_name, e)
 
 
 class CSVResultsDriver(ResultsDriver):
@@ -247,25 +248,24 @@ class CSVResultsDriver(ResultsDriver):
 
     def load(self, logger=None):
         raw_perf_results_csv = Path(self.raw_file_name)
-        if raw_perf_results_csv.exists():
-            with raw_perf_results_csv.open('rb') as fd:
-                # xlrd need to be installed
-                try:
-                    return pandas.read_csv(fd)
-                except ModuleNotFoundError as e:
-                    if logger:
-                        msg = 'Could not load previous results from %s: %s'
-                        logger.warning(msg, self.raw_file_name, e)
+        if not raw_perf_results_csv.exists():
+            return
+        with raw_perf_results_csv.open('rb') as fd:
+            try:
+                return pandas.read_csv(fd)
+            except ModuleNotFoundError as e:
+                if logger:
+                    msg = 'Could not load previous results from %s: %s'
+                    logger.warning(msg, self.raw_file_name, e)
 
 
 class TestResults:
-    index = ['name', 'N', 'type', 'size']
+    index = ['name', 'nthreads', 'type', 'size']
     test_results_data = pandas.DataFrame(index=index)
     logger = setup_logging()
 
     def __init__(self, drivers=None):
-        self.drivers = drivers
-        self.default_driver = drivers[0] if drivers else None
+        self.drivers = drivers or []
 
     @property
     def grouped_data(self):
@@ -317,7 +317,7 @@ class TestResults:
         """
         data = {
             'name': test_name,
-            'N': num_threads,
+            'nthreads': num_threads,
             'type': test_type,
             'size': data_size,
             'Time(s)': test_results,
@@ -345,14 +345,15 @@ class TestResults:
         """
         Load existing performance testing results from excel to global data storage
         """
-        if self.default_driver:
-            test_results_data = self.default_driver.load(self.logger)
+        for d in self.drivers:
+            test_results_data = d.load(self.logger)
             if test_results_data is not None:
                 self.test_results_data = test_results_data
+                break
 
 
 class TestResultsStr(TestResults):
-    index = ['name', 'N', 'type', 'size', 'width']
+    index = ['name', 'nthreads', 'type', 'size', 'width']
 
     def add(self, test_name, test_type, data_size, test_results, data_width=None,
             boxing_results=None, compile_results=None, num_threads=config.NUMBA_NUM_THREADS):
@@ -369,7 +370,7 @@ class TestResultsStr(TestResults):
         """
         data = {
             'name': test_name,
-            'N': num_threads,
+            'nthreads': num_threads,
             'type': test_type,
             'size': data_size,
             'width': data_width,
