@@ -1513,7 +1513,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_add.py
        :language: python
        :lines: 27-
-       :caption: Getting the addition of series and other
+       :caption: Getting the addition of Series and other
        :name: ex_series_add
 
     .. code-block:: console
@@ -1869,7 +1869,7 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_mul.py
        :language: python
        :lines: 27-
-       :caption: Element-wise multiplication of two series
+       :caption: Element-wise multiplication of two Series
        :name: ex_series_mul
 
     .. code-block:: console
@@ -1960,7 +1960,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_div.py
        :language: python
        :lines: 27-
-       :caption: Element-wise division of one series by another (binary operator div)
+       :caption: Element-wise division of one Series by another (binary operator div)
        :name: ex_series_div
 
     .. code-block:: console
@@ -2052,7 +2052,7 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
     .. literalinclude:: ../../../examples/series/series_truediv.py
        :language: python
        :lines: 27-
-       :caption: Element-wise division of one series by another (binary operator truediv)
+       :caption: Element-wise division of one Series by another (binary operator truediv)
        :name: ex_series_truediv
 
     .. code-block:: console
@@ -2329,7 +2329,7 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     .. literalinclude:: ../../../examples/series/series_quantile.py
        :language: python
        :lines: 27-
-       :caption: Computing quantile for the series
+       :caption: Computing quantile for the Series
        :name: ex_series_quantile
 
     .. code-block:: console
@@ -3095,7 +3095,7 @@ def hpat_pandas_series_abs(self):
     .. literalinclude:: ../../../examples/series/series_abs.py
        :language: python
        :lines: 27-
-       :caption: Getting the absolute value of each element in series
+       :caption: Getting the absolute value of each element in Series
        :name: ex_series_abs
 
     .. code-block:: console
@@ -3157,7 +3157,7 @@ def hpat_pandas_series_unique(self):
     .. literalinclude:: ../../../examples/series/series_unique.py
        :language: python
        :lines: 27-
-       :caption: Getting unique values in series
+       :caption: Getting unique values in Series
        :name: ex_series_unique
 
     .. code-block:: console
@@ -3340,7 +3340,7 @@ def hpat_pandas_series_count(self, level=None):
     .. literalinclude:: ../../../examples/series/series_count.py
        :language: python
        :lines: 27-
-       :caption: Counting non-NaN values in series
+       :caption: Counting non-NaN values in Series
        :name: ex_series_count
 
     .. code-block:: console
@@ -3351,6 +3351,12 @@ def hpat_pandas_series_count(self, level=None):
     .. note::
 
         Parameter level is currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        :ref:`Series.value_counts <pandas.Series.value_counts>`
+        :ref:`Series.value_counts <pandas.Series.value_counts>`
+        :ref:`Series.str.len <pandas.Series.str.len>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
