@@ -180,9 +180,6 @@ ext_set = Extension(name="sdc.hset_ext",
 
 str_libs = np_compile_args['libraries']
 
-if not is_win:
-    str_libs += ['boost_regex']
-
 ext_str = Extension(name="sdc.hstr_ext",
                     sources=["sdc/_str_ext.cpp"],
                     libraries=str_libs,
