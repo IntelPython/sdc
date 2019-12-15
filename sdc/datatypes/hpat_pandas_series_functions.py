@@ -730,7 +730,7 @@ def hpat_pandas_series_rolling(self, window, min_periods=None, center=False,
         if window < 0:
             raise ValueError('window must be non-negative')
 
-        if nan_minp == True: #  noqa
+        if nan_minp == True:  # noqa
             minp = window
         else:
             minp = min_periods
@@ -740,7 +740,7 @@ def hpat_pandas_series_rolling(self, window, min_periods=None, center=False,
         if minp > window:
             raise ValueError('min_periods must be <= window')
 
-        if center != False: #  noqa
+        if center != False:  # noqa
             raise ValueError('Method rolling(). The object center\n expected: False')
 
         if win_type is not None:
