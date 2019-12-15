@@ -44,8 +44,7 @@ from sdc.hiframes.api import fix_df_array
 
 from sdc.config import config_pipeline_hpat_default
 
-# sdc_nopython_pipeline_lite_register cause some errors
-if config_pipeline_hpat_default:
+if not config_pipeline_hpat_default:
     @register_rewrite('before-inference')
     class RewriteDataFrame(Rewrite):
         """
@@ -60,7 +59,6 @@ if config_pipeline_hpat_default:
             super().__init__(pipeline)
 
             self._reset()
-
 
         def match(self, func_ir, block, typemap, calltypes):
             self._reset()
@@ -81,7 +79,6 @@ if config_pipeline_hpat_default:
                         pass  # Forward this case to pd_dataframe_overload which will handle it
 
             return len(self._calls_to_rewrite) > 0
-
 
         def apply(self):
             init_df_stmt = import_function(init_dataframe, self._block, self._func_ir)
@@ -159,7 +156,6 @@ if config_pipeline_hpat_default:
                 new_args.append(call_stmt.target)
 
             return new_args
-
 
     @overload(DataFrame)
     def pd_dataframe_overload(data, index=None, columns=None, dtype=None, copy=False):

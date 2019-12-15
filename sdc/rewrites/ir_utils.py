@@ -168,7 +168,7 @@ def is_dict(var, func_ir):
         rhs = func_ir.get_definition(var)
         if isinstance(rhs, Expr):
             return rhs.op == 'build_map'
-    except:
+    except Exception:
         pass
 
     return False
@@ -194,7 +194,7 @@ def is_list(var, func_ir):
         rhs = func_ir.get_definition(var)
         if isinstance(rhs, Expr):
             return rhs.op == 'build_list'
-    except:
+    except Exception:
         pass
 
     return False
@@ -213,7 +213,7 @@ def is_tuple(var, func_ir):
         rhs = func_ir.get_definition(var)
         if isinstance(rhs, Expr):
             return rhs.op == 'build_tuple'
-    except:
+    except Exception:
         pass
 
     return False
@@ -241,7 +241,7 @@ def get_tuple_items(var, block, func_ir):
         if isinstance(rhs, Expr):
             if rhs.op == 'build_tuple':
                 return list(rhs.items)
-    except:
+    except Exception:
         pass
 
     return None
