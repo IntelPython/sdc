@@ -198,11 +198,11 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
 
     Limitations
     -----------
-    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/str/center.py
+    .. literalinclude:: ../../../examples/series/str/series_str_center.py
        :language: python
        :lines: 27-
        :caption: Filling left and right side of strings in the Series with an additional character
@@ -210,7 +210,7 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
 
     .. code-block:: console
 
-        > python ./series/str/center.py
+        > python ./series/str/series_str_center.py
         0    *dog*
         1    *foo*
         2    *bar*
@@ -274,11 +274,11 @@ def hpat_pandas_stringmethods_endswith(self, pat, na=None):
 
     Limitations
     -----------
-    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/str/endswith.py
+    .. literalinclude:: ../../../examples/series/str/series_str_endswith.py
        :language: python
        :lines: 27-
        :caption: Test if the end of each string element matches a string
@@ -286,7 +286,7 @@ def hpat_pandas_stringmethods_endswith(self, pat, na=None):
 
     .. code-block:: console
 
-        > python ./series/str/endswith.py
+        > python ./series/str/series_str_endswith.py
         0    False
         1     True
         2     True
@@ -295,6 +295,14 @@ def hpat_pandas_stringmethods_endswith(self, pat, na=None):
     .. todo::
         - Add support of matching the end of each string by a pattern
         - Add support of parameter ``na``
+
+    .. seealso::
+        `str.endswith <https://docs.python.org/3/library/stdtypes.html#str.endswith>`_
+            Python standard library string method.
+        :ref:`Series.str.startswith <pandas.Series.str.startswith>`
+            Same as endswith, but tests the start of string.
+        :ref:`Series.str.contains <pandas.Series.str.contains>`
+            Tests if string element contains a pattern.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -356,11 +364,11 @@ def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
 
     Limitations
     -----------
-    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/str/find.py
+    .. literalinclude:: ../../../examples/series/str/series_str_find.py
        :language: python
        :lines: 27-
        :caption: Return lowest indexes in each strings in the Series
@@ -368,13 +376,17 @@ def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
 
     .. code-block:: console
 
-        > python ./series/str/find.py
+        > python ./series/str/series_str_find.py
         0   -1
         1    0
         2    3
         dtype: int64
 
     .. todo:: Add support of parameters ``start`` and ``end``
+
+    .. seealso::
+        :ref:`Series.str.rfind <pandas.Series.str.rfind>`
+            Return highest indexes in each strings.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -444,11 +456,11 @@ def hpat_pandas_stringmethods_isupper(self):
 
     Limitations
     -----------
-    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/str/isupper.py
+    .. literalinclude:: ../../../examples/series/str/series_str_isupper.py
        :language: python
        :lines: 27-
        :caption: Check whether all characters in each string are uppercase
@@ -456,11 +468,29 @@ def hpat_pandas_stringmethods_isupper(self):
 
     .. code-block:: console
 
-        > python ./series/str/isupper.py
+        > python ./series/str/series_str_isupper.py
         0     True
         1    False
         2    False
         dtype: bool
+
+    .. seealso::
+        :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
+            Check whether all characters are alphabetic.
+        :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
+            Check whether all characters are numeric.
+        :ref:`Series.str.isalnum <pandas.Series.str.isalnum>`
+            Check whether all characters are alphanumeric.
+        :ref:`Series.str.isdigit <pandas.Series.str.isdigit>`
+            Check whether all characters are digits.
+        :ref:`Series.str.isdecimal <pandas.Series.str.isdecimal>`
+            Check whether all characters are decimal.
+        :ref:`Series.str.isspace <pandas.Series.str.isspace>`
+            Check whether all characters are whitespace.
+        :ref:`Series.str.islower <pandas.Series.str.islower>`
+            Check whether all characters are lowercase.
+        :ref:`Series.str.istitle <pandas.Series.str.istitle>`
+            Check whether all characters are titlecase.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -507,11 +537,11 @@ def hpat_pandas_stringmethods_len(self):
 
     Limitations
     -----------
-    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/str/len.py
+    .. literalinclude:: ../../../examples/series/str/series_str_len.py
        :language: python
        :lines: 27-
        :caption: Compute the length of each element in the Series
@@ -519,11 +549,17 @@ def hpat_pandas_stringmethods_len(self):
 
     .. code-block:: console
 
-        > python ./series/str/len.py
+        > python ./series/str/series_str_len.py
         0    3
         1    3
         2    6
         dtype: int64
+
+    .. seealso::
+        `str.len`
+            Python built-in function returning the length of an object.
+        :ref:`Series.size <pandas.Series.size>`
+            SReturns the length of the Series.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -570,11 +606,11 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
 
     Limitations
     -----------
-    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/str/ljust.py
+    .. literalinclude:: ../../../examples/series/str/series_str_ljust.py
        :language: python
        :lines: 27-
        :caption: Filling right side of strings in the Series with an additional character
@@ -582,7 +618,7 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
 
     .. code-block:: console
 
-        > python ./series/str/ljust.py
+        > python ./series/str/series_str_ljust.py
         0    dog**
         1    foo**
         2    bar**
@@ -646,11 +682,11 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
 
     Limitations
     -----------
-    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/str/rjust.py
+    .. literalinclude:: ../../../examples/series/str/series_str_rjust.py
        :language: python
        :lines: 27-
        :caption: Filling left side of strings in the Series with an additional character
@@ -658,7 +694,7 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
 
     .. code-block:: console
 
-        > python ./series/str/rjust.py
+        > python ./series/str/series_str_rjust.py
         0    **dog
         1    **foo
         2    **bar
@@ -722,11 +758,11 @@ def hpat_pandas_stringmethods_startswith(self, pat, na=None):
 
     Limitations
     -----------
-    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/str/startswith.py
+    .. literalinclude:: ../../../examples/series/str/series_str_startswith.py
        :language: python
        :lines: 27-
        :caption: Test if the start of each string element matches a string
@@ -734,7 +770,7 @@ def hpat_pandas_stringmethods_startswith(self, pat, na=None):
 
     .. code-block:: console
 
-        > python ./series/str/startswith.py
+        > python ./series/str/series_str_startswith.py
         0     True
         1    False
         2     True
@@ -743,6 +779,14 @@ def hpat_pandas_stringmethods_startswith(self, pat, na=None):
     .. todo::
         - Add support of matching the start of each string by a pattern
         - Add support of parameter ``na``
+
+    .. seealso::
+        `str.startswith <https://docs.python.org/3/library/stdtypes.html#str.startswith>`_
+            Python standard library string method.
+        :ref:`Series.str.endswith <pandas.Series.str.endswith>`
+            Same as startswith, but tests the end of string.
+        :ref:`Series.str.contains <pandas.Series.str.contains>`
+            Tests if string element contains a pattern.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -804,11 +848,11 @@ def hpat_pandas_stringmethods_zfill(self, width):
 
     Limitations
     -----------
-    Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series/str/zfill.py
+    .. literalinclude:: ../../../examples/series/str/series_str_zfill.py
        :language: python
        :lines: 27-
        :caption: Pad strings in the Series by prepending '0' characters
@@ -816,13 +860,23 @@ def hpat_pandas_stringmethods_zfill(self, width):
 
     .. code-block:: console
 
-        > python ./series/str/zfill.py
+        > python ./series/str/series_str_zfill.py
         0    00dog
         1    00foo
         2    00bar
         dtype: object
 
     .. todo:: Add support of 32-bit Unicode for `str.zfill()`
+
+    .. seealso::
+        :ref:`Series.str.rjust <pandas.Series.str.rjust>`
+            Fills the left side of strings with an arbitrary character.
+        :ref:`Series.str.ljust <pandas.Series.str.ljust>`
+            Fills the right side of strings with an arbitrary character.
+        :ref:`Series.str.pad <pandas.Series.str.pad>`
+            Fills the specified sides of strings with an arbitrary character.
+        :ref:`Series.str.center <pandas.Series.str.center>`
+            Fills boths sides of strings with an arbitrary character.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
