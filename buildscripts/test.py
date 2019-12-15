@@ -213,22 +213,23 @@ if __name__ == '__main__':
                 format_print(f'Run examples for sdc conda package: {package}')
                 create_conda_env(conda_activate, test_env, python, sdc_env['test'], conda_channels)
                 run_command(f'{test_env_activate} && conda install -y {package}')
-                for i, item in enumerate(os.listdir(sdc_examples)):
+                for item in os.listdir(sdc_examples):
                     if os.path.isfile(item) and re.search(r'^\w+\.py$', item):
                         format_print(f'Execute {item}')
                         try:
-                            run_command(f'python {item}')
+                            run_command(f'{test_env_activate} && python {item}')
                         except Exception:
                             failed_examples.append(item)
-                            format_print(f'{item} FAILED')
+                            format_print(f'{item} FAILED', new_block=False)
                             traceback.print_exc()
                         else:
-                            format_print(f'{item} PASSED')
+                            format_print(f'{item} PASSED', new_block=False)
                             passed_examples.append(item)
 
         total_passed = len(passed_examples)
         total_failed = len(failed_examples)
-        format_print(f'SDC examples summary: {i} RUN, {total_passed} PASSED, {total_failed} FAILED')
+        total_run = total_passed + total_failed
+        format_print(f'SDC examples summary: {total_run} RUN, {total_passed} PASSED, {total_failed} FAILED')
         for item in passed_examples:
             format_print(f' - {item}: PASSED', new_block=False)
         for item in failed_examples:
