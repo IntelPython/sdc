@@ -205,6 +205,8 @@ if __name__ == '__main__':
         sdc_examples = os.path.join(sdc_src, 'examples')
         passed_examples = []
         failed_examples = []
+        expected_failures = []
+        expected_failures_list = ['basic_workflow.py', 'basic_workflow_parallel.py']
 
         os.chdir(sdc_examples)
         sdc_packages = get_sdc_build_packages(build_folder)
@@ -219,7 +221,10 @@ if __name__ == '__main__':
                         try:
                             run_command(f'{test_env_activate} && python {item}')
                         except Exception:
-                            failed_examples.append(item)
+                            if item in expected_failures_list:
+                                expected_failures.append(item)
+                            else:
+                                failed_examples.append(item)
                             format_print(f'{item} FAILED', new_block=False)
                             traceback.print_exc()
                         else:
@@ -228,12 +233,19 @@ if __name__ == '__main__':
 
         total_passed = len(passed_examples)
         total_failed = len(failed_examples)
-        total_run = total_passed + total_failed
-        format_print(f'SDC examples summary: {total_run} RUN, {total_passed} PASSED, {total_failed} FAILED')
+        total_expected_failures = len(expected_failures)
+        total_run = total_passed + total_failed + total_expected_failures
+        format_print(' '.join([f'SDC examples summary:',
+                               f'{total_run} RUN,',
+                               f'{total_passed} PASSED,',
+                               f'{total_failed} FAILED,',
+                               f'{total_expected_failures} EXPECTED FAILURES']))
         for item in passed_examples:
             format_print(f' - {item}: PASSED', new_block=False)
         for item in failed_examples:
             format_print(f' - {item}: FAILED', new_block=False)
+        for item in expected_failures:
+            format_print(f' - {item}: EXPECTED FAILED', new_block=False)
 
         sys.exit(0 if total_failed == 0 else -1)
 

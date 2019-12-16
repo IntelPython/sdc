@@ -38,7 +38,7 @@ def series_getitem():
     for x in series[2:6]:  # Accessing series by a slice
         s += x
 
-    indices = pd.Series(np.asarray[1, 6, 7, 8, 9])
+    indices = pd.Series(np.asarray([1, 6, 7, 8, 9]))
     for x in series[indices]:  # Accessing series by another series
         s += x
 
