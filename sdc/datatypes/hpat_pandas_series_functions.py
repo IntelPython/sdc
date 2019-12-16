@@ -168,7 +168,6 @@ def hpat_pandas_series_setitem(self, idx, value):
 
     if (isinstance(value, SeriesType) and not isinstance(self.dtype, value.dtype)) or \
             not isinstance(self.dtype, type(value)):
-        print("QQQQQ")
         raise TypingError('{} Value must be one type with series. Given: {}, self.dtype={}'.format(_func_name,
                                                                                                    value, self.dtype))
 
