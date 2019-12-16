@@ -25,14 +25,13 @@
 # *****************************************************************************
 
 import pandas as pd
-import numpy as np
 from numba import njit
 
 
 @njit
 def series_div():
-    s1 = pd.Series([1, 2, 4, np.nan])
-    s2 = pd.Series([4, 4, 16, np.nan])
+    s1 = pd.Series([1, 2, 4])
+    s2 = pd.Series([4, 4, 16])
     out_series = s1.div(s2)
 
     return out_series  # Expect series of 0.25, 0.50, 0.25

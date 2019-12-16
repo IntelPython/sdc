@@ -2150,7 +2150,6 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
         0    0.25
         1    0.50
         2    0.25
-        3     NaN
         dtype: float64
 
     .. note::
@@ -2238,11 +2237,10 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     .. code-block:: console
 
-        > python ./series/series_div.py
+        > python ./series/series_truediv.py
         0    0.25
         1    0.50
         2    0.25
-        3     NaN
         dtype: float64
 
     .. note::

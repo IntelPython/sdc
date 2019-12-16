@@ -31,10 +31,19 @@ from numba import njit
 
 @njit
 def series_value_counts():
+    """
+    Expected result:
+    3.0    2
+    4.0    1
+    2.0    1
+    1.0    1
+    dtype: int64
+
+    """
     s = pd.Series([3, 1, 2, 3, 4, np.nan])
     out_series = s.value_counts()
 
-    return out_series   # Expect series of non-Nan values occurrence
+    return out_series
 
 
 print(series_value_counts())
