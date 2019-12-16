@@ -98,6 +98,25 @@ def get_sdc_object(pandas_obj):
         return None  # There is no match in Intel SDC to pandas_obj
 
 
+def get_sdc_object_by_pandas_name(pandas_name):
+    """
+    Returns corresponding Intel SDC object for a given Pandas object given as string ``pandas_name``.
+
+    This function is needed because :func:`get_sdc_object` cannot uniquely match Intel SDC and Pandas objects.
+    For example, the same Pandas object represents :meth:`Series.get` and :meth:`DataFrame.get` methods. As a result
+    that :func:`get_sdc_object` will return **some** SDC object that matches respective Pandas object. If you need
+    unique match between Pandas and Intel SDC use :func:`get_sdc_object_by_pandas_name` function instead. (Which
+    should be the case for majority usecases).
+
+    :param pandas_name: Pandas object to be matched with Intel SDC object
+    :return: Intel SDC object corresponding to Pandas object having ``pandas_name`` name
+    """
+    if pandas_name in pandas_sdc_dict:
+        return pandas_sdc_dict[pandas_name]
+    else:
+        return None  # There is no match in Intel SDC to pandas_obj
+
+
 def init_pandas_sdc_dict():
     """
     Initializes global dictionary that performs mapping between Pandas objects and SDC objects.
@@ -118,6 +137,7 @@ def init_pandas_sdc_dict():
                 pandas_name = extract_pandas_name_from(text)
                 pandas_obj = get_obj(pandas_name)
                 pandas_sdc_dict[pandas_obj] = sdc_obj
+                pandas_sdc_dict[pandas_name] = sdc_obj
         return False
 
     global pandas_sdc_dict
