@@ -442,7 +442,7 @@ class SeriesAttribute(AttributeTemplate):
         # TODO: support iat/iloc differences
         return SeriesIatType(ary)
 
-PR135. This needs to be commented out
+# PR135. This needs to be commented out
     def resolve_loc(self, ary):
         # TODO: support iat/iloc differences
         return SeriesIatType(ary)
@@ -901,7 +901,7 @@ class SeriesIatType(types.Type):
         super(SeriesIatType, self).__init__(name)
 
 
-PR135. This needs to be commented out
+# PR135. This needs to be commented out
 @infer_global(operator.getitem)
 class GetItemSeriesIat(AbstractTemplate):
     key = operator.getitem
