@@ -51,11 +51,9 @@ else:
         saved_columns = df.columns
         n_cols = len(saved_columns)
         data_args = tuple('data{}'.format(i) for i in range(n_cols))
-        space = []
-        if len(params) > 0:
-            space.append(', ')
-        func_definition = 'def _reduce_impl(df{}{}):'.format("".join(space), ", ".join(
-            str(key) + '=' + str(value) for key, value in params))
+        all_params = ['df'] + [f'{key}={value}' for key, value in params]
+        func_definition = "def _reduce_impl(" + ', '.join(all_params) + "):"
+
         func_lines = [func_definition]
         for i, d in enumerate(data_args):
             line = '  {} = sdc.hiframes.api.init_series(sdc.hiframes.pd_dataframe_ext.get_dataframe_data(df, {}))'
@@ -117,12 +115,7 @@ else:
 
         check_type(name, df)
 
-        ty_checker = TypeChecker('Method {}().'.format(name))
-        ty_checker.check(df, DataFrameType)
-
         if not (isinstance(n, (types.Omitted, types.Integer)) or n == 5):
             ty_checker.raise_exc(n, 'int64', 'n')
 
-        params = [('n', 5)]
-
-        return sdc_pandas_dataframe_reduce_columns_series(df, name, params)
+        return sdc_pandas_dataframe_reduce_columns_series(df, name, [('n', 5)])
