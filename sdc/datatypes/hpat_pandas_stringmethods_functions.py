@@ -559,7 +559,7 @@ def hpat_pandas_stringmethods_len(self):
         `str.len`
             Python built-in function returning the length of an object.
         :ref:`Series.size <pandas.Series.size>`
-            SReturns the length of the Series.
+            Returns the length of the Series.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
