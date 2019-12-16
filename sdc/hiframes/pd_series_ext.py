@@ -900,16 +900,16 @@ class SeriesIatType(types.Type):
         name = "SeriesIatType({})".format(stype)
         super(SeriesIatType, self).__init__(name)
 
+if sdc.config.config_pipeline_hpat_default:
+    # PR135. This needs to be commented out
+    @infer_global(operator.getitem)
+    class GetItemSeriesIat(AbstractTemplate):
+        key = operator.getitem
 
-# PR135. This needs to be commented out
-@infer_global(operator.getitem)
-class GetItemSeriesIat(AbstractTemplate):
-    key = operator.getitem
-
-    def generic(self, args, kws):
-        # iat[] is the same as regular getitem
-        if isinstance(args[0], SeriesIatType):
-            return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
+        def generic(self, args, kws):
+            # iat[] is the same as regular getitem
+            if isinstance(args[0], SeriesIatType):
+                return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
 
 if sdc.config.config_pipeline_hpat_default:
     @infer_global(operator.getitem)
@@ -973,21 +973,22 @@ class CmpOpLESeries(SeriesCompEqual):
 class CmpOpLTSeries(SeriesCompEqual):
     key = '<'
 
-@infer_global(operator.getitem)
-class GetItemBuffer(AbstractTemplate):
-    key = operator.getitem
+if sdc.config.config_pipeline_hpat_default:
+    @infer_global(operator.getitem)
+    class GetItemBuffer(AbstractTemplate):
+        key = operator.getitem
 
-    def generic(self, args, kws):
-        assert not kws
-        [ary, idx] = args
-        import pdb; pdb.set_trace()
-        if not isinstance(ary, SeriesType):
-            return
-        out = get_array_index_type(ary, idx)
-        # check result to be dt64 since it might be sliced array
-        # replace result with Timestamp
-        if out is not None and out.result == types.NPDatetime('ns'):
-            return signature(pandas_timestamp_type, ary, out.index)
+        def generic(self, args, kws):
+            assert not kws
+            [ary, idx] = args
+            import pdb; pdb.set_trace()
+            if not isinstance(ary, SeriesType):
+                return
+            out = get_array_index_type(ary, idx)
+            # check result to be dt64 since it might be sliced array
+            # replace result with Timestamp
+            if out is not None and out.result == types.NPDatetime('ns'):
+                return signature(pandas_timestamp_type, ary, out.index)
 
 
 def install_array_method(name, generic):
