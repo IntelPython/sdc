@@ -25,6 +25,9 @@
 # *****************************************************************************
 
 
+import contextlib
+import functools
+
 import llvmlite.binding as ll
 from llvmlite import ir as lir
 from .. import hio
@@ -93,7 +96,7 @@ def csv_array_analysis(csv_node, equiv_set, typemap, array_analysis):
         equiv_set.insert_equiv(col_var, shape)
         post.extend(c_post)
         all_shapes.append(shape[0])
-        equiv_set.define(col_var)
+        equiv_set.define(col_var, {})
 
     if len(all_shapes) > 1:
         equiv_set.insert_equiv(*all_shapes)
@@ -398,6 +401,26 @@ def to_varname(string):
     return re.sub(r'\W|^(?=\d)','_', string)
 
 
+@contextlib.contextmanager
+def pyarrow_cpu_count(cpu_count=pyarrow.cpu_count()):
+    old_cpu_count = pyarrow.cpu_count()
+    pyarrow.set_cpu_count(cpu_count)
+    try:
+        yield
+    finally:
+        pyarrow.set_cpu_count(old_cpu_count)
+
+
+def pyarrow_cpu_count_equal_numba_num_treads(func):
+    """Decorator. Set pyarrow cpu_count the same as NUMBA_NUM_THREADS."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        with pyarrow_cpu_count(numba.config.NUMBA_NUM_THREADS):
+            return func(*args, **kwargs)
+    return wrapper
+
+
+@pyarrow_cpu_count_equal_numba_num_treads
 def pandas_read_csv(
     filepath_or_buffer,
     sep=",",

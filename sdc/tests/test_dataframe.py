@@ -38,7 +38,7 @@ import sdc
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs,
                                    count_array_OneDs, dist_IR_contains, get_start_end, check_numba_version,
-                                   skip_numba_jit)
+                                   skip_numba_jit, skip_sdc_jit)
 
 from sdc.tests.gen_test_data import ParquetGenerator
 from numba.config import IS_32BITS
@@ -163,8 +163,7 @@ class TestDataFrame(TestCase):
                                           dtype=pd.api.types.CategoricalDtype(['N', 'Y']))})
         pd.testing.assert_frame_equal(hpat_func(df.copy(deep=True)), test_impl(df))
 
-    @unittest.skipIf(check_numba_version('0.46.0'),
-                     "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
+    @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
     def test_box_dist_return(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
@@ -499,6 +498,7 @@ class TestDataFrame(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_sdc_jit
     @skip_numba_jit
     def test_df_apply(self):
         def test_impl(n):
@@ -510,6 +510,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
+    @skip_sdc_jit
     @skip_numba_jit
     def test_df_apply_branch(self):
         def test_impl(n):

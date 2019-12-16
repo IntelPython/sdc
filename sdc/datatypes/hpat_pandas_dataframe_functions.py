@@ -40,8 +40,11 @@ from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.datatypes.common_functions import TypeChecker
 from numba.errors import TypingError
 
+# from sdc.datatypes.hpat_pandas_dataframe_types import DataFrameType
+from sdc.utils import sdc_overload_method
 
-@overload_method(DataFrameType, 'append')
+
+@sdc_overload_method(DataFrameType, 'append')
 def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=False, sort=None):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -127,7 +130,7 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
         func_args = ['df', 'other']
 
         for key, value in args:
-            #TODO: improve check
+            # TODO: improve check
             if key not in func_args:
                 if isinstance(value, types.Literal):
                     value = value.literal_value
@@ -140,7 +143,8 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
             return f'new_col_{column}_data_{df} = get_dataframe_data({df}, {idx})'
 
         def get_append_result(df1, df2, column):
-            return f'new_col_{column} = init_series(new_col_{column}_data_{df1}).append(init_series(new_col_{column}_data_{df2}))._data'
+            return f'new_col_{column} = ' \
+                f'init_series(new_col_{column}_data_{df1}).append(init_series(new_col_{column}_data_{df2}))._data'
 
         func_definition = [f'def sdc_pandas_dataframe_{name}_impl({", ".join(func_args)}):']
         func_text = []
@@ -165,7 +169,8 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
             if col_name not in df_columns_indx:
                 func_text.append(get_dataframe_column('other', col_name, i))
                 func_text.append(f'new_col_{col_name}_data = init_series(new_col_{col_name}_data_other)._data')
-                func_text.append(f'new_col_{col_name} = fill_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
+                func_text.append(f'new_col_{col_name} = '
+                                 f'fill_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
                 column_list.append((f'new_col_{col_name}', col_name))
 
         data = ', '.join(column for column, _ in column_list)
@@ -180,14 +185,15 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
 
         loc_vars = {}
         exec(func_def, {'sdc': sdc, 'np': numpy, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data,
-                         'init_series': sdc.hiframes.api.init_series, 'fill_array': sdc.datatypes.common_functions.fill_array}, loc_vars)
+                        'init_series': sdc.hiframes.api.init_series,
+                        'fill_array': sdc.datatypes.common_functions.fill_array}, loc_vars)
         _append_impl = loc_vars['sdc_pandas_dataframe_append_impl']
         return _append_impl
 
     return sdc_pandas_dataframe_append_impl(df, other, name, args)
 
 
-@overload_method(DataFrameType, 'count')
+@sdc_overload_method(DataFrameType, 'count')
 def sdc_pandas_dataframe_count(self, axis=0, level=None, numeric_only=False):
     """
     Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.
@@ -240,4 +246,3 @@ def sdc_pandas_dataframe_count(self, axis=0, level=None, numeric_only=False):
         return pandas.Series(data=result_data, index=result_index)
 
     return sdc_pandas_dataframe_count_impl
-
