@@ -49,6 +49,7 @@ max_int64 = np.iinfo(np.int64).max
 test_global_input_data_float64 = [
     [1., -1., 0.1, min_float64, max_float64, max_float64, min_float64, -0.1],
     [1., np.nan, -1., 0., min_float64, max_float64, max_float64, min_float64],
+    [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
     [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO],
 ]
 
