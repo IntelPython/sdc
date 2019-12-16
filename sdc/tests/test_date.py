@@ -36,7 +36,7 @@ from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs,
                                    count_parfor_OneD_Vars, count_array_OneD_Vars,
                                    dist_IR_contains,
-                                   skip_numba_jit)
+                                   skip_numba_jit, skip_sdc_jit)
 from datetime import datetime
 import random
 
@@ -87,7 +87,7 @@ class TestDate(TestCase):
         hpat_func = self.jit(test_impl)
         df = self._gen_str_date_df()
         A = pd.DatetimeIndex(df['str_date']).to_series()
-        self.assertEqual(hpat_func(A), test_impl(A))
+        self.assertEqual(hpat_func(A)[0], test_impl(A))
 
     @skip_numba_jit
     def test_ts_map(self):
@@ -109,6 +109,7 @@ class TestDate(TestCase):
         A = pd.DatetimeIndex(df['str_date']).to_series()
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
+    @skip_sdc_jit
     @skip_numba_jit
     def test_ts_map_date2(self):
         def test_impl(df):
@@ -139,7 +140,7 @@ class TestDate(TestCase):
         hpat_func = self.jit(test_impl)
         df = self._gen_str_date_df()
         A = pd.DatetimeIndex(df['str_date']).to_series().map(lambda x: x.date())
-        self.assertEqual(hpat_func(A), test_impl(A))
+        self.assertEqual(hpat_func(A)[0], test_impl(A))
 
     @skip_numba_jit
     def test_date_series_unbox2(self):
@@ -149,7 +150,7 @@ class TestDate(TestCase):
         hpat_func = self.jit(test_impl)
         df = self._gen_str_date_df()
         A = pd.DatetimeIndex(df['str_date']).map(lambda x: x.date())
-        self.assertEqual(hpat_func(A), test_impl(A))
+        self.assertEqual(hpat_func(A)[0], test_impl(A))
 
     @skip_numba_jit
     def test_datetime_index_set(self):

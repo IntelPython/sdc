@@ -69,7 +69,7 @@ Indexing and Iteration
 For more information on ``.at``, ``.iat``, ``.loc``, and
 ``.iloc``,  see the :ref:`indexing documentation <indexing>`.
 
-Binary operator functions
+Binary Operator Functions
 -------------------------
 
 .. sdc_toctree
