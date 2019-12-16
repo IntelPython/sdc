@@ -47,10 +47,10 @@ from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.str_arr_ext import (StringArrayType, cp_str_list_to_array, num_total_chars, string_array_type,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na)
-from sdc.utils import to_array
+from sdc.utils import to_array, sdc_overload, sdc_overload_method, sdc_overload_attribute
 
 
-@overload(operator.getitem)
+@sdc_overload(operator.getitem)
 def hpat_pandas_series_getitem(self, idx):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -141,7 +141,7 @@ def hpat_pandas_series_getitem(self, idx):
     raise TypingError('{} The index must be an Integer, Slice or a pandas.series. Given: {}'.format(_func_name, idx))
 
 
-@overload(operator.setitem)
+@sdc_overload(operator.setitem)
 def hpat_pandas_series_setitem(self, idx, value):
     """
         Pandas Series operator :attr:`pandas.Series.get` implementation
@@ -197,10 +197,10 @@ def hpat_pandas_series_setitem(self, idx, value):
     raise TypingError('{} The index must be an Integer, Slice or a pandas.series. Given: {}'.format(_func_name, idx))
 
 
-@overload_attribute(SeriesType, 'at')
-@overload_attribute(SeriesType, 'iat')
-@overload_attribute(SeriesType, 'iloc')
-@overload_attribute(SeriesType, 'loc')
+@sdc_overload_attribute(SeriesType, 'at')
+@sdc_overload_attribute(SeriesType, 'iat')
+@sdc_overload_attribute(SeriesType, 'iloc')
+@sdc_overload_attribute(SeriesType, 'loc')
 def hpat_pandas_series_iloc(self):
     """
     Pandas Series operators :attr:`pandas.Series.at`, :attr:`pandas.Series.iat`, :attr:`pandas.Series.iloc`, :attr:`pandas.Series.loc` implementation.
@@ -230,7 +230,7 @@ def hpat_pandas_series_iloc(self):
     return hpat_pandas_series_iloc_impl
 
 
-@overload_method(SeriesType, 'nsmallest')
+@sdc_overload_method(SeriesType, 'nsmallest')
 def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
     """
     Pandas Series method :meth:`pandas.Series.nsmallest` implementation.
@@ -280,7 +280,7 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
     return hpat_pandas_series_nsmallest_impl
 
 
-@overload_method(SeriesType, 'nlargest')
+@sdc_overload_method(SeriesType, 'nlargest')
 def hpat_pandas_series_nlargest(self, n=5, keep='first'):
     """
     Pandas Series method :meth:`pandas.Series.nlargest` implementation.
@@ -332,7 +332,7 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
     return hpat_pandas_series_nlargest_impl
 
 
-@overload_attribute(SeriesType, 'shape')
+@sdc_overload_attribute(SeriesType, 'shape')
 def hpat_pandas_series_shape(self):
     """
     Pandas Series attribute :attr:`pandas.Series.shape` implementation
@@ -359,7 +359,7 @@ def hpat_pandas_series_shape(self):
     return hpat_pandas_series_shape_impl
 
 
-@overload_method(SeriesType, 'std')
+@sdc_overload_method(SeriesType, 'std')
 def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.std` implementation.
@@ -427,7 +427,7 @@ def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, num
     return hpat_pandas_series_std_impl
 
 
-@overload_attribute(SeriesType, 'values')
+@sdc_overload_attribute(SeriesType, 'values')
 def hpat_pandas_series_values(self):
     """
     Pandas Series attribute 'values' implementation.
@@ -450,7 +450,7 @@ def hpat_pandas_series_values(self):
     return hpat_pandas_series_values_impl
 
 
-@overload_method(SeriesType, 'value_counts')
+@sdc_overload_method(SeriesType, 'value_counts')
 def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
     """
     Pandas Series method :meth:`pandas.Series.value_counts` implementation.
@@ -562,7 +562,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
     return hpat_pandas_series_value_counts_number_impl
 
 
-@overload_method(SeriesType, 'var')
+@sdc_overload_method(SeriesType, 'var')
 def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.var` implementation.
@@ -642,7 +642,7 @@ def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
     return hpat_pandas_series_var_impl
 
 
-@overload_attribute(SeriesType, 'index')
+@sdc_overload_attribute(SeriesType, 'index')
 def hpat_pandas_series_index(self):
     """
     Pandas Series attribute :attr:`pandas.Series.index` implementation
@@ -676,7 +676,7 @@ def hpat_pandas_series_index(self):
         return hpat_pandas_series_index_impl
 
 
-@overload_attribute(SeriesType, 'size')
+@sdc_overload_attribute(SeriesType, 'size')
 def hpat_pandas_series_size(self):
     """
     Pandas Series attribute :attr:`pandas.Series.size` implementation
@@ -707,7 +707,7 @@ def hpat_pandas_series_size(self):
     return hpat_pandas_series_size_impl
 
 
-@overload_attribute(SeriesType, 'str')
+@sdc_overload_attribute(SeriesType, 'str')
 def hpat_pandas_series_str(self):
     """
     Pandas Series attribute :attr:`pandas.Series.str` implementation
@@ -742,7 +742,7 @@ def hpat_pandas_series_str(self):
     return hpat_pandas_series_str_impl
 
 
-@overload_attribute(SeriesType, 'ndim')
+@sdc_overload_attribute(SeriesType, 'ndim')
 def hpat_pandas_series_ndim(self):
     """
     Pandas Series attribute :attr:`pandas.Series.ndim` implementation
@@ -773,7 +773,7 @@ def hpat_pandas_series_ndim(self):
     return hpat_pandas_series_ndim_impl
 
 
-@overload_attribute(SeriesType, 'T')
+@sdc_overload_attribute(SeriesType, 'T')
 def hpat_pandas_series_T(self):
     """
     Pandas Series attribute :attr:`pandas.Series.T` implementation
@@ -804,7 +804,7 @@ def hpat_pandas_series_T(self):
     return hpat_pandas_series_T_impl
 
 
-@overload(len)
+@sdc_overload(len)
 def hpat_pandas_series_len(self):
     """
     Pandas Series operator :func:`len` implementation
@@ -834,7 +834,7 @@ def hpat_pandas_series_len(self):
     return hpat_pandas_series_len_impl
 
 
-@overload_method(SeriesType, 'astype')
+@sdc_overload_method(SeriesType, 'astype')
 def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
     """
     Pandas Series method :meth:`pandas.Series.astype` implementation.
@@ -937,7 +937,7 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
         return hpat_pandas_series_astype_no_modify_impl
 
 
-@overload_method(SeriesType, 'shift')
+@sdc_overload_method(SeriesType, 'shift')
 def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None):
     """
     Pandas Series method :meth:`pandas.Series.shift` implementation.
@@ -1010,7 +1010,7 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
     return hpat_pandas_series_shift_impl
 
 
-@overload_method(SeriesType, 'isin')
+@sdc_overload_method(SeriesType, 'isin')
 def hpat_pandas_series_isin(self, values):
     """
     Pandas Series method :meth:`pandas.Series.isin` implementation.
@@ -1044,7 +1044,7 @@ def hpat_pandas_series_isin(self, values):
     return hpat_pandas_series_isin_impl
 
 
-@overload_method(SeriesType, 'append')
+@sdc_overload_method(SeriesType, 'append')
 def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integrity=False):
     """
     Pandas Series method :meth:`pandas.Series.append` implementation.
@@ -1133,7 +1133,7 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
         return hpat_pandas_series_append_ignore_index_impl
 
 
-@overload_method(SeriesType, 'copy')
+@sdc_overload_method(SeriesType, 'copy')
 def hpat_pandas_series_copy(self, deep=True):
     """
     Pandas Series method :meth:`pandas.Series.copy` implementation.
@@ -1178,7 +1178,7 @@ def hpat_pandas_series_copy(self, deep=True):
             return hpat_pandas_series_copy_impl
 
 
-@overload_method(SeriesType, 'corr')
+@sdc_overload_method(SeriesType, 'corr')
 def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
     """
     Pandas Series method :meth:`pandas.Series.corr` implementation.
@@ -1259,7 +1259,7 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
     return hpat_pandas_series_corr_impl
 
 
-@overload_method(SeriesType, 'head')
+@sdc_overload_method(SeriesType, 'head')
 def hpat_pandas_series_head(self, n=5):
     """
     Pandas Series method :meth:`pandas.Series.head` implementation.
@@ -1297,7 +1297,7 @@ def hpat_pandas_series_head(self, n=5):
         return hpat_pandas_series_head_index_impl
 
 
-@overload_method(SeriesType, 'groupby')
+@sdc_overload_method(SeriesType, 'groupby')
 def hpat_pandas_series_groupby(
         self,
         by=None,
@@ -1368,8 +1368,8 @@ def hpat_pandas_series_groupby(
     return hpat_pandas_series_groupby_impl
 
 
-@overload_method(SeriesType, 'isnull')
-@overload_method(SeriesType, 'isna')
+@sdc_overload_method(SeriesType, 'isnull')
+@sdc_overload_method(SeriesType, 'isna')
 def hpat_pandas_series_isna(self):
     """
     Pandas Series method :meth:`pandas.Series.isna` and :meth:`pandas.Series.isnull` implementation.
@@ -1421,7 +1421,7 @@ def hpat_pandas_series_isna(self):
         return hpat_pandas_series_isna_impl
 
 
-@overload_method(SeriesType, 'notna')
+@sdc_overload_method(SeriesType, 'notna')
 def hpat_pandas_series_notna(self):
     """
     Pandas Series method :meth:`pandas.Series.notna` implementation.
@@ -1460,7 +1460,7 @@ def hpat_pandas_series_notna(self):
         return hpat_pandas_series_notna_impl
 
 
-@overload_method(SeriesType, 'ne')
+@sdc_overload_method(SeriesType, 'ne')
 def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.ne` implementation.
@@ -1491,13 +1491,23 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if level is not None or fill_value is not None or axis != 0:
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_ne_impl(self, other):
+        def hpat_pandas_series_ne_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
             """
@@ -1507,7 +1517,7 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_ne_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_ne_impl(self, other):
+        def hpat_pandas_series_ne_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_float_scalar
@@ -1522,7 +1532,7 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
             _func_name, self, other))
 
 
-@overload_method(SeriesType, 'add')
+@sdc_overload_method(SeriesType, 'add')
 def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.add` implementation.
@@ -1553,29 +1563,39 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if level is not None or fill_value is not None or axis != 0:
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_add_impl(lhs, rhs):
+        def hpat_pandas_series_add_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
             """
 
-            return pandas.Series(lhs._data + rhs._data)
+            return pandas.Series(self._data + other._data)
 
         return hpat_pandas_series_add_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_add_number_impl(lhs, rhs):
+        def hpat_pandas_series_add_number_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
             """
 
-            return pandas.Series(lhs._data + rhs)
+            return pandas.Series(self._data + other)
 
         return hpat_pandas_series_add_number_impl
 
@@ -1584,7 +1604,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
             _func_name, self, other))
 
 
-@overload_method(SeriesType, 'sub')
+@sdc_overload_method(SeriesType, 'sub')
 def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.sub` implementation.
@@ -1615,13 +1635,23 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if level is not None or fill_value is not None or axis != 0:
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_sub_impl(self, other):
+        def hpat_pandas_series_sub_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
             """
@@ -1631,7 +1661,7 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_sub_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_sub_number_impl(self, other):
+        def hpat_pandas_series_sub_number_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
@@ -1644,7 +1674,7 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
     raise TypingError('{} The object must be a pandas.series or scalar. Given other: {}'.format(_func_name, other))
 
 
-@overload_method(SeriesType, 'sum')
+@sdc_overload_method(SeriesType, 'sum')
 def hpat_pandas_series_sum(
     self,
     axis=None,
@@ -1729,7 +1759,7 @@ def hpat_pandas_series_sum(
     return hpat_pandas_series_sum_impl
 
 
-@overload_method(SeriesType, 'take')
+@sdc_overload_method(SeriesType, 'take')
 def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
     """
     Pandas Series method :meth:`pandas.Series.take` implementation.
@@ -1789,8 +1819,8 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
     return hpat_pandas_series_take_impl
 
 
-@overload_method(SeriesType, 'idxmax')
-def hpat_pandas_series_idxmax(self, axis=None, skipna=True, *args):
+@sdc_overload_method(SeriesType, 'idxmax')
+def hpat_pandas_series_idxmax(self, axis=None, skipna=True):
     """
     Pandas Series method :meth:`pandas.Series.idxmax` implementation.
     .. only:: developer
@@ -1847,7 +1877,7 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=True, *args):
         return hpat_pandas_series_idxmax_index_impl
 
 
-@overload_method(SeriesType, 'mul')
+@sdc_overload_method(SeriesType, 'mul')
 def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.mul` implementation.
@@ -1878,13 +1908,23 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if level is not None or fill_value is not None or axis != 0:
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_mul_impl(self, other):
+        def hpat_pandas_series_mul_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
             """
@@ -1894,7 +1934,7 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_mul_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_mul_number_impl(self, other):
+        def hpat_pandas_series_mul_number_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
@@ -1907,8 +1947,8 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
     raise TypingError('{} The object must be a pandas.series or scalar. Given other: {}'.format(_func_name, other))
 
 
-@overload_method(SeriesType, 'div')
-@overload_method(SeriesType, 'truediv')
+@sdc_overload_method(SeriesType, 'div')
+@sdc_overload_method(SeriesType, 'truediv')
 def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.div` and :meth:`pandas.Series.truediv` implementation.
@@ -1939,13 +1979,23 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if level is not None or fill_value is not None or axis != 0:
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_div_impl(self, other):
+        def hpat_pandas_series_div_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
             """
@@ -1955,7 +2005,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_div_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_div_number_impl(self, other):
+        def hpat_pandas_series_div_number_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
@@ -1968,7 +2018,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
     raise TypingError('{} The object must be a pandas.series or scalar. Given other: {}'.format(_func_name, other))
 
 
-@overload_method(SeriesType, 'floordiv')
+@sdc_overload_method(SeriesType, 'floordiv')
 def hpat_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.floordiv` implementation.
@@ -1999,13 +2049,23 @@ def hpat_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if level is not None or fill_value is not None or axis != 0:
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_floordiv_impl(self, other):
+        def hpat_pandas_series_floordiv_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
             """
@@ -2015,7 +2075,7 @@ def hpat_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0
         return hpat_pandas_series_floordiv_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_floordiv_number_impl(self, other):
+        def hpat_pandas_series_floordiv_number_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
@@ -2028,7 +2088,7 @@ def hpat_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0
     raise TypingError('{} The object must be a pandas.series or scalar. Given other: {}'.format(_func_name, other))
 
 
-@overload_method(SeriesType, 'pow')
+@sdc_overload_method(SeriesType, 'pow')
 def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.pow` implementation.
@@ -2057,13 +2117,23 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if level is not None or fill_value is not None or axis != 0:
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_pow_impl(self, other):
+        def hpat_pandas_series_pow_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
             """
@@ -2073,7 +2143,7 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_pow_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_pow_impl(self, other):
+        def hpat_pandas_series_pow_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
@@ -2088,7 +2158,7 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
             _func_name, self, other))
 
 
-@overload_method(SeriesType, 'prod')
+@sdc_overload_method(SeriesType, 'prod')
 def hpat_pandas_series_prod(self, axis=None, skipna=True, level=None, numeric_only=None, min_count=0):
     """
     Pandas Series method :meth:`pandas.Series.prod` implementation.
@@ -2153,7 +2223,7 @@ def hpat_pandas_series_prod(self, axis=None, skipna=True, level=None, numeric_on
     return hpat_pandas_series_prod_impl
 
 
-@overload_method(SeriesType, 'quantile')
+@sdc_overload_method(SeriesType, 'quantile')
 def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     """
     Pandas Series method :meth:`pandas.Series.quantile` implementation.
@@ -2188,7 +2258,7 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     return hpat_pandas_series_quantile_impl
 
 
-@overload_method(SeriesType, 'rename')
+@sdc_overload_method(SeriesType, 'rename')
 def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=None):
     """
     Pandas Series method :meth:`pandas.Series.rename` implementation.
@@ -2259,7 +2329,7 @@ def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=
     return hpat_pandas_series_rename_idx_impl
 
 
-@overload_method(SeriesType, 'min')
+@sdc_overload_method(SeriesType, 'min')
 def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.min` implementation.
@@ -2312,7 +2382,7 @@ def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_onl
     return hpat_pandas_series_min_impl
 
 
-@overload_method(SeriesType, 'max')
+@sdc_overload_method(SeriesType, 'max')
 def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.max` implementation.
@@ -2365,7 +2435,7 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
     return hpat_pandas_series_max_impl
 
 
-@overload_method(SeriesType, 'mean')
+@sdc_overload_method(SeriesType, 'mean')
 def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.mean` implementation.
@@ -2428,7 +2498,7 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
     return hpat_pandas_series_mean_impl
 
 
-@overload_method(SeriesType, 'mod')
+@sdc_overload_method(SeriesType, 'mod')
 def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.mod` implementation.
@@ -2457,13 +2527,23 @@ def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if level is not None or fill_value is not None or axis != 0:
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_mod_impl(self, other):
+        def hpat_pandas_series_mod_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
             """
@@ -2473,7 +2553,7 @@ def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_mod_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_mod_impl(self, other):
+        def hpat_pandas_series_mod_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
@@ -2488,7 +2568,7 @@ def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
             _func_name, self, other))
 
 
-@overload_method(SeriesType, 'eq')
+@sdc_overload_method(SeriesType, 'eq')
 def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.eq` implementation.
@@ -2517,13 +2597,23 @@ def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if level is not None or fill_value is not None or axis != 0:
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_eq_impl(self, other):
+        def hpat_pandas_series_eq_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
             """
@@ -2533,7 +2623,7 @@ def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_eq_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_eq_impl(self, other):
+        def hpat_pandas_series_eq_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_float_scalar
@@ -2548,7 +2638,7 @@ def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
             _func_name, self, other))
 
 
-@overload_method(SeriesType, 'ge')
+@sdc_overload_method(SeriesType, 'ge')
 def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.ge` implementation.
@@ -2577,13 +2667,23 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if level is not None or fill_value is not None or axis != 0:
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_ge_impl(self, other):
+        def hpat_pandas_series_ge_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
             """
@@ -2593,7 +2693,7 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_ge_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_ge_impl(self, other):
+        def hpat_pandas_series_ge_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_float_scalar
@@ -2608,8 +2708,8 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
             _func_name, self, other))
 
 
-@overload_method(SeriesType, 'idxmin')
-def hpat_pandas_series_idxmin(self, axis=None, skipna=True, *args):
+@sdc_overload_method(SeriesType, 'idxmin')
+def hpat_pandas_series_idxmin(self, axis=None, skipna=True):
     """
     Pandas Series method :meth:`pandas.Series.idxmin` implementation.
 
@@ -2672,7 +2772,7 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True, *args):
         return hpat_pandas_series_idxmin_index_impl
 
 
-@overload_method(SeriesType, 'lt')
+@sdc_overload_method(SeriesType, 'lt')
 def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.lt` implementation.
@@ -2701,13 +2801,23 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if level is not None or fill_value is not None or axis != 0:
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_lt_impl(self, other):
+        def hpat_pandas_series_lt_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
             """
@@ -2717,7 +2827,7 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_lt_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_lt_impl(self, other):
+        def hpat_pandas_series_lt_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_float_scalar
@@ -2732,7 +2842,7 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
             _func_name, self, other))
 
 
-@overload_method(SeriesType, 'gt')
+@sdc_overload_method(SeriesType, 'gt')
 def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.gt` implementation.
@@ -2761,13 +2871,26 @@ def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if level is not None or fill_value is not None or axis != 0:
+    if not isinstance(self, SeriesType):
+        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_gt_impl(self, other):
+        def hpat_pandas_series_gt_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
             """
@@ -2777,7 +2900,7 @@ def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_gt_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_gt_impl(self, other):
+        def hpat_pandas_series_gt_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_float_scalar
@@ -2792,7 +2915,7 @@ def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
             _func_name, self, other))
 
 
-@overload_method(SeriesType, 'le')
+@sdc_overload_method(SeriesType, 'le')
 def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
     """
     Pandas Series method :meth:`pandas.Series.le` implementation.
@@ -2821,13 +2944,23 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
     if not isinstance(self, SeriesType):
         raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
 
-    if level is not None or fill_value is not None or axis != 0:
+    if not (isinstance(level, types.Omitted) or level is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        raise TypingError(
+            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
+                                                                                          axis))
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
         raise TypingError(
             '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
                                                                                           axis))
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_le_impl(self, other):
+        def hpat_pandas_series_le_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
             """
@@ -2837,7 +2970,7 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
         return hpat_pandas_series_le_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_le_impl(self, other):
+        def hpat_pandas_series_le_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_float_scalar
@@ -2852,7 +2985,7 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
             _func_name, self, other))
 
 
-@overload_method(SeriesType, 'abs')
+@sdc_overload_method(SeriesType, 'abs')
 def hpat_pandas_series_abs(self):
     """
     Pandas Series method :meth:`pandas.Series.abs` implementation.
@@ -2885,7 +3018,7 @@ def hpat_pandas_series_abs(self):
     return hpat_pandas_series_abs_impl
 
 
-@overload_method(SeriesType, 'unique')
+@sdc_overload_method(SeriesType, 'unique')
 def hpat_pandas_series_unique(self):
     """
     Pandas Series method :meth:`pandas.Series.unique` implementation.
@@ -2934,8 +3067,8 @@ def hpat_pandas_series_unique(self):
     return hpat_pandas_series_unique_impl
 
 
-@overload_method(SeriesType, 'cumsum')
-def hpat_pandas_series_cumsum(self, axis=None, skipna=True, *args):
+@sdc_overload_method(SeriesType, 'cumsum')
+def hpat_pandas_series_cumsum(self, axis=None, skipna=True):
     """
     Pandas Series method :meth:`pandas.Series.cumsum` implementation.
 
@@ -2990,7 +3123,7 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True, *args):
     return hpat_pandas_series_cumsum_impl
 
 
-@overload_method(SeriesType, 'nunique')
+@sdc_overload_method(SeriesType, 'nunique')
 def hpat_pandas_series_nunique(self, dropna=True):
     """
     Pandas Series method :meth:`pandas.Series.nunique` implementation.
@@ -3048,7 +3181,7 @@ def hpat_pandas_series_nunique(self, dropna=True):
     return hpat_pandas_series_nunique_impl
 
 
-@overload_method(SeriesType, 'count')
+@sdc_overload_method(SeriesType, 'count')
 def hpat_pandas_series_count(self, level=None):
     """
     Pandas Series method :meth:`pandas.Series.count` implementation.
@@ -3097,7 +3230,7 @@ def hpat_pandas_series_count(self, level=None):
     return hpat_pandas_series_count_impl
 
 
-@overload_method(SeriesType, 'median')
+@sdc_overload_method(SeriesType, 'median')
 def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.median` implementation.
@@ -3165,7 +3298,7 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
     return hpat_pandas_series_median_impl
 
 
-@overload_method(SeriesType, 'argsort')
+@sdc_overload_method(SeriesType, 'argsort')
 def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     """
     Pandas Series method :meth:`pandas.Series.argsort` implementation.
@@ -3270,7 +3403,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     return hpat_pandas_series_argsort_noidx_impl
 
 
-@overload_method(SeriesType, 'sort_values')
+@sdc_overload_method(SeriesType, 'sort_values')
 def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, kind='quicksort', na_position='last'):
     """
     Pandas Series method :meth:`pandas.Series.sort_values` implementation.
@@ -3446,7 +3579,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
         return hpat_pandas_series_sort_values_num_idx_impl
 
 
-@overload_method(SeriesType, 'dropna')
+@sdc_overload_method(SeriesType, 'dropna')
 def hpat_pandas_series_dropna(self, axis=0, inplace=False):
     """
     Pandas Series method :meth:`pandas.Series.dropna` implementation.
@@ -3490,7 +3623,7 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
     return hpat_pandas_series_dropna_impl
 
 
-@overload_method(SeriesType, 'fillna')
+@sdc_overload_method(SeriesType, 'fillna')
 def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
     """
     Pandas Series method :meth:`pandas.Series.fillna` implementation.
@@ -3610,7 +3743,7 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
             return hpat_pandas_series_fillna_impl
 
 
-@overload_method(SeriesType, 'cov')
+@sdc_overload_method(SeriesType, 'cov')
 def hpat_pandas_series_cov(self, other, min_periods=None):
     """
     Pandas Series method :meth:`pandas.Series.cov` implementation.
@@ -3681,7 +3814,7 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
     return hpat_pandas_series_cov_impl
 
 
-@overload_method(SeriesType, 'pct_change')
+@sdc_overload_method(SeriesType, 'pct_change')
 def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None, freq=None):
     """
     Pandas Series method :meth:`pandas.Series.pct_change` implementation.
@@ -3783,7 +3916,7 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
     return hpat_pandas_series_pct_change_impl
 
 
-@overload(operator.add)
+@sdc_overload(operator.add)
 def hpat_pandas_series_operator_add(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.add` implementation

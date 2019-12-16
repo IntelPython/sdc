@@ -34,8 +34,7 @@ import sdc
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                    count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
-                                   get_start_end,
-                                   skip_numba_jit)
+                                   get_start_end, skip_numba_jit, skip_sdc_jit)
 
 
 _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
@@ -49,6 +48,7 @@ _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
 
 
 class TestGroupBy(TestCase):
+    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_seq(self):
         def test_impl(df):
@@ -150,6 +150,7 @@ class TestGroupBy(TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_seq_var(self):
         def test_impl(df):
@@ -160,6 +161,7 @@ class TestGroupBy(TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_seq_std(self):
         def test_impl(df):
@@ -192,6 +194,7 @@ class TestGroupBy(TestCase):
                            'C': [3, 5, 6, 5, 4, 4, 3]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
+    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_multikey_parallel(self):
         def test_impl(in_A, in_B, in_C):
@@ -215,6 +218,7 @@ class TestGroupBy(TestCase):
         p_res = test_impl(p_A, p_B, p_C)
         self.assertEqual(h_res, p_res)
 
+    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_parallel(self):
         def test_impl(n):
@@ -293,6 +297,7 @@ class TestGroupBy(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_parallel_var(self):
         def test_impl(n):
@@ -306,6 +311,7 @@ class TestGroupBy(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_parallel_std(self):
         def test_impl(n):
@@ -358,6 +364,7 @@ class TestGroupBy(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_sdc_jit
     @skip_numba_jit
     def test_muti_hiframes_node_filter_agg(self):
         def test_impl(df, cond):
@@ -373,6 +380,7 @@ class TestGroupBy(TestCase):
         self.assertEqual(set(res[1]), set(h_res[1]))
         np.testing.assert_array_equal(res[0], h_res[0])
 
+    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_seq_str(self):
         def test_impl(df):
