@@ -34,7 +34,7 @@ import numpy
 
 from numba import types
 from numba.errors import TypingError
-from numba.extending import overload
+from numba.extending import overload, register_jitable
 from numba import numpy_support
 
 import sdc
@@ -181,3 +181,15 @@ def hpat_arrays_append_overload(A, B):
                 return new_data
 
             return _append_list_string_array_impl
+
+
+@register_jitable
+def fill_array(data, size, fill_value=numpy.nan, push_back=True):
+    """
+    Fill array with given values to reach the size
+    """
+
+    if push_back:
+        return numpy.append(data, numpy.repeat(fill_value, size - data.size))
+
+    return numpy.append(numpy.repeat(fill_value, size - data.size), data)
