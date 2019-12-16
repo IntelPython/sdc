@@ -442,10 +442,10 @@ class SeriesAttribute(AttributeTemplate):
         # TODO: support iat/iloc differences
         return SeriesIatType(ary)
 
-# PR135. This needs to be commented out
-#     def resolve_loc(self, ary):
-#         # TODO: support iat/iloc differences
-#         return SeriesIatType(ary)
+PR135. This needs to be commented out
+    def resolve_loc(self, ary):
+        # TODO: support iat/iloc differences
+        return SeriesIatType(ary)
 
     # @bound_function("array.astype")
     # def resolve_astype(self, ary, args, kws):
@@ -901,15 +901,15 @@ class SeriesIatType(types.Type):
         super(SeriesIatType, self).__init__(name)
 
 
-# PR135. This needs to be commented out
-# @infer_global(operator.getitem)
-# class GetItemSeriesIat(AbstractTemplate):
-#     key = operator.getitem
-#
-#     def generic(self, args, kws):
-#         # iat[] is the same as regular getitem
-#         if isinstance(args[0], SeriesIatType):
-#             return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
+PR135. This needs to be commented out
+@infer_global(operator.getitem)
+class GetItemSeriesIat(AbstractTemplate):
+    key = operator.getitem
+
+    def generic(self, args, kws):
+        # iat[] is the same as regular getitem
+        if isinstance(args[0], SeriesIatType):
+            return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
 
 if sdc.config.config_pipeline_hpat_default:
     @infer_global(operator.getitem)
