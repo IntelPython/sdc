@@ -52,17 +52,17 @@ else:
         n_cols = len(saved_columns)
         data_args = tuple('data{}'.format(i) for i in range(n_cols))
         all_params = ['df'] + [f'{key}={value}' for key, value in params]
-        func_definition = "def _reduce_impl(" + ', '.join(all_params) + "):"
+        func_definition = 'def _reduce_impl({}):'.format(', '.join(all_params))
 
         func_lines = [func_definition]
         for i, d in enumerate(data_args):
             line = '  {} = sdc.hiframes.api.init_series(sdc.hiframes.pd_dataframe_ext.get_dataframe_data(df, {}))'
             func_lines.append(line.format(d + '_S', i))
-            func_lines.append('  {} = {}.{}({})'.format(d + '_O', d + '_S', name, ", ".join(
-                str(key) for key, value in params)))
+            func_lines.append('  {}_O = {}_S.{}({})'.format(d, d, name, ", ".join(
+                key for key, _ in params)))
         func_lines.append("  return sdc.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
             ", ".join(d + '_O._data' for d in data_args),
-            ", ".join("'" + c + "'" for c in saved_columns)))
+            ", ".join(f"'{c}'" for c in saved_columns)))
 
         loc_vars = {}
         func_text = '\n'.join(func_lines)
@@ -113,7 +113,8 @@ else:
 
         name = 'head'
 
-        check_type(name, df)
+        ty_checker = TypeChecker('Method {}().'.format(name))
+        ty_checker.check(df, DataFrameType)
 
         if not (isinstance(n, (types.Omitted, types.Integer)) or n == 5):
             ty_checker.raise_exc(n, 'int64', 'n')
