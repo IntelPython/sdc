@@ -201,7 +201,7 @@ if __name__ == '__main__':
 
     # Execute examples
     if test_mode == 'examples':
-        format_print(f'Run SDC examples')
+        format_print('Run SDC examples')
         sdc_examples = os.path.join(sdc_src, 'examples')
         passed_examples = []
         failed_examples = []
