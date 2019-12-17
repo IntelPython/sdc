@@ -54,6 +54,12 @@ def arr_min(arr):
     return arr.min()
 
 
+@register_jitable
+def arr_sum(arr):
+    """Calculate sum of values"""
+    return arr.sum()
+
+
 def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
     """Generate series rolling methods implementations based on input func"""
     nan_out_type = output_type is None
@@ -93,6 +99,8 @@ hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max, float64))
 hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min, float64))
+hpat_pandas_rolling_series_sum_impl = register_jitable(
+    gen_hpat_pandas_series_rolling_impl(arr_sum, float64))
 
 
 @sdc_overload_method(SeriesRollingType, 'max')
@@ -215,3 +223,68 @@ def hpat_pandas_series_rolling_min(self):
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_min_impl
+
+
+@sdc_overload_method(SeriesRollingType, 'sum')
+def hpat_pandas_series_rolling_sum(self):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.core.window.Rolling.sum
+
+    Limitations
+    -----------
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/rolling/series_rolling_sum.py
+       :language: python
+       :lines: 27-
+       :caption: Calculate rolling sum of given Series.
+       :name: ex_series_rolling_sum
+
+    .. code-block:: console
+
+        > python ./series_rolling_sum.py
+        0     NaN
+        1     NaN
+        2    12.0
+        3    10.0
+        4    13.0
+        dtype: float64
+
+    .. seealso::
+        :ref:`Series.rolling <pandas.Series.rolling>`
+            Calling object with a Series.
+        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
+            Calling object with a DataFrame.
+        :ref:`Series.sum <pandas.Series.sum>`
+            Similar method for Series.
+        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
+            Similar method for DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas Series method :meth:`pandas.Series.rolling.sum()` implementation.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_sum
+
+    Parameters
+    ----------
+    self: :class:`pandas.Series.rolling`
+        input arg
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method sum().')
+    ty_checker.check(self, SeriesRollingType)
+
+    return hpat_pandas_rolling_series_sum_impl
