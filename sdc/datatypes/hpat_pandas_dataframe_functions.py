@@ -42,23 +42,22 @@ from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from numba.errors import TypingError
 from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
 
-def sdc_pandas_dataframe_reduce_columns(df, name, params_s, params_df):
+def sdc_pandas_dataframe_reduce_columns(df, name, params):
 
     saved_columns = df.columns
     data_args = tuple('data{}'.format(i) for i in range(len(saved_columns)))
     all_params = ['df']
 
-    for key, value in params_s:
+    for key, value in params:
         all_params.append('{}={}'.format(key, value))
     ap = all_params.copy()
-    ap.pop(0)
-    par = '{}'.format(', '.join(ap))
+    par = '{}'.format(', '.join(ap[1:]))
     func_definition = 'def _reduce_impl({}):'.format(', '.join(all_params))
     func_lines = [func_definition]
     for i, d in enumerate(data_args):
-        line = '  {} = sdc.hiframes.api.init_series(sdc.hiframes.pd_dataframe_ext.get_dataframe_data(df, {}))'
+        line = '  {} = sdc.hiframes.api.init_series(sdc.hiframes.pd_dataframe_ext.get_dataframe_data(all_params[0], {}))'
         func_lines.append(line.format(d + '_S', i))
-        func_lines.append('  {} = {}.{}({})'.format(d + '_O', d + '_S', name, par))
+        func_lines.append(' {}_O = {}_S.{}({})'.format(d, d, name, par))
     func_lines.append('  data = np.array(({},))'.format(
         ", ".join(d + '_O' for d in data_args)))
     func_lines.append('  index = sdc.str_arr_ext.StringArray(({},))'.format(
