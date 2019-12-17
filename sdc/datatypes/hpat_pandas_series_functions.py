@@ -1709,24 +1709,14 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
     """
 
     _func_name = 'Method add().'
-
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
-
-    if not (isinstance(level, types.Omitted) or level is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(axis, 'int', 'axis')
 
     if isinstance(other, SeriesType):
         def hpat_pandas_series_add_impl(self, other, level=None, fill_value=None, axis=0):
@@ -1745,13 +1735,14 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
             """
 
+            if axis != 0:
+                raise ValueError('Method add(). The object axis\n expected: 0')
+
             return pandas.Series(self._data + other)
 
         return hpat_pandas_series_add_number_impl
 
-    raise TypingError(
-        '{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(
-            _func_name, self, other))
+    ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
 @sdc_overload_method(SeriesType, 'sub')
@@ -2085,30 +2076,25 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
     """
 
     _func_name = 'Method mul().'
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    if not isinstance(level, types.Omitted) and level is not None:
+        ty_checker.raise_exc(level, 'None', 'level')
 
-    if not (isinstance(level, types.Omitted) or level is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+    if not isinstance(fill_value, types.Omitted) and fill_value is not None:
+        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
 
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+    if not isinstance(axis, types.Omitted) and axis != 0:
+        ty_checker.raise_exc(axis, 'int', 'axis')
 
     if isinstance(other, SeriesType):
         def hpat_pandas_series_mul_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
             """
+            if axis != 0:
+                raise ValueError('Method mul(). The object axis\n expected: 0')
 
             return pandas.Series(self._data * other._data)
 
@@ -2121,11 +2107,14 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
             """
 
+            if axis != 0:
+                raise ValueError('Method mul(). The object axis\n expected: 0')
+
             return pandas.Series(self._data * other)
 
         return hpat_pandas_series_mul_number_impl
 
-    raise TypingError('{} The object must be a pandas.series or scalar. Given other: {}'.format(_func_name, other))
+    ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
 @sdc_overload_method(SeriesType, 'div')
@@ -2185,38 +2174,47 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
          returns :obj:`pandas.Series` object
     """
 
-    _func_name = 'Method div() or truediv().'
+    _func_name = 'Method div().'
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    if not (isinstance(level, types.Omitted) or level is None):
+        ty_checker.raise_exc(level, 'None', 'level')
 
-    if level is not None or fill_value is not None or axis != 0:
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
+        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
+        ty_checker.raise_exc(axis, 'int', 'axis')
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_div_impl(self, other):
+        def hpat_pandas_series_div_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
             """
+
+            if axis != 0:
+                raise ValueError('Method div(). The object axis\n expected: 0')
 
             return pandas.Series(self._data / other._data)
 
         return hpat_pandas_series_div_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_div_number_impl(self, other):
+        def hpat_pandas_series_div_number_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
             """
 
+            if axis != 0:
+                raise ValueError('Method div(). The object axis\n expected: 0')
+
             return pandas.Series(self._data / other)
 
         return hpat_pandas_series_div_number_impl
 
-    raise TypingError('{} The object must be a pandas.series or scalar. Given other: {}'.format(_func_name, other))
+    ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
 @sdc_overload_method(SeriesType, 'truediv')
@@ -2276,48 +2274,47 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
          returns :obj:`pandas.Series` object
     """
 
-    _func_name = 'Method div() or truediv().'
-
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    _func_name = 'Method truediv().'
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not (isinstance(level, types.Omitted) or level is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(level, 'None', 'level')
 
     if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(axis, 'int', 'axis')
 
     if isinstance(other, SeriesType):
-        def hpat_pandas_series_div_impl(self, other, level=None, fill_value=None, axis=0):
+        def hpat_pandas_series_truediv_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
             """
 
+            if axis != 0:
+                raise ValueError('Method truediv(). The object axis\n expected: 0')
+
             return pandas.Series(self._data / other._data)
 
-        return hpat_pandas_series_div_impl
+        return hpat_pandas_series_truediv_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_div_number_impl(self, other, level=None, fill_value=None, axis=0):
+        def hpat_pandas_series_truediv_number_impl(self, other, level=None, fill_value=None, axis=0):
             """
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_integer_scalar
             Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
             """
 
+            if axis != 0:
+                raise ValueError('Method truediv(). The object axis\n expected: 0')
+
             return pandas.Series(self._data / other)
 
-        return hpat_pandas_series_div_number_impl
+        return hpat_pandas_series_truediv_number_impl
 
-    raise TypingError('{} The object must be a pandas.series or scalar. Given other: {}'.format(_func_name, other))
+    ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
 @sdc_overload_method(SeriesType, 'floordiv')
@@ -2573,17 +2570,19 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     """
 
     _func_name = 'Method quantile().'
-
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not isinstance(interpolation, types.Omitted) and interpolation is not 'linear':
-        raise TypingError('{} Unsupported parameters. Given interpolation: {}'.format(_func_name, interpolation))
+        ty_checker.raise_exc(interpolation, 'str', 'interpolation')
 
-    if not isinstance(q, (types.Number, types.Omitted, types.List)) and q != 0.5:
-        raise TypingError('{} The parameter must be float. Given type q: {}'.format(_func_name, type(q)))
+    if not isinstance(q, (types.Number, types.Omitted, types.List)):
+        ty_checker.raise_exc(q, 'int, float, list', 'q')
 
     def hpat_pandas_series_quantile_impl(self, q=0.5, interpolation='linear'):
+        if interpolation is not 'linear':
+            raise ValueError('Method quantile(). The object interpolation\n expected: linear')
+
         return numpy.quantile(self._data, q)
 
     return hpat_pandas_series_quantile_impl
@@ -2774,9 +2773,8 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
     """
 
     _func_name = 'Method max().'
-
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not isinstance(self.data.dtype, (types.Integer, types.Float)):
         raise TypingError(
@@ -2784,15 +2782,16 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
                 _func_name, self.data.dtype))
 
     if not isinstance(skipna, (types.Omitted, types.Boolean)) and skipna is not True:
-        raise TypingError(
-            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, skipna))
+        ty_checker.raise_exc(skipna, 'bool', 'skipna')
 
-    if not (isinstance(axis, types.Omitted) or axis is None) \
-            or not (isinstance(level, types.Omitted) or level is None) \
-            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
-                                                                                            numeric_only))
+    if not isinstance(axis, types.Omitted) and axis is not None:
+        ty_checker.raise_exc(axis, 'None', 'axis')
+
+    if not isinstance(level, types.Omitted) and level is not None:
+        ty_checker.raise_exc(level, 'None', 'level')
+
+    if not isinstance(numeric_only, types.Omitted) and numeric_only is not None:
+        ty_checker.raise_exc(numeric_only, 'None', 'numeric_only')
 
     def hpat_pandas_series_max_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
         if skipna:
@@ -3401,9 +3400,8 @@ def hpat_pandas_series_abs(self):
 
     _func_name = 'Method abs().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError(
-            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not isinstance(self.dtype, (types.Integer, types.Float)):
         raise TypingError(
@@ -3453,10 +3451,8 @@ def hpat_pandas_series_unique(self):
          returns :obj:`numpy.array` ndarray
     """
 
-    _func_name = 'Method unique().'
-
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker('Method unique().')
+    ty_checker.check(self, SeriesType)
 
     if isinstance(self.data, StringArrayType):
         def hpat_pandas_series_unique_str_impl(self):
@@ -3649,14 +3645,11 @@ def hpat_pandas_series_count(self, level=None):
     """
 
     _func_name = 'Method count().'
-
-    if not isinstance(self, SeriesType):
-        raise TypingError(
-            '{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not isinstance(level, (types.Omitted, types.NoneType)) and level is not None:
-        raise TypingError(
-            '{} The function only applies with level is None. Given level: {}'.format(_func_name, level))
+        ty_checker.raise_exc(level, 'None', 'level')
 
     if isinstance(self.data, StringArrayType):
         def hpat_pandas_series_count_str_impl(self, level=None):
