@@ -46,6 +46,15 @@ def arr_max(arr):
 
 
 @register_jitable
+def arr_median(arr):
+    """Calculate median of values"""
+    if len(arr) == 0:
+        return numpy.nan
+
+    return numpy.median(arr)
+
+
+@register_jitable
 def arr_min(arr):
     """Calculate minimum of values"""
     if len(arr) == 0:
@@ -91,6 +100,8 @@ def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
 
 hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max, float64))
+hpat_pandas_rolling_series_median_impl = register_jitable(
+    gen_hpat_pandas_series_rolling_impl(arr_median, float64))
 hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min, float64))
 
@@ -154,6 +165,67 @@ def hpat_pandas_series_rolling_max(self):
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_max_impl
+
+
+@sdc_overload_method(SeriesRollingType, 'median')
+def hpat_pandas_series_rolling_median(self):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.core.window.Rolling.median
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/rolling/series_rolling_median.py
+       :language: python
+       :lines: 27-
+       :caption: Calculate the rolling median.
+       :name: ex_series_rolling_median
+
+    .. code-block:: console
+
+        > python ./series_rolling_median.py
+        0    NaN
+        1    NaN
+        2    4.0
+        3    3.0
+        4    5.0
+        dtype: float64
+
+    .. seealso::
+        :ref:`Series.rolling <pandas.Series.rolling>`
+            Calling object with a Series.
+        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
+            Calling object with a DataFrame.
+        :ref:`Series.median <pandas.Series.median>`
+            Similar method for Series.
+        :ref:`DataFrame.median <pandas.DataFrame.median>`
+            Similar method for DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas Series method :meth:`pandas.Series.rolling.median()` implementation.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_median
+
+    Parameters
+    ----------
+    self: :class:`pandas.Series.rolling`
+        input arg
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method median().')
+    ty_checker.check(self, SeriesRollingType)
+
+    return hpat_pandas_rolling_series_median_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'min')
