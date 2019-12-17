@@ -37,13 +37,21 @@ from sdc.utils import sdc_overload_method
 
 
 @register_jitable
-def arr_finite_min(arr):
-    """Calculate minimum of finite values"""
-    finite_arr = arr[numpy.isfinite(arr)]
-    if len(finite_arr) == 0:
+def arr_max(arr):
+    """Calculate maximum of values"""
+    if len(arr) == 0:
         return numpy.nan
 
-    return finite_arr.min()
+    return arr.max()
+
+
+@register_jitable
+def arr_min(arr):
+    """Calculate minimum of values"""
+    if len(arr) == 0:
+        return numpy.nan
+
+    return arr.min()
 
 
 def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
@@ -62,27 +70,90 @@ def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
 
         for i in prange(min(win, length)):
             arr_range = input_arr[:i + 1]
-            finite_values_num = numpy.isfinite(arr_range).sum()
-            if finite_values_num < minp:
+            finite_arr = arr_range[numpy.isfinite(arr_range)]
+            if len(finite_arr) < minp:
                 output_arr[i] = numpy.nan
             else:
-                output_arr[i] = rolling_func(arr_range)
+                output_arr[i] = rolling_func(finite_arr)
 
         for i in prange(min(win, length), length):
             arr_range = input_arr[i + 1 - win:i + 1]
-            finite_values_num = numpy.isfinite(arr_range).sum()
-            if finite_values_num < minp:
+            finite_arr = arr_range[numpy.isfinite(arr_range)]
+            if len(finite_arr) < minp:
                 output_arr[i] = numpy.nan
             else:
-                output_arr[i] = rolling_func(arr_range)
+                output_arr[i] = rolling_func(finite_arr)
 
         return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
     return impl
 
 
+hpat_pandas_rolling_series_max_impl = register_jitable(
+    gen_hpat_pandas_series_rolling_impl(arr_max, float64))
 hpat_pandas_rolling_series_min_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_finite_min, float64))
+    gen_hpat_pandas_series_rolling_impl(arr_min, float64))
+
+
+@sdc_overload_method(SeriesRollingType, 'max')
+def hpat_pandas_series_rolling_max(self):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.core.window.Rolling.max
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/rolling/series_rolling_max.py
+       :language: python
+       :lines: 27-
+       :caption: Calculate the rolling maximum.
+       :name: ex_series_rolling_max
+
+    .. code-block:: console
+
+        > python ./series_rolling_max.py
+        0    NaN
+        1    NaN
+        2    5.0
+        3    5.0
+        4    6.0
+        dtype: float64
+
+    .. seealso::
+        :ref:`Series.rolling <pandas.Series.rolling>`
+            Calling object with a Series.
+        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
+            Calling object with a DataFrame.
+        :ref:`Series.max <pandas.Series.max>`
+            Similar method for Series.
+        :ref:`DataFrame.max <pandas.DataFrame.max>`
+            Similar method for DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas Series method :meth:`pandas.Series.rolling.max()` implementation.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_max
+
+    Parameters
+    ----------
+    self: :class:`pandas.Series.rolling`
+        input arg
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method max().')
+    ty_checker.check(self, SeriesRollingType)
+
+    return hpat_pandas_rolling_series_max_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'min')

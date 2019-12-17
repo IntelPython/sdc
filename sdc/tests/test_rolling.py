@@ -486,6 +486,25 @@ class TestRolling(TestCase):
         msg = msg_tmpl.format('closed', 'int64', 'str')
         self.assertIn(msg, str(raises.exception))
 
+    @skip_sdc_jit('Series.rolling.max() unsupported Series index')
+    def test_series_rolling_max(self):
+        def test_impl(series, window, min_periods):
+            return series.rolling(window, min_periods).max()
+
+        hpat_func = self.jit(test_impl)
+
+        all_data = test_global_input_data_float64
+        indices = [list(range(len(data)))[::-1] for data in all_data]
+        for data, index in zip(all_data, indices):
+            series = pd.Series(data, index, name='A')
+
+            # TODO: fix the issue when window = 0
+            for window in range(1, len(series) + 2):
+                for min_periods in range(window + 1):
+                    ref_result = test_impl(series, window, min_periods)
+                    jit_result = hpat_func(series, window, min_periods)
+                    pd.testing.assert_series_equal(ref_result, jit_result)
+
     @skip_sdc_jit('Series.rolling.min() unsupported Series index')
     def test_series_rolling_min(self):
         def test_impl(series, window, min_periods):
