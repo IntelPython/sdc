@@ -57,7 +57,9 @@ from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype, CategoricalArray)
 from sdc.hiframes.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type)
 from sdc.hiframes.rolling import supported_rolling_funcs
-from sdc.hiframes.split_impl import (string_array_split_view_type, GetItemStringArraySplitView)
+from sdc.hiframes.split_impl import (SplitViewStringMethodsType,
+                                     string_array_split_view_type,
+                                     GetItemStringArraySplitView)
 from sdc.str_arr_ext import (
     string_array_type,
     iternext_str_array,
@@ -423,9 +425,9 @@ class SeriesAttribute(AttributeTemplate):
 #     def resolve_index(self, ary):
 #         return ary.index
 
-    def resolve_str(self, ary):
-        assert ary.dtype in (string_type, types.List(string_type))
-        return StringMethodsType(ary)
+    # def resolve_str(self, ary):
+    #     assert ary.dtype in (string_type, types.List(string_type))
+    #     return StringMethodsType(ary)
 
     def resolve_dt(self, ary):
         assert ary.dtype == types.NPDatetime('ns')
@@ -564,18 +566,8 @@ class SeriesAttribute(AttributeTemplate):
         # getitem returns Timestamp for dt_index and series(dt64)
         if dtype == types.NPDatetime('ns'):
             dtype = pandas_timestamp_type
-        code = args[0].literal_value.code
-        _globals = {'np': np}
-        # XXX hack in hiframes_typed to make globals available
-        if hasattr(args[0].literal_value, 'globals'):
-            # TODO: use code.co_names to find globals actually used?
-            _globals = args[0].literal_value.globals
-
-        f_ir = numba.ir_utils.get_ir_of_code(_globals, code)
-        f_typemap, f_return_type, f_calltypes = numba.typed_passes.type_inference_stage(
-            self.context, f_ir, (dtype,), None)
-
-        return signature(SeriesType(f_return_type), *args)
+        t = args[0].get_call_type(self.context, (dtype,), {})
+        return signature(SeriesType(t.return_type), *args)
 
     @bound_function("series.map")
     def resolve_map(self, ary, args, kws):
@@ -594,11 +586,8 @@ class SeriesAttribute(AttributeTemplate):
         dtype2 = args[0].dtype
         if dtype2 == types.NPDatetime('ns'):
             dtype2 = pandas_timestamp_type
-        code = args[1].literal_value.code
-        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
-        f_typemap, f_return_type, f_calltypes = numba.typed_passes.type_inference_stage(
-            self.context, f_ir, (dtype1, dtype2,), None)
-        return signature(SeriesType(f_return_type), *args)
+        t = args[1].get_call_type(self.context, (dtype1, dtype2,), {})
+        return signature(SeriesType(t.return_type), *args)
 
     @bound_function("series.combine")
     def resolve_combine(self, ary, args, kws):
@@ -729,13 +718,13 @@ class SeriesAttribute(AttributeTemplate):
     #         types.int64, types.Array(types.int64, 1, 'C'), ary.data)
     #     return signature(out, *args)
 
-    @bound_function("series.rename")
-    def resolve_rename(self, ary, args, kws):
-        # TODO: support index rename, kws
-        assert len(args) == 1 and isinstance(
-            args[0], (types.UnicodeType, types.StringLiteral))
-        out = SeriesType(ary.dtype, ary.data, ary.index, True)
-        return signature(out, *args)
+    # @bound_function("series.rename")
+    # def resolve_rename(self, ary, args, kws):
+    #     # TODO: support index rename, kws
+    #     assert len(args) == 1 and isinstance(
+    #         args[0], (types.UnicodeType, types.StringLiteral))
+    #     out = SeriesType(ary.dtype, ary.data, ary.index, True)
+    #     return signature(out, *args)
 
 
 # TODO: use ops logic from pandas/core/ops.py
@@ -756,7 +745,10 @@ str2str_methods = ['capitalize', 'swapcase', 'title']
     Functions which are still overloaded by HPAT compiler pipeline
 """
 
-str2str_methods_excluded = ['upper', 'len', 'lower', 'lstrip', 'rstrip', 'strip']
+str2str_methods_excluded = [
+    'upper', 'center', 'endswith', 'find', 'isupper', 'len', 'ljust',
+    'lower', 'lstrip', 'rjust', 'rstrip', 'startswith', 'strip', 'zfill'
+]
 """
     Functions which are used from Numba directly by calling from StringMethodsType
 
@@ -780,9 +772,9 @@ class SeriesStrMethodAttribute(AttributeTemplate):
     def resolve_contains(self, ary, args, kws):
         return signature(SeriesType(types.bool_), *args)
 
-    @bound_function("strmethod.len")
-    def resolve_len(self, ary, args, kws):
-        return signature(SeriesType(types.int64), *args)
+    # @bound_function("strmethod.len")
+    # def resolve_len(self, ary, args, kws):
+    #     return signature(SeriesType(types.int64), *args)
 
     @bound_function("strmethod.replace")
     def resolve_replace(self, ary, args, kws):
@@ -818,6 +810,16 @@ class SeriesStrMethodAttribute(AttributeTemplate):
             return
 
         raise NotImplementedError('Series.str.{} is not supported yet'.format(func_name))
+
+
+@infer_getattr
+class SplitViewSeriesStrMethodAttribute(AttributeTemplate):
+    key = SplitViewStringMethodsType
+
+    @bound_function('strmethod.get')
+    def resolve_get(self, ary, args, kws):
+        # XXX only list(list(str)) supported
+        return signature(SeriesType(string_type), *args)
 
 
 class SeriesDtMethodType(types.Type):
@@ -899,15 +901,15 @@ class SeriesIatType(types.Type):
         super(SeriesIatType, self).__init__(name)
 
 
-# PR135. This needs to be commented out
-@infer_global(operator.getitem)
-class GetItemSeriesIat(AbstractTemplate):
-    key = operator.getitem
+if sdc.config.config_pipeline_hpat_default:
+    @infer_global(operator.getitem)
+    class GetItemSeriesIat(AbstractTemplate):
+        key = operator.getitem
 
-    def generic(self, args, kws):
-        # iat[] is the same as regular getitem
-        if isinstance(args[0], SeriesIatType):
-            return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
+        def generic(self, args, kws):
+            # iat[] is the same as regular getitem
+            if isinstance(args[0], SeriesIatType):
+                return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
 
 
 @infer
@@ -1016,7 +1018,7 @@ if not sdc.config.config_pipeline_hpat_default:
 _non_hpat_pipeline_attrs = [
     'resolve_append', 'resolve_combine', 'resolve_corr', 'resolve_cov',
     'resolve_dropna', 'resolve_fillna', 'resolve_head', 'resolve_nlargest',
-    'resolve_nsmallest', 'resolve_pct_change'
+    'resolve_nsmallest', 'resolve_pct_change', 'resolve_loc'
 ]
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
@@ -1032,72 +1034,72 @@ if not sdc.config.config_pipeline_hpat_default:
         if attr in SeriesAttribute.__dict__:
             delattr(SeriesAttribute, attr)
 
-# PR135. This needs to be commented out
-@infer_global(operator.getitem)
-class GetItemSeries(AbstractTemplate):
-    key = operator.getitem
+if sdc.config.config_pipeline_hpat_default:
+    @infer_global(operator.getitem)
+    class GetItemSeries(AbstractTemplate):
+        key = operator.getitem
 
-    def generic(self, args, kws):
-        assert not kws
-        [in_arr, in_idx] = args
-        is_arr_series = False
-        is_idx_series = False
-        is_arr_dt_index = False
+        def generic(self, args, kws):
+            assert not kws
+            [in_arr, in_idx] = args
+            is_arr_series = False
+            is_idx_series = False
+            is_arr_dt_index = False
 
-        if not isinstance(in_arr, SeriesType) and not isinstance(in_idx, SeriesType):
-            return None
+            if not isinstance(in_arr, SeriesType) and not isinstance(in_idx, SeriesType):
+                return None
 
-        if isinstance(in_arr, SeriesType):
-            in_arr = series_to_array_type(in_arr)
-            is_arr_series = True
-            if in_arr.dtype == types.NPDatetime('ns'):
-                is_arr_dt_index = True
+            if isinstance(in_arr, SeriesType):
+                in_arr = series_to_array_type(in_arr)
+                is_arr_series = True
+                if in_arr.dtype == types.NPDatetime('ns'):
+                    is_arr_dt_index = True
 
-        if isinstance(in_idx, SeriesType):
-            in_idx = series_to_array_type(in_idx)
-            is_idx_series = True
+            if isinstance(in_idx, SeriesType):
+                in_idx = series_to_array_type(in_idx)
+                is_idx_series = True
 
-        # TODO: dt_index
-        if in_arr == string_array_type:
-            # XXX fails due in overload
-            # compile_internal version results in symbol not found!
-            # sig = self.context.resolve_function_type(
-            #     operator.getitem, (in_arr, in_idx), kws)
-            # HACK to get avoid issues for now
-            if isinstance(in_idx, (types.Integer, types.IntegerLiteral)):
-                sig = string_type(in_arr, in_idx)
-            else:
-                sig = GetItemStringArray.generic(self, (in_arr, in_idx), kws)
-        elif in_arr == list_string_array_type:
-            # TODO: split view
-            # mimic array indexing for list
-            if (isinstance(in_idx, types.Array) and in_idx.ndim == 1
-                    and isinstance(
-                        in_idx.dtype, (types.Integer, types.Boolean))):
-                sig = signature(in_arr, in_arr, in_idx)
-            else:
-                sig = numba.typing.collections.GetItemSequence.generic(
+            # TODO: dt_index
+            if in_arr == string_array_type:
+                # XXX fails due in overload
+                # compile_internal version results in symbol not found!
+                # sig = self.context.resolve_function_type(
+                #     operator.getitem, (in_arr, in_idx), kws)
+                # HACK to get avoid issues for now
+                if isinstance(in_idx, (types.Integer, types.IntegerLiteral)):
+                    sig = string_type(in_arr, in_idx)
+                else:
+                    sig = GetItemStringArray.generic(self, (in_arr, in_idx), kws)
+            elif in_arr == list_string_array_type:
+                # TODO: split view
+                # mimic array indexing for list
+                if (isinstance(in_idx, types.Array) and in_idx.ndim == 1
+                        and isinstance(
+                            in_idx.dtype, (types.Integer, types.Boolean))):
+                    sig = signature(in_arr, in_arr, in_idx)
+                else:
+                    sig = numba.typing.collections.GetItemSequence.generic(
+                        self, (in_arr, in_idx), kws)
+            elif in_arr == string_array_split_view_type:
+                sig = GetItemStringArraySplitView.generic(
                     self, (in_arr, in_idx), kws)
-        elif in_arr == string_array_split_view_type:
-            sig = GetItemStringArraySplitView.generic(
-                self, (in_arr, in_idx), kws)
-        else:
-            out = get_array_index_type(in_arr, in_idx)
-            sig = signature(out.result, in_arr, out.index)
+            else:
+                out = get_array_index_type(in_arr, in_idx)
+                sig = signature(out.result, in_arr, out.index)
 
-        if sig is not None:
-            arg1 = sig.args[0]
-            arg2 = sig.args[1]
-            if is_arr_series:
-                sig.return_type = if_arr_to_series_type(sig.return_type)
-                arg1 = if_arr_to_series_type(arg1)
-            if is_idx_series:
-                arg2 = if_arr_to_series_type(arg2)
-            sig.args = (arg1, arg2)
-            # dt_index and Series(dt64) should return Timestamp
-            if is_arr_dt_index and sig.return_type == types.NPDatetime('ns'):
-                sig.return_type = pandas_timestamp_type
-        return sig
+            if sig is not None:
+                arg1 = sig.args[0]
+                arg2 = sig.args[1]
+                if is_arr_series:
+                    sig.return_type = if_arr_to_series_type(sig.return_type)
+                    arg1 = if_arr_to_series_type(arg1)
+                if is_idx_series:
+                    arg2 = if_arr_to_series_type(arg2)
+                sig.args = (arg1, arg2)
+                # dt_index and Series(dt64) should return Timestamp
+                if is_arr_dt_index and sig.return_type == types.NPDatetime('ns'):
+                    sig.return_type = pandas_timestamp_type
+            return sig
 
 
 @infer_global(operator.setitem)
@@ -1224,10 +1226,11 @@ class SeriesUnaryOpUfuncs(NumpyRulesUnaryArrayOperator):
         return series_op_generic(SeriesUnaryOpUfuncs, self, args, kws)
 
 
-# TODO: change class name to Series in install_operations
-SeriesOpUfuncs.install_operations()
-SeriesInplaceOpUfuncs.install_operations()
-SeriesUnaryOpUfuncs.install_operations()
+if sdc.config.config_pipeline_hpat_default:
+    # TODO: change class name to Series in install_operations
+    SeriesOpUfuncs.install_operations()
+    SeriesInplaceOpUfuncs.install_operations()
+    SeriesUnaryOpUfuncs.install_operations()
 
 
 class Series_Numpy_rules_ufunc(Numpy_rules_ufunc):

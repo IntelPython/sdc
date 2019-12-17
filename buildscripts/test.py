@@ -102,6 +102,9 @@ if __name__ == '__main__':
     develop_env_activate = get_activate_env_cmd(conda_activate, develop_env)
 
     conda_channels = f'-c {numba_channel} -c conda-forge -c intel -c defaults --override-channels'
+    # If numba is taken from custom channel, need to add numba channel to get dependencies
+    if numba_channel != 'numba':
+        conda_channels = f'-c {numba_channel} -c numba -c conda-forge -c intel -c defaults --override-channels'
     if channel_list:
         conda_channels = f'{channel_list} --override-channels'
 
@@ -200,6 +203,7 @@ if __name__ == '__main__':
         for package in sdc_packages:
             if '.tar.bz2' in package and package_type == 'conda':
                 format_print(f'Run benchmark tests for sdc conda package: {package}')
-                create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['openpyxl'], conda_channels)
+                create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['openpyxl', 'xlrd'],
+                                 conda_channels)
                 run_command(f'{test_env_activate} && conda install -y {package}')
                 run_command(f'{test_env_activate} && python -W ignore -m sdc.runtests {benchmark_argv}')

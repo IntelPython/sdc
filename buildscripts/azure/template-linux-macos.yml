@@ -24,7 +24,7 @@ jobs:
         if [ "$USE_NUMBA_MASTER" == "False" ]; then
             $HOME/miniconda3/bin/python buildscripts/build.py --build-mode=package --python=$PYTHON_VER --numpy=$NUMPY_VER --skip-smoke-tests --conda-prefix=$HOME/miniconda3;
         else
-            $HOME/miniconda3/bin/python buildscripts/build.py --build-mode=package --python=$PYTHON_VER --numpy=$NUMPY_VER --use-numba-master --conda-prefix=$HOME/miniconda3;
+            $HOME/miniconda3/bin/python buildscripts/build.py --build-mode=package --python=$PYTHON_VER --numpy=$NUMPY_VER --use-numba-master --skip-smoke-tests --conda-prefix=$HOME/miniconda3;
         fi
       displayName: 'Build conda and wheel packages'
       continueOnError: ${{ parameters.allowFailure }}
