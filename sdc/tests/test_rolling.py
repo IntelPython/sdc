@@ -531,15 +531,15 @@ class TestRolling(TestCase):
 
         hpat_func = self.jit(test_impl)
 
-        all_data = [list(range(10)), [1., -1., 0., 0.1, -0.1],
-                    [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
-                    [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]]
+        all_data = [
+            list(range(10)), [1., -1., 0., 0.1, -0.1],
+            [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
+            [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
+        ]
         indices = [list(range(len(data)))[::-1] for data in all_data]
         for data, index in zip(all_data, indices):
             series = pd.Series(data, index, name='A')
-
-            # TODO: fix the issue when window = 0
-            for window in range(1, len(series) + 2):
+            for window in range(len(series) + 2):
                 for min_periods in range(window + 1):
                     ref_result = test_impl(series, window, min_periods)
                     jit_result = hpat_func(series, window, min_periods)
