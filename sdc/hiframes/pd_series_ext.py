@@ -848,11 +848,14 @@ for field in sdc.hiframes.pd_timestamp_ext.date_fields:
     setattr(SeriesDtMethodAttribute, "resolve_" + field, resolve_date_field)
 
 
-class SeriesRollingType(types.Type):
-    def __init__(self, dtype):
-        self.dtype = dtype
-        name = "SeriesRollingType({})".format(dtype)
-        super(SeriesRollingType, self).__init__(name)
+if sdc.config.config_pipeline_hpat_default:
+    class SeriesRollingType(types.Type):
+        def __init__(self, dtype):
+            self.dtype = dtype
+            name = "SeriesRollingType({})".format(dtype)
+            super(SeriesRollingType, self).__init__(name)
+else:
+    from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 
 
 @infer_getattr
@@ -1030,7 +1033,7 @@ if not sdc.config.config_pipeline_hpat_default:
 _non_hpat_pipeline_attrs = [
     'resolve_append', 'resolve_combine', 'resolve_corr', 'resolve_cov',
     'resolve_dropna', 'resolve_fillna', 'resolve_head', 'resolve_nlargest',
-    'resolve_nsmallest', 'resolve_pct_change', 'resolve_loc'
+    'resolve_nsmallest', 'resolve_pct_change', 'resolve_rolling', 'resolve_loc'
 ]
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute

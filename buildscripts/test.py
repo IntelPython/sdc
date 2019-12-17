@@ -29,6 +29,7 @@
 import argparse
 import os
 import platform
+import re
 import subprocess
 import sys
 import traceback
@@ -54,12 +55,14 @@ if __name__ == '__main__':
 
     # Parse input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--test-mode', default='conda', choices=['conda', 'package', 'develop', 'benchmark'],
+    parser.add_argument('--test-mode', default='conda', choices=['conda', 'package', 'develop',
+                                                                 'benchmark', 'examples'],
                         help="""Test mode:
-                        conda:   use conda-build to run tests (default and valid for conda package-type)
-                        package: create test environment, install package there and run tests
-                        develop: run tests for sdc package already installed in develop mode
-                        benchmark: run benchmark tests for sdc""")
+                        conda:     use conda-build to run tests (default and valid for conda package-type)
+                        package:   create test environment, install package there and run tests
+                        develop:   run tests for sdc package already installed in develop mode
+                        benchmark: run benchmark tests for sdc
+                        examples:  execute examples, located in sdc/examples""")
     parser.add_argument('--package-type', default='conda', choices=['conda', 'wheel'],
                         help='Package to test: conda or wheel, default = conda')
     parser.add_argument('--python', default='3.7', choices=['3.6', '3.7', '3.8'],
@@ -195,6 +198,56 @@ if __name__ == '__main__':
                 run_command(f'{test_env_activate} && {test_script}')
 
         format_print(f'Tests for {package_type} packages are PASSED')
+
+    # Execute examples
+    if test_mode == 'examples':
+        format_print('Run SDC examples')
+        sdc_examples = os.path.join(sdc_src, 'examples')
+        passed_examples = []
+        failed_examples = []
+        expected_failures = []
+        expected_failures_list = ['basic_workflow.py', 'basic_workflow_parallel.py']
+
+        os.chdir(sdc_examples)
+        sdc_packages = get_sdc_build_packages(build_folder)
+        for package in sdc_packages:
+            if '.tar.bz2' in package and package_type == 'conda':
+                format_print(f'Run examples for sdc conda package: {package}')
+                create_conda_env(conda_activate, test_env, python, sdc_env['test'], conda_channels)
+                run_command(f'{test_env_activate} && conda install -y {package}')
+                for item in os.listdir(sdc_examples):
+                    if os.path.isfile(item) and re.search(r'^\w+\.py$', item):
+                        format_print(f'Execute {item}')
+                        try:
+                            run_command(f'{test_env_activate} && python {item}')
+                        except Exception:
+                            if item in expected_failures_list:
+                                expected_failures.append(item)
+                            else:
+                                failed_examples.append(item)
+                            format_print(f'{item} FAILED', new_block=False)
+                            traceback.print_exc()
+                        else:
+                            format_print(f'{item} PASSED', new_block=False)
+                            passed_examples.append(item)
+
+        total_passed = len(passed_examples)
+        total_failed = len(failed_examples)
+        total_expected_failures = len(expected_failures)
+        total_run = total_passed + total_failed + total_expected_failures
+        format_print(' '.join([f'SDC examples summary:',
+                               f'{total_run} RUN,',
+                               f'{total_passed} PASSED,',
+                               f'{total_failed} FAILED,',
+                               f'{total_expected_failures} EXPECTED FAILURES']))
+        for item in passed_examples:
+            format_print(f' - {item}: PASSED', new_block=False)
+        for item in failed_examples:
+            format_print(f' - {item}: FAILED', new_block=False)
+        for item in expected_failures:
+            format_print(f' - {item}: EXPECTED FAILED', new_block=False)
+
+        sys.exit(0 if total_failed == 0 else -1)
 
     # Benchmark tests
     if test_mode == 'benchmark':
