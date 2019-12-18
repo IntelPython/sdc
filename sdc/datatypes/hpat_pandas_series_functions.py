@@ -145,32 +145,65 @@ def hpat_pandas_series_getitem(self, idx):
 @sdc_overload(operator.setitem)
 def hpat_pandas_series_setitem(self, idx, value):
     """
-        Pandas Series operator :attr:`pandas.Series.get` implementation
-        '''
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_unsupported
-        '''
-        Parameters
-        ----------
-        series: :obj:`pandas.Series`
-               input series
-        idx: :obj:`int`, :obj:`slice` or :obj:`pandas.Series`
-            input index
-        value: :object
-            input value
-        Returns
-        -------
-        :class:`pandas.Series` or an element of the underneath type
-                object of :class:`pandas.Series`
-        """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.set
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series_setitem.py
+       :language: python
+       :lines: 27-
+       :caption: Setting Pandas Series elements
+       :name: ex_series_setitem
+
+    .. code-block:: console
+
+        > python ./series_setitem.py
+
+            0    0
+            1    0
+            2    0
+            3    0
+            4    0
+            5    0
+            6    0
+            7    0
+            8    0
+            9    0
+
+
+    .. todo:: Fix SDC behavior and add the expected output of the > python ./series_getitem.py to the docstring
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+     Pandas Series operator :attr:`pandas.Series.set` implementation
+
+    Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_unsupported
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+           input series
+    idx: :obj:`int`, :obj:`slice` or :obj:`pandas.Series`
+        input index
+    value: :object
+        input value
+
+    Returns
+    -------
+    :class:`pandas.Series` or an element of the underneath type
+            object of :class:`pandas.Series`
+    """
 
     _func_name = 'Operator setitem().'
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+
+    ty_checker = TypeChecker('Operator setitem().')
+    ty_checker.check(self, SeriesType)
 
     if (isinstance(value, SeriesType) and not isinstance(self.dtype, value.dtype)) or \
             not isinstance(self.dtype, type(value)):
-        raise TypingError('{} Value must be one type with series. Given: {}, self.dtype={}'.format(_func_name,
-                                                                                                   value, self.dtype))
+        ty_checker.raise_exc(value, 'self', 'value')
 
     if isinstance(idx, types.Integer) or isinstance(idx, types.SliceType):
         def hpat_pandas_series_setitem_idx_integer_impl(self, idx, value):
