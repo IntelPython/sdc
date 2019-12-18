@@ -486,7 +486,7 @@ class TestRolling(TestCase):
         msg = msg_tmpl.format('closed', 'int64', 'str')
         self.assertIn(msg, str(raises.exception))
 
-    skip_sdc_jit('Series.rolling.count() unsupported Series index')
+    @skip_sdc_jit('Series.rolling.count() unsupported Series index')
     def test_series_rolling_count(self):
         def test_impl(series, window, min_periods):
             return series.rolling(window, min_periods).count()
@@ -504,7 +504,7 @@ class TestRolling(TestCase):
                         jit_result = hpat_func(series, window, min_periods)
                         pd.testing.assert_series_equal(ref_result, jit_result)
 
-    skip_sdc_jit('Series.rolling.max() unsupported Series index')
+    @skip_sdc_jit('Series.rolling.max() unsupported Series index')
     def test_series_rolling_max(self):
         def test_impl(series, window, min_periods):
             return series.rolling(window, min_periods).max()
@@ -523,7 +523,7 @@ class TestRolling(TestCase):
                         jit_result = hpat_func(series, window, min_periods)
                         pd.testing.assert_series_equal(ref_result, jit_result)
 
-    skip_sdc_jit('Series.rolling.min() unsupported Series index')
+    @skip_sdc_jit('Series.rolling.min() unsupported Series index')
     def test_series_rolling_min(self):
         def test_impl(series, window, min_periods):
             return series.rolling(window, min_periods).min()
