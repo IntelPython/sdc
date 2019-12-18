@@ -43,22 +43,23 @@ from numba.errors import TypingError
 
 from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
 
-def sdc_pandas_dataframe_reduce_columns(df, name, params):
+def sdc_pandas_dataframe_reduce_columns(df, name, series_call_params):
 
     saved_columns = df.columns
     data_args = tuple('data{}'.format(i) for i in range(len(saved_columns)))
     all_params = ['df']
 
-    for key, value in params:
+    for key, value in series_call_params:
         all_params.append('{}={}'.format(key, value))
-    ap = all_params.copy()
-    par = '{}'.format(', '.join(ap[1:]))
+    # This relies on parameters part of the signature of Series method called below being the same
+    # as for the corresponding DataFrame method
+    series_call_params_str = '{}'.format(', '.join(all_params[1:]))
     func_definition = 'def _reduce_impl({}):'.format(', '.join(all_params))
     func_lines = [func_definition]
     for i, d in enumerate(data_args):
         line = '  {} = sdc.hiframes.api.init_series(sdc.hiframes.pd_dataframe_ext.get_dataframe_data(all_params[0], {}))'
         func_lines.append(line.format(d + '_S', i))
-        func_lines.append(' {}_O = {}_S.{}({})'.format(d, d, name, par))
+        func_lines.append(' {}_O = {}_S.{}({})'.format(d, d, name, series_call_params_str))
     func_lines.append('  data = np.array(({},))'.format(
         ", ".join(d + '_O' for d in data_args)))
     func_lines.append('  index = sdc.str_arr_ext.StringArray(({},))'.format(
@@ -73,3 +74,47 @@ def sdc_pandas_dataframe_reduce_columns(df, name, params):
     return _reduce_impl
 
 
+@overload_method(DataFrameType, 'count')
+def count_overload(df, axis=0, level=None, numeric_only=False):
+    """
+    Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count
+    Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count1
+
+    Parameters
+    -----------
+    self: :class:`pandas.DataFrame`
+    input arg
+    axis:
+    *unsupported*
+    level:
+    *unsupported*
+    numeric_only:
+    *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series` or `pandas.DataFrame`
+    for each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
+    """
+
+    name = 'count'
+
+    ty_checker = TypeChecker('Method {}().'.format(name))
+    ty_checker.check(df, DataFrameType)
+
+    if not (isinstance(axis, types.Omitted) or axis == 0):
+        ty_checker.raise_exc(axis, 'unsupported', 'axis')
+
+    if not (isinstance(level, types.Omitted) or level is None):
+        ty_checker.raise_exc(level, 'unsupported', 'level')
+
+    if not (isinstance(numeric_only, types.Omitted) or numeric_only is False):
+        ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
+
+    params = [('axis', None), ('level', None), ('numeric_only', numeric_only)]
+
+    return sdc_pandas_dataframe_reduce_columns(df, name, params)
