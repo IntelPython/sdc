@@ -988,6 +988,7 @@ class TestSeries(TestCase):
         test_impl(A2, df.B)
         pd.testing.assert_series_equal(A1, A2)
 
+    @skip_sdc_jit('Not impl in old style')
     def test_static_getitem_series1(self):
         def test_impl(A):
             return A[1]
@@ -1006,6 +1007,7 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         pd.testing.assert_series_equal(hpat_func(df.A, 0), pd.Series(test_impl(df.A, 0)))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_getitem_series2(self):
         def test_impl(A, i):
             return A[i]
@@ -1015,6 +1017,7 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df.A, 0).data[0], test_impl(df.A, 0))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_getitem_series_str1(self):
         def test_impl(A, i):
             return A[i]
@@ -1023,6 +1026,7 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': ['aa', 'bb', 'cc']})
         pd.testing.assert_series_equal(hpat_func(df.A, 0), pd.Series(test_impl(df.A, 0)))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_series_iat1(self):
         def test_impl(A):
             return A.iat[3]
@@ -1043,6 +1047,7 @@ class TestSeries(TestCase):
         S = pd.Series(np.arange(n)**2)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_series_getitem_series_list(self):
         def test_impl(A, B):
             return A[B]
@@ -1052,6 +1057,7 @@ class TestSeries(TestCase):
         n = np.array([True, False, False, True])
         pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_series_getitem_series(self):
         def test_impl(A, B):
             return A[B]
@@ -1061,6 +1067,7 @@ class TestSeries(TestCase):
         S2 = pd.Series([8, 6, 0], [12, 11, 14])
         pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_series_getitem_series_noidx(self):
         def test_impl(A, B):
             return A[B]
@@ -1080,6 +1087,7 @@ class TestSeries(TestCase):
         S2 = pd.Series(['8', '6', '0'], ['12', '11', '14'])
         pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_series_iloc1(self):
         def test_impl(A):
             return A.iloc[3]
@@ -1089,6 +1097,7 @@ class TestSeries(TestCase):
         S = pd.Series(np.arange(n)**2)
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_series_loc_return_ser(self):
         def test_impl(A):
             return A.loc[3]
@@ -1097,6 +1106,7 @@ class TestSeries(TestCase):
         S = pd.Series([2, 4, 6, 5, 7], [1, 3, 5, 3, 3])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_series_getitem(self):
         def test_impl(S, key):
             return S[key]
@@ -1109,6 +1119,7 @@ class TestSeries(TestCase):
             S = pd.Series([11, 22, 33], index)
             np.testing.assert_array_equal(jit_impl(S, key).data, np.array(test_impl(S, key)))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_series_getitem_return_ser(self):
         def test_impl(A):
             return A[3]
@@ -1117,6 +1128,7 @@ class TestSeries(TestCase):
         S = pd.Series([2, 4, 6, 33, 7], [1, 3, 5, 3, 3])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_series_getitem_slice(self):
         def test_impl(S, start, end):
             return S[start:end]
@@ -1131,7 +1143,7 @@ class TestSeries(TestCase):
             ref_result = test_impl(S, start, end)
             jit_result = jit_impl(S, start, end)
             pd.testing.assert_series_equal(jit_result, ref_result)
-    
+
     @unittest.skip('String slice not implement')
     def test_series_getitem_str(self):
         def test_impl(A):
@@ -1162,6 +1174,7 @@ class TestSeries(TestCase):
         S = pd.Series([2, 4, 6, 12, 0], [1, 3, 5, 3, 3])
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_series_loc(self):
         def test_impl(S, key):
             return S.loc[key]
@@ -1175,6 +1188,7 @@ class TestSeries(TestCase):
             S = pd.Series(data, index)
             np.testing.assert_array_equal(jit_impl(S, key).data, np.array(test_impl(S, key)))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_series_loc_str(self):
         def test_impl(A):
             return A.loc['1']
@@ -1183,15 +1197,23 @@ class TestSeries(TestCase):
         S = pd.Series([2, 4, 6], ['1', '3', '5'])
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('Loc for slice idx not implement')
-    def test_series_loc_slice(self):
+    def test_series_slice(self):
         def test_impl(A):
             return A.loc[1:5]
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([2, 4, 6], [1, 3, 5])
+        S = pd.Series([2, 4, 6, 6, 3], [1, 3, 5, 13, 22])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_slice_nonidx(self):
+        def test_impl(A):
+            return A.loc[1:3]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([2, 4, 6, 6, 3])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit('Not impl in old style')
     def test_series_iloc2(self):
         def test_impl(A):
             return A.iloc[3:8]
@@ -1442,7 +1464,7 @@ class TestSeries(TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
-    @skip_numba_jit
+    @unittest.skip("Str not impl")
     def test_series_list_str_unbox1(self):
         def test_impl(A):
             return A.iloc[0]
@@ -3642,7 +3664,7 @@ class TestSeries(TestCase):
             S = pd.Series(['a', 'ab', 'abc', 'c', 'f', 'hh', ''] * n)
             start, end = get_start_end(len(S))
             pd.testing.assert_series_equal(hpat_func(S[start:end]), test_impl(S[start:end]))
-            # self.assertTrue(count_array_OneDs() > 0)
+            self.assertTrue(count_array_OneDs() > 0)
 
     @skip_numba_jit
     def test_series_head_index_parallel1(self):
@@ -3654,7 +3676,7 @@ class TestSeries(TestCase):
         S = pd.Series([6, 9, 2, 3, 6, 4, 5], [8, 1, 6, 0, 9, 1, 3])
         start, end = get_start_end(len(S))
         pd.testing.assert_series_equal(hpat_func(S[start:end]), test_impl(S[start:end]))
-        # self.assertTrue(count_array_OneDs() > 0)
+        self.assertTrue(count_array_OneDs() > 0)
 
     @unittest.skip("Passed if run single")
     def test_series_head_index_parallel2(self):

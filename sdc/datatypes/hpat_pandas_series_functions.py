@@ -104,13 +104,36 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
         raise TypingError('{} The index must be a Integer. Given: {}'.format(_func_name, idx))
 
-    #Loc for slice idx not implement
-    #note: Loc return Series
     if accessor == 'loc':
-        # if isinstance(idx, types.SliceType):
-        #     def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
-        #         return
-        # return hpat_pandas_series_getitem_idx_slice_impl
+    #note: Loc return Series
+        index_is_none = (self.series.index is None or
+                         isinstance(self.series.index, numba.types.misc.NoneType))
+        if isinstance(idx, types.SliceType) and not index_is_none:
+            def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
+                start = -1
+                stop = -1
+                for i in numba.prange(len(self._series._index)):
+                    if self._series._index[i] == idx.start and start == -1:
+                        start = i
+                    if self._series._index[i] == idx.stop and start != -1 and stop == -1:
+                        stop = i 
+                return pandas.Series(self._series._data[start:stop+1], self._series._index[start:stop+1])
+
+            return hpat_pandas_series_getitem_idx_slice_impl
+
+        if isinstance(idx, types.SliceType) and index_is_none:
+            def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
+                start = -1
+                stop = -1
+                index = numpy.arange(len(self._series._data))
+                for i in numba.prange(len(index)):
+                    if index[i] == idx.start and start == -1:
+                        start = i
+                    if index[i] == idx.stop and start != -1 and stop == -1:
+                        stop = i 
+                return pandas.Series(self._series._data[start:stop+1], index[start:stop+1])
+
+            return hpat_pandas_series_getitem_idx_slice_impl
 
         def hpat_pandas_series_loc_impl(self, idx):
             mask = numpy.empty(len(self._series._data), numpy.bool_)
@@ -209,8 +232,8 @@ def hpat_pandas_series_getitem(self, idx):
 
         return hpat_pandas_series_idx_impl
 
-    #Return slice for str values not implement
     if isinstance(idx, types.SliceType):
+    #Return slice for str values not implement
         def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
             return pandas.Series(self._data[idx], self.index[idx])
 
@@ -218,15 +241,15 @@ def hpat_pandas_series_getitem(self, idx):
 
     if isinstance(idx, (types.List, types.Array)):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
-            if (idx[0] == True or idx[0] == False):
-                return  pandas.Series(self._data[idx], self.index[idx])
+            if (idx[0] is True or idx[0] is False):
+                return pandas.Series(self._data[idx], self.index[idx])
         return hpat_pandas_series_getitem_idx_list_impl
 
     if (isinstance(self.index, types.NoneType) and isinstance(idx, SeriesType)):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
             if (idx._data[0] == True or idx._data[0] == False):
                 index = numpy.arange(len(self._data))
-                return  pandas.Series(self._data[idx._data], index[idx._data])
+                return pandas.Series(self._data[idx._data], index[idx._data])
             res = numpy.copy(self._data[:len(idx._data)])
             index = numpy.arange(len(self._data))
             for i in numba.prange(len(res)):
@@ -236,11 +259,11 @@ def hpat_pandas_series_getitem(self, idx):
             return pandas.Series(res, index[idx._data])
         return hpat_pandas_series_getitem_idx_list_impl
 
-    #Series with str index not implement
     if (isinstance(idx, SeriesType) and not isinstance(self.index, types.NoneType)):
+    #Series with str index not implement
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
-            if (idx._data[0] == True or idx._data[0] == False):
-                return  pandas.Series(self._data[idx._data], self._index[idx._data])
+            if (idx._data[0] is True or idx._data[0] is False):
+                return pandas.Series(self._data[idx._data], self._index[idx._data])
             res = numpy.copy(self._data[:len(idx._data)])
             for i in numba.prange(len(res)):
                 for j in numba.prange(len(self.index)):

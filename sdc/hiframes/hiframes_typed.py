@@ -222,8 +222,9 @@ class HiFramesTypedPassImpl(object):
                 return self._run_unary(assign, rhs)
 
             # replace getitems on Series.iat
-            # if rhs.op in ('getitem', 'static_getitem'):
-            #     return self._run_getitem(assign, rhs)
+            if sdc.config.config_pipeline_hpat_default:
+                if rhs.op in ('getitem', 'static_getitem'):
+                    return self._run_getitem(assign, rhs)
 
             if rhs.op == 'call':
                 return self._run_call(assign, lhs, rhs)
@@ -943,30 +944,30 @@ class HiFramesTypedPassImpl(object):
                                                      'lt_f': series_kernels.lt_f},
                                       pre_nodes=nodes)
 
-        # if func_name == 'head':
-        #     nodes = []
-        #     n_arg = self._get_arg('Series.head', rhs.args, dict(rhs.kws), 0,
-        #                           'n', default=False)  # TODO: proper default handling
-        #     if n_arg is False:
-        #         n_arg = ir.Var(lhs.scope, mk_unique_var('head_n'), lhs.loc)
-        #         # default is 5
-        #         self.state.typemap[n_arg.name] = types.IntegerLiteral(5)
-        #         nodes.append(ir.Assign(
-        #             ir.Const(5, lhs.loc), n_arg, lhs.loc))
+        if func_name == 'head':
+            nodes = []
+            n_arg = self._get_arg('Series.head', rhs.args, dict(rhs.kws), 0,
+                                  'n', default=False)  # TODO: proper default handling
+            if n_arg is False:
+                n_arg = ir.Var(lhs.scope, mk_unique_var('head_n'), lhs.loc)
+                # default is 5
+                self.state.typemap[n_arg.name] = types.IntegerLiteral(5)
+                nodes.append(ir.Assign(
+                    ir.Const(5, lhs.loc), n_arg, lhs.loc))
 
-        #     data = self._get_series_data(series_var, nodes)
-        #     func = series_replace_funcs[func_name]
+            data = self._get_series_data(series_var, nodes)
+            func = series_replace_funcs[func_name]
 
-        #     if self.state.typemap[series_var.name].index != types.none:
-        #         index = self._get_series_index(series_var, nodes)
-        #         func = series_replace_funcs['head_index']
-        #     else:
-        #         index = self._get_index_values(data, nodes)
+            if self.state.typemap[series_var.name].index != types.none:
+                index = self._get_series_index(series_var, nodes)
+                func = series_replace_funcs['head_index']
+            else:
+                index = self._get_index_values(data, nodes)
 
-        #     name = self._get_series_name(series_var, nodes)
+            name = self._get_series_name(series_var, nodes)
 
-        #     return self._replace_func(
-        #         func, (data, index, n_arg, name), pre_nodes=nodes)
+            return self._replace_func(
+                func, (data, index, n_arg, name), pre_nodes=nodes)
 
         if func_name in ('cov', 'corr'):
             S2 = rhs.args[0]

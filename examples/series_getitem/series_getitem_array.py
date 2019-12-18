@@ -26,12 +26,22 @@
 
 import numpy as np
 import pandas as pd
+from numba import njit
 
 
 @njit
-def series_at(i):
-    series = pd.Series([5, 4, 3, 2, 1], index=[0, 2, 4, 6, 8])
-    return series.at[i]
+def series_getitem_array():
+    series = pd.Series(np.arange(10, 0, -1))  # Series of 10, 9, ..., 1
+    array = np.array([True, False, True, True, False] * 2)
+    return series[array]  # Accessing series by series index
+    # Expected Series:
+    # 0    10
+    # 2     8
+    # 3     7
+    # 5     5
+    # 7     3
+    # 8     2
+    # dtype: int64
 
 
-print(series_at(4))
+print(series_getitem_array())

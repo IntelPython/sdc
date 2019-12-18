@@ -275,7 +275,7 @@ class TestStrings(TestCase):
         hpat_func = self.jit(test_impl)
 
         S = pd.Series([''])
-        self.assertEqual(hpat_func(S)[0], test_impl(S))
+        self.assertEqual(hpat_func(S), test_impl(S))
 
     @skip_numba_jit
     def test_decode_single_ascii_char1(self):
@@ -293,7 +293,7 @@ class TestStrings(TestCase):
         hpat_func = self.jit(test_impl)
 
         S = pd.Series(['Abc12', 'bcd', '345'])
-        self.assertEqual(hpat_func(S)[0], test_impl(S))
+        self.assertEqual(hpat_func(S), test_impl(S))
 
     @unittest.skip("non ascii decode not implement")
     def test_decode_unicode1(self):

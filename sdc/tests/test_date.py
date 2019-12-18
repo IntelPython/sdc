@@ -87,7 +87,7 @@ class TestDate(TestCase):
         hpat_func = self.jit(test_impl)
         df = self._gen_str_date_df()
         A = pd.DatetimeIndex(df['str_date']).to_series()
-        self.assertEqual(hpat_func(A)[0], test_impl(A))
+        self.assertEqual(hpat_func(A), test_impl(A))
 
     @skip_numba_jit
     def test_ts_map(self):
@@ -140,7 +140,7 @@ class TestDate(TestCase):
         hpat_func = self.jit(test_impl)
         df = self._gen_str_date_df()
         A = pd.DatetimeIndex(df['str_date']).to_series().map(lambda x: x.date())
-        self.assertEqual(hpat_func(A)[0], test_impl(A))
+        self.assertEqual(hpat_func(A), test_impl(A))
 
     @skip_numba_jit
     def test_date_series_unbox2(self):
@@ -150,7 +150,7 @@ class TestDate(TestCase):
         hpat_func = self.jit(test_impl)
         df = self._gen_str_date_df()
         A = pd.DatetimeIndex(df['str_date']).map(lambda x: x.date())
-        self.assertEqual(hpat_func(A)[0], test_impl(A))
+        self.assertEqual(hpat_func(A), test_impl(A))
 
     @skip_numba_jit
     def test_datetime_index_set(self):
