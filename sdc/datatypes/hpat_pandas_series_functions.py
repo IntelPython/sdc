@@ -151,7 +151,7 @@ def hpat_pandas_series_setitem(self, idx, value):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_setitem.py
+    .. literalinclude:: ../../../examples/series_setitem_int.py
        :language: python
        :lines: 27-
        :caption: Setting Pandas Series elements
@@ -159,21 +159,32 @@ def hpat_pandas_series_setitem(self, idx, value):
 
     .. code-block:: console
 
-        > python ./series_setitem.py
+        > python ./series_setitem_int.py
 
             0    0
-            1    0
+            1    4
+            2    3
+            3    2
+            4    1
+            dtype: int64
+
+        > python ./series_setitem_slice.py
+
+            0    5
+            1    4
             2    0
             3    0
             4    0
-            5    0
-            6    0
-            7    0
-            8    0
-            9    0
+            dtype: int64
 
+        > python ./series_setitem_series.py
 
-    .. todo:: Fix SDC behavior and add the expected output of the > python ./series_getitem.py to the docstring
+            0    5
+            1    0
+            2    3
+            3    0
+            4    1
+            dtype: int64
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -195,7 +206,6 @@ def hpat_pandas_series_setitem(self, idx, value):
     :class:`pandas.Series` or an element of the underneath type
             object of :class:`pandas.Series`
     """
-
     ty_checker = TypeChecker('Operator setitem().')
     ty_checker.check(self, SeriesType)
 
@@ -209,7 +219,6 @@ def hpat_pandas_series_setitem(self, idx, value):
             Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_value
             Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_slice
             """
-
             self._data[idx] = value
             return self
 

@@ -4691,10 +4691,11 @@ class TestSeries(TestCase):
             return S
 
         hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4])
+        S1 = pd.Series([0, 1, 2, 3, 4])
+        S2 = pd.Series([0, 1, 2, 3, 4])
         value = 50
-        result_ref = test_impl(S, value)
-        result = hpat_func(S, value)
+        result_ref = test_impl(S1, value)
+        result = hpat_func(S2, value)
         pd.testing.assert_series_equal(result_ref, result)
 
     def test_series_setitem_for_slice(self):
@@ -4703,10 +4704,11 @@ class TestSeries(TestCase):
             return S
 
         hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4])
+        S1 = pd.Series([0, 1, 2, 3, 4])
+        S2 = pd.Series([0, 1, 2, 3, 4])
         value = 50
-        result_ref = test_impl(S, value)
-        result = hpat_func(S, value)
+        result_ref = test_impl(S1, value)
+        result = hpat_func(S2, value)
         pd.testing.assert_series_equal(result_ref, result)
 
     def test_series_setitem_for_series(self):
