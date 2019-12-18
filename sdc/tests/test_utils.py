@@ -134,6 +134,7 @@ def skip_numba_jit(msg_or_func=None):
     msg, func = msg_and_func(msg_or_func)
     wrapper = unittest.skipUnless(sdc.config.config_pipeline_hpat_default, msg or "numba pipeline not supported")
     # wrapper = lambda f: f  # disable skipping
+    # wrapper = unittest.expectedFailure
     return wrapper(func) if func else wrapper
 
 
@@ -141,4 +142,5 @@ def skip_sdc_jit(msg_or_func=None):
     msg, func = msg_and_func(msg_or_func)
     wrapper = unittest.skipIf(sdc.config.config_pipeline_hpat_default, msg or "sdc pipeline not supported")
     # wrapper = lambda f: f  # disable skipping
+    # wrapper = unittest.expectedFailure
     return wrapper(func) if func else wrapper
