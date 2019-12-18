@@ -196,9 +196,9 @@ def hpat_pandas_series_setitem(self, idx, value):
             object of :class:`pandas.Series`
     """
 
-    _func_name = 'Operator setitem().'
+    _func_name = 'Operator setitem.'
 
-    ty_checker = TypeChecker('Operator setitem().')
+    ty_checker = TypeChecker('Operator setitem.')
     ty_checker.check(self, SeriesType)
 
     if (isinstance(value, SeriesType) and not isinstance(self.dtype, value.dtype)) or \
@@ -228,7 +228,7 @@ def hpat_pandas_series_setitem(self, idx, value):
 
         return hpat_pandas_series_setitem_idx_series_impl
 
-    raise TypingError('{} The index must be an Integer, Slice or a pandas.series. Given: {}'.format(_func_name, idx))
+    ty_checker.raise_exc(idx, 'int64, slice, series', 'idx')
 
 
 @sdc_overload_attribute(SeriesType, 'at')
