@@ -30,18 +30,21 @@ from numba import njit
 
 @njit
 def dataframe_append():
-    # Concat dfs with the same column names
+    """
+    Expected result:
+         A  B    C
+    0  1.0  2  NaN
+    1  3.0  4  NaN
+    2  NaN  5  6.0
+    3  NaN  7  8.0
+    dtype: object
+    """
+
     df = pd.DataFrame([[1, 2], [3, 4]], columns=list('AB'))
-    df2 = pd.DataFrame([[5, 6], [7, 8]], columns=list('AB'))
-    result1 = df.append(df2)
+    df2 = pd.DataFrame([[5, 6], [7, 8]], columns=list('BC'))
+    result = df.append(df2)
 
-    # Concat dfs with the different column names
-    df = pd.DataFrame([[1, 2], [3, 4]], columns=list('AB'))
-    df2 = pd.DataFrame([[5, 6], [7, 8]], columns=list('CD'))
-    result2 = df.append(df2)
-
-    return result1, result2
+    return result
 
 
-print(dataframe_append()[0])
-print(dataframe_append()[1])
+print(dataframe_append())

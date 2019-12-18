@@ -201,6 +201,46 @@ def fill_array(data, size, fill_value=numpy.nan, push_back=True):
     return numpy.append(numpy.repeat(fill_value, size - data.size), data)
 
 
+@register_jitable
+def fill_str_array(data, size, push_back=True):
+    """
+    Fill StringArrayType array with given values to reach the size
+    """
+
+    string_array_size = len(data)
+    none_array_size = size - string_array_size
+    num_chars = sdc.str_arr_ext.num_total_chars(data)
+
+    result_data = sdc.str_arr_ext.pre_alloc_string_array(size, num_chars)
+
+    # Keep NaN values of initial array
+    str_arr_is_na_mask = []
+    for i in numba.prange(string_array_size):
+        if sdc.hiframes.api.isna(data, i):
+            str_arr_is_na_mask.append(i)
+
+    str_arr_is_na_mask = numpy.array(str_arr_is_na_mask)
+
+    if push_back:
+        str_arr_is_na_mask = numpy.append(str_arr_is_na_mask, numpy.arange(string_array_size, size))
+    else:
+        # Make offset to push front
+        str_arr_is_na_mask = str_arr_is_na_mask + none_array_size
+        str_arr_is_na_mask = numpy.append(numpy.arange(none_array_size), str_arr_is_na_mask)
+
+    data_str_list = sdc.str_arr_ext.to_string_list(data)
+    nan_list = ['' for _ in numba.prange(none_array_size)]
+
+    result_list = data_str_list + nan_list if push_back else nan_list + data_str_list
+
+    sdc.str_arr_ext.cp_str_list_to_array(result_data, result_list)
+
+    for i in numba.prange(len(str_arr_is_na_mask)):
+        str_arr_set_na(result_data, str_arr_is_na_mask[i])
+
+    return result_data
+
+
 @numba.njit
 def _hpat_ensure_array_capacity(new_size, arr):
     """ Function ensuring that the size of numpy array is at least as specified

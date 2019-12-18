@@ -39,6 +39,7 @@ from numba.extending import (overload, overload_method, overload_attribute)
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.datatypes.common_functions import TypeChecker
 from numba.errors import TypingError
+from sdc.str_arr_ext import StringArrayType
 
 # from sdc.datatypes.hpat_pandas_dataframe_types import DataFrameType
 from sdc.utils import sdc_overload_method
@@ -61,18 +62,11 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
        :name: ex_dataframe_append
     .. code-block:: console
         > python ./dataframe_append.py
-            A  B
-         0  1  2
-         1  3  4
-         0  5  6
-         1  7  8
-        dtype: object
-
-             A    B    C    D
-        0  1.0  2.0  NaN  NaN
-        1  3.0  4.0  NaN  NaN
-        0  NaN  NaN  5.0  6.0
-        1  NaN  NaN  7.0  8.0
+             A  B    C
+        0  1.0  2  NaN
+        1  3.0  4  NaN
+        2  NaN  5  6.0
+        3  NaN  7  8.0
         dtype: object
 
      .. note::
@@ -107,9 +101,9 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
         return DataFrame with appended rows to the end
     """
 
-    name = 'append'
+    _func_name = 'append'
 
-    ty_checker = TypeChecker('Method {}().'.format(name))
+    ty_checker = TypeChecker(f'Method {_func_name}().')
     ty_checker.check(df, DataFrameType)
     # TODO: support other array-like types
     ty_checker.check(other, DataFrameType)
@@ -120,13 +114,13 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     if not isinstance(verify_integrity, (bool, types.Boolean, types.Omitted)) and verify_integrity:
         ty_checker.raise_exc(verify_integrity, 'boolean', 'verify_integrity')
 
-    if not isinstance(sort, (bool, types.Boolean, types.Omitted)) and verify_integrity:
-        ty_checker.raise_exc(verify_integrity, 'boolean', 'sort')
+    if not isinstance(sort, (bool, types.Boolean, types.Omitted)) and sort is not None:
+        ty_checker.raise_exc(sort, 'boolean, None', 'sort')
 
-    args = (('ignore_index', ignore_index), ('verify_integrity', False), ('sort', None))
+    args = (('ignore_index', True), ('verify_integrity', False), ('sort', None))
 
-    def sdc_pandas_dataframe_append_impl(df, other, name, args):
-        spaces = 4 * ' '
+    def sdc_pandas_dataframe_append_impl(df, other, _func_name, args):
+        indent = 4 * ' '
         func_args = ['df', 'other']
 
         for key, value in args:
@@ -139,6 +133,14 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
         df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
         other_columns_indx = {col_name: i for i, col_name in enumerate(other.columns)}
 
+        # Keep columns that are StringArrayType
+        string_type_columns = set(col_name for typ, col_name in zip(df.data, df.columns)
+                                  if isinstance(typ, StringArrayType))
+
+        for typ, col_name in zip(other.data, other.columns):
+            if isinstance(typ, StringArrayType):
+                string_type_columns.add(col_name)
+
         def get_dataframe_column(df, column, idx):
             return f'new_col_{column}_data_{df} = get_dataframe_data({df}, {idx})'
 
@@ -146,7 +148,7 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
             return f'new_col_{column} = ' \
                 f'init_series(new_col_{column}_data_{df1}).append(init_series(new_col_{column}_data_{df2}))._data'
 
-        func_definition = [f'def sdc_pandas_dataframe_{name}_impl({", ".join(func_args)}):']
+        func_definition = [f'def sdc_pandas_dataframe_{_func_name}_impl({", ".join(func_args)}):']
         func_text = []
         column_list = []
 
@@ -154,23 +156,27 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
         func_text.append(f'len_other = len(get_dataframe_data(other, {0}))')
 
         for col_name, i in df_columns_indx.items():
+            func_text.append(get_dataframe_column('df', col_name, i))
             if col_name in other_columns_indx:
-                func_text.append(get_dataframe_column('df', col_name, i))
                 func_text.append(get_dataframe_column('other', col_name, other_columns_indx.get(col_name)))
                 func_text.append(get_append_result('df', 'other', col_name))
-                column_list.append((f'new_col_{col_name}', col_name))
             else:
-                func_text.append(get_dataframe_column('df', col_name, i))
                 func_text.append(f'new_col_{col_name}_data = init_series(new_col_{col_name}_data_df)._data')
-                func_text.append(f'new_col_{col_name} = fill_array(new_col_{col_name}_data, len_df+len_other)')
-                column_list.append((f'new_col_{col_name}', col_name))
+                if col_name in string_type_columns:
+                    func_text.append(f'new_col_{col_name} = fill_str_array(new_col_{col_name}_data, len_df+len_other)')
+                else:
+                    func_text.append(f'new_col_{col_name} = fill_array(new_col_{col_name}_data, len_df+len_other)')
+            column_list.append((f'new_col_{col_name}', col_name))
 
         for col_name, i in other_columns_indx.items():
             if col_name not in df_columns_indx:
                 func_text.append(get_dataframe_column('other', col_name, i))
                 func_text.append(f'new_col_{col_name}_data = init_series(new_col_{col_name}_data_other)._data')
-                func_text.append(f'new_col_{col_name} = '
-                                 f'fill_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
+                if col_name in string_type_columns:
+                    func_text.append(f'new_col_{col_name} = fill_str_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
+                else:
+                    func_text.append(f'new_col_{col_name} = '
+                                     f'fill_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
                 column_list.append((f'new_col_{col_name}', col_name))
 
         data = ', '.join(column for column, _ in column_list)
@@ -179,18 +185,18 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
         col_names = ', '.join(f"'{column_name}'" for _, column_name in column_list)
         func_text.append(f"return sdc.hiframes.pd_dataframe_ext.init_dataframe({data}, {index}, {col_names})\n")
 
-        func_definition.extend([spaces + func_line for func_line in func_text])
+        func_definition.extend([indent + func_line for func_line in func_text])
 
         func_def = '\n'.join(func_definition)
 
         loc_vars = {}
         exec(func_def, {'sdc': sdc, 'np': numpy, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data,
                         'init_series': sdc.hiframes.api.init_series,
-                        'fill_array': sdc.datatypes.common_functions.fill_array}, loc_vars)
+                        'fill_array': sdc.datatypes.common_functions.fill_array, 'fill_str_array': sdc.datatypes.common_functions.fill_str_array}, loc_vars)
         _append_impl = loc_vars['sdc_pandas_dataframe_append_impl']
         return _append_impl
 
-    return sdc_pandas_dataframe_append_impl(df, other, name, args)
+    return sdc_pandas_dataframe_append_impl(df, other, _func_name, args)
 
 
 @sdc_overload_method(DataFrameType, 'count')

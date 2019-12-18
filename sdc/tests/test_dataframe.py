@@ -1074,9 +1074,6 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1)**2})
         df2 = pd.DataFrame({'A': np.arange(n2), 'D': np.arange(n2)**2, 'E': np.arange(n2) + 100})
 
-        print(hpat_func(df, df2))
-        print(test_impl(df, df2))
-
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
     def test_append_df_diff_types_no_index(self):
@@ -1085,12 +1082,12 @@ class TestDataFrame(TestCase):
 
         hpat_func = self.jit(test_impl)
 
-        df = pd.DataFrame({'A': ['e', 'm', 'l'], 'B': [.2, .3, np.nan]})
-        df2 = pd.DataFrame({'C': [5, 6, 7], 'A': ['a', 'b', 'c']})
+        df = pd.DataFrame({'A': ['cat', 'dog', np.nan], 'B': [.2, .3, np.nan]})
+        df2 = pd.DataFrame({'A': ['bird', 'fox', 'mouse'], 'C': [5, 6, 7], 'D': ['a', np.nan, '']})
 
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
-    @skip_numba_jit
+    @unittest.skip('Unsupported functionality df.append([df2, df3]')
     def test_append_no_index(self):
         def test_impl(df, df2, df3):
             return df.append([df2, df3], ignore_index=True)
