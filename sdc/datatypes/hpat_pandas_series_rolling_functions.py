@@ -103,8 +103,6 @@ hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max, float64))
 hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min, float64))
-hpat_pandas_rolling_series_var_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_var, float64))
 
 
 @sdc_overload_method(SeriesRollingType, 'max')
@@ -281,6 +279,8 @@ def hpat_pandas_series_rolling_var(self, ddof=1):
     ----------
     self: :class:`pandas.Series.rolling`
         input arg
+    ddof: :obj:`int`
+        Delta Degrees of Freedom.
 
     Returns
     -------
