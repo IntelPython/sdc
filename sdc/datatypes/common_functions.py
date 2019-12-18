@@ -229,7 +229,7 @@ def fill_str_array(data, size, push_back=True):
         str_arr_is_na_mask = numpy.append(numpy.arange(none_array_size), str_arr_is_na_mask)
 
     data_str_list = sdc.str_arr_ext.to_string_list(data)
-    nan_list = ['' for _ in numba.prange(none_array_size)]
+    nan_list = [''] * none_array_size
 
     result_list = data_str_list + nan_list if push_back else nan_list + data_str_list
 
