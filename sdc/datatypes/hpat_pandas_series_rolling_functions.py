@@ -29,7 +29,7 @@ import pandas
 
 from numba import prange
 from numba.extending import register_jitable
-from numba.types import float64
+from numba.types import float64, Integer, Omitted
 
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
@@ -52,6 +52,16 @@ def arr_min(arr):
         return numpy.nan
 
     return arr.min()
+
+
+@register_jitable
+def arr_var(arr, ddof):
+    """Calculate unbiased variance of values"""
+    length = len(arr)
+    if length in [0, ddof]:
+        return numpy.nan
+
+    return numpy.var(arr) * length / (length - ddof)
 
 
 def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
@@ -93,6 +103,8 @@ hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max, float64))
 hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min, float64))
+hpat_pandas_rolling_series_var_impl = register_jitable(
+    gen_hpat_pandas_series_rolling_impl(arr_var, float64))
 
 
 @sdc_overload_method(SeriesRollingType, 'max')
@@ -215,3 +227,98 @@ def hpat_pandas_series_rolling_min(self):
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_min_impl
+
+
+@sdc_overload_method(SeriesRollingType, 'var')
+def hpat_pandas_series_rolling_var(self, ddof=1):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.core.window.Rolling.var
+
+    Limitations
+    -----------
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/rolling/series_rolling_var.py
+       :language: python
+       :lines: 27-
+       :caption: Calculate unbiased rolling variance.
+       :name: ex_series_rolling_var
+
+    .. code-block:: console
+
+        > python ./series_rolling_var.py
+        0         NaN
+        1         NaN
+        2    1.000000
+        3    2.333333
+        4    4.333333
+        dtype: float64
+
+    .. seealso::
+        :ref:`Series.rolling <pandas.Series.rolling>`
+            Calling object with a Series.
+        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
+            Calling object with a DataFrame.
+        :ref:`Series.var <pandas.Series.var>`
+            Similar method for Series.
+        :ref:`DataFrame.var <pandas.DataFrame.var>`
+            Similar method for DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas Series method :meth:`pandas.Series.rolling.var()` implementation.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_var
+
+    Parameters
+    ----------
+    self: :class:`pandas.Series.rolling`
+        input arg
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method var().')
+    ty_checker.check(self, SeriesRollingType)
+
+    if not isinstance(ddof, (int, Integer, Omitted)):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
+
+    def hpat_pandas_rolling_series_var_impl(self, ddof=1):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        for i in prange(min(win, length)):
+            arr_range = input_arr[:i + 1]
+            finite_arr = arr_range[numpy.isfinite(arr_range)]
+            if len(finite_arr) < minp:
+                output_arr[i] = numpy.nan
+            else:
+                output_arr[i] = arr_var(finite_arr, ddof)
+
+        for i in prange(min(win, length), length):
+            arr_range = input_arr[i + 1 - win:i + 1]
+            finite_arr = arr_range[numpy.isfinite(arr_range)]
+            if len(finite_arr) < minp:
+                output_arr[i] = numpy.nan
+            else:
+                output_arr[i] = arr_var(finite_arr, ddof)
+
+        return pandas.Series(output_arr, input_series._index, name=input_series._name)
+
+    return hpat_pandas_rolling_series_var_impl
