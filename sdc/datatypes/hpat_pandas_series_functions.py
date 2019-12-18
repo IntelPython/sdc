@@ -448,82 +448,71 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
         ty_checker.raise_exc(dropna, 'boolean', 'dropna')
 
     if isinstance(self.data, StringArrayType):
-        def hpat_pandas_series_value_counts_str_impl(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
+        def hpat_pandas_series_value_counts_str_impl(
+                self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
 
-            value_counts_dict = {}
+            value_counts_dict = Dict.empty(
+                key_type=types.unicode_type,
+                value_type=types.intp
+            )
 
             nan_counts = 0
-            empty_str_key_exist = False
             for i, value in enumerate(self._data):
                 if str_arr_is_na(self._data, i):
                     if not dropna:
                         nan_counts += 1
                     continue
 
-                if value in value_counts_dict:
-                    value_counts_dict[value] += 1
-                else:
-                    value_counts_dict[value] = 1
+                value_counts_dict[value] = value_counts_dict.get(value, 0) + 1
 
-                if (not empty_str_key_exist and value == ''):
-                    empty_str_key_exist = True
+            need_add_nan_count = not dropna and nan_counts
 
-            # TODO: workaround, keys() result can not be casted to array type
-            # TODO: use list comprehension instead or self.unique()
-            unique_values = [key for key in value_counts_dict]
+            values = [key for key in value_counts_dict]
+            counts_as_list = [value_counts_dict[key] for key in value_counts_dict.keys()]
+            values_len = len(values)
 
-            if not dropna:
+            if need_add_nan_count:
                 # append a separate empty string for NaN elements
-                value = ''
-                unique_values.append(value)
-                if not empty_str_key_exist:
-                    value_counts_dict[value] = 0
+                values_len += 1
+                values.append('')
+                counts_as_list.append(nan_counts)
 
-            unique_values_len = len(unique_values)
-
-            value_counts = numpy.empty(unique_values_len, dtype=numpy.intp)
-            for i, key in enumerate(value_counts_dict):
-                value_counts[i] = value_counts_dict[key]
-
-            if not dropna:
-                # replace the value for one empty string to refer to NaNs count
-                value_counts[unique_values_len - 1] = nan_counts
-
-            # Take initial order as default
-            indexes_order = numpy.arange(unique_values_len)
+            counts = numpy.asarray(counts_as_list, dtype=numpy.intp)
+            indexes_order = numpy.arange(values_len)
             if sort:
-                indexes_order = value_counts.argsort()
+                indexes_order = counts.argsort()
                 if not ascending:
                     indexes_order = indexes_order[::-1]
 
-            sorted_unique_values = [unique_values[i] for i in indexes_order]
+            counts_sorted = numpy.take(counts, indexes_order)
+            values_sorted_by_count = [values[i] for i in indexes_order]
 
-            index_string_lengths = numpy.asarray([len(s) for s in sorted_unique_values])
+            # allocate the result index as a StringArray and copy values to it
+            index_string_lengths = numpy.asarray([len(s) for s in values_sorted_by_count])
             index_total_chars = numpy.sum(index_string_lengths)
-            result_index = pre_alloc_string_array(len(sorted_unique_values), index_total_chars)
-            cp_str_list_to_array(result_index, sorted_unique_values)
+            result_index = pre_alloc_string_array(len(values_sorted_by_count), index_total_chars)
+            cp_str_list_to_array(result_index, values_sorted_by_count)
 
-            if not dropna:
-                # set null bit for StringArray element corresponding to NaN element of initial Series
-                index_previous_nan_pos = unique_values_len - 1
-                for i in numpy.arange(unique_values_len):
+            if need_add_nan_count:
+                # set null bit for StringArray element corresponding to NaN element (was added as last in values)
+                index_previous_nan_pos = values_len - 1
+                for i in numpy.arange(values_len):
                     if indexes_order[i] == index_previous_nan_pos:
                         str_arr_set_na(result_index, i)
                         break
 
-            sorted_value_counts = numpy.take(value_counts, indexes_order)
-
-            return pandas.Series(sorted_value_counts, index=result_index, name=self._name)
+            return pandas.Series(counts_sorted, index=result_index, name=self._name)
 
         return hpat_pandas_series_value_counts_str_impl
 
     elif isinstance(self.dtype, types.Number):
 
-        series_values_type = numba.typeof(self.dtype)
-        def hpat_pandas_series_value_counts_number_impl(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
+        series_dtype = self.dtype
+        def hpat_pandas_series_value_counts_number_impl(
+                self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
 
             value_counts_dict = Dict.empty(
-                key_type=series_values_type,
+                key_type=series_dtype,
                 value_type=types.intp
             )
 
@@ -543,10 +532,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
                         is_zero_found = True
                     continue
 
-                if value in value_counts_dict:
-                    value_counts_dict[value] += 1
-                else:
-                    value_counts_dict[value] = 1
+                value_counts_dict[value] = value_counts_dict.get(value, 0) + 1
 
             if zero_counts:
                 value_counts_dict[zero_value] = zero_counts

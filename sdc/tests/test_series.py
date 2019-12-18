@@ -2164,7 +2164,8 @@ class TestSeries(TestCase):
             return S.value_counts(dropna=False)
 
         data_to_test = [['a', '', 'a', '', 'b', None, 'a', '', None, 'b'],
-                        ['dog', None, 'NaN', '', 'cat', None, 'cat', None, 'dog', '']]
+                        ['dog', None, 'NaN', '', 'cat', None, 'cat', None, 'dog', ''],
+                        ['dog', 'NaN', '', 'cat', 'cat', 'dog', '']]
 
         hpat_func = self.jit(test_impl)
 
