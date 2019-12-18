@@ -242,7 +242,7 @@ def hpat_pandas_series_getitem(self, idx):
 
     if isinstance(idx, (types.List, types.Array)):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
-            if (idx[0] is True or idx[0] is False):
+            if (idx[0] == True or idx[0] == False):
                 return pandas.Series(self._data[idx], self.index[idx])
         return hpat_pandas_series_getitem_idx_list_impl
 
