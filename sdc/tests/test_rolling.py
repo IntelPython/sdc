@@ -33,6 +33,7 @@ import platform
 import numpy as np
 import numba
 import sdc
+from itertools import product
 from numba.errors import TypingError
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
@@ -48,6 +49,10 @@ test_funcs = ('mean', 'max',)
 if LONG_TEST:
     # all functions except apply, cov, corr
     test_funcs = supported_rolling_funcs[:-3]
+
+
+def series_rolling_std_usecase(series, window, min_periods, ddof):
+    return series.rolling(window, min_periods).std(ddof)
 
 
 class TestRolling(TestCase):
@@ -523,6 +528,37 @@ class TestRolling(TestCase):
                     ref_result = test_impl(series, window, min_periods)
                     jit_result = hpat_func(series, window, min_periods)
                     pd.testing.assert_series_equal(ref_result, jit_result)
+
+    @skip_sdc_jit('Series.rolling.std() unsupported Series index')
+    def test_series_rolling_std(self):
+        test_impl = series_rolling_std_usecase
+        hpat_func = self.jit(test_impl)
+
+        all_data = [
+            list(range(10)), [1., -1., 0., 0.1, -0.1],
+            [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
+            [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
+        ]
+        indices = [list(range(len(data)))[::-1] for data in all_data]
+        for data, index in zip(all_data, indices):
+            series = pd.Series(data, index, name='A')
+            for window in range(len(series) + 2):
+                for min_periods, ddof in product(range(window), [0, 1]):
+                    with self.subTest(window=window, min_periods=min_periods, ddof=ddof):
+                        ref_result = test_impl(series, window, min_periods, ddof)
+                        jit_result = hpat_func(series, window, min_periods, ddof)
+                        pd.testing.assert_series_equal(ref_result, jit_result)
+
+    @skip_sdc_jit('Series.rolling.std() unsupported exceptions')
+    def test_series_rolling_std_exception_unsupported_ddof(self):
+        test_impl = series_rolling_std_usecase
+        hpat_func = self.jit(test_impl)
+
+        series = pd.Series([1., -1., 0., 0.1, -0.1])
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(series, 3, 2, '1')
+        msg = 'Method std(). The object ddof\n given: unicode_type\n expected: int'
+        self.assertIn(msg, str(raises.exception))
 
 
 if __name__ == "__main__":

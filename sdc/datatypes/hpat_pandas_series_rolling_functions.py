@@ -29,7 +29,7 @@ import pandas
 
 from numba import prange
 from numba.extending import register_jitable
-from numba.types import float64
+from numba.types import float64, Integer, Omitted
 
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
@@ -52,6 +52,18 @@ def arr_min(arr):
         return numpy.nan
 
     return arr.min()
+
+
+@register_jitable
+def arr_std(arr, ddof):
+    """Calculate standard deviation of values"""
+    length = len(arr)
+    if length in [0, ddof]:
+        return numpy.nan
+
+    var = numpy.var(arr) * length / (length - ddof)
+
+    return var ** 0.5
 
 
 def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
@@ -215,3 +227,100 @@ def hpat_pandas_series_rolling_min(self):
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_min_impl
+
+
+@sdc_overload_method(SeriesRollingType, 'std')
+def hpat_pandas_series_rolling_std(self, ddof=1):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.core.window.Rolling.std
+
+    Limitations
+    -----------
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/rolling/series_rolling_std.py
+       :language: python
+       :lines: 27-
+       :caption: Calculate rolling standard deviation.
+       :name: ex_series_rolling_std
+
+    .. code-block:: console
+
+        > python ./series_rolling_std.py
+        0         NaN
+        1         NaN
+        2    1.000000
+        3    1.527525
+        4    2.081666
+        dtype: float64
+
+    .. seealso::
+        :ref:`Series.rolling <pandas.Series.rolling>`
+            Calling object with a Series.
+        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
+            Calling object with a DataFrame.
+        :ref:`Series.std <pandas.Series.std>`
+            Similar method for Series.
+        :ref:`DataFrame.std <pandas.DataFrame.std>`
+            Similar method for DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas Series method :meth:`pandas.Series.rolling.std()` implementation.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_std
+
+    Parameters
+    ----------
+    self: :class:`pandas.Series.rolling`
+        input arg
+    ddof: :obj:`int`
+        Delta Degrees of Freedom.
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method std().')
+    ty_checker.check(self, SeriesRollingType)
+
+    if not isinstance(ddof, (int, Integer, Omitted)):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
+
+    def hpat_pandas_rolling_series_std_impl(self, ddof=1):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        for i in prange(min(win, length)):
+            arr_range = input_arr[:i + 1]
+            finite_arr = arr_range[numpy.isfinite(arr_range)]
+            if len(finite_arr) < minp:
+                output_arr[i] = numpy.nan
+            else:
+                output_arr[i] = arr_std(finite_arr, ddof)
+
+        for i in prange(min(win, length), length):
+            arr_range = input_arr[i + 1 - win:i + 1]
+            finite_arr = arr_range[numpy.isfinite(arr_range)]
+            if len(finite_arr) < minp:
+                output_arr[i] = numpy.nan
+            else:
+                output_arr[i] = arr_std(finite_arr, ddof)
+
+        return pandas.Series(output_arr, input_series._index, name=input_series._name)
+
+    return hpat_pandas_rolling_series_std_impl
