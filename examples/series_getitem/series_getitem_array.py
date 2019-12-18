@@ -28,6 +28,8 @@ import numpy as np
 import pandas as pd
 from numba import njit
 
+from numba import njit
+
 
 @njit
 def series_getitem_array():

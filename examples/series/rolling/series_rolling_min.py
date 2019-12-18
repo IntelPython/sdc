@@ -24,19 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import numpy as np
 import pandas as pd
-from numba import njit
-
 from numba import njit
 
 
 @njit
-def series_iat():
-    series = pd.Series([5, 4, 3, 2, 1], index=[0, 2, 4, 6, 8])
-    return series.iat[4]
-    # Expected Value:
-    # 1
+def series_rolling_min():
+    series = pd.Series([4, 3, 5, 2, 6])  # Series of 4, 3, 5, 2, 6
+    out_series = series.rolling(3).min()
+
+    return out_series  # Expect series of NaN, NaN, 3.0, 2.0, 2.0
 
 
-print(series_iat())
+print(series_rolling_min())
