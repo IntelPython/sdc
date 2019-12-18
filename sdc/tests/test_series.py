@@ -1197,6 +1197,7 @@ class TestSeries(TestCase):
         S = pd.Series([2, 4, 6], ['1', '3', '5'])
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_series_slice(self):
         def test_impl(A):
             return A.loc[1:5]
@@ -1205,6 +1206,7 @@ class TestSeries(TestCase):
         S = pd.Series([2, 4, 6, 6, 3], [1, 3, 5, 13, 22])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @skip_sdc_jit('Not impl in old style')
     def test_series_slice_nonidx(self):
         def test_impl(A):
             return A.loc[1:3]
