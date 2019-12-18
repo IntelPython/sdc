@@ -28,10 +28,8 @@ import numpy as np
 import pandas as pd
 
 from numba import njit
-# import sdc
 
 @njit
-# @sdc.jit
 def series_setitem():
     numb = 0
     series = pd.Series(np.arange(5, 0, -1))  # Series of 5, 4, 3, 2, 1
