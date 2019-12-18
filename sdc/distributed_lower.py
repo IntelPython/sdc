@@ -624,6 +624,7 @@ def call_finalize():
     hpat_finalize()
 
 
-atexit.register(call_finalize)
-# flush output before finalize
-atexit.register(sys.stdout.flush)
+if sdc.config.config_pipeline_hpat_default:
+    atexit.register(call_finalize)
+    # flush output before finalize
+    atexit.register(sys.stdout.flush)
