@@ -4743,8 +4743,9 @@ class TestSeries(TestCase):
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, ind2, value2)
-        msg = 'Operator setitem(). The index must be an Integer, Slice or a pandas.series.'
+        msg = 'Operator setitem(). The object idx'
         self.assertIn(msg, str(raises.exception))
+
 
     @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
     def test_series_operator_add_numeric_scalar(self):

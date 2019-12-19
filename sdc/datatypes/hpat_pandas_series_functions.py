@@ -235,7 +235,7 @@ def hpat_pandas_series_setitem(self, idx, value):
 
         return hpat_pandas_series_setitem_idx_series_impl
 
-    ty_checker.raise_exc(idx, 'int64', 'SliceType', 'SeriesType', 'idx')
+    ty_checker.raise_exc(idx, 'int, Slice, Series', 'idx')
 
 
 @sdc_overload_attribute(SeriesType, 'at')

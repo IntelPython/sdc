@@ -29,6 +29,7 @@ import pandas as pd
 
 from numba import njit
 
+
 @njit
 def series_setitem():
     numb = 0
