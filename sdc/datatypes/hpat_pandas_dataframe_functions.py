@@ -43,33 +43,51 @@ from numba.errors import TypingError
 
 from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
 
-def sdc_pandas_dataframe_reduce_columns(df, name, series_call_params):
 
-    saved_columns = df.columns
-    data_args = tuple('data{}'.format(i) for i in range(len(saved_columns)))
-    all_params = ['df']
+def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, columns):
+    result_name_list = []
+    joined = ', '.join(func_params)
+    func_lines = [f'def _df_{func_name}_impl({joined}):']
+    for i, c in enumerate(columns):
+        result_c = f'result_{c}'
+        func_lines += [f'  series_{c} = init_series(get_dataframe_data({func_params[0]}, {i}))',
+                       f'  {result_c} = series_{c}.{func_name}({series_params})']
+        result_name_list.append(result_c)
+    print(result_name_list)
+    all_results = ', '.join(result_name_list)
+    print(all_results)
+    all_columns = ', '.join([f"'{c}'" for c in columns])
 
-    for key, value in series_call_params:
-        all_params.append('{}={}'.format(key, value))
-    # This relies on parameters part of the signature of Series method called below being the same
-    # as for the corresponding DataFrame method
-    series_call_params_str = '{}'.format(', '.join(all_params[1:]))
-    func_definition = 'def _reduce_impl({}):'.format(', '.join(all_params))
-    func_lines = [func_definition]
-    for i, d in enumerate(data_args):
-        line = '  {} = sdc.hiframes.api.init_series(sdc.hiframes.pd_dataframe_ext.get_dataframe_data(all_params[0], {}))'
-        func_lines.append(line.format(d + '_S', i))
-        func_lines.append(' {}_O = {}_S.{}({})'.format(d, d, name, series_call_params_str))
-    func_lines.append('  data = np.array(({},))'.format(
-        ", ".join(d + '_O' for d in data_args)))
-    func_lines.append('  index = sdc.str_arr_ext.StringArray(({},))'.format(
-        ', '.join('"{}"'.format(c) for c in saved_columns)))
-    func_lines.append('  return sdc.hiframes.api.init_series(data, index)')
-    loc_vars = {}
+    func_lines += [f'  return pandas.Series([{all_results}], [{all_columns}])']
     func_text = '\n'.join(func_lines)
 
-    exec(func_text, {'sdc': sdc, 'np': numpy}, loc_vars)
-    _reduce_impl = loc_vars['_reduce_impl']
+    global_vars = {'pandas': pandas, 'np': numpy,
+                   'init_series': sdc.hiframes.api.init_series,
+                   'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_reduce_columns(df, func_name, params):
+    all_params = ['df']
+
+    for key, value in params:
+        all_params.append('{}={}'.format(key, value))
+    ap = all_params.copy()
+    par = '{}'.format(', '.join(ap[1:]))
+    # param = 'level'
+    # if param in params
+    # par += 'level=' + param
+    # else
+    # par += 'level=' + 'None'
+    df_func_name = f'_df_{func_name}_impl'
+
+    func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, par, df.columns)
+    print(func_text, global_vars)
+    loc_vars = {}
+
+    exec(func_text, global_vars, loc_vars)
+    _reduce_impl = loc_vars[df_func_name]
 
     return _reduce_impl
 
