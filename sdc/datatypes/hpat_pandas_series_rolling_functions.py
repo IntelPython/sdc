@@ -108,11 +108,11 @@ def gen_hpat_pandas_series_rolling_zerominp_impl(rolling_func, output_type=None)
         out_type = input_arr.dtype if nan_out_type == True else output_type  # noqa
         output_arr = numpy.empty(length, dtype=out_type)
 
-        for i in prange(min(win, length)):
+        for i in prange(win):
             arr_range = input_arr[:i + 1]
             output_arr[i] = rolling_func(arr_range)
 
-        for i in prange(min(win, length), length):
+        for i in prange(win, length):
             arr_range = input_arr[i + 1 - win:i + 1]
             output_arr[i] = rolling_func(arr_range)
 
@@ -184,7 +184,7 @@ def hpat_pandas_series_rolling_count(self):
          returns :obj:`pandas.Series` object
     """
 
-    ty_checker = TypeChecker('Method count().')
+    ty_checker = TypeChecker('Method rolling.count().')
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_count_impl
