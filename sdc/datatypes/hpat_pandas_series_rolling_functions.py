@@ -212,7 +212,7 @@ def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
             else:
                 return arr_corr(main[valid], other[valid])
 
-        for i in prange(win):
+        for i in prange(min(win, length)):
             main_arr_range = main_arr[:i + 1]
             other_arr_range = other_arr[:i + 1]
             output_arr[i] = calc_corr(main_arr_range, other_arr_range, minp)
