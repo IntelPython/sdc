@@ -43,26 +43,8 @@ class SDCBuildDoc(Command):
     def _remove_cwd_from_syspath():
         # Remove current working directory from PYTHONPATH to avoid importing SDC from sources vs.
         # from installed SDC package
-        cwd = os.getcwd()
-
-        removed_flag = True
-        while removed_flag:
-            removed_flag = False
-            if '' in sys.path:
-                sys.path.remove('')
-                removed_flag = True
-
-            if '.' in sys.path:
-                sys.path.remove('.')
-                removed_flag = True
-
-            if './' in sys.path:
-                sys.path.remove('./')
-                removed_flag = True
-
-            if cwd in sys.path:
-                sys.path.remove(cwd)
-                removed_flag = True
+        cwd = ['', '.', './', os.getcwd()]
+        sys.path = [p for p in sys.path if p not in cwd]
 
     def initialize_options(self):
         self.format = 'html'
@@ -99,5 +81,3 @@ class SDCBuildDoc(Command):
 #        spawn(['rm', '-rf', 'docs/_builddev'])
 #        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_builddev/docstrees',
 #               '-j1', 'docs/devsource', '-t', 'developer', 'docs/_builddev/html'])
-
-
