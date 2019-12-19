@@ -2580,8 +2580,6 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
         ty_checker.raise_exc(q, 'int, float, list', 'q')
 
     def hpat_pandas_series_quantile_impl(self, q=0.5, interpolation='linear'):
-        if interpolation is not 'linear':
-            raise ValueError('Method quantile(). The object interpolation\n expected: linear')
 
         return numpy.quantile(self._data, q)
 
