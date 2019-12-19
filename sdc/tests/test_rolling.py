@@ -539,9 +539,10 @@ class TestRolling(TestCase):
         indices = [list(range(len(data)))[::-1] for data in all_data]
         for data, index in zip(all_data, indices):
             series = pd.Series(data, index, name='A')
-            for window in range(len(series) + 2):
-                for min_periods in range(window + 1):
-                    with self.subTest(window=window, min_periods=min_periods):
+            for window in range(0, len(series) + 3, 2):
+                for min_periods in range(0, window + 1, 2):
+                    with self.subTest(series=series, window=window,
+                                      min_periods=min_periods):
                         ref_result = test_impl(series, window, min_periods)
                         jit_result = hpat_func(series, window, min_periods)
                         pd.testing.assert_series_equal(ref_result, jit_result)

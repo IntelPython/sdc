@@ -74,21 +74,20 @@ def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
         out_type = input_arr.dtype if nan_out_type == True else output_type  # noqa
         output_arr = numpy.empty(length, dtype=out_type)
 
+        def apply_minp(arr, minp):
+            finite_arr = arr[numpy.isfinite(arr)]
+            if len(finite_arr) < minp:
+                return numpy.nan
+            else:
+                return rolling_func(finite_arr)
+
         for i in prange(min(win, length)):
             arr_range = input_arr[:i + 1]
-            finite_arr = arr_range[numpy.isfinite(arr_range)]
-            if len(finite_arr) < minp:
-                output_arr[i] = numpy.nan
-            else:
-                output_arr[i] = rolling_func(finite_arr)
+            output_arr[i] = apply_minp(arr_range, minp)
 
         for i in prange(min(win, length), length):
             arr_range = input_arr[i + 1 - win:i + 1]
-            finite_arr = arr_range[numpy.isfinite(arr_range)]
-            if len(finite_arr) < minp:
-                output_arr[i] = numpy.nan
-            else:
-                output_arr[i] = rolling_func(finite_arr)
+            output_arr[i] = apply_minp(arr_range, minp)
 
         return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
@@ -284,7 +283,7 @@ def hpat_pandas_series_rolling_sum(self):
          returns :obj:`pandas.Series` object
     """
 
-    ty_checker = TypeChecker('Method sum().')
+    ty_checker = TypeChecker('Method rolling.sum().')
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_sum_impl
