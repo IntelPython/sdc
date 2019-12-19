@@ -108,11 +108,12 @@ def gen_hpat_pandas_series_rolling_zerominp_impl(rolling_func, output_type=None)
         out_type = input_arr.dtype if nan_out_type == True else output_type  # noqa
         output_arr = numpy.empty(length, dtype=out_type)
 
-        for i in prange(win):
+        boundary = min(win, length)
+        for i in prange(boundary):
             arr_range = input_arr[:i + 1]
             output_arr[i] = rolling_func(arr_range)
 
-        for i in prange(win, length):
+        for i in prange(boundary, length):
             arr_range = input_arr[i + 1 - win:i + 1]
             output_arr[i] = rolling_func(arr_range)
 
