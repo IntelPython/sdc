@@ -218,7 +218,7 @@ def hpat_pandas_series_rolling_max(self):
 @sdc_overload_method(SeriesRollingType, 'mean')
 def hpat_pandas_series_rolling_mean(self):
 
-    ty_checker = TypeChecker('Method mean().')
+    ty_checker = TypeChecker('Method rolling.mean().')
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_mean_impl
