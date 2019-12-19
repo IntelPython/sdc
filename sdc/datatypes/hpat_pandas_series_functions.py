@@ -2576,7 +2576,7 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     if not isinstance(interpolation, types.Omitted) and interpolation is not 'linear':
         ty_checker.raise_exc(interpolation, 'str', 'interpolation')
 
-    if not isinstance(q, (types.Number, types.Omitted, types.List)):
+    if not isinstance(q, (int, float, list, types.Number, types.Omitted, types.List)):
         ty_checker.raise_exc(q, 'int, float, list', 'q')
 
     def hpat_pandas_series_quantile_impl(self, q=0.5, interpolation='linear'):
