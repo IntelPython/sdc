@@ -4887,7 +4887,9 @@ class TestSeries(TestCase):
                     A = pd.Series(np.arange(n, dtype=np.int64), index=index_data)
                 else:
                     A = pd.Series(np.arange(n), index=index_data)
-                pd.testing.assert_series_equal(hpat_func(A, int_scalar), test_impl(A, int_scalar), check_names=False)
+                result = hpat_func(A, int_scalar)
+                result_ref = test_impl(A, int_scalar)
+                pd.testing.assert_series_equal(result, result_ref, check_dtype=False, check_names=False)
 
         float_scalar = 24.0
         for dtype, index_data in dtype_to_index.items():
@@ -4898,7 +4900,7 @@ class TestSeries(TestCase):
                     A = pd.Series(np.arange(n), index=index_data)
                 ref_result = test_impl(A, float_scalar)
                 result = hpat_func(A, float_scalar)
-                pd.testing.assert_series_equal(result, ref_result, check_names=False)
+                pd.testing.assert_series_equal(result, ref_result, check_dtype=False, check_names=False)
 
     def test_series_operator_add_numeric_same_index_default(self):
         """Verifies implementation of Series.operator.add between two numeric Series
@@ -4945,8 +4947,8 @@ class TestSeries(TestCase):
         hpat_func = self.jit(test_impl)
 
         n = 7
-        int_dtypes_to_test = (np.int32, np.int64, np.float32, np.float64)
-        for dtype_left, dtype_right in combinations(int_dtypes_to_test, 2):
+        index_dtypes_to_test = (np.int32, np.int64, np.float32, np.float64)
+        for dtype_left, dtype_right in combinations(index_dtypes_to_test, 2):
             # FIXME: skip the sub-test if one of the dtypes is float and the other is integer
             if not (np.issubdtype(dtype_left, np.integer) and np.issubdtype(dtype_right, np.integer)
                     or np.issubdtype(dtype_left, np.float) and np.issubdtype(dtype_right, np.float)):
@@ -5108,7 +5110,7 @@ class TestSeries(TestCase):
         S1 = pd.Series(np.arange(n), name='A')
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2), check_dtype=False)
 
-    @unittest.expectedFailure   #    FIXME add @sdc_limitation
+    @unittest.expectedFailure
     def test_series_operator_add_result_name2(self):
         """Verifies implementation of Series.operator.add differs from Pandas
            in returning unnamed Series when both operands are named Series with the same name"""
@@ -5124,7 +5126,7 @@ class TestSeries(TestCase):
         # check_dtype=False because SDC implementation always returns float64 Series
         pd.testing.assert_series_equal(result, result_ref, check_dtype=False)
 
-    @unittest.expectedFailure   #    FIXME add @sdc_limitation
+    @unittest.expectedFailure
     def test_series_operator_add_series_dtype_promotion(self):
         """Verifies implementation of Series.operator.add differs from Pandas
            in dtype of resulting Series that is fixed to float64"""

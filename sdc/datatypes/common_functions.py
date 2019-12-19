@@ -475,7 +475,7 @@ def sdc_check_indexes_equal_overload(A, B):
             for i in numpy.arange(len(A)):
                 if (A[i] != B[i]
                         or str_arr_is_na(A, i) is not str_arr_is_na(B, i)):
-                    is_index_equal = False
+                    return False
 
             return is_index_equal
 

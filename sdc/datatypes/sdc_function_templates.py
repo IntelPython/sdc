@@ -78,14 +78,15 @@ def sdc_pandas_series_operator_binop(self, other):
     _func_name = 'Operator binop().'
 
     ty_checker = TypeChecker('Operator binop().')
-    ty_checker.check(self, SeriesType)
+    if not isinstance(self, SeriesType):
+        return None
 
     if not isinstance(other, (SeriesType, types.Number)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
     if isinstance(other, SeriesType):
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
-                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
+                                   and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
         series_data_comparable = check_types_comparable(self.data, other.data)
         series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
 
@@ -204,14 +205,15 @@ def sdc_pandas_series_operator_comp_binop(self, other):
     _func_name = 'Operator comp_binop().'
 
     ty_checker = TypeChecker('Operator comp_binop().')
-    ty_checker.check(self, SeriesType)
+    if not isinstance(self, SeriesType):
+        return None
 
     if not isinstance(other, (SeriesType, types.Number)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
     if isinstance(other, SeriesType):
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
-                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
+                                   and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
         series_data_comparable = check_types_comparable(self.data, other.data)
         series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
 
