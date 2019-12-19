@@ -222,7 +222,7 @@ def hpat_pandas_series_rolling_median(self):
          returns :obj:`pandas.Series` object
     """
 
-    ty_checker = TypeChecker('Method median().')
+    ty_checker = TypeChecker('Method rolling.median().')
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_median_impl
