@@ -81,11 +81,12 @@ def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
             else:
                 return rolling_func(finite_arr)
 
-        for i in prange(win):
+        boundary = min(win, length)
+        for i in prange(boundary):
             arr_range = input_arr[:i + 1]
             output_arr[i] = apply_minp(arr_range, minp)
 
-        for i in prange(win, length):
+        for i in prange(boundary, length):
             arr_range = input_arr[i + 1 - win:i + 1]
             output_arr[i] = apply_minp(arr_range, minp)
 
