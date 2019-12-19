@@ -29,11 +29,20 @@ import pandas
 
 from numba import prange
 from numba.extending import register_jitable
-from numba.types import float64
+from numba.types import float64, Boolean, NoneType, Omitted
 
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.utils import sdc_overload_method
+
+
+@register_jitable
+def arr_corr(x, y):
+    """Calculate correlation of values"""
+    if len(x) == 0:
+        return numpy.nan
+
+    return numpy.corrcoef(x, y)[0, 1]
 
 
 @register_jitable
@@ -93,6 +102,129 @@ hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max, float64))
 hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min, float64))
+
+
+@sdc_overload_method(SeriesRollingType, 'corr')
+def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.core.window.Rolling.corr
+
+    Limitations
+    -----------
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    Resulting Series has default index and name.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/rolling/series_rolling_corr.py
+       :language: python
+       :lines: 27-
+       :caption: Calculate rolling correlation.
+       :name: ex_series_rolling_corr
+
+    .. code-block:: console
+
+        > python ./series_rolling_corr.py
+        0         NaN
+        1         NaN
+        2         NaN
+        3    0.333333
+        4    0.916949
+        dtype: float64
+
+    .. seealso::
+        :ref:`Series.rolling <pandas.Series.rolling>`
+            Calling object with a Series.
+        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
+            Calling object with a DataFrame.
+        :ref:`Series.corr <pandas.Series.corr>`
+            Similar method for Series.
+        :ref:`DataFrame.corr <pandas.DataFrame.corr>`
+            Similar method for DataFrame.
+        :ref:`rolling.cov <pandas.core.window.Rolling.cov>`
+            Similar method to calculate covariance.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas Series method :meth:`pandas.Series.rolling.corr()` implementation.
+
+    .. only:: developer
+    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_corr
+
+    Parameters
+    ----------
+    self: :class:`pandas.Series.rolling`
+        input arg
+    other: :obj:`Series`
+        Other Series.
+    pairwise: :obj:`bool`
+        Not relevant for Series.
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method rolling.corr().')
+    ty_checker.check(self, SeriesRollingType)
+
+    # TODO: check `other` is Series after a circular import of SeriesType fixed
+    # accepted_other = (bool, Omitted, NoneType, SeriesType)
+    # if not isinstance(other, accepted_other) and other is not None:
+    #     ty_checker.raise_exc(other, 'Series', 'other')
+
+    accepted_pairwise = (bool, Boolean, Omitted, NoneType)
+    if not isinstance(pairwise, accepted_pairwise) and pairwise is not None:
+        ty_checker.raise_exc(pairwise, 'bool', 'pairwise')
+
+    nan_other = isinstance(other, (Omitted, NoneType)) or other is None
+
+    def hpat_pandas_rolling_series_std_impl(self, other=None, pairwise=None):
+        win = self._window
+        minp = self._min_periods
+
+        main_series = self._data
+        main_arr = main_series._data
+        main_arr_length = len(main_arr)
+
+        if nan_other == True:  # noqa
+            other_arr = main_arr
+        else:
+            other_arr = other._data
+
+        other_arr_length = len(other_arr)
+        length = max(main_arr_length, other_arr_length)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        def calc_corr(main, other, minp):
+            # align arrays `main` and `other` by size and finiteness
+            min_length = min(len(main), len(other))
+            main_valid_indices = numpy.isfinite(main[:min_length])
+            other_valid_indices = numpy.isfinite(other[:min_length])
+            valid = main_valid_indices & other_valid_indices
+
+            if len(main[valid]) < minp:
+                return numpy.nan
+            else:
+                return arr_corr(main[valid], other[valid])
+
+        for i in prange(win):
+            main_arr_range = main_arr[:i + 1]
+            other_arr_range = other_arr[:i + 1]
+            output_arr[i] = calc_corr(main_arr_range, other_arr_range, minp)
+
+        for i in prange(win, length):
+            main_arr_range = main_arr[i + 1 - win:i + 1]
+            other_arr_range = other_arr[i + 1 - win:i + 1]
+            output_arr[i] = calc_corr(main_arr_range, other_arr_range, minp)
+
+        return pandas.Series(output_arr)
+
+    return hpat_pandas_rolling_series_std_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'max')
