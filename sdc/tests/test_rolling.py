@@ -542,9 +542,10 @@ class TestRolling(TestCase):
         indices = [list(range(len(data)))[::-1] for data in all_data]
         for data, index in zip(all_data, indices):
             series = pd.Series(data, index, name='A')
-            for window in range(len(series) + 2):
-                for min_periods, ddof in product(range(window), [0, 1]):
-                    with self.subTest(window=window, min_periods=min_periods, ddof=ddof):
+            for window in range(0, len(series) + 3, 2):
+                for min_periods, ddof in product(range(0, window, 2), [0, 1]):
+                    with self.subTest(series=series, window=window,
+                                      min_periods=min_periods, ddof=ddof):
                         ref_result = test_impl(series, window, min_periods, ddof)
                         jit_result = hpat_func(series, window, min_periods, ddof)
                         pd.testing.assert_series_equal(ref_result, jit_result)
@@ -557,7 +558,7 @@ class TestRolling(TestCase):
         series = pd.Series([1., -1., 0., 0.1, -0.1])
         with self.assertRaises(TypingError) as raises:
             hpat_func(series, 3, 2, '1')
-        msg = 'Method var(). The object ddof\n given: unicode_type\n expected: int'
+        msg = 'Method rolling.var(). The object ddof\n given: unicode_type\n expected: int'
         self.assertIn(msg, str(raises.exception))
 
 

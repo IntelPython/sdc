@@ -288,7 +288,7 @@ def hpat_pandas_series_rolling_var(self, ddof=1):
          returns :obj:`pandas.Series` object
     """
 
-    ty_checker = TypeChecker('Method var().')
+    ty_checker = TypeChecker('Method rolling.var().')
     ty_checker.check(self, SeriesRollingType)
 
     if not isinstance(ddof, (int, Integer, Omitted)):
@@ -303,21 +303,21 @@ def hpat_pandas_series_rolling_var(self, ddof=1):
         length = len(input_arr)
         output_arr = numpy.empty(length, dtype=float64)
 
-        for i in prange(min(win, length)):
-            arr_range = input_arr[:i + 1]
-            finite_arr = arr_range[numpy.isfinite(arr_range)]
+        def culc_var(arr, ddof, minp):
+            finite_arr = arr[numpy.isfinite(arr)]
             if len(finite_arr) < minp:
-                output_arr[i] = numpy.nan
+                return numpy.nan
             else:
-                output_arr[i] = arr_var(finite_arr, ddof)
+                return arr_var(finite_arr, ddof)
 
-        for i in prange(min(win, length), length):
+        boundary = min(win, length)
+        for i in prange(boundary):
+            arr_range = input_arr[:i + 1]
+            output_arr[i] = culc_var(arr_range, ddof, minp)
+
+        for i in prange(boundary, length):
             arr_range = input_arr[i + 1 - win:i + 1]
-            finite_arr = arr_range[numpy.isfinite(arr_range)]
-            if len(finite_arr) < minp:
-                output_arr[i] = numpy.nan
-            else:
-                output_arr[i] = arr_var(finite_arr, ddof)
+            output_arr[i] = culc_var(arr_range, ddof, minp)
 
         return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
