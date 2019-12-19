@@ -290,7 +290,7 @@ def hpat_pandas_series_rolling_std(self, ddof=1):
          returns :obj:`pandas.Series` object
     """
 
-    ty_checker = TypeChecker('Method std().')
+    ty_checker = TypeChecker('Method rolling.std().')
     ty_checker.check(self, SeriesRollingType)
 
     if not isinstance(ddof, (int, Integer, Omitted)):
@@ -305,21 +305,21 @@ def hpat_pandas_series_rolling_std(self, ddof=1):
         length = len(input_arr)
         output_arr = numpy.empty(length, dtype=float64)
 
-        for i in prange(min(win, length)):
-            arr_range = input_arr[:i + 1]
-            finite_arr = arr_range[numpy.isfinite(arr_range)]
+        def culc_std(arr, ddof, minp):
+            finite_arr = arr[numpy.isfinite(arr)]
             if len(finite_arr) < minp:
-                output_arr[i] = numpy.nan
+                return numpy.nan
             else:
-                output_arr[i] = arr_std(finite_arr, ddof)
+                return arr_std(finite_arr, ddof)
+
+        boundary = min(win, length)
+        for i in prange(boundary):
+            arr_range = input_arr[:i + 1]
+            output_arr[i] = culc_std(arr_range, ddof, minp)
 
         for i in prange(min(win, length), length):
             arr_range = input_arr[i + 1 - win:i + 1]
-            finite_arr = arr_range[numpy.isfinite(arr_range)]
-            if len(finite_arr) < minp:
-                output_arr[i] = numpy.nan
-            else:
-                output_arr[i] = arr_std(finite_arr, ddof)
+            output_arr[i] = culc_std(arr_range, ddof, minp)
 
         return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
