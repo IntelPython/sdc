@@ -246,7 +246,7 @@ def hpat_pandas_series_rolling_max(self):
          returns :obj:`pandas.Series` object
     """
 
-    ty_checker = TypeChecker('Method max().')
+    ty_checker = TypeChecker('Method rolling.max().')
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_max_impl
@@ -307,7 +307,7 @@ def hpat_pandas_series_rolling_min(self):
          returns :obj:`pandas.Series` object
     """
 
-    ty_checker = TypeChecker('Method min().')
+    ty_checker = TypeChecker('Method rolling.min().')
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_min_impl

@@ -519,7 +519,8 @@ class TestRolling(TestCase):
             # TODO: fix the issue when window = 0
             for window in range(1, len(series) + 2):
                 for min_periods in range(window + 1):
-                    with self.subTest(window=window, min_periods=min_periods):
+                    with self.subTest(series=series, window=window,
+                                      min_periods=min_periods):
                         ref_result = test_impl(series, window, min_periods)
                         jit_result = hpat_func(series, window, min_periods)
                         pd.testing.assert_series_equal(ref_result, jit_result)
@@ -538,7 +539,8 @@ class TestRolling(TestCase):
             # TODO: fix the issue when window = 0
             for window in range(1, len(series) + 2):
                 for min_periods in range(window + 1):
-                    with self.subTest(window=window, min_periods=min_periods):
+                    with self.subTest(series=series, window=window,
+                                      min_periods=min_periods):
                         ref_result = test_impl(series, window, min_periods)
                         jit_result = hpat_func(series, window, min_periods)
                         pd.testing.assert_series_equal(ref_result, jit_result)
