@@ -38,13 +38,6 @@ def series_setitem():
     indices = pd.Series(np.asarray([1, 3]))
     series[indices] = numb
 
-    return series       # result
-                        # 0    0
-                        # 1    4
-                        # 2    3
-                        # 3    2
-                        # 4    1
-                        # dtype: int64
-
+    return series       # result Series of 0, 4, 3, 2, 1
 
 print(series_setitem())
