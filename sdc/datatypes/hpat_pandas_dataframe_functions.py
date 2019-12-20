@@ -41,7 +41,6 @@ from sdc.datatypes.common_functions import TypeChecker
 from numba.errors import TypingError
 from sdc.str_arr_ext import StringArrayType
 
-# from sdc.datatypes.hpat_pandas_dataframe_types import DataFrameType
 from sdc.utils import sdc_overload_method
 
 
@@ -60,7 +59,9 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
        :caption: Appending rows of other to the end of caller, returning a new object.
        Columns in other that are not in the caller are added as new columns.
        :name: ex_dataframe_append
+
     .. code-block:: console
+
         > python ./dataframe_append.py
              A  B    C
         0  1.0  2  NaN
@@ -82,6 +83,7 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     Pandas DataFrame method :meth:`pandas.DataFrame.append` implementation.
     .. only:: developer
     Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_append*
+
     Parameters
     -----------
     df: :obj:`pandas.DataFrame`
@@ -145,8 +147,9 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
             return f'new_col_{column}_data_{df} = get_dataframe_data({df}, {idx})'
 
         def get_append_result(df1, df2, column):
-            return f'new_col_{column} = ' \
-                f'init_series(new_col_{column}_data_{df1}).append(init_series(new_col_{column}_data_{df2}))._data'
+            s1 = f'init_series(new_col_{column}_data_{df1})'
+            s2 = f'init_series(new_col_{column}_data_{df2})'
+            return f'new_col_{column} = {s1}.append({s2})._data'
 
         func_definition = [f'def sdc_pandas_dataframe_{_func_name}_impl({", ".join(func_args)}):']
         func_text = []
