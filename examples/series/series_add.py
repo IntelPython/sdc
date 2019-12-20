@@ -24,8 +24,17 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from numba import njit
 
-import sdc.datatypes.hpat_pandas_dataframe_pass
-import sdc.datatypes.hpat_pandas_series_rolling_functions
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions
-import sdc.datatypes.hpat_pandas_stringmethods_functions
+
+@njit
+def series_add():
+    s1 = pd.Series([1, 2, 3])
+    s2 = pd.Series([4, 5, 6])
+    out_series = s1.add(s2)
+
+    return out_series  # Expect series of 5, 7, 9
+
+
+print(series_add())

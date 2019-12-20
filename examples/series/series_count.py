@@ -24,8 +24,17 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+import numpy as np
+from numba import njit
 
-import sdc.datatypes.hpat_pandas_dataframe_pass
-import sdc.datatypes.hpat_pandas_series_rolling_functions
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions
-import sdc.datatypes.hpat_pandas_stringmethods_functions
+
+@njit
+def series_count():
+    s = pd.Series([1, 2, np.nan])
+    out_series = s.count()
+
+    return out_series  # Expect the number of non-Nan values == '2'
+
+
+print(series_count())

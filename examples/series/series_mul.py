@@ -24,8 +24,17 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from numba import njit
 
-import sdc.datatypes.hpat_pandas_dataframe_pass
-import sdc.datatypes.hpat_pandas_series_rolling_functions
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions
-import sdc.datatypes.hpat_pandas_stringmethods_functions
+
+@njit
+def series_mul():
+    s1 = pd.Series([1, 3, 100])
+    s2 = pd.Series([0, 1, 2])
+    out_series = s1.mul(s2)
+
+    return out_series  # Expect series of 0, 3, 200
+
+
+print(series_mul())

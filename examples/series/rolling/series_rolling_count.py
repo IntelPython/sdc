@@ -24,8 +24,17 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy as np
+import pandas as pd
+from numba import njit
 
-import sdc.datatypes.hpat_pandas_dataframe_pass
-import sdc.datatypes.hpat_pandas_series_rolling_functions
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions
-import sdc.datatypes.hpat_pandas_stringmethods_functions
+
+@njit
+def series_rolling_count():
+    series = pd.Series([4, 3, 2, np.nan, 6])  # Series of 4, 3, 2, np.nan, 6
+    out_series = series.rolling(3).count()
+
+    return out_series  # Expect series of 1.0, 2.0, 3.0, 2.0, 2.0
+
+
+print(series_rolling_count())

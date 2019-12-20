@@ -24,8 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from numba import njit
 
-import sdc.datatypes.hpat_pandas_dataframe_pass
-import sdc.datatypes.hpat_pandas_series_rolling_functions
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions
-import sdc.datatypes.hpat_pandas_stringmethods_functions
+
+@njit
+def series_max():
+    s = pd.Series([1, 4, 2, 0])
+    out_series = s.max()
+
+    return out_series  # Expect maximum value 4
+
+
+print(series_max())

@@ -24,8 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from numba import njit
 
-import sdc.datatypes.hpat_pandas_dataframe_pass
-import sdc.datatypes.hpat_pandas_series_rolling_functions
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions
-import sdc.datatypes.hpat_pandas_stringmethods_functions
+
+@njit
+def series_abs():
+    s = pd.Series([-1.10, 2, -3.33])
+    out_series = s.abs()
+
+    return out_series  # Expect series of 1.10, 2.00, 3.33
+
+
+print(series_abs())

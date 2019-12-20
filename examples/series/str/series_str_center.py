@@ -24,8 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from numba import njit
 
-import sdc.datatypes.hpat_pandas_dataframe_pass
-import sdc.datatypes.hpat_pandas_series_rolling_functions
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions
-import sdc.datatypes.hpat_pandas_stringmethods_functions
+
+@njit
+def series_str_center():
+    series = pd.Series(['dog', 'foo', 'bar'])  # Series of 'dog', 'foo', 'bar'
+    out_series = series.str.center(5, '*')
+
+    return out_series  # Expect series of '*dog*', '*foo*', '*bar*'
+
+
+print(series_str_center())

@@ -24,8 +24,17 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from numba import njit
 
-import sdc.datatypes.hpat_pandas_dataframe_pass
-import sdc.datatypes.hpat_pandas_series_rolling_functions
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions
-import sdc.datatypes.hpat_pandas_stringmethods_functions
+
+@njit
+def series_quantile():
+    s = pd.Series([1, 2, 3, 4])
+    median = .5  # compute median
+    out_series = s.quantile(median)
+
+    return out_series # Expect median value == 2.5
+
+
+print(series_quantile())

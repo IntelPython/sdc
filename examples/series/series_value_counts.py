@@ -24,8 +24,26 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+import numpy as np
+from numba import njit
 
-import sdc.datatypes.hpat_pandas_dataframe_pass
-import sdc.datatypes.hpat_pandas_series_rolling_functions
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions
-import sdc.datatypes.hpat_pandas_stringmethods_functions
+
+@njit
+def series_value_counts():
+    """
+    Expected result:
+    3.0    2
+    4.0    1
+    2.0    1
+    1.0    1
+    dtype: int64
+
+    """
+    s = pd.Series([3, 1, 2, 3, 4, np.nan])
+    out_series = s.value_counts()
+
+    return out_series
+
+
+print(series_value_counts())

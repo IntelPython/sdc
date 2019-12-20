@@ -24,8 +24,17 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from numba import njit
 
-import sdc.datatypes.hpat_pandas_dataframe_pass
-import sdc.datatypes.hpat_pandas_series_rolling_functions
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions
-import sdc.datatypes.hpat_pandas_stringmethods_functions
+
+@njit
+def series_truediv():
+    s1 = pd.Series([1, 2, 4])
+    s2 = pd.Series([4, 4, 16])
+    out_series = s1.truediv(s2)
+
+    return out_series  # Expect series of 0.25, 0.50, 0.25
+
+
+print(series_truediv())
