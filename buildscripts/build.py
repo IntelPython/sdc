@@ -128,7 +128,7 @@ if __name__ == '__main__':
                                       ' '.join(['conda build --no-test',
                                                 f'--python {python}',
                                                 f'--numpy {numpy}',
-                                                f'{conda_prefix_limit}'
+                                                f'{conda_prefix_limit}',
                                                 f'--output-folder {numba_output_folder}',
                                                 f'{numba_conda_channels} {numba_recipe}'])))
         format_print('NUMBA BUILD COMPETED')
