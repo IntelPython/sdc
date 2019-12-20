@@ -41,8 +41,7 @@ from numba.typed import Dict
 
 import sdc
 import sdc.datatypes.common_functions as common_functions
-from sdc.datatypes.common_functions import TypeChecker
-from sdc.datatypes.common_functions import (check_index_is_numeric, find_common_dtype_from_numpy_dtypes,
+from sdc.datatypes.common_functions import (TypeChecker, check_index_is_numeric, find_common_dtype_from_numpy_dtypes,
                                             hpat_join_series_indexes)
 from sdc.datatypes.hpat_pandas_series_rolling_types import _hpat_pandas_series_rolling_init
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
@@ -1161,21 +1160,22 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
     if not isinstance(freq, (types.Omitted, types.NoneType)) and freq is not None:
         raise TypingError('{} Unsupported parameters. Given freq: {}'.format(_func_name, freq))
 
-    if not isinstance(axis, (types.Omitted, int, types.Integer)):
+    if not isinstance(axis, (types.Omitted, int, types.Integer)) and not axis:
         raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
 
     fill_is_default = isinstance(fill_value, (types.Omitted, types.NoneType)) or fill_value is None
     series_np_dtype = [numpy_support.as_dtype(self.data.dtype)]
     fill_np_dtype = [numpy.float64 if fill_is_default else numpy_support.as_dtype(fill_value)]
 
-    common_dtype = numpy.find_common_type(series_np_dtype, fill_np_dtype)
+    fill_dtype = types.float64 if fill_is_default else fill_value
+    common_dtype = find_common_dtype_from_numpy_dtypes([], [self.data.dtype, fill_dtype])
 
     if fill_is_default:
         def hpat_pandas_series_shift_impl(self, periods=1, freq=None, axis=0, fill_value=None):
             if axis != 0:
                 raise TypingError('Method shift(). Unsupported parameters. Given axis != 0')
 
-            arr = numpy.empty_like(self._data, dtype=common_dtype)
+            arr = numpy.empty(shape=len(self._data), dtype=common_dtype)
             if periods > 0:
                 arr[:periods] = numpy.nan
                 arr[periods:] = self._data[:-periods]
@@ -1193,7 +1193,7 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
         if axis != 0:
             raise TypingError('Method shift(). Unsupported parameters. Given axis != 0')
 
-        arr = numpy.empty_like(self._data, dtype=common_dtype)
+        arr = numpy.empty(len(self._data), dtype=common_dtype)
         if periods > 0:
             arr[:periods] = fill_value
             arr[periods:] = self._data[:-periods]
@@ -1376,6 +1376,7 @@ def hpat_pandas_series_copy(self, deep=True):
             if deep:
                 return pandas.Series(data=self._data.copy(), index=self._index.copy(), name=self._name)
             else:
+                # Shallow copy of index is not supported yet
                 return pandas.Series(data=self._data, index=self._index.copy(), name=self._name)
         return hpat_pandas_series_copy_impl
 

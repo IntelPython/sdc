@@ -2811,6 +2811,7 @@ class TestSeries(TestCase):
 
     @sdc_limitation
     def test_series_append_same_names(self):
+        '''SDC discards name'''
         def test_impl():
             s1 = pd.Series(data=[0, 1, 2], name='A')
             s2 = pd.Series(data=[3, 4, 5], name='A')
@@ -3146,59 +3147,40 @@ class TestSeries(TestCase):
         values = {'b', 'c', 'e'}
         pd.testing.assert_series_equal(hpat_func(S, values), test_impl(S, values))
 
-    def test_series_isna1(self):
+    def test_series_isna(self):
         def test_impl(S):
             return S.isna()
-        hpat_func = self.jit(test_impl)
 
-        # column with NA
-        S = pd.Series([np.nan, 2., 3., np.inf])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        jit_func = self.jit(test_impl)
 
-    def test_series_isna_index(self):
+        datas = [[0, 1, 2, 3], [0., 1., np.inf, np.nan], ['a', None, 'b', 'c']]
+        indices = [None, [3, 2, 1, 0], ['a', 'b', 'c', 'd']]
+        names = [None, 'A']
+
+        for data, index, name in product(datas, indices, names):
+            with self.subTest(data=data, index=index, name=name):
+                series = pd.Series(data=data, index=index, name=name)
+                jit_result = jit_func(series)
+                ref_result = test_impl(series)
+                pd.testing.assert_series_equal(jit_result, ref_result)
+
+    @skip_sdc_jit('Index and name are not supported')
+    def test_series_isnull(self):
         def test_impl(S):
-            return S.isna()
-        hpat_func = self.jit(test_impl)
+            return S.isnull()
 
-        # column with NA
-        S = pd.Series(data=[np.nan, 2., 3., np.inf], index=[3, 2, 1, 0])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        jit_func = self.jit(test_impl)
 
-    def test_series_isna_named(self):
-        def test_impl(S):
-            return S.isna()
-        hpat_func = self.jit(test_impl)
+        datas = [[0, 1, 2, 3], [0., 1., np.inf, np.nan], ['a', None, 'b', 'c']]
+        indices = [None, [3, 2, 1, 0], ['a', 'b', 'c', 'd']]
+        names = [None, 'A']
 
-        # column with NA
-        S = pd.Series(data=[np.nan, 2., 3., np.inf], name='A')
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_isna_str(self):
-        def test_impl(S):
-            return S.isna()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series([np.nan, '2.', '3.', 'np.inf'])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_isna_str_index(self):
-        def test_impl(S):
-            return S.isna()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series(data=[np.nan, '2.', '3.', 'np.inf'], index=[3, 2, 1, 0])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_isna_str_named(self):
-        def test_impl(S):
-            return S.isna()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series(data=[np.nan, '2.', '3.', 'np.inf'], name='A')
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        for data, index, name in product(datas, indices, names):
+            with self.subTest(data=data, index=index, name=name):
+                series = pd.Series(data=data, index=index, name=name)
+                jit_result = jit_func(series)
+                ref_result = test_impl(series)
+                pd.testing.assert_series_equal(jit_result, ref_result)
 
     def test_series_isnull1(self):
         def test_impl(S):
@@ -3209,182 +3191,22 @@ class TestSeries(TestCase):
         S = pd.Series([np.nan, 2., 3.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_sdc_jit('Index is not supported')
-    def test_series_isnull_index(self):
-        def test_impl(S):
-            return S.isnull()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series(data=[np.nan, 2., 3., np.inf], index=[3, 2, 1, 0])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_sdc_jit('Name is not supported')
-    def test_series_isnull_named(self):
-        def test_impl(S):
-            return S.isnull()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series(data=[np.nan, 2., 3., np.inf], name='A')
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_isnull_full(self):
-        def test_impl(series):
-            return series.isnull()
-
-        hpat_func = self.jit(test_impl)
-
-        for data in test_global_input_data_numeric + [test_global_input_data_unicode_kind4]:
-            series = pd.Series(data * 3)
-            ref_result = test_impl(series)
-            jit_result = hpat_func(series)
-            pd.testing.assert_series_equal(ref_result, jit_result)
-
-    def test_series_isnull_str(self):
-        def test_impl(S):
-            return S.isnull()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series([None, '2.', '3.', 'np.inf'])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_sdc_jit('Index is not supported')
-    def test_series_isnull_str_index(self):
-        def test_impl(S):
-            return S.isnull()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series(data=[None, '2.', '3.', 'np.inf'], index=[3, 2, 1, 0])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_sdc_jit('Name is not supported')
-    def test_series_isnull_str_named(self):
-        def test_impl(S):
-            return S.isnull()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series(data=[None, '2.', '3.', 'np.inf'], name='A')
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_notna1(self):
-        def test_impl(S):
-            return S.notna()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series([np.nan, 2., 3.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_notna_index(self):
-        def test_impl(S):
-            return S.notna()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series(data=[np.nan, 2., 3.], index=[2, 1, 0])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_notna_named(self):
-        def test_impl(S):
-            return S.notna()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series(data=[np.nan, 2., 3.], name='A')
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_notna_str(self):
-        def test_impl(S):
-            return S.notna()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series(['a', 'b', '', None])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_notna_str_index(self):
-        def test_impl(S):
-            return S.notna()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series(data=['a', 'b', '', None], index=['aa', 'bb', 'cc', 'dd'])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_notna_str_named(self):
-        def test_impl(S):
-            return S.notna()
-        hpat_func = self.jit(test_impl)
-
-        # column with NA
-        S = pd.Series(data=['a', 'b', '', None], name='A')
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_notna_noidx_float(self):
+    def test_series_notna(self):
         def test_impl(S):
             return S.notna()
 
-        hpat_func = self.jit(test_impl)
-        for input_data in test_global_input_data_float64:
-            S = pd.Series(input_data)
-            result_ref = test_impl(S)
-            result_jit = hpat_func(S)
-            pd.testing.assert_series_equal(result_jit, result_ref)
+        jit_func = self.jit(test_impl)
 
-    @unittest.skip("Need fix test_global_input_data_integer64")
-    def test_series_notna_noidx_int(self):
-        def test_impl(S):
-            return S.notna()
+        datas = [[0, 1, 2, 3], [0., 1., np.inf, np.nan], ['a', None, 'b', 'c']]
+        indices = [None, [3, 2, 1, 0], ['a', 'b', 'c', 'd']]
+        names = [None, 'A']
 
-        hpat_func = self.jit(test_impl)
-        for input_data in test_global_input_data_integer64:
-            S = pd.Series(input_data)
-            result_ref = test_impl(S)
-            result_jit = hpat_func(S)
-            pd.testing.assert_series_equal(result_jit, result_ref)
-
-    @unittest.skip("Need fix test_global_input_data_integer64")
-    def test_series_notna_noidx_num(self):
-        def test_impl(S):
-            return S.notna()
-
-        hpat_func = self.jit(test_impl)
-        for input_data in test_global_input_data_numeric:
-            S = pd.Series(input_data)
-            result_ref = test_impl(S)
-            result_jit = hpat_func(S)
-            pd.testing.assert_series_equal(result_jit, result_ref)
-
-    def test_series_notna_noidx_str(self):
-        def test_impl(S):
-            return S.notna()
-
-        hpat_func = self.jit(test_impl)
-        input_data = test_global_input_data_unicode_kind4
-        S = pd.Series(input_data)
-        result_ref = test_impl(S)
-        result_jit = hpat_func(S)
-        pd.testing.assert_series_equal(result_jit, result_ref)
-
-    def test_series_str_notna(self):
-        def test_impl(S):
-            return S.notna()
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series(['aa', None, 'c', 'cccd'])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    def test_series_str_isna1(self):
-        def test_impl(S):
-            return S.isna()
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series(['aa', None, 'c', 'cccd'])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        for data, index, name in product(datas, indices, names):
+            with self.subTest(data=data, index=index, name=name):
+                series = pd.Series(data=data, index=index, name=name)
+                jit_result = jit_func(series)
+                ref_result = test_impl(series)
+                pd.testing.assert_series_equal(jit_result, ref_result)
 
     @unittest.skip('AssertionError: Series are different')
     def test_series_dt_isna1(self):
@@ -3767,7 +3589,6 @@ class TestSeries(TestCase):
                 result_jit = hpat_func(S, n)
                 pd.testing.assert_series_equal(result_jit, result_ref)
 
-    # @unittest.skip("Need fix test_global_input_data_integer64")
     def test_series_head_noidx_int(self):
         def test_impl(S, n):
             return S.head(n)
@@ -3779,7 +3600,6 @@ class TestSeries(TestCase):
                 result_jit = hpat_func(S, n)
                 pd.testing.assert_series_equal(result_jit, result_ref)
 
-    # @unittest.skip("Need fix test_global_input_data_integer64")
     def test_series_head_noidx_num(self):
         def test_impl(S, n):
             return S.head(n)
@@ -4223,6 +4043,7 @@ class TestSeries(TestCase):
 
     @sdc_limitation
     def test_series_shift_0period(self):
+        '''SDC implementation always changes dtype to float. Even in case of period = 0'''
         def pyfunc():
             series = pd.Series([6, 4, 3])
             return series.shift(periods=0)
@@ -4238,10 +4059,11 @@ class TestSeries(TestCase):
 
         cfunc = self.jit(pyfunc)
         ref_result = pyfunc()
-        pd.testing.assert_series_equal(cfunc(), ref_result.astype(np.float64))
+        pd.testing.assert_series_equal(cfunc(), ref_result, check_dtype=False)
 
     @sdc_limitation
     def test_series_shift_uint_int(self):
+        '''SDC assumes fill_value is int and unifies unsigned int and int to float. Even if fill_value is positive'''
         def pyfunc():
             series = pd.Series([max_uint64])
             return series.shift(fill_value=0)
@@ -4257,7 +4079,7 @@ class TestSeries(TestCase):
 
         cfunc = self.jit(pyfunc)
         ref_result = pyfunc()
-        pd.testing.assert_series_equal(cfunc(), ref_result.astype(np.float64))
+        pd.testing.assert_series_equal(cfunc(), ref_result, check_dtype=False)
 
     def test_series_shift_str(self):
         def pyfunc(series):
