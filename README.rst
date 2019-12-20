@@ -21,7 +21,7 @@ Intel® Scalable Dataframe Compiler (Intel® SDC), which is an extension of `Num
 that enables compilation of `Pandas* <https://pandas.pydata.org/>`_ operations. It automatically vectorizes and parallelizes 
 the code by leveraging modern hardware instructions and by utilizing all available cores. 
 
-Intel SDC's documentation can be found `here <https://intellabs.github.io/sdc-doc/>`_.
+Intel SDC's documentation can be found `here <https://intelpython.github.io/sdc-doc/>`_.
 
 Installing Binary Packages (conda)
 ----------------------------------
