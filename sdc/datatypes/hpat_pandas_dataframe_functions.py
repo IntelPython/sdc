@@ -40,6 +40,7 @@ from numba import types
 from numba.extending import (overload, overload_method, overload_attribute)
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from numba.errors import TypingError
+import sdc.datatypes.hpat_pandas_dataframe_types
 
 from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
 
