@@ -28,7 +28,6 @@
 from setuptools import setup, Extension, find_packages, Command
 import platform
 import os
-import sys
 from docs.source.buildscripts.sdc_build_doc import SDCBuildDoc
 
 
