@@ -110,6 +110,7 @@ if __name__ == '__main__':
     if channel_list:
         conda_channels = f'{channel_list} --override-channels'
 
+    conda_prefix_limit = ''
     conda_build_packages = ['conda-build']
     if platform.system() == 'Windows':
         if build_mode != 'package':
@@ -117,6 +118,7 @@ if __name__ == '__main__':
             set_environment_variable('LIB', os.path.join('%CONDA_PREFIX%', 'Library', 'lib'))
 
         conda_build_packages.extend(['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64'])
+        conda_prefix_limit = '--prefix-length 20'
 
     # Build Numba from master
     if use_numba_master is True:
@@ -126,6 +128,7 @@ if __name__ == '__main__':
                                       ' '.join(['conda build --no-test',
                                                 f'--python {python}',
                                                 f'--numpy {numpy}',
+                                                f'{conda_prefix_limit}'
                                                 f'--output-folder {numba_output_folder}',
                                                 f'{numba_conda_channels} {numba_recipe}'])))
         format_print('NUMBA BUILD COMPETED')
