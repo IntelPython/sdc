@@ -212,7 +212,7 @@ def hpat_pandas_series_setitem(self, idx, value):
 
     if (isinstance(value, SeriesType) and not isinstance(self.dtype, value.dtype)) or \
             not isinstance(self.dtype, type(value)):
-        ty_checker.raise_exc(value, 'self', 'value')
+        ty_checker.raise_exc(value, self.dtype, 'value')
 
     if isinstance(idx, types.Integer) or isinstance(idx, types.SliceType):
         def hpat_pandas_series_setitem_idx_integer_impl(self, idx, value):

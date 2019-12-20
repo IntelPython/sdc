@@ -4771,17 +4771,17 @@ class TestSeries(TestCase):
         ind2 = '3'
         value1 = 'ababa'
         value2 = 101
+        msg_tmpl = 'Operator setitem. The object {}\n given: unicode_type\n expected: {}'
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, ind1, value1)
-        msg = 'Operator setitem. The object value\n given: unicode_type\n expected: self'
+        msg = msg_tmpl.format('value', 'int64')
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, ind2, value2)
-        msg = 'Operator setitem. The object idx\n given: unicode_type\n expected: int, Slice, Series'
+        msg = msg_tmpl.format('idx', 'int, Slice, Series')
         self.assertIn(msg, str(raises.exception))
-
 
     @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
     def test_series_operator_add_numeric_scalar(self):
