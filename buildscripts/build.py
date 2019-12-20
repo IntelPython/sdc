@@ -143,6 +143,7 @@ if __name__ == '__main__':
                                       ' '.join(['conda build --no-test',
                                                             f'--python {python}',
                                                             f'--numpy {numpy}',
+                                                            f'{conda_prefix_limit}',
                                                             f'--output-folder {output_folder}',
                                                             f'{conda_channels} {sdc_recipe}']))
     else:
