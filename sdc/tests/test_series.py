@@ -998,7 +998,6 @@ class TestSeries(TestCase):
         A = pd.Series(np.arange(n))
         self.assertEqual(hpat_func(A), test_impl(A))
 
-
     @skip_numba_jit
     def test_getitem_series1(self):
         def test_impl(A, i):
@@ -4705,7 +4704,7 @@ class TestSeries(TestCase):
 
         hpat_func = self.jit(test_impl)
         S1 = pd.Series([0, 1, 2, 3, 4])
-        S2 = pd.Series([0, 1, 2, 3, 4])
+        S2 = S1.copy()
         value = 50
         result_ref = test_impl(S1, value)
         result = hpat_func(S2, value)

@@ -33,11 +33,16 @@ from numba import njit
 @njit
 def series_setitem():
     numb = 0
-    series = pd.Series(np.arange(5, 0, -1))  # Series of 10, 9, ..., 1
+    series = pd.Series(np.arange(5, 0, -1))  # Series of 5, 4, 3, 2, 1
 
     series[2:5] = numb
 
-    return series
-
+    return series   # result
+                    # 0    5
+                    # 1    4
+                    # 2    0
+                    # 3    0
+                    # 4    0
+                    # dtype: int64
 
 print(series_setitem())

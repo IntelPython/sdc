@@ -37,7 +37,12 @@ def series_setitem():
 
     series[0] = numb
 
-    return series
-
+    return series   # result
+                    # 0    5
+                    # 1    0
+                    # 2    3
+                    # 3    0
+                    # 4    1
+                    # dtype: int64
 
 print(series_setitem())
