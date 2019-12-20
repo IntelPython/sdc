@@ -206,7 +206,7 @@ def hpat_pandas_series_setitem(self, idx, value):
     :class:`pandas.Series` or an element of the underneath type
             object of :class:`pandas.Series`
     """
-    ty_checker = TypeChecker('Operator setitem().')
+    ty_checker = TypeChecker('Operator setitem.')
     ty_checker.check(self, SeriesType)
 
     if (isinstance(value, SeriesType) and not isinstance(self.dtype, value.dtype)) or \

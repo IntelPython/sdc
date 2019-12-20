@@ -4691,7 +4691,7 @@ class TestSeries(TestCase):
 
         hpat_func = self.jit(test_impl)
         S1 = pd.Series([0, 1, 2, 3, 4])
-        S2 = pd.Series([0, 1, 2, 3, 4])
+        S2 = S1.copy(deep=True)
         value = 50
         result_ref = test_impl(S1, value)
         result = hpat_func(S2, value)
@@ -4704,7 +4704,7 @@ class TestSeries(TestCase):
 
         hpat_func = self.jit(test_impl)
         S1 = pd.Series([0, 1, 2, 3, 4])
-        S2 = S1.copy()
+        S2 = S1.copy(deep=True)
         value = 50
         result_ref = test_impl(S1, value)
         result = hpat_func(S2, value)
@@ -4716,11 +4716,12 @@ class TestSeries(TestCase):
             return S
 
         hpat_func = self.jit(test_impl)
-        S = pd.Series([0, 1, 2, 3, 4])
+        S1 = pd.Series([0, 1, 2, 3, 4])
+        S2 = S1.copy(deep=True)
         ind = pd.Series([0, 2, 4])
         value = 50
-        result_ref = test_impl(S, ind, value)
-        result = hpat_func(S, ind, value)
+        result_ref = test_impl(S1, ind, value)
+        result = hpat_func(S2, ind, value)
         pd.testing.assert_series_equal(result_ref, result)
 
     def test_series_setitem_unsupported(self):
@@ -4737,12 +4738,12 @@ class TestSeries(TestCase):
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, ind1, value1)
-        msg = 'TypingError: Operator setitem(). The object value'
+        msg = 'TypingError: Operator setitem. The object value'
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, ind2, value2)
-        msg = 'Operator setitem(). The object idx'
+        msg = 'Operator setitem. The object idx'
         self.assertIn(msg, str(raises.exception))
 
 
