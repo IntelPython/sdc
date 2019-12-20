@@ -15,30 +15,30 @@ jobs:
       ${{ insert }}: ${{ parameters.matrix }}
 
   steps:
-    - script: |
-        buildscripts\\install_conda.bat "C:\Conda"
-      displayName: 'Install conda'
+    # - script: |
+    #     buildscripts\\install_conda.bat "%UserProfile%\\Miniconda3"
+    #   displayName: 'Install conda'
 
     - script: |
         IF "%USE_NUMBA_MASTER%" == "False" (
-            "C:\Conda\python.exe" buildscripts\\build.py --build-mode=package --python=%PYTHON_VER% --numpy=%NUMPY_VER% --skip-smoke-tests --conda-prefix="C:\Conda"
+            "C:\\Miniconda\\python.exe" buildscripts\\build.py --build-mode=package --python=%PYTHON_VER% --numpy=%NUMPY_VER% --skip-smoke-tests --conda-prefix="C:\\Miniconda"
             ) ELSE (
-            "C:\Conda\python.exe" buildscripts\\build.py --build-mode=package --python=%PYTHON_VER% --numpy=%NUMPY_VER% --use-numba-master --skip-smoke-tests --conda-prefix="C:\Conda")
+            "C:\\Miniconda\\python.exe" buildscripts\\build.py --build-mode=package --python=%PYTHON_VER% --numpy=%NUMPY_VER% --use-numba-master --skip-smoke-tests --conda-prefix="C:\\Miniconda")
       displayName: 'Build conda and wheel packages'
       continueOnError: ${{ parameters.allowFailure }}
 
     - script: |
         IF "%USE_NUMBA_MASTER%" == "False" (
-            "C:\Conda\python.exe" buildscripts\\test.py --test-mode=conda --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="C:\Conda"
+            "C:\\Miniconda\\python.exe" buildscripts\\test.py --test-mode=conda --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="C:\\Miniconda"
             ) ELSE (
-            "C:\Conda\python.exe" buildscripts\\test.py --test-mode=conda --python=%PYTHON_VER% --numpy=%NUMPY_VER% --use-numba-master --conda-prefix="C:\Conda")
+            "C:\\Miniconda\\python.exe" buildscripts\\test.py --test-mode=conda --python=%PYTHON_VER% --numpy=%NUMPY_VER% --use-numba-master --conda-prefix="C:\\Miniconda")
       displayName: 'Test conda package'
       continueOnError: ${{ parameters.allowFailure }}
 
     - script: |
         IF "%USE_NUMBA_MASTER%" == "False" (
-            "C:\Conda\python.exe" buildscripts\\test.py --test-mode=examples --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="C:\Conda"
+            "C:\\Miniconda\\python.exe" buildscripts\\test.py --test-mode=examples --python=%PYTHON_VER% --numpy=%NUMPY_VER% --conda-prefix="C:\\Miniconda"
             ) ELSE (
-            "C:\Conda\python.exe" buildscripts\\test.py --test-mode=examples --python=%PYTHON_VER% --numpy=%NUMPY_VER% --use-numba-master --conda-prefix="C:\Conda")
+            "C:\\Miniconda\\python.exe" buildscripts\\test.py --test-mode=examples --python=%PYTHON_VER% --numpy=%NUMPY_VER% --use-numba-master --conda-prefix="C:\\Miniconda")
       displayName: 'Test package examples'
       continueOnError: ${{ parameters.allowFailure }}
