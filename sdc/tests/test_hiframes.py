@@ -87,6 +87,7 @@ class TestHiFrames(TestCase):
         df = pd.DataFrame({'A': [1, 2, 3], 'B': [True, False, True]})
         np.testing.assert_array_equal(test_impl(df), hpat_func(df))
 
+    @skip_numba_jit
     def test_fillna(self):
         def test_impl():
             A = np.array([1., 2., 3.])
@@ -98,6 +99,7 @@ class TestHiFrames(TestCase):
         hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    @skip_numba_jit
     def test_fillna_inplace(self):
         def test_impl():
             A = np.array([1., 2., 3.])
@@ -109,6 +111,7 @@ class TestHiFrames(TestCase):
         hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    @skip_numba_jit
     def test_column_mean(self):
         def test_impl():
             A = np.array([1., 2., 3.])
@@ -119,6 +122,7 @@ class TestHiFrames(TestCase):
         hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    @skip_numba_jit
     def test_column_var(self):
         def test_impl():
             A = np.array([1., 2., 3.])
@@ -129,6 +133,7 @@ class TestHiFrames(TestCase):
         hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
+    @skip_numba_jit
     def test_column_std(self):
         def test_impl():
             A = np.array([1., 2., 3.])
@@ -202,6 +207,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertTrue(dist_IR_contains('dist_cumsum'))
 
+    @skip_numba_jit
     def test_quantile_parallel(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float64)})
@@ -282,6 +288,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
 
+    @skip_numba_jit
     def test_nunique_str(self):
         def test_impl(n):
             df = pd.DataFrame({'A': ['aa', 'bb', 'aa', 'cc', 'cc']})
@@ -664,6 +671,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_df_input(self):
         def test_impl(df):
             return df.B.sum()
