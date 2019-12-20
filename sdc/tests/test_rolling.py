@@ -567,9 +567,9 @@ class TestRolling(TestCase):
                 for min_periods, ddof in product(range(0, window, 2), [0, 1]):
                     with self.subTest(series=series, window=window,
                                       min_periods=min_periods, ddof=ddof):
-                        ref_result = test_impl(series, window, min_periods, ddof)
                         jit_result = hpat_func(series, window, min_periods, ddof)
-                        pd.testing.assert_series_equal(ref_result, jit_result)
+                        ref_result = test_impl(series, window, min_periods, ddof)
+                        pd.testing.assert_series_equal(jit_result, ref_result)
 
     @skip_sdc_jit('Series.rolling.std() unsupported exceptions')
     def test_series_rolling_std_exception_unsupported_ddof(self):
