@@ -544,9 +544,9 @@ class TestRolling(TestCase):
                 for min_periods in range(0, window + 1, 2):
                     with self.subTest(series=series, window=window,
                                       min_periods=min_periods):
-                        ref_result = test_impl(series, window, min_periods)
                         jit_result = hpat_func(series, window, min_periods)
-                        pd.testing.assert_series_equal(ref_result, jit_result)
+                        ref_result = test_impl(series, window, min_periods)
+                        pd.testing.assert_series_equal(jit_result, ref_result)
 
     @skip_sdc_jit('Series.rolling.min() unsupported Series index')
     def test_series_rolling_min(self):
