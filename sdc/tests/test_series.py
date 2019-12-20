@@ -4779,7 +4779,8 @@ class TestSeries(TestCase):
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, ind2, value2)
-        msg = 'Operator setitem. The object idx' + '\n' + ' given: unicode_type' + '\n' + ' expected: int, Slice, Series'
+        msg = 'Operator setitem. The object idx' + '\n' + ' given: unicode_type' + '\n' \
+              + ' expected: int, Slice, Series'
         self.assertIn(msg, str(raises.exception))
 
 
