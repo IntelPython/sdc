@@ -82,11 +82,6 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params):
     ap = all_params.copy()
     par = '{}'.format(', '.join(ap[1:]))
 
-    # param = 'level'
-    # if param in params
-    # par += 'level=' + param
-    # else
-    # par += 'level=' + 'None'
     df_func_name = f'_df_{func_name}_impl'
 
     func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, par, df.columns)
@@ -97,6 +92,12 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params):
     _reduce_impl = loc_vars[df_func_name]
 
     return _reduce_impl
+
+# param = 'level'
+# if param in params
+# par += 'level=' + param
+# else
+# par += 'level=' + 'None'
 
 
 @overload_method(DataFrameType, 'count')
