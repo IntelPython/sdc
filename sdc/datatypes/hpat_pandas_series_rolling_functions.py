@@ -29,7 +29,7 @@ import pandas
 
 from numba import prange
 from numba.extending import register_jitable
-from numba.types import float64
+from numba.types import float64, Number, Omitted, StringLiteral, UnicodeType
 
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
@@ -58,6 +58,15 @@ def arr_min(arr):
         return numpy.nan
 
     return arr.min()
+
+
+@register_jitable
+def arr_quantile(arr, q):
+    """Calculate quantile of values"""
+    if len(arr) == 0:
+        return numpy.nan
+
+    return numpy.quantile(arr, q)
 
 
 def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
@@ -311,3 +320,112 @@ def hpat_pandas_series_rolling_min(self):
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_min_impl
+
+
+@sdc_overload_method(SeriesRollingType, 'quantile')
+def hpat_pandas_series_rolling_quantile(self, quantile, interpolation='linear'):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.core.window.Rolling.quantile
+
+    Limitations
+    -----------
+    Supported ``interpolation`` only can be `'linear'`.
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/rolling/series_rolling_quantile.py
+       :language: python
+       :lines: 27-
+       :caption: Calculate the rolling quantile.
+       :name: ex_series_rolling_quantile
+
+    .. code-block:: console
+
+        > python ./series_rolling_quantile.py
+        0    NaN
+        1    NaN
+        2    4.0
+        3    3.0
+        4    5.0
+        dtype: float64
+
+    .. seealso::
+        :ref:`Series.rolling <pandas.Series.rolling>`
+            Calling object with a Series.
+        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
+            Calling object with a DataFrame.
+        :ref:`Series.quantile <pandas.Series.quantile>`
+            Similar method for Series.
+        :ref:`DataFrame.quantile <pandas.DataFrame.quantile>`
+            Similar method for DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas Series method :meth:`pandas.Series.rolling.quantile()` implementation.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_quantile
+
+    Parameters
+    ----------
+    self: :class:`pandas.Series.rolling`
+        input arg
+    quantile: :obj:`float`
+        Quantile to compute. 0 <= quantile <= 1.
+    interpolation: :obj:`str`
+        This optional parameter specifies the interpolation method to use.
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method rolling.quantile().')
+    ty_checker.check(self, SeriesRollingType)
+
+    if not isinstance(quantile, Number):
+        ty_checker.raise_exc(quantile, 'float', 'quantile')
+
+    str_types = (Omitted, StringLiteral, UnicodeType)
+    if not isinstance(interpolation, str_types) and interpolation != 'linear':
+        ty_checker.raise_exc(interpolation, 'str', 'interpolation')
+
+    def hpat_pandas_rolling_series_quantile_impl(self, quantile, interpolation='linear'):
+        if quantile < 0 or quantile > 1:
+            raise ValueError('quantile value not in [0, 1]')
+        if interpolation != 'linear':
+            raise ValueError('interpolation value not "linear"')
+
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        def culc_quantile(arr, quantile, minp):
+            finite_arr = arr[numpy.isfinite(arr)]
+            if len(finite_arr) < minp:
+                return numpy.nan
+            else:
+                return arr_quantile(finite_arr, quantile)
+
+        boundary = min(win, length)
+        for i in prange(boundary):
+            arr_range = input_arr[:i + 1]
+            output_arr[i] = culc_quantile(arr_range, quantile, minp)
+
+        for i in prange(min(win, length), length):
+            arr_range = input_arr[i + 1 - win:i + 1]
+            output_arr[i] = culc_quantile(arr_range, quantile, minp)
+
+        return pandas.Series(output_arr, input_series._index, name=input_series._name)
+
+    return hpat_pandas_rolling_series_quantile_impl
