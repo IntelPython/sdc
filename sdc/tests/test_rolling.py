@@ -52,6 +52,7 @@ if LONG_TEST:
 
 
 class TestRolling(TestCase):
+    @skip_numba_jit
     def test_fixed1(self):
         # test sequentially with manually created dfs
         wins = (3,)
@@ -72,6 +73,7 @@ class TestRolling(TestCase):
                 df = pd.DataFrame({'B': [0, 1, 2, -2, 4]})
                 pd.testing.assert_frame_equal(hpat_func(df, *args), test_impl(df, *args))
 
+    @skip_numba_jit
     def test_fixed2(self):
         # test sequentially with generated dfs
         sizes = (121,)
@@ -122,6 +124,7 @@ class TestRolling(TestCase):
             df = pd.DataFrame({'B': np.arange(n)})
             pd.testing.assert_frame_equal(hpat_func(df, w, c), test_impl(df, w, c))
 
+    @skip_numba_jit
     def test_fixed_parallel1(self):
         def test_impl(n, w, center):
             df = pd.DataFrame({'B': np.arange(n)})
@@ -161,6 +164,7 @@ class TestRolling(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_variable1(self):
         # test sequentially with manually created dfs
         df1 = pd.DataFrame({'B': [0, 1, 2, np.nan, 4],
@@ -191,6 +195,7 @@ class TestRolling(TestCase):
                 pd.testing.assert_frame_equal(hpat_func(df1), test_impl(df1))
             pd.testing.assert_frame_equal(hpat_func(df2), test_impl(df2))
 
+    @skip_numba_jit
     def test_variable2(self):
         # test sequentially with generated dfs
         wins = ('2s',)
@@ -259,6 +264,7 @@ class TestRolling(TestCase):
                 df = pd.DataFrame({'B': np.arange(n), 'time': time})
                 pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     @unittest.skipIf(platform.system() == 'Windows', "ValueError: time must be monotonic")
     def test_variable_parallel1(self):
         wins = ('2s',)
