@@ -254,7 +254,7 @@ def box_dataframe(typ, val, c):
 
     # set df.index if necessary
     if typ.index != types.none:
-        arr_obj = box_array(typ.index, dataframe.index, c)
+        arr_obj = _box_series_data(typ.index.dtype, typ.index, dataframe.index, c)
         pyapi.object_setattr_string(df_obj, 'index', arr_obj)
 
     pyapi.decref(class_obj)
