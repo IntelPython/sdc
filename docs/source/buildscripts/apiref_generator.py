@@ -26,11 +26,20 @@
 # *****************************************************************************
 
 import pandas
-from sdc_object_utils import init_pandas_structure, init_sdc_structure, init_pandas_sdc_dict, get_sdc_object, get_obj
+from sdc_object_utils import init_pandas_structure, init_sdc_structure, init_pandas_sdc_dict
+from sdc_object_utils import get_sdc_object_by_pandas_name, get_obj
 from sdc_object_utils import get_class_methods, get_class_attributes, get_fully_qualified_name
 from sdc_doc_utils import is_sdc_user_guide_header, get_indent, reindent, get_short_description
 from sdc_doc_utils import split_in_sections, get_docstring, create_heading_str, cut_sdc_dev_guide
 import os
+
+
+APIREF_TEMPLATE_FNAMES = [
+    './_templates/_api_ref.pandas.series_templ.rst',
+    './_templates/_api_ref.pandas.dataframe_templ.rst',
+    './_templates/_api_ref.pandas.window_templ.rst',
+]
+
 
 APIREF_REL_PATH = './_api_ref/'
 
@@ -168,7 +177,7 @@ def reformat_explicit_markup(text):
         line = lines[0]
 
         if line.strip().startswith('.. versionchanged') or line.strip().startswith('.. versionadded') or \
-                line.strip().startswith('.. deprecated'):
+                line.strip().startswith('.. deprecated') or line.strip().startswith('.. _'):
             new_text += line + '\n'
             # Here if found explicit markup
             if len(lines) > 1:
@@ -385,7 +394,7 @@ def reformat_pandas_params(title, text):
         return text
 
 
-def generate_simple_object_doc(pandas_obj, short_doc_flag=False, doc_from_pandas_flag=True, add_sdc_sections=True,
+def generate_simple_object_doc(pandas_name, short_doc_flag=False, doc_from_pandas_flag=True, add_sdc_sections=True,
                                unsupported_warning=True, reformat_pandas=True):
     """
     Generates documentation for Pandas object obj according to flags.
@@ -393,7 +402,7 @@ def generate_simple_object_doc(pandas_obj, short_doc_flag=False, doc_from_pandas
     For complex objects such as modules and classes the function does not go to sub-objects,
     i.e. to class attributes and sub-modules of the module.
 
-    :param pandas_obj: Pandas object for which documentation to be generated.
+    :param pandas_name: Pandas object for which documentation to be generated.
     :param short_doc_flag: Flag to indicate that only short description for the object is needed.
     :param doc_from_pandas_flag: Flag to indicate that the documentation must be taken from Pandas docstring.
            This docstring can be extended with Intel SDC specific sections. These are See Also, Examples,
@@ -409,6 +418,7 @@ def generate_simple_object_doc(pandas_obj, short_doc_flag=False, doc_from_pandas
     """
 
     doc = ''
+    pandas_obj = get_obj(pandas_name)
     if pandas_obj is None:
         return doc  # Empty documentation for no-object
 
@@ -450,7 +460,7 @@ def generate_simple_object_doc(pandas_obj, short_doc_flag=False, doc_from_pandas
             return doc
 
     # Here if additional sections from Intel SDC object needs to be added to pandas_obj docstring
-    sdc_obj = get_sdc_object(pandas_obj)
+    sdc_obj = get_sdc_object_by_pandas_name(pandas_name)
     if sdc_obj is None:
         if unsupported_warning:
             if reformat_pandas:
@@ -541,8 +551,7 @@ def write_simple_object_rst_file(pandas_name, short_doc_flag=False, doc_from_pan
     :param doc_from_pandas_flag: Flag, if ``True``, derive the description from Pandas docstring for the object.
     :param add_sdc_sections: Flag, if ``True``, extend the docstring with respective Intel SDC sections (if any)
     """
-    pandas_obj = get_obj(pandas_name)
-    doc = generate_simple_object_doc(pandas_obj, short_doc_flag, doc_from_pandas_flag, add_sdc_sections)
+    doc = generate_simple_object_doc(pandas_name, short_doc_flag, doc_from_pandas_flag, add_sdc_sections)
     if doc is None or doc == '':
         return
 
@@ -612,14 +621,13 @@ def parse_templ_rst(fname_templ):
                 indent = get_indent(line)
                 line = line.strip()
                 full_name = current_module_name + '.' + line
-                obj = get_obj(full_name)
-                short_description = generate_simple_object_doc(obj, short_doc_flag=True).strip()
+                short_description = generate_simple_object_doc(full_name, short_doc_flag=True).strip()
                 new_line = reindent(':ref:`', indent) + line + ' <' + full_name + '>`\n' + \
                     reindent(short_description, indent+4) + '\n'
                 fout.write(new_line)
                 doc.pop(0)
 
-                full_description = generate_simple_object_doc(obj, short_doc_flag=False)
+                full_description = generate_simple_object_doc(full_name, short_doc_flag=False)
                 f = open_file_for_write(APIREF_REL_PATH + full_name + '.rst')
                 f.write('.. _' + full_name + ':\n\n:orphan:\n\n')
                 f.write(create_heading_str(full_name, '*') + '\n\n')
@@ -645,11 +653,18 @@ def write_class_rst_files(cls, short_doc_flag=False, doc_from_pandas_flag=True, 
 
 
 def generate_api_reference():
+    """
+    Master function for API Reference generation.
+
+    This function initializes all required data structures, and parses required templates for
+    Final RST files generation that looks and feels like Pandas API Reference.
+    """
     init_pandas_structure()
     init_sdc_structure()
     init_pandas_sdc_dict()
 
-    parse_templ_rst('./_templates/_api_ref.pandas.series_templ.rst')
+    for templ_fname in APIREF_TEMPLATE_FNAMES:
+        parse_templ_rst(templ_fname)
 
 
 if __name__ == "__main__":

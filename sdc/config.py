@@ -58,7 +58,7 @@ Current value for transport controlled by decorator need to initialize this here
 because decorator called later then modules have been initialized
 '''
 
-config_pipeline_hpat_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_PIPELINE_SDC', 'True'))
+config_pipeline_hpat_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_PIPELINE_SDC', 'False'))
 '''
 Default value used to select compiler pipeline in a function decorator
 '''

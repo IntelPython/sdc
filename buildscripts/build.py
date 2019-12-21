@@ -103,7 +103,10 @@ if __name__ == '__main__':
     develop_env_activate = get_activate_env_cmd(conda_activate, develop_env)
 
     conda_channels = f'-c {numba_channel} -c conda-forge -c intel -c defaults --override-channels'
-    numba_conda_channels = '-c conda-forge -c intel --override-channels'
+    # If numba is taken from custom channel, need to add numba channel to get dependencies
+    if numba_channel != 'numba':
+        conda_channels = f'-c {numba_channel} -c numba -c conda-forge -c intel -c defaults --override-channels'
+    numba_conda_channels = '-c numba -c conda-forge -c intel --override-channels'
     if channel_list:
         conda_channels = f'{channel_list} --override-channels'
 
@@ -113,7 +116,7 @@ if __name__ == '__main__':
             set_environment_variable('INCLUDE', os.path.join('%CONDA_PREFIX%', 'Library', 'include'))
             set_environment_variable('LIB', os.path.join('%CONDA_PREFIX%', 'Library', 'lib'))
 
-        conda_build_packages.extend(['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64'])
+        conda_build_packages.extend(['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64', 'pywin32=223'])
 
     # Build Numba from master
     if use_numba_master is True:
