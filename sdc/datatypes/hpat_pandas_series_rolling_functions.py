@@ -87,7 +87,6 @@ hpat_pandas_series_rolling_docstring_tmpl = """
 @register_jitable
 def arr_apply(arr, func):
     """Apply function for values"""
-    # Use np.apply_along_axis when it's supported by Numba to apply array with infinite values
     return func(arr)
 
 
