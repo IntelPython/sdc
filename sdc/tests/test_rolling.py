@@ -492,6 +492,27 @@ class TestRolling(TestCase):
         msg = msg_tmpl.format('closed', 'int64', 'str')
         self.assertIn(msg, str(raises.exception))
 
+    @skip_sdc_jit('Series.rolling.aggregate() unsupported Series index')
+    def test_series_rolling_aggregate_mean_only(self):
+        def test_impl(series, window, min_periods):
+            def func(x):
+                if len(x) == 0:
+                    return np.nan
+                return x.mean()
+            return series.rolling(window, min_periods).aggregate(func)
+
+        hpat_func = self.jit(test_impl)
+
+        data = [1., -1., 0., 0.1, -0.1]
+        index = list(range(len(data)))[::-1]
+        series = pd.Series(data, index, name='A')
+        for window in range(0, len(series) + 3, 2):
+            for min_periods in range(0, window + 1, 2):
+                with self.subTest(swindow=window, min_periods=min_periods):
+                    jit_result = hpat_func(series, window, min_periods)
+                    ref_result = test_impl(series, window, min_periods)
+                    pd.testing.assert_series_equal(jit_result, ref_result)
+
     @skip_sdc_jit('Series.rolling.count() unsupported Series index')
     def test_series_rolling_count(self):
         def test_impl(series, window, min_periods):

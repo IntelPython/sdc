@@ -29,7 +29,8 @@ import pandas
 
 from numba import prange
 from numba.extending import register_jitable
-from numba.types import float64
+from numba.types import float64, Tuple, UniTuple
+from numba.types.functions import Callable
 
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
@@ -82,6 +83,12 @@ hpat_pandas_series_rolling_docstring_tmpl = """
     :obj:`pandas.Series`
          returns :obj:`pandas.Series` object
 """
+
+
+@register_jitable
+def arr_apply(arr, func):
+    """Apply function for values"""
+    return func(arr)
 
 
 @register_jitable
@@ -194,6 +201,37 @@ def gen_hpat_pandas_series_rolling_zerominp_impl(rolling_func, output_type=None)
     return impl
 
 
+@register_jitable
+def hpat_pandas_series_rolling_apply_impl(self, arg):
+    win = self._window
+    minp = self._min_periods
+
+    input_series = self._data
+    input_arr = input_series._data
+    length = len(input_arr)
+    output_arr = numpy.empty(length, dtype=float64)
+
+    def culc_apply(arr, func, minp):
+        finite_arr = arr.copy()
+        finite_arr[numpy.isinf(arr)] = numpy.nan
+        if len(finite_arr) < minp:
+            return numpy.nan
+        else:
+            return arr_apply(finite_arr, func)
+
+    boundary = min(win, length)
+    for i in prange(boundary):
+        arr_range = input_arr[:i + 1]
+        output_arr[i] = culc_apply(arr_range, arg, minp)
+
+    for i in prange(min(win, length), length):
+        arr_range = input_arr[i + 1 - win:i + 1]
+        output_arr[i] = culc_apply(arr_range, arg, minp)
+
+    return pandas.Series(output_arr, input_series._index,
+                         name=input_series._name)
+
+
 hpat_pandas_rolling_series_count_impl = register_jitable(
     gen_hpat_pandas_series_rolling_zerominp_impl(arr_nonnan_count, float64))
 hpat_pandas_rolling_series_max_impl = register_jitable(
@@ -206,6 +244,39 @@ hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min, float64))
 hpat_pandas_rolling_series_sum_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_sum, float64))
+
+
+@sdc_overload_method(SeriesRollingType, 'aggregate')
+def hpat_pandas_series_rolling_aggregate(self, arg):
+
+    ty_checker = TypeChecker('Method rolling.aggregate().')
+    ty_checker.check(self, SeriesRollingType)
+
+    if isinstance(arg, (Tuple, UniTuple)):
+        def hpat_pandas_rolling_series_aggregate_impl(self, arg):
+            win = self._window
+            minp = self._min_periods
+
+            input_series = self._data
+            input_arr = input_series._data
+            length = len(input_arr)
+            output_arr = numpy.empty(length, dtype=float64)
+
+            for func in arg:
+                # TODO: fix issue when iterating over tuple of functions
+                # most likely the issue happens due to heterogeneous tuple
+                pass
+
+            # TODO: return Dataframe
+            return pandas.Series(output_arr, input_series._index,
+                                 name=input_series._name)
+
+        return hpat_pandas_rolling_series_aggregate_impl
+
+    elif isinstance(arg, Callable):
+        return hpat_pandas_series_rolling_apply_impl
+
+    ty_checker.raise_exc(arg, 'callable, tuple of callables', 'arg')
 
 
 @sdc_overload_method(SeriesRollingType, 'count')
