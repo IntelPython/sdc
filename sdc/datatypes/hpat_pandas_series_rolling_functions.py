@@ -36,6 +36,54 @@ from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.utils import sdc_overload_method
 
 
+hpat_pandas_series_rolling_docstring_tmpl = """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.core.window.Rolling.{method_name}
+{limitations_block}
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/rolling/series_rolling_{method_name}.py
+       :language: python
+       :lines: 27-
+       :caption: {example_caption}
+       :name: ex_series_rolling_{method_name}
+
+    .. code-block:: console
+
+        > python ./series_rolling_{method_name}.py{example_result}
+
+    .. seealso::
+        :ref:`Series.rolling <pandas.Series.rolling>`
+            Calling object with a Series.
+        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
+            Calling object with a DataFrame.
+        :ref:`Series.{method_name} <pandas.Series.{method_name}>`
+            Similar method for Series.
+        :ref:`DataFrame.{method_name} <pandas.DataFrame.{method_name}>`
+            Similar method for DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas Series method :meth:`pandas.Series.rolling.{method_name}()` implementation.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_{method_name}
+
+    Parameters
+    ----------
+    self: :class:`pandas.Series.rolling`
+        input arg
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+"""
+
+
 @register_jitable
 def arr_nonnan_count(arr):
     """Count non-NaN values"""
@@ -49,6 +97,15 @@ def arr_max(arr):
         return numpy.nan
 
     return arr.max()
+
+
+@register_jitable
+def arr_mean(arr):
+    """Calculate mean of values"""
+    if len(arr) == 0:
+        return numpy.nan
+
+    return arr.mean()
 
 
 @register_jitable
@@ -132,6 +189,8 @@ hpat_pandas_rolling_series_count_impl = register_jitable(
     gen_hpat_pandas_series_rolling_zerominp_impl(arr_nonnan_count, float64))
 hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max, float64))
+hpat_pandas_rolling_series_mean_impl = register_jitable(
+    gen_hpat_pandas_series_rolling_impl(arr_mean, float64))
 hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min, float64))
 hpat_pandas_rolling_series_sum_impl = register_jitable(
@@ -260,6 +319,15 @@ def hpat_pandas_series_rolling_max(self):
     return hpat_pandas_rolling_series_max_impl
 
 
+@sdc_overload_method(SeriesRollingType, 'mean')
+def hpat_pandas_series_rolling_mean(self):
+
+    ty_checker = TypeChecker('Method rolling.mean().')
+    ty_checker.check(self, SeriesRollingType)
+
+    return hpat_pandas_rolling_series_mean_impl
+
+
 @sdc_overload_method(SeriesRollingType, 'min')
 def hpat_pandas_series_rolling_min(self):
     """
@@ -384,3 +452,24 @@ def hpat_pandas_series_rolling_sum(self):
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_sum_impl
+
+
+hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'mean',
+    'example_caption': 'Calculate the rolling mean of the values.',
+    'example_result':
+    """
+        0         NaN
+        1         NaN
+        2    4.000000
+        3    3.333333
+        4    4.333333
+        dtype: float64
+    """,
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """
+})
