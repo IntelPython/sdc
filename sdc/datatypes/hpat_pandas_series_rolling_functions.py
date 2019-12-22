@@ -117,6 +117,12 @@ def arr_min(arr):
     return arr.min()
 
 
+@register_jitable
+def arr_sum(arr):
+    """Calculate sum of values"""
+    return arr.sum()
+
+
 def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
     """Generate series rolling methods implementations based on input func"""
     nan_out_type = output_type is None
@@ -131,21 +137,21 @@ def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
         out_type = input_arr.dtype if nan_out_type == True else output_type  # noqa
         output_arr = numpy.empty(length, dtype=out_type)
 
-        for i in prange(min(win, length)):
-            arr_range = input_arr[:i + 1]
-            finite_arr = arr_range[numpy.isfinite(arr_range)]
+        def apply_minp(arr, minp):
+            finite_arr = arr[numpy.isfinite(arr)]
             if len(finite_arr) < minp:
-                output_arr[i] = numpy.nan
+                return numpy.nan
             else:
-                output_arr[i] = rolling_func(finite_arr)
+                return rolling_func(finite_arr)
 
-        for i in prange(min(win, length), length):
+        boundary = min(win, length)
+        for i in prange(boundary):
+            arr_range = input_arr[:i + 1]
+            output_arr[i] = apply_minp(arr_range, minp)
+
+        for i in prange(boundary, length):
             arr_range = input_arr[i + 1 - win:i + 1]
-            finite_arr = arr_range[numpy.isfinite(arr_range)]
-            if len(finite_arr) < minp:
-                output_arr[i] = numpy.nan
-            else:
-                output_arr[i] = rolling_func(finite_arr)
+            output_arr[i] = apply_minp(arr_range, minp)
 
         return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
@@ -187,6 +193,8 @@ hpat_pandas_rolling_series_mean_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_mean, float64))
 hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min, float64))
+hpat_pandas_rolling_series_sum_impl = register_jitable(
+    gen_hpat_pandas_series_rolling_impl(arr_sum, float64))
 
 
 @sdc_overload_method(SeriesRollingType, 'count')
@@ -379,6 +387,71 @@ def hpat_pandas_series_rolling_min(self):
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_min_impl
+
+
+@sdc_overload_method(SeriesRollingType, 'sum')
+def hpat_pandas_series_rolling_sum(self):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.core.window.Rolling.sum
+
+    Limitations
+    -----------
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/rolling/series_rolling_sum.py
+       :language: python
+       :lines: 27-
+       :caption: Calculate rolling sum of given Series.
+       :name: ex_series_rolling_sum
+
+    .. code-block:: console
+
+        > python ./series_rolling_sum.py
+        0     NaN
+        1     NaN
+        2    12.0
+        3    10.0
+        4    13.0
+        dtype: float64
+
+    .. seealso::
+        :ref:`Series.rolling <pandas.Series.rolling>`
+            Calling object with a Series.
+        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
+            Calling object with a DataFrame.
+        :ref:`Series.sum <pandas.Series.sum>`
+            Similar method for Series.
+        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
+            Similar method for DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas Series method :meth:`pandas.Series.rolling.sum()` implementation.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_sum
+
+    Parameters
+    ----------
+    self: :class:`pandas.Series.rolling`
+        input arg
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method rolling.sum().')
+    ty_checker.check(self, SeriesRollingType)
+
+    return hpat_pandas_rolling_series_sum_impl
 
 
 hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
