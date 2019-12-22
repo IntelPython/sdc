@@ -29,7 +29,7 @@ import pandas
 
 from numba import prange
 from numba.extending import register_jitable
-from numba.types import float64, Integer, Omitted
+from numba.types import float64, Boolean, Integer, NoneType, Omitted
 
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
@@ -88,6 +88,15 @@ hpat_pandas_series_rolling_docstring_tmpl = """
 def arr_nonnan_count(arr):
     """Count non-NaN values"""
     return len(arr) - numpy.isnan(arr).sum()
+
+
+@register_jitable
+def arr_corr(x, y):
+    """Calculate correlation of values"""
+    if len(x) == 0:
+        return numpy.nan
+
+    return numpy.corrcoef(x, y)[0, 1]
 
 
 @register_jitable
@@ -222,6 +231,67 @@ hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min, float64))
 hpat_pandas_rolling_series_sum_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_sum, float64))
+
+
+@sdc_overload_method(SeriesRollingType, 'corr')
+def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
+
+    ty_checker = TypeChecker('Method rolling.corr().')
+    ty_checker.check(self, SeriesRollingType)
+
+    # TODO: check `other` is Series after a circular import of SeriesType fixed
+    # accepted_other = (bool, Omitted, NoneType, SeriesType)
+    # if not isinstance(other, accepted_other) and other is not None:
+    #     ty_checker.raise_exc(other, 'Series', 'other')
+
+    accepted_pairwise = (bool, Boolean, Omitted, NoneType)
+    if not isinstance(pairwise, accepted_pairwise) and pairwise is not None:
+        ty_checker.raise_exc(pairwise, 'bool', 'pairwise')
+
+    nan_other = isinstance(other, (Omitted, NoneType)) or other is None
+
+    def hpat_pandas_rolling_series_std_impl(self, other=None, pairwise=None):
+        win = self._window
+        minp = self._min_periods
+
+        main_series = self._data
+        main_arr = main_series._data
+        main_arr_length = len(main_arr)
+
+        if nan_other == True:  # noqa
+            other_arr = main_arr
+        else:
+            other_arr = other._data
+
+        other_arr_length = len(other_arr)
+        length = max(main_arr_length, other_arr_length)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        def calc_corr(main, other, minp):
+            # align arrays `main` and `other` by size and finiteness
+            min_length = min(len(main), len(other))
+            main_valid_indices = numpy.isfinite(main[:min_length])
+            other_valid_indices = numpy.isfinite(other[:min_length])
+            valid = main_valid_indices & other_valid_indices
+
+            if len(main[valid]) < minp:
+                return numpy.nan
+            else:
+                return arr_corr(main[valid], other[valid])
+
+        for i in prange(min(win, length)):
+            main_arr_range = main_arr[:i + 1]
+            other_arr_range = other_arr[:i + 1]
+            output_arr[i] = calc_corr(main_arr_range, other_arr_range, minp)
+
+        for i in prange(win, length):
+            main_arr_range = main_arr[i + 1 - win:i + 1]
+            other_arr_range = other_arr[i + 1 - win:i + 1]
+            output_arr[i] = calc_corr(main_arr_range, other_arr_range, minp)
+
+        return pandas.Series(output_arr)
+
+    return hpat_pandas_rolling_series_std_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'count')
@@ -567,6 +637,34 @@ def hpat_pandas_series_rolling_var(self, ddof=1):
 
     return hpat_pandas_rolling_series_var_impl
 
+
+hpat_pandas_series_rolling_corr.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'corr',
+    'example_caption': 'Calculate rolling correlation.',
+    'example_result':
+    """
+        0         NaN
+        1         NaN
+        2         NaN
+        3    0.333333
+        4    0.916949
+        dtype: float64
+    """,
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    Resulting Series has default index and name.
+    """,
+    'extra_params':
+    """
+    other: :obj:`Series`
+        Other Series.
+    pairwise: :obj:`bool`
+        Not relevant for Series.
+    """
+})
 
 hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'mean',
