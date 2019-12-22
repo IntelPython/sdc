@@ -235,69 +235,6 @@ hpat_pandas_rolling_series_sum_impl = register_jitable(
 
 @sdc_overload_method(SeriesRollingType, 'corr')
 def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-    Pandas API: pandas.core.window.Rolling.corr
-
-    Limitations
-    -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
-    Resulting Series has default index and name.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/rolling/series_rolling_corr.py
-       :language: python
-       :lines: 27-
-       :caption: Calculate rolling correlation.
-       :name: ex_series_rolling_corr
-
-    .. code-block:: console
-
-        > python ./series_rolling_corr.py
-        0         NaN
-        1         NaN
-        2         NaN
-        3    0.333333
-        4    0.916949
-        dtype: float64
-
-    .. seealso::
-        :ref:`Series.rolling <pandas.Series.rolling>`
-            Calling object with a Series.
-        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
-            Calling object with a DataFrame.
-        :ref:`Series.corr <pandas.Series.corr>`
-            Similar method for Series.
-        :ref:`DataFrame.corr <pandas.DataFrame.corr>`
-            Similar method for DataFrame.
-        :ref:`rolling.cov <pandas.core.window.Rolling.cov>`
-            Similar method to calculate covariance.
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-
-    Pandas Series method :meth:`pandas.Series.rolling.corr()` implementation.
-
-    .. only:: developer
-
-    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_corr
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series.rolling`
-        input arg
-    other: :obj:`Series`
-        Other Series.
-    pairwise: :obj:`bool`
-        Not relevant for Series.
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
-    """
 
     ty_checker = TypeChecker('Method rolling.corr().')
     ty_checker.check(self, SeriesRollingType)
@@ -700,6 +637,34 @@ def hpat_pandas_series_rolling_var(self, ddof=1):
 
     return hpat_pandas_rolling_series_var_impl
 
+
+hpat_pandas_series_rolling_corr.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'corr',
+    'example_caption': 'Calculate rolling correlation.',
+    'example_result':
+    """
+        0         NaN
+        1         NaN
+        2         NaN
+        3    0.333333
+        4    0.916949
+        dtype: float64
+    """,
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    Resulting Series has default index and name.
+    """,
+    'extra_params':
+    """
+    other: :obj:`Series`
+        Other Series.
+    pairwise: :obj:`bool`
+        Not relevant for Series.
+    """
+})
 
 hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'mean',
