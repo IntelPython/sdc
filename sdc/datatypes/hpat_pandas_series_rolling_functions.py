@@ -109,6 +109,15 @@ def arr_mean(arr):
 
 
 @register_jitable
+def arr_median(arr):
+    """Calculate median of values"""
+    if len(arr) == 0:
+        return numpy.nan
+
+    return numpy.median(arr)
+
+
+@register_jitable
 def arr_min(arr):
     """Calculate minimum of values"""
     if len(arr) == 0:
@@ -191,6 +200,8 @@ hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max, float64))
 hpat_pandas_rolling_series_mean_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_mean, float64))
+hpat_pandas_rolling_series_median_impl = register_jitable(
+    gen_hpat_pandas_series_rolling_impl(arr_median, float64))
 hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min, float64))
 hpat_pandas_rolling_series_sum_impl = register_jitable(
@@ -326,6 +337,15 @@ def hpat_pandas_series_rolling_mean(self):
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_mean_impl
+
+
+@sdc_overload_method(SeriesRollingType, 'median')
+def hpat_pandas_series_rolling_median(self):
+
+    ty_checker = TypeChecker('Method rolling.median().')
+    ty_checker.check(self, SeriesRollingType)
+
+    return hpat_pandas_rolling_series_median_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'min')
@@ -472,4 +492,19 @@ hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_t
     -----------
     Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """
+})
+
+hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'median',
+    'example_caption': 'Calculate the rolling median.',
+    'example_result':
+    """
+        0    NaN
+        1    NaN
+        2    4.0
+        3    3.0
+        4    5.0
+        dtype: float64
+    """,
+    'limitations_block': ''
 })
