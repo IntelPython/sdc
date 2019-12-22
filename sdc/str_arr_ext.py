@@ -752,9 +752,14 @@ def construct_string_array(context, builder):
 @lower_builtin(StringArray)
 @lower_builtin(StringArray, types.List)
 @lower_builtin(StringArray, types.UniTuple)
+@lower_builtin(StringArray, types.Tuple)
 def impl_string_array_single(context, builder, sig, args):
     if isinstance(args[0], types.UniTuple):
         assert args[0].dtype == string_type
+
+    if isinstance(args[0], types.Tuple):
+        for i in args[0]:
+            assert i.dtype  == string_type or i.dtype == types.StringLiteral
 
     if not sig.args:  # return empty string array if no args
         res = context.compile_internal(
