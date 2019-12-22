@@ -29,7 +29,7 @@ import pandas
 
 from numba import prange
 from numba.extending import register_jitable
-from numba.types import float64
+from numba.types import float64, Integer, Omitted
 
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
@@ -75,7 +75,7 @@ hpat_pandas_series_rolling_docstring_tmpl = """
     Parameters
     ----------
     self: :class:`pandas.Series.rolling`
-        input arg
+        input arg{extra_params}
 
     Returns
     -------
@@ -130,6 +130,16 @@ def arr_min(arr):
 def arr_sum(arr):
     """Calculate sum of values"""
     return arr.sum()
+
+
+@register_jitable
+def arr_var(arr, ddof):
+    """Calculate unbiased variance of values"""
+    length = len(arr)
+    if length in [0, ddof]:
+        return numpy.nan
+
+    return numpy.var(arr) * length / (length - ddof)
 
 
 def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
@@ -474,6 +484,45 @@ def hpat_pandas_series_rolling_sum(self):
     return hpat_pandas_rolling_series_sum_impl
 
 
+@sdc_overload_method(SeriesRollingType, 'var')
+def hpat_pandas_series_rolling_var(self, ddof=1):
+
+    ty_checker = TypeChecker('Method rolling.var().')
+    ty_checker.check(self, SeriesRollingType)
+
+    if not isinstance(ddof, (int, Integer, Omitted)):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
+
+    def hpat_pandas_rolling_series_var_impl(self, ddof=1):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        def culc_var(arr, ddof, minp):
+            finite_arr = arr[numpy.isfinite(arr)]
+            if len(finite_arr) < minp:
+                return numpy.nan
+            else:
+                return arr_var(finite_arr, ddof)
+
+        boundary = min(win, length)
+        for i in prange(boundary):
+            arr_range = input_arr[:i + 1]
+            output_arr[i] = culc_var(arr_range, ddof, minp)
+
+        for i in prange(boundary, length):
+            arr_range = input_arr[i + 1 - win:i + 1]
+            output_arr[i] = culc_var(arr_range, ddof, minp)
+
+        return pandas.Series(output_arr, input_series._index, name=input_series._name)
+
+    return hpat_pandas_rolling_series_var_impl
+
+
 hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'mean',
     'example_caption': 'Calculate the rolling mean of the values.',
@@ -491,7 +540,8 @@ hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_t
     Limitations
     -----------
     Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
-    """
+    """,
+    'extra_params': ''
 })
 
 hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
@@ -506,5 +556,31 @@ hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring
         4    5.0
         dtype: float64
     """,
-    'limitations_block': ''
+    'limitations_block': '',
+    'extra_params': ''
+})
+
+hpat_pandas_series_rolling_var.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'var',
+    'example_caption': 'Calculate unbiased rolling variance.',
+    'example_result':
+    """
+        0         NaN
+        1         NaN
+        2    1.000000
+        3    2.333333
+        4    4.333333
+        dtype: float64
+    """,
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """,
+    'extra_params':
+    """
+    ddof: :obj:`int`
+        Delta Degrees of Freedom.
+    """
 })
