@@ -29,11 +29,18 @@ import pandas
 
 from numba import prange
 from numba.extending import register_jitable
-from numba.types import float64
+from numba.types import float64, Boolean, NoneType, Omitted
 
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.utils import sdc_overload_method
+
+
+@register_jitable
+def arr_apply(arr, func):
+    """Apply function for values"""
+    # Use np.apply_along_axis when it's supported by Numba to apply array with infinite values
+    return func(arr)
 
 
 @register_jitable
@@ -128,6 +135,112 @@ hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max, float64))
 hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min, float64))
+
+
+@sdc_overload_method(SeriesRollingType, 'apply')
+def hpat_pandas_series_rolling_apply(self, func, raw=None):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.core.window.Rolling.apply
+
+    Limitations
+    -----------
+    Supported ``raw`` only can be `None` or `True`.
+    Series elements cannot be max/min float/integer and infinite.
+    Otherwise SDC and Pandas results are different.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/rolling/series_rolling_apply.py
+       :language: python
+       :lines: 27-
+       :caption: Calculate the rolling apply.
+       :name: ex_series_rolling_apply
+
+    .. code-block:: console
+
+        > python ./series_rolling_apply.py
+        0    NaN
+        1    NaN
+        2    4.0
+        3    3.0
+        4    5.0
+        dtype: float64
+
+    .. seealso::
+        :ref:`Series.rolling <pandas.Series.rolling>`
+            Calling object with a Series.
+        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
+            Calling object with a DataFrame.
+        :ref:`Series.apply <pandas.Series.apply>`
+            Similar method for Series.
+        :ref:`DataFrame.apply <pandas.DataFrame.apply>`
+            Similar method for DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas Series method :meth:`pandas.Series.rolling.apply()` implementation.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_apply
+
+    Parameters
+    ----------
+    self: :class:`pandas.Series.rolling`
+        input arg
+    func: :obj:`function`
+        A single value producer
+    raw: :obj:`bool`
+        False : passes each row or column as a Series to the function.
+        True or None : the passed function will receive ndarray objects instead.
+    *args:
+        Arguments to be passed into func.
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    ty_checker = TypeChecker('Method rolling.apply().')
+    ty_checker.check(self, SeriesRollingType)
+
+    raw_accepted = (Omitted, NoneType, Boolean)
+    if not isinstance(raw, raw_accepted) and raw is not None:
+        ty_checker.raise_exc(raw, 'bool', 'raw')
+
+    def hpat_pandas_rolling_series_apply_impl(self, func, raw=None):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        def culc_apply(arr, func, minp):
+            finite_arr = arr[numpy.isfinite(arr)]
+            if len(finite_arr) < minp:
+                return numpy.nan
+            else:
+                return arr_apply(finite_arr, func)
+
+        boundary = min(win, length)
+        for i in prange(boundary):
+            arr_range = input_arr[:i + 1]
+            output_arr[i] = culc_apply(arr_range, func, minp)
+
+        for i in prange(min(win, length), length):
+            arr_range = input_arr[i + 1 - win:i + 1]
+            output_arr[i] = culc_apply(arr_range, func, minp)
+
+        return pandas.Series(output_arr, input_series._index, name=input_series._name)
+
+    return hpat_pandas_rolling_series_apply_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'count')
