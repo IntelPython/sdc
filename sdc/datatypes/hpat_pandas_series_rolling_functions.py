@@ -75,7 +75,7 @@ hpat_pandas_series_rolling_docstring_tmpl = """
     Parameters
     ----------
     self: :class:`pandas.Series.rolling`
-        input arg
+        input arg{extra_params}
 
     Returns
     -------
@@ -486,64 +486,6 @@ def hpat_pandas_series_rolling_sum(self):
 
 @sdc_overload_method(SeriesRollingType, 'var')
 def hpat_pandas_series_rolling_var(self, ddof=1):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-    Pandas API: pandas.core.window.Rolling.var
-
-    Limitations
-    -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/rolling/series_rolling_var.py
-       :language: python
-       :lines: 27-
-       :caption: Calculate unbiased rolling variance.
-       :name: ex_series_rolling_var
-
-    .. code-block:: console
-
-        > python ./series_rolling_var.py
-        0         NaN
-        1         NaN
-        2    1.000000
-        3    2.333333
-        4    4.333333
-        dtype: float64
-
-    .. seealso::
-        :ref:`Series.rolling <pandas.Series.rolling>`
-            Calling object with a Series.
-        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
-            Calling object with a DataFrame.
-        :ref:`Series.var <pandas.Series.var>`
-            Similar method for Series.
-        :ref:`DataFrame.var <pandas.DataFrame.var>`
-            Similar method for DataFrame.
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-
-    Pandas Series method :meth:`pandas.Series.rolling.var()` implementation.
-
-    .. only:: developer
-
-    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_var
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series.rolling`
-        input arg
-    ddof: :obj:`int`
-        Delta Degrees of Freedom.
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
-    """
 
     ty_checker = TypeChecker('Method rolling.var().')
     ty_checker.check(self, SeriesRollingType)
@@ -598,7 +540,8 @@ hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_t
     Limitations
     -----------
     Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
-    """
+    """,
+    'extra_params': ''
 })
 
 hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
@@ -613,5 +556,31 @@ hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring
         4    5.0
         dtype: float64
     """,
-    'limitations_block': ''
+    'limitations_block': '',
+    'extra_params': ''
+})
+
+hpat_pandas_series_rolling_var.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'var',
+    'example_caption': 'Calculate unbiased rolling variance.',
+    'example_result':
+    """
+        0         NaN
+        1         NaN
+        2    1.000000
+        3    2.333333
+        4    4.333333
+        dtype: float64
+    """,
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """,
+    'extra_params':
+    """
+    ddof: :obj:`int`
+        Delta Degrees of Freedom.
+    """
 })
