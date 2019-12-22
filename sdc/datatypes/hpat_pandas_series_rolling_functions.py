@@ -341,58 +341,6 @@ def hpat_pandas_series_rolling_mean(self):
 
 @sdc_overload_method(SeriesRollingType, 'median')
 def hpat_pandas_series_rolling_median(self):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-    Pandas API: pandas.core.window.Rolling.median
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/rolling/series_rolling_median.py
-       :language: python
-       :lines: 27-
-       :caption: Calculate the rolling median.
-       :name: ex_series_rolling_median
-
-    .. code-block:: console
-
-        > python ./series_rolling_median.py
-        0    NaN
-        1    NaN
-        2    4.0
-        3    3.0
-        4    5.0
-        dtype: float64
-
-    .. seealso::
-        :ref:`Series.rolling <pandas.Series.rolling>`
-            Calling object with a Series.
-        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
-            Calling object with a DataFrame.
-        :ref:`Series.median <pandas.Series.median>`
-            Similar method for Series.
-        :ref:`DataFrame.median <pandas.DataFrame.median>`
-            Similar method for DataFrame.
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-
-    Pandas Series method :meth:`pandas.Series.rolling.median()` implementation.
-
-    .. only:: developer
-
-    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_median
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series.rolling`
-        input arg
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
-    """
 
     ty_checker = TypeChecker('Method rolling.median().')
     ty_checker.check(self, SeriesRollingType)
@@ -544,4 +492,19 @@ hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_t
     -----------
     Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """
+})
+
+hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'median',
+    'example_caption': 'Calculate the rolling median.',
+    'example_result':
+    """
+        0    NaN
+        1    NaN
+        2    4.0
+        3    3.0
+        4    5.0
+        dtype: float64
+    """,
+    'limitations_block': ''
 })
