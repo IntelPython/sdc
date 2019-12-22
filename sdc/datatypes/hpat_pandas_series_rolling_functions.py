@@ -206,72 +206,6 @@ hpat_pandas_rolling_series_sum_impl = register_jitable(
 
 @sdc_overload_method(SeriesRollingType, 'apply')
 def hpat_pandas_series_rolling_apply(self, func, raw=None):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-    Pandas API: pandas.core.window.Rolling.apply
-
-    Limitations
-    -----------
-    Supported ``raw`` only can be `None` or `True`.
-    Series elements cannot be max/min float/integer and infinite.
-    Otherwise SDC and Pandas results are different.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/rolling/series_rolling_apply.py
-       :language: python
-       :lines: 27-
-       :caption: Calculate the rolling apply.
-       :name: ex_series_rolling_apply
-
-    .. code-block:: console
-
-        > python ./series_rolling_apply.py
-        0    NaN
-        1    NaN
-        2    4.0
-        3    3.0
-        4    5.0
-        dtype: float64
-
-    .. seealso::
-        :ref:`Series.rolling <pandas.Series.rolling>`
-            Calling object with a Series.
-        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
-            Calling object with a DataFrame.
-        :ref:`Series.apply <pandas.Series.apply>`
-            Similar method for Series.
-        :ref:`DataFrame.apply <pandas.DataFrame.apply>`
-            Similar method for DataFrame.
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-
-    Pandas Series method :meth:`pandas.Series.rolling.apply()` implementation.
-
-    .. only:: developer
-
-    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_apply
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series.rolling`
-        input arg
-    func: :obj:`function`
-        A single value producer
-    raw: :obj:`bool`
-        False : passes each row or column as a Series to the function.
-        True or None : the passed function will receive ndarray objects instead.
-    *args:
-        Arguments to be passed into func.
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
-    """
 
     ty_checker = TypeChecker('Method rolling.apply().')
     ty_checker.check(self, SeriesRollingType)
@@ -566,6 +500,28 @@ def hpat_pandas_series_rolling_sum(self):
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_sum_impl
+
+
+hpat_pandas_series_rolling_apply.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'apply',
+    'example_caption': 'Calculate the rolling apply.',
+    'example_result':
+    """
+        0    NaN
+        1    NaN
+        2    4.0
+        3    3.0
+        4    5.0
+        dtype: float64
+    """,
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    Supported ``raw`` only can be `None` or `True`.
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """
+})
 
 
 hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
