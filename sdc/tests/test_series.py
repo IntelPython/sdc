@@ -1058,13 +1058,35 @@ class TestSeries(TestCase):
         pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
 
     @skip_sdc_jit('Not impl in old style')
+    def test_series_getitem_series_list_bool(self):
+        def test_impl(A, B):
+            return A[B]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([2, 3, 1, 5], [11, 2, 44, 5])
+        S2 = pd.Series([True, False, False, True], [11, 2, 44, 5])
+        pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
+
+    @skip_sdc_jit('Not impl in old style')
+    def test_series_getitem_series_list_bool2(self):
+        def test_impl(A, B):
+            return A[B]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([2, 3, 1, 5])
+        S2 = pd.Series([True, False, False, True])
+        pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
+
+    @skip_sdc_jit('Not impl in old style')
     def test_series_getitem_series(self):
         def test_impl(A, B):
             return A[B]
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([1, 2, 3, 4, 5], [6, 7, 8, 9, 0])
+        S = pd.Series([1, 2, 3, 4, 5], [6, 0, 8, 0, 0])
         S2 = pd.Series([8, 6, 0], [12, 11, 14])
+        print(hpat_func(S, S2))
+        print(test_impl(S, S2))
         pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
     @skip_sdc_jit('Not impl in old style')
@@ -1213,6 +1235,15 @@ class TestSeries(TestCase):
         hpat_func = self.jit(test_impl)
 
         S = pd.Series([2, 4, 6, 6, 3])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit('Not impl in old style')
+    def test_series_slice_nonidx_nostart(self):
+        def test_impl(A):
+            return A.loc[-4:301]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([2, 4, 6, 6, 3], [-22, -5, -2, 300, 40000])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')

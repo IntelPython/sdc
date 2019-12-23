@@ -33,6 +33,7 @@ import numba
 import numpy
 import operator
 import pandas
+import math
 
 from numba.errors import TypingError
 from numba.extending import overload, overload_method, overload_attribute
@@ -91,10 +92,11 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
             return hpat_pandas_series_iloc_slice_impl
 
-        def hpat_pandas_series_iloc_impl(self, idx):
-            return self._series._data[idx]
+        if isinstance(idx, (int, types.Integer, types.Integer)):
+            def hpat_pandas_series_iloc_impl(self, idx):
+                return self._series._data[idx]
 
-        return hpat_pandas_series_iloc_impl
+            return hpat_pandas_series_iloc_impl
 
     if accessor == 'iat':
         if isinstance(idx, (int, types.Integer)):
@@ -107,32 +109,85 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
     if accessor == 'loc':
     #note: Loc return Series
+    #note: Index 0 in slice not supported
         index_is_none = (self.series.index is None or
                          isinstance(self.series.index, numba.types.misc.NoneType))
         if isinstance(idx, types.SliceType) and not index_is_none:
             def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
+                max_slice = 9223372036854775807
                 start = -1
                 stop = -1
+                is_monotonic = True
+                inc = 0
+                dec = 0
                 for i in numba.prange(len(self._series._index)):
+                    if i > 0:
+                        if self._series._index[i-1] > self._series._index[i]:
+                            dec = 1
+                        else:
+                            inc = 1
                     if self._series._index[i] == idx.start and start == -1:
                         start = i
                     if self._series._index[i] == idx.stop and start != -1 and stop == -1:
-                        stop = i 
+                        stop = i
+                if inc + dec != 1:
+                    is_monotonic = False
+                start_value = max_slice
+                tmp = 0
+                if (start == -1 and is_monotonic == True):
+                    for i in numba.prange(len(self._series._index)):
+                        if idx.start < self._series._index[i]:
+                            if ((idx.start < 0 and
+                                self._series._index[i] > 0 or
+                                idx.start > 0
+                                and self._series._index[i] < 0)):
+                                t = (math.fabs(idx.start) +
+                                    math.fabs(self._series._index[i]))
+                                if t < start_value:
+                                    tmp = i
+                                    start_value = t
+                            else:
+                                t = (math.fabs(idx.start -
+                                    self._series._index[i]))
+                                if t < start_value:
+                                    tmp = i
+                                    start_value = t
+                    start = tmp
+                end_value = max_slice
+                tmp = 0
+                if (stop == -1 and is_monotonic == True):
+                    for i in numba.prange(len(self._series._index)):
+                        if idx.stop > self._series._index[i]:
+                            if ((idx.stop < 0 and
+                                self._series._index[i] > 0 or
+                                idx.stop > 0
+                                and self._series._index[i] < 0)):
+                                t = (math.fabs(idx.stop) +
+                                    math.fabs(self._series._index[i]))
+                                if t < end_value:
+                                    tmp = i
+                                    end_value = t
+                            else:
+                                t = (math.fabs(idx.stop -
+                                    self._series._index[i]))
+                                if t < end_value:
+                                    tmp = i
+                                    end_value = t
+                    stop = tmp
+                if idx.start == 0:
+                    start = 0
+                if idx.stop == max_slice:
+                    stop = max_slice - 1
+                if not is_monotonic and start == -1 and stop == -1:
+                    raise ValueError("Incorrect values entered")
                 return pandas.Series(self._series._data[start:stop+1], self._series._index[start:stop+1])
 
             return hpat_pandas_series_getitem_idx_slice_impl
 
         if isinstance(idx, types.SliceType) and index_is_none:
             def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
-                start = -1
-                stop = -1
                 index = numpy.arange(len(self._series._data))
-                for i in numba.prange(len(index)):
-                    if index[i] == idx.start and start == -1:
-                        start = i
-                    if index[i] == idx.stop and start != -1 and stop == -1:
-                        stop = i 
-                return pandas.Series(self._series._data[start:stop+1], index[start:stop+1])
+                return pandas.Series(self._series._data[idx.start:idx.stop+1], index[idx.start:idx.stop+1])
 
             return hpat_pandas_series_getitem_idx_slice_impl
 
@@ -240,37 +295,51 @@ def hpat_pandas_series_getitem(self, idx):
 
         return hpat_pandas_series_getitem_idx_slice_impl
 
-    if isinstance(idx, (types.List, types.Array)):
+    if (isinstance(idx, (types.List, types.Array)) and
+        isinstance(idx.dtype, (types.Boolean, bool))):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
-            if (idx[0] == True or idx[0] == False):
-                return pandas.Series(self._data[idx], self.index[idx])
+            return pandas.Series(self._data[idx], self.index[idx])
         return hpat_pandas_series_getitem_idx_list_impl
 
     if (isinstance(self.index, types.NoneType) and isinstance(idx, SeriesType)):
-        def hpat_pandas_series_getitem_idx_list_impl(self, idx):
-            if (idx._data[0] == True or idx._data[0] == False):
+        if isinstance(idx.data.dtype, (types.Boolean, bool)):
+            def hpat_pandas_series_getitem_idx_list_impl(self, idx):
                 index = numpy.arange(len(self._data))
-                return pandas.Series(self._data[idx._data], index[idx._data])
+                if (index != idx.index).sum() == 0:
+                    return pandas.Series(self._data[idx._data], index[idx._data])
+
+            return hpat_pandas_series_getitem_idx_list_impl
+
+        def hpat_pandas_series_getitem_idx_list_impl(self, idx):
             res = numpy.copy(self._data[:len(idx._data)])
             index = numpy.arange(len(self._data))
             for i in numba.prange(len(res)):
                 for j in numba.prange(len(index)):
-                    if index[j] == idx._data[i]:
+                    if j == idx._data[i]:
                         res[i] = self._data[j]
             return pandas.Series(res, index[idx._data])
         return hpat_pandas_series_getitem_idx_list_impl
 
     if (isinstance(idx, SeriesType) and not isinstance(self.index, types.NoneType)):
     #Series with str index not implement
+        if isinstance(idx.data.dtype, (types.Boolean, bool)):
+            def hpat_pandas_series_getitem_idx_series_impl(self, idx):
+                if (self._index != idx._index).sum() == 0:
+                    return pandas.Series(self._data[idx._data], self._index[idx._data])
+
+            return hpat_pandas_series_getitem_idx_series_impl
+
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
-            if (idx._data[0] is True or idx._data[0] is False):
-                return pandas.Series(self._data[idx._data], self._index[idx._data])
-            res = numpy.copy(self._data[:len(idx._data)])
-            for i in numba.prange(len(res)):
+            res = []
+            for i in numba.prange(len(idx._data)):
+                temp = []
                 for j in numba.prange(len(self.index)):
                     if self.index[j] == idx._data[i]:
-                        res[i] = self._data[j]
-            return pandas.Series(res, idx._data)
+                        temp.append(self._data[j])
+                res.append(temp)
+            new_data = numpy.array([value for arr in res for value in arr])
+            new_index = numpy.array([idx._data[arr] for arr in range(len(res)) for value in range(len(res[arr]))])
+            return pandas.Series(new_data, new_index)
 
         return hpat_pandas_series_getitem_idx_series_impl
 

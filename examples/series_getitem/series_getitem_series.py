@@ -33,7 +33,7 @@ from numba import njit
 def series_getitem_series():
     series = pd.Series(np.arange(10, 0, -1))  # Series of 10, 9, ..., 1
     indices = pd.Series(np.asarray([1, 6, 7, 8, 9]))
-    return series[indices]  # Accessing series by scalar index
+    return series[indices]  # Accessing series by series
     # Expected Series:
     # 1    9
     # 6    4
