@@ -208,6 +208,7 @@ if __name__ == '__main__':
         passed_examples = []
         failed_examples = []
         expected_failures = []
+        unexpected_success = []
         expected_failures_list = ['basic_workflow.py', 'basic_workflow_parallel.py']
 
         os.chdir(sdc_examples)
@@ -225,6 +226,8 @@ if __name__ == '__main__':
                     format_print(f'Execute {item}')
                     try:
                         run_command(f'{test_env_activate} && python {item}')
+                        if item in expected_failures_list:
+                            unexpected_success.append(item)
                     except Exception:
                         if item in expected_failures_list:
                             expected_failures.append(item)
@@ -239,20 +242,26 @@ if __name__ == '__main__':
         total_passed = len(passed_examples)
         total_failed = len(failed_examples)
         total_expected_failures = len(expected_failures)
-        total_run = total_passed + total_failed + total_expected_failures
+        total_unexpected_success = len(unexpected_success)
+        total_run = total_passed + total_failed + total_expected_failures + total_unexpected_success
         format_print(' '.join([f'SDC examples summary:',
                                f'{total_run} RUN,',
                                f'{total_passed} PASSED,',
                                f'{total_failed} FAILED,',
-                               f'{total_expected_failures} EXPECTED FAILURES']))
+                               f'{total_expected_failures} EXPECTED FAILURES',
+                               f'{total_unexpected_success} UNEXPECTED SUCCESS',
+                               ]))
         for item in passed_examples:
             format_print(f' - {item}: PASSED', new_block=False)
         for item in failed_examples:
             format_print(f' - {item}: FAILED', new_block=False)
         for item in expected_failures:
             format_print(f' - {item}: EXPECTED FAILED', new_block=False)
+        for item in unexpected_success:
+            format_print(f' - {item}: UNEXPECTED SUCCESS', new_block=False)
 
-        sys.exit(0 if total_failed == 0 else -1)
+        success = (total_failed + total_unexpected_success) == 0
+        sys.exit(0 if success else -1)
 
     # Benchmark tests
     if test_mode == 'benchmark':
