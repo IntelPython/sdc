@@ -136,14 +136,6 @@ def arr_min(arr):
 
 
 @register_jitable
-def _chk_asarray(a, axis):
-    if axis is None:
-        return numpy.ravel(a), 0
-
-    return numpy.asarray(a), axis
-
-
-@register_jitable
 def _moment(arr, moment):
     mn = numpy.mean(arr)
     s = numpy.power((arr - mn), moment)
