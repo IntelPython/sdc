@@ -671,18 +671,13 @@ class TestRolling(TestCase):
         indices = [list(range(len(data)))[::-1] for data in all_data]
         for data, index in zip(all_data, indices):
             series = pd.Series(data, index, name='A')
-            for window in range(0, len(series) + 3, 2):
-                for min_periods in range(0, window + 1, 2):
+            for window in range(3, len(series) + 1):
+                for min_periods in range(window + 1):
                     with self.subTest(series=series, window=window,
                                       min_periods=min_periods):
-                        try:
-                            ref_result = test_impl(series, window, min_periods)
-                        except ValueError:
-                            # sometimes Pandas overwrites min_periods and fails
-                            pass
-                        else:
-                            jit_result = hpat_func(series, window, min_periods)
-                            pd.testing.assert_series_equal(jit_result, ref_result)
+                        ref_result = test_impl(series, window, min_periods)
+                        jit_result = hpat_func(series, window, min_periods)
+                        pd.testing.assert_series_equal(jit_result, ref_result)
 
     @skip_sdc_jit('Series.rolling.std() unsupported Series index')
     def test_series_rolling_std(self):
