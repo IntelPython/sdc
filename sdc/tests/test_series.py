@@ -1331,6 +1331,7 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         np.testing.assert_array_equal(hpat_func(df.A, 1), test_impl(df.A, 1))
 
+    @skip_numba_jit
     def test_list_convert(self):
         def test_impl():
             df = pd.DataFrame({'one': np.array([-1, np.nan, 2.5]),
