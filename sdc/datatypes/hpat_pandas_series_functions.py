@@ -1347,6 +1347,33 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
 @sdc_overload_method(SeriesType, 'head')
 def hpat_pandas_series_head(self, n=5):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.div
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_head.py
+       :language: python
+       :lines: 27-
+       :caption: Getting the first n rows.
+       :name: ex_series_head
+
+    .. code-block:: console
+
+        > python ./series/series_head.py
+        0    7
+        2    6
+        4    5
+        dtype: int64
+
+    .. seealso::
+
+        :ref:`DataFrame.tail <pandas.DataFrame.tail>`
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.head` implementation.
 
     .. only:: developer
@@ -1364,8 +1391,8 @@ def hpat_pandas_series_head(self, n=5):
 
     _func_name = 'Method head().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not isinstance(n, (types.Integer, types.Omitted)) and n != 5:
         raise TypingError('{} The parameter must be an integer type. Given type n: {}'.format(_func_name, n))
@@ -1454,9 +1481,32 @@ def hpat_pandas_series_groupby(
 
 
 @sdc_overload_method(SeriesType, 'isnull')
-@sdc_overload_method(SeriesType, 'isna')
-def hpat_pandas_series_isna(self):
+def hpat_pandas_series_isnull(self):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.isnull
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_isnull.py
+       :language: python
+       :lines: 27-
+       :caption: Detect missing values.
+       :name: ex_series_isnull
+
+    .. code-block:: console
+
+        > python ./series/series_isnull.py
+        0    False
+        1     True
+        2    False
+        3    False
+        dtype: bool
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.isna` and :meth:`pandas.Series.isnull` implementation.
 
     .. only:: developer
@@ -1468,29 +1518,113 @@ def hpat_pandas_series_isna(self):
     Parameters
     -----------
     self : :obj:`pandas.Series` object
-               input argument
+        input argument
 
     Returns
     -------
     :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
+        returns :obj:`pandas.Series` object
     """
 
-    _func_name = 'Method isna/isnull().'
+    _func_name = 'Method isnull().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError(
-            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if isinstance(self.data.dtype, (types.Integer, types.Float)):
-
         def hpat_pandas_series_isna_impl(self):
             return pandas.Series(numpy.isnan(self._data))
 
         return hpat_pandas_series_isna_impl
 
     if isinstance(self.data.dtype, types.UnicodeType):
+        def hpat_pandas_series_isna_impl(self):
+            result = numpy.empty(len(self._data), numpy.bool_)
+            byte_size = 8
+            # iterate over bits in StringArrayType null_bitmap and fill array indicating if array's element are NaN
+            for i in range(len(self._data)):
+                bmap_idx = i // byte_size
+                bit_idx = i % byte_size
+                bmap = self._data.null_bitmap[bmap_idx]
+                bit_value = (bmap >> bit_idx) & 1
+                result[i] = bit_value == 0
+            return pandas.Series(result)
 
+        return hpat_pandas_series_isna_impl
+
+
+@sdc_overload_method(SeriesType, 'isna')
+def hpat_pandas_series_isna(self):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.isna
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_isna.py
+       :language: python
+       :lines: 27-
+       :caption: Detect missing values.
+       :name: ex_series_isna
+
+    .. code-block:: console
+
+        > python ./series/series_isna.py
+        0    False
+        1     True
+        2    False
+        3    False
+        dtype: bool
+
+    .. seealso::
+
+        :ref:`Series.isnull <pandas.Series.isnull>`
+            Alias of isna.
+
+        :ref:`Series.notna <pandas.Series.notna>`
+            Boolean inverse of isna.
+
+        :ref:`Series.dropna <pandas.Series.dropna>`
+            Omit axes labels with missing values.
+
+        `pandas.absolute <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.isna.html#pandas.isna>`_
+            Top-level isna.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas Series method :meth:`pandas.Series.isna` and :meth:`pandas.Series.isnull` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isna1
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_str_isna1
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isnull1
+
+    Parameters
+    -----------
+    self : :obj:`pandas.Series` object
+        input argument
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+        returns :obj:`pandas.Series` object
+    """
+
+    _func_name = 'Method isna().'
+
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
+
+    if isinstance(self.data.dtype, (types.Integer, types.Float)):
+        def hpat_pandas_series_isna_impl(self):
+            return pandas.Series(numpy.isnan(self._data))
+
+        return hpat_pandas_series_isna_impl
+
+    if isinstance(self.data.dtype, types.UnicodeType):
         def hpat_pandas_series_isna_impl(self):
             result = numpy.empty(len(self._data), numpy.bool_)
             byte_size = 8
@@ -1509,6 +1643,44 @@ def hpat_pandas_series_isna(self):
 @sdc_overload_method(SeriesType, 'notna')
 def hpat_pandas_series_notna(self):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.notna
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_notna.py
+       :language: python
+       :lines: 27-
+       :caption: Detect existing (non-missing) values.
+       :name: ex_series_notna
+
+    .. code-block:: console
+
+        > python ./series/series_notna.py
+        0     True
+        1    False
+        2     True
+        3     True
+        dtype: bool
+
+    .. seealso::
+
+        :ref:`Series.notnull <pandas.Series.notnull>`
+            Alias of notna.
+
+        :ref:`Series.isna <pandas.Series.isna>`
+            Boolean inverse of notna.
+
+        :ref:`Series.dropna <pandas.Series.dropna>`
+            Omit axes labels with missing values.
+
+        `pandas.absolute <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.notna.html#pandas.notna>`_
+            Top-level notna.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.notna` implementation.
 
     .. only:: developer
@@ -1528,8 +1700,8 @@ def hpat_pandas_series_notna(self):
 
     _func_name = 'Method notna().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if isinstance(self.data.dtype, types.Number):
         def hpat_pandas_series_notna_impl(self):
@@ -1548,10 +1720,39 @@ def hpat_pandas_series_notna(self):
 @sdc_overload_method(SeriesType, 'ne')
 def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.ne
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_ne.py
+       :language: python
+       :lines: 27-
+       :caption: Element-wise not equal of one Series by another (binary operator ne)
+       :name: ex_series_ne
+
+    .. code-block:: console
+
+        > python ./series/series_ne.py
+        0     True
+        1     True
+        2    False
+        3     True
+        4     True
+        dtype: bool
+
+    .. note::
+
+        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.ne` implementation.
     .. only:: developer
 
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
+       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8*
 
     Parameters
     ----------
@@ -1560,61 +1761,44 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
         input arg
     level: :obj:`int` or name
-         *unsupported*
+        *unsupported*
     fill_value: :obj:`float` or None, default None
-              *unsupported*
+        *unsupported*
     axis: default 0
-         *unsupported*
+        *unsupported*
     Returns
     -------
     :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
+        returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method ne().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not (isinstance(level, types.Omitted) or level is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(level, 'None', 'level')
 
     if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(axis, 'int', 'axis')
 
     if isinstance(other, SeriesType):
         def hpat_pandas_series_ne_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
-            """
-
             return pandas.Series(self._data != other._data)
 
         return hpat_pandas_series_ne_impl
 
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
+    if isinstance(other, types.Number):
         def hpat_pandas_series_ne_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_integer_scalar
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_float_scalar
-            """
-
             return pandas.Series(self._data != other)
 
         return hpat_pandas_series_ne_impl
 
-    raise TypingError(
-        '{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(
-            _func_name, self, other))
+    ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
 @sdc_overload_method(SeriesType, 'add')
@@ -1907,52 +2091,80 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
 @sdc_overload_method(SeriesType, 'idxmax')
 def hpat_pandas_series_idxmax(self, axis=None, skipna=True):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.idxmax
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_idxmax.py
+       :language: python
+       :lines: 27-
+       :caption: Getting the row label of the maximum value.
+       :name: ex_series_idxmax
+
+    .. code-block:: console
+
+        > python ./series/series_idxmax.py
+        A
+
+    .. note::
+
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        :ref:`Series.idxmin <pandas.Series.idxmin>`
+            Return index label of the first occurrence of minimum of values.
+
+        `numpy.absolute <https://docs.scipy.org/doc/numpy/reference/generated/numpy.argmax.html#numpy.argmax>`_
+            Return indices of the maximum values along the given axis.
+
+        :ref:`DataFrame.idxmax <pandas.DataFrame.idxmax>`
+            Return index of first occurrence of maximum over requested axis.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.idxmax` implementation.
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmax1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmax_str_idx
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmax_noidx
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmax_idx
+        Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmax*
 
     Parameters
     -----------
     axis :  :obj:`int`, :obj:`str`, default: None
-            Axis along which the operation acts
-            0/None - row-wise operation
-            1      - column-wise operation
-            *unsupported*
+        Axis along which the operation acts
+        0/None - row-wise operation
+        1      - column-wise operation
+        *unsupported*
     skipna:  :obj:`bool`, default: True
-            exclude NA/null values
-            *unsupported*
+        exclude NA/null values
     Returns
     -------
     :obj:`pandas.Series.index` or nan
-            returns: Label of the minimum value.
+        returns: Label of the minimum value.
     """
 
     _func_name = 'Method idxmax().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not isinstance(self.data.dtype, types.Number):
         raise TypingError('{} Numeric values supported only. Given: {}'.format(_func_name, self.data.dtype))
 
     if not (isinstance(skipna, (types.Omitted, types.Boolean, bool)) or skipna is True):
-        raise TypingError("{} 'skipna' must be a boolean type. Given: {}".format(_func_name, skipna))
+        ty_checker.raise_exc(skipna, 'bool', 'skipna')
 
     if not (isinstance(axis, types.Omitted) or axis is None):
-        raise TypingError("{} 'axis' unsupported. Given: {}".format(_func_name, axis))
-
-    if not (isinstance(skipna, types.Omitted) or skipna is True):
-        raise TypingError("{} 'skipna' unsupported. Given: {}".format(_func_name, skipna))
+        ty_checker.raise_exc(axis, 'None', 'axis')
 
     if isinstance(self.index, types.NoneType) or self.index is None:
         def hpat_pandas_series_idxmax_impl(self, axis=None, skipna=True):
-
             return numpy.argmax(self._data)
 
         return hpat_pandas_series_idxmax_impl
+
     else:
         def hpat_pandas_series_idxmax_index_impl(self, axis=None, skipna=True):
             # no numpy.nanargmax is supported by Numba at this time
@@ -2176,9 +2388,44 @@ def hpat_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0
 @sdc_overload_method(SeriesType, 'pow')
 def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.pow
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_pow.py
+       :language: python
+       :lines: 27-
+       :caption: Element-wise power of one Series by another (binary operator pow)
+       :name: ex_series_pow
+
+    .. code-block:: console
+
+        > python ./series/series_pow.py
+        0     1
+        1    16
+        2    27
+        3    64
+        4     1
+        dtype: int64
+
+    .. note::
+
+        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        :ref:`Series.rpow <pandas.Series.rpow>`
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.pow` implementation.
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
+
+       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5*
+
     Parameters
     ----------
     self: :class:`pandas.Series`
@@ -2186,61 +2433,44 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
     other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
         input arg
     level: :obj:`int` or name
-         *unsupported*
+        *unsupported*
     fill_value: :obj:`float` or None, default None
-              *unsupported*
+        *unsupported*
     axis: default 0
-         *unsupported*
+        *unsupported*
     Returns
     -------
     :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
+        returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method pow().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not (isinstance(level, types.Omitted) or level is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(level, 'None', 'level')
 
     if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(axis, 'int', 'axis')
 
     if isinstance(other, SeriesType):
         def hpat_pandas_series_pow_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
-            """
-
             return pandas.Series(self._data ** other._data)
 
         return hpat_pandas_series_pow_impl
 
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
+    if isinstance(other, types.Number):
         def hpat_pandas_series_pow_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_integer_scalar
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
-            """
-
             return pandas.Series(self._data ** other)
 
         return hpat_pandas_series_pow_impl
 
-    raise TypingError(
-        '{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(
-            _func_name, self, other))
+    ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
 @sdc_overload_method(SeriesType, 'prod')
@@ -2417,10 +2647,53 @@ def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=
 @sdc_overload_method(SeriesType, 'min')
 def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_only=None):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.min
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_min.py
+       :language: python
+       :lines: 27-
+       :caption: Getting the minimum value of Series elements
+       :name: ex_series_min
+
+    .. code-block:: console
+
+        > python ./series/series_min.py
+        1.0
+
+    .. note::
+
+        Parameters axis, level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        :ref:`Series.sum <pandas.Series.sum>`
+            Return the sum.
+
+        :ref:`Series.min <pandas.Series.min>`
+            Return the minimum.
+
+        :ref:`Series.max <pandas.Series.max>`
+            Return the maximum.
+
+        :ref:`Series.idxmin <pandas.Series.idxmin>`
+            Return the index of the minimum.
+
+        :ref:`Series.idxmax <pandas.Series.idxmax>`
+            Return the index of the maximum.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.min` implementation.
+
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_min
-             python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_min_param
+
+        Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_min*
+
     Parameters
     -----------
     axis:
@@ -2439,24 +2712,25 @@ def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_onl
 
     _func_name = 'Method min().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
-    if not isinstance(self.data.dtype, (types.Integer, types.Float)):
+    if not isinstance(self.data.dtype, types.Number):
         raise TypingError(
             '{} Currently function supports only numeric values. Given data type: {}'.format(
                 _func_name, self.data.dtype))
 
     if not isinstance(skipna, (types.Omitted, types.Boolean)) and skipna is not True:
-        raise TypingError(
-            '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, skipna))
+        ty_checker.raise_exc(skipna, 'bool', 'skipna')
 
-    if not (isinstance(axis, types.Omitted) or axis is None) \
-            or not (isinstance(level, types.Omitted) or level is None) \
-            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
-                                                                                            numeric_only))
+    if not isinstance(axis, types.Omitted) and axis is not None:
+        ty_checker.raise_exc(axis, 'None', 'axis')
+
+    if not isinstance(level, types.Omitted) and level is not None:
+        ty_checker.raise_exc(level, 'None', 'level')
+
+    if not isinstance(numeric_only, types.Omitted) and numeric_only is not None:
+        ty_checker.raise_exc(numeric_only, 'None', 'numeric_only')
 
     def hpat_pandas_series_min_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
         if skipna:
@@ -2656,9 +2930,41 @@ def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
 @sdc_overload_method(SeriesType, 'eq')
 def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.eq
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_eq.py
+       :language: python
+       :lines: 27-
+       :caption: Element-wise equal of one Series by another (binary operator eq)
+       :name: ex_series_eq
+
+    .. code-block:: console
+
+        > python ./series/series_eq.py
+        0    False
+        1    False
+        2     True
+        3    False
+        4    False
+        dtype: bool
+
+    .. note::
+
+        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.eq` implementation.
+
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
+
+       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8*
+
     Parameters
     ----------
     self: :class:`pandas.Series`
@@ -2666,69 +2972,84 @@ def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
     other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
         input arg
     level: :obj:`int` or name
-         *unsupported*
+        *unsupported*
     fill_value: :obj:`float` or None, default None
-              *unsupported*
+        *unsupported*
     axis: default 0
-         *unsupported*
+        *unsupported*
     Returns
     -------
     :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
+        returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method eq().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not (isinstance(level, types.Omitted) or level is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(level, 'None', 'level')
 
     if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(axis, 'int', 'axis')
 
     if isinstance(other, SeriesType):
         def hpat_pandas_series_eq_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
-            """
-
             return pandas.Series(self._data == other._data)
 
         return hpat_pandas_series_eq_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
         def hpat_pandas_series_eq_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_integer_scalar
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_float_scalar
-            """
-
             return pandas.Series(self._data == other)
 
         return hpat_pandas_series_eq_impl
 
-    raise TypingError(
-        '{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(
-            _func_name, self, other))
+    ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
 @sdc_overload_method(SeriesType, 'ge')
 def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.ge
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_ge.py
+       :language: python
+       :lines: 27-
+       :caption: Element-wise greater than or equal of one Series by another (binary operator ge)
+       :name: ex_series_ge
+
+    .. code-block:: console
+
+        > python ./series/series_ge.py
+        0     True
+        1     True
+        2     True
+        3    False
+        4    False
+        dtype: bool
+
+    .. note::
+
+        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.ge` implementation.
+
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
+
+       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8*
+
     Parameters
     ----------
     self: :class:`pandas.Series`
@@ -2736,118 +3057,125 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
     other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
         input arg
     level: :obj:`int` or name
-         *unsupported*
+        *unsupported*
     fill_value: :obj:`float` or None, default None
-              *unsupported*
+        *unsupported*
     axis: default 0
-         *unsupported*
+        *unsupported*
     Returns
     -------
     :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
+        returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method ge().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not (isinstance(level, types.Omitted) or level is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(level, 'None', 'level')
 
     if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(axis, 'int', 'axis')
 
     if isinstance(other, SeriesType):
         def hpat_pandas_series_ge_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
-            """
-
             return pandas.Series(self._data >= other._data)
 
         return hpat_pandas_series_ge_impl
 
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
+    if isinstance(other, types.Number):
         def hpat_pandas_series_ge_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_integer_scalar
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_float_scalar
-            """
-
             return pandas.Series(self._data >= other)
 
         return hpat_pandas_series_ge_impl
 
-    raise TypingError(
-        '{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(
-            _func_name, self, other))
+    ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
 @sdc_overload_method(SeriesType, 'idxmin')
 def hpat_pandas_series_idxmin(self, axis=None, skipna=True):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.idxmin
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_idxmin.py
+       :language: python
+       :lines: 27-
+       :caption: Getting the row label of the minimum value.
+       :name: ex_series_idxmin
+
+    .. code-block:: console
+
+        > python ./series/series_idxmin.py
+        D
+
+    .. note::
+
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        :ref:`Series.idxmax <pandas.Series.idxmax>`
+            Return index label of the first occurrence of maximum of values.
+
+        `numpy.absolute <https://docs.scipy.org/doc/numpy/reference/generated/numpy.argmin.html#numpy.argmin>`_
+            Return indices of the minimum values along the given axis.
+
+        :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
+            Return index of first occurrence of minimum over requested axis.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.idxmin` implementation.
 
     .. only:: developer
 
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmin1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmin_str
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmin_str_idx
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmin_no
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmin_int
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmin_noidx
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmin_idx
+        Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmin*
 
     Parameters
     -----------
     axis :  :obj:`int`, :obj:`str`, default: None
-            Axis along which the operation acts
-            0/None - row-wise operation
-            1      - column-wise operation
-            *unsupported*
+        Axis along which the operation acts
+        0/None - row-wise operation
+        1      - column-wise operation
+        *unsupported*
     skipna:  :obj:`bool`, default: True
-            exclude NA/null values
-            *unsupported*
-
+        exclude NA/null values
     Returns
     -------
     :obj:`pandas.Series.index` or nan
-            returns: Label of the minimum value.
+        returns: Label of the minimum value.
     """
 
     _func_name = 'Method idxmin().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not isinstance(self.data.dtype, types.Number):
         raise TypingError('{} Numeric values supported only. Given: {}'.format(_func_name, self.data.dtype))
 
     if not (isinstance(skipna, (types.Omitted, types.Boolean, bool)) or skipna is True):
-        raise TypingError("{} 'skipna' must be a boolean type. Given: {}".format(_func_name, skipna))
+        ty_checker.raise_exc(skipna, 'bool', 'skipna')
 
     if not (isinstance(axis, types.Omitted) or axis is None):
-        raise TypingError("{} 'axis' unsupported. Given: {}".format(_func_name, axis))
-
-    if not (isinstance(skipna, types.Omitted) or skipna is True):
-        raise TypingError("{} 'skipna' unsupported. Given: {}".format(_func_name, skipna))
+        ty_checker.raise_exc(axis, 'None', 'axis')
 
     if isinstance(self.index, types.NoneType) or self.index is None:
         def hpat_pandas_series_idxmin_impl(self, axis=None, skipna=True):
-
             return numpy.argmin(self._data)
 
         return hpat_pandas_series_idxmin_impl
+
     else:
         def hpat_pandas_series_idxmin_index_impl(self, axis=None, skipna=True):
             # no numpy.nanargmin is supported by Numba at this time
@@ -2860,9 +3188,41 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True):
 @sdc_overload_method(SeriesType, 'lt')
 def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.lt
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_lt.py
+       :language: python
+       :lines: 27-
+       :caption: Element-wise less than of one Series by another (binary operator lt)
+       :name: ex_series_lt
+
+    .. code-block:: console
+
+        > python ./series/series_lt.py
+        0    False
+        1    False
+        2    False
+        3     True
+        4     True
+        dtype: bool
+
+    .. note::
+
+        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.lt` implementation.
+
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
+
+       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8*
+
     Parameters
     ----------
     self: :class:`pandas.Series`
@@ -2870,69 +3230,84 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
     other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
         input arg
     level: :obj:`int` or name
-         *unsupported*
+        *unsupported*
     fill_value: :obj:`float` or None, default None
-              *unsupported*
+        *unsupported*
     axis: default 0
-         *unsupported*
+        *unsupported*
     Returns
     -------
     :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
+        returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method lt().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not (isinstance(level, types.Omitted) or level is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(level, 'None', 'level')
 
     if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(axis, 'int', 'axis')
 
     if isinstance(other, SeriesType):
         def hpat_pandas_series_lt_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
-            """
-
             return pandas.Series(self._data < other._data)
 
         return hpat_pandas_series_lt_impl
 
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
+    if isinstance(other, types.Number):
         def hpat_pandas_series_lt_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_integer_scalar
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_float_scalar
-            """
-
             return pandas.Series(self._data < other)
 
         return hpat_pandas_series_lt_impl
 
-    raise TypingError(
-        '{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(
-            _func_name, self, other))
+    ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
 @sdc_overload_method(SeriesType, 'gt')
 def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.gt
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_gt.py
+       :language: python
+       :lines: 27-
+       :caption: Element-wise greater than of one Series by another (binary operator gt)
+       :name: ex_series_gt
+
+    .. code-block:: console
+
+        > python ./series/series_gt.py
+        0     True
+        1     True
+        2    False
+        3    False
+        4    False
+        dtype: bool
+
+    .. note::
+
+        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.gt` implementation.
+
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
+
+       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8*
+
     Parameters
     ----------
     self: :class:`pandas.Series`
@@ -2953,59 +3328,71 @@ def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
 
     _func_name = 'Method gt().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
-
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not (isinstance(level, types.Omitted) or level is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(level, 'None', 'level')
 
     if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(axis, 'int', 'axis')
 
     if isinstance(other, SeriesType):
         def hpat_pandas_series_gt_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
-            """
-
             return pandas.Series(self._data > other._data)
 
         return hpat_pandas_series_gt_impl
 
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
+    if isinstance(other, types.Number):
         def hpat_pandas_series_gt_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_integer_scalar
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_float_scalar
-            """
-
             return pandas.Series(self._data > other)
 
         return hpat_pandas_series_gt_impl
 
-    raise TypingError(
-        '{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(
-            _func_name, self, other))
+    ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
 @sdc_overload_method(SeriesType, 'le')
 def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.le
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_le.py
+       :language: python
+       :lines: 27-
+       :caption: Element-wise less than or equal of one Series by another (binary operator le)
+       :name: ex_series_le
+
+    .. code-block:: console
+
+        > python ./series/series_le.py
+        0    False
+        1    False
+        2     True
+        3     True
+        4     True
+        dtype: bool
+
+    .. note::
+
+        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.le` implementation.
+
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
+
+       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8*
+
     Parameters
     ----------
     self: :class:`pandas.Series`
@@ -3026,48 +3413,31 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
 
     _func_name = 'Method le().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not (isinstance(level, types.Omitted) or level is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(level, 'None', 'level')
 
     if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
-        raise TypingError(
-            '{} Unsupported parameters. Given level: {}, fill_value: {}, axis: {}'.format(_func_name, level, fill_value,
-                                                                                          axis))
+        ty_checker.raise_exc(axis, 'int', 'axis')
 
     if isinstance(other, SeriesType):
         def hpat_pandas_series_le_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8
-            """
-
             return pandas.Series(self._data <= other._data)
 
         return hpat_pandas_series_le_impl
 
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
+    if isinstance(other, types.Number):
         def hpat_pandas_series_le_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_integer_scalar
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8_float_scalar
-            """
-
             return pandas.Series(self._data <= other)
 
         return hpat_pandas_series_le_impl
 
-    raise TypingError(
-        '{} The object must be a pandas.series and argument must be a number. Given: {} and other: {}'.format(
-            _func_name, self, other))
+    ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
 @sdc_overload_method(SeriesType, 'abs')
@@ -3386,6 +3756,40 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
 @sdc_overload_method(SeriesType, 'argsort')
 def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.argsort
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_argsort.py
+       :language: python
+       :lines: 27-
+       :caption: Override ndarray.argsort.
+       :name: ex_series_argsort
+
+    .. code-block:: console
+
+        > python ./series/series_argsort.py
+        0    1
+        1    2
+        2   -1
+        3    0
+        4    3
+        dtype: int64
+
+    .. note::
+
+        Parameters axis, kind, order are currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        `numpy.absolute <https://docs.scipy.org/doc/numpy/reference/generated/numpy.ndarray.argsort.html#numpy.ndarray.argsort>`_
+            Return indices of the minimum values along the given axis.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.argsort` implementation.
 
     .. only:: developer
@@ -3415,21 +3819,21 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     _func_name = 'Method argsort().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not isinstance(self.data.dtype, types.Number):
         raise TypingError('{} Non-numeric type unsupported. Given: {}'.format(_func_name, self.data.dtype))
 
     if not (isinstance(axis, types.Omitted) or isinstance(axis, types.Integer) or axis == 0):
-        raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
+        ty_checker.raise_exc(axis, '0', 'axis')
 
     if not isinstance(kind, (types.Omitted, str, types.UnicodeType, types.StringLiteral)):
-        raise TypingError('{} Non-string type unsupported. Given kind: {}'.format(_func_name, kind))
+        ty_checker.raise_exc(kind, 'quicksort', 'kind')
 
     if not isinstance(order, (str, types.UnicodeType, types.StringLiteral, types.Omitted, types.NoneType, types.List))\
             and order is not None:
-        raise TypingError('{} Unsupported parameters. Given order: {}'.format(_func_name, order))
+        ty_checker.raise_exc(order, 'None', 'order')
 
     if not isinstance(self.index, types.NoneType):
         def hpat_pandas_series_argsort_idx_impl(self, axis=0, kind='quicksort', order=None):
@@ -3491,6 +3895,46 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 @sdc_overload_method(SeriesType, 'sort_values')
 def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, kind='quicksort', na_position='last'):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.sort_values
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_sort_values.py
+       :language: python
+       :lines: 27-
+       :caption: Sort by the values.
+       :name: ex_series_sort_values
+
+    .. code-block:: console
+
+        > python ./series/series_sort_values.py
+        1   -10.0
+        3     0.0
+        0     3.0
+        4    92.0
+        2     NaN
+        dtype: float64
+
+    .. note::
+
+        Parameters axis, kind, na_position are currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. seealso::
+
+        :ref:`Series.sort_index <pandas.Series.sort_index>`
+            Sort by the Series indices.
+        
+        :ref:`DataFrame.sort_values <pandas.DataFrame.sort_values>`
+            Sort DataFrame by the values along either axis.
+
+        :ref:`DataFrame.sort_index <pandas.DataFrame.sort_index>`
+            Sort DataFrame by indices.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.sort_values` implementation.
 
     .. only:: developer
@@ -3521,20 +3965,20 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
     _func_name = 'Method sort_values().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not (isinstance(axis, types.Omitted) or isinstance(axis, types.Integer) or axis == 0):
-        raise TypingError('{} Unsupported parameters. Given axis: {}'.format(_func_name, axis))
+        ty_checker.raise_exc(axis, '0', 'axis')
 
     if not (isinstance(ascending, types.Omitted) or isinstance(ascending, types.Boolean) or ascending is True or False):
-        raise TypingError('{} Unsupported parameters. Given ascending: {}'.format(_func_name, ascending))
+        ty_checker.raise_exc(ascending, 'True', 'ascending')
 
     if not isinstance(kind, (types.Omitted, str, types.UnicodeType, types.StringLiteral)):
-        raise TypingError('{} Non-string type unsupported. Given kind: {}'.format(_func_name, kind))
+        ty_checker.raise_exc(kind, 'quicksort', 'kind')
 
     if not isinstance(na_position, (types.Omitted, str, types.UnicodeType, types.StringLiteral)):
-        raise TypingError('{} Unsupported parameters. Given na_position: {}'.format(_func_name, na_position))
+        ty_checker.raise_exc(na_position, 'last', 'na_position')
 
     if isinstance(self.index, types.NoneType) and isinstance(self.data.dtype, types.UnicodeType):
         def hpat_pandas_series_sort_values_str_noidx_impl(self, axis=0, ascending=True, inplace=False, kind='quicksort',
