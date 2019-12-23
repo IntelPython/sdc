@@ -71,6 +71,7 @@ min_float64 = np.finfo('float64').min
 max_float64 = np.finfo('float64').max
 
 test_global_input_data_float64 = [
+    [11., 35.2, -24., 0., np.NZERO, np.NINF, np.PZERO, min_float64],
     [1., np.nan, -1., 0., min_float64, max_float64, max_float64, min_float64],
     [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
 ]
@@ -1497,6 +1498,7 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         np.testing.assert_array_equal(hpat_func(df.A, 1), test_impl(df.A, 1))
 
+    @skip_numba_jit
     def test_list_convert(self):
         def test_impl():
             df = pd.DataFrame({'one': np.array([-1, np.nan, 2.5]),
@@ -2270,6 +2272,7 @@ class TestSeries(TestCase):
             result = hpat_func(S, param_skipna)
             self.assertEqual(result, result_ref)
 
+    @skip_sdc_jit('Old-style value_counts implementation doesn\'t handle numpy.nan values')
     def test_series_value_counts_number(self):
         def test_impl(S):
             return S.value_counts()
@@ -2279,27 +2282,36 @@ class TestSeries(TestCase):
 
         hpat_func = self.jit(test_impl)
 
-        for data, extra in zip(input_data, extras):
-            for d in data:
-                S = pd.Series(d + extra)
-                # Remove sort_index() after implementing sorting with the same number of frequency
-                pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
+        for data_to_test, extra in zip(input_data, extras):
+            for d in data_to_test:
+                data = d + extra
+                with self.subTest(series_data=data):
+                    S = pd.Series(data)
+                    # use sort_index() due to possible different order of values with the same counts in results
+                    result_ref = test_impl(S).sort_index()
+                    result = hpat_func(S).sort_index()
+                    pd.testing.assert_series_equal(result, result_ref)
 
-
+    @skip_sdc_jit('Old-style value_counts implementation doesn\'t handle sort argument')
     def test_series_value_counts_sort(self):
-        def test_impl(S, asceding):
-            return S.value_counts(sort=True, ascending=asceding)
+        def test_impl(S, value):
+            return S.value_counts(sort=True, ascending=value)
 
         hpat_func = self.jit(test_impl)
 
         data = [1, 0, 0, 1, 1, -1, 0, -1, 0]
 
-        for asceding in (False, True):
-            S = pd.Series(data)
-            pd.testing.assert_series_equal(hpat_func(S, asceding), test_impl(S, asceding))
+        for ascending in (False, True):
+            with self.subTest(ascending=ascending):
+                S = pd.Series(data)
+                # to test sorting of result series works correctly do not use sort_index() on results!
+                # instead ensure that there are no elements with the same frequency in the data
+                result_ref = test_impl(S, ascending)
+                result = hpat_func(S, ascending)
+                pd.testing.assert_series_equal(result, result_ref)
 
-    @unittest.skip('Unimplemented: need handling of numpy.nan comparison')
-    def test_series_value_counts_dropna_false(self):
+    @skip_sdc_jit('Old-style value_counts implementation doesn\'t handle numpy.nan values')
+    def test_series_value_counts_numeric_dropna_false(self):
         def test_impl(S):
             return S.value_counts(dropna=False)
 
@@ -2310,22 +2322,48 @@ class TestSeries(TestCase):
         hpat_func = self.jit(test_impl)
 
         for data in data_to_test:
-            S = pd.Series(data)
-            pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+            with self.subTest(series_data=data):
+                S = pd.Series(data)
+                pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @skip_sdc_jit('Old-style value_counts implementation doesn\'t handle None values in string series')
+    def test_series_value_counts_str_dropna_false(self):
+        def test_impl(S):
+            return S.value_counts(dropna=False)
+
+        data_to_test = [['a', '', 'a', '', 'b', None, 'a', '', None, 'b'],
+                        ['dog', None, 'NaN', '', 'cat', None, 'cat', None, 'dog', ''],
+                        ['dog', 'NaN', '', 'cat', 'cat', 'dog', '']]
+
+        hpat_func = self.jit(test_impl)
+
+        for data in data_to_test:
+            with self.subTest(series_data=data):
+                S = pd.Series(data)
+                # use sort_index() due to possible different order of values with the same counts in results
+                result_ref = test_impl(S).sort_index()
+                result = hpat_func(S).sort_index()
+                pd.testing.assert_series_equal(result, result_ref)
+
+    @skip_sdc_jit('Old-style value_counts implementation doesn\'t handle sort argument')
     def test_series_value_counts_str_sort(self):
         def test_impl(S, ascending):
             return S.value_counts(sort=True, ascending=ascending)
 
-        data_to_test = [['a', 'b', 'a', 'b', 'c', 'a'],
+        data_to_test = [['a', '', 'a', '', 'b', None, 'a', '', 'a', 'b'],
                         ['dog', 'cat', 'cat', 'cat', 'dog']]
 
         hpat_func = self.jit(test_impl)
 
         for data in data_to_test:
             for ascending in (True, False):
-                S = pd.Series(data)
-                pd.testing.assert_series_equal(hpat_func(S, ascending), test_impl(S, ascending))
+                with self.subTest(series_data=data, ascending=ascending):
+                    S = pd.Series(data)
+                    # to test sorting of result series works correctly do not use sort_index() on results!
+                    # instead ensure that there are no elements with the same frequency in the data
+                    result_ref = test_impl(S, ascending)
+                    result = hpat_func(S, ascending)
+                    pd.testing.assert_series_equal(result, result_ref)
 
     def test_series_value_counts_index(self):
         def test_impl(S):
@@ -2334,9 +2372,10 @@ class TestSeries(TestCase):
         hpat_func = self.jit(test_impl)
 
         for data in test_global_input_data_integer64:
-            index = np.arange(start=1, stop=len(data) + 1)
-            S = pd.Series(data, index=index)
-            pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
+            with self.subTest(series_data=data):
+                index = np.arange(start=1, stop=len(data) + 1)
+                S = pd.Series(data, index=index)
+                pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
 
     def test_series_value_counts_no_unboxing(self):
         def test_impl():
@@ -4502,7 +4541,6 @@ class TestSeries(TestCase):
             cfunc(series, axis=None, level=None, numeric_only=True)
         self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
 
-
     def test_series_nunique(self):
         def test_series_nunique_impl(S):
             return S.nunique()
@@ -4650,7 +4688,6 @@ class TestSeries(TestCase):
             result_ref = test_series_count_impl(S)
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
-
 
     @skip_sdc_jit('Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum(self):

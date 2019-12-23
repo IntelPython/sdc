@@ -24,51 +24,26 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-from ._version import get_versions
-import numba
-
-# re-export from Numba
-from numba import (typeof, prange, pndindex, gdb, gdb_breakpoint, gdb_init,
-                   stencil, threading_layer, jitclass, objmode)
-
-import sdc.dict_ext
-import sdc.set_ext
-import sdc.compiler
-import sdc.io
-import sdc.io.np_io
-import sdc.hiframes.pd_timestamp_ext
-import sdc.hiframes.boxing
-import sdc.config
-import sdc.timsort
-from sdc.decorators import jit
-import sdc.rewrites.dataframe_constructor
-
-multithread_mode = False
+import pandas as pd
+import numpy as np
+from numba import njit
 
 
-__version__ = get_versions()['version']
-del get_versions
-
-
-if not sdc.config.config_pipeline_hpat_default:
+@njit
+def series_value_counts():
     """
-    Overload Numba function to allow call SDC pass in Numba compiler pipeline
-    Functions are:
-    - Numba DefaultPassBuilder define_nopython_pipeline()
+    Expected result:
+    3.0    2
+    4.0    1
+    2.0    1
+    1.0    1
+    dtype: int64
 
-    TODO: Needs to detect 'import Pandas' and align initialization according to it
     """
+    s = pd.Series([3, 1, 2, 3, 4, np.nan])
+    out_series = s.value_counts()
 
-    # sdc.config.numba_compiler_define_nopython_pipeline_orig = \
-    #     numba.compiler.DefaultPassBuilder.define_nopython_pipeline
-    # numba.compiler.DefaultPassBuilder.define_nopython_pipeline = \
-    #     sdc.datatypes.hpat_pandas_dataframe_pass.sdc_nopython_pipeline_lite_register
+    return out_series
 
-def _init_extension():
-    '''Register Pandas classes and functions with Numba.
 
-    This exntry_point is called by Numba when it initializes.
-    '''
-    # Importing SDC is already happened
-    pass
+print(series_value_counts())
