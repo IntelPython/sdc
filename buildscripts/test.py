@@ -130,7 +130,7 @@ if __name__ == '__main__':
         format_print('Run coverage')
         format_print(f'Assume that SDC is installed in develop build-mode to {develop_env} environment', new_block=False)
         format_print('Install scipy and coveralls')
-        run_command(f'{develop_env_activate} && conda install -q -y scipy coveralls')
+        run_command(f'{develop_env_activate} && conda install -q -y scipy coveralls coverage=4')
         run_command(f'{develop_env_activate} && python -m sdc.tests.gen_test_data')
         run_command(f'{develop_env_activate} && {coverage_cmd}')
         sys.exit(0)

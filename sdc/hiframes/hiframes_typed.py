@@ -1005,28 +1005,28 @@ class HiFramesTypedPassImpl(object):
         #     return self._replace_func(
         #         lambda S: S.isna() == False, [series_var])
 
-        # if func_name == 'value_counts':
-        #     nodes = []
-        #     data = self._get_series_data(series_var, nodes)
-        #     # reusing aggregate/count
-        #     # TODO: write optimized implementation
-        #     # data of input becomes both key and data for aggregate input
-        #     # data of output is the counts
-        #     out_key_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_index'), lhs.loc)
-        #     self.state.typemap[out_key_var.name] = self.state.typemap[data.name]
-        #     out_data_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
-        #     self.state.typemap[out_data_var.name] = self.state.typemap[lhs.name].data
-        #     agg_func = series_replace_funcs['count']
-        #     agg_node = hiframes.aggregate.Aggregate(
-        #         lhs.name, 'series', ['series'], [out_key_var], {
-        #             'data': out_data_var}, {
-        #             'data': data}, [data], agg_func, None, lhs.loc)
-        #     nodes.append(agg_node)
-        #     # TODO: handle args like sort=False
-        #
-        #     def func(A, B):
-        #         return sdc.hiframes.api.init_series(A, B).sort_values(ascending=False)
-        #     return self._replace_func(func, [out_data_var, out_key_var], pre_nodes=nodes)
+        if func_name == 'value_counts':
+            nodes = []
+            data = self._get_series_data(series_var, nodes)
+            # reusing aggregate/count
+            # TODO: write optimized implementation
+            # data of input becomes both key and data for aggregate input
+            # data of output is the counts
+            out_key_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_index'), lhs.loc)
+            self.state.typemap[out_key_var.name] = self.state.typemap[data.name]
+            out_data_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
+            self.state.typemap[out_data_var.name] = self.state.typemap[lhs.name].data
+            agg_func = series_replace_funcs['count']
+            agg_node = hiframes.aggregate.Aggregate(
+                lhs.name, 'series', ['series'], [out_key_var], {
+                    'data': out_data_var}, {
+                    'data': data}, [data], agg_func, None, lhs.loc)
+            nodes.append(agg_node)
+            # TODO: handle args like sort=False
+
+            def func(A, B):
+                return sdc.hiframes.api.init_series(A, B).sort_values(ascending=False)
+            return self._replace_func(func, [out_data_var, out_key_var], pre_nodes=nodes)
 
         # astype with string output
         # if func_name == 'astype' and is_str_series_typ(self.state.typemap[lhs.name]):
