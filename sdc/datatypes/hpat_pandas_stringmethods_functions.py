@@ -967,13 +967,14 @@ def hpat_pandas_stringmethods_istitle(self):
 
     def hpat_pandas_stringmethods_istitle_impl(self):
         item_count = len(self._data)
-        result = numpy.empty(item_count, numba.types.int64)
+        result = numpy.empty(item_count, numba.types.boolean)
         for idx, item in enumerate(self._data._data):
             result[idx] = item.istitle()
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
     return hpat_pandas_stringmethods_istitle_impl
+
 
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))
 _hpat_pandas_stringmethods_autogen_methods = ['upper', 'lower', 'lstrip', 'rstrip', 'strip']

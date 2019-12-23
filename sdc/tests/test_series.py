@@ -225,6 +225,10 @@ def rjust_with_fillchar_usecase(series, width, fillchar):
     return series.str.rjust(width, fillchar)
 
 
+def istitle_usecase(series):
+    return series.str.istitle()
+
+
 GLOBAL_VAL = 2
 
 
@@ -4942,13 +4946,22 @@ class TestSeries(TestCase):
         B = pd.Series(['b', 'aa', '', 'b', 'o', None, 'oo'])
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
-    # def test_series_istitle_str(self):
-    #     def test_impl(A):
-    #         return A.istitle()
-    #
-    #     hpat_func = self.jit(test_impl)
-    #     S = pd.Series(['Cat', 'Dog', 'Bird'])
-    #     pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_istitle_str(self):
+        series = pd.Series(['Cat', 'dog', 'Bird'])
+
+        cfunc = self.jit(istitle_usecase)
+        pd.testing.assert_series_equal(cfunc(series), istitle_usecase(series))
+
+
+    def test_series_istitle_str_unsupported(self):
+        series = pd.Series([0, 1, 2])
+
+        cfunc = self.jit(istitle_usecase)
+        with self.assertRaises(TypingError) as raises:
+            cfunc(series)
+        msg = 'TypingError: Attribute str.  Can only use .str accessor with string values. Given: int64'
+        self.assertIn(msg, str(raises.exception))
 
 
 if __name__ == "__main__":
