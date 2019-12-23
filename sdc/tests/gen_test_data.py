@@ -101,7 +101,7 @@ def generate_other_data():
     # CSV reader test
     data = ("0,2.3,4.6,A\n"
             "1,2.3,4.6,B\n"
-            "2,2.3,4.6,C\n"
+            "2,2.3,4.6,\n"
             "4,2.3,4.6,D\n")
 
     with open("csv_data1.csv", "w") as f:
