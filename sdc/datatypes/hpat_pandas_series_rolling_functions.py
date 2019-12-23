@@ -100,6 +100,31 @@ def arr_corr(x, y):
 
 
 @register_jitable
+def _moment(arr, moment):
+    mn = numpy.mean(arr)
+    s = numpy.power((arr - mn), moment)
+
+    return numpy.mean(s)
+
+
+@register_jitable
+def arr_kurt(arr):
+    """Calculate unbiased kurtosis of values"""
+    n = len(arr)
+    if n < 4:
+        return numpy.nan
+
+    m2 = _moment(arr, 2)
+    m4 = _moment(arr, 4)
+    val = 0 if m2 == 0 else m4 / m2 ** 2.0
+
+    if (n > 2) & (m2 > 0):
+        val = 1.0/(n-2)/(n-3) * ((n**2-1.0)*m4/m2**2.0 - 3*(n-1)**2.0)
+
+    return val
+
+
+@register_jitable
 def arr_max(arr):
     """Calculate maximum of values"""
     if len(arr) == 0:
@@ -221,6 +246,8 @@ def gen_hpat_pandas_series_rolling_zerominp_impl(rolling_func, output_type=None)
 
 hpat_pandas_rolling_series_count_impl = register_jitable(
     gen_hpat_pandas_series_rolling_zerominp_impl(arr_nonnan_count, float64))
+hpat_pandas_rolling_series_kurt_impl = register_jitable(
+    gen_hpat_pandas_series_rolling_impl(arr_kurt, float64))
 hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max, float64))
 hpat_pandas_rolling_series_mean_impl = register_jitable(
@@ -353,6 +380,15 @@ def hpat_pandas_series_rolling_count(self):
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_count_impl
+
+
+@sdc_overload_method(SeriesRollingType, 'kurt')
+def hpat_pandas_series_rolling_kurt(self):
+
+    ty_checker = TypeChecker('Method rolling.kurt().')
+    ty_checker.check(self, SeriesRollingType)
+
+    return hpat_pandas_rolling_series_kurt_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'max')
@@ -664,6 +700,22 @@ hpat_pandas_series_rolling_corr.__doc__ = hpat_pandas_series_rolling_docstring_t
     pairwise: :obj:`bool`
         Not relevant for Series.
     """
+})
+
+hpat_pandas_series_rolling_kurt.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'kurt',
+    'example_caption': 'Calculate unbiased rolling kurtosis.',
+    'example_result':
+    """
+        0    NaN
+        1    NaN
+        2    NaN
+        3   -1.2
+        4   -3.3
+        dtype: float64
+    """,
+    'limitations_block': '',
+    'extra_params': ''
 })
 
 hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
