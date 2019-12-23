@@ -4946,13 +4946,11 @@ class TestSeries(TestCase):
         B = pd.Series(['b', 'aa', '', 'b', 'o', None, 'oo'])
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
-
     def test_series_istitle_str(self):
         series = pd.Series(['Cat', 'dog', 'Bird'])
 
         cfunc = self.jit(istitle_usecase)
         pd.testing.assert_series_equal(cfunc(series), istitle_usecase(series))
-
 
     def test_series_istitle_str_unsupported(self):
         series = pd.Series([0, 1, 2])
