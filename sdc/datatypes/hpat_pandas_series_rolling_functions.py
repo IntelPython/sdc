@@ -136,6 +136,39 @@ def arr_min(arr):
 
 
 @register_jitable
+def _chk_asarray(a, axis):
+    if axis is None:
+        return numpy.ravel(a), 0
+
+    return numpy.asarray(a), axis
+
+
+@register_jitable
+def _moment(arr, moment):
+    mn = numpy.mean(arr)
+    s = numpy.power((arr - mn), moment)
+
+    return numpy.mean(s)
+
+
+@register_jitable
+def arr_skew(arr):
+    """Calculate unbiased skewness of values"""
+    n = len(arr)
+    if n < 3:
+        return numpy.nan
+
+    m2 = _moment(arr, 2)
+    m3 = _moment(arr, 3)
+    val = 0 if m2 == 0 else m3 / m2 ** 1.5
+
+    if (n > 2) & (m2 > 0):
+        val = numpy.sqrt((n - 1.0) * n) / (n - 2.0) * m3 / m2 ** 1.5
+
+    return val
+
+
+@register_jitable
 def arr_std(arr, ddof):
     """Calculate standard deviation of values"""
     return arr_var(arr, ddof) ** 0.5
@@ -229,6 +262,8 @@ hpat_pandas_rolling_series_median_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_median, float64))
 hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min, float64))
+hpat_pandas_rolling_series_skew_impl = register_jitable(
+    gen_hpat_pandas_series_rolling_impl(arr_skew, float64))
 hpat_pandas_rolling_series_sum_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_sum, float64))
 
@@ -495,6 +530,15 @@ def hpat_pandas_series_rolling_min(self):
     return hpat_pandas_rolling_series_min_impl
 
 
+@sdc_overload_method(SeriesRollingType, 'skew')
+def hpat_pandas_series_rolling_skew(self):
+
+    ty_checker = TypeChecker('Method rolling.skew().')
+    ty_checker.check(self, SeriesRollingType)
+
+    return hpat_pandas_rolling_series_skew_impl
+
+
 @sdc_overload_method(SeriesRollingType, 'std')
 def hpat_pandas_series_rolling_std(self, ddof=1):
 
@@ -697,6 +741,22 @@ hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring
         2    4.0
         3    3.0
         4    5.0
+        dtype: float64
+    """,
+    'limitations_block': '',
+    'extra_params': ''
+})
+
+hpat_pandas_series_rolling_skew.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'skew',
+    'example_caption': 'Unbiased rolling skewness.',
+    'example_result':
+    """
+        0         NaN
+        1         NaN
+        2    0.000000
+        3    0.935220
+        4   -1.293343
         dtype: float64
     """,
     'limitations_block': '',

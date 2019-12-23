@@ -660,6 +660,30 @@ class TestRolling(TestCase):
                         ref_result = test_impl(series, window, min_periods)
                         pd.testing.assert_series_equal(jit_result, ref_result)
 
+    @skip_sdc_jit('Series.rolling.skew() unsupported Series index')
+    def test_series_rolling_skew(self):
+        def test_impl(series, window, min_periods):
+            return series.rolling(window, min_periods).skew()
+
+        hpat_func = self.jit(test_impl)
+
+        all_data = test_global_input_data_float64
+        indices = [list(range(len(data)))[::-1] for data in all_data]
+        for data, index in zip(all_data, indices):
+            series = pd.Series(data, index, name='A')
+            for window in range(0, len(series) + 3, 2):
+                for min_periods in range(0, window + 1, 2):
+                    with self.subTest(series=series, window=window,
+                                      min_periods=min_periods):
+                        try:
+                            ref_result = test_impl(series, window, min_periods)
+                        except ValueError:
+                            # sometimes Pandas overwrites min_periods and fails
+                            pass
+                        else:
+                            jit_result = hpat_func(series, window, min_periods)
+                            pd.testing.assert_series_equal(jit_result, ref_result)
+
     @skip_sdc_jit('Series.rolling.std() unsupported Series index')
     def test_series_rolling_std(self):
         test_impl = series_rolling_std_usecase
