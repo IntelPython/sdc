@@ -1063,18 +1063,18 @@ def lower_dropna_dummy(context, builder, sig, args):
     return out_obj._getvalue()
 
 
-@overload_method(DataFrameType, 'drop')
-def drop_overload(df, labels=None, axis=0, index=None, columns=None,
-                  level=None, inplace=False, errors='raise'):
-
-    # TODO: avoid dummy and generate func here when inlining is possible
-    # TODO: inplace of df with parent (reflection)
-    def _impl(df, labels=None, axis=0, index=None, columns=None,
-              level=None, inplace=False, errors='raise'):
-        return sdc.hiframes.pd_dataframe_ext.drop_dummy(
-            df, labels, axis, columns, inplace)
-
-    return _impl
+# @overload_method(DataFrameType, 'drop')
+# def drop_overload(df, labels=None, axis=0, index=None, columns=None,
+#                   level=None, inplace=False, errors='raise'):
+#
+#     # TODO: avoid dummy and generate func here when inlining is possible
+#     # TODO: inplace of df with parent (reflection)
+#     def _impl(df, labels=None, axis=0, index=None, columns=None,
+#               level=None, inplace=False, errors='raise'):
+#         return sdc.hiframes.pd_dataframe_ext.drop_dummy(
+#             df, labels, axis, columns, inplace)
+#
+#     return _impl
 
 
 def drop_dummy(df, labels, axis, columns, inplace):
@@ -1628,3 +1628,6 @@ def to_csv_overload(df, path_or_buf=None, sep=',', na_rep='', float_format=None,
                       date_format, doublequote, escapechar, decimal)
 
     return _impl
+
+
+from sdc.datatypes.hpat_pandas_dataframe_functions import *

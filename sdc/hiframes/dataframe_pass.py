@@ -830,18 +830,18 @@ class DataFramePassImpl(object):
                                       pysig=numba.utils.pysignature(stub),
                                       kws=dict(rhs.kws))
 
-        if func_name == 'drop':
-            rhs.args.insert(0, df_var)
-            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
-            kw_typs = {name: self.state.typemap[v.name]
-                       for name, v in dict(rhs.kws).items()}
-            impl = sdc.hiframes.pd_dataframe_ext.drop_overload(
-                *arg_typs, **kw_typs)
-            stub = (lambda df, labels=None, axis=0, index=None, columns=None,
-                    level=None, inplace=False, errors='raise': None)
-            return self._replace_func(impl, rhs.args,
-                                      pysig=numba.utils.pysignature(stub),
-                                      kws=dict(rhs.kws))
+        # if func_name == 'drop':
+        #     rhs.args.insert(0, df_var)
+        #     arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+        #     kw_typs = {name: self.state.typemap[v.name]
+        #                for name, v in dict(rhs.kws).items()}
+        #     impl = sdc.hiframes.pd_dataframe_ext.drop_overload(
+        #         *arg_typs, **kw_typs)
+        #     stub = (lambda df, labels=None, axis=0, index=None, columns=None,
+        #             level=None, inplace=False, errors='raise': None)
+        #     return self._replace_func(impl, rhs.args,
+        #                               pysig=numba.utils.pysignature(stub),
+        #                               kws=dict(rhs.kws))
 
         if func_name == 'isin':
             rhs.args.insert(0, df_var)
