@@ -408,6 +408,7 @@ def hpat_pandas_stringmethods_len(self):
     ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_len_impl(self):
+        print('SELF\n', self._data)
         item_count = len(self._data)
         result = numpy.empty(item_count, numba.types.int64)
         for idx, item in enumerate(self._data._data):
@@ -717,6 +718,22 @@ def _hpat_pandas_stringmethods_autogen(method_name):
     global_dict_name = 'hpat_pandas_stringmethods_{methodname}'.format(methodname=method_name)
     return _hpat_pandas_stringmethods_autogen_global_dict[global_dict_name]
 
+
+@overload_method(StringMethodsType, 'istitle')
+def hpat_pandas_stringmethods_istitle(self):
+
+    ty_checker = TypeChecker('Method istitle().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_istitle_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.int64)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.istitle()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_istitle_impl
 
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))
 _hpat_pandas_stringmethods_autogen_methods = ['upper', 'lower', 'lstrip', 'rstrip', 'strip']

@@ -4905,6 +4905,14 @@ class TestSeries(TestCase):
         B = pd.Series(['b', 'aa', '', 'b', 'o', None, 'oo'])
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
+    # def test_series_istitle_str(self):
+    #     def test_impl(A):
+    #         return A.istitle()
+    #
+    #     hpat_func = self.jit(test_impl)
+    #     S = pd.Series(['Cat', 'Dog', 'Bird'])
+    #     pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
 
 if __name__ == "__main__":
     unittest.main()
