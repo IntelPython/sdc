@@ -271,7 +271,7 @@ def hpat_pandas_series_rolling_apply(self, func, raw=None):
             arr_range = input_arr[:i + 1]
             output_arr[i] = culc_apply(arr_range, func, minp)
 
-        for i in prange(min(win, length), length):
+        for i in prange(boundary, length):
             arr_range = input_arr[i + 1 - win:i + 1]
             output_arr[i] = culc_apply(arr_range, func, minp)
 
