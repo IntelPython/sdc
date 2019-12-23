@@ -532,7 +532,7 @@ def hpat_pandas_series_rolling_quantile(self, quantile, interpolation='linear'):
         length = len(input_arr)
         output_arr = numpy.empty(length, dtype=float64)
 
-        def culc_quantile(arr, quantile, minp):
+        def calc_quantile(arr, quantile, minp):
             finite_arr = arr[numpy.isfinite(arr)]
             if len(finite_arr) < minp:
                 return numpy.nan
@@ -542,11 +542,11 @@ def hpat_pandas_series_rolling_quantile(self, quantile, interpolation='linear'):
         boundary = min(win, length)
         for i in prange(boundary):
             arr_range = input_arr[:i + 1]
-            output_arr[i] = culc_quantile(arr_range, quantile, minp)
+            output_arr[i] = calc_quantile(arr_range, quantile, minp)
 
-        for i in prange(min(win, length), length):
+        for i in prange(boundary, length):
             arr_range = input_arr[i + 1 - win:i + 1]
-            output_arr[i] = culc_quantile(arr_range, quantile, minp)
+            output_arr[i] = calc_quantile(arr_range, quantile, minp)
 
         return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
@@ -768,9 +768,9 @@ hpat_pandas_series_rolling_quantile.__doc__ = hpat_pandas_series_rolling_docstri
     """
         0    NaN
         1    NaN
-        2    4.0
-        3    3.0
-        4    5.0
+        2    3.5
+        3    2.5
+        4    3.5
         dtype: float64
     """,
     'limitations_block':
