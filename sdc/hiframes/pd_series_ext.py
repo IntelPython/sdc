@@ -711,12 +711,12 @@ class SeriesAttribute(AttributeTemplate):
     #              if isinstance(dtype, types.NPDatetime) else dtype)
     #     return signature(dtype, *args)
 
-    # @bound_function("series.value_counts")
-    # def resolve_value_counts(self, ary, args, kws):
-    #     # output is int series with original data as index
-    #     out = SeriesType(
-    #         types.int64, types.Array(types.int64, 1, 'C'), ary.data)
-    #     return signature(out, *args)
+    @bound_function("series.value_counts")
+    def resolve_value_counts(self, ary, args, kws):
+        # output is int series with original data as index
+        out = SeriesType(
+            types.int64, types.Array(types.int64, 1, 'C'), ary.data)
+        return signature(out, *args)
 
     # @bound_function("series.rename")
     # def resolve_rename(self, ary, args, kws):
@@ -1021,7 +1021,8 @@ if not sdc.config.config_pipeline_hpat_default:
 _non_hpat_pipeline_attrs = [
     'resolve_append', 'resolve_combine', 'resolve_corr', 'resolve_cov',
     'resolve_dropna', 'resolve_fillna', 'resolve_head', 'resolve_nlargest',
-    'resolve_nsmallest', 'resolve_pct_change', 'resolve_rolling', 'resolve_loc'
+    'resolve_nsmallest', 'resolve_pct_change', 'resolve_rolling', 'resolve_loc',
+    'resolve_value_counts'
 ]
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
