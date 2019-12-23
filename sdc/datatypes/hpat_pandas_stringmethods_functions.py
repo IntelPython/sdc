@@ -587,7 +587,6 @@ def hpat_pandas_stringmethods_len(self):
     ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_len_impl(self):
-        print('SELF\n', self._data)
         item_count = len(self._data)
         result = numpy.empty(item_count, numba.types.int64)
         for idx, item in enumerate(self._data._data):
