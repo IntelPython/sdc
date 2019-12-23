@@ -101,7 +101,7 @@ def arr_nonnan_count(arr):
 
 @register_jitable
 def arr_cov(x, y, ddof):
-    """Calculate covariance of values"""
+    """Calculate covariance of values 1D arrays x and y of the same size"""
     if len(x) == 0:
         return numpy.nan
 

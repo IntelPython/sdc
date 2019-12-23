@@ -626,6 +626,7 @@ class TestRolling(TestCase):
     @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
     @unittest.expectedFailure
     def test_series_rolling_cov_issue_floating_point_rounding(self):
+        """Cover issue of different float rounding in Python and SDC/Numba"""
         def test_impl(series, window, min_periods, other, ddof):
             return series.rolling(window, min_periods).cov(other, ddof=ddof)
 
