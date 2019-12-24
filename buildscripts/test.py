@@ -34,6 +34,8 @@ import subprocess
 import sys
 import traceback
 
+from pathlib import Path
+
 from utilities import create_conda_env
 from utilities import format_print
 from utilities import get_sdc_env
@@ -130,7 +132,7 @@ if __name__ == '__main__':
         format_print('Run coverage')
         format_print(f'Assume that SDC is installed in develop build-mode to {develop_env} environment', new_block=False)
         format_print('Install scipy and coveralls')
-        run_command(f'{develop_env_activate} && conda install -q -y scipy coveralls')
+        run_command(f'{develop_env_activate} && conda install -q -y scipy coveralls coverage=4')
         run_command(f'{develop_env_activate} && python -m sdc.tests.gen_test_data')
         run_command(f'{develop_env_activate} && {coverage_cmd}')
         sys.exit(0)
@@ -206,6 +208,7 @@ if __name__ == '__main__':
         passed_examples = []
         failed_examples = []
         expected_failures = []
+        unexpected_success = []
         expected_failures_list = ['basic_workflow.py', 'basic_workflow_parallel.py']
 
         os.chdir(sdc_examples)
@@ -215,39 +218,50 @@ if __name__ == '__main__':
                 format_print(f'Run examples for sdc conda package: {package}')
                 create_conda_env(conda_activate, test_env, python, sdc_env['test'], conda_channels)
                 run_command(f'{test_env_activate} && conda install -y {package}')
-                for item in os.listdir(sdc_examples):
-                    if os.path.isfile(item) and re.search(r'^\w+\.py$', item):
-                        format_print(f'Execute {item}')
-                        try:
-                            run_command(f'{test_env_activate} && python {item}')
-                        except Exception:
-                            if item in expected_failures_list:
-                                expected_failures.append(item)
-                            else:
-                                failed_examples.append(item)
-                            format_print(f'{item} FAILED', new_block=False)
-                            traceback.print_exc()
+                for item in Path('.').glob('**/*.py'):
+                    item = str(item)
+                    if 'old_examples' in item:
+                        continue
+
+                    format_print(f'Execute {item}')
+                    try:
+                        run_command(f'{test_env_activate} && python {item}')
+                        if item in expected_failures_list:
+                            unexpected_success.append(item)
+                    except Exception:
+                        if item in expected_failures_list:
+                            expected_failures.append(item)
                         else:
-                            format_print(f'{item} PASSED', new_block=False)
-                            passed_examples.append(item)
+                            failed_examples.append(item)
+                        format_print(f'{item} FAILED', new_block=False)
+                        traceback.print_exc()
+                    else:
+                        format_print(f'{item} PASSED', new_block=False)
+                        passed_examples.append(item)
 
         total_passed = len(passed_examples)
         total_failed = len(failed_examples)
         total_expected_failures = len(expected_failures)
-        total_run = total_passed + total_failed + total_expected_failures
+        total_unexpected_success = len(unexpected_success)
+        total_run = total_passed + total_failed + total_expected_failures + total_unexpected_success
         format_print(' '.join([f'SDC examples summary:',
                                f'{total_run} RUN,',
                                f'{total_passed} PASSED,',
                                f'{total_failed} FAILED,',
-                               f'{total_expected_failures} EXPECTED FAILURES']))
+                               f'{total_expected_failures} EXPECTED FAILURES',
+                               f'{total_unexpected_success} UNEXPECTED SUCCESS',
+                               ]))
         for item in passed_examples:
             format_print(f' - {item}: PASSED', new_block=False)
         for item in failed_examples:
             format_print(f' - {item}: FAILED', new_block=False)
         for item in expected_failures:
             format_print(f' - {item}: EXPECTED FAILED', new_block=False)
+        for item in unexpected_success:
+            format_print(f' - {item}: UNEXPECTED SUCCESS', new_block=False)
 
-        sys.exit(0 if total_failed == 0 else -1)
+        success = (total_failed + total_unexpected_success) == 0
+        sys.exit(0 if success else -1)
 
     # Benchmark tests
     if test_mode == 'benchmark':

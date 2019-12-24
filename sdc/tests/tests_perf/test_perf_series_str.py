@@ -112,7 +112,7 @@ def usecase_series_strip(input_data):
 
 class TestSeriesStringMethods(TestBase):
     iter_number = 5
-    test_results_class = TestResultsStr
+    results_class = TestResultsStr
 
     @classmethod
     def setUpClass(cls):
