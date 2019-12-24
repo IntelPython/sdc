@@ -371,7 +371,7 @@ sdc_build_commands = versioneer.get_cmdclass()
 sdc_build_commands['build_doc'] = SDCBuildDoc
 sdc_build_commands.update({'style': style})
 sdc_version = versioneer.get_version()
-sdc_release = 'Alpha (' + versioneer.get_version() + ')'
+sdc_release = 'Alpha ({})'.format(versioneer.get_version())
 
 setup(name=SDC_NAME_STR,
       version=sdc_version,
