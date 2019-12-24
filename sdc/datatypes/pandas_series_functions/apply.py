@@ -36,6 +36,58 @@ from ..common_functions import TypeChecker
 @sdc_overload_method(SeriesType, 'apply')
 def hpat_pandas_series_apply(self, func, convert_dtype=True, args=()):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.apply
+
+    Limitations
+    -----------
+    `convert_dtype`, `args` and `**kwds` are currently unsupported by Intel Scalable Dataframe Compiler.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_apply.py
+       :language: python
+       :lines: 33-
+       :caption: Square the values by defining a function and passing it as an argument to `apply()`.
+       :name: ex_series_apply
+
+    .. command-output:: python ./series/series_apply.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/series/series_apply_lambda.py
+       :language: python
+       :lines: 33-
+       :caption: Square the values by passing an anonymous function as an argument to `apply()`.
+       :name: ex_series_apply_lambda
+
+    .. command-output:: python ./series/series_apply_lambda.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/series/series_apply_log.py
+       :language: python
+       :lines: 33-
+       :caption: Use a function from the Numpy library.
+       :name: ex_series_apply_log
+
+    .. command-output:: python ./series/series_apply_log.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`Series.map <pandas.Series.map>`
+            For element-wise operations.
+        :ref:`Series.agg <pandas.Series.agg>`
+            Only perform aggregating type operations.
+        :ref:`Series.transform <pandas.transform>`
+            Only perform transforming type operations.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_series_apply
     """
 
     ty_checker = TypeChecker("Method apply().")
