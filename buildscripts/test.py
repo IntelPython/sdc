@@ -34,6 +34,8 @@ import subprocess
 import sys
 import traceback
 
+from pathlib import Path
+
 from utilities import create_conda_env
 from utilities import format_print
 from utilities import get_sdc_env
@@ -215,21 +217,24 @@ if __name__ == '__main__':
                 format_print(f'Run examples for sdc conda package: {package}')
                 create_conda_env(conda_activate, test_env, python, sdc_env['test'], conda_channels)
                 run_command(f'{test_env_activate} && conda install -y {package}')
-                for item in os.listdir(sdc_examples):
-                    if os.path.isfile(item) and re.search(r'^\w+\.py$', item):
-                        format_print(f'Execute {item}')
-                        try:
-                            run_command(f'{test_env_activate} && python {item}')
-                        except Exception:
-                            if item in expected_failures_list:
-                                expected_failures.append(item)
-                            else:
-                                failed_examples.append(item)
-                            format_print(f'{item} FAILED', new_block=False)
-                            traceback.print_exc()
+                for item in Path('.').glob('**/*.py'):
+                    item = str(item)
+                    if 'old_examples' in item:
+                        continue
+
+                    format_print(f'Execute {item}')
+                    try:
+                        run_command(f'{test_env_activate} && python {item}')
+                    except Exception:
+                        if item in expected_failures_list:
+                            expected_failures.append(item)
                         else:
-                            format_print(f'{item} PASSED', new_block=False)
-                            passed_examples.append(item)
+                            failed_examples.append(item)
+                        format_print(f'{item} FAILED', new_block=False)
+                        traceback.print_exc()
+                    else:
+                        format_print(f'{item} PASSED', new_block=False)
+                        passed_examples.append(item)
 
         total_passed = len(passed_examples)
         total_failed = len(failed_examples)
