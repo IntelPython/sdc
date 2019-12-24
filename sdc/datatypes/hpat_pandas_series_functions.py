@@ -109,8 +109,8 @@ def hpat_pandas_series_accessor_getitem(self, idx):
         raise TypingError('{} The index must be a Integer. Given: {}'.format(_func_name, idx))
 
     if accessor == 'loc':
-    #note: Loc return Series
-    #note: Index 0 in slice not supported
+        #note: Loc return Series
+        #note: Index 0 in slice not supported
         index_is_none = (self.series.index is None or
                          isinstance(self.series.index, numba.types.misc.NoneType))
         if isinstance(idx, types.SliceType) and not index_is_none:
@@ -137,8 +137,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                         case_start = idx < self._series._index[i]
                         case_stop = idx > self._series._index[i]
                         if choice == 0 and case_start or choice == 1 and case_stop:
-                            if (idx < 0 and self._series._index[i] > 0 or
-                                idx > 0 and self._series._index[i] < 0):
+                            if (idx < 0 and self._series._index[i] > 0 or idx > 0 and self._series._index[i] < 0):
                                 t = math.fabs(idx) + math.fabs(self._series._index[i])
                                 if t < x_value:
                                     tmp = i
@@ -150,9 +149,9 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                                     x_value = t
                     return tmp
 
-                if start == -1 and is_monotonic == True:
+                if start == -1 and is_monotonic == True: # noqa
                     start = search(idx.start, 0)
-                if stop == -1 and is_monotonic == True:
+                if stop == -1 and is_monotonic == True: # noqa
                     stop = search(idx.stop, 1)
                 if idx.start == 0:
                     start = 0
@@ -252,8 +251,10 @@ def hpat_pandas_series_getitem(self, idx):
     index_is_number = index_is_none or (self.index and isinstance(self.index.dtype, types.Number))
     index_is_string = not index_is_none and isinstance(self.index.dtype, (types.UnicodeType, types.StringLiteral))
 
-    if (isinstance(idx, types.Number) and index_is_number or
-        (isinstance(idx, (str, types.UnicodeType, types.StringLiteral)) and index_is_string)):
+    if (
+        isinstance(idx, types.Number) and index_is_number or
+        (isinstance(idx, (str, types.UnicodeType, types.StringLiteral)) and index_is_string)
+    ):
         def hpat_pandas_series_getitem_index_impl(self, idx):
             mask = numpy.empty(len(self._data), numpy.bool_)
             for i in numba.prange(len(self.index)):
@@ -275,8 +276,10 @@ def hpat_pandas_series_getitem(self, idx):
 
         return hpat_pandas_series_getitem_idx_slice_impl
 
-    if (isinstance(idx, (types.List, types.Array)) and
-        isinstance(idx.dtype, (types.Boolean, bool))):
+    if (
+        isinstance(idx, (types.List, types.Array)) and
+        isinstance(idx.dtype, (types.Boolean, bool))
+    ):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
             return pandas.Series(self._data[idx], self.index[idx])
         return hpat_pandas_series_getitem_idx_list_impl
@@ -4437,10 +4440,11 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
             or inplace is False):
         raise TypingError('{} The inplace must be a literal Boolean constant. Given: {}'.format(_func_name, inplace))
 
-    if not ((method is None or isinstance(method, types.Omitted))
-            and (limit is None or isinstance(limit, types.Omitted))
-            and (downcast is None or isinstance(downcast, types.Omitted))
-           ):
+    if not (
+        (method is None or isinstance(method, types.Omitted))
+        and (limit is None or isinstance(limit, types.Omitted))
+        and (downcast is None or isinstance(downcast, types.Omitted))
+    ):
         raise TypingError('{} Unsupported parameters. Given method: {}, limit: {}, downcast: {}'.format(
                 _func_name, method, limit, downcast))
 
