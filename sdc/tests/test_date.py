@@ -133,6 +133,7 @@ class TestDate(TestCase):
         np.testing.assert_array_equal(df['hpat_date'], df['pd_date'])
 
     @skip_numba_jit
+    @unittest.expectedFailure
     def test_date_series_unbox(self):
         def test_impl(A):
             return A[0]
@@ -143,6 +144,7 @@ class TestDate(TestCase):
         self.assertEqual(hpat_func(A), test_impl(A))
 
     @skip_numba_jit
+    @unittest.expectedFailure
     def test_date_series_unbox2(self):
         def test_impl(A):
             return A[0]
