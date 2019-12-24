@@ -34,6 +34,7 @@ import numpy
 import operator
 import pandas
 import math
+import sys
 
 from numba.errors import TypingError
 from numba.extending import overload, overload_method, overload_attribute
@@ -114,66 +115,45 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                          isinstance(self.series.index, numba.types.misc.NoneType))
         if isinstance(idx, types.SliceType) and not index_is_none:
             def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
-                max_slice = 9223372036854775807
+                max_slice = sys.maxsize
                 start = -1
                 stop = -1
                 is_monotonic = True
-                inc = 0
-                dec = 0
+                inc_or_dec = 0
                 for i in numba.prange(len(self._series._index)):
-                    if i > 0:
-                        if self._series._index[i-1] > self._series._index[i]:
-                            dec = 1
-                        else:
-                            inc = 1
                     if self._series._index[i] == idx.start and start == -1:
                         start = i
                     if self._series._index[i] == idx.stop and start != -1 and stop == -1:
                         stop = i
-                if inc + dec != 1:
+                inc_or_dec = (numpy.all(numpy.diff(self._series._index) <= 0) or
+                              numpy.all(numpy.diff(self._series._index) >= 0))
+                if inc_or_dec != 1:
                     is_monotonic = False
-                start_value = max_slice
-                tmp = 0
-                if (start == -1 and is_monotonic == True):
+
+                def search(idx, choice):
+                    x_value = max_slice
+                    tmp = 0
                     for i in numba.prange(len(self._series._index)):
-                        if idx.start < self._series._index[i]:
-                            if ((idx.start < 0 and
-                                self._series._index[i] > 0 or
-                                idx.start > 0
-                                and self._series._index[i] < 0)):
-                                t = (math.fabs(idx.start) +
-                                    math.fabs(self._series._index[i]))
-                                if t < start_value:
+                        case_start = idx < self._series._index[i]
+                        case_stop = idx > self._series._index[i]
+                        if choice == 0 and case_start or choice == 1 and case_stop:
+                            if (idx < 0 and self._series._index[i] > 0 or
+                                idx > 0 and self._series._index[i] < 0):
+                                t = math.fabs(idx) + math.fabs(self._series._index[i])
+                                if t < x_value:
                                     tmp = i
-                                    start_value = t
+                                    x_value = t
                             else:
-                                t = (math.fabs(idx.start -
-                                    self._series._index[i]))
-                                if t < start_value:
+                                t = math.fabs(idx - self._series._index[i])
+                                if t < x_value:
                                     tmp = i
-                                    start_value = t
-                    start = tmp
-                end_value = max_slice
-                tmp = 0
-                if (stop == -1 and is_monotonic == True):
-                    for i in numba.prange(len(self._series._index)):
-                        if idx.stop > self._series._index[i]:
-                            if ((idx.stop < 0 and
-                                self._series._index[i] > 0 or
-                                idx.stop > 0
-                                and self._series._index[i] < 0)):
-                                t = (math.fabs(idx.stop) +
-                                    math.fabs(self._series._index[i]))
-                                if t < end_value:
-                                    tmp = i
-                                    end_value = t
-                            else:
-                                t = (math.fabs(idx.stop -
-                                    self._series._index[i]))
-                                if t < end_value:
-                                    tmp = i
-                                    end_value = t
-                    stop = tmp
+                                    x_value = t
+                    return tmp
+
+                if start == -1 and is_monotonic == True:
+                    start = search(idx.start, 0)
+                if stop == -1 and is_monotonic == True:
+                    stop = search(idx.stop, 1)
                 if idx.start == 0:
                     start = 0
                 if idx.stop == max_slice:
