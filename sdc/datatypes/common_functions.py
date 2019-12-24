@@ -34,6 +34,7 @@ import numpy
 import pandas
 
 import numba
+from numba.targets import quicksort
 from numba import types
 from numba.errors import TypingError
 from numba.extending import overload
@@ -41,7 +42,8 @@ from numba import numpy_support
 
 import sdc
 from sdc.str_arr_ext import (string_array_type, num_total_chars, append_string_array_to,
-                             str_arr_is_na, pre_alloc_string_array, str_arr_set_na)
+                             str_arr_is_na, pre_alloc_string_array, str_arr_set_na,
+                             cp_str_list_to_array, make_str_arr_from_list)
 
 
 class TypeChecker:
@@ -511,3 +513,68 @@ def _sdc_pandas_format_percentiles(arr):
         percentiles_strs.append(p_as_string_trimmed + '%')
 
     return percentiles_strs
+
+
+def sdc_arrays_argsort(A, kind='quicksort'):
+    pass
+
+
+@overload(sdc_arrays_argsort)
+def sdc_arrays_argsort_overload(A, kind='quicksort'):
+    """Function overloading argsort for different 1D array types"""
+
+    # kind is not known at compile time, so get this function here and use in impl if needed
+    quicksort_func = quicksort.make_jit_quicksort().run_quicksort
+
+    if isinstance(A, types.Array):
+        def _sdc_arrays_argsort_numeric_impl(A, kind='quicksort'):
+            return numpy.argsort(A, kind=kind)
+        return _sdc_arrays_argsort_numeric_impl
+
+    elif A == string_array_type:
+        def _sdc_arrays_argsort_str_impl(A, kind='quicksort'):
+
+            # save the NaN positions in the initial array since they cannot be sorted using list of strings
+            nan_mask = sdc.hiframes.api.get_nan_mask(A)
+            idx = numpy.arange(len(A))
+            old_nan_positions = idx[nan_mask]
+
+            data = A[~nan_mask]
+            keys = idx[~nan_mask]
+            if kind == 'quicksort':
+                zipped = list(zip(list(data), list(keys)))
+                zipped = quicksort_func(zipped)
+                argsorted = [zipped[i][1] for i in numpy.arange(len(data))]
+
+            elif kind == 'mergesort':
+                sdc.hiframes.sort.local_sort((data, ), (keys, ))
+                argsorted = list(keys)
+
+            argsorted.extend(old_nan_positions)
+
+            return numpy.asarray(argsorted, dtype=numpy.int32)
+
+        return _sdc_arrays_argsort_str_impl
+
+    return None
+
+def _sdc_pandas_series_check_axis(axis):
+    pass
+
+
+@overload(_sdc_pandas_series_check_axis)
+def _sdc_pandas_series_check_axis_overload(axis):
+    if isinstance(axis, types.UnicodeType):
+        def _sdc_pandas_series_check_axis_impl(axis):
+            if axis != 'index':
+                raise ValueError("Method sort_values(). Unsupported parameter. Given axis != 'index'")
+        return _sdc_pandas_series_check_axis_impl
+
+    elif isinstance(axis, types.Integer):
+        def _sdc_pandas_series_check_axis_impl(axis):
+            if axis != 0:
+                raise ValueError("Method sort_values(). Unsupported parameter. Given axis != 0")
+        return _sdc_pandas_series_check_axis_impl
+
+    return None
+
