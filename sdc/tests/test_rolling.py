@@ -578,6 +578,86 @@ class TestRolling(TestCase):
                         ref_result = test_impl(series, window, min_periods)
                         pd.testing.assert_series_equal(jit_result, ref_result)
 
+    @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
+    def test_series_rolling_cov(self):
+        def test_impl(series, window, min_periods, other, ddof):
+            return series.rolling(window, min_periods).cov(other, ddof=ddof)
+
+        hpat_func = self.jit(test_impl)
+
+        all_data = [
+            list(range(5)), [1., -1., 0., 0.1, -0.1],
+            [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
+            [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
+        ]
+        for main_data, other_data in product(all_data, all_data):
+            series = pd.Series(main_data)
+            other = pd.Series(other_data)
+            for window in range(0, len(series) + 3, 2):
+                for min_periods, ddof in product(range(0, window, 2), [0, 1]):
+                    with self.subTest(series=series, other=other, window=window,
+                                      min_periods=min_periods, ddof=ddof):
+                        jit_result = hpat_func(series, window, min_periods, other, ddof)
+                        ref_result = test_impl(series, window, min_periods, other, ddof)
+                        pd.testing.assert_series_equal(jit_result, ref_result)
+
+    @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
+    def test_series_rolling_cov_default(self):
+        def test_impl(series, window, min_periods):
+            return series.rolling(window, min_periods).cov()
+
+        hpat_func = self.jit(test_impl)
+
+        all_data = [
+            list(range(5)), [1., -1., 0., 0.1, -0.1],
+            [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
+            [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
+        ]
+        for data in all_data:
+            series = pd.Series(data)
+            for window in range(0, len(series) + 3, 2):
+                for min_periods in range(0, window, 2):
+                    with self.subTest(series=series, window=window,
+                                      min_periods=min_periods):
+                        jit_result = hpat_func(series, window, min_periods)
+                        ref_result = test_impl(series, window, min_periods)
+                        pd.testing.assert_series_equal(jit_result, ref_result)
+
+    @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
+    @unittest.expectedFailure
+    def test_series_rolling_cov_issue_floating_point_rounding(self):
+        """Cover issue of different float rounding in Python and SDC/Numba"""
+        def test_impl(series, window, min_periods, other, ddof):
+            return series.rolling(window, min_periods).cov(other, ddof=ddof)
+
+        hpat_func = self.jit(test_impl)
+
+        series = pd.Series(list(range(10)))
+        other = pd.Series([1., -1., 0., 0.1, -0.1])
+        jit_result = hpat_func(series, 6, 0, other, 1)
+        ref_result = test_impl(series, 6, 0, other, 1)
+        pd.testing.assert_series_equal(jit_result, ref_result)
+
+    @skip_sdc_jit('Series.rolling.cov() unsupported exceptions')
+    def test_series_rolling_cov_unsupported_types(self):
+        def test_impl(pairwise, ddof):
+            series = pd.Series([1., -1., 0., 0.1, -0.1])
+            return series.rolling(3, 3).cov(pairwise=pairwise, ddof=ddof)
+
+        hpat_func = self.jit(test_impl)
+
+        msg_tmpl = 'Method rolling.cov(). The object {}\n given: {}\n expected: {}'
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(1, 1)
+        msg = msg_tmpl.format('pairwise', 'int64', 'bool')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(None, '1')
+        msg = msg_tmpl.format('ddof', 'unicode_type', 'int')
+        self.assertIn(msg, str(raises.exception))
+
     @skip_sdc_jit('Series.rolling.max() unsupported Series index')
     def test_series_rolling_max(self):
         def test_impl(series, window, min_periods):

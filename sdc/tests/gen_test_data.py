@@ -99,10 +99,10 @@ def generate_other_data():
     df.to_parquet("pivot2.pq")
 
     # CSV reader test
-    data = ("0,2.3,4.6,47736\n"
-            "1,2.3,4.6,47736\n"
-            "2,2.3,4.6,47736\n"
-            "4,2.3,4.6,47736\n")
+    data = ("0,2.3,4.6,A\n"
+            "1,2.3,4.6,B\n"
+            "2,2.3,4.6,\n"
+            "4,2.3,4.6,D\n")
 
     with open("csv_data1.csv", "w") as f:
         f.write(data)

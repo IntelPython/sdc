@@ -86,18 +86,27 @@ hpat_pandas_series_rolling_docstring_tmpl = """
 
 
 @register_jitable
-def arr_nonnan_count(arr):
-    """Count non-NaN values"""
-    return len(arr) - numpy.isnan(arr).sum()
-
-
-@register_jitable
 def arr_corr(x, y):
     """Calculate correlation of values"""
     if len(x) == 0:
         return numpy.nan
 
     return numpy.corrcoef(x, y)[0, 1]
+
+
+@register_jitable
+def arr_nonnan_count(arr):
+    """Count non-NaN values"""
+    return len(arr) - numpy.isnan(arr).sum()
+
+
+@register_jitable
+def arr_cov(x, y, ddof):
+    """Calculate covariance of values 1D arrays x and y of the same size"""
+    if len(x) == 0:
+        return numpy.nan
+
+    return numpy.cov(x, y, ddof=ddof)[0, 1]
 
 
 @register_jitable
@@ -363,6 +372,70 @@ def hpat_pandas_series_rolling_count(self):
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_count_impl
+
+
+@sdc_overload_method(SeriesRollingType, 'cov')
+def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
+
+    ty_checker = TypeChecker('Method rolling.cov().')
+    ty_checker.check(self, SeriesRollingType)
+
+    # TODO: check `other` is Series after a circular import of SeriesType fixed
+    # accepted_other = (bool, Omitted, NoneType, SeriesType)
+    # if not isinstance(other, accepted_other) and other is not None:
+    #     ty_checker.raise_exc(other, 'Series', 'other')
+
+    accepted_pairwise = (bool, Boolean, Omitted, NoneType)
+    if not isinstance(pairwise, accepted_pairwise) and pairwise is not None:
+        ty_checker.raise_exc(pairwise, 'bool', 'pairwise')
+
+    if not isinstance(ddof, (int, Integer, Omitted)):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
+
+    nan_other = isinstance(other, (Omitted, NoneType)) or other is None
+
+    def hpat_pandas_rolling_series_std_impl(self, other=None, pairwise=None, ddof=1):
+        win = self._window
+        minp = self._min_periods
+
+        main_series = self._data
+        main_arr = main_series._data
+        main_arr_length = len(main_arr)
+
+        if nan_other == True:  # noqa
+            other_arr = main_arr
+        else:
+            other_arr = other._data
+
+        other_arr_length = len(other_arr)
+        length = max(main_arr_length, other_arr_length)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        def calc_cov(main, other, ddof, minp):
+            # align arrays `main` and `other` by size and finiteness
+            min_length = min(len(main), len(other))
+            main_valid_indices = numpy.isfinite(main[:min_length])
+            other_valid_indices = numpy.isfinite(other[:min_length])
+            valid = main_valid_indices & other_valid_indices
+
+            if len(main[valid]) < minp:
+                return numpy.nan
+            else:
+                return arr_cov(main[valid], other[valid], ddof)
+
+        for i in prange(min(win, length)):
+            main_arr_range = main_arr[:i + 1]
+            other_arr_range = other_arr[:i + 1]
+            output_arr[i] = calc_cov(main_arr_range, other_arr_range, ddof, minp)
+
+        for i in prange(win, length):
+            main_arr_range = main_arr[i + 1 - win:i + 1]
+            other_arr_range = other_arr[i + 1 - win:i + 1]
+            output_arr[i] = calc_cov(main_arr_range, other_arr_range, ddof, minp)
+
+        return pandas.Series(output_arr)
+
+    return hpat_pandas_rolling_series_std_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'max')
@@ -721,6 +794,36 @@ hpat_pandas_series_rolling_corr.__doc__ = hpat_pandas_series_rolling_docstring_t
         Other Series.
     pairwise: :obj:`bool`
         Not relevant for Series.
+    """
+})
+
+hpat_pandas_series_rolling_cov.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'cov',
+    'example_caption': 'Calculate rolling covariance.',
+    'example_result':
+    """
+        0         NaN
+        1         NaN
+        2         NaN
+        3    0.166667
+        4    4.333333
+        dtype: float64
+    """,
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    Resulting Series has default index and name.
+    """,
+    'extra_params':
+    """
+    other: :obj:`Series`
+        Other Series.
+    pairwise: :obj:`bool`
+        Not relevant for Series.
+    ddof: :obj:`int`
+        Delta Degrees of Freedom.
     """
 })
 
