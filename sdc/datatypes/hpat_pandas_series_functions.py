@@ -109,8 +109,8 @@ def hpat_pandas_series_accessor_getitem(self, idx):
         raise TypingError('{} The index must be a Integer. Given: {}'.format(_func_name, idx))
 
     if accessor == 'loc':
-        #note: Loc return Series
-        #note: Index 0 in slice not supported
+        # Note: Loc return Series
+        # Note: Index 0 in slice not supported
         index_is_none = (self.series.index is None or
                          isinstance(self.series.index, numba.types.misc.NoneType))
         if isinstance(idx, types.SliceType) and not index_is_none:
@@ -149,9 +149,9 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                                     x_value = t
                     return tmp
 
-                if start == -1 and is_monotonic == True: # noqa
+                if start == -1 and is_monotonic == True:  # noqa
                     start = search(idx.start, 0)
-                if stop == -1 and is_monotonic == True: # noqa
+                if stop == -1 and is_monotonic == True:  # noqa
                     stop = search(idx.stop, 1)
                 if idx.start == 0:
                     start = 0
@@ -246,7 +246,7 @@ def hpat_pandas_series_getitem(self, idx):
     if not isinstance(self, SeriesType):
         return None
 
-    #note: Getitem return Series
+    # Note: Getitem return Series
     index_is_none = self.index is None or isinstance(self.index, numba.types.misc.NoneType)
     index_is_number = index_is_none or (self.index and isinstance(self.index.dtype, types.Number))
     index_is_string = not index_is_none and isinstance(self.index.dtype, (types.UnicodeType, types.StringLiteral))
@@ -270,7 +270,7 @@ def hpat_pandas_series_getitem(self, idx):
         return hpat_pandas_series_idx_impl
 
     if isinstance(idx, types.SliceType):
-    #Return slice for str values not implement
+        # Return slice for str values not implement
         def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
             return pandas.Series(self._data[idx], self.index[idx])
 
@@ -304,8 +304,8 @@ def hpat_pandas_series_getitem(self, idx):
         return hpat_pandas_series_getitem_idx_list_impl
 
     if (isinstance(idx, SeriesType) and not isinstance(self.index, types.NoneType)):
-    #Series with str index not implement
         if isinstance(idx.data.dtype, (types.Boolean, bool)):
+            # Series with str index not implement
             def hpat_pandas_series_getitem_idx_series_impl(self, idx):
                 if (self._index != idx._index).sum() == 0:
                     return pandas.Series(self._data[idx._data], self._index[idx._data])
