@@ -209,7 +209,7 @@ if __name__ == '__main__':
         failed_examples = []
         expected_failures = []
         unexpected_success = []
-        expected_failures_list = ['basic_workflow.py', 'basic_workflow_parallel.py']
+        expected_failures_list = []
 
         os.chdir(sdc_examples)
         sdc_packages = get_sdc_build_packages(build_folder)
