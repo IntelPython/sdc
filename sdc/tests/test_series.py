@@ -4216,6 +4216,7 @@ class TestSeries(TestCase):
                 else:
                     self.assertEqual(result, result_ref)
 
+    @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_default(self):
         """Verifies Series.sort_values method with default parameters
             on a named Series of different dtypes and default index"""
@@ -4238,23 +4239,27 @@ class TestSeries(TestCase):
                 S = pd.Series(data, name='A')
                 pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_ascending(self):
         """Verifies Series.sort_values method handles parameter 'ascending' as a literal and non-literal value"""
         def test_impl(S, param_value):
             return S.sort_values(ascending=param_value)
+
         def test_impl_literal(S):
             return S.sort_values(ascending=False)
+
         hpat_func1 = self.jit(test_impl)
         hpat_func2 = self.jit(test_impl_literal)
 
         S = pd.Series(['ac', 'c', 'cb', 'ca', None, 'da', 'cc', 'ddd', 'd'])
         for ascending in (False, True):
-            with self.subTest(jitted_func='hpat_func1', ascending=ascending):
+            with self.subTest(literal_value='no', ascending=ascending):
                 pd.testing.assert_series_equal(hpat_func1(S, ascending), test_impl(S, ascending))
 
-        with self.subTest(jitted_func='hpat_func2'):
+        with self.subTest(literal_value='yes'):
             pd.testing.assert_series_equal(hpat_func2(S), test_impl_literal(S))
 
+    @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_invalid_axis(self):
         """Verifies Series.sort_values method raises with invalid value of parameter 'axis'"""
         def test_impl(S, param_value):
@@ -4270,10 +4275,11 @@ class TestSeries(TestCase):
 
             self.assertRaises(type(pandas_exception), hpat_func, S, axis)
 
+    @skip_sdc_jit('Old-style impl returns array but not Series')
     @skip_numba_jit('TODO: inplace sorting is not implemented yet')
     def test_series_sort_values_inplace(self):
         def test_impl(S):
-            S.sort_values(inplace='True')
+            S.sort_values(inplace=True)
             return S
         hpat_func = self.jit(test_impl)
 
@@ -4281,6 +4287,7 @@ class TestSeries(TestCase):
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
+    @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_kind(self):
         """Verifies Series.sort_values method support of parameter 'kind'
            on a unnamed Series of different dtypes and default index"""
@@ -4306,6 +4313,7 @@ class TestSeries(TestCase):
                 with self.subTest(series_data=data, kind=kind):
                     pd.testing.assert_series_equal(hpat_func(S, kind), test_impl(S, kind))
 
+    @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_na_position(self):
         """Verifies Series.sort_values method support of parameter 'na_position'
            on a unnamed Series of different dtypes and default index"""
@@ -4329,6 +4337,7 @@ class TestSeries(TestCase):
                 with self.subTest(series_data=data, na_position=na_position):
                     pd.testing.assert_series_equal(hpat_func(S, na_position), test_impl(S, na_position))
 
+    @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_index(self):
         """Verifies Series.sort_values method with default parameters
            on an unnamed integer Series and different indexes"""
@@ -4352,9 +4361,10 @@ class TestSeries(TestCase):
                 pd.testing.assert_series_equal(hpat_func(S), test_impl(S), check_names=False)
 
     @skip_parallel
+    @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_full(self):
         def test_impl(series, ascending, kind):
-            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind=literally(kind), na_position='last')
+            return series.sort_values(axis=0, ascending=ascending, kind=literally(kind), na_position='last')
 
         hpat_func = self.jit(test_impl)
 
@@ -4374,10 +4384,10 @@ class TestSeries(TestCase):
                         np.testing.assert_array_equal(ref_result.data, jit_result.data)
                         self.assertEqual(ref, jit)
 
-    @unittest.skip("Creating Python string/unicode object failed")
+    @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_full_unicode4(self):
         def test_impl(series, ascending, kind):
-            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind=kind, na_position='last')
+            return series.sort_values(axis=0, ascending=ascending, kind=kind, na_position='last')
 
         hpat_func = self.jit(test_impl)
 
@@ -4398,9 +4408,10 @@ class TestSeries(TestCase):
                         self.assertEqual(ref, jit)
 
     @skip_parallel
+    @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_full_idx(self):
         def test_impl(series, ascending, kind):
-            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind=literally(kind), na_position='last')
+            return series.sort_values(axis=0, ascending=ascending, kind=literally(kind), na_position='last')
 
         hpat_func = self.jit(test_impl)
 

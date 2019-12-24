@@ -534,7 +534,6 @@ def sdc_arrays_argsort_overload(A, kind='quicksort'):
     elif A == string_array_type:
         def _sdc_arrays_argsort_str_impl(A, kind='quicksort'):
 
-            # save the NaN positions in the initial array since they cannot be sorted using list of strings
             nan_mask = sdc.hiframes.api.get_nan_mask(A)
             idx = numpy.arange(len(A))
             old_nan_positions = idx[nan_mask]
@@ -545,18 +544,17 @@ def sdc_arrays_argsort_overload(A, kind='quicksort'):
                 zipped = list(zip(list(data), list(keys)))
                 zipped = quicksort_func(zipped)
                 argsorted = [zipped[i][1] for i in numpy.arange(len(data))]
-
             elif kind == 'mergesort':
                 sdc.hiframes.sort.local_sort((data, ), (keys, ))
                 argsorted = list(keys)
 
             argsorted.extend(old_nan_positions)
-
             return numpy.asarray(argsorted, dtype=numpy.int32)
 
         return _sdc_arrays_argsort_str_impl
 
     return None
+
 
 def _sdc_pandas_series_check_axis(axis):
     pass

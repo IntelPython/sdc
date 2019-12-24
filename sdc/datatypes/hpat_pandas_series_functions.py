@@ -868,11 +868,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
             values_sorted_by_count = [values[i] for i in indexes_order]
 
             # allocate the result index as a StringArray and copy values to it
-            index_string_lengths = numpy.asarray([len(s) for s in values_sorted_by_count])
-            index_total_chars = numpy.sum(index_string_lengths)
-            result_index = pre_alloc_string_array(len(values_sorted_by_count), index_total_chars)
-            cp_str_list_to_array(result_index, values_sorted_by_count)
-
+            result_index = make_str_arr_from_list(values_sorted_by_count)
             if need_add_nan_count:
                 # set null bit for StringArray element corresponding to NaN element (was added as last in values)
                 index_previous_nan_pos = values_len - 1
@@ -1396,7 +1392,7 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
             item = self._data[i]
             num_chars += len(str(item))  # TODO: check NA
 
-        data = sdc.str_arr_ext.pre_alloc_string_array(arr_len, num_chars)
+        data = pre_alloc_string_array(arr_len, num_chars)
         for i in numba.parfor.internal_prange(arr_len):
             item = self._data[i]
             data[i] = str(item)  # TODO: check NA
@@ -4290,30 +4286,28 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
     _func_name = 'Method sort_values().'
 
-#     ty_checker = TypeChecker('Method sort_values().')
-#     ty_checker.check(self, SeriesType)
-# 
-#     axis_supported_types = (int, types.Omitted, types.Integer, types.UnicodeType)
-#     if not isinstance(axis, axis_supported_types):
-#         ty_checker.raise_exc(axis, 'integer or string', 'axis')
-# 
-#     ascending_supported_types = (bool, types.Omitted, types.Boolean)
-#     if not isinstance(ascending, ascending_supported_types):
-#         ty_checker.raise_exc(ascending, 'boolean', 'ascending')
-# 
-#     kind_supported_types = (str, types.Omitted, types.UnicodeType)
-#     if not isinstance(kind, kind_supported_types):
-#         ty_checker.raise_exc(kind, 'string', 'kind')
-#     kind_is_default = isinstance(kind, (str, types.Omitted))
-# 
-#     na_position_supported_types = (str, types.Omitted, types.UnicodeType)
-#     if not isinstance(na_position, na_position_supported_types):
-#         ty_checker.raise_exc(na_position, 'string', 'na_position')
-# 
-#     if not (inplace is False or isinstance(inplace, types.Omitted)):
-#         raise TypingError('{} Unsupported parameters. Given inplace: {}'.format(_func_name, inplace))
+    ty_checker = TypeChecker('Method sort_values().')
+    ty_checker.check(self, SeriesType)
 
+    axis_supported_types = (int, types.Omitted, types.Integer, types.StringLiteral, types.UnicodeType)
+    if not isinstance(axis, axis_supported_types):
+        ty_checker.raise_exc(axis, 'integer or string', 'axis')
+
+    ascending_supported_types = (bool, types.Omitted, types.Boolean)
+    if not isinstance(ascending, ascending_supported_types):
+        ty_checker.raise_exc(ascending, 'boolean', 'ascending')
+
+    kind_supported_types = (str, types.Omitted, types.StringLiteral, types.UnicodeType)
+    if not isinstance(kind, kind_supported_types):
+        ty_checker.raise_exc(kind, 'string', 'kind')
     kind_is_default = isinstance(kind, (str, types.Omitted))
+
+    na_position_supported_types = (str, types.Omitted, types.StringLiteral, types.UnicodeType)
+    if not isinstance(na_position, na_position_supported_types):
+        ty_checker.raise_exc(na_position, 'string', 'na_position')
+
+    if not (inplace is False or isinstance(inplace, types.Omitted)):
+        raise TypingError('{} Unsupported parameters. Given inplace: {}'.format(_func_name, inplace))
 
     def _sdc_pandas_series_sort_values_impl(
             self, axis=0, ascending=True, inplace=False, kind='quicksort', na_position='last'):
@@ -4321,10 +4315,12 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
         common_functions._sdc_pandas_series_check_axis(axis)
 
         # TODO: investigate why 'not in' doesn't work in this context
-        if kind in ('quicksort', 'mergesort') == False:
+        kind_is_valid = kind in ('quicksort', 'mergesort')
+        if not kind_is_valid:
             raise ValueError("Method sort_values(). Unsupported parameter. Given kind != 'quicksort', 'mergesort'")
 
-        if na_position in ('last', 'first') == False:
+        na_position_is_valid = na_position in ('last', 'first')
+        if not na_position_is_valid:
             raise ValueError("Method sort_values(). Unsupported parameter. Given na_position != 'last', 'first'")
 
         data_nan_mask = sdc.hiframes.api.get_nan_mask(self._data)
@@ -4499,7 +4495,7 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
                     else:
                         num_chars += len(s)
 
-                filled_data = sdc.str_arr_ext.pre_alloc_string_array(n, num_chars)
+                filled_data = pre_alloc_string_array(n, num_chars)
                 for i in numba.parfor.internal_prange(n):
                     if sdc.hiframes.api.isna(self._data, i):
                         filled_data[i] = value
