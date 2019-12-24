@@ -38,6 +38,7 @@ from numba.errors import TypingError
 from numba.extending import overload, overload_method, overload_attribute
 from numba import (types, numpy_support)
 from numba.typed import Dict
+from numba import prange
 
 import sdc
 import sdc.datatypes.common_functions as common_functions
@@ -4308,32 +4309,31 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
 
     def hpat_pandas_series_cov_impl(self, other, min_periods=None):
 
-        if min_periods is None:
-            min_periods = 1
+        if min_periods is None or min_periods < 2:
+            min_periods = 2
 
-        if len(self._data) == 0 or len(other._data) == 0:
+        min_len = min(len(self._data), len(other._data))
+
+        if min_len == 0:
             return numpy.nan
 
-        self_arr = self._data[:min(len(self._data), len(other._data))]
-        other_arr = other._data[:min(len(self._data), len(other._data))]
+        other_sum = 0.
+        self_sum = 0.
+        self_other_sum = 0.
+        total_count = 0
+        for i in prange(min_len):
+            s = self._data[i]
+            o = other._data[i]
+            if not (numpy.isnan(s) or numpy.isnan(o)):
+                self_sum += s
+                other_sum += o
+                self_other_sum += s*o
+                total_count += 1
 
-        invalid = numpy.isnan(self_arr) | numpy.isnan(other_arr)
-        if invalid.any():
-            self_arr = self_arr[~invalid]
-            other_arr = other_arr[~invalid]
-
-        if len(self_arr) < min_periods:
+        if total_count < min_periods:
             return numpy.nan
 
-        new_self = pandas.Series(self_arr)
-
-        ma = new_self.mean()
-        mb = other.mean()
-
-        if numpy.isinf(mb):
-            return numpy.nan
-
-        return ((self_arr - ma) * (other_arr - mb)).sum() / (new_self.count() - 1.0)
+        return (self_other_sum - self_sum*other_sum/total_count)/(total_count - 1)
 
     return hpat_pandas_series_cov_impl
 

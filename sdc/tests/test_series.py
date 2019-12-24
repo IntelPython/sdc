@@ -4669,9 +4669,10 @@ class TestSeries(TestCase):
                 S1 = pd.Series(input_data1)
                 S2 = pd.Series(input_data2)
                 for period in [None, 2, 1, 8, -4]:
-                    result_ref = test_series_cov_impl(S1, S2, min_periods=period)
-                    result = hpat_func(S1, S2, min_periods=period)
-                    np.testing.assert_allclose(result, result_ref)
+                    with self.subTest(input_data1=input_data1, input_data2=input_data2, min_periods=period):
+                        result_ref = test_series_cov_impl(S1, S2, min_periods=period)
+                        result = hpat_func(S1, S2, min_periods=period)
+                        np.testing.assert_allclose(result, result_ref)
 
     @skip_sdc_jit('Series.cov() parameter "min_periods" unsupported')
     def test_series_cov_unsupported_dtype(self):
