@@ -3739,6 +3739,7 @@ class TestSeries(TestCase):
             self.assertTrue(count_array_OneDs() > 0)
 
     @skip_numba_jit
+    @unittest.expectedFailure
     def test_series_head_index_parallel1(self):
         '''Verifies head method for distributed Series with integer index'''
         def test_impl(S):

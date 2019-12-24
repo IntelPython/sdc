@@ -1,6 +1,6 @@
 {% set name = "numba" %}
 {% set version = "0.46.0" %}
-{% set LLVMLITE_VERSION = "0.31.0dev0 py*_0" %}
+{% set LLVMLITE_VERSION = "0.31.0rc1 py*_0" %}
 
 package:
   name: {{ name|lower }}
@@ -8,7 +8,7 @@ package:
 
 source:
   git_url: https://github.com/numba/numba
-  git_tag: 8044d6edc79e56847778164656a8c0856383503a
+  git_tag: 18fe9159849a0d512f1fb284d7cdc6bbf72ceab3
 
 build:
   number: 0

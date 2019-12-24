@@ -94,7 +94,7 @@ def usecase_center(input_data):
 
 
 class TestStringMethods(TestBase):
-    test_results_class = TestResultsStr
+    results_class = TestResultsStr
 
     @classmethod
     def setUpClass(cls):
