@@ -214,29 +214,27 @@ def fill_str_array(data, size, push_back=True):
     result_data = sdc.str_arr_ext.pre_alloc_string_array(size, num_chars)
 
     # Keep NaN values of initial array
-    str_arr_is_na_mask = []
-    for i in numba.prange(string_array_size):
-        if sdc.hiframes.api.isna(data, i):
-            str_arr_is_na_mask.append(i)
-
-    str_arr_is_na_mask = numpy.array(str_arr_is_na_mask)
-
-    if push_back:
-        str_arr_is_na_mask = numpy.append(str_arr_is_na_mask, numpy.arange(string_array_size, size))
-    else:
-        # Make offset to push front
-        str_arr_is_na_mask = str_arr_is_na_mask + none_array_size
-        str_arr_is_na_mask = numpy.append(numpy.arange(none_array_size), str_arr_is_na_mask)
-
+    arr_is_na_mask = numpy.array([sdc.hiframes.api.isna(data, i) for i in
+                                  numba.parfor.internal_prange(string_array_size)])
     data_str_list = sdc.str_arr_ext.to_string_list(data)
     nan_list = [''] * none_array_size
 
     result_list = data_str_list + nan_list if push_back else nan_list + data_str_list
-
     sdc.str_arr_ext.cp_str_list_to_array(result_data, result_list)
 
-    for i in numba.prange(len(str_arr_is_na_mask)):
-        str_arr_set_na(result_data, str_arr_is_na_mask[i])
+    if push_back:
+        for i in numba.parfor.internal_prange(string_array_size):
+            if arr_is_na_mask[i]:
+                str_arr_set_na(result_data, i)
+        for i in numba.parfor.internal_prange(string_array_size, size):
+            str_arr_set_na(result_data, i)
+    else:
+        for i in numba.parfor.internal_prange(none_array_size):
+            str_arr_set_na(result_data, i)
+        for i in numba.parfor.internal_prange(none_array_size, size):
+            off_set = i - none_array_size
+            if arr_is_na_mask[off_set]:
+                str_arr_set_na(result_data, i)
 
     return result_data
 

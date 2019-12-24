@@ -33,15 +33,15 @@ def dataframe_append():
     """
     Expected result:
          A  B    C
-    0  1.0  2  NaN
-    1  3.0  4  NaN
-    2  NaN  5  6.0
-    3  NaN  7  8.0
-    dtype: object
+    0  1.0  3  NaN
+    1  2.0  4  NaN
+    2  NaN  5  7.0
+    3  NaN  6  8.0
+
     """
 
-    df = pd.DataFrame([[1, 2], [3, 4]], columns=list('AB'))
-    df2 = pd.DataFrame([[5, 6], [7, 8]], columns=list('BC'))
+    df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
+    df2 = pd.DataFrame({'B': [5, 6], 'C': [7, 8]})
     result = df.append(df2)
 
     return result

@@ -1158,7 +1158,7 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
-    @unittest.skip('Unsupported functionality df.append([df2, df3]')
+    @skip_numba_jit('Unsupported functionality df.append([df2, df3])')
     def test_append_no_index(self):
         def test_impl(df, df2, df3):
             return df.append([df2, df3], ignore_index=True)

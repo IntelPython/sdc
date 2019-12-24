@@ -44,6 +44,107 @@ from sdc.str_arr_ext import StringArrayType
 from sdc.utils import sdc_overload_method
 
 
+def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
+    """
+    Input:
+    df = pd.DataFrame({'A': ['cat', 'dog', np.nan], 'B': [.2, .3, np.nan]})
+    other = pd.DataFrame({'A': ['bird', 'fox', 'mouse'], 'C': ['a', np.nan, '']})
+
+    Func generated:
+    def sdc_pandas_dataframe_append_impl(df, other, ignore_index=True, verify_integrity=False, sort=None):
+        len_df = len(get_dataframe_data(df, 0))
+        len_other = len(get_dataframe_data(other, 0))
+        new_col_A_data_df = get_dataframe_data(df, 0)
+        new_col_A_data_other = get_dataframe_data(other, 0)
+        new_col_A = init_series(new_col_A_data_df).append(init_series(new_col_A_data_other))._data
+        new_col_B_data_df = get_dataframe_data(df, 1)
+        new_col_B_data = init_series(new_col_B_data_df)._data
+        new_col_B = fill_array(new_col_B_data, len_df+len_other)
+        new_col_C_data_other = get_dataframe_data(other, 1)
+        new_col_C_data = init_series(new_col_C_data_other)._data
+        new_col_C = fill_str_array(new_col_C_data, len_df+len_other, push_back=False)
+        return init_dataframe(new_col_A, new_col_B, new_col_C, None, 'A', 'B', 'C')
+    """
+    indent = 4 * ' '
+    func_args = ['df', 'other']
+
+    for key, value in args:
+        # TODO: improve check
+        if key not in func_args:
+            if isinstance(value, types.Literal):
+                value = value.literal_value
+            func_args.append(f'{key}={value}')
+
+    df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
+    other_columns_indx = {col_name: i for i, col_name in enumerate(other.columns)}
+
+    # Keep columns that are StringArrayType
+    string_type_columns = set(col_name for typ, col_name in zip(df.data, df.columns)
+                              if isinstance(typ, StringArrayType))
+
+    for typ, col_name in zip(other.data, other.columns):
+        if isinstance(typ, StringArrayType):
+            string_type_columns.add(col_name)
+
+    def get_dataframe_column(df, column, idx):
+        return f'new_col_{column}_data_{df} = get_dataframe_data({df}, {idx})'
+
+    def get_append_result(df1, df2, column):
+        s1 = f'init_series(new_col_{column}_data_{df1})'
+        s2 = f'init_series(new_col_{column}_data_{df2})'
+        return f'new_col_{column} = {s1}.append({s2})._data'
+
+    func_definition = [f'def sdc_pandas_dataframe_{_func_name}_impl({", ".join(func_args)}):']
+    func_text = []
+    column_list = []
+
+    func_text.append(f'len_df = len(get_dataframe_data(df, 0))')
+    func_text.append(f'len_other = len(get_dataframe_data(other, 0))')
+
+    for col_name, i in df_columns_indx.items():
+        func_text.append(get_dataframe_column('df', col_name, i))
+        if col_name in other_columns_indx:
+            func_text.append(get_dataframe_column('other', col_name, other_columns_indx.get(col_name)))
+            func_text.append(get_append_result('df', 'other', col_name))
+        else:
+            func_text.append(f'new_col_{col_name}_data = init_series(new_col_{col_name}_data_df)._data')
+            if col_name in string_type_columns:
+                func_text.append(f'new_col_{col_name} = fill_str_array(new_col_{col_name}_data, len_df+len_other)')
+            else:
+                func_text.append(f'new_col_{col_name} = fill_array(new_col_{col_name}_data, len_df+len_other)')
+        column_list.append((f'new_col_{col_name}', col_name))
+
+    for col_name, i in other_columns_indx.items():
+        if col_name not in df_columns_indx:
+            func_text.append(get_dataframe_column('other', col_name, i))
+            func_text.append(f'new_col_{col_name}_data = init_series(new_col_{col_name}_data_other)._data')
+            if col_name in string_type_columns:
+                func_text.append(
+                    f'new_col_{col_name} = fill_str_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
+            else:
+                func_text.append(f'new_col_{col_name} = '
+                                 f'fill_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
+            column_list.append((f'new_col_{col_name}', col_name))
+
+    data = ', '.join(column for column, _ in column_list)
+    # TODO: Handle index
+    index = None
+    col_names = ', '.join(f"'{column_name}'" for _, column_name in column_list)
+    func_text.append(f"return init_dataframe({data}, {index}, {col_names})\n")
+
+    func_definition.extend([indent + func_line for func_line in func_text])
+
+    func_def = '\n'.join(func_definition)
+
+    global_vars = {'sdc': sdc, 'np': numpy, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data,
+                   'init_series': sdc.hiframes.api.init_series,
+                   'fill_array': sdc.datatypes.common_functions.fill_array,
+                   'fill_str_array': sdc.datatypes.common_functions.fill_str_array,
+                   'init_dataframe': sdc.hiframes.pd_dataframe_ext.init_dataframe}
+
+    return func_def, global_vars
+
+
 @sdc_overload_method(DataFrameType, 'append')
 def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=False, sort=None):
     """
@@ -64,18 +165,18 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
 
         > python ./dataframe_append.py
              A  B    C
-        0  1.0  2  NaN
-        1  3.0  4  NaN
-        2  NaN  5  6.0
-        3  NaN  7  8.0
-        dtype: object
+        0  1.0  3  NaN
+        1  2.0  4  NaN
+        2  NaN  5  7.0
+        3  NaN  6  8.0
 
      .. note::
         Parameter ignore_index, verify_integrity, sort are currently unsupported by Intel Scalable Dataframe Compiler
         Currently only pandas.DataFrame is supported as "other" parameter
 
     .. seealso::
-        :ref:`concat <pandas.concat>`
+
+        `pandas.concat <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.concat.html>`_
             General function to concatenate DataFrame or Series objects.
 
     Intel Scalable Dataframe Compiler Developer Guide
@@ -122,80 +223,10 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     args = (('ignore_index', True), ('verify_integrity', False), ('sort', None))
 
     def sdc_pandas_dataframe_append_impl(df, other, _func_name, args):
-        indent = 4 * ' '
-        func_args = ['df', 'other']
-
-        for key, value in args:
-            # TODO: improve check
-            if key not in func_args:
-                if isinstance(value, types.Literal):
-                    value = value.literal_value
-                func_args.append('{}={}'.format(key, value))
-
-        df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
-        other_columns_indx = {col_name: i for i, col_name in enumerate(other.columns)}
-
-        # Keep columns that are StringArrayType
-        string_type_columns = set(col_name for typ, col_name in zip(df.data, df.columns)
-                                  if isinstance(typ, StringArrayType))
-
-        for typ, col_name in zip(other.data, other.columns):
-            if isinstance(typ, StringArrayType):
-                string_type_columns.add(col_name)
-
-        def get_dataframe_column(df, column, idx):
-            return f'new_col_{column}_data_{df} = get_dataframe_data({df}, {idx})'
-
-        def get_append_result(df1, df2, column):
-            s1 = f'init_series(new_col_{column}_data_{df1})'
-            s2 = f'init_series(new_col_{column}_data_{df2})'
-            return f'new_col_{column} = {s1}.append({s2})._data'
-
-        func_definition = [f'def sdc_pandas_dataframe_{_func_name}_impl({", ".join(func_args)}):']
-        func_text = []
-        column_list = []
-
-        func_text.append(f'len_df = len(get_dataframe_data(df, {0}))')
-        func_text.append(f'len_other = len(get_dataframe_data(other, {0}))')
-
-        for col_name, i in df_columns_indx.items():
-            func_text.append(get_dataframe_column('df', col_name, i))
-            if col_name in other_columns_indx:
-                func_text.append(get_dataframe_column('other', col_name, other_columns_indx.get(col_name)))
-                func_text.append(get_append_result('df', 'other', col_name))
-            else:
-                func_text.append(f'new_col_{col_name}_data = init_series(new_col_{col_name}_data_df)._data')
-                if col_name in string_type_columns:
-                    func_text.append(f'new_col_{col_name} = fill_str_array(new_col_{col_name}_data, len_df+len_other)')
-                else:
-                    func_text.append(f'new_col_{col_name} = fill_array(new_col_{col_name}_data, len_df+len_other)')
-            column_list.append((f'new_col_{col_name}', col_name))
-
-        for col_name, i in other_columns_indx.items():
-            if col_name not in df_columns_indx:
-                func_text.append(get_dataframe_column('other', col_name, i))
-                func_text.append(f'new_col_{col_name}_data = init_series(new_col_{col_name}_data_other)._data')
-                if col_name in string_type_columns:
-                    func_text.append(f'new_col_{col_name} = fill_str_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
-                else:
-                    func_text.append(f'new_col_{col_name} = '
-                                     f'fill_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
-                column_list.append((f'new_col_{col_name}', col_name))
-
-        data = ', '.join(column for column, _ in column_list)
-        # TODO: Handle index
-        index = None
-        col_names = ', '.join(f"'{column_name}'" for _, column_name in column_list)
-        func_text.append(f"return sdc.hiframes.pd_dataframe_ext.init_dataframe({data}, {index}, {col_names})\n")
-
-        func_definition.extend([indent + func_line for func_line in func_text])
-
-        func_def = '\n'.join(func_definition)
-
         loc_vars = {}
-        exec(func_def, {'sdc': sdc, 'np': numpy, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data,
-                        'init_series': sdc.hiframes.api.init_series,
-                        'fill_array': sdc.datatypes.common_functions.fill_array, 'fill_str_array': sdc.datatypes.common_functions.fill_str_array}, loc_vars)
+        func_def, global_vars = sdc_pandas_dataframe_append_codegen(df, other, _func_name, args)
+
+        exec(func_def, global_vars, loc_vars)
         _append_impl = loc_vars['sdc_pandas_dataframe_append_impl']
         return _append_impl
 

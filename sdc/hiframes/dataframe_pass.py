@@ -855,18 +855,18 @@ class DataFramePassImpl(object):
                                       pysig=numba.utils.pysignature(stub),
                                       kws=dict(rhs.kws))
 
-        # if func_name == 'append':
-        #     rhs.args.insert(0, df_var)
-        #     arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
-        #     kw_typs = {name: self.state.typemap[v.name]
-        #                for name, v in dict(rhs.kws).items()}
-        #     impl = sdc.hiframes.pd_dataframe_ext.append_overload(
-        #         *arg_typs, **kw_typs)
-        #     stub = (lambda df, other, ignore_index=False,
-        #             verify_integrity=False, sort=None: None)
-        #     return self._replace_func(impl, rhs.args,
-        #                               pysig=numba.utils.pysignature(stub),
-        #                               kws=dict(rhs.kws))
+        if func_name == 'append':
+            rhs.args.insert(0, df_var)
+            arg_typs = tuple(self.state.typemap[v.name] for v in rhs.args)
+            kw_typs = {name: self.state.typemap[v.name]
+                       for name, v in dict(rhs.kws).items()}
+            impl = sdc.hiframes.pd_dataframe_ext.append_overload(
+                *arg_typs, **kw_typs)
+            stub = (lambda df, other, ignore_index=False,
+                    verify_integrity=False, sort=None: None)
+            return self._replace_func(impl, rhs.args,
+                                      pysig=numba.utils.pysignature(stub),
+                                      kws=dict(rhs.kws))
 
         if func_name == 'pct_change':
             rhs.args.insert(0, df_var)
