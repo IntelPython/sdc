@@ -499,6 +499,7 @@ def pandas_read_csv(
 
     convert_options = pyarrow.csv.ConvertOptions(
         column_types=dtype,
+        strings_can_be_null=True,
         include_columns=include_columns,
     )
 
