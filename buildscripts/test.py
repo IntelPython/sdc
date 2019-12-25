@@ -67,7 +67,7 @@ if __name__ == '__main__':
                         examples:  execute examples, located in sdc/examples""")
     parser.add_argument('--package-type', default='conda', choices=['conda', 'wheel'],
                         help='Package to test: conda or wheel, default = conda')
-    parser.add_argument('--python', default='3.7', choices=['3.6', '3.7', '3.8'],
+    parser.add_argument('--python', default='3.7.3', choices=['3.6', '3.7.3', '3.8'],
                         help='Python version to test with, default = 3.7')
     parser.add_argument('--numpy', default='1.16', choices=['1.15', '1.16', '1.17'],
                         help='Numpy version to test with, default = 1.16')
