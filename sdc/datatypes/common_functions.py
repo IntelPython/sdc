@@ -215,26 +215,32 @@ def fill_str_array(data, size, push_back=True):
 
     # Keep NaN values of initial array
     arr_is_na_mask = numpy.array([sdc.hiframes.api.isna(data, i) for i in
-                                  numba.parfor.internal_prange(string_array_size)])
+                                  numba.prange(string_array_size)])
     data_str_list = sdc.str_arr_ext.to_string_list(data)
     nan_list = [''] * none_array_size
 
     result_list = data_str_list + nan_list if push_back else nan_list + data_str_list
     sdc.str_arr_ext.cp_str_list_to_array(result_data, result_list)
 
+    # Batch=64 iteration to avoid threads competition
+    batch_size = 64
     if push_back:
-        for i in numba.parfor.internal_prange(string_array_size):
-            if arr_is_na_mask[i]:
-                str_arr_set_na(result_data, i)
-        for i in numba.parfor.internal_prange(string_array_size, size):
-            str_arr_set_na(result_data, i)
+        for i in numba.prange(string_array_size//batch_size + 1):
+            for j in range(i, max(i + batch_size, string_array_size)):
+                if arr_is_na_mask[j]:
+                    str_arr_set_na(result_data, j)
+        for i in numba.prange(none_array_size//batch_size + 1):
+            for j in range(string_array_size, string_array_size + max(i + batch_size, size)):
+                str_arr_set_na(result_data, j)
     else:
-        for i in numba.parfor.internal_prange(none_array_size):
-            str_arr_set_na(result_data, i)
-        for i in numba.parfor.internal_prange(none_array_size, size):
-            off_set = i - none_array_size
-            if arr_is_na_mask[off_set]:
-                str_arr_set_na(result_data, i)
+        for i in numba.prange(none_array_size//batch_size + 1):
+            for j in range(i, max(i + batch_size, none_array_size)):
+                str_arr_set_na(result_data, j)
+        for i in numba.prange(string_array_size//batch_size + 1):
+            for j in range(none_array_size, none_array_size + max(i + batch_size, size)):
+                off_set = j - none_array_size
+                if arr_is_na_mask[off_set]:
+                    str_arr_set_na(result_data, j)
 
     return result_data
 
