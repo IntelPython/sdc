@@ -30,7 +30,7 @@ from numba import njit
 
 @njit
 def series_str_isspace():
-    series = pd.Series([' ', ' c ', '  b ', '     a     '])  # Series of ' ', ' c ', '  b ', '     a     '
+    series = pd.Series([' ', ' c ', '  b ', '     a     '])
     out_series = series.str.isspace()
 
     return out_series  # Expect series of True, False, False, False
