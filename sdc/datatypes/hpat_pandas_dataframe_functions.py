@@ -148,6 +148,6 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     if not (isinstance(numeric_only, types.Omitted) or numeric_only is False):
         ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-    params = [('axis', None), ('level', None), ('numeric_only', numeric_only)]
+    params = [('axis', 0), ('level', None), ('numeric_only', False)]
 
     return sdc_pandas_dataframe_reduce_columns(df, name, params)
