@@ -743,6 +743,18 @@ class HiFramesPassImpl(object):
         # # remove DataFrame call
         # return nodes
 
+    @staticmethod
+    def get_dtypes(df):
+        dtypes = []
+        for d in df.dtypes.values:
+            try:
+                numba_type = numba.typeof(d).dtype
+                array_type = types.Array(numba_type, 1, 'C')
+            except:
+                array_type = string_array_type
+            dtypes.append(array_type)
+        return dtypes
+
     def _handle_pd_read_csv(self, assign, lhs, rhs, label):
         """transform pd.read_csv(names=[A], dtype={'A': np.int32}) call
         """
@@ -781,8 +793,7 @@ class HiFramesPassImpl(object):
             rows_to_read = 100  # TODO: tune this
             df = pd.read_csv(fname_const, nrows=rows_to_read, skiprows=skiprows)
             # TODO: string_array, categorical, etc.
-            dtypes = [types.Array(numba.typeof(d).dtype, 1, 'C')
-                      for d in df.dtypes.values]
+            dtypes = HiFramesPassImpl.get_dtypes(df)
             cols = df.columns.to_list()
             # overwrite column names like Pandas if explicitly provided
             if col_names != 0:
