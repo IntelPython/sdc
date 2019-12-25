@@ -24,56 +24,17 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-'''
-This is a set of configuration variables in SDC initialized at startup
-'''
+import pandas as pd
+from numba import njit
 
 
-import os
-from distutils import util as distutils_util
+@njit
+def series_rolling_cov():
+    series = pd.Series([3, 3, 3, 5, 8])  # Series of 3, 3, 3, 5, 8
+    other = pd.Series([3, 4, 4, 4, 8])  # Series of 3, 4, 4, 4, 8
+    out_series = series.rolling(4).cov(other)
 
-try:
-    import pyarrow
-except ImportError:
-    _has_pyarrow = False
-else:
-    _has_pyarrow = True
+    return out_series  # Expect series of NaN, NaN, NaN, 0.166667, 4.333333
 
-try:
-    from . import cv_wrapper
-except ImportError:
-    _has_opencv = False
-else:
-    _has_opencv = True
-    import sdc.cv_ext
 
-config_transport_mpi_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_MPI', 'True'))
-'''
-Default value for transport used if no function decorator controls the transport
-'''
-
-config_transport_mpi = config_transport_mpi_default
-'''
-Current value for transport controlled by decorator need to initialize this here
-because decorator called later then modules have been initialized
-'''
-
-config_pipeline_hpat_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_PIPELINE_SDC', 'False'))
-'''
-Default value used to select compiler pipeline in a function decorator
-'''
-
-if not config_pipeline_hpat_default:
-    # avoid using MPI transport if no SDC compiler pipeline used
-    config_transport_mpi_default = False
-    config_transport_mpi = config_transport_mpi_default
-
-numba_compiler_define_nopython_pipeline_orig = None
-'''
-Default value for a pointer intended to use as Numba.DefaultPassBuilder.define_nopython_pipeline() in overloaded function
-'''
-
-test_expected_failure  = distutils_util.strtobool(os.getenv('SDC_TEST_EXPECTED_FAILURE', 'False'))
-'''
-If True then replaces skip decorators to expectedFailure decorator.
-'''
+print(series_rolling_cov())
