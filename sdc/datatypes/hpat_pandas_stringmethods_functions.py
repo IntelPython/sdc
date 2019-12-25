@@ -958,6 +958,69 @@ def _hpat_pandas_stringmethods_autogen(method_name):
     return _hpat_pandas_stringmethods_autogen_global_dict[global_dict_name]
 
 
+@overload_method(StringMethodsType, 'isalnum')
+def hpat_pandas_stringmethods_isalnum(self):
+    """
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+        Pandas API: pandas.Series.str.isalnum
+
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+        Examples
+        --------
+        .. literalinclude:: ../../../examples/series/str/series_str_isalnum.py
+           :language: python
+           :lines: 27-
+           :caption: Check if each word start with an upper case letter
+           :name: ex_series_str_isalnum
+
+        .. code-block:: console
+
+            > python ./series/str/series_str_isalnum.py
+            0     True
+            1    False
+            2    True
+            dtype: bool
+
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+
+        Pandas Series method :meth:`pandas.core.strings.StringMethods.isalnum()` implementation.
+
+        Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+        .. only:: developer
+
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isalnum_str
+
+        Parameters
+        ----------
+        self: :class:`pandas.core.strings.StringMethods`
+            input arg
+
+        Returns
+        -------
+        :obj:`pandas.Series`
+             returns :obj:`pandas.Series` object
+        """
+
+    ty_checker = TypeChecker('Method isalnum().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isalnum_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isalnum()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isalnum_impl
+
+
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))
 _hpat_pandas_stringmethods_autogen_methods = ['upper', 'lower', 'lstrip', 'rstrip', 'strip']
 """
