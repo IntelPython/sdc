@@ -116,7 +116,8 @@ if not config_pipeline_hpat_default:
                 func_text.append(f'new_col_{col_name}_data = init_series(new_col_{col_name}_data_other)._data')
                 if col_name in string_type_columns:
                     func_text.append(
-                        f'new_col_{col_name} = fill_str_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
+                        f'new_col_{col_name} = '
+                        f'fill_str_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
                 else:
                     func_text.append(f'new_col_{col_name} = '
                                      f'fill_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
@@ -137,7 +138,6 @@ if not config_pipeline_hpat_default:
                        'init_dataframe': sdc.hiframes.pd_dataframe_ext.init_dataframe}
 
         return func_def, global_vars
-
 
     @sdc_overload_method(DataFrameType, 'append')
     def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=False, sort=None):
@@ -165,7 +165,8 @@ if not config_pipeline_hpat_default:
             3  NaN  6  8.0
 
          .. note::
-            Parameter ignore_index, verify_integrity, sort are currently unsupported by Intel Scalable Dataframe Compiler
+            Parameter ignore_index, verify_integrity, sort are currently unsupported
+            by Intel Scalable Dataframe Compiler
             Currently only pandas.DataFrame is supported as "other" parameter
 
         .. seealso::
@@ -226,7 +227,6 @@ if not config_pipeline_hpat_default:
 
         return sdc_pandas_dataframe_append_impl(df, other, _func_name, args)
 
-
     @sdc_overload_method(DataFrameType, 'count')
     def sdc_pandas_dataframe_count(self, axis=0, level=None, numeric_only=False):
         """
@@ -250,7 +250,8 @@ if not config_pipeline_hpat_default:
         Returns
         -------
         :obj:`pandas.Series` or `pandas.DataFrame`
-                returns: For each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
+                returns: For each column/row the number of non-NA/null entries.
+                If level is specified returns a DataFrame.
         """
 
         _func_name = 'Method pandas.dataframe.count().'
