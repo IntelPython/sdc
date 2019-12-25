@@ -29,7 +29,8 @@ import pandas
 
 from numba import prange
 from numba.extending import register_jitable
-from numba.types import float64, Boolean, Integer, NoneType, Omitted
+from numba.types import (float64, Boolean, Integer, NoneType, Number,
+                         Omitted, StringLiteral, UnicodeType)
 
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
@@ -85,18 +86,27 @@ hpat_pandas_series_rolling_docstring_tmpl = """
 
 
 @register_jitable
-def arr_nonnan_count(arr):
-    """Count non-NaN values"""
-    return len(arr) - numpy.isnan(arr).sum()
-
-
-@register_jitable
 def arr_corr(x, y):
     """Calculate correlation of values"""
     if len(x) == 0:
         return numpy.nan
 
     return numpy.corrcoef(x, y)[0, 1]
+
+
+@register_jitable
+def arr_nonnan_count(arr):
+    """Count non-NaN values"""
+    return len(arr) - numpy.isnan(arr).sum()
+
+
+@register_jitable
+def arr_cov(x, y, ddof):
+    """Calculate covariance of values 1D arrays x and y of the same size"""
+    if len(x) == 0:
+        return numpy.nan
+
+    return numpy.cov(x, y, ddof=ddof)[0, 1]
 
 
 @register_jitable
@@ -133,6 +143,15 @@ def arr_min(arr):
         return numpy.nan
 
     return arr.min()
+
+
+@register_jitable
+def arr_quantile(arr, q):
+    """Calculate quantile of values"""
+    if len(arr) == 0:
+        return numpy.nan
+
+    return numpy.quantile(arr, q)
 
 
 @register_jitable
@@ -355,6 +374,70 @@ def hpat_pandas_series_rolling_count(self):
     return hpat_pandas_rolling_series_count_impl
 
 
+@sdc_overload_method(SeriesRollingType, 'cov')
+def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
+
+    ty_checker = TypeChecker('Method rolling.cov().')
+    ty_checker.check(self, SeriesRollingType)
+
+    # TODO: check `other` is Series after a circular import of SeriesType fixed
+    # accepted_other = (bool, Omitted, NoneType, SeriesType)
+    # if not isinstance(other, accepted_other) and other is not None:
+    #     ty_checker.raise_exc(other, 'Series', 'other')
+
+    accepted_pairwise = (bool, Boolean, Omitted, NoneType)
+    if not isinstance(pairwise, accepted_pairwise) and pairwise is not None:
+        ty_checker.raise_exc(pairwise, 'bool', 'pairwise')
+
+    if not isinstance(ddof, (int, Integer, Omitted)):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
+
+    nan_other = isinstance(other, (Omitted, NoneType)) or other is None
+
+    def hpat_pandas_rolling_series_std_impl(self, other=None, pairwise=None, ddof=1):
+        win = self._window
+        minp = self._min_periods
+
+        main_series = self._data
+        main_arr = main_series._data
+        main_arr_length = len(main_arr)
+
+        if nan_other == True:  # noqa
+            other_arr = main_arr
+        else:
+            other_arr = other._data
+
+        other_arr_length = len(other_arr)
+        length = max(main_arr_length, other_arr_length)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        def calc_cov(main, other, ddof, minp):
+            # align arrays `main` and `other` by size and finiteness
+            min_length = min(len(main), len(other))
+            main_valid_indices = numpy.isfinite(main[:min_length])
+            other_valid_indices = numpy.isfinite(other[:min_length])
+            valid = main_valid_indices & other_valid_indices
+
+            if len(main[valid]) < minp:
+                return numpy.nan
+            else:
+                return arr_cov(main[valid], other[valid], ddof)
+
+        for i in prange(min(win, length)):
+            main_arr_range = main_arr[:i + 1]
+            other_arr_range = other_arr[:i + 1]
+            output_arr[i] = calc_cov(main_arr_range, other_arr_range, ddof, minp)
+
+        for i in prange(win, length):
+            main_arr_range = main_arr[i + 1 - win:i + 1]
+            other_arr_range = other_arr[i + 1 - win:i + 1]
+            output_arr[i] = calc_cov(main_arr_range, other_arr_range, ddof, minp)
+
+        return pandas.Series(output_arr)
+
+    return hpat_pandas_rolling_series_std_impl
+
+
 @sdc_overload_method(SeriesRollingType, 'max')
 def hpat_pandas_series_rolling_max(self):
     """
@@ -495,16 +578,25 @@ def hpat_pandas_series_rolling_min(self):
     return hpat_pandas_rolling_series_min_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'std')
-def hpat_pandas_series_rolling_std(self, ddof=1):
+@sdc_overload_method(SeriesRollingType, 'quantile')
+def hpat_pandas_series_rolling_quantile(self, quantile, interpolation='linear'):
 
-    ty_checker = TypeChecker('Method rolling.std().')
+    ty_checker = TypeChecker('Method rolling.quantile().')
     ty_checker.check(self, SeriesRollingType)
 
-    if not isinstance(ddof, (int, Integer, Omitted)):
-        ty_checker.raise_exc(ddof, 'int', 'ddof')
+    if not isinstance(quantile, Number):
+        ty_checker.raise_exc(quantile, 'float', 'quantile')
 
-    def hpat_pandas_rolling_series_std_impl(self, ddof=1):
+    str_types = (Omitted, StringLiteral, UnicodeType)
+    if not isinstance(interpolation, str_types) and interpolation != 'linear':
+        ty_checker.raise_exc(interpolation, 'str', 'interpolation')
+
+    def hpat_pandas_rolling_series_quantile_impl(self, quantile, interpolation='linear'):
+        if quantile < 0 or quantile > 1:
+            raise ValueError('quantile value not in [0, 1]')
+        if interpolation != 'linear':
+            raise ValueError('interpolation value not "linear"')
+
         win = self._window
         minp = self._min_periods
 
@@ -513,25 +605,25 @@ def hpat_pandas_series_rolling_std(self, ddof=1):
         length = len(input_arr)
         output_arr = numpy.empty(length, dtype=float64)
 
-        def culc_std(arr, ddof, minp):
+        def calc_quantile(arr, quantile, minp):
             finite_arr = arr[numpy.isfinite(arr)]
             if len(finite_arr) < minp:
                 return numpy.nan
             else:
-                return arr_std(finite_arr, ddof)
+                return arr_quantile(finite_arr, quantile)
 
         boundary = min(win, length)
         for i in prange(boundary):
             arr_range = input_arr[:i + 1]
-            output_arr[i] = culc_std(arr_range, ddof, minp)
+            output_arr[i] = calc_quantile(arr_range, quantile, minp)
 
-        for i in prange(min(win, length), length):
+        for i in prange(boundary, length):
             arr_range = input_arr[i + 1 - win:i + 1]
-            output_arr[i] = culc_std(arr_range, ddof, minp)
+            output_arr[i] = calc_quantile(arr_range, quantile, minp)
 
         return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
-    return hpat_pandas_rolling_series_std_impl
+    return hpat_pandas_rolling_series_quantile_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'sum')
@@ -597,6 +689,45 @@ def hpat_pandas_series_rolling_sum(self):
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_sum_impl
+
+
+@sdc_overload_method(SeriesRollingType, 'std')
+def hpat_pandas_series_rolling_std(self, ddof=1):
+
+    ty_checker = TypeChecker('Method rolling.std().')
+    ty_checker.check(self, SeriesRollingType)
+
+    if not isinstance(ddof, (int, Integer, Omitted)):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
+
+    def hpat_pandas_rolling_series_std_impl(self, ddof=1):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        def culc_std(arr, ddof, minp):
+            finite_arr = arr[numpy.isfinite(arr)]
+            if len(finite_arr) < minp:
+                return numpy.nan
+            else:
+                return arr_std(finite_arr, ddof)
+
+        boundary = min(win, length)
+        for i in prange(boundary):
+            arr_range = input_arr[:i + 1]
+            output_arr[i] = culc_std(arr_range, ddof, minp)
+
+        for i in prange(min(win, length), length):
+            arr_range = input_arr[i + 1 - win:i + 1]
+            output_arr[i] = culc_std(arr_range, ddof, minp)
+
+        return pandas.Series(output_arr, input_series._index, name=input_series._name)
+
+    return hpat_pandas_rolling_series_std_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'var')
@@ -666,6 +797,36 @@ hpat_pandas_series_rolling_corr.__doc__ = hpat_pandas_series_rolling_docstring_t
     """
 })
 
+hpat_pandas_series_rolling_cov.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'cov',
+    'example_caption': 'Calculate rolling covariance.',
+    'example_result':
+    """
+        0         NaN
+        1         NaN
+        2         NaN
+        3    0.166667
+        4    4.333333
+        dtype: float64
+    """,
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    Resulting Series has default index and name.
+    """,
+    'extra_params':
+    """
+    other: :obj:`Series`
+        Other Series.
+    pairwise: :obj:`bool`
+        Not relevant for Series.
+    ddof: :obj:`int`
+        Delta Degrees of Freedom.
+    """
+})
+
 hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'mean',
     'example_caption': 'Calculate the rolling mean of the values.',
@@ -701,6 +862,34 @@ hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring
     """,
     'limitations_block': '',
     'extra_params': ''
+})
+
+hpat_pandas_series_rolling_quantile.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'quantile',
+    'example_caption': 'Calculate the rolling quantile.',
+    'example_result':
+    """
+        0    NaN
+        1    NaN
+        2    3.5
+        3    2.5
+        4    3.5
+        dtype: float64
+    """,
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    Supported ``interpolation`` only can be `'linear'`.
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """,
+    'extra_params':
+    """
+    quantile: :obj:`float`
+        Quantile to compute. 0 <= quantile <= 1.
+    interpolation: :obj:`str`
+        This optional parameter specifies the interpolation method to use.
+    """
 })
 
 hpat_pandas_series_rolling_std.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
