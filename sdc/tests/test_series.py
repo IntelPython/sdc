@@ -5007,6 +5007,7 @@ class TestSeries(TestCase):
         B = pd.Series(['b', 'aa', '', 'b', 'o', None, 'oo'])
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
+    @skip_sdc_jit("Series.str.isalnum is not supported yet")
     def test_series_isalnum_str(self):
         series = [['one', 'one1', '1', ''],
                   ['A B', '1.5', '3,000'],
