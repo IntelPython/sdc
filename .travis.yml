@@ -10,7 +10,7 @@ env:
     global:
         - GIT_DESCRIBE_TAG=0.29.2
         - GIT_DESCRIBE_NUMBER=1
-        - PYTHON_VER=3.7
+        - PYTHON_VER=3.7.3
         - NUMPY_VER=1.17
         - CONDA_PREFIX_PATH=$HOME/miniconda3
     matrix:
