@@ -116,7 +116,7 @@ if __name__ == '__main__':
             set_environment_variable('INCLUDE', os.path.join('%CONDA_PREFIX%', 'Library', 'include'))
             set_environment_variable('LIB', os.path.join('%CONDA_PREFIX%', 'Library', 'lib'))
 
-        conda_build_packages.extend(['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64'])
+        conda_build_packages.extend(['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64', 'pywin32=223'])
 
     # Build Numba from master
     if use_numba_master is True:
