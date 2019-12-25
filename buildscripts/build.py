@@ -67,7 +67,7 @@ if __name__ == '__main__':
                                 develop: install package in source directory (default)
                                 install: build and install package in build environment
                                 package: build conda and wheel packages""")
-    parser.add_argument('--python', default='3.7', choices=['3.6', '3.7', '3.8'],
+    parser.add_argument('--python', default='3.7.3', choices=['3.6', '3.7.3', '3.8'],
                         help='Python version to build with, default = 3.7')
     parser.add_argument('--numpy', default='1.16', choices=['1.15', '1.16', '1.17'],
                         help='Numpy version to build with, default = 1.16')
