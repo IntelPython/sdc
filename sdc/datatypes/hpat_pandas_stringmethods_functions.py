@@ -717,6 +717,22 @@ def _hpat_pandas_stringmethods_autogen(method_name):
     global_dict_name = 'hpat_pandas_stringmethods_{methodname}'.format(methodname=method_name)
     return _hpat_pandas_stringmethods_autogen_global_dict[global_dict_name]
 
+@overload_method(StringMethodsType, 'isspace')
+def hpat_pandas_stringmethods_isspace(self):
+
+    ty_checker = TypeChecker('Method isspace().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isspace_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isspace()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isspace_impl
+
 
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))
 _hpat_pandas_stringmethods_autogen_methods = ['upper', 'lower', 'lstrip', 'rstrip', 'strip']

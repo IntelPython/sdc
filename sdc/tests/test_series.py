@@ -224,6 +224,10 @@ def rjust_with_fillchar_usecase(series, width, fillchar):
     return series.str.rjust(width, fillchar)
 
 
+def isspace_usecase(series):
+    return series.str.isspace()
+
+
 GLOBAL_VAL = 2
 
 
@@ -4904,6 +4908,18 @@ class TestSeries(TestCase):
         A = pd.Series(['a', '', 'ae', 'b', 'cccc', 'oo', None])
         B = pd.Series(['b', 'aa', '', 'b', 'o', None, 'oo'])
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
+
+    def test_series_isspace_str(self):
+        series = [['', '  ', '    ', '           '],
+                  ['', ' c ', '  b ', '     a     '],
+                  ['aaaaaa', 'bb', 'c', '  d']
+                  ]
+
+        cfunc = self.jit(isspace_usecase)
+        for ser in series:
+            S = pd.Series(ser)
+            pd.testing.assert_series_equal(cfunc(S), isspace_usecase(S))
+
 
 
 if __name__ == "__main__":
