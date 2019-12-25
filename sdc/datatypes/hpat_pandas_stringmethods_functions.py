@@ -974,7 +974,7 @@ def hpat_pandas_stringmethods_isalnum(self):
         .. literalinclude:: ../../../examples/series/str/series_str_isalnum.py
            :language: python
            :lines: 27-
-           :caption: Check if each word start with an upper case letter
+           :caption: Check if all the characters in the text are alphanumeric
            :name: ex_series_str_isalnum
 
         .. code-block:: console
@@ -983,6 +983,7 @@ def hpat_pandas_stringmethods_isalnum(self):
             0     True
             1    False
             2    True
+            3    False
             dtype: bool
 
         Intel Scalable Dataframe Compiler Developer Guide

@@ -30,10 +30,10 @@ from numba import njit
 
 @njit
 def series_str_isalnum():
-    series = pd.Series(['A B', '1.5', '3,000'])  # Series of 'A B', '1.5', '3,000'
+    series = pd.Series(['leopard', 'Golden Eagle', 'SNAKE', ''])  # Series of 'leopard', 'Golden Eagle', 'SNAKE', ''
     out_series = series.str.isalnum()
 
-    return out_series  # Expect series of True, False, False, False
+    return out_series  # Expect series of True, False, True, False
 
 
 print(series_str_isalnum())
