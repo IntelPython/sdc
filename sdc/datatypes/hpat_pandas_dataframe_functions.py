@@ -123,19 +123,17 @@ if not config_pipeline_hpat_default:
                                      f'fill_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
                 column_list.append((f'new_col_{col_name}', col_name))
 
-        data = ', '.join(column for column, _ in column_list)
+        data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
         # TODO: Handle index
-        index = None
-        col_names = ', '.join(f"'{column_name}'" for _, column_name in column_list)
-        func_text.append(f"return init_dataframe({data}, {index}, {col_names})\n")
+        func_text.append(f"return pandas.DataFrame({{{data}}})\n")
         func_definition.extend([indent + func_line for func_line in func_text])
         func_def = '\n'.join(func_definition)
 
-        global_vars = {'sdc': sdc, 'np': numpy, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data,
+        global_vars = {'sdc': sdc, 'np': numpy, 'pandas': pandas,
+                       'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data,
                        'init_series': sdc.hiframes.api.init_series,
                        'fill_array': sdc.datatypes.common_functions.fill_array,
-                       'fill_str_array': sdc.datatypes.common_functions.fill_str_array,
-                       'init_dataframe': sdc.hiframes.pd_dataframe_ext.init_dataframe}
+                       'fill_str_array': sdc.datatypes.common_functions.fill_str_array}
 
         return func_def, global_vars
 
