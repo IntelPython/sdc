@@ -89,15 +89,20 @@ def hpat_pandas_series_accessor_getitem(self, idx):
     if accessor == 'iloc':
         if isinstance(idx, types.SliceType):
             def hpat_pandas_series_iloc_slice_impl(self, idx):
-                return pandas.Series(self._series._data[idx])
+                result_data = self._series._data[idx]
+                result_index = self._series.index[idx]
+                return pandas.Series(result_data, result_index, self._series._name)
 
             return hpat_pandas_series_iloc_slice_impl
 
-        if isinstance(idx, (int, types.Integer, types.Integer)):
+        if isinstance(idx, (int, types.Integer)):
             def hpat_pandas_series_iloc_impl(self, idx):
                 return self._series._data[idx]
 
             return hpat_pandas_series_iloc_impl
+
+        raise TypingError('{} The index must be an Number, Slice, String, List, Array or a callable.\
+                    Given: {}'.format(_func_name, idx))
 
     if accessor == 'iat':
         if isinstance(idx, (int, types.Integer)):
@@ -159,33 +164,51 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                     stop = max_slice - 1
                 if not is_monotonic and start == -1 and stop == -1:
                     raise ValueError("Incorrect values entered")
-                return pandas.Series(self._series._data[start:stop+1], self._series._index[start:stop+1])
+                result_data = self._series._data[start:stop+1]
+                result_index = self._series._index[start:stop+1]
+                return pandas.Series(result_data, result_index, self._series._name)
 
             return hpat_pandas_series_getitem_idx_slice_impl
 
         if isinstance(idx, types.SliceType) and index_is_none:
             def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
+                max_slice = sys.maxsize
+                start = idx.start
+                stop = idx.stop
+                if idx.stop == max_slice:
+                    stop = max_slice - 1
                 index = numpy.arange(len(self._series._data))
-                return pandas.Series(self._series._data[idx.start:idx.stop+1], index[idx.start:idx.stop+1])
+                result_data = self._series._data[start:stop+1]
+                result_index = index[start:stop+1]
+                return pandas.Series(result_data, result_index, self._series._name)
 
             return hpat_pandas_series_getitem_idx_slice_impl
 
-        def hpat_pandas_series_loc_impl(self, idx):
-            mask = numpy.empty(len(self._series._data), numpy.bool_)
-            for i in numba.prange(len(self._series.index)):
-                mask[i] = self._series.index[i] == idx
-            return pandas.Series(self._series._data[mask], self._series.index[mask])
+        if isinstance(idx, (int, types.Integer, types.UnicodeType, types.StringLiteral)):
+            def hpat_pandas_series_loc_impl(self, idx):
+                index = self._series.index.copy()
+                mask = numpy.empty(len(self._series._data), numpy.bool_)
+                for i in numba.prange(len(index)):
+                    mask[i] = index[i] == idx
+                return pandas.Series(self._series._data[mask], index[mask], self._series._name)
 
-        return hpat_pandas_series_loc_impl
+            return hpat_pandas_series_loc_impl
+
+        raise TypingError('{} The index must be an Integer, Slice or List of Integer or a callable.\
+                    Given: {}'.format(_func_name, idx))
 
     if accessor == 'at':
-        def hpat_pandas_series_at_impl(self, idx):
-            mask = numpy.empty(len(self._series._data), numpy.bool_)
-            for i in numba.prange(len(self._series.index)):
-                mask[i] = self._series.index[i] == idx
-            return self._series._data[mask]
+        if isinstance(idx, (int, types.Integer, types.UnicodeType, types.StringLiteral)):
+            def hpat_pandas_series_at_impl(self, idx):
+                index = self._series.index.copy()
+                mask = numpy.empty(len(self._series._data), numpy.bool_)
+                for i in numba.prange(len(index)):
+                    mask[i] = index[i] == idx
+                return self._series._data[mask]
 
-        return hpat_pandas_series_at_impl
+            return hpat_pandas_series_at_impl
+
+        raise TypingError('{} The index must be a Number or String. Given: {}'.format(_func_name, idx))
 
     raise TypingError('{} Unknown accessor. Only "loc", "iloc", "at", "iat" are supported.\
                       Given: {}'.format(_func_name, accessor))
@@ -248,18 +271,19 @@ def hpat_pandas_series_getitem(self, idx):
 
     # Note: Getitem return Series
     index_is_none = self.index is None or isinstance(self.index, numba.types.misc.NoneType)
-    index_is_number = index_is_none or (self.index and isinstance(self.index.dtype, types.Number))
+    index_is_none_or_numeric = index_is_none or (self.index and isinstance(self.index.dtype, types.Number))
     index_is_string = not index_is_none and isinstance(self.index.dtype, (types.UnicodeType, types.StringLiteral))
 
     if (
-        isinstance(idx, types.Number) and index_is_number or
-        (isinstance(idx, (str, types.UnicodeType, types.StringLiteral)) and index_is_string)
+        isinstance(idx, types.Number) and index_is_none_or_numeric or
+        (isinstance(idx, (types.UnicodeType, types.StringLiteral)) and index_is_string)
     ):
         def hpat_pandas_series_getitem_index_impl(self, idx):
+            index = numpy.copy(self.index)
             mask = numpy.empty(len(self._data), numpy.bool_)
-            for i in numba.prange(len(self.index)):
-                mask[i] = self.index[i] == idx
-            return pandas.Series(self._data[mask], self.index[mask])
+            for i in numba.prange(len(index)):
+                mask[i] = index[i] == idx
+            return pandas.Series(self._data[mask], index[mask], self._name)
 
         return hpat_pandas_series_getitem_index_impl
 
@@ -272,7 +296,7 @@ def hpat_pandas_series_getitem(self, idx):
     if isinstance(idx, types.SliceType):
         # Return slice for str values not implement
         def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
-            return pandas.Series(self._data[idx], self.index[idx])
+            return pandas.Series(self._data[idx], self.index[idx], self._name)
 
         return hpat_pandas_series_getitem_idx_slice_impl
 
@@ -281,7 +305,7 @@ def hpat_pandas_series_getitem(self, idx):
         isinstance(idx.dtype, (types.Boolean, bool))
     ):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
-            return pandas.Series(self._data[idx], self.index[idx])
+            return pandas.Series(self._data[idx], self.index[idx], self._name)
         return hpat_pandas_series_getitem_idx_list_impl
 
     if (isinstance(self.index, types.NoneType) and isinstance(idx, SeriesType)):
@@ -289,7 +313,7 @@ def hpat_pandas_series_getitem(self, idx):
             def hpat_pandas_series_getitem_idx_list_impl(self, idx):
                 index = numpy.arange(len(self._data))
                 if (index != idx.index).sum() == 0:
-                    return pandas.Series(self._data[idx._data], index[idx._data])
+                    return pandas.Series(self._data[idx._data], index[idx._data], self._name)
 
             return hpat_pandas_series_getitem_idx_list_impl
 
@@ -300,7 +324,7 @@ def hpat_pandas_series_getitem(self, idx):
                 for j in numba.prange(len(index)):
                     if j == idx._data[i]:
                         res[i] = self._data[j]
-            return pandas.Series(res, index[idx._data])
+            return pandas.Series(res, index[idx._data], self._name)
         return hpat_pandas_series_getitem_idx_list_impl
 
     if (isinstance(idx, SeriesType) and not isinstance(self.index, types.NoneType)):
@@ -308,25 +332,26 @@ def hpat_pandas_series_getitem(self, idx):
             # Series with str index not implement
             def hpat_pandas_series_getitem_idx_series_impl(self, idx):
                 if (self._index != idx._index).sum() == 0:
-                    return pandas.Series(self._data[idx._data], self._index[idx._data])
+                    return pandas.Series(self._data[idx._data], self._index[idx._data], self._name)
 
             return hpat_pandas_series_getitem_idx_series_impl
 
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
+            index = numpy.copy(self.index)
             res = []
             for i in numba.prange(len(idx._data)):
                 temp = []
-                for j in numba.prange(len(self.index)):
-                    if self.index[j] == idx._data[i]:
+                for j in numba.prange(len(index)):
+                    if index[j] == idx._data[i]:
                         temp.append(self._data[j])
                 res.append(temp)
             new_data = numpy.array([value for arr in res for value in arr])
             new_index = numpy.array([idx._data[arr] for arr in range(len(res)) for value in range(len(res[arr]))])
-            return pandas.Series(new_data, new_index)
+            return pandas.Series(new_data, new_index, self._name)
 
         return hpat_pandas_series_getitem_idx_series_impl
 
-    raise TypingError('{} The index must be an Integer, Slice, String or a Series.\
+    raise TypingError('{} The index must be an Number, Slice, String, Boolean Array or a Series.\
                     Given: {}'.format(_func_name, idx))
 
 

@@ -33,16 +33,12 @@ from numba.datamodel import (register_default, StructModel)
 from numba.typing.templates import signature
 
 
-class SeriesGetitemAccessorType(types.IterableType):
+class SeriesGetitemAccessorType(types.Type):
     def __init__(self, series, accessor):
         self.series = series
         self.accessor = accessor
         super(SeriesGetitemAccessorType, self).__init__('SeriesGetitemAccessorType({}, {})\
             '.format(series, accessor))
-
-    @property
-    def iterator_type(self):
-        return None
 
 
 @register_model(SeriesGetitemAccessorType)

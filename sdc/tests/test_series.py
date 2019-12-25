@@ -1086,8 +1086,6 @@ class TestSeries(TestCase):
 
         S = pd.Series([1, 2, 3, 4, 5], [6, 0, 8, 0, 0])
         S2 = pd.Series([8, 6, 0], [12, 11, 14])
-        print(hpat_func(S, S2))
-        print(test_impl(S, S2))
         pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
     @skip_sdc_jit('Not impl in old style')
@@ -1221,6 +1219,15 @@ class TestSeries(TestCase):
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
+    def test_series_at_str(self):
+        def test_impl(A):
+            return A.at['1']
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([2, 4, 6], ['1', '3', '5'])
+        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit('Not impl in old style')
     def test_series_slice(self):
         def test_impl(A):
             return A.loc[1:5]
@@ -1256,7 +1263,7 @@ class TestSeries(TestCase):
         n = 11
         S = pd.Series(np.arange(n)**2)
         pd.testing.assert_series_equal(
-            hpat_func(S), test_impl(S).reset_index(drop=True))
+            hpat_func(S), test_impl(S))
 
     @skip_numba_jit
     def test_series_op1(self):
