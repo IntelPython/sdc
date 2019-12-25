@@ -4952,15 +4952,6 @@ class TestSeries(TestCase):
         cfunc = self.jit(istitle_usecase)
         pd.testing.assert_series_equal(cfunc(series), istitle_usecase(series))
 
-    def test_series_istitle_str_unsupported(self):
-        series = pd.Series([0, 1, 2])
-
-        cfunc = self.jit(istitle_usecase)
-        with self.assertRaises(TypingError) as raises:
-            cfunc(series)
-        msg = 'TypingError: Attribute str.  Can only use .str accessor with string values. Given: int64'
-        self.assertIn(msg, str(raises.exception))
-
 
 if __name__ == "__main__":
     unittest.main()

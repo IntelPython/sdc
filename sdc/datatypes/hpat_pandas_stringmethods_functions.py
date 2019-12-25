@@ -960,6 +960,52 @@ def _hpat_pandas_stringmethods_autogen(method_name):
 
 @overload_method(StringMethodsType, 'istitle')
 def hpat_pandas_stringmethods_istitle(self):
+    """
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+        Pandas API: pandas.Series.str.istitle
+
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+        Examples
+        --------
+        .. literalinclude:: ../../../examples/series/str/series_str_istitle.py
+           :language: python
+           :lines: 27-
+           :caption: Check if each word start with an upper case letter
+           :name: ex_series_str_istitle
+
+        .. code-block:: console
+
+            > python ./series/str/series_str_isupper.py
+            0     True
+            1    False
+            2    True
+            dtype: bool
+
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+
+        Pandas Series method :meth:`pandas.core.strings.StringMethods.istitle()` implementation.
+
+        Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+        .. only:: developer
+
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_istitle_str
+
+        Parameters
+        ----------
+        self: :class:`pandas.core.strings.StringMethods`
+            input arg
+
+        Returns
+        -------
+        :obj:`pandas.Series`
+             returns :obj:`pandas.Series` object
+        """
 
     ty_checker = TypeChecker('Method istitle().')
     ty_checker.check(self, StringMethodsType)
