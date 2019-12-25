@@ -5007,6 +5007,7 @@ class TestSeries(TestCase):
         B = pd.Series(['b', 'aa', '', 'b', 'o', None, 'oo'])
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
+    @skip_sdc_jit("Series.str.isspace is not supported yet")
     def test_series_isspace_str(self):
         series = [['', '  ', '    ', '           '],
                   ['', ' c ', '  b ', '     a     '],
