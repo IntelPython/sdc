@@ -979,7 +979,7 @@ def hpat_pandas_stringmethods_istitle(self):
 
         .. code-block:: console
 
-            > python ./series/str/series_str_isupper.py
+            > python ./series/str/series_str_istitle.py
             0     True
             1    False
             2    True
