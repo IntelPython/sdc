@@ -166,11 +166,10 @@ Building documentation
 ----------------------
 Building Intel SDC User's Guide documentation requires pre-installed Intel SDC package along with compatible Pandas* version as well as Sphinx* 2.2.1 or later.
 
-You can install Sphinx* using either ``conda`` or ``pip``:
+Use ``pip`` to install Sphinx* and extensions:
 ::
 
-    conda install sphinx
-    pip install sphinx
+    pip install sphinx sphinxcontrib-programoutput
 
 Currently the build precedure is based on ``make`` located at ``./sdc/docs/`` folder. While it is not generally required we recommended that you clean up the system from previous documentaiton build by running
 ::

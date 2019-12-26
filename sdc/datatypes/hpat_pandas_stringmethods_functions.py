@@ -208,13 +208,8 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
        :caption: Filling left and right side of strings in the Series with an additional character
        :name: ex_series_str_center
 
-    .. code-block:: console
-
-        > python ./series/str/series_str_center.py
-        0    *dog*
-        1    *foo*
-        2    *bar*
-        dtype: object
+    .. command-output:: python ./series/str/series_str_center.py
+       :cwd: ../../../examples
 
     .. todo:: Add support of 32-bit Unicode for `str.center()`
 
@@ -284,13 +279,8 @@ def hpat_pandas_stringmethods_endswith(self, pat, na=None):
        :caption: Test if the end of each string element matches a string
        :name: ex_series_str_endswith
 
-    .. code-block:: console
-
-        > python ./series/str/series_str_endswith.py
-        0    False
-        1     True
-        2     True
-        dtype: bool
+    .. command-output:: python ./series/str/series_str_endswith.py
+       :cwd: ../../../examples
 
     .. todo::
         - Add support of matching the end of each string by a pattern
@@ -374,13 +364,8 @@ def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
        :caption: Return lowest indexes in each strings in the Series
        :name: ex_series_str_find
 
-    .. code-block:: console
-
-        > python ./series/str/series_str_find.py
-        0   -1
-        1    0
-        2    3
-        dtype: int64
+    .. command-output:: python ./series/str/series_str_find.py
+       :cwd: ../../../examples
 
     .. todo:: Add support of parameters ``start`` and ``end``
 
@@ -466,13 +451,8 @@ def hpat_pandas_stringmethods_isupper(self):
        :caption: Check whether all characters in each string are uppercase
        :name: ex_series_str_isupper
 
-    .. code-block:: console
-
-        > python ./series/str/series_str_isupper.py
-        0     True
-        1    False
-        2    False
-        dtype: bool
+    .. command-output:: python ./series/str/series_str_isupper.py
+       :cwd: ../../../examples
 
     .. seealso::
         :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
@@ -547,13 +527,8 @@ def hpat_pandas_stringmethods_len(self):
        :caption: Compute the length of each element in the Series
        :name: ex_series_str_len
 
-    .. code-block:: console
-
-        > python ./series/str/series_str_len.py
-        0    3
-        1    3
-        2    6
-        dtype: int64
+    .. command-output:: python ./series/str/series_str_len.py
+       :cwd: ../../../examples
 
     .. seealso::
         `str.len`
@@ -616,13 +591,8 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
        :caption: Filling right side of strings in the Series with an additional character
        :name: ex_series_str_ljust
 
-    .. code-block:: console
-
-        > python ./series/str/series_str_ljust.py
-        0    dog**
-        1    foo**
-        2    bar**
-        dtype: object
+    .. command-output:: python ./series/str/series_str_ljust.py
+       :cwd: ../../../examples
 
     .. todo:: Add support of 32-bit Unicode for `str.ljust()`
 
@@ -692,13 +662,8 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
        :caption: Filling left side of strings in the Series with an additional character
        :name: ex_series_str_rjust
 
-    .. code-block:: console
-
-        > python ./series/str/series_str_rjust.py
-        0    **dog
-        1    **foo
-        2    **bar
-        dtype: object
+    .. command-output:: python ./series/str/series_str_rjust.py
+       :cwd: ../../../examples
 
     .. todo:: Add support of 32-bit Unicode for `str.rjust()`
 
@@ -768,13 +733,8 @@ def hpat_pandas_stringmethods_startswith(self, pat, na=None):
        :caption: Test if the start of each string element matches a string
        :name: ex_series_str_startswith
 
-    .. code-block:: console
-
-        > python ./series/str/series_str_startswith.py
-        0     True
-        1    False
-        2     True
-        dtype: bool
+    .. command-output:: python ./series/str/series_str_startswith.py
+       :cwd: ../../../examples
 
     .. todo::
         - Add support of matching the start of each string by a pattern
@@ -858,13 +818,8 @@ def hpat_pandas_stringmethods_zfill(self, width):
        :caption: Pad strings in the Series by prepending '0' characters
        :name: ex_series_str_zfill
 
-    .. code-block:: console
-
-        > python ./series/str/series_str_zfill.py
-        0    00dog
-        1    00foo
-        2    00bar
-        dtype: object
+    .. command-output:: python ./series/str/series_str_zfill.py
+       :cwd: ../../../examples
 
     .. todo:: Add support of 32-bit Unicode for `str.zfill()`
 
