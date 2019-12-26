@@ -54,9 +54,7 @@ def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, col
         func_lines += [f'  series_{c} = init_series(get_dataframe_data({func_params[0]}, {i}))',
                        f'  {result_c} = series_{c}.{func_name}({series_params})']
         result_name_list.append(result_c)
-    print(result_name_list)
     all_results = ', '.join(result_name_list)
-    print(all_results)
     all_columns = ', '.join([f"'{c}'" for c in columns])
 
     func_lines += [f'  return pandas.Series([{all_results}], [{all_columns}])']
@@ -65,7 +63,6 @@ def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, col
     global_vars = {'pandas': pandas, 'np': numpy,
                    'init_series': sdc.hiframes.api.init_series,
                    'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
-    print(func_text)
 
     return func_text, global_vars
 
@@ -86,7 +83,6 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
     func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, s_par, df.columns)
 
     loc_vars = {}
-    print(global_vars, loc_vars)
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
 
