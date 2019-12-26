@@ -977,13 +977,8 @@ def hpat_pandas_stringmethods_istitle(self):
            :caption: Check if each word start with an upper case letter
            :name: ex_series_str_istitle
 
-        .. code-block:: console
-
-            > python ./series/str/series_str_istitle.py
-            0     True
-            1    False
-            2    True
-            dtype: bool
+         .. command-output:: python ./series/series_str_istitle.py
+            :cwd: ../../../examples
 
         .. seealso::
             :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
