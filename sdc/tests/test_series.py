@@ -4782,21 +4782,15 @@ class TestSeries(TestCase):
         msg = 'Method pct_change(). The object periods'
         self.assertIn(msg, str(raises.exception))
 
-    def test_series_setitem_for_value(self):
+    def test_series_setitem_for_value_int(self):
         def test_impl(S, val):
             S[3] = val
             return S
 
         hpat_func = self.jit(test_impl)
-        data_to_test_int = [[0, 1, 2, 3, 4]]
-        data_to_test_float = [[0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf],
-                              [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
-                              [1, 2, 3, 4, np.nan, np.inf, 0, 0, np.nan, np.nan]]
-        data_to_test_string = [['a', '', 'a', '', 'b', None, 'a', '', None, 'b'],
-                               ['dog', None, 'NaN', '', 'cat', None, 'cat', None, 'dog', ''],
-                               ['dog', 'NaN', '', 'cat', 'cat', 'dog', '']]
+        data_to_test = [[0, 1, 2, 3, 4]]
 
-        for data in data_to_test_int:
+        for data in data_to_test:
             S1 = pd.Series(data)
             S2 = S1.copy(deep=True)
             value = 50
@@ -4804,7 +4798,17 @@ class TestSeries(TestCase):
             result = hpat_func(S2, value)
             pd.testing.assert_series_equal(result_ref, result)
 
-        for data in data_to_test_float:
+    def test_series_setitem_for_value_float(self):
+        def test_impl(S, val):
+            S[3] = val
+            return S
+
+        hpat_func = self.jit(test_impl)
+        data_to_test = [[0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf],
+                        [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                        [1, 2, 3, 4, np.nan, np.inf, 0, 0, np.nan, np.nan]]
+
+        for data in data_to_test:
             S1 = pd.Series(data)
             S2 = S1.copy(deep=True)
             value = np.nan
@@ -4812,32 +4816,35 @@ class TestSeries(TestCase):
             result = hpat_func(S2, value)
             pd.testing.assert_series_equal(result_ref, result)
 
-        #########################################################
-        # NOT WORK, PROBLEM WITH StringArrayType in _str_ext.cpp
-        #########################################################
-        # for data in data_to_test_string:
-        #     S1 = pd.Series(data)
-        #     S2 = S1.copy(deep=True)
-        #     value = 'Hello, world!'
-        #     result_ref = test_impl(S1, value)
-        #     result = hpat_func(S2, value)
-        #     pd.testing.assert_series_equal(result_ref, result)
+    @skip_numba_jit('NOT WORK, PROBLEM WITH StringArrayType in _str_ext.cpp')
+    @skip_sdc_jit
+    def test_series_setitem_for_value_string(self):
+        def test_impl(S, val):
+            S[3] = val
+            return S
 
-    def test_series_setitem_for_slice(self):
+        hpat_func = self.jit(test_impl)
+        data_to_test = [['a', '', 'a', '', 'b', None, 'a', '', None, 'b'],
+                        ['dog', None, 'NaN', '', 'cat', None, 'cat', None, 'dog', ''],
+                        ['dog', 'NaN', '', 'cat', 'cat', 'dog', '']]
+
+        for data in data_to_test:
+            S1 = pd.Series(data)
+            S2 = S1.copy(deep=True)
+            value = 'Hello, world!'
+            result_ref = test_impl(S1, value)
+            result = hpat_func(S2, value)
+            pd.testing.assert_series_equal(result_ref, result)
+
+    def test_series_setitem_for_slice_int(self):
         def test_impl(S, val):
             S[2:] = val
             return S
 
         hpat_func = self.jit(test_impl)
-        data_to_test_int = [[0, 1, 2, 3, 4]]
-        data_to_test_float = [[0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf],
-                              [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
-                              [1, 2, 3, 4, np.nan, np.inf, 0, 0, np.nan, np.nan]]
-        data_to_test_string = [['a', '', 'a', '', 'b', None, 'a', '', None, 'b'],
-                               ['dog', None, 'NaN', '', 'cat', None, 'cat', None, 'dog', ''],
-                               ['dog', 'NaN', '', 'cat', 'cat', 'dog', '']]
+        data_to_test = [[0, 1, 2, 3, 4]]
 
-        for data in data_to_test_int:
+        for data in data_to_test:
             S1 = pd.Series(data)
             S2 = S1.copy(deep=True)
             value = 50
@@ -4845,7 +4852,17 @@ class TestSeries(TestCase):
             result = hpat_func(S2, value)
             pd.testing.assert_series_equal(result_ref, result)
 
-        for data in data_to_test_float:
+    def test_series_setitem_for_slice_float(self):
+        def test_impl(S, val):
+            S[2:] = val
+            return S
+
+        hpat_func = self.jit(test_impl)
+        data_to_test = [[0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf],
+                        [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                        [1, 2, 3, 4, np.nan, np.inf, 0, 0, np.nan, np.nan]]
+
+        for data in data_to_test:
             S1 = pd.Series(data)
             S2 = S1.copy(deep=True)
             value = np.nan
@@ -4853,33 +4870,36 @@ class TestSeries(TestCase):
             result = hpat_func(S2, value)
             pd.testing.assert_series_equal(result_ref, result)
 
-        #########################################################
-        # NOT WORK, PROBLEM WITH StringArrayType in _str_ext.cpp
-        #########################################################
-        # for data in data_to_test_string:
-        #     S1 = pd.Series(data)
-        #     S2 = S1.copy(deep=True)
-        #     value = 'Hello, world!'
-        #     result_ref = test_impl(S1, value)
-        #     result = hpat_func(S2, value)
-        #     pd.testing.assert_series_equal(result_ref, result)
+    @skip_numba_jit('NOT WORK, PROBLEM WITH StringArrayType in _str_ext.cpp')
+    @skip_sdc_jit
+    def test_series_setitem_for_slice_string(self):
+        def test_impl(S, val):
+            S[2:] = val
+            return S
 
-    def test_series_setitem_for_series(self):
+        hpat_func = self.jit(test_impl)
+        data_to_test = [['a', '', 'a', '', 'b', None, 'a', '', None, 'b'],
+                        ['dog', None, 'NaN', '', 'cat', None, 'cat', None, 'dog', ''],
+                        ['dog', 'NaN', '', 'cat', 'cat', 'dog', '']]
+
+        for data in data_to_test:
+            S1 = pd.Series(data)
+            S2 = S1.copy(deep=True)
+            value = 'Hello, world!'
+            result_ref = test_impl(S1, value)
+            result = hpat_func(S2, value)
+            pd.testing.assert_series_equal(result_ref, result)
+
+    def test_series_setitem_for_series_int(self):
         def test_impl(S, ind, val):
             S[ind] = val
             return S
 
         hpat_func = self.jit(test_impl)
-        data_to_test_int = [[0, 1, 2, 3, 4]]
-        data_to_test_float = [[0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf],
-                              [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
-                              [1, 2, 3, 4, np.nan, np.inf, 0, 0, np.nan, np.nan]]
-        data_to_test_string = [['a', '', 'a', '', 'b', None, 'a', '', None, 'b'],
-                               ['dog', None, 'NaN', '', 'cat', None, 'cat', None, 'dog', ''],
-                               ['dog', 'NaN', '', 'cat', 'cat', 'dog', '']]
+        data_to_test = [[0, 1, 2, 3, 4]]
         ind = pd.Series([0, 2, 4])
 
-        for data in data_to_test_int:
+        for data in data_to_test:
             S1 = pd.Series(data)
             S2 = S1.copy(deep=True)
             value = 50
@@ -4887,7 +4907,18 @@ class TestSeries(TestCase):
             result = hpat_func(S2, ind, value)
             pd.testing.assert_series_equal(result_ref, result)
 
-        for data in data_to_test_float:
+    def test_series_setitem_for_series_float(self):
+        def test_impl(S, ind, val):
+            S[ind] = val
+            return S
+
+        hpat_func = self.jit(test_impl)
+        data_to_test = [[0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf],
+                        [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                        [1, 2, 3, 4, np.nan, np.inf, 0, 0, np.nan, np.nan]]
+        ind = pd.Series([0, 2, 4])
+
+        for data in data_to_test:
             S1 = pd.Series(data)
             S2 = S1.copy(deep=True)
             value = np.nan
@@ -4895,16 +4926,26 @@ class TestSeries(TestCase):
             result = hpat_func(S2, ind, value)
             pd.testing.assert_series_equal(result_ref, result)
 
-        #########################################################
-        # NOT WORK, PROBLEM WITH StringArrayType in _str_ext.cpp
-        #########################################################
-        # for data in data_to_test_string:
-        #     S1 = pd.Series(data)
-        #     S2 = S1.copy(deep=True)
-        #     value = 'Hello, world!'
-        #     result_ref = test_impl(S1, ind, value)
-        #     result = hpat_func(S2, ind, value)
-        #     pd.testing.assert_series_equal(result_ref, result)
+    @skip_numba_jit('NOT WORK, PROBLEM WITH StringArrayType in _str_ext.cpp')
+    @skip_sdc_jit
+    def test_series_setitem_for_series_string(self):
+        def test_impl(S, ind, val):
+            S[ind] = val
+            return S
+
+        hpat_func = self.jit(test_impl)
+        data_to_test = [['a', '', 'a', '', 'b', None, 'a', '', None, 'b'],
+                        ['dog', None, 'NaN', '', 'cat', None, 'cat', None, 'dog', ''],
+                        ['dog', 'NaN', '', 'cat', 'cat', 'dog', '']]
+        ind = pd.Series([0, 2, 4])
+
+        for data in data_to_test:
+            S1 = pd.Series(data)
+            S2 = S1.copy(deep=True)
+            value = 'Hello, world!'
+            result_ref = test_impl(S1, ind, value)
+            result = hpat_func(S2, ind, value)
+            pd.testing.assert_series_equal(result_ref, result)
 
     def test_series_setitem_unsupported(self):
         def test_impl(S, ind, val):
