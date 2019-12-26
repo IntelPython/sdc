@@ -226,6 +226,10 @@ def rjust_with_fillchar_usecase(series, width, fillchar):
     return series.str.rjust(width, fillchar)
 
 
+def isalpha_usecase(series):
+    return series.str.isalpha()
+
+
 GLOBAL_VAL = 2
 
 
@@ -5002,6 +5006,18 @@ class TestSeries(TestCase):
         A = pd.Series(['a', '', 'ae', 'b', 'cccc', 'oo', None])
         B = pd.Series(['b', 'aa', '', 'b', 'o', None, 'oo'])
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
+
+    @skip_sdc_jit("Series.str.isalpha is not supported yet")
+    def test_series_isalpha_str(self):
+        series = [['leopard', 'Golden Eagle', 'SNAKE', ''],
+                  ['Hello world!', 'hello 123', 'mynameisPeter'],
+                  ['one', 'one1', '1', '']
+                  ]
+
+        cfunc = self.jit(isalpha_usecase)
+        for ser in series:
+            S = pd.Series(ser)
+            pd.testing.assert_series_equal(cfunc(S), isalpha_usecase(S))
 
 
 if __name__ == "__main__":
