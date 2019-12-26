@@ -65,39 +65,25 @@ def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, col
     global_vars = {'pandas': pandas, 'np': numpy,
                    'init_series': sdc.hiframes.api.init_series,
                    'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
+    print(func_text)
 
     return func_text, global_vars
 
 
-def sdc_pandas_dataframe_reduce_columns(df, func_name, params):
+def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
     all_params = ['df']
-    par1 = {'count': ['level']}
     ser_par = []
 
-    print('PARAMS')
-    print(params)
-
-    for key, value in params:
+    for key, value in params.items():
         all_params.append('{}={}'.format(key, value))
+    for key, value in ser_params.items():
+        ser_par.append('{}={}'.format(key, value))
 
-    if func_name in par1:
-        for key, value in params:
-            if key in par1[func_name]:
-                ser_par.append('{}={}'.format(key, value))
-        sp = ser_par.copy()
-        par = '{}'.format(', '.join(sp))
-    else:
-        ap = all_params.copy()
-        par = '{}'.format(', '.join(ap[1:]))
+    s_par = '{}'.format(', '.join(ser_par[:]))
 
     df_func_name = f'_df_{func_name}_impl'
 
-    print('ALL PARAMS')
-    print(all_params)
-    print('PAR')
-    print(par)
-
-    func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, par, df.columns)
+    func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, s_par, df.columns)
 
     loc_vars = {}
     print(global_vars, loc_vars)
@@ -148,6 +134,7 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     if not (isinstance(numeric_only, types.Omitted) or numeric_only is False):
         ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-    params = [('axis', 0), ('level', None), ('numeric_only', False)]
+    params = {'axis': 0, 'level': None, 'numeric_only': False}
+    ser_par = {'level': 'level'}
 
-    return sdc_pandas_dataframe_reduce_columns(df, name, params)
+    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
