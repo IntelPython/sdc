@@ -119,7 +119,8 @@ if not config_pipeline_hpat_default:
             dtype: object
 
          .. note::
-            Parameters axis, index, level, inplace, errors are currently unsupported by Intel Scalable Dataframe Compiler
+            Parameters axis, index, level, inplace, errors are currently unsupported
+            by Intel Scalable Dataframe Compiler
             Currently multi-indexing is not supported.
 
         .. seealso::
@@ -244,7 +245,8 @@ if not config_pipeline_hpat_default:
         Returns
         -------
         :obj:`pandas.Series` or `pandas.DataFrame`
-                returns: For each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
+                returns: For each column/row the number of non-NA/null entries.
+                If level is specified returns a DataFrame.
         """
 
         _func_name = 'Method pandas.dataframe.count().'
