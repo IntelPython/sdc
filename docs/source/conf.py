@@ -94,6 +94,7 @@ extensions = [
     'sphinx.ext.extlinks',
     'sphinx.ext.githubpages',
     'sphinx.ext.napoleon',
+    'sphinxcontrib.programoutput',
 ]
 
 
