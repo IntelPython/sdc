@@ -521,13 +521,21 @@ def pandas_read_csv(
 
 
 def _gen_csv_reader_py_pyarrow(col_names, col_typs, usecols, sep, typingctx, targetctx, parallel, skiprows):
+    func_text, func_name = _gen_csv_reader_py_pyarrow_func_text(col_names, col_typs, usecols, sep, skiprows)
+    csv_reader_py = _gen_csv_reader_py_pyarrow_py_func(func_text, func_name)
+    return _gen_csv_reader_py_pyarrow_jit_func(csv_reader_py)
+
+
+def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, usecols, sep, skiprows, signature=None):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs) if t.dtype == types.NPDatetime('ns'))
     typ_strs = ", ".join(["{}='{}'".format(to_varname(cname), _get_dtype_str(t))
                           for cname, t in zip(col_names, col_typs)])
     pd_dtype_strs = ", ".join(["'{}':{}".format(cname, _get_pd_dtype_str(t)) for cname, t in zip(col_names, col_typs)])
 
-    func_text =  "def csv_reader_py(fname):\n"
+    if signature is None:
+        signature = "fname"
+    func_text = "def csv_reader_py({}):\n".format(signature)
     func_text += "  with objmode({}):\n".format(typ_strs)
     func_text += "    df = pandas_read_csv(fname, names={},\n".format(col_names)
     func_text += "       parse_dates=[{}],\n".format(date_inds)
@@ -537,16 +545,42 @@ def _gen_csv_reader_py_pyarrow(col_names, col_typs, usecols, sep, typingctx, tar
     for cname in col_names:
         func_text += "    {} = df['{}'].values\n".format(to_varname(cname), cname)
         # func_text += "    print({})\n".format(cname)
+    return func_text, 'csv_reader_py'
+
+
+def _gen_csv_reader_py_pyarrow_func_text(col_names, col_typs, usecols, sep, skiprows):
+    func_text, func_name = _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, usecols, sep, skiprows)
+
     func_text += "  return ({},)\n".format(", ".join(to_varname(c) for c in col_names))
 
+    return func_text, func_name
+
+
+def _gen_csv_reader_py_pyarrow_func_text_dataframe(col_names, col_typs, usecols, sep, skiprows, signature):
+    func_text, func_name = _gen_csv_reader_py_pyarrow_func_text_core(
+        col_names, col_typs, usecols, sep, skiprows, signature)
+
+    func_text += "  return sdc.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
+        ", ".join(to_varname(c) for c in col_names),
+        ", ".join("'{}'".format(c) for c in col_names)
+    )
+
+    return func_text, func_name
+
+
+def _gen_csv_reader_py_pyarrow_py_func(func_text, func_name):
     # print(func_text)
     glbls = globals()  # TODO: fix globals after Numba's #3355 is resolved
     # {'objmode': objmode, 'csv_file_chunk_reader': csv_file_chunk_reader,
     # 'pd': pd, 'np': np}
     loc_vars = {}
     exec(func_text, glbls, loc_vars)
-    csv_reader_py = loc_vars['csv_reader_py']
+    csv_reader_py = loc_vars[func_name]
 
+    return csv_reader_py
+
+
+def _gen_csv_reader_py_pyarrow_jit_func(csv_reader_py):
     # TODO: no_cpython_wrapper=True crashes for some reason
     jit_func = numba.njit(csv_reader_py)
     compiled_funcs.append(jit_func)
