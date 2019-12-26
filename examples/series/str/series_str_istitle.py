@@ -30,7 +30,7 @@ from numba import njit
 
 @njit
 def series_str_istitle():
-    series = pd.Series(['Cat', 'dog', 'Bird'])  # Series of 'Cat', 'dog', 'Bird'
+    series = pd.Series(['Cat', 'dog', 'Bird'])
     out_series = series.str.istitle()
 
     return out_series  # Expect series of True, False, True
