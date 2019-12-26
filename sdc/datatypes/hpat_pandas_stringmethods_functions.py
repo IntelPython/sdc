@@ -977,14 +977,8 @@ def hpat_pandas_stringmethods_isalnum(self):
            :caption: Check if all the characters in the text are alphanumeric
            :name: ex_series_str_isalnum
 
-        .. code-block:: console
-
-            > python ./series/str/series_str_isalnum.py
-            0     True
-            1    False
-            2    True
-            3    False
-            dtype: bool
+        .. command-output:: python ./series/str/series_str_isalnum.py
+            :cwd: ../../../examples
 
         .. seealso::
             :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
