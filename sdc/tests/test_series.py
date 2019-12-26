@@ -2213,7 +2213,7 @@ class TestSeries(TestCase):
                     result = hpat_func(S).sort_index()
                     pd.testing.assert_series_equal(result, result_ref)
 
-
+    @skip_sdc_jit('Bug in old-style value_counts implementation for ascending param support')
     def test_series_value_counts_sort(self):
         def test_impl(S, value):
             return S.value_counts(sort=True, ascending=value)

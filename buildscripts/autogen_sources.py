@@ -105,6 +105,13 @@ if __name__ == '__main__':
     # read templates_module as text and extract import section to be copied into auto-generated target file
     module_text = inspect.getsource(templates_module)
     module_text_lines = module_text.splitlines(keepends=True)
+
+    # extract copyright text from templates file
+    copyright_line_numbers = [k for k, line in enumerate(module_text_lines) if '# *****' in line]
+    copyright_section_text = ''.join(module_text_lines[copyright_line_numbers[0]: copyright_line_numbers[1] + 1])
+
+    # extract copyright text from templates file - this only works if imports in it
+    # are placed contigiously, i.e. at one place and not intermixed with code
     imports_line_numbers = [k for k, line in enumerate(module_text_lines) if 'import ' in line]
     imports_start_line, import_end_line = min(imports_line_numbers), max(imports_line_numbers)
     import_section_text = ''.join(module_text_lines[imports_start_line: import_end_line + 1])
@@ -118,7 +125,7 @@ if __name__ == '__main__':
         # open the target file for writing and do the main work
         with target_file_path.open('w', newline='') as file:
             file.write(f'{encoding_info}\n')
-            file.write(f'{copyright_header}\n')
+            file.write(f'{copyright_section_text}\n')
             file.write(f'{docstring_header}\n')
             file.write(import_section_text)
 
