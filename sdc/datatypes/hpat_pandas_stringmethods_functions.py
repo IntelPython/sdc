@@ -957,6 +957,89 @@ def _hpat_pandas_stringmethods_autogen(method_name):
     global_dict_name = 'hpat_pandas_stringmethods_{methodname}'.format(methodname=method_name)
     return _hpat_pandas_stringmethods_autogen_global_dict[global_dict_name]
 
+@overload_method(StringMethodsType, 'islower')
+def hpat_pandas_stringmethods_islower(self):
+    """
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+        Pandas API: pandas.Series.str.islower
+
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+        Examples
+        --------
+        .. literalinclude:: ../../../examples/series/str/series_str_islower.py
+           :language: python
+           :lines: 27-
+           :caption: Check if all the characters in the text are alphanumeric
+           :name: ex_series_str_islower
+
+        .. code-block:: console
+
+            > python ./series/str/series_str_islower.py
+            0     True
+            1    False
+            2    False
+            3    False
+            dtype: bool
+
+        .. seealso::
+            :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
+                Check whether all characters are alphabetic.
+            :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
+                Check whether all characters are numeric.
+            :ref:`Series.str.isalnum <pandas.Series.str.isalnum>`
+                Check whether all characters are alphanumeric.
+            :ref:`Series.str.isdigit <pandas.Series.str.isdigit>`
+                Check whether all characters are digits.
+            :ref:`Series.str.isdecimal <pandas.Series.str.isdecimal>`
+                Check whether all characters are decimal.
+            :ref:`Series.str.isspace <pandas.Series.str.isspace>`
+                Check whether all characters are whitespace.
+            :ref:`Series.str.islower <pandas.Series.str.islower>`
+                Check whether all characters are lowercase.
+            :ref:`Series.str.isupper <pandas.Series.str.isupper>`
+                Check whether all characters are uppercase.
+            :ref:`Series.str.istitle <pandas.Series.str.istitle>`
+                Check whether all characters are titlecase.
+
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+
+        Pandas Series method :meth:`pandas.core.strings.StringMethods.islower()` implementation.
+
+        Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+        .. only:: developer
+
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_islower_str
+
+        Parameters
+        ----------
+        self: :class:`pandas.core.strings.StringMethods`
+            input arg
+
+        Returns
+        -------
+        :obj:`pandas.Series`
+             returns :obj:`pandas.Series` object
+        """
+
+    ty_checker = TypeChecker('Method islower().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_islower_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.islower()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_islower_impl
+
 
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))
 _hpat_pandas_stringmethods_autogen_methods = ['upper', 'lower', 'lstrip', 'rstrip', 'strip']
