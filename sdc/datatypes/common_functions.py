@@ -117,9 +117,20 @@ def has_python_value(var, value):
         return var == value
 
 
+def check_is_numeric_array(type_var):
+    """Used during typing to check that type_var is a numeric numpy arrays"""
+    return isinstance(type_var, types.Array) and isinstance(type_var.dtype, types.Number)
+
+
 def check_index_is_numeric(ty_series):
     """Used during typing to check that series has numeric index"""
-    return isinstance(ty_series.index, types.Array) and isinstance(ty_series.index.dtype, types.Number)
+    return check_is_numeric_array(ty_series.index)
+
+
+def check_types_comparable(ty_left, ty_right):
+    """Used during typing to check that underlying arrays of specified types can be compared"""
+    return ((ty_left == string_array_type and ty_right == string_array_type)
+            or (check_is_numeric_array(ty_left) and check_is_numeric_array(ty_right)))
 
 
 def hpat_arrays_append(A, B):
@@ -217,12 +228,12 @@ def find_common_dtype_from_numpy_dtypes(array_types, scalar_types):
     return numba_common_dtype
 
 
-def hpat_join_series_indexes(left, right):
+def sdc_join_series_indexes(left, right):
     pass
 
 
-@overload(hpat_join_series_indexes)
-def hpat_join_series_indexes_overload(left, right):
+@overload(sdc_join_series_indexes)
+def sdc_join_series_indexes_overload(left, right):
     """Function for joining arrays left and right in a way similar to pandas.join 'outer' algorithm"""
 
     # TODO: eliminate code duplication by merging implementations for numeric and StringArray
@@ -232,7 +243,7 @@ def hpat_join_series_indexes_overload(left, right):
         numba_common_dtype = find_common_dtype_from_numpy_dtypes([left.dtype, right.dtype], [])
         if isinstance(numba_common_dtype, types.Number):
 
-            def hpat_join_series_indexes_impl(left, right):
+            def sdc_join_series_indexes_impl(left, right):
 
                 # allocate result arrays
                 lsize = len(left)
@@ -321,7 +332,7 @@ def hpat_join_series_indexes_overload(left, right):
 
                 return joined[:k], lidx[:k], ridx[:k]
 
-            return hpat_join_series_indexes_impl
+            return sdc_join_series_indexes_impl
 
         else:
             # TODO: support joining indexes with common dtype=object - requires Numba
@@ -330,7 +341,7 @@ def hpat_join_series_indexes_overload(left, right):
 
     elif (left == string_array_type and right == string_array_type):
 
-        def hpat_join_series_indexes_impl(left, right):
+        def sdc_join_series_indexes_impl(left, right):
 
             # allocate result arrays
             lsize = len(left)
@@ -438,6 +449,34 @@ def hpat_join_series_indexes_overload(left, right):
 
             return joined, lidx, ridx
 
-        return hpat_join_series_indexes_impl
+        return sdc_join_series_indexes_impl
 
     return None
+
+
+def sdc_check_indexes_equal(left, right):
+    pass
+
+
+@overload(sdc_check_indexes_equal)
+def sdc_check_indexes_equal_overload(A, B):
+    """Function for checking arrays A and B of the same type are equal"""
+
+    if isinstance(A, types.Array):
+        def sdc_check_indexes_equal_numeric_impl(A, B):
+            return numpy.array_equal(A, B)
+        return sdc_check_indexes_equal_numeric_impl
+
+    elif A == string_array_type:
+        def sdc_check_indexes_equal_string_impl(A, B):
+            # TODO: replace with StringArrays comparison
+            is_index_equal = (len(A) == len(B)
+                              and num_total_chars(A) == num_total_chars(B))
+            for i in numpy.arange(len(A)):
+                if (A[i] != B[i]
+                        or str_arr_is_na(A, i) is not str_arr_is_na(B, i)):
+                    return False
+
+            return is_index_equal
+
+        return sdc_check_indexes_equal_string_impl
