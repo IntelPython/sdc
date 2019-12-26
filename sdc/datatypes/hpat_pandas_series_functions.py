@@ -73,10 +73,8 @@ def hpat_pandas_series_getitem(self, idx):
        :caption: Getting Pandas Series elements
        :name: ex_series_getitem
 
-    .. code-block:: console
-
-        > python ./series_getitem.py
-        55
+    .. command-output:: python ./series_getitem.py
+       :cwd: ../../../examples
 
     .. todo:: Fix SDC behavior and add the expected output of the > python ./series_getitem.py to the docstring
 
@@ -411,14 +409,8 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
        :caption: Getting the number of values excluding NaNs
        :name: ex_series_value_counts
 
-    .. code-block:: console
-
-        > python ./series/series_value_counts.py
-        3.0    2
-        4.0    1
-        2.0    1
-        1.0    1
-        dtype: int64
+    .. command-output:: python ./series/series_value_counts.py
+       :cwd: ../../../examples
 
      .. note::
 
@@ -724,15 +716,8 @@ def hpat_pandas_series_rolling(self, window, min_periods=None, center=False,
        :caption: Calculate the rolling minimum.
        :name: ex_series_rolling
 
-    .. code-block:: console
-
-        > python ./series_rolling_min.py
-        0    NaN
-        1    NaN
-        2    3.0
-        3    2.0
-        4    2.0
-        dtype: float64
+    .. command-output:: python ./series/rolling/series_rolling_min.py
+       :cwd: ../../../examples
 
     .. todo:: Add support of parameters ``center``, ``win_type``, ``on``, ``axis`` and ``closed``
 
@@ -1752,13 +1737,8 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
        :caption: Getting the addition of Series and other
        :name: ex_series_add
 
-    .. code-block:: console
-
-        > python ./series/series_add.py
-        0    5
-        1    7
-        2    9
-        dtype: int64
+    .. command-output:: python ./series/series_add.py
+       :cwd: ../../../examples
 
     .. note::
 
@@ -2119,13 +2099,8 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
        :caption: Element-wise multiplication of two Series
        :name: ex_series_mul
 
-    .. code-block:: console
-
-        > python ./series/series_mul.py
-        0      0
-        1      3
-        2    200
-        dtype: int64
+    .. command-output:: python ./series/series_mul.py
+       :cwd: ../../../examples
 
      .. note::
 
@@ -2218,13 +2193,8 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
        :caption: Element-wise division of one Series by another (binary operator div)
        :name: ex_series_div
 
-    .. code-block:: console
-
-        > python ./series/series_div.py
-        0    0.25
-        1    0.50
-        2    0.25
-        dtype: float64
+    .. command-output:: python ./series/series_div.py
+       :cwd: ../../../examples
 
     .. note::
 
@@ -2318,13 +2288,8 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
        :caption: Element-wise division of one Series by another (binary operator truediv)
        :name: ex_series_truediv
 
-    .. code-block:: console
-
-        > python ./series/series_truediv.py
-        0    0.25
-        1    0.50
-        2    0.25
-        dtype: float64
+    .. command-output:: python ./series/series_truediv.py
+       :cwd: ../../../examples
 
     .. note::
 
@@ -2623,10 +2588,8 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
        :caption: Computing quantile for the Series
        :name: ex_series_quantile
 
-    .. code-block:: console
-
-        > python ./series/series_quantile.py
-        2.5
+    .. command-output:: python ./series/series_quantile.py
+       :cwd: ../../../examples
 
     .. note::
 
@@ -2811,10 +2774,8 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
        :caption: Getting the maximum value of Series elements
        :name: ex_series_max
 
-    .. code-block:: console
-
-        > python ./series/series_max.py
-        4
+    .. command-output:: python ./series/series_max.py
+       :cwd: ../../../examples
 
     .. note::
 
@@ -3508,10 +3469,8 @@ def hpat_pandas_series_unique(self):
        :caption: Getting unique values in Series
        :name: ex_series_unique
 
-    .. code-block:: console
-
-        > python ./series/series_unique.py
-        array([2, 1, 3], dtype=int64)
+    .. command-output:: python ./series/series_unique.py
+       :cwd: ../../../examples
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -3689,10 +3648,8 @@ def hpat_pandas_series_count(self, level=None):
        :caption: Counting non-NaN values in Series
        :name: ex_series_count
 
-    .. code-block:: console
-
-        > python ./series/series_count.py
-        2
+    .. command-output:: python ./series/series_count.py
+       :cwd: ../../../examples
 
     .. note::
 
