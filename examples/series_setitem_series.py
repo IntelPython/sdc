@@ -32,13 +32,13 @@ from numba import njit
 
 @njit
 def series_setitem():
-    numb = 0
+    value = 0
     series = pd.Series(np.arange(5, 0, -1))  # Series of 5, 4, 3, 2, 1
 
     indices = pd.Series(np.asarray([1, 3]))
-    series[indices] = numb
+    series[indices] = value
 
-    return series       # result Series of 0, 4, 3, 2, 1
+    return series       # result Series of 5, 0, 3, 0, 1
 
 
 print(series_setitem())

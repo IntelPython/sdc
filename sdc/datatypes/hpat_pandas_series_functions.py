@@ -190,12 +190,12 @@ def hpat_pandas_series_setitem(self, idx, value):
     *************************************************
      Pandas Series operator :attr:`pandas.Series.set` implementation
 
-    Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_unsupported
+    Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_setitem*
 
     Parameters
     ----------
     series: :obj:`pandas.Series`
-           input series
+        input series
     idx: :obj:`int`, :obj:`slice` or :obj:`pandas.Series`
         input index
     value: :object
