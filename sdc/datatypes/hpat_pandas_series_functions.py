@@ -3452,13 +3452,8 @@ def hpat_pandas_series_abs(self):
        :caption: Getting the absolute value of each element in Series
        :name: ex_series_abs
 
-    .. code-block:: console
-
-        > python ./series/series_abs.py
-        0     1.10
-        1     2.00
-        2     3.33
-        dtype: float64
+    .. command-output:: python ./series/series_abs.py
+       :cwd: ../../../examples
 
     .. seealso::
 
