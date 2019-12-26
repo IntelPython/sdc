@@ -1045,12 +1045,37 @@ class TestDataFrame(TestCase):
         h_out = hpat_func(df)
         pd.testing.assert_frame_equal(out, h_out)
 
-    def test_df_drop_by_column(self):
+    def test_df_drop_one_column(self):
         def test_impl(df):
             return df.drop(columns='A')
 
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]})
         hpat_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_drop_tuple_column(self):
+        def test_impl(df):
+            return df.drop(columns=['A', 'B'])
+
+        # Numba supports only tuple iteration
+        def test_sdc_impl(df):
+            return df.drop(columns=('A', 'B'))
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = self.jit(test_sdc_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    @unittest.skip("Implement Index for DataFrames")
+    def test_df_drop_tuple_columns_all(self):
+        def test_impl(df):
+            return df.drop(columns=['A', 'B', 'C'])
+
+        # Numba supports only tuple iteration
+        def test_sdc_impl(df):
+            return df.drop(columns=('A', 'B', 'C'))
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = self.jit(test_sdc_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     def test_df_drop_by_column_errors_ignore(self):
