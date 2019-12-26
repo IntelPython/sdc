@@ -5014,6 +5014,14 @@ class TestSeries(TestCase):
         cfunc = self.jit(istitle_usecase)
         pd.testing.assert_series_equal(cfunc(series), istitle_usecase(series))
 
+    @skip_sdc_jit("Series.str.istitle is not supported yet")
+    @skip_numba_jit("Not work with None and np.nan")
+    def test_series_istitle_str(self):
+        series = pd.Series(['Cat', 'dog', 'Bird', None, np.nan])
+
+        cfunc = self.jit(istitle_usecase)
+        pd.testing.assert_series_equal(cfunc(series), istitle_usecase(series))
+
 
 if __name__ == "__main__":
     unittest.main()
