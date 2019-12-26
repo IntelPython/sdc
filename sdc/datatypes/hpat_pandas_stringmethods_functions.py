@@ -957,6 +957,7 @@ def _hpat_pandas_stringmethods_autogen(method_name):
     global_dict_name = 'hpat_pandas_stringmethods_{methodname}'.format(methodname=method_name)
     return _hpat_pandas_stringmethods_autogen_global_dict[global_dict_name]
 
+
 @overload_method(StringMethodsType, 'islower')
 def hpat_pandas_stringmethods_islower(self):
     """
