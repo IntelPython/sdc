@@ -25,18 +25,44 @@
 # *****************************************************************************
 
 import pandas as pd
+import numpy as np
 
 from sdc.tests.test_base import TestCase
+from sdc.tests.test_utils import skip_sdc_jit
+
+
+DATA = [1.0, 2., 3., 4., 5.]
 
 
 class TestSeries_apply(object):
 
-    def test_series_apply1(self):
+    def test_series_apply(self):
+        def test_impl(S):
+
+            def square(x):
+                return x ** 2
+
+            return S.apply(square)
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(DATA)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_apply_lambda(self):
         def test_impl(S):
             return S.apply(lambda a: 2 * a)
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([1.0, 2., 3., 4., 5.])
+        S = pd.Series(DATA)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit("'Var' object has no attribute 'py_func'")
+    def test_series_apply_log(self):
+        def test_impl(S):
+            return S.apply(np.log)
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(DATA)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
 
