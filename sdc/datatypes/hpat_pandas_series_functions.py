@@ -205,11 +205,15 @@ def hpat_pandas_series_setitem(self, idx, value):
     :class:`pandas.Series` or an element of the underneath type
             object of :class:`pandas.Series`
     """
+
     ty_checker = TypeChecker('Operator setitem.')
     ty_checker.check(self, SeriesType)
 
-    if (isinstance(value, SeriesType) and not isinstance(self.dtype, value.dtype)) or \
-            not isinstance(self.dtype, type(value)):
+    if not (isinstance(idx, (types.Integer, types.SliceType, SeriesType))):
+        ty_checker.raise_exc(idx, 'int, Slice, Series', 'idx')
+
+    if not((isinstance(value, SeriesType) and isinstance(value.dtype, self.dtype)) or \
+           isinstance(value, type(self.dtype))):
         ty_checker.raise_exc(value, self.dtype, 'value')
 
     if isinstance(idx, types.Integer) or isinstance(idx, types.SliceType):
@@ -233,8 +237,6 @@ def hpat_pandas_series_setitem(self, idx, value):
             return self
 
         return hpat_pandas_series_setitem_idx_series_impl
-
-    ty_checker.raise_exc(idx, 'int, Slice, Series', 'idx')
 
 
 @sdc_overload_attribute(SeriesType, 'at')
