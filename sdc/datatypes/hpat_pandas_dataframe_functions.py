@@ -54,6 +54,8 @@ Example func_text for func_name='count' columns=('A', 'B'):
           result_B = series_B.count(level=level)
           return pandas.Series([result_A, result_B], ['A', 'B'])
 '''
+
+
 def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, columns):
     result_name_list = []
     joined = ', '.join(func_params)

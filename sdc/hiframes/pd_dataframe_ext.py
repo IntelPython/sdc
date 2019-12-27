@@ -44,6 +44,8 @@ from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.str_ext import string_type
 from sdc.str_arr_ext import string_array_type
 
+from sdc.datatypes.hpat_pandas_dataframe_functions import *
+
 
 class DataFrameType(types.Type):  # TODO: IterableType over column names
     """Temporary type class for DataFrame objects.
@@ -1628,6 +1630,3 @@ def to_csv_overload(df, path_or_buf=None, sep=',', na_rep='', float_format=None,
                       date_format, doublequote, escapechar, decimal)
 
     return _impl
-
-
-from sdc.datatypes.hpat_pandas_dataframe_functions import *
