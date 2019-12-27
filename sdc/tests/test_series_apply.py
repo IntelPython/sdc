@@ -32,20 +32,41 @@ from sdc.tests.test_utils import skip_sdc_jit
 
 
 DATA = [1.0, 2., 3., 4., 5.]
+INDEX = [5, 4, 3, 2, 1]
+NAME = "sname"
+
+
+def series_apply_square_usecase(S):
+
+    def square(x):
+        return x ** 2
+
+    return S.apply(square)
 
 
 class TestSeries_apply(object):
 
     def test_series_apply(self):
-        def test_impl(S):
-
-            def square(x):
-                return x ** 2
-
-            return S.apply(square)
+        test_impl = series_apply_square_usecase
         hpat_func = self.jit(test_impl)
 
         S = pd.Series(DATA)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit("Series.index values are different")
+    def test_series_apply_index(self):
+        test_impl = series_apply_square_usecase
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(DATA, INDEX)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit('Attribute "name" are different')
+    def test_series_apply_name(self):
+        test_impl = series_apply_square_usecase
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(DATA, name=NAME)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_apply_lambda(self):

@@ -94,6 +94,6 @@ def hpat_pandas_series_apply(self, func, convert_dtype=True, args=()):
     ty_checker.check(self, SeriesType)
 
     def impl(self, func, convert_dtype=True, args=()):
-        return pandas.Series(list(map(func, self._data)), self.index)
+        return pandas.Series(list(map(func, self._data)), index=self._index, name=self._name)
 
     return impl
