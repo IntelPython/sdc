@@ -44,16 +44,15 @@ import sdc.datatypes.hpat_pandas_dataframe_types
 
 from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
 
-'''
-Example func_text for func_name='count' columns=('A', 'B'):
 
-        def _df_count_impl(df, axis=0, level=None, numeric_only=False):
-          series_A = init_series(get_dataframe_data(df, 0))
-          result_A = series_A.count(level=level)
-          series_B = init_series(get_dataframe_data(df, 1))
-          result_B = series_B.count(level=level)
-          return pandas.Series([result_A, result_B], ['A', 'B'])
-'''
+# Example func_text for func_name='count' columns=('A', 'B'):
+#
+#         def _df_count_impl(df, axis=0, level=None, numeric_only=False):
+#           series_A = init_series(get_dataframe_data(df, 0))
+#           result_A = series_A.count(level=level)
+#           series_B = init_series(get_dataframe_data(df, 1))
+#           result_B = series_B.count(level=level)
+#           return pandas.Series([result_A, result_B], ['A', 'B'])
 
 
 def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, columns):
