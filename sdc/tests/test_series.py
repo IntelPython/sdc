@@ -229,6 +229,7 @@ def rjust_with_fillchar_usecase(series, width, fillchar):
 def istitle_usecase(series):
     return series.str.istitle()
 
+
 def isalnum_usecase(series):
     return series.str.isalnum()
 
