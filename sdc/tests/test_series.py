@@ -226,6 +226,9 @@ def rjust_with_fillchar_usecase(series, width, fillchar):
     return series.str.rjust(width, fillchar)
 
 
+def istitle_usecase(series):
+    return series.str.istitle()
+
 def isalnum_usecase(series):
     return series.str.isalnum()
 
@@ -5288,6 +5291,21 @@ class TestSeries(TestCase):
         A = pd.Series(['a', '', 'ae', 'b', 'cccc', 'oo', None])
         B = pd.Series(['b', 'aa', '', 'b', 'o', None, 'oo'])
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+
+    @skip_sdc_jit("Series.str.istitle is not supported yet")
+    def test_series_istitle_str(self):
+        series = pd.Series(['Cat', 'dog', 'Bird'])
+
+        cfunc = self.jit(istitle_usecase)
+        pd.testing.assert_series_equal(cfunc(series), istitle_usecase(series))
+
+    @skip_sdc_jit("Series.str.istitle is not supported yet")
+    @skip_numba_jit("Not work with None and np.nan")
+    def test_series_istitle_str(self):
+        series = pd.Series(['Cat', 'dog', 'Bird', None, np.nan])
+
+        cfunc = self.jit(istitle_usecase)
+        pd.testing.assert_series_equal(cfunc(series), istitle_usecase(series))
 
     @skip_sdc_jit("Series.str.isalnum is not supported yet")
     def test_series_isalnum_str(self):
