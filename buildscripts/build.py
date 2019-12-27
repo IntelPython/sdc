@@ -67,7 +67,7 @@ if __name__ == '__main__':
                                 develop: install package in source directory (default)
                                 install: build and install package in build environment
                                 package: build conda and wheel packages""")
-    parser.add_argument('--python', default='3.7.3', choices=['3.6', '3.7.3', '3.8'],
+    parser.add_argument('--python', default='3.7', choices=['3.6', '3.7', '3.8'],
                         help='Python version to build with, default = 3.7')
     parser.add_argument('--numpy', default='1.16', choices=['1.15', '1.16', '1.17'],
                         help='Numpy version to build with, default = 1.16')
@@ -84,6 +84,8 @@ if __name__ == '__main__':
 
     build_mode = args.build_mode
     python = args.python
+    if python == '3.7':
+        python = '3.7.3'
     numpy = args.numpy
     output_folder = args.output_folder
     conda_prefix = os.getenv('CONDA_PREFIX', args.conda_prefix)
@@ -92,7 +94,7 @@ if __name__ == '__main__':
     use_numba_master = args.use_numba_master
     numba_channel = numba_master_channel if use_numba_master is True else args.numba_channel
     assert conda_prefix is not None, 'CONDA_PREFIX is not defined; Please use --conda-prefix option or activate your conda'
-    
+
     # Init variables
     conda_activate = get_conda_activate_cmd(conda_prefix).replace('"', '')
     build_env = f'sdc-build-env-py{python}-numpy{numpy}'
