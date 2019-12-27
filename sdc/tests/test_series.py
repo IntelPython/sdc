@@ -226,12 +226,12 @@ def rjust_with_fillchar_usecase(series, width, fillchar):
     return series.str.rjust(width, fillchar)
 
 
-def isalpha_usecase(series):
-    return series.str.isalpha()
-
-
 def istitle_usecase(series):
     return series.str.istitle()
+
+
+def isalpha_usecase(series):
+    return series.str.isalpha()
 
 
 GLOBAL_VAL = 2
