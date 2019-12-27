@@ -5496,7 +5496,6 @@ class TestSeries(TestCase):
         cfunc = self.jit(istitle_usecase)
         pd.testing.assert_series_equal(cfunc(series), istitle_usecase(series))
 
-
     @skip_sdc_jit("Series.str.isalpha is not supported yet")
     def test_series_isalpha_str(self):
         series = [['leopard', 'Golden Eagle', 'SNAKE', ''],
