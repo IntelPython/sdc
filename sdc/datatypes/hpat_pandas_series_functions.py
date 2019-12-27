@@ -141,6 +141,104 @@ def hpat_pandas_series_getitem(self, idx):
     raise TypingError('{} The index must be an Integer, Slice or a pandas.series. Given: {}'.format(_func_name, idx))
 
 
+@sdc_overload(operator.setitem)
+def hpat_pandas_series_setitem(self, idx, value):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.set
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series_setitem_int.py
+       :language: python
+       :lines: 27-
+       :caption: Setting Pandas Series elements
+       :name: ex_series_setitem
+
+    .. code-block:: console
+
+        > python ./series_setitem_int.py
+
+            0    0
+            1    4
+            2    3
+            3    2
+            4    1
+            dtype: int64
+
+        > python ./series_setitem_slice.py
+
+            0    5
+            1    4
+            2    0
+            3    0
+            4    0
+            dtype: int64
+
+        > python ./series_setitem_series.py
+
+            0    5
+            1    0
+            2    3
+            3    0
+            4    1
+            dtype: int64
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+     Pandas Series operator :attr:`pandas.Series.set` implementation
+
+    Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_setitem*
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+        input series
+    idx: :obj:`int`, :obj:`slice` or :obj:`pandas.Series`
+        input index
+    value: :object
+        input value
+
+    Returns
+    -------
+    :class:`pandas.Series` or an element of the underneath type
+            object of :class:`pandas.Series`
+    """
+
+    ty_checker = TypeChecker('Operator setitem.')
+    ty_checker.check(self, SeriesType)
+
+    if not (isinstance(idx, (types.Integer, types.SliceType, SeriesType))):
+        ty_checker.raise_exc(idx, 'int, Slice, Series', 'idx')
+
+    if not((isinstance(value, SeriesType) and isinstance(value.dtype, self.dtype)) or \
+           isinstance(value, type(self.dtype))):
+        ty_checker.raise_exc(value, self.dtype, 'value')
+
+    if isinstance(idx, types.Integer) or isinstance(idx, types.SliceType):
+        def hpat_pandas_series_setitem_idx_integer_impl(self, idx, value):
+            """
+            Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_value
+            Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_slice
+            """
+            self._data[idx] = value
+            return self
+
+        return hpat_pandas_series_setitem_idx_integer_impl
+
+    if isinstance(idx, SeriesType):
+        def hpat_pandas_series_setitem_idx_series_impl(self, idx, value):
+            """
+            Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_series
+            """
+            super_index = idx._data
+            self._data[super_index] = value
+            return self
+
+        return hpat_pandas_series_setitem_idx_series_impl
+
+
 @sdc_overload_attribute(SeriesType, 'at')
 @sdc_overload_attribute(SeriesType, 'iat')
 @sdc_overload_attribute(SeriesType, 'iloc')
