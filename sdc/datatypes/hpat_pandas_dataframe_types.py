@@ -110,7 +110,7 @@ class DataFrameType(types.IterableType):
         return DataFrameTypeIterator(self)
 
 
-if config_pipeline_hpat_default is 0:
+if not config_pipeline_hpat_default:
     @register_model(DataFrameType)
     class DataFrameTypeModel(StructModel):
         """
@@ -163,7 +163,7 @@ def _hpat_pandas_dataframe_init(typingctx, data=None):
     return sig, _hpat_pandas_dataframe_init_codegen
 
 
-if config_pipeline_hpat_default is 0:
+if not config_pipeline_hpat_default:
     @overload(pandas.DataFrame)
     def hpat_pandas_dataframe(data=None, index=None, columns=None, dtype=None, copy=False):
         """
