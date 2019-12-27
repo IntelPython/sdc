@@ -89,6 +89,8 @@ if __name__ == '__main__':
     test_mode = args.test_mode
     package_type = args.package_type
     python = args.python
+    if python == '3.7':
+        python = '3.7.3'
     numpy = args.numpy
     build_folder = args.build_folder
     conda_prefix = os.getenv('CONDA_PREFIX', args.conda_prefix)
