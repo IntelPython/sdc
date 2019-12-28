@@ -242,7 +242,6 @@ def islower_usecase(series):
     return series.str.islower()
 
 
-
 GLOBAL_VAL = 2
 
 
