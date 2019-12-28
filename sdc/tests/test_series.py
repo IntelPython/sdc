@@ -238,6 +238,10 @@ def isalpha_usecase(series):
     return series.str.isalpha()
 
 
+def islower_usecase(series):
+    return series.str.islower()
+
+
 def isalnum_usecase(series):
     return series.str.isalnum()
 
@@ -5527,6 +5531,17 @@ class TestSeries(TestCase):
         for ser in series:
             S = pd.Series(ser)
             pd.testing.assert_series_equal(cfunc(S), isalpha_usecase(S))
+
+    @skip_sdc_jit("Series.str.islower is not supported yet")
+    def test_series_islower_str(self):
+        series = [['leopard', 'Golden Eagle', 'SNAKE', ''],
+                  ['Hello world!', 'hello 123', 'mynameisPeter']
+                  ]
+
+        cfunc = self.jit(islower_usecase)
+        for ser in series:
+            S = pd.Series(ser)
+            pd.testing.assert_series_equal(cfunc(S), islower_usecase(S))
 
     @skip_sdc_jit("Series.str.isalnum is not supported yet")
     def test_series_isalnum_str(self):
