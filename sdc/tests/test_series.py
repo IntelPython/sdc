@@ -242,6 +242,10 @@ def islower_usecase(series):
     return series.str.islower()
 
 
+def isalnum_usecase(series):
+    return series.str.isalnum()
+
+
 GLOBAL_VAL = 2
 
 
@@ -5538,6 +5542,19 @@ class TestSeries(TestCase):
         for ser in series:
             S = pd.Series(ser)
             pd.testing.assert_series_equal(cfunc(S), islower_usecase(S))
+
+    @skip_sdc_jit("Series.str.isalnum is not supported yet")
+    def test_series_isalnum_str(self):
+        series = [['one', 'one1', '1', ''],
+                  ['A B', '1.5', '3,000'],
+                  ['23', '⅕', ''],
+                  ['leopard', 'Golden Eagle', 'SNAKE', '']
+                  ]
+
+        cfunc = self.jit(isalnum_usecase)
+        for ser in series:
+            S = pd.Series(ser)
+            pd.testing.assert_series_equal(cfunc(S), isalnum_usecase(S))
 
 
 if __name__ == "__main__":
