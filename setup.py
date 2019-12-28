@@ -1,3 +1,4 @@
+﻿# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2019, Intel Corporation All rights reserved.
 #
@@ -27,8 +28,7 @@
 from setuptools import setup, Extension, find_packages, Command
 import platform
 import os
-from distutils.command import build
-from distutils.spawn import spawn
+from docs.source.buildscripts.sdc_build_doc import SDCBuildDoc
 
 
 # Note we don't import Numpy at the toplevel, since setup.py
@@ -38,54 +38,20 @@ import numpy.distutils.misc_util as np_misc
 #import copy
 import versioneer
 
+# String constants for Intel SDC project configuration
+SDC_NAME_STR = 'Intel® Scalable Dataframe Compiler'
+
 # Inject required options for extensions compiled against the Numpy
 # C API (include dirs, library dirs etc.)
 np_compile_args = np_misc.get_info('npymath')
 
 is_win = platform.system() == 'Windows'
 
-# Sphinx User's Documentation Build
-
-
-class build_doc(build.build):
-    description = "Build user's documentation"
-
-    def run(self):
-        spawn(['rm', '-rf', 'docs/_build', 'API_doc', 'docs/usersource/api/'])
-        spawn(['python', 'docs/rename_function.py'])
-        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_build/docstrees',
-               '-j1', 'docs/usersource', '-t', 'user', 'docs/_build/html'])
-        spawn(['python', 'docs/CleanRSTfiles.py'])
-        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_build/docstrees',
-               '-j1', 'docs/usersource', '-t', 'user', 'docs/_build/html'])
-
-# Sphinx Developer's Documentation Build
-
-
-class build_devdoc(build.build):
-    description = "Build developer's documentation"
-
-    def run(self):
-        spawn(['rm', '-rf', 'docs/_builddev'])
-        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_builddev/docstrees',
-               '-j1', 'docs/devsource', '-t', 'developer', 'docs/_builddev/html'])
-
 
 def readme():
     with open('README.rst', encoding='utf-8') as f:
         return f.read()
 
-
-_has_h5py = False
-HDF5_DIR = ""
-
-if 'HDF5_DIR' in os.environ:
-    _has_h5py = True
-    HDF5_DIR = os.environ['HDF5_DIR']
-
-#PANDAS_DIR = ""
-# if 'PANDAS_DIR' in os.environ:
-#    PANDAS_DIR = os.environ['PANDAS_DIR']
 
 # package environment variable is PREFIX during build time
 if 'CONDA_BUILD' in os.environ:
@@ -104,18 +70,6 @@ except ImportError:
 else:
     _has_pyarrow = True
 
-_has_daal = False
-DAALROOT = ""
-
-if 'DAALROOT' in os.environ:
-    _has_daal = True
-    DAALROOT = os.environ['DAALROOT']
-
-_has_ros = False
-if 'ROS_PACKAGE_PATH' in os.environ:
-    _has_ros = True
-
-
 _has_opencv = False
 OPENCV_DIR = ""
 
@@ -127,18 +81,12 @@ if 'OPENCV_DIR' in os.environ:
     # p_cvconf = subprocess.run(["pkg-config", "--libs", "--static","opencv"], stdout=subprocess.PIPE)
     # cv_link_args = p_cvconf.stdout.decode().split()
 
-_has_xenon = False
-
-if 'SDC_XE_SUPPORT' in os.environ and os.environ['SDC_XE_SUPPORT'] != "0":
-    _has_xenon = True
-
 ind = [PREFIX_DIR + '/include', ]
 lid = [PREFIX_DIR + '/lib', ]
 eca = ['-std=c++11', ]  # '-g', '-O0']
 ela = ['-std=c++11', ]
 
 MPI_LIBS = ['mpi']
-H5_CPP_FLAGS = []
 
 use_impi = False
 if use_impi:
@@ -152,10 +100,7 @@ if use_impi:
 if is_win:
     # use Intel MPI on Windows
     MPI_LIBS = ['impi']
-    # hdf5-parallel Windows build uses CMake which needs this flag
-    H5_CPP_FLAGS = [('H5_BUILT_AS_DYNAMIC_LIB', None)]
 
-hdf5_libs = MPI_LIBS + ['hdf5']
 io_libs = MPI_LIBS
 boost_libs = []
 
@@ -171,7 +116,6 @@ ext_io = Extension(name="sdc.hio",
                    libraries=boost_libs,
                    include_dirs=ind + np_compile_args['include_dirs'],
                    library_dirs=lid,
-                   define_macros=H5_CPP_FLAGS,
                    extra_compile_args=eca,
                    extra_link_args=ela,
                    language="c++"
@@ -197,18 +141,6 @@ ext_transport_seq = Extension(name="sdc.transport_seq",
                               extra_link_args=ela,
                               language="c++"
                               )
-
-ext_hdf5 = Extension(name="sdc.io._hdf5",
-                     sources=["sdc/io/_hdf5.cpp"],
-                     depends=[],
-                     libraries=hdf5_libs,
-                     include_dirs=[HDF5_DIR + '/include', ] + ind,
-                     library_dirs=[HDF5_DIR + '/lib', ] + lid,
-                     define_macros=H5_CPP_FLAGS,
-                     extra_compile_args=eca,
-                     extra_link_args=ela,
-                     language="c++"
-                     )
 
 ext_hdist = Extension(name="sdc.hdist",
                       sources=["sdc/_distributed.cpp"],
@@ -247,9 +179,6 @@ ext_set = Extension(name="sdc.hset_ext",
 
 str_libs = np_compile_args['libraries']
 
-if not is_win:
-    str_libs += ['boost_regex']
-
 ext_str = Extension(name="sdc.hstr_ext",
                     sources=["sdc/_str_ext.cpp"],
                     libraries=str_libs,
@@ -259,11 +188,6 @@ ext_str = Extension(name="sdc.hstr_ext",
                     include_dirs=np_compile_args['include_dirs'] + ind,
                     library_dirs=np_compile_args['library_dirs'] + lid,
                     )
-
-#dt_args = copy.copy(np_compile_args)
-#dt_args['include_dirs'] = dt_args['include_dirs'] + [PANDAS_DIR+'/_libs/src/datetime/']
-#dt_args['library_dirs'] = dt_args['library_dirs'] + [PANDAS_DIR+'/_libs/tslibs']
-#dt_args['libraries'] = dt_args['libraries'] + ['np_datetime']
 
 ext_dt = Extension(name="sdc.hdatetime_ext",
                    sources=["sdc/_datetime_ext.cpp"],
@@ -299,46 +223,6 @@ ext_parquet = Extension(name="sdc.parquet_cpp",
                         library_dirs=lid,
                         )
 
-# ext_daal_wrapper = Extension(name="sdc.daal_wrapper",
-#                             include_dirs = [DAALROOT+'/include'],
-#                             libraries = ['daal_core', 'daal_thread']+MPI_LIBS,
-#                             sources=["sdc/_daal.cpp"]
-#                             )
-
-ext_ros = Extension(name="sdc.ros_cpp",
-                    sources=["sdc/_ros.cpp"],
-                    include_dirs=['/opt/ros/lunar/include',
-                                  '/opt/ros/lunar/include/xmlrpcpp',
-                                  PREFIX_DIR + '/include/',
-                                  './ros_include'],
-                    extra_compile_args=eca,
-                    extra_link_args=ela + ['-rdynamic',
-                                           '/opt/ros/lunar/lib/librosbag.so',
-                                           '/opt/ros/lunar/lib/librosbag_storage.so',
-                                           '-lboost_program_options',
-                                           '/opt/ros/lunar/lib/libroslz4.so',
-                                           '/opt/ros/lunar/lib/libtopic_tools.so',
-                                           '/opt/ros/lunar/lib/libroscpp.so',
-                                           '-lboost_filesystem',
-                                           '-lboost_signals',
-                                           '/opt/ros/lunar/lib/librosconsole.so',
-                                           '/opt/ros/lunar/lib/librosconsole_log4cxx.so',
-                                           '/opt/ros/lunar/lib/librosconsole_backend_interface.so',
-                                           '-lboost_regex',
-                                           '/opt/ros/lunar/lib/libroscpp_serialization.so',
-                                           '/opt/ros/lunar/lib/librostime.so',
-                                           '/opt/ros/lunar/lib/libxmlrpcpp.so',
-                                           '/opt/ros/lunar/lib/libcpp_common.so',
-                                           '-lboost_system',
-                                           '-lboost_thread',
-                                           '-lboost_chrono',
-                                           '-lboost_date_time',
-                                           '-lboost_atomic',
-                                           '-lpthread',
-                                           '-Wl,-rpath,/opt/ros/lunar/lib'],
-                    library_dirs=lid,
-                    )
-
 cv_libs = ['opencv_core', 'opencv_imgproc', 'opencv_imgcodecs', 'opencv_highgui']
 # XXX cv lib file name needs version on Windows
 if is_win:
@@ -353,39 +237,13 @@ ext_cv_wrapper = Extension(name="sdc.cv_wrapper",
                            language="c++",
                            )
 
-ext_xenon_wrapper = Extension(name="sdc.hxe_ext",
-                              sources=["sdc/io/_xe_wrapper.cpp"],
-                              #include_dirs = ['/usr/include'],
-                              include_dirs=['.'] + ind,
-                              library_dirs=['.'] + lid,
-                              libraries=['xe'],
-                              extra_compile_args=eca,
-                              extra_link_args=ela,
-                              )
-
 _ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_dt, ext_io, ext_transport_mpi, ext_transport_seq]
 
-if _has_h5py:
-    _ext_mods.append(ext_hdf5)
 if _has_pyarrow:
     _ext_mods.append(ext_parquet)
-# if _has_daal:
-#    _ext_mods.append(ext_daal_wrapper)
-if _has_ros:
-    _ext_mods.append(ext_ros)
+
 if _has_opencv:
     _ext_mods.append(ext_cv_wrapper)
-
-if _has_xenon:
-    _ext_mods.append(ext_xenon_wrapper)
-
-# Custom build commands
-#
-# These commands extends standart setuptools build procedure
-#
-sdc_build_commands = versioneer.get_cmdclass()
-sdc_build_commands['build_doc'] = build_doc
-sdc_build_commands['build_devdoc'] = build_devdoc
 
 
 class style(Command):
@@ -505,11 +363,19 @@ class style(Command):
             print("%s Style check passed" % self._result_marker)
 
 
+# Custom build commands
+#
+# These commands extend standard setuptools build procedure
+#
+sdc_build_commands = versioneer.get_cmdclass()
+sdc_build_commands['build_doc'] = SDCBuildDoc
 sdc_build_commands.update({'style': style})
+sdc_version = versioneer.get_version()
+sdc_release = 'Alpha ({})'.format(versioneer.get_version())
 
-setup(name='sdc',
-      version=versioneer.get_version(),
-      description='compiling Python code for clusters',
+setup(name=SDC_NAME_STR,
+      version=sdc_version,
+      description='Numba* extension for compiling Pandas* operations',
       long_description=readme(),
       classifiers=[
           "Development Status :: 2 - Pre-Alpha",
@@ -520,18 +386,17 @@ setup(name='sdc',
           "Topic :: Software Development :: Compilers",
           "Topic :: System :: Distributed Computing",
       ],
-      keywords='data analytics cluster',
+      keywords='data analytics distributed Pandas Numba',
       url='https://github.com/IntelPython/sdc',
-      author='Intel',
+      author='Intel Corporation',
       packages=find_packages(),
       package_data={'sdc.tests': ['*.bz2'], },
       install_requires=['numba'],
-      extras_require={'HDF5': ["h5py"], 'Parquet': ["pyarrow"]},
+      extras_require={'Parquet': ["pyarrow"], },
       cmdclass=sdc_build_commands,
       ext_modules=_ext_mods,
       entry_points={
           "numba_extensions": [
               "init = sdc:_init_extension",
-          ],
-      },
-)
+          ]},
+      )

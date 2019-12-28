@@ -33,27 +33,11 @@ import os
 from distutils import util as distutils_util
 
 try:
-    from .io import _hdf5
-    import h5py
-    # TODO: make sure h5py/hdf5 supports parallel
-except ImportError:
-    _has_h5py = False
-else:
-    _has_h5py = True
-
-try:
     import pyarrow
 except ImportError:
     _has_pyarrow = False
 else:
     _has_pyarrow = True
-
-try:
-    from . import ros_cpp
-except ImportError:
-    _has_ros = False
-else:
-    _has_ros = True
 
 try:
     from . import cv_wrapper
@@ -62,14 +46,6 @@ except ImportError:
 else:
     _has_opencv = True
     import sdc.cv_ext
-
-try:
-    from . import hxe_ext
-except ImportError:
-    _has_xenon = False
-else:
-    _has_xenon = True
-    import sdc.io.xenon_ext
 
 config_transport_mpi_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_MPI', 'True'))
 '''
@@ -82,12 +58,22 @@ Current value for transport controlled by decorator need to initialize this here
 because decorator called later then modules have been initialized
 '''
 
-config_pipeline_hpat_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_PIPELINE_SDC', 'True'))
+config_pipeline_hpat_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_PIPELINE_SDC', 'False'))
 '''
 Default value used to select compiler pipeline in a function decorator
 '''
 
+if not config_pipeline_hpat_default:
+    # avoid using MPI transport if no SDC compiler pipeline used
+    config_transport_mpi_default = False
+    config_transport_mpi = config_transport_mpi_default
+
 numba_compiler_define_nopython_pipeline_orig = None
 '''
 Default value for a pointer intended to use as Numba.DefaultPassBuilder.define_nopython_pipeline() in overloaded function
+'''
+
+test_expected_failure  = distutils_util.strtobool(os.getenv('SDC_TEST_EXPECTED_FAILURE', 'False'))
+'''
+If True then replaces skip decorators to expectedFailure decorator.
 '''

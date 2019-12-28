@@ -38,6 +38,7 @@ from numba import types, cgutils
 from numba.extending import (models, overload, register_model, make_attribute_wrapper, intrinsic)
 from numba.datamodel import (register_default, StructModel)
 from numba.typing.templates import signature
+from sdc.utils import sdc_overload
 
 
 class SeriesGroupByTypeIterator(types.SimpleIteratorType):
@@ -145,7 +146,7 @@ def _hpat_pandas_seriesgroupby_init(typingctx, data):
     return sig, _hpat_pandas_seriesgroupby_init_codegen
 
 
-@overload(pandas.core.groupby.SeriesGroupBy)
+@sdc_overload(pandas.core.groupby.SeriesGroupBy)
 def hpat_pandas_seriesgroupby(
         obj,
         keys=None,

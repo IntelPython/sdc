@@ -51,7 +51,7 @@ from numba.compiler_machinery import FunctionPass, register_pass
 import sdc
 from sdc import utils, config
 import sdc.io
-from sdc.io import pio, parquet_pio
+from sdc.io import parquet_pio
 from sdc.hiframes import filter, join, aggregate, sort
 from sdc.utils import (get_constant, NOT_CONSTANT, debug_prints,
                         inline_new_blocks, ReplaceFunc, is_call, is_assign, update_globals)
@@ -165,7 +165,6 @@ class HiFramesPassImpl(object):
 
         self.pq_handler = ParquetHandler(
             self.state.func_ir, self.state.typingctx, self.state.args, self.state.locals, self.reverse_copies)
-        self.h5_handler = pio.PIO(self.state.func_ir, self.state.locals, self.reverse_copies)
 
         # FIXME: see why this breaks test_kmeans
         # remove_dels(self.state.func_ir.blocks)
@@ -270,13 +269,6 @@ class HiFramesPassImpl(object):
             if rhs.op == 'call':
                 return self._run_call(assign, label)
 
-            # fix type for f['A'][:] dset reads
-            if config._has_h5py and rhs.op in ('getitem', 'static_getitem'):
-                h5_nodes = self.h5_handler.handle_possible_h5_read(
-                    assign, lhs, rhs)
-                if h5_nodes is not None:
-                    return h5_nodes
-
             # HACK: delete pd.DataFrame({}) nodes to avoid typing errors
             # TODO: remove when dictionaries are implemented and typing works
             if rhs.op == 'getattr':
@@ -322,6 +314,9 @@ class HiFramesPassImpl(object):
                 # TODO: add proper metadata to Numba types
                 # XXX: when constants are used, all the uses of the list object
                 # have to be checked since lists are mutable
+                # Tests:
+                # SDC_CONFIG_PIPELINE_SDC=0 python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_df_drop_inplace2
+                # SDC_CONFIG_PIPELINE_SDC=0 python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_df_drop1
                 try:
                     vals = tuple(find_const(self.state.func_ir, v) for v in rhs.items)
                     # a = ['A', 'B'] ->
@@ -429,9 +424,6 @@ class HiFramesPassImpl(object):
         if fdef == ('to_numeric', 'pandas'):
             return self._handle_pd_to_numeric(assign, lhs, rhs)
 
-        if fdef == ('read_ros_images', 'sdc.ros'):
-            return self._handle_ros(assign, lhs, rhs)
-
         if isinstance(func_mod, ir.Var) and self._is_df_var(func_mod):
             return self._run_call_df(
                 assign, lhs, rhs, func_mod, func_name, label)
@@ -451,18 +443,8 @@ class HiFramesPassImpl(object):
         if isinstance(func_mod, ir.Var) and self._is_df_obj_call(func_mod, 'rolling'):
             return self._handle_rolling(lhs, rhs, func_mod, func_name, label)
 
-        if config._has_h5py and fdef == ('File', 'h5py'):
-            return self.h5_handler._handle_h5_File_call(assign, lhs, rhs)
-
         if fdef == ('fromfile', 'numpy'):
             return sdc.io.np_io._handle_np_fromfile(assign, lhs, rhs)
-
-        if fdef == ('read_xenon', 'sdc.xenon_ext'):
-            col_items, nodes = sdc.xenon_ext._handle_read(assign, lhs, rhs, self.state.func_ir)
-            df_nodes, col_map = self._process_df_build_map(col_items)
-            self._create_df(lhs.name, col_map, label)
-            nodes += df_nodes
-            return nodes
 
         return [assign]
 
@@ -761,6 +743,35 @@ class HiFramesPassImpl(object):
         # # remove DataFrame call
         # return nodes
 
+    @staticmethod
+    def get_dtypes(df):
+        dtypes = []
+        for d in df.dtypes.values:
+            try:
+                numba_type = numba.typeof(d).dtype
+                array_type = types.Array(numba_type, 1, 'C')
+            except:
+                array_type = string_array_type
+            dtypes.append(array_type)
+        return dtypes
+
+    @staticmethod
+    def infer_column_names_and_types_from_constant_filename(fname_const, skiprows, col_names):
+        rows_to_read = 100  # TODO: tune this
+        df = pd.read_csv(fname_const, nrows=rows_to_read, skiprows=skiprows)
+        # TODO: string_array, categorical, etc.
+        dtypes = HiFramesPassImpl.get_dtypes(df)
+        cols = df.columns.to_list()
+        # overwrite column names like Pandas if explicitly provided
+        if col_names != 0:
+            cols[-len(col_names):] = col_names
+        else:
+            # a row is used for names if not provided
+            skiprows += 1
+        col_names = cols
+        dtype_map = {c: d for c, d in zip(col_names, dtypes)}
+        return skiprows, col_names, dtype_map
+
     def _handle_pd_read_csv(self, assign, lhs, rhs, label):
         """transform pd.read_csv(names=[A], dtype={'A': np.int32}) call
         """
@@ -796,20 +807,9 @@ class HiFramesPassImpl(object):
             if fname_const is None:
                 raise ValueError("pd.read_csv() requires explicit type"
                                  "annotation using 'dtype' if filename is not constant")
-            rows_to_read = 100  # TODO: tune this
-            df = pd.read_csv(fname_const, nrows=rows_to_read, skiprows=skiprows)
-            # TODO: string_array, categorical, etc.
-            dtypes = [types.Array(numba.typeof(d).dtype, 1, 'C')
-                      for d in df.dtypes.values]
-            cols = df.columns.to_list()
-            # overwrite column names like Pandas if explicitly provided
-            if col_names != 0:
-                cols[-len(col_names):] = col_names
-            else:
-                # a row is used for names if not provided
-                skiprows += 1
-            col_names = cols
-            dtype_map = {c: d for c, d in zip(col_names, dtypes)}
+            skiprows, col_names, dtype_map = \
+                self.infer_column_names_and_types_from_constant_filename(
+                    fname_const, skiprows, col_names)
         else:
             dtype_map = guard(get_definition, self.state.func_ir, dtype_var)
             if (not isinstance(dtype_map, ir.Expr)
@@ -869,15 +869,13 @@ class HiFramesPassImpl(object):
         nodes[-1].target = lhs
         return nodes
 
-    def _get_csv_col_info(self, dtype_map, date_cols, col_names, lhs):
+    @staticmethod
+    def _get_csv_col_info_core(dtype_map, date_cols, col_names):
         if isinstance(dtype_map, types.Type):
             typ = dtype_map
-            data_arrs = [ir.Var(lhs.scope, mk_unique_var(cname), lhs.loc)
-                         for cname in col_names]
-            return col_names, data_arrs, [typ] * len(col_names)
+            return col_names, [typ] * len(col_names)
 
         columns = []
-        data_arrs = []
         out_types = []
         for i, (col_name, typ) in enumerate(dtype_map.items()):
             columns.append(col_name)
@@ -885,11 +883,23 @@ class HiFramesPassImpl(object):
             if i in date_cols:
                 typ = types.Array(types.NPDatetime('ns'), 1, 'C')
             out_types.append(typ)
+        return columns, out_types
+
+    @staticmethod
+    def _get_csv_col_info(dtype_map, date_cols, col_names, lhs):
+        col_names, out_types = HiFramesPassImpl._get_csv_col_info_core(dtype_map, date_cols, col_names)
+
+        if isinstance(dtype_map, types.Type):
+            data_arrs = [ir.Var(lhs.scope, mk_unique_var(cname), lhs.loc)
+                         for cname in col_names]
+            return col_names, data_arrs, out_types
+
+        data_arrs = []
+        for i, (col_name, typ) in enumerate(dtype_map.items()):
             # output array variable
             data_arrs.append(
                 ir.Var(lhs.scope, mk_unique_var(col_name), lhs.loc))
-
-        return columns, data_arrs, out_types
+        return col_names, data_arrs, out_types
 
     def _get_const_dtype(self, dtype_var):
         dtype_def = guard(get_definition, self.state.func_ir, dtype_var)
@@ -1084,12 +1094,6 @@ class HiFramesPassImpl(object):
         def f(arr_list):  # pragma: no cover
             return sdc.hiframes.api.init_series(sdc.hiframes.api.concat(arr_list))
         return self._replace_func(f, rhs.args)
-
-    def _handle_ros(self, assign, lhs, rhs):
-        if len(rhs.args) != 1:  # pragma: no cover
-            raise ValueError("Invalid read_ros_images() arguments")
-        import sdc.ros
-        return sdc.ros._handle_read_images(lhs, rhs)
 
     def _fix_df_arrays(self, items_list):
         nodes = []
@@ -1938,3 +1942,6 @@ def simple_block_copy_propagate(block):
             for k in lhs_kill:
                 var_dict.pop(k, None)
     return
+
+
+from sdc.datatypes.hpat_pandas_functions import *

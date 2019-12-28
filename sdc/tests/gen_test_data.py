@@ -25,7 +25,6 @@
 # *****************************************************************************
 
 
-import h5py
 import numpy as np
 import pyarrow.parquet as pq
 import pyarrow as pa
@@ -85,29 +84,7 @@ def generate_spark_data():
     tar.close()
 
 
-def gen_lr(file_name, N, D):
-    points = np.random.random((N, D))
-    responses = np.random.random(N)
-    f = h5py.File(file_name, "w")
-    dset1 = f.create_dataset("points", (N, D), dtype='f8')
-    dset1[:] = points
-    dset2 = f.create_dataset("responses", (N,), dtype='f8')
-    dset2[:] = responses
-    f.close()
-
-
 def generate_other_data():
-    N = 101
-    D = 10
-    gen_lr("lr.hdf5", N, D)
-
-    arr = np.arange(N)
-    f = h5py.File("test_group_read.hdf5", "w")
-    g1 = f.create_group("G")
-    dset1 = g1.create_dataset("data", (N,), dtype='i8')
-    dset1[:] = arr
-    f.close()
-
     df = pd.DataFrame({'A': ['bc'] + ["a"] * 3 + ["bc"] * 3 + ['a'], 'B': [-8, 1, 2, 3, 1, 5, 6, 7]})
     df.to_parquet("groupby3.pq")
 
@@ -122,10 +99,10 @@ def generate_other_data():
     df.to_parquet("pivot2.pq")
 
     # CSV reader test
-    data = ("0,2.3,4.6,47736\n"
-            "1,2.3,4.6,47736\n"
-            "2,2.3,4.6,47736\n"
-            "4,2.3,4.6,47736\n")
+    data = ("0,2.3,4.6,A\n"
+            "1,2.3,4.6,B\n"
+            "2,2.3,4.6,\n"
+            "4,2.3,4.6,D\n")
 
     with open("csv_data1.csv", "w") as f:
         f.write(data)

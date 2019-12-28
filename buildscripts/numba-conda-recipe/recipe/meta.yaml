@@ -1,5 +1,6 @@
 {% set name = "numba" %}
 {% set version = "0.46.0" %}
+{% set LLVMLITE_VERSION = "0.31.0rc1 py*_0" %}
 
 package:
   name: {{ name|lower }}
@@ -7,7 +8,7 @@ package:
 
 source:
   git_url: https://github.com/numba/numba
-  git_tag: master
+  git_tag: 18fe9159849a0d512f1fb284d7cdc6bbf72ceab3
 
 build:
   number: 0
@@ -34,15 +35,16 @@ requirements:
     - python
     - numpy
     - setuptools
-    - llvmlite 0.30.*
+    - llvmlite {{ LLVMLITE_VERSION }}
     - funcsigs                 # [py27]
     - singledispatch           # [py27]
     - tbb-devel >=2018.0.5     # [not (win and py27)]
+    - llvm-openmp              # [osx]
+    - intel-openmp             # [osx]
   run:
     - python
     - {{ pin_compatible('numpy') }}
-    - {{ pin_compatible('llvmlite', max_pin='x.x') }}
-    - llvmlite >=0.30.0
+    - llvmlite {{ LLVMLITE_VERSION }}
     - funcsigs                 # [py27]
     - singledispatch           # [py27]
   run_constrained:

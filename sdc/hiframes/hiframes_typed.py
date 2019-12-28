@@ -65,10 +65,10 @@ from sdc.hiframes.pd_index_ext import DatetimeIndexType
 from sdc.hiframes.rolling import get_rolling_setup_args
 from sdc.hiframes.aggregate import Aggregate
 from sdc.hiframes.series_kernels import series_replace_funcs
-from sdc.hiframes.split_impl import (string_array_split_view_type,
-                                      StringArraySplitViewType, getitem_c_arr, get_array_ctypes_ptr,
-                                      get_split_view_index, get_split_view_data_ptr)
-from sdc.io.pio_api import h5dataset_type
+from sdc.hiframes.split_impl import (SplitViewStringMethodsType,
+                                     string_array_split_view_type, StringArraySplitViewType,
+                                     getitem_c_arr, get_array_ctypes_ptr,
+                                     get_split_view_index, get_split_view_data_ptr)
 
 
 _dt_index_binops = ('==', '!=', '>=', '>', '<=', '<', '-',
@@ -304,9 +304,6 @@ class HiFramesTypedPassImpl(object):
                 and isinstance(self.state.typemap[inst.value.name], SeriesType)):
             inst.value = self._get_series_data(inst.value, nodes)
 
-        if target_typ == h5dataset_type:
-            return self._handle_h5_write(inst.target, inst.index, inst.value)
-
         if isinstance(target_typ, SeriesIatType):
             val_def = guard(get_definition, self.state.func_ir, inst.target)
             assert (isinstance(val_def, ir.Expr) and val_def.op == 'getattr'
@@ -484,7 +481,8 @@ class HiFramesTypedPassImpl(object):
         else:
             func_name, func_mod = fdef
 
-        if (isinstance(func_mod, ir.Var) and isinstance(self.state.typemap[func_mod.name], StringMethodsType)):
+        string_methods_types = (SplitViewStringMethodsType, StringMethodsType)
+        if isinstance(func_mod, ir.Var) and isinstance(self.state.typemap[func_mod.name], string_methods_types):
             f_def = guard(get_definition, self.state.func_ir, rhs.func)
             str_def = guard(get_definition, self.state.func_ir, f_def.value)
             if str_def is None:  # TODO: check for errors
@@ -509,41 +507,6 @@ class HiFramesTypedPassImpl(object):
             return self._replace_func(
                 lambda d: numba.targets.builtins.get_type_max_value(
                     d), rhs.args)
-
-        if fdef == ('h5_read_dummy', 'sdc.io.pio_api'):
-            ndim = guard(find_const, self.state.func_ir, rhs.args[1])
-            dtype_str = guard(find_const, self.state.func_ir, rhs.args[2])
-            index_var = rhs.args[3]
-            filter_read = False
-
-            func_text = "def _h5_read_impl(dset_id, ndim, dtype_str, index):\n"
-            if guard(is_whole_slice, self.state.typemap, self.state.func_ir, index_var):
-                func_text += "  size_0 = sdc.io.pio_api.h5size(dset_id, np.int32(0))\n"
-            else:
-                # TODO: check index format for this case
-                filter_read = True
-                assert isinstance(self.state.typemap[index_var.name], types.BaseTuple)
-                func_text += "  read_indices = sdc.io.pio_api.get_filter_read_indices(index[0])\n"
-                func_text += "  size_0 = len(read_indices)\n"
-            for i in range(1, ndim):
-                func_text += "  size_{} = sdc.io.pio_api.h5size(dset_id, np.int32({}))\n".format(i, i)
-            func_text += "  arr_shape = ({},)\n".format(
-                ", ".join(["size_{}".format(i) for i in range(ndim)]))
-            func_text += "  zero_tup = ({},)\n".format(", ".join(["0"] * ndim))
-            func_text += "  A = np.empty(arr_shape, np.{})\n".format(
-                dtype_str)
-            if filter_read:
-                func_text += "  err = sdc.io.pio_api.h5read_filter(dset_id, np.int32({}),\n".format(ndim)
-                func_text += "                                      zero_tup, arr_shape, 0, A, read_indices)\n"
-            else:
-                func_text += "  err = sdc.io.pio_api.h5read(dset_id, np.int32({}),\n".format(ndim)
-                func_text += "                               zero_tup, arr_shape, 0, A)\n"
-            func_text += "  return A\n"
-
-            loc_vars = {}
-            exec(func_text, {'sdc': sdc, 'np': np}, loc_vars)
-            _h5_read_impl = loc_vars['_h5_read_impl']
-            return self._replace_func(_h5_read_impl, rhs.args)
 
         if fdef == ('DatetimeIndex', 'pandas'):
             return self._run_pd_DatetimeIndex(assign, assign.target, rhs)
@@ -938,15 +901,15 @@ class HiFramesTypedPassImpl(object):
         if func_name == 'dropna':
             return self._run_call_series_dropna(assign, lhs, rhs, series_var)
 
-        if func_name == 'rename':
-            nodes = []
-            data = self._get_series_data(series_var, nodes)
-            index = self._get_series_index(series_var, nodes)
-            name = rhs.args[0]
-            return self._replace_func(
-                lambda data, index, name: sdc.hiframes.api.init_series(
-                    data, index, name),
-                [data, index, name], pre_nodes=nodes)
+        # if func_name == 'rename':
+        #     nodes = []
+        #     data = self._get_series_data(series_var, nodes)
+        #     index = self._get_series_index(series_var, nodes)
+        #     name = rhs.args[0]
+        #     return self._replace_func(
+        #         lambda data, index, name: sdc.hiframes.api.init_series(
+        #             data, index, name),
+        #         [data, index, name], pre_nodes=nodes)
 
         if func_name == 'pct_change':
             nodes = []
@@ -1041,28 +1004,28 @@ class HiFramesTypedPassImpl(object):
         #     return self._replace_func(
         #         lambda S: S.isna() == False, [series_var])
 
-        # if func_name == 'value_counts':
-        #     nodes = []
-        #     data = self._get_series_data(series_var, nodes)
-        #     # reusing aggregate/count
-        #     # TODO: write optimized implementation
-        #     # data of input becomes both key and data for aggregate input
-        #     # data of output is the counts
-        #     out_key_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_index'), lhs.loc)
-        #     self.state.typemap[out_key_var.name] = self.state.typemap[data.name]
-        #     out_data_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
-        #     self.state.typemap[out_data_var.name] = self.state.typemap[lhs.name].data
-        #     agg_func = series_replace_funcs['count']
-        #     agg_node = hiframes.aggregate.Aggregate(
-        #         lhs.name, 'series', ['series'], [out_key_var], {
-        #             'data': out_data_var}, {
-        #             'data': data}, [data], agg_func, None, lhs.loc)
-        #     nodes.append(agg_node)
-        #     # TODO: handle args like sort=False
-        #
-        #     def func(A, B):
-        #         return sdc.hiframes.api.init_series(A, B).sort_values(ascending=False)
-        #     return self._replace_func(func, [out_data_var, out_key_var], pre_nodes=nodes)
+        if func_name == 'value_counts':
+            nodes = []
+            data = self._get_series_data(series_var, nodes)
+            # reusing aggregate/count
+            # TODO: write optimized implementation
+            # data of input becomes both key and data for aggregate input
+            # data of output is the counts
+            out_key_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_index'), lhs.loc)
+            self.state.typemap[out_key_var.name] = self.state.typemap[data.name]
+            out_data_var = ir.Var(lhs.scope, mk_unique_var(lhs.name + '_data'), lhs.loc)
+            self.state.typemap[out_data_var.name] = self.state.typemap[lhs.name].data
+            agg_func = series_replace_funcs['count']
+            agg_node = hiframes.aggregate.Aggregate(
+                lhs.name, 'series', ['series'], [out_key_var], {
+                    'data': out_data_var}, {
+                    'data': data}, [data], agg_func, None, lhs.loc)
+            nodes.append(agg_node)
+            # TODO: handle args like sort=False
+
+            def func(A, B):
+                return sdc.hiframes.api.init_series(A, B).sort_values(ascending=False)
+            return self._replace_func(func, [out_data_var, out_key_var], pre_nodes=nodes)
 
         # astype with string output
         # if func_name == 'astype' and is_str_series_typ(self.state.typemap[lhs.name]):
@@ -1251,10 +1214,7 @@ class HiFramesTypedPassImpl(object):
         # error checking: make sure there is function input only
         if len(rhs.args) != 1:
             raise ValueError("map expects 1 argument")
-        func = guard(get_definition, self.state.func_ir, rhs.args[0])
-        if func is None or not (isinstance(func, ir.Expr)
-                                and func.op == 'make_function'):
-            raise ValueError("lambda for map not found")
+        func = guard(get_definition, self.state.func_ir, rhs.args[0]).value.py_func
 
         dtype = self.state.typemap[series_var.name].dtype
         nodes = []
@@ -1421,11 +1381,7 @@ class HiFramesTypedPassImpl(object):
             raise ValueError("not enough arguments in call to combine")
         if len(rhs.args) > 3:
             raise ValueError("too many arguments in call to combine")
-        func = guard(get_definition, self.state.func_ir, rhs.args[1])
-        if func is None or not (isinstance(func, ir.Expr)
-                                and func.op == 'make_function'):
-            raise ValueError("lambda for combine not found")
-
+        func = guard(get_definition, self.state.func_ir, rhs.args[1]).value.py_func
         out_typ = self.state.typemap[lhs.name].dtype
         other = rhs.args[0]
         nodes = []
@@ -1572,19 +1528,16 @@ class HiFramesTypedPassImpl(object):
     def _handle_rolling_apply_func(self, func_node, dtype, out_dtype):
         if func_node is None:
             raise ValueError("cannot find kernel function for rolling.apply() call")
+        func_node = func_node.value.py_func
         # TODO: more error checking on the kernel to make sure it doesn't
         # use global/closure variables
-        if func_node.closure is not None:
-            raise ValueError("rolling apply kernel functions cannot have closure variables")
-        if func_node.defaults is not None:
-            raise ValueError("rolling apply kernel functions cannot have default arguments")
         # create a function from the code object
         glbs = self.state.func_ir.func_id.func.__globals__
         lcs = {}
         exec("def f(A): return A", glbs, lcs)
         kernel_func = lcs['f']
-        kernel_func.__code__ = func_node.code
-        kernel_func.__name__ = func_node.code.co_name
+        kernel_func.__code__ = func_node.__code__
+        kernel_func.__name__ = func_node.__code__.co_name
         # use hpat's sequential pipeline to enable pandas operations
         # XXX seq pipeline used since dist pass causes a hang
         m = numba.ir_utils._max_label
@@ -2192,34 +2145,6 @@ class HiFramesTypedPassImpl(object):
         return self._replace_func(
             lambda arr_list: sdc.hiframes.api.init_series(sdc.hiframes.api.concat(arr_list)),
             [arr_tup], pre_nodes=nodes)
-
-    def _handle_h5_write(self, dset, index, arr):
-        if index != slice(None):
-            raise ValueError("Only HDF5 write of full array supported")
-        assert isinstance(self.state.typemap[arr.name], types.Array)
-        ndim = self.state.typemap[arr.name].ndim
-
-        func_text = "def _h5_write_impl(dset_id, arr):\n"
-        func_text += "  zero_tup = ({},)\n".format(", ".join(["0"] * ndim))
-        # TODO: remove after support arr.shape in parallel
-        func_text += "  arr_shape = ({},)\n".format(", ".join(["arr.shape[{}]".format(i) for i in range(ndim)]))
-        func_text += "  err = sdc.io.pio_api.h5write(dset_id, np.int32({}),\n".format(ndim)
-        func_text += "                                zero_tup, arr_shape, 0, arr)\n"
-
-        loc_vars = {}
-        exec(func_text, {'sdc': sdc, 'np': np}, loc_vars)
-        _h5_write_impl = loc_vars['_h5_write_impl']
-        f_block = compile_to_numba_ir(_h5_write_impl,
-                                      {'np': np,
-                                       'sdc': sdc},
-                                      self.state.typingctx,
-                                      (self.state.typemap[dset.name],
-                                       self.state.typemap[arr.name]),
-                                      self.state.typemap,
-                                      self.state.calltypes).blocks.popitem()[1]
-        replace_arg_nodes(f_block, [dset, arr])
-        nodes = f_block.body[:-3]  # remove none return
-        return nodes
 
     def _handle_sorted_by_key(self, rhs):
         """generate a sort function with the given key lambda

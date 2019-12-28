@@ -53,28 +53,6 @@ _file_write_parallel = types.ExternalFunction(
         types.intp,
         types.intp))
 
-# @overload(np.fromfile)
-# def fromfile_overload(fname, dtype):
-#     if fname != string_type:
-#         raise("np.fromfile() invalid filename type")
-#     if dtype is not None and not isinstance(dtype, types.DTypeSpec):
-#         raise("np.fromfile() invalid dtype")
-#
-#     # FIXME: import here since hio has hdf5 which might not be available
-#     from .. import hio
-#     import llvmlite.binding as ll
-#     ll.add_symbol('get_file_size', hio.get_file_size)
-#     ll.add_symbol('file_read', hio.file_read)
-#
-#     def fromfile_impl(fname, dtype):
-#         size = get_file_size(fname)
-#         dtype_size = get_dtype_size(dtype)
-#         A = np.empty(size//dtype_size, dtype=dtype)
-#         file_read(fname, A.ctypes, size)
-#         return A
-#
-#     return fromfile_impl
-
 
 def _handle_np_fromfile(assign, lhs, rhs):
     """translate np.fromfile() to native
@@ -127,7 +105,7 @@ def get_dtype_size(typingctx, dtype=None):
 
 
 @overload_method(types.Array, 'tofile')
-def tofile_overload(arr_ty, fname_ty):
+def tofile_overload(arr, fname):
     # FIXME: import here since hio has hdf5 which might not be available
     from .. import hio
     if sdc.config.config_transport_mpi:
@@ -139,7 +117,7 @@ def tofile_overload(arr_ty, fname_ty):
     ll.add_symbol('file_write', hio.file_write)
     ll.add_symbol('file_write_parallel', transport.file_write_parallel)
     # TODO: fix Numba to convert literal
-    if fname_ty == string_type or isinstance(fname_ty, types.StringLiteral):
+    if fname == string_type or isinstance(fname, types.StringLiteral):
         def tofile_impl(arr, fname):
             A = np.ascontiguousarray(arr)
             dtype_size = get_dtype_size(A.dtype)

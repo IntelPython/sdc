@@ -26,13 +26,16 @@
 
 
 import operator
-import numpy as np
+import numpy
+import pandas
 import numba
 import sdc
 from numba import types
 from numba.typing.templates import (infer_global, AbstractTemplate, infer,
                                     signature, AttributeTemplate, infer_getattr, bound_function)
 import numba.typing.typeof
+from numba.datamodel import StructModel
+from numba.errors import TypingError
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
                              make_attribute_wrapper, lower_builtin, box, unbox,
                              lower_getattr, intrinsic, overload_method, overload, overload_attribute)
@@ -43,7 +46,6 @@ from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
 from sdc.str_arr_ext import (string_array_type, get_data_ptr,
                               is_str_arr_typ, pre_alloc_string_array, _memcpy)
 
-import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 from llvmlite.llvmpy.core import Type as LLType
@@ -131,6 +133,43 @@ make_attribute_wrapper(StringArraySplitViewType, 'num_items', '_num_items')
 make_attribute_wrapper(StringArraySplitViewType, 'index_offsets', '_index_offsets')
 make_attribute_wrapper(StringArraySplitViewType, 'data_offsets', '_data_offsets')
 make_attribute_wrapper(StringArraySplitViewType, 'data', '_data')
+
+
+class SplitViewStringMethodsType(types.IterableType):
+    """
+    Type definition for pandas.core.strings.StringMethods functions handling.
+
+    Members
+    ----------
+    _data: :class:`SeriesType`
+        input arg
+    """
+
+    def __init__(self, data):
+        self.data = data
+        name = 'SplitViewStringMethodsType({})'.format(self.data)
+        super(SplitViewStringMethodsType, self).__init__(name)
+
+    @property
+    def iterator_type(self):
+        return None
+
+
+@register_model(SplitViewStringMethodsType)
+class SplitViewStringMethodsTypeModel(StructModel):
+    """
+    Model for SplitViewStringMethodsType type
+    All members must be the same as main type for this model
+    """
+
+    def __init__(self, dmm, fe_type):
+        members = [
+            ('data', fe_type.data)
+        ]
+        models.StructModel.__init__(self, dmm, fe_type, members)
+
+
+make_attribute_wrapper(SplitViewStringMethodsType, 'data', '_data')
 
 
 def construct_str_arr_split_view(context, builder):
@@ -404,6 +443,44 @@ def get_split_view_data_ptr(arr, data_start):
 def str_arr_split_view_len_overload(arr):
     if arr == string_array_split_view_type:
         return lambda arr: arr._num_items
+
+
+@overload_method(SplitViewStringMethodsType, 'len')
+def hpat_pandas_spliview_stringmethods_len(self):
+    """
+    Pandas Series method :meth:`pandas.core.strings.StringMethods.len()` implementation.
+
+    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests sdc.tests.test_hiframes.TestHiFrames.test_str_split_filter
+
+    Parameters
+    ----------
+    self: :class:`pandas.core.strings.StringMethods`
+        input arg
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+         returns :obj:`pandas.Series` object
+    """
+
+    if not isinstance(self, SplitViewStringMethodsType):
+        msg = 'Method len(). The object must be a pandas.core.strings. Given: {}'
+        raise TypingError(msg.format(self))
+
+    def hpat_pandas_spliview_stringmethods_len_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.int64)
+        local_data = self._data._data
+        for i in range(len(local_data)):
+            result[i] = len(local_data[i])
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_spliview_stringmethods_len_impl
 
 
 # @infer_global(operator.getitem)

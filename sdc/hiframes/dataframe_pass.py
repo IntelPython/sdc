@@ -26,7 +26,7 @@
 
 
 import operator
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 import numpy as np
 import pandas as pd
 import warnings
@@ -40,23 +40,16 @@ from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             build_definitions, find_build_sequence,
                             GuardException, compute_cfg_from_blocks)
 from numba.inline_closurecall import inline_closure_call
-from numba.typing.templates import Signature, bound_function, signature
-from numba.typing.arraydecl import ArrayAttribute
-from numba.extending import overload
-from numba.typing.templates import infer_global, AbstractTemplate, signature
 from numba.compiler_machinery import FunctionPass, register_pass
 import sdc
 from sdc import hiframes
 from sdc.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
                         is_whole_slice, is_array, is_assign, sanitize_varname, update_globals)
-from sdc.str_ext import string_type
 from sdc.str_arr_ext import (string_array_type, StringArrayType,
                               is_str_arr_typ, pre_alloc_string_array)
-from sdc.io.pio_api import h5dataset_type
-from sdc.hiframes.rolling import get_rolling_setup_args
 from sdc.hiframes.pd_dataframe_ext import (DataFrameType, DataFrameLocType,
                                             DataFrameILocType, DataFrameIatType)
-from sdc.hiframes.pd_series_ext import SeriesType, is_series_type
+from sdc.hiframes.pd_series_ext import SeriesType
 import sdc.hiframes.pd_groupby_ext
 from sdc.hiframes.pd_groupby_ext import DataFrameGroupByType
 import sdc.hiframes.pd_rolling_ext
@@ -83,6 +76,18 @@ class DataFramePassImpl(object):
         self.state = state
 
     def run_pass(self):
+        """
+        The function could return exxeption. It means that the IR transformation can not be completed.
+        This is acceptable behaviour.
+        """
+
+        try:
+            self.run_pass_throw()
+            return True
+        except ValueError:
+            return False
+
+    def run_pass_throw(self):
         blocks = self.state.func_ir.blocks
         # topo_order necessary so DataFrame data replacement optimization can
         # be performed in one pass
@@ -116,8 +121,7 @@ class DataFramePassImpl(object):
                         # TODO: add this to dead_branch_prune pass
                         for inst in self.state.func_ir.blocks[dead_label].body:
                             if is_assign(inst):
-                                self.state.func_ir._definitions[inst.target.name].remove(
-                                    inst.value)
+                                self.state.func_ir._definitions[inst.target.name].remove(inst.value)
 
                         del self.state.func_ir.blocks[dead_label]
                     else:
@@ -131,9 +135,7 @@ class DataFramePassImpl(object):
                         used_vars = set()
                         new_body = []
                         for inst in reversed(block.body):
-                            if (is_assign(inst)
-                                    and inst.target.name not in used_vars
-                                    and inst.target.name in jmp_defs):
+                            if (is_assign(inst) and inst.target.name not in used_vars and inst.target.name in jmp_defs):
                                 self.state.func_ir._definitions[inst.target.name].remove(inst.value)
                                 continue
                             used_vars.update(v.name for v in inst.list_vars())
@@ -147,7 +149,8 @@ class DataFramePassImpl(object):
                 out_nodes = [inst]
 
                 if isinstance(inst, ir.Assign):
-                    self.state.func_ir._definitions[inst.target.name].remove(inst.value)
+                    if inst.value in self.state.func_ir._definitions[inst.target.name]:
+                        self.state.func_ir._definitions[inst.target.name].remove(inst.value)
                     out_nodes = self._run_assign(inst)
                 elif isinstance(inst, (ir.SetItem, ir.StaticSetItem)):
                     out_nodes = self._run_setitem(inst)

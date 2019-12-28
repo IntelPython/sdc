@@ -34,18 +34,17 @@ import numba
 from numba import ir_utils, ir, types, cgutils
 from numba.ir_utils import (guard, get_definition, find_callname, require,
                             add_offset_to_labels, find_topo_order, find_const)
-from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
 from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.targets.imputils import lower_builtin
 from numba.extending import overload, intrinsic, lower_cast
-import collections
 import numpy as np
 import sdc
 from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import string_array_type, num_total_chars, pre_alloc_string_array
 from enum import Enum
 import types as pytypes
+from numba.extending import overload, overload_method, overload_attribute
 
 
 # int values for types to pass to C code
@@ -564,3 +563,15 @@ def debug_prints():
 def update_globals(func, glbls):
     if isinstance(func, pytypes.FunctionType):
         func.__globals__.update(glbls)
+
+
+def sdc_overload(func, jit_options={}, strict=True, inline='never'):
+    return overload(func, jit_options=jit_options, strict=strict, inline=inline)
+
+
+def sdc_overload_method(typ, name, jit_options={}, strict=True, inline='never'):
+    return overload_method(typ, name, jit_options=jit_options, strict=strict, inline=inline)
+
+
+def sdc_overload_attribute(typ, name, jit_options={}, strict=True, inline='never'):
+    return overload_attribute(typ, name, jit_options=jit_options, strict=strict, inline=inline)

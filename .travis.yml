@@ -2,26 +2,31 @@
 
 dist: trusty
 
+branches:
+  only:
+  - master
+
 env:
     global:
         - GIT_DESCRIBE_TAG=0.29.2
         - GIT_DESCRIBE_NUMBER=1
         - PYTHON_VER=3.7
-        - NUMPY_VER=1.16
+        - NUMPY_VER=1.17
         - CONDA_PREFIX_PATH=$HOME/miniconda3
     matrix:
-        - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_NP_MPI=1
-        - BUILD_MODE=develop TEST_MODE=develop RUN_COVERAGE=True
+        - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_CONFIG_PIPELINE_SDC=True
+        - BUILD_MODE=package TEST_MODE=conda RUN_COVERAGE=False SDC_CONFIG_PIPELINE_SDC=True SDC_NP_MPI=1
+        - BUILD_MODE=develop TEST_MODE=develop RUN_COVERAGE=True SDC_CONFIG_PIPELINE_SDC=True
 
 before_install:
     - chmod 777 buildscripts/install_conda.sh
     - buildscripts/install_conda.sh $CONDA_PREFIX_PATH
 
 install:
-    - travis_wait 40 $CONDA_PREFIX_PATH/bin/python buildscripts/build.py --build-mode=$BUILD_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH
+    - travis_wait 40 $CONDA_PREFIX_PATH/bin/python buildscripts/build.py --build-mode=$BUILD_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --use-numba-master --skip-smoke-tests --conda-prefix=$CONDA_PREFIX_PATH
 
 script:
-    - $CONDA_PREFIX_PATH/bin/python buildscripts/test.py --test-mode=$TEST_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$CONDA_PREFIX_PATH --run-coverage=$RUN_COVERAGE
+    - $CONDA_PREFIX_PATH/bin/python buildscripts/test.py --test-mode=$TEST_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --use-numba-master --conda-prefix=$CONDA_PREFIX_PATH --run-coverage=$RUN_COVERAGE
 
 after_success: skip
 

@@ -35,13 +35,10 @@ from numba.extending import (typeof_impl, unbox, register_model, models,
                              NativeValue, box, intrinsic)
 from numba import numpy_support, types, cgutils
 from numba.typing import signature
-from numba.typing.templates import infer_global, AbstractTemplate, CallableTemplate
 from numba.targets.boxing import box_array, unbox_array, box_list
-from numba.targets.imputils import lower_builtin
 from numba.targets.boxing import _NumbaTypeHelper
 from numba.targets import listobj
 
-import sdc
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.hiframes.pd_timestamp_ext import (datetime_date_type,
                                             unbox_datetime_date_array, box_datetime_date_array)
@@ -257,7 +254,7 @@ def box_dataframe(typ, val, c):
 
     # set df.index if necessary
     if typ.index != types.none:
-        arr_obj = box_array(typ.index, dataframe.index, c)
+        arr_obj = _box_series_data(typ.index.dtype, typ.index, dataframe.index, c)
         pyapi.object_setattr_string(df_obj, 'index', arr_obj)
 
     pyapi.decref(class_obj)
