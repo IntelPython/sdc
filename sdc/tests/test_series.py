@@ -234,8 +234,13 @@ def isspace_usecase(series):
     return series.str.isspace()
 
 
+def isalpha_usecase(series):
+    return series.str.isalpha()
+
+
 def islower_usecase(series):
     return series.str.islower()
+
 
 
 GLOBAL_VAL = 2
@@ -5511,6 +5516,18 @@ class TestSeries(TestCase):
         for ser in series:
             S = pd.Series(ser)
             pd.testing.assert_series_equal(cfunc(S), isspace_usecase(S))
+
+    @skip_sdc_jit("Series.str.isalpha is not supported yet")
+    def test_series_isalpha_str(self):
+        series = [['leopard', 'Golden Eagle', 'SNAKE', ''],
+                  ['Hello world!', 'hello 123', 'mynameisPeter'],
+                  ['one', 'one1', '1', '']
+                  ]
+
+        cfunc = self.jit(isalpha_usecase)
+        for ser in series:
+            S = pd.Series(ser)
+            pd.testing.assert_series_equal(cfunc(S), isalpha_usecase(S))
 
     @skip_sdc_jit("Series.str.islower is not supported yet")
     def test_series_islower_str(self):
