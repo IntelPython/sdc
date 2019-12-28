@@ -997,9 +997,11 @@ def hpat_pandas_stringmethods_isspace(self):
         Intel Scalable Dataframe Compiler User Guide
         ********************************************
         Pandas API: pandas.Series.str.isspace
+
         Limitations
         -----------
         Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
         Examples
         --------
         .. literalinclude:: ../../../examples/series/str/series_str_isspace.py
@@ -1007,8 +1009,10 @@ def hpat_pandas_stringmethods_isspace(self):
            :lines: 27-
            :caption: Check if all the characters in the text are whitespaces
            :name: ex_series_str_isspace
+
         .. command-output:: python ./series/str/series_str_isspace.py
             :cwd: ../../../examples
+
         .. seealso::
             :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
                 Check whether all characters are alphabetic.
@@ -1028,16 +1032,23 @@ def hpat_pandas_stringmethods_isspace(self):
                 Check whether all characters are uppercase.
             :ref:`Series.str.istitle <pandas.Series.str.istitle>`
                 Check whether all characters are titlecase.
+
         Intel Scalable Dataframe Compiler Developer Guide
         *************************************************
+
         Pandas Series method :meth:`pandas.core.strings.StringMethods.isspace()` implementation.
+
         Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
         .. only:: developer
+
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isspace_str
+
         Parameters
         ----------
         self: :class:`pandas.core.strings.StringMethods`
             input arg
+
         Returns
         -------
         :obj:`pandas.Series`
@@ -1058,15 +1069,17 @@ def hpat_pandas_stringmethods_isspace(self):
     return hpat_pandas_stringmethods_isspace_impl
 
 
-	@overload_method(StringMethodsType, 'isalpha')
+@overload_method(StringMethodsType, 'isalpha')
 def hpat_pandas_stringmethods_isalpha(self):
     """
         Intel Scalable Dataframe Compiler User Guide
         ********************************************
         Pandas API: pandas.Series.str.isalpha
+
         Limitations
         -----------
         Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
         Examples
         --------
         .. literalinclude:: ../../../examples/series/str/series_str_isalpha.py
@@ -1074,8 +1087,10 @@ def hpat_pandas_stringmethods_isalpha(self):
            :lines: 27-
            :caption: Check whether all characters in each string are alphabetic.
            :name: ex_series_str_isalpha
+
         .. command-output:: python ./series/str/series_str_isalpha.py
             :cwd: ../../../examples
+
         .. seealso::
             :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
                 Check whether all characters are alphabetic.
@@ -1095,16 +1110,23 @@ def hpat_pandas_stringmethods_isalpha(self):
                 Check whether all characters are uppercase.
             :ref:`Series.str.istitle <pandas.Series.str.istitle>`
                 Check whether all characters are titlecase.
+
         Intel Scalable Dataframe Compiler Developer Guide
         *************************************************
+
         Pandas Series method :meth:`pandas.core.strings.StringMethods.isalpha()` implementation.
+
         Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
         .. only:: developer
+
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isalpha_str
+
         Parameters
         ----------
         self: :class:`pandas.core.strings.StringMethods`
             input arg
+
         Returns
         -------
         :obj:`pandas.Series`
