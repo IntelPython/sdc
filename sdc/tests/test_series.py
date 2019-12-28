@@ -230,6 +230,10 @@ def istitle_usecase(series):
     return series.str.istitle()
 
 
+def isspace_usecase(series):
+    return series.str.isspace()
+
+
 def islower_usecase(series):
     return series.str.islower()
 
@@ -5495,6 +5499,18 @@ class TestSeries(TestCase):
 
         cfunc = self.jit(istitle_usecase)
         pd.testing.assert_series_equal(cfunc(series), istitle_usecase(series))
+
+    @skip_sdc_jit("Series.str.isspace is not supported yet")
+    def test_series_isspace_str(self):
+        series = [['', '  ', '    ', '           '],
+                  ['', ' c ', '  b ', '     a     '],
+                  ['aaaaaa', 'bb', 'c', '  d']
+                  ]
+
+        cfunc = self.jit(isspace_usecase)
+        for ser in series:
+            S = pd.Series(ser)
+            pd.testing.assert_series_equal(cfunc(S), isspace_usecase(S))
 
     @skip_sdc_jit("Series.str.islower is not supported yet")
     def test_series_islower_str(self):
