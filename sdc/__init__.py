@@ -68,6 +68,7 @@ if not sdc.config.config_pipeline_hpat_default:
 else:
     import sdc.compiler
 
+import sdc.datatypes.hpat_pandas_series_functions
 
 def _init_extension():
     '''Register Pandas classes and functions with Numba.

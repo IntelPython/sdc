@@ -1070,5 +1070,3 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
         return sdc.hiframes.api.init_series(sdc.hiframes.api.fix_df_array(data), fix_index, name)
 
     return hpat_pandas_series_ctor_impl
-
-from sdc.datatypes.hpat_pandas_series_functions import *
