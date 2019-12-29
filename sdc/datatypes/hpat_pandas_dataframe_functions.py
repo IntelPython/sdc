@@ -91,7 +91,7 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
     df_func_name = f'_df_{func_name}_impl'
 
     func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, s_par, df.columns)
-
+    print(func_text)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
@@ -107,7 +107,7 @@ def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, 
         ty_checker.raise_exc(axis, 'unsupported', 'axis')
 
     if not (isinstance(skipna, (types.Omitted, types.NoneType, types.Boolean)) or skipna is None):
-            ty_checker.raise_exc(skipna, 'bool', 'skipna')
+        ty_checker.raise_exc(skipna, 'bool', 'skipna')
 
     if not (isinstance(level, types.Omitted) or level is None):
         ty_checker.raise_exc(level, 'unsupported', 'level')
@@ -155,9 +155,10 @@ def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-    params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only)]
+    params = {'axis': None, 'skipna': None, 'level': None, 'numeric_only': None}
+    ser_par = {'skipna': None, 'level': None}
 
-    return sdc_pandas_dataframe_reduce_columns(df, name, params)
+    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
 @overload_method(DataFrameType, 'mean')
@@ -193,9 +194,10 @@ def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-    params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only)]
+    params = {'axis': None, 'skipna': None, 'level': None, 'numeric_only': None}
+    ser_par = {'skipna': 'skipna', 'level': 'level'}
 
-    return sdc_pandas_dataframe_reduce_columns(df, name, params)
+    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
 @overload_method(DataFrameType, 'std')
@@ -233,9 +235,10 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
     check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, ddof=ddof)
 
-    params = [('axis', None), ('skipna', skipna), ('level', None), ('ddof', ddof), ('numeric_only', numeric_only)]
+    params = {'axis': None, 'skipna': None, 'level': None, 'ddof': 1, 'numeric_only': None}
+    ser_par = {'skipna': 'skipna', 'level': 'level', 'ddof': 'ddof'}
 
-    return sdc_pandas_dataframe_reduce_columns(df, name, params)
+    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
 @overload_method(DataFrameType, 'var')
@@ -273,9 +276,10 @@ def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
     check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, ddof=ddof)
 
-    params = [('axis', None), ('skipna', skipna), ('level', None), ('ddof', ddof), ('numeric_only', numeric_only)]
+    params = {'axis': None, 'skipna': None, 'level': None, 'ddof': 1, 'numeric_only': None}
+    ser_par = {'skipna': 'skipna', 'level': 'level', 'ddof': 'ddof'}
 
-    return sdc_pandas_dataframe_reduce_columns(df, name, params)
+    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
 @overload_method(DataFrameType, 'max')
@@ -311,9 +315,10 @@ def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-    params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only)]
+    params = {'axis': None, 'skipna': None, 'level': None, 'numeric_only': None}
+    ser_par = {'skipna': 'skipna', 'level': 'level'}
 
-    return sdc_pandas_dataframe_reduce_columns(df, name, params)
+    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
 @overload_method(DataFrameType, 'min')
@@ -349,9 +354,10 @@ def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
-    params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only)]
+    params = {'axis': None, 'skipna': None, 'level': None, 'numeric_only': None}
+    ser_par = {'skipna': 'skipna', 'level': 'level'}
 
-    return sdc_pandas_dataframe_reduce_columns(df, name, params)
+    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
 @overload_method(DataFrameType, 'sum')
@@ -389,10 +395,10 @@ def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_
 
     check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
 
-    params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only),
-              ('min_count', min_count)]
+    params = {'axis': None, 'skipna': None, 'level': None, 'numeric_only': None, 'min_count': 0}
+    ser_par = {'skipna': 'skipna', 'level': 'level', 'min_count': 'min_count'}
 
-    return sdc_pandas_dataframe_reduce_columns(df, name, params)
+    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
 @overload_method(DataFrameType, 'prod')
@@ -430,10 +436,10 @@ def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min
 
     check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only, min_count=min_count)
 
-    params = [('axis', None), ('skipna', skipna), ('level', None), ('numeric_only', numeric_only),
-              ('min_count', min_count)]
+    params = {'axis': None, 'skipna': None, 'level': None, 'numeric_only': None, 'min_count': 0}
+    ser_par = {'skipna': 'skipna', 'level': 'level', 'min_count': 'min_count'}
 
-    return sdc_pandas_dataframe_reduce_columns(df, name, params)
+    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
 @overload_method(DataFrameType, 'count')
@@ -443,8 +449,7 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
 
     .. only:: developer
 
-        Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count
-        Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count1
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_count
 
     Parameters
     -----------
