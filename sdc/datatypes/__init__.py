@@ -25,7 +25,5 @@
 # *****************************************************************************
 
 
-import sdc.datatypes.hpat_pandas_dataframe_pass
+# import sdc.datatypes.hpat_pandas_dataframe_pass
 import sdc.datatypes.hpat_pandas_series_rolling_functions
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions
-import sdc.datatypes.hpat_pandas_stringmethods_functions
