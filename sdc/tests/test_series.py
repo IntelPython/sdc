@@ -5556,6 +5556,132 @@ class TestSeries(TestCase):
             S = pd.Series(ser)
             pd.testing.assert_series_equal(cfunc(S), isalnum_usecase(S))
 
+    @skip_sdc_jit('Old-style implementation returns string, but not series')
+    def test_series_describe_numeric(self):
+        def test_impl(A):
+            return A.describe()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit('Old-style implementation doesn\'t support pecentiles argument')
+    def test_series_describe_numeric_percentiles(self):
+        def test_impl(A, values):
+            return A.describe(percentiles=values)
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        supported_values = [
+            [0.323, 0.778, 0.1, 0.01, 0.2],
+            [0.001, 0.002],
+            [0.001, 0.5, 0.002],
+            [0.9999, 0.0001],
+            (0.323, 0.778, 0.1, 0.01, 0.2),
+            np.array([0, 1.0]),
+            np.array([0.323, 0.778, 0.1, 0.01, 0.2]),
+            None,
+        ]
+        for percentiles in supported_values:
+            with self.subTest(percentiles=percentiles):
+                pd.testing.assert_series_equal(hpat_func(S, percentiles), test_impl(S, percentiles))
+
+    @skip_sdc_jit('Old-style implementation for string series is not supported')
+    def test_series_describe_str(self):
+        def test_impl(A):
+            return A.describe()
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(['a', 'dd', None, 'bbbb', 'dd', '', 'dd', '', 'dd'])
+        # SDC implementation returns series of string, hence conversion of reference result is needed
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S).astype(str))
+
+    @skip_sdc_jit('Old-style implementation for datetime series is not supported')
+    @skip_numba_jit('Series.describe is not implemented for datatime Series due to Numba limitations\n'
+                    'Requires dropna for pd.Timestamp (depends on Numba isnat) to be implemented')
+    def test_series_describe_dt(self):
+        def test_impl(A):
+            return A.describe()
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([pd.Timestamp('1970-12-01 03:02:35'),
+                       pd.NaT,
+                       pd.Timestamp('1970-03-03 12:34:59'),
+                       pd.Timestamp('1970-12-01 03:02:35'),
+                       pd.Timestamp('2012-07-25'),
+                       None])
+        # SDC implementation returns series of string, hence conversion of reference result is needed
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S).astype(str))
+
+    @skip_sdc_jit('Old-style implementation doesn\'t support pecentiles argument')
+    def test_series_describe_unsupported_percentiles(self):
+        def test_impl(A, values):
+            return A.describe(percentiles=values)
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        unsupported_values = [0.5, '0.77', True, ('a', 'b'), ['0.5', '0.7'], np.arange(0.1, 0.5, 0.1).astype(str)]
+        for percentiles in unsupported_values:
+            with self.assertRaises(TypingError) as raises:
+                hpat_func(S, percentiles)
+            msg = 'Method describe(). The object percentiles'
+            self.assertIn(msg, str(raises.exception))
+
+    @skip_sdc_jit('Old-style implementation doesn\'t support pecentiles argument')
+    def test_series_describe_invalid_percentiles(self):
+        def test_impl(A, values):
+            return A.describe(percentiles=values)
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        S = pd.Series(np.arange(n))
+        unsupported_values = [
+            [0.5, 0.7, 1.1],
+            [-0.5, 0.7, 1.1],
+            [0.5, 0.7, 0.2, 0.7]
+        ]
+        for percentiles in unsupported_values:
+            with self.assertRaises(Exception) as context:
+                test_impl(S, percentiles)
+            pandas_exception = context.exception
+
+            self.assertRaises(type(pandas_exception), hpat_func, S, percentiles)
+
+    @skip_numba_jit('BUG: Series.count() impl for String series does count None elements, but it should not')
+    def test_series_count_string_with_none(self):
+        def test_impl(S):
+            return S.count()
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(['a', 'dd', None, 'bbbb', 'dd', '', 'dd', '', 'dd'])
+        test_impl(S)
+        self.assertEqual(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit('BUG: Series.value_counts() impl for String series does count None elements, but it should not')
+    @skip_numba_jit('BUG: Series.value_counts() impl for String series does count None elements, but it should not')
+    def test_series_value_counts_string_with_none(self):
+        def test_impl(S):
+            return S.value_counts()
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(['a', 'dd', None, 'bbbb', '', '', 'dd'])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit('Fails occasionally due to use of non-stable sort in Pandas and SDC implementations')
+    @skip_numba_jit('Fails occasionally due to use of non-stable sort in Pandas and SDC implementations')
+    def test_series_value_counts_string_order_in_group(self):
+        def test_impl(S):
+            return S.value_counts()
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(['c', 'dd', 'b', 'a', 'dd', 'dd', 'e', 'f', 'g'])
+        pandas_res = test_impl(S)
+        hpat_res = hpat_func(S)
+        pd.testing.assert_series_equal(hpat_res, pandas_res)
+
 
 if __name__ == "__main__":
     unittest.main()
