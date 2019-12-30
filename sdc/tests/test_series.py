@@ -1111,7 +1111,6 @@ class TestSeries(TestCase):
         S2 = pd.Series(['8', '6', '0'], ['12', '11', '14'])
         pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
-    @skip_sdc_jit('Not impl in old style')
     def test_series_iloc1(self):
         def test_impl(A):
             return A.iloc[3]
@@ -1255,6 +1254,15 @@ class TestSeries(TestCase):
         hpat_func = self.jit(test_impl)
 
         S = pd.Series([2, 4, 6, 6, 3], [-22, -5, -2, 300, 40000])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('Slice string index not impl')
+    def test_series_slice_empty(self):
+        def test_impl(A):
+            return A.loc['301':'-4']
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([2, 4, 6, 6, 3], ['-22', '-5', '-2', '300', '40000'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
@@ -1508,7 +1516,6 @@ class TestSeries(TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
-    @unittest.skip("Str not impl")
     def test_series_list_str_unbox1(self):
         def test_impl(A):
             return A.iloc[0]
@@ -1519,6 +1526,24 @@ class TestSeries(TestCase):
 
         # call twice to test potential refcount errors
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit('Not impl in old style')
+    def test_series_iloc_array(self):
+        def test_impl(A, n):
+            return A.iloc[n]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 4, 8, 6, 0], [1, 2, 4, 8, 6, 0])
+        n = np.array([0, 4, 2])
+        pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
+
+    @skip_sdc_jit('Not impl in old style')
+    def test_series_iloc_callable(self):
+        def test_impl(S):
+            return S.iloc[(lambda a: abs(4 - a))]
+        hpat_func = self.jit(test_impl)
+        S = pd.Series([0, 6, 4, 7, 8], [0, 6, 66, 6, 8])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_np_typ_call_replace(self):
         # calltype replacement is tricky for np.typ() calls since variable
