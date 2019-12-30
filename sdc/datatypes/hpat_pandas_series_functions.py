@@ -146,7 +146,7 @@ def hpat_pandas_series_setitem(self, idx, value):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
-    Pandas API: pandas.Series.set
+    Pandas API: pandas.Series.__setitem__
 
     Examples
     --------
