@@ -91,7 +91,7 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
     df_func_name = f'_df_{func_name}_impl'
 
     func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, s_par, df.columns)
-    print(func_text)
+
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
