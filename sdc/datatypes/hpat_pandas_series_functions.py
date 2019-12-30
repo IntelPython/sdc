@@ -4551,27 +4551,7 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
 
                 # TODO: support proper rounding of percentiles like in pandas.io.formats.format.format_percentiles
                 # requires numpy.round(precision), numpy.isclose to be supported by Numba
-                percentiles_indexes = []
-                for percentile in arr:
-                    p_as_string = str(percentile * 100)
-
-                    trim_index = len(p_as_string) - 1
-                    while trim_index >= 0:
-                        if p_as_string[trim_index] == '0':
-                            trim_index -= 1
-                            continue
-                        elif p_as_string[trim_index] == '.':
-                            break
-
-                        trim_index += 1
-                        break
-
-                    if trim_index < 0:
-                        p_as_string_trimmed = '0'
-                    else:
-                        p_as_string_trimmed = p_as_string[:trim_index]
-
-                    percentiles_indexes.append(p_as_string_trimmed + '%')
+                percentiles_indexes = common_functions._sdc_pandas_format_percentiles(arr)
             else:
                 sorted_percentiles = [0.25, 0.5, 0.75]
                 percentiles_indexes = ['25%', '50%', '75%']
@@ -4579,10 +4559,6 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
             index_strings = ['count', 'mean', 'std', 'min']
             index_strings.extend(percentiles_indexes)
             index_strings.append('max')
-
-            total_index_chars = numpy.sum(numpy.array([len(s) for s in index_strings]))
-            result_index = sdc.str_arr_ext.pre_alloc_string_array(len(index_strings), total_index_chars)
-            sdc.str_arr_ext.cp_str_list_to_array(result_index, index_strings)
 
             values = []
             values.append(numpy.float64(self.count()))
@@ -4593,7 +4569,7 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
                 values.append(self.quantile(p))
             values.append(self.max())
 
-            return pandas.Series(values, result_index)
+            return pandas.Series(values, index_strings)
 
         return hpat_pandas_series_describe_numeric_impl
 
@@ -4601,24 +4577,11 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
         def hpat_pandas_series_describe_string_impl(self, percentiles=None, include=None, exclude=None):
 
             objcounts = self.value_counts()
-
-            # temporary workaround for problem in Series.count not skipping Nones
-            # TODO: delete this and use self.count() in append below when test_series_count_string_with_none is fixed
-            dropna_series = self.dropna()
-
             index_strings = ['count', 'unique', 'top', 'freq']
-
-            total_index_chars = numpy.sum(numpy.array([len(s) for s in index_strings]))
-            result_index = sdc.str_arr_ext.pre_alloc_string_array(len(index_strings), total_index_chars)
-            sdc.str_arr_ext.cp_str_list_to_array(result_index, index_strings)
 
             # use list of strings for the output series, since Numba doesn't support np.arrays with object dtype
             values = []
-            # TODO: change the arg in the next line with 'str(self.count())'
-            values.append(str(dropna_series.count()))
-
-            # TODO: change the arg in the next line with 'str(len(objcounts[objcounts != 0]))'
-            # when operator.ne is supported in new-style
+            values.append(str(self.count()))
             values.append(str(len(self.unique())))
             values.append(str(objcounts.index[0]))
             values.append(str(objcounts.iloc[0]))
@@ -4633,4 +4596,3 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
         return None
 
     return None
-

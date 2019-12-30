@@ -5556,7 +5556,6 @@ class TestSeries(TestCase):
             S = pd.Series(ser)
             pd.testing.assert_series_equal(cfunc(S), isalnum_usecase(S))
 
-
     @skip_sdc_jit('Old-style implementation returns string, but not series')
     def test_series_describe_numeric(self):
         def test_impl(A):
