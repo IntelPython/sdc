@@ -40,10 +40,10 @@ import sdc.hiframes.boxing
 import sdc.timsort
 from sdc.decorators import jit
 
-import sdc.datatypes.hpat_pandas_series_functions  # noqa
-import sdc.datatypes.hpat_pandas_series_rolling_functions  # noqa
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions  # noqa
-import sdc.datatypes.hpat_pandas_stringmethods_functions  # noqa
+import sdc.datatypes.hpat_pandas_series_functions
+import sdc.datatypes.hpat_pandas_series_rolling_functions
+import sdc.datatypes.hpat_pandas_seriesgroupby_functions
+import sdc.datatypes.hpat_pandas_stringmethods_functions
 
 from ._version import get_versions
 
