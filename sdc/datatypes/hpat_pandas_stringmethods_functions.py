@@ -192,6 +192,30 @@ def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
 @sdc_overload_method(StringMethodsType, 'center')
 def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.center
+
+    Limitations
+    -----------
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/str/series_str_center.py
+       :language: python
+       :lines: 27-
+       :caption: Filling left and right side of strings in the Series with an additional character
+       :name: ex_series_str_center
+
+    .. command-output:: python ./series/str/series_str_center.py
+       :cwd: ../../../examples
+
+    .. todo:: Add support of 32-bit Unicode for `str.center()`
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.center()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
@@ -239,6 +263,40 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
 @sdc_overload_method(StringMethodsType, 'endswith')
 def hpat_pandas_stringmethods_endswith(self, pat, na=None):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.endswith
+
+    Limitations
+    -----------
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/str/series_str_endswith.py
+       :language: python
+       :lines: 27-
+       :caption: Test if the end of each string element matches a string
+       :name: ex_series_str_endswith
+
+    .. command-output:: python ./series/str/series_str_endswith.py
+       :cwd: ../../../examples
+
+    .. todo::
+        - Add support of matching the end of each string by a pattern
+        - Add support of parameter ``na``
+
+    .. seealso::
+        `str.endswith <https://docs.python.org/3/library/stdtypes.html#str.endswith>`_
+            Python standard library string method.
+        :ref:`Series.str.startswith <pandas.Series.str.startswith>`
+            Same as endswith, but tests the start of string.
+        :ref:`Series.str.contains <pandas.Series.str.contains>`
+            Tests if string element contains a pattern.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.endswith()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
@@ -290,6 +348,34 @@ def hpat_pandas_stringmethods_endswith(self, pat, na=None):
 @sdc_overload_method(StringMethodsType, 'find')
 def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.find
+
+    Limitations
+    -----------
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/str/series_str_find.py
+       :language: python
+       :lines: 27-
+       :caption: Return lowest indexes in each strings in the Series
+       :name: ex_series_str_find
+
+    .. command-output:: python ./series/str/series_str_find.py
+       :cwd: ../../../examples
+
+    .. todo:: Add support of parameters ``start`` and ``end``
+
+    .. seealso::
+        :ref:`Series.str.rfind <pandas.Series.str.rfind>`
+            Return highest indexes in each strings.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.find()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
@@ -349,6 +435,46 @@ def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
 @sdc_overload_method(StringMethodsType, 'isupper')
 def hpat_pandas_stringmethods_isupper(self):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.isupper
+
+    Limitations
+    -----------
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/str/series_str_isupper.py
+       :language: python
+       :lines: 27-
+       :caption: Check whether all characters in each string are uppercase
+       :name: ex_series_str_isupper
+
+    .. command-output:: python ./series/str/series_str_isupper.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
+            Check whether all characters are alphabetic.
+        :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
+            Check whether all characters are numeric.
+        :ref:`Series.str.isalnum <pandas.Series.str.isalnum>`
+            Check whether all characters are alphanumeric.
+        :ref:`Series.str.isdigit <pandas.Series.str.isdigit>`
+            Check whether all characters are digits.
+        :ref:`Series.str.isdecimal <pandas.Series.str.isdecimal>`
+            Check whether all characters are decimal.
+        :ref:`Series.str.isspace <pandas.Series.str.isspace>`
+            Check whether all characters are whitespace.
+        :ref:`Series.str.islower <pandas.Series.str.islower>`
+            Check whether all characters are lowercase.
+        :ref:`Series.str.istitle <pandas.Series.str.istitle>`
+            Check whether all characters are titlecase.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.isupper()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
@@ -385,6 +511,34 @@ def hpat_pandas_stringmethods_isupper(self):
 @sdc_overload_method(StringMethodsType, 'len')
 def hpat_pandas_stringmethods_len(self):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.len
+
+    Limitations
+    -----------
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/str/series_str_len.py
+       :language: python
+       :lines: 27-
+       :caption: Compute the length of each element in the Series
+       :name: ex_series_str_len
+
+    .. command-output:: python ./series/str/series_str_len.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        `str.len`
+            Python built-in function returning the length of an object.
+        :ref:`Series.size <pandas.Series.size>`
+            Returns the length of the Series.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.len()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
@@ -425,21 +579,20 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
     ********************************************
     Pandas API: pandas.Series.str.ljust
 
+    Limitations
+    -----------
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_str_ljust.py
+    .. literalinclude:: ../../../examples/series/str/series_str_ljust.py
        :language: python
        :lines: 27-
        :caption: Filling right side of strings in the Series with an additional character
        :name: ex_series_str_ljust
 
-    .. code-block:: console
-
-        > python ./series_str_ljust.py
-        0    dog**
-        1    foo**
-        2    bar**
-        dtype: object
+    .. command-output:: python ./series/str/series_str_ljust.py
+       :cwd: ../../../examples
 
     .. todo:: Add support of 32-bit Unicode for `str.ljust()`
 
@@ -497,21 +650,20 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
     ********************************************
     Pandas API: pandas.Series.str.rjust
 
+    Limitations
+    -----------
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_str_rjust.py
+    .. literalinclude:: ../../../examples/series/str/series_str_rjust.py
        :language: python
        :lines: 27-
        :caption: Filling left side of strings in the Series with an additional character
        :name: ex_series_str_rjust
 
-    .. code-block:: console
-
-        > python ./series_str_rjust.py
-        0    **dog
-        1    **foo
-        2    **bar
-        dtype: object
+    .. command-output:: python ./series/str/series_str_rjust.py
+       :cwd: ../../../examples
 
     .. todo:: Add support of 32-bit Unicode for `str.rjust()`
 
@@ -565,6 +717,40 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
 @sdc_overload_method(StringMethodsType, 'startswith')
 def hpat_pandas_stringmethods_startswith(self, pat, na=None):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series.str.startswith
+
+    Limitations
+    -----------
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/str/series_str_startswith.py
+       :language: python
+       :lines: 27-
+       :caption: Test if the start of each string element matches a string
+       :name: ex_series_str_startswith
+
+    .. command-output:: python ./series/str/series_str_startswith.py
+       :cwd: ../../../examples
+
+    .. todo::
+        - Add support of matching the start of each string by a pattern
+        - Add support of parameter ``na``
+
+    .. seealso::
+        `str.startswith <https://docs.python.org/3/library/stdtypes.html#str.startswith>`_
+            Python standard library string method.
+        :ref:`Series.str.endswith <pandas.Series.str.endswith>`
+            Same as startswith, but tests the end of string.
+        :ref:`Series.str.contains <pandas.Series.str.contains>`
+            Tests if string element contains a pattern.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
     Pandas Series method :meth:`pandas.core.strings.StringMethods.startswith()` implementation.
 
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
@@ -620,23 +806,32 @@ def hpat_pandas_stringmethods_zfill(self, width):
     ********************************************
     Pandas API: pandas.Series.str.zfill
 
+    Limitations
+    -----------
+    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_str_zfill.py
+    .. literalinclude:: ../../../examples/series/str/series_str_zfill.py
        :language: python
        :lines: 27-
        :caption: Pad strings in the Series by prepending '0' characters
        :name: ex_series_str_zfill
 
-    .. code-block:: console
-
-        > python ./series_str_zfill.py
-        0    00dog
-        1    00foo
-        2    00bar
-        dtype: object
+    .. command-output:: python ./series/str/series_str_zfill.py
+       :cwd: ../../../examples
 
     .. todo:: Add support of 32-bit Unicode for `str.zfill()`
+
+    .. seealso::
+        :ref:`Series.str.rjust <pandas.Series.str.rjust>`
+            Fills the left side of strings with an arbitrary character.
+        :ref:`Series.str.ljust <pandas.Series.str.ljust>`
+            Fills the right side of strings with an arbitrary character.
+        :ref:`Series.str.pad <pandas.Series.str.pad>`
+            Fills the specified sides of strings with an arbitrary character.
+        :ref:`Series.str.center <pandas.Series.str.center>`
+            Fills boths sides of strings with an arbitrary character.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -716,6 +911,396 @@ def _hpat_pandas_stringmethods_autogen(method_name):
 
     global_dict_name = 'hpat_pandas_stringmethods_{methodname}'.format(methodname=method_name)
     return _hpat_pandas_stringmethods_autogen_global_dict[global_dict_name]
+
+
+@overload_method(StringMethodsType, 'istitle')
+def hpat_pandas_stringmethods_istitle(self):
+    """
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+        Pandas API: pandas.Series.str.istitle
+
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+        Examples
+        --------
+        .. literalinclude:: ../../../examples/series/str/series_str_istitle.py
+           :language: python
+           :lines: 27-
+           :caption: Check if each word start with an upper case letter
+           :name: ex_series_str_istitle
+
+         .. command-output:: python ./series/str/series_str_istitle.py
+            :cwd: ../../../examples
+
+        .. seealso::
+            :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
+                Check whether all characters are alphabetic.
+            :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
+                Check whether all characters are numeric.
+            :ref:`Series.str.isalnum <pandas.Series.str.isalnum>`
+                Check whether all characters are alphanumeric.
+            :ref:`Series.str.isdigit <pandas.Series.str.isdigit>`
+                Check whether all characters are digits.
+            :ref:`Series.str.isdecimal <pandas.Series.str.isdecimal>`
+                Check whether all characters are decimal.
+            :ref:`Series.str.isspace <pandas.Series.str.isspace>`
+                Check whether all characters are whitespace.
+            :ref:`Series.str.islower <pandas.Series.str.islower>`
+                Check whether all characters are lowercase.
+            :ref:`Series.str.isupper <pandas.Series.str.isupper>`
+                Check whether all characters are uppercase.
+            :ref:`Series.str.istitle <pandas.Series.str.istitle>`
+                Check whether all characters are titlecase.
+
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+
+        Pandas Series method :meth:`pandas.core.strings.StringMethods.istitle()` implementation.
+
+        Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+        .. only:: developer
+
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_istitle_str
+
+        Parameters
+        ----------
+        self: :class:`pandas.core.strings.StringMethods`
+            input arg
+
+        Returns
+        -------
+        :obj:`pandas.Series`
+             returns :obj:`pandas.Series` object
+        """
+
+    ty_checker = TypeChecker('Method istitle().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_istitle_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.istitle()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_istitle_impl
+
+
+@overload_method(StringMethodsType, 'isspace')
+def hpat_pandas_stringmethods_isspace(self):
+    """
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+        Pandas API: pandas.Series.str.isspace
+
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+        Examples
+        --------
+        .. literalinclude:: ../../../examples/series/str/series_str_isspace.py
+           :language: python
+           :lines: 27-
+           :caption: Check if all the characters in the text are whitespaces
+           :name: ex_series_str_isspace
+
+        .. command-output:: python ./series/str/series_str_isspace.py
+            :cwd: ../../../examples
+
+        .. seealso::
+            :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
+                Check whether all characters are alphabetic.
+            :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
+                Check whether all characters are numeric.
+            :ref:`Series.str.isalnum <pandas.Series.str.isalnum>`
+                Check whether all characters are alphanumeric.
+            :ref:`Series.str.isdigit <pandas.Series.str.isdigit>`
+                Check whether all characters are digits.
+            :ref:`Series.str.isdecimal <pandas.Series.str.isdecimal>`
+                Check whether all characters are decimal.
+            :ref:`Series.str.isspace <pandas.Series.str.isspace>`
+                Check whether all characters are whitespace.
+            :ref:`Series.str.islower <pandas.Series.str.islower>`
+                Check whether all characters are lowercase.
+            :ref:`Series.str.isupper <pandas.Series.str.isupper>`
+                Check whether all characters are uppercase.
+            :ref:`Series.str.istitle <pandas.Series.str.istitle>`
+                Check whether all characters are titlecase.
+
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+
+        Pandas Series method :meth:`pandas.core.strings.StringMethods.isspace()` implementation.
+
+        Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+        .. only:: developer
+
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isspace_str
+
+        Parameters
+        ----------
+        self: :class:`pandas.core.strings.StringMethods`
+            input arg
+
+        Returns
+        -------
+        :obj:`pandas.Series`
+             returns :obj:`pandas.Series` object
+        """
+
+    ty_checker = TypeChecker('Method isspace().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isspace_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isspace()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isspace_impl
+
+
+@overload_method(StringMethodsType, 'isalpha')
+def hpat_pandas_stringmethods_isalpha(self):
+    """
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+        Pandas API: pandas.Series.str.isalpha
+
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+        Examples
+        --------
+        .. literalinclude:: ../../../examples/series/str/series_str_isalpha.py
+           :language: python
+           :lines: 27-
+           :caption: Check whether all characters in each string are alphabetic.
+           :name: ex_series_str_isalpha
+
+        .. command-output:: python ./series/str/series_str_isalpha.py
+            :cwd: ../../../examples
+
+        .. seealso::
+            :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
+                Check whether all characters are alphabetic.
+            :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
+                Check whether all characters are numeric.
+            :ref:`Series.str.isalnum <pandas.Series.str.isalnum>`
+                Check whether all characters are alphanumeric.
+            :ref:`Series.str.isdigit <pandas.Series.str.isdigit>`
+                Check whether all characters are digits.
+            :ref:`Series.str.isdecimal <pandas.Series.str.isdecimal>`
+                Check whether all characters are decimal.
+            :ref:`Series.str.isspace <pandas.Series.str.isspace>`
+                Check whether all characters are whitespace.
+            :ref:`Series.str.islower <pandas.Series.str.islower>`
+                Check whether all characters are lowercase.
+            :ref:`Series.str.isupper <pandas.Series.str.isupper>`
+                Check whether all characters are uppercase.
+            :ref:`Series.str.istitle <pandas.Series.str.istitle>`
+                Check whether all characters are titlecase.
+
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+
+        Pandas Series method :meth:`pandas.core.strings.StringMethods.isalpha()` implementation.
+
+        Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+        .. only:: developer
+
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isalpha_str
+
+        Parameters
+        ----------
+        self: :class:`pandas.core.strings.StringMethods`
+            input arg
+
+        Returns
+        -------
+        :obj:`pandas.Series`
+             returns :obj:`pandas.Series` object
+        """
+
+    ty_checker = TypeChecker('Method isalpha().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isalpha_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isalpha()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isalpha_impl
+
+
+@overload_method(StringMethodsType, 'islower')
+def hpat_pandas_stringmethods_islower(self):
+    """
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+        Pandas API: pandas.Series.str.islower
+
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+        Examples
+        --------
+        .. literalinclude:: ../../../examples/series/str/series_str_islower.py
+           :language: python
+           :lines: 27-
+           :caption: Check if all the characters in the text are alphanumeric
+           :name: ex_series_str_islower
+
+        .. command-output:: python ./series/str/series_str_islower.py
+            :cwd: ../../../examples
+
+        .. seealso::
+            :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
+                Check whether all characters are alphabetic.
+            :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
+                Check whether all characters are numeric.
+            :ref:`Series.str.isalnum <pandas.Series.str.isalnum>`
+                Check whether all characters are alphanumeric.
+            :ref:`Series.str.isdigit <pandas.Series.str.isdigit>`
+                Check whether all characters are digits.
+            :ref:`Series.str.isdecimal <pandas.Series.str.isdecimal>`
+                Check whether all characters are decimal.
+            :ref:`Series.str.isspace <pandas.Series.str.isspace>`
+                Check whether all characters are whitespace.
+            :ref:`Series.str.islower <pandas.Series.str.islower>`
+                Check whether all characters are lowercase.
+            :ref:`Series.str.isupper <pandas.Series.str.isupper>`
+                Check whether all characters are uppercase.
+            :ref:`Series.str.istitle <pandas.Series.str.istitle>`
+                Check whether all characters are titlecase.
+
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+
+        Pandas Series method :meth:`pandas.core.strings.StringMethods.islower()` implementation.
+
+        Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+        .. only:: developer
+
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_islower_str
+
+        Parameters
+        ----------
+        self: :class:`pandas.core.strings.StringMethods`
+            input arg
+
+        Returns
+        -------
+        :obj:`pandas.Series`
+             returns :obj:`pandas.Series` object
+        """
+
+    ty_checker = TypeChecker('Method islower().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_islower_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.islower()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_islower_impl
+
+
+@overload_method(StringMethodsType, 'isalnum')
+def hpat_pandas_stringmethods_isalnum(self):
+    """
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+        Pandas API: pandas.Series.str.isalnum
+
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+        Examples
+        --------
+        .. literalinclude:: ../../../examples/series/str/series_str_isalnum.py
+           :language: python
+           :lines: 27-
+           :caption: Check if all the characters in the text are alphanumeric
+           :name: ex_series_str_isalnum
+
+        .. command-output:: python ./series/str/series_str_isalnum.py
+            :cwd: ../../../examples
+
+        .. seealso::
+            :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
+                Check whether all characters are alphabetic.
+            :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
+                Check whether all characters are numeric.
+            :ref:`Series.str.isalnum <pandas.Series.str.isalnum>`
+                Check whether all characters are alphanumeric.
+            :ref:`Series.str.isdigit <pandas.Series.str.isdigit>`
+                Check whether all characters are digits.
+            :ref:`Series.str.isdecimal <pandas.Series.str.isdecimal>`
+                Check whether all characters are decimal.
+            :ref:`Series.str.isspace <pandas.Series.str.isspace>`
+                Check whether all characters are whitespace.
+            :ref:`Series.str.islower <pandas.Series.str.islower>`
+                Check whether all characters are lowercase.
+            :ref:`Series.str.isupper <pandas.Series.str.isupper>`
+                Check whether all characters are uppercase.
+            :ref:`Series.str.istitle <pandas.Series.str.istitle>`
+                Check whether all characters are titlecase.
+
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+
+        Pandas Series method :meth:`pandas.core.strings.StringMethods.isalnum()` implementation.
+
+        Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+        .. only:: developer
+
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isalnum_str
+
+        Parameters
+        ----------
+        self: :class:`pandas.core.strings.StringMethods`
+            input arg
+
+        Returns
+        -------
+        :obj:`pandas.Series`
+             returns :obj:`pandas.Series` object
+        """
+
+    ty_checker = TypeChecker('Method isalnum().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isalnum_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isalnum()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isalnum_impl
 
 
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))

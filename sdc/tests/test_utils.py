@@ -45,6 +45,7 @@ max_float64 = np.finfo('float64').max
 test_global_input_data_float64 = [
     [1., -1., 0.1, min_float64, max_float64, max_float64, min_float64, -0.1],
     [1., np.nan, -1., 0., min_float64, max_float64, max_float64, min_float64],
+    [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
     [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO],
 ]
 
@@ -132,6 +133,8 @@ def msg_and_func(msg_or_func=None):
 def skip_numba_jit(msg_or_func=None):
     msg, func = msg_and_func(msg_or_func)
     wrapper = unittest.skipUnless(sdc.config.config_pipeline_hpat_default, msg or "numba pipeline not supported")
+    if sdc.config.test_expected_failure:
+        wrapper = unittest.expectedFailure
     # wrapper = lambda f: f  # disable skipping
     return wrapper(func) if func else wrapper
 
@@ -139,5 +142,11 @@ def skip_numba_jit(msg_or_func=None):
 def skip_sdc_jit(msg_or_func=None):
     msg, func = msg_and_func(msg_or_func)
     wrapper = unittest.skipIf(sdc.config.config_pipeline_hpat_default, msg or "sdc pipeline not supported")
+    if sdc.config.test_expected_failure:
+        wrapper = unittest.expectedFailure
     # wrapper = lambda f: f  # disable skipping
     return wrapper(func) if func else wrapper
+
+
+def sdc_limitation(func):
+    return unittest.expectedFailure(func)

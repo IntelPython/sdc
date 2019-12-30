@@ -711,12 +711,12 @@ class SeriesAttribute(AttributeTemplate):
     #              if isinstance(dtype, types.NPDatetime) else dtype)
     #     return signature(dtype, *args)
 
-    # @bound_function("series.value_counts")
-    # def resolve_value_counts(self, ary, args, kws):
-    #     # output is int series with original data as index
-    #     out = SeriesType(
-    #         types.int64, types.Array(types.int64, 1, 'C'), ary.data)
-    #     return signature(out, *args)
+    @bound_function("series.value_counts")
+    def resolve_value_counts(self, ary, args, kws):
+        # output is int series with original data as index
+        out = SeriesType(
+            types.int64, types.Array(types.int64, 1, 'C'), ary.data)
+        return signature(out, *args)
 
     # @bound_function("series.rename")
     # def resolve_rename(self, ary, args, kws):
@@ -848,11 +848,14 @@ for field in sdc.hiframes.pd_timestamp_ext.date_fields:
     setattr(SeriesDtMethodAttribute, "resolve_" + field, resolve_date_field)
 
 
-class SeriesRollingType(types.Type):
-    def __init__(self, dtype):
-        self.dtype = dtype
-        name = "SeriesRollingType({})".format(dtype)
-        super(SeriesRollingType, self).__init__(name)
+if sdc.config.config_pipeline_hpat_default:
+    class SeriesRollingType(types.Type):
+        def __init__(self, dtype):
+            self.dtype = dtype
+            name = "SeriesRollingType({})".format(dtype)
+            super(SeriesRollingType, self).__init__(name)
+else:
+    from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 
 
 @infer_getattr
@@ -962,21 +965,22 @@ class CmpOpLESeries(SeriesCompEqual):
 class CmpOpLTSeries(SeriesCompEqual):
     key = '<'
 
-# @infer_global(operator.getitem)
-# class GetItemBuffer(AbstractTemplate):
-#     key = operator.getitem
 
-#     def generic(self, args, kws):
-#         assert not kws
-#         [ary, idx] = args
-#         import pdb; pdb.set_trace()
-#         if not isinstance(ary, SeriesType):
-#             return
-#         out = get_array_index_type(ary, idx)
-#         # check result to be dt64 since it might be sliced array
-#         # replace result with Timestamp
-#         if out is not None and out.result == types.NPDatetime('ns'):
-#             return signature(pandas_timestamp_type, ary, out.index)
+if sdc.config.config_pipeline_hpat_default:
+    @infer_global(operator.getitem)
+    class GetItemBuffer(AbstractTemplate):
+        key = operator.getitem
+
+        def generic(self, args, kws):
+            assert not kws
+            [ary, idx] = args
+            if not isinstance(ary, SeriesType):
+                return
+            out = get_array_index_type(ary, idx)
+            # check result to be dt64 since it might be sliced array
+            # replace result with Timestamp
+            if out is not None and out.result == types.NPDatetime('ns'):
+                return signature(pandas_timestamp_type, ary, out.index)
 
 
 def install_array_method(name, generic):
@@ -1018,7 +1022,8 @@ if not sdc.config.config_pipeline_hpat_default:
 _non_hpat_pipeline_attrs = [
     'resolve_append', 'resolve_combine', 'resolve_corr', 'resolve_cov',
     'resolve_dropna', 'resolve_fillna', 'resolve_head', 'resolve_nlargest',
-    'resolve_nsmallest', 'resolve_pct_change', 'resolve_loc'
+    'resolve_nsmallest', 'resolve_pct_change', 'resolve_rolling', 'resolve_loc',
+    'resolve_value_counts'
 ]
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
@@ -1101,44 +1106,44 @@ if sdc.config.config_pipeline_hpat_default:
                     sig.return_type = pandas_timestamp_type
             return sig
 
+if sdc.config.config_pipeline_hpat_default:
+    @infer_global(operator.setitem)
+    class SetItemSeries(SetItemBuffer):
+        def generic(self, args, kws):
+            assert not kws
+            series, idx, val = args
+            if not isinstance(series, SeriesType):
+                return None
+            # TODO: handle any of args being Series independently
+            ary = series_to_array_type(series)
+            is_idx_series = False
+            if isinstance(idx, SeriesType):
+                idx = series_to_array_type(idx)
+                is_idx_series = True
+            is_val_series = False
+            if isinstance(val, SeriesType):
+                val = series_to_array_type(val)
+                is_val_series = True
+            # TODO: strings, dt_index
+            res = super(SetItemSeries, self).generic((ary, idx, val), kws)
+            if res is not None:
+                new_series = if_arr_to_series_type(res.args[0])
+                idx = res.args[1]
+                val = res.args[2]
+                if is_idx_series:
+                    idx = if_arr_to_series_type(idx)
+                if is_val_series:
+                    val = if_arr_to_series_type(val)
+                res.args = (new_series, idx, val)
+                return res
 
-@infer_global(operator.setitem)
-class SetItemSeries(SetItemBuffer):
-    def generic(self, args, kws):
-        assert not kws
-        series, idx, val = args
-        if not isinstance(series, SeriesType):
-            return None
-        # TODO: handle any of args being Series independently
-        ary = series_to_array_type(series)
-        is_idx_series = False
-        if isinstance(idx, SeriesType):
-            idx = series_to_array_type(idx)
-            is_idx_series = True
-        is_val_series = False
-        if isinstance(val, SeriesType):
-            val = series_to_array_type(val)
-            is_val_series = True
-        # TODO: strings, dt_index
-        res = super(SetItemSeries, self).generic((ary, idx, val), kws)
-        if res is not None:
-            new_series = if_arr_to_series_type(res.args[0])
-            idx = res.args[1]
-            val = res.args[2]
-            if is_idx_series:
-                idx = if_arr_to_series_type(idx)
-            if is_val_series:
-                val = if_arr_to_series_type(val)
-            res.args = (new_series, idx, val)
-            return res
-
-
-@infer_global(operator.setitem)
-class SetItemSeriesIat(SetItemSeries):
-    def generic(self, args, kws):
-        # iat[] is the same as regular setitem
-        if isinstance(args[0], SeriesIatType):
-            return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
+if sdc.config.config_pipeline_hpat_default:
+    @infer_global(operator.setitem)
+    class SetItemSeriesIat(SetItemSeries):
+        def generic(self, args, kws):
+            # iat[] is the same as regular setitem
+            if isinstance(args[0], SeriesIatType):
+                return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
 
 
 inplace_ops = [
