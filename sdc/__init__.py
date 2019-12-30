@@ -24,8 +24,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-from ._version import get_versions
 import numba
 
 # re-export from Numba
@@ -42,12 +40,12 @@ import sdc.hiframes.boxing
 import sdc.timsort
 from sdc.decorators import jit
 
-multithread_mode = False
+import sdc.datatypes.hpat_pandas_series_functions  # noqa
+import sdc.datatypes.hpat_pandas_series_rolling_functions  # noqa
+import sdc.datatypes.hpat_pandas_seriesgroupby_functions  # noqa
+import sdc.datatypes.hpat_pandas_stringmethods_functions  # noqa
 
-
-__version__ = get_versions()['version']
-del get_versions
-
+from ._version import get_versions
 
 if not sdc.config.config_pipeline_hpat_default:
     """
@@ -68,10 +66,11 @@ if not sdc.config.config_pipeline_hpat_default:
 else:
     import sdc.compiler
 
-import sdc.datatypes.hpat_pandas_series_functions
-import sdc.datatypes.hpat_pandas_series_rolling_functions
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions
-import sdc.datatypes.hpat_pandas_stringmethods_functions
+multithread_mode = False
+
+
+__version__ = get_versions()['version']
+del get_versions
 
 def _init_extension():
     '''Register Pandas classes and functions with Numba.

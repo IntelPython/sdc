@@ -501,7 +501,7 @@ str2str_methods = ['capitalize', 'swapcase', 'title']
 str2str_methods_excluded = [
     'upper', 'center', 'endswith', 'find', 'isupper', 'len', 'ljust',
     'lower', 'lstrip', 'rjust', 'rstrip', 'startswith', 'strip', 'zfill',
-    'isspace'
+    'isspace', 'islower', 'isalpha', 'isalnum'
 ]
 """
     Functions which are used from Numba directly by calling from StringMethodsType
@@ -609,7 +609,6 @@ if sdc.config.config_pipeline_hpat_default:
             name = "SeriesRollingType({})".format(dtype)
             super(SeriesRollingType, self).__init__(name)
 
-
     @infer_getattr
     class SeriesRollingAttribute(AttributeTemplate):
         key = SeriesRollingType
@@ -629,7 +628,6 @@ if sdc.config.config_pipeline_hpat_default:
 
     # similar to install_array_method in arraydecl.py
 
-
     def install_rolling_method(name, generic):
         my_attr = {"key": "rolling." + name, "generic": generic}
         temp_class = type("Rolling_" + name, (AbstractTemplate,), my_attr)
@@ -644,13 +642,11 @@ if sdc.config.config_pipeline_hpat_default:
         # output is always float64
         return signature(SeriesType(types.float64), *args)
 
-
     for fname in supported_rolling_funcs:
         install_rolling_method(fname, rolling_generic)
 
 else:
     from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
-
 
 class SeriesIatType(types.Type):
     def __init__(self, stype):
