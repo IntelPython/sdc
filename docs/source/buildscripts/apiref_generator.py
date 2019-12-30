@@ -25,7 +25,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import pandas
 from sdc_object_utils import init_pandas_structure, init_sdc_structure, init_pandas_sdc_dict
 from sdc_object_utils import get_sdc_object_by_pandas_name, get_obj
 from sdc_object_utils import get_class_methods, get_class_attributes, get_fully_qualified_name
@@ -35,8 +34,12 @@ import os
 
 
 APIREF_TEMPLATE_FNAMES = [
+    './_templates/_api_ref.pandas.io_templ.rst',
     './_templates/_api_ref.pandas.series_templ.rst',
     './_templates/_api_ref.pandas.dataframe_templ.rst',
+    './_templates/_api_ref.pandas.general_functions_templ.rst',
+    './_templates/_api_ref.pandas.window_templ.rst',
+    './_templates/_api_ref.pandas.groupby_templ.rst',
 ]
 
 
@@ -51,12 +54,26 @@ def reformat(text):
     :param text: Original text with warnings
     :return: Modified text that fixes warnings
     """
+    text = reformat_multiline_inline_literal(text)
+    text = reformat_reindent_code_block(text)
+    text = reformat_perceived_reference(text)
     text = reformat_replace_star_list_with_dash_list(text)  # Must be called before :func:`reformat_asterisks`
     text = reformat_asterisks(text)  # Fix for * and ** symbols
     text = reformat_explicit_markup(text)  # Fix for explicit markup without a blank line
     text = reformat_bullet_list(text)  # Fix bullet list indentation issues
+    text = reformat_bullet_list_add_blank_line(text)  # Fix the lack of blank line before a bullet list
     text = reformat_remove_unresolved_references(text)  # Fix unresolved references after removal of References sections
     return reformat_remove_multiple_blank_lines(text)
+
+
+def reformat_perceived_reference(text):
+    """
+    Searches for pattern ``_\*`` and replaces it with ``*\``
+
+    :param text: Original text with warnings
+    :return: Modified text that fixes warnings
+    """
+    return text.replace('csv.QUOTE_', 'csv.QUOTE')
 
 
 def reformat_remove_unresolved_references(text):
@@ -136,7 +153,117 @@ def reformat_remove_multiple_blank_lines(text):
     return new_text
 
 
+def reformat_multiline_inline_literal(text):
+    """
+    Fixes warning with multi-line inline literal when the inline `` starts in one line and finishes `` in another one.
+
+    The limitation is that this function fixes only two-line literal but unwrapping it into a single line.
+    The function will not work for arbitrary length inline literals.
+
+    :param text: Original text with warnings
+    :return: Modified text with fixed warnings
+    """
+    new_text = ''
+
+    while len(text) > 0:
+        idx = text.find('``')
+
+        if idx >= 0:
+            # Copy as is the text before opening inline literal
+            new_text += text[:idx+2]
+            text = text[idx+2:]
+
+            # Look for closing inline literal
+            idx = text.find('``')
+            if idx >= 0:
+                # Here if found closing inline literal
+                # Remove `\n` for inline literal
+                literal = text[:idx]
+                literal = literal.replace('\n', '')
+                new_text += literal + '``'
+                text = text[idx+2:]
+            else:
+                # No closing inline literal found. Copy text as is
+                new_text += text
+                text = ''
+        else:
+            # No opening inline literal found. Copy text as is
+            new_text += text
+            text = ''
+
+    return new_text
+
+
+def reformat_reindent_code_block(text):
+    """
+    Fixes warnings related to un-indented code blocks starting with ::
+
+    :param text: Original text with warnings
+    :return: Modified text with fixed warnings
+    """
+    lines = text.split('\n\n')
+    new_text = ''
+    while len(lines) > 0:
+        line = lines[0]
+        if line.endswith(' ::'):
+            # Here if we found next code block
+            new_text += line + '\n\n'
+
+            # Get the indent for the last line (the line with ::)
+            lns = line.split('\n')
+            indent = get_indent(lns[-1])
+            if len(lines) > 1:
+                # Here if there is another paragraph after ::
+                new_text += reindent(lines[1], indent+4) + '\n\n'
+                lines.pop(0)
+        else:
+            # Here if it is not code block for which indent to be fixed
+            new_text += line + '\n\n'
+        lines.pop(0)
+    return new_text
+
+
+def reformat_bullet_list_add_blank_line(text):
+    """
+    Fixes the warning caused by situation when the new bullet list does not start with a blank line
+
+    :param text: Original text
+    :return: Reformatted text with added blank lines before bullet list blocks
+    """
+    lines = text.split('\n')
+    new_text = ''
+    while len(lines) > 0:
+        # Skip lines which do not start with `-`
+        while len(lines) > 0:
+            line = lines[0]
+            if line.strip().startswith('- '):
+                break
+            else:
+                new_text += line + '\n'
+                lines.pop(0)
+
+        if len(lines) > 0:
+            # Here if we are in the beginning of the bullet list block
+            new_text += '\n'  # Add blank line at the block beginning
+
+            # Skip list items until the blank line reached
+            while len(lines) > 0:
+                line = lines[0]
+                new_text += line + '\n'
+                lines.pop(0)
+                if len(line.strip()) == 0:
+                    # Reached the end of the bullet list block
+                    break
+    return new_text
+
+
 def reformat_bullet_list(text):
+    """
+    Reindent the bullet list
+
+    :param text: Original text with warnings
+    :return: Modified text with fixed warnings
+    """
     lines = text.split('\n')
     new_text = ''
     bullet_indent = -1
@@ -283,11 +410,24 @@ def reformat_pandas_params(title, text):
             return ':param ' + param + ':'
         elif title == 'Return' or title == 'Returns':
             return ':return:'
+        elif title == 'Yield' or title == 'Yields':
+            return ':yields:'
         elif title == 'Raises':
             return ':raises:'
 
     # Internal function. Returns correct markup for Parameters section
-    def _reformat_parameters(title, text):
+    # This function assumes parameters are in the following format
+    # <param_name> : <short description>
+    #     <long description
+    #      continued...
+    #      continued>
+    #
+    # <param_name> : <short description>
+    #     <long description
+    #      continued...
+    #      continued>
+    #
+    def _reformat_parameters_colon_separator(title, text):
         lines = text.split('\n')
         new_text = ''
 
@@ -323,6 +463,41 @@ def reformat_pandas_params(title, text):
 
         if param != '' and description != '':
             new_text += _get_param_text(title, param) + '\n' + reindent(description, indent+4) + '\n'
+        return new_text
+
+    def _reformat_parameters_sub_indent(title, text):
+        lines = text.split('\n')
+        new_text = ''
+
+        if len(lines) == 0:
+            return new_text
+
+        indent = get_indent(text)
+        while len(lines) > 0:
+            line = lines[0]
+            first_line_description = line
+            lines.pop(0)
+
+            description = ''
+            while len(lines) > 0:
+                # Continue multi-line description until blank line met
+                line = lines[0]
+                if len(line.strip()) == 0:
+                    # Blank line is either end of parameter description or separates paragraph/list
+                    lines.pop(0)
+                    description += '\n'
+                    continue
+
+                sub_indent = get_indent(line)
+                if sub_indent > indent:
+                    # Here if multi-line description encountered
+                    lines.pop(0)
+                    description += line + '\n'
+                else:
+                    # New parameter description without blank line
+                    break
+
+            new_text += _get_param_text(title, first_line_description) + '\n' + description + '\n'
         return new_text
 
     # Internal function. Returns correct markup for Raises section
@@ -384,7 +559,7 @@ def reformat_pandas_params(title, text):
         return new_text + '\n'
 
     if title.strip() == 'Parameters':
-        return _reformat_parameters(title, text)
+        return _reformat_parameters_sub_indent(title, text)
     elif title.strip() == 'Returns' or title.strip() == 'Return':
         return _reformat_returns(title, text)
     elif title.strip() == 'Raises':
@@ -441,7 +616,7 @@ def generate_simple_object_doc(pandas_name, short_doc_flag=False, doc_from_panda
                 elif title.strip() == 'References':  # Exclude References section (may be too specific to Pandas)
                     sections.pop(0)
                 elif title.strip() == 'Parameters' or title.strip() == 'Raises' or title.strip() == 'Return' or \
-                        title.strip() == 'Returns':
+                        title.strip() == 'Returns' or title.strip() == 'Yields':
                     if reformat_pandas:
                         doc += reformat_pandas_params(title, text)
                         sections.pop(0)
@@ -604,7 +779,7 @@ def parse_templ_rst(fname_templ):
             # Parsing lines until ``.. sdc_toctree`` section is met
             while len(doc) > 0 and not doc[0].startswith('.. sdc_toctree'):
                 line = doc[0]
-                if line.startswith('.. currentmodule::'):
+                if line.strip().startswith('.. currentmodule::'):
                     current_module_name = line[19:].strip()
                 fout.write(line)
                 doc.pop(0)
