@@ -50,7 +50,7 @@ from sdc.datatypes.common_functions import (TypeChecker, check_index_is_numeric,
 from sdc.datatypes.hpat_pandas_series_rolling_types import _hpat_pandas_series_rolling_init
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.datatypes.hpat_pandas_getitem_types import SeriesGetitemAccessorType
-from sdc.hiframes.pd_series_ext import SeriesType
+from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_arr_ext import (StringArrayType, string_array_type, str_arr_is_na, str_arr_set_na,
                              num_total_chars, pre_alloc_string_array, cp_str_list_to_array)
 from sdc.utils import to_array, sdc_overload, sdc_overload_method, sdc_overload_attribute
@@ -4820,4 +4820,3 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
         return pandas.Series(result)
 
     return hpat_pandas_series_pct_change_impl
-
