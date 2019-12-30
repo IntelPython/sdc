@@ -34,15 +34,13 @@ import pandas
 import copy
 import numpy
 
-import sdc
-
 from numba import types
 from numba.extending import (overload, overload_method, overload_attribute)
-from sdc.hiframes.pd_dataframe_ext import DataFrameType
+from sdc.hiframes.pd_dataframe_type import DataFrameType
 from numba.errors import TypingError
-import sdc.datatypes.hpat_pandas_dataframe_types
 
 from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
+from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 
 
 # Example func_text for func_name='count' columns=('A', 'B'):
@@ -61,7 +59,7 @@ def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, col
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     for i, c in enumerate(columns):
         result_c = f'result_{c}'
-        func_lines += [f'  series_{c} = init_series(get_dataframe_data({func_params[0]}, {i}))',
+        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({func_params[0]}, {i}))',
                        f'  {result_c} = series_{c}.{func_name}({series_params})']
         result_name_list.append(result_c)
     all_results = ', '.join(result_name_list)
@@ -71,8 +69,7 @@ def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, col
     func_text = '\n'.join(func_lines)
 
     global_vars = {'pandas': pandas, 'np': numpy,
-                   'init_series': sdc.hiframes.api.init_series,
-                   'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
+                   'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
 
