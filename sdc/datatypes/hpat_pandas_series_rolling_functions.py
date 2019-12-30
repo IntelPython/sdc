@@ -50,9 +50,8 @@ hpat_pandas_series_rolling_docstring_tmpl = """
        :caption: {example_caption}
        :name: ex_series_rolling_{method_name}
 
-    .. code-block:: console
-
-        > python ./series_rolling_{method_name}.py{example_result}
+    .. command-output:: python ./series/rolling/series_rolling_{method_name}.py
+       :cwd: ../../../examples
 
     .. seealso::
         :ref:`Series.rolling <pandas.Series.rolling>`
@@ -328,15 +327,8 @@ def hpat_pandas_series_rolling_count(self):
        :caption: Count of any non-NaN observations inside the window.
        :name: ex_series_rolling_count
 
-    .. code-block:: console
-
-        > python ./series_rolling_count.py
-        0    1.0
-        1    2.0
-        2    3.0
-        3    2.0
-        4    2.0
-        dtype: float64
+    .. command-output:: python ./series/rolling/series_rolling_count.py
+       :cwd: ../../../examples
 
     .. seealso::
         :ref:`Series.rolling <pandas.Series.rolling>`
@@ -453,15 +445,8 @@ def hpat_pandas_series_rolling_max(self):
        :caption: Calculate the rolling maximum.
        :name: ex_series_rolling_max
 
-    .. code-block:: console
-
-        > python ./series_rolling_max.py
-        0    NaN
-        1    NaN
-        2    5.0
-        3    5.0
-        4    6.0
-        dtype: float64
+    .. command-output:: python ./series/rolling/series_rolling_max.py
+       :cwd: ../../../examples
 
     .. seealso::
         :ref:`Series.rolling <pandas.Series.rolling>`
@@ -532,15 +517,8 @@ def hpat_pandas_series_rolling_min(self):
        :caption: Calculate the rolling minimum.
        :name: ex_series_rolling_min
 
-    .. code-block:: console
-
-        > python ./series_rolling_min.py
-        0    NaN
-        1    NaN
-        2    3.0
-        3    2.0
-        4    2.0
-        dtype: float64
+    .. command-output:: python ./series/rolling/series_rolling_min.py
+       :cwd: ../../../examples
 
     .. seealso::
         :ref:`Series.rolling <pandas.Series.rolling>`
@@ -645,15 +623,8 @@ def hpat_pandas_series_rolling_sum(self):
        :caption: Calculate rolling sum of given Series.
        :name: ex_series_rolling_sum
 
-    .. code-block:: console
-
-        > python ./series_rolling_sum.py
-        0     NaN
-        1     NaN
-        2    12.0
-        3    10.0
-        4    13.0
-        dtype: float64
+    .. command-output:: python ./series/rolling/series_rolling_sum.py
+       :cwd: ../../../examples
 
     .. seealso::
         :ref:`Series.rolling <pandas.Series.rolling>`
@@ -772,15 +743,6 @@ def hpat_pandas_series_rolling_var(self, ddof=1):
 hpat_pandas_series_rolling_corr.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'corr',
     'example_caption': 'Calculate rolling correlation.',
-    'example_result':
-    """
-        0         NaN
-        1         NaN
-        2         NaN
-        3    0.333333
-        4    0.916949
-        dtype: float64
-    """,
     'limitations_block':
     """
     Limitations
@@ -800,15 +762,6 @@ hpat_pandas_series_rolling_corr.__doc__ = hpat_pandas_series_rolling_docstring_t
 hpat_pandas_series_rolling_cov.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'cov',
     'example_caption': 'Calculate rolling covariance.',
-    'example_result':
-    """
-        0         NaN
-        1         NaN
-        2         NaN
-        3    0.166667
-        4    4.333333
-        dtype: float64
-    """,
     'limitations_block':
     """
     Limitations
@@ -830,15 +783,6 @@ hpat_pandas_series_rolling_cov.__doc__ = hpat_pandas_series_rolling_docstring_tm
 hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'mean',
     'example_caption': 'Calculate the rolling mean of the values.',
-    'example_result':
-    """
-        0         NaN
-        1         NaN
-        2    4.000000
-        3    3.333333
-        4    4.333333
-        dtype: float64
-    """,
     'limitations_block':
     """
     Limitations
@@ -851,15 +795,6 @@ hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_t
 hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'median',
     'example_caption': 'Calculate the rolling median.',
-    'example_result':
-    """
-        0    NaN
-        1    NaN
-        2    4.0
-        3    3.0
-        4    5.0
-        dtype: float64
-    """,
     'limitations_block': '',
     'extra_params': ''
 })
@@ -867,15 +802,6 @@ hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring
 hpat_pandas_series_rolling_quantile.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'quantile',
     'example_caption': 'Calculate the rolling quantile.',
-    'example_result':
-    """
-        0    NaN
-        1    NaN
-        2    3.5
-        3    2.5
-        4    3.5
-        dtype: float64
-    """,
     'limitations_block':
     """
     Limitations
@@ -895,15 +821,6 @@ hpat_pandas_series_rolling_quantile.__doc__ = hpat_pandas_series_rolling_docstri
 hpat_pandas_series_rolling_std.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'std',
     'example_caption': 'Calculate rolling standard deviation.',
-    'example_result':
-    """
-        0         NaN
-        1         NaN
-        2    1.000000
-        3    1.527525
-        4    2.081666
-        dtype: float64
-    """,
     'limitations_block':
     """
     Limitations
@@ -920,15 +837,6 @@ hpat_pandas_series_rolling_std.__doc__ = hpat_pandas_series_rolling_docstring_tm
 hpat_pandas_series_rolling_var.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'var',
     'example_caption': 'Calculate unbiased rolling variance.',
-    'example_result':
-    """
-        0         NaN
-        1         NaN
-        2    1.000000
-        3    2.333333
-        4    4.333333
-        dtype: float64
-    """,
     'limitations_block':
     """
     Limitations
