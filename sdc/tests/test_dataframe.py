@@ -1233,6 +1233,7 @@ class TestDataFrame(TestCase):
                            "D": [14, 3, None, 2, 6]})
         pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
+    @skip_sdc_jit
     def test_median(self):
         def test_impl(df):
             return df.median()
@@ -1298,6 +1299,7 @@ class TestDataFrame(TestCase):
                            "F": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
+    @skip_sdc_jit
     def test_min(self):
         def test_impl(df):
             return df.min()
