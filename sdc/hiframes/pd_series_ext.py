@@ -637,7 +637,6 @@ if sdc.config.config_pipeline_hpat_default:
 
         setattr(SeriesRollingAttribute, "resolve_" + name, rolling_attribute_attachment)
 
-
     def rolling_generic(self, args, kws):
         # output is always float64
         return signature(SeriesType(types.float64), *args)
