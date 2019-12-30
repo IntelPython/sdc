@@ -30,6 +30,7 @@ This is a set of configuration variables in SDC initialized at startup
 
 
 import os
+from distutils import util as distutils_util
 
 try:
     import pyarrow
@@ -48,12 +49,8 @@ else:
 
 
 def strtobool(val):
-    '''Convert a string to True or False.'''
-    val = val.lower()
-    if val in ('n', 'no', 'f', 'false', 'off', '0'):
-        return False
-    else:
-        return True
+    '''Convert string to True or False'''
+    return bool(distutils_util.strtobool(val))
 
 
 config_transport_mpi_default = strtobool(os.getenv('SDC_CONFIG_MPI', 'True'))
