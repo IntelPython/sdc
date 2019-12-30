@@ -1241,6 +1241,32 @@ class TestSeries(TestCase):
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
+    def test_series_loc_array(self):
+        def test_impl(A, n):
+            return A.loc[n]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 4, 8, 6, 0], [1, 2, 4, 0, 6, 0])
+        n = np.array([0, 4, 2])
+        pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
+
+    @skip_sdc_jit('Not impl in old style')
+    def test_series_loc_callable(self):
+        def test_impl(S):
+            return S.loc[(lambda a: a)]
+        hpat_func = self.jit(test_impl)
+        S = pd.Series([0, 6, 4, 7, 8], [0, 6, 66, 6, 8])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @unittest.skip('Loc callable return float Series')
+    def test_series_loc_callable2(self):
+        def test_impl(S):
+            return S.loc[(lambda a: a)]
+        hpat_func = self.jit(test_impl)
+        S = pd.Series([0, 6, 8, 8, 8], [0, 6, 66, 6, 8])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit('Not impl in old style')
     def test_series_at_str(self):
         def test_impl(A):
             return A.at['1']

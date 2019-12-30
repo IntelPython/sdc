@@ -121,6 +121,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
     if accessor == 'loc':
         # Note: Loc return Series
         # Note: Index 0 in slice not supported
+        # Note: Loc slice and callable with String not implement
         index_is_none = (self.series.index is None or
                          isinstance(self.series.index, numba.types.misc.NoneType))
         if isinstance(idx, types.SliceType) and not index_is_none:
@@ -152,8 +153,10 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                 if stop_position < len(index):
                     stop_position += 1
 
-                if (start_position >= len(index) or stop_position <= 0 or stop_position <= start_position
-                    or idx.start >= idx.stop):
+                if (
+                    start_position >= len(index) or stop_position <= 0 or stop_position <= start_position
+                    or idx.start >= idx.stop
+                ):
                     return pandas.Series(data=series._data[:0], index=series._index[:0], name=series._name)
 
                 return pandas.Series(data=series._data[start_position:stop_position],
@@ -175,6 +178,23 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
             return hpat_pandas_series_loc_slice_noidx_impl
 
+        if isinstance(idx, (types.Array, types.List)):
+            def hpat_pandas_series_loc_array_impl(self, idx):
+                series = self._series
+                index = series.index
+                res = []
+                for i in numba.prange(len(idx)):
+                    temp = []
+                    for j in numba.prange(len(index)):
+                        if index[j] == idx[i]:
+                            temp.append(series._data[j])
+                    res.append(temp)
+                new_data = numpy.array([value for arr in res for value in arr])
+                new_index = numpy.array([idx[arr] for arr in range(len(res)) for value in range(len(res[arr]))])
+                return pandas.Series(new_data, new_index, series._name)
+
+            return hpat_pandas_series_loc_array_impl
+
         if isinstance(idx, (int, types.Integer, types.UnicodeType, types.StringLiteral)):
             def hpat_pandas_series_loc_impl(self, idx):
                 index = self._series.index
@@ -184,6 +204,22 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                 return pandas.Series(self._series._data[mask], index[mask], self._series._name)
 
             return hpat_pandas_series_loc_impl
+
+        def hpat_pandas_series_loc_callable_impl(self, idx):
+            # Note: Loc callable return float Series
+            series = self._series
+            index = series.index
+            res = numpy.asarray(list(map(idx, self._series._data)))
+            new_series = pandas.Series(numpy.array([numpy.nan])[:0], index[:0], series._name)
+            for i in numba.prange(len(res)):
+                tmp = series.loc[res[i]]
+                if len(tmp) > 0:
+                    new_series = new_series.append(tmp)
+                else:
+                    new_series = new_series.append(pandas.Series(numpy.array([numpy.nan]), numpy.array([res[i]])))
+            return new_series
+
+        return hpat_pandas_series_loc_callable_impl
 
         raise TypingError('{} The index must be an Number, Slice, String, List, Array or a callable.\
                           Given: {}'.format(_func_name, idx))
@@ -268,7 +304,7 @@ def hpat_pandas_series_getitem(self, idx):
         (isinstance(idx, (types.UnicodeType, types.StringLiteral)) and index_is_string)
     ):
         def hpat_pandas_series_getitem_index_impl(self, idx):
-            index = numpy.copy(self.index)
+            index = self.index
             mask = numpy.empty(len(self._data), numpy.bool_)
             for i in numba.prange(len(index)):
                 mask[i] = index[i] == idx
@@ -326,7 +362,7 @@ def hpat_pandas_series_getitem(self, idx):
             return hpat_pandas_series_getitem_idx_series_impl
 
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
-            index = numpy.copy(self.index)
+            index = self.index
             res = []
             for i in numba.prange(len(idx._data)):
                 temp = []
