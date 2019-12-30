@@ -155,7 +155,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
                 if (
                     start_position >= len(index) or stop_position <= 0 or stop_position <= start_position
-                    or idx.start >= idx.stop
+                    or idx.start > idx.stop
                 ):
                     return pandas.Series(data=series._data[:0], index=series._index[:0], name=series._name)
 
@@ -178,23 +178,6 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
             return hpat_pandas_series_loc_slice_noidx_impl
 
-        if isinstance(idx, (types.Array, types.List)):
-            def hpat_pandas_series_loc_array_impl(self, idx):
-                series = self._series
-                index = series.index
-                res = []
-                for i in numba.prange(len(idx)):
-                    temp = []
-                    for j in numba.prange(len(index)):
-                        if index[j] == idx[i]:
-                            temp.append(series._data[j])
-                    res.append(temp)
-                new_data = numpy.array([value for arr in res for value in arr])
-                new_index = numpy.array([idx[arr] for arr in range(len(res)) for value in range(len(res[arr]))])
-                return pandas.Series(new_data, new_index, series._name)
-
-            return hpat_pandas_series_loc_array_impl
-
         if isinstance(idx, (int, types.Integer, types.UnicodeType, types.StringLiteral)):
             def hpat_pandas_series_loc_impl(self, idx):
                 index = self._series.index
@@ -204,22 +187,6 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                 return pandas.Series(self._series._data[mask], index[mask], self._series._name)
 
             return hpat_pandas_series_loc_impl
-
-        def hpat_pandas_series_loc_callable_impl(self, idx):
-            # Note: Loc callable return float Series
-            series = self._series
-            index = series.index
-            res = numpy.asarray(list(map(idx, self._series._data)))
-            new_series = pandas.Series(numpy.array([numpy.nan])[:0], index[:0], series._name)
-            for i in numba.prange(len(res)):
-                tmp = series.loc[res[i]]
-                if len(tmp) > 0:
-                    new_series = new_series.append(tmp)
-                else:
-                    new_series = new_series.append(pandas.Series(numpy.array([numpy.nan]), numpy.array([res[i]])))
-            return new_series
-
-        return hpat_pandas_series_loc_callable_impl
 
         raise TypingError('{} The index must be an Number, Slice, String, List, Array or a callable.\
                           Given: {}'.format(_func_name, idx))
