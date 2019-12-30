@@ -2839,7 +2839,8 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
             '{} Currently function supports only numeric values. Given data type: {}'.format(
                 _func_name, self.data.dtype))
 
-    if not isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) and skipna is not True and skipna is not None:
+    if not isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) and skipna is not True \
+            and skipna is not None:
         raise TypingError(
             '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, skipna))
 
