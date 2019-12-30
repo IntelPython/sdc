@@ -841,7 +841,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
-    # @skip_numba_jit
     def test_mean1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -852,7 +851,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    # @skip_numba_jit
     def test_median1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -863,7 +861,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    # @skip_numba_jit
     def test_std1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -874,7 +871,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    # @skip_numba_jit
     def test_var1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -885,7 +881,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    # @skip_numba_jit
     def test_max1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -896,7 +891,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    # @skip_numba_jit
     def test_min1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -907,8 +901,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    # @unittest.skipIf(not sdc.config.config_pipeline_hpat_default, "DataFrame.sum() not implemented in new style")
-    # @skip_numba_jit("DataFrame.sum() not implemented in new style")
     def test_sum1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -1149,7 +1141,7 @@ class TestDataFrame(TestCase):
             hpat_func(S1, S2),
             test_impl(S1, S2).rename(columns={0: '0', 1: '1'}))
 
-    # @skip_numba_jit
+    @skip_numba_jit
     def test_var_rename(self):
         # tests df variable replacement in hiframes_untyped where inlining
         # can cause extra assignments and definition handling errors
@@ -1221,7 +1213,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    def test_dataframe_min(self):
+    def test_min_dataframe(self):
         def test_impl(df):
             return df.min()
         sdc_func = sdc.jit(test_impl)
@@ -1229,10 +1221,9 @@ class TestDataFrame(TestCase):
                            "B": [5, 2, 54, 3, 2],
                            "C": [20, 16, 7, 3, 8],
                            "D": [14, 3, 17, 2, 6]})
-        print(sdc_func(df))
         pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
-    def test_dataframe_min2(self):
+    def test_min2_dataframe(self):
         def test_impl(df):
             return df.min()
         sdc_func = sdc.jit(test_impl)
@@ -1240,7 +1231,6 @@ class TestDataFrame(TestCase):
                            "B": [5, 2, 54, 3, None],
                            "C": [20, 16, 7, 3, 8],
                            "D": [14, 3, None, 2, 6]})
-        print(sdc_func(df))
         pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
     def test_median(self):

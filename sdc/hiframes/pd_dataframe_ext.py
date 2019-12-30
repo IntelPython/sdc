@@ -1561,13 +1561,14 @@ def lower_prod_dummy(context, builder, sig, args):
     return out_obj._getvalue()
 
 
-@overload_method(DataFrameType, 'count')
-def count_overload(df, axis=0, level=None, numeric_only=False):
-    # TODO: avoid dummy and generate func here when inlining is possible
-    def _impl(df, axis=0, level=None, numeric_only=False):
-        return sdc.hiframes.pd_dataframe_ext.count_dummy(df)
+if sdc.config.config_pipeline_hpat_default:
+    @overload_method(DataFrameType, 'count')
+    def count_overload(df, axis=0, level=None, numeric_only=False):
+        # TODO: avoid dummy and generate func here when inlining is possible
+        def _impl(df, axis=0, level=None, numeric_only=False):
+            return sdc.hiframes.pd_dataframe_ext.count_dummy(df)
 
-    return _impl
+        return _impl
 
 
 def count_dummy(df, n):

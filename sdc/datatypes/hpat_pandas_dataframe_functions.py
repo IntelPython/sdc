@@ -38,8 +38,8 @@ import sdc
 
 from numba import types
 from numba.extending import (overload, overload_method, overload_attribute)
-from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from numba.errors import TypingError
+from sdc.hiframes.pd_dataframe_ext import DataFrameType
 import sdc.datatypes.hpat_pandas_dataframe_types
 
 from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
@@ -129,8 +129,7 @@ def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
        .. only:: developer
 
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_median1
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_median
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_median
 
        Parameters
        -----------
@@ -156,7 +155,7 @@ def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
 
     params = {'axis': None, 'skipna': None, 'level': None, 'numeric_only': None}
-    ser_par = {'skipna': None, 'level': None}
+    ser_par = {'skipna': 'skipna', 'level': 'level'}
 
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
@@ -168,8 +167,7 @@ def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
        .. only:: developer
 
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_mean1
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_mean
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_mean
 
        Parameters
        -----------
@@ -207,8 +205,7 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
        .. only:: developer
 
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_std1
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_std
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_std
 
        Parameters
        -----------
@@ -248,8 +245,7 @@ def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
        .. only:: developer
 
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_var1
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_var
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_var
 
        Parameters
        -----------
@@ -289,8 +285,7 @@ def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
        .. only:: developer
 
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_max1
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_max
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_max
 
        Parameters
        -----------
@@ -328,8 +323,7 @@ def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
        .. only:: developer
 
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_min1
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_min
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_min
 
        Parameters
        -----------
@@ -367,8 +361,7 @@ def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_
 
        .. only:: developer
 
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_sum1
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_sum
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_sum
 
        Parameters
        -----------
@@ -408,8 +401,7 @@ def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min
 
        .. only:: developer
 
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_prod1
-           Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_prod
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_prod
 
        Parameters
        -----------
