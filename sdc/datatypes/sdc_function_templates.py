@@ -45,7 +45,7 @@ import sdc
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.common_functions import (check_index_is_numeric, find_common_dtype_from_numpy_dtypes,
                                             sdc_join_series_indexes, sdc_check_indexes_equal, check_types_comparable)
-from sdc.hiframes.pd_series_ext import SeriesType
+from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_arr_ext import (string_array_type, num_total_chars, str_arr_is_na)
 
 
