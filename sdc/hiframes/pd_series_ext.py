@@ -608,47 +608,48 @@ if sdc.config.config_pipeline_hpat_default:
             self.dtype = dtype
             name = "SeriesRollingType({})".format(dtype)
             super(SeriesRollingType, self).__init__(name)
+
+
+    @infer_getattr
+    class SeriesRollingAttribute(AttributeTemplate):
+        key = SeriesRollingType
+
+        @bound_function("rolling.apply")
+        def resolve_apply(self, ary, args, kws):
+            # result is always float64 (see Pandas window.pyx:roll_generic)
+            return signature(SeriesType(types.float64), *args)
+
+        @bound_function("rolling.cov")
+        def resolve_cov(self, ary, args, kws):
+            return signature(SeriesType(types.float64), *args)
+
+        @bound_function("rolling.corr")
+        def resolve_corr(self, ary, args, kws):
+            return signature(SeriesType(types.float64), *args)
+
+    # similar to install_array_method in arraydecl.py
+
+
+    def install_rolling_method(name, generic):
+        my_attr = {"key": "rolling." + name, "generic": generic}
+        temp_class = type("Rolling_" + name, (AbstractTemplate,), my_attr)
+
+        def rolling_attribute_attachment(self, ary):
+            return types.BoundFunction(temp_class, ary)
+
+        setattr(SeriesRollingAttribute, "resolve_" + name, rolling_attribute_attachment)
+
+
+    def rolling_generic(self, args, kws):
+        # output is always float64
+        return signature(SeriesType(types.float64), *args)
+
+
+    for fname in supported_rolling_funcs:
+        install_rolling_method(fname, rolling_generic)
+
 else:
     from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
-
-
-@infer_getattr
-class SeriesRollingAttribute(AttributeTemplate):
-    key = SeriesRollingType
-
-    @bound_function("rolling.apply")
-    def resolve_apply(self, ary, args, kws):
-        # result is always float64 (see Pandas window.pyx:roll_generic)
-        return signature(SeriesType(types.float64), *args)
-
-    @bound_function("rolling.cov")
-    def resolve_cov(self, ary, args, kws):
-        return signature(SeriesType(types.float64), *args)
-
-    @bound_function("rolling.corr")
-    def resolve_corr(self, ary, args, kws):
-        return signature(SeriesType(types.float64), *args)
-
-# similar to install_array_method in arraydecl.py
-
-
-def install_rolling_method(name, generic):
-    my_attr = {"key": "rolling." + name, "generic": generic}
-    temp_class = type("Rolling_" + name, (AbstractTemplate,), my_attr)
-
-    def rolling_attribute_attachment(self, ary):
-        return types.BoundFunction(temp_class, ary)
-
-    setattr(SeriesRollingAttribute, "resolve_" + name, rolling_attribute_attachment)
-
-
-def rolling_generic(self, args, kws):
-    # output is always float64
-    return signature(SeriesType(types.float64), *args)
-
-
-for fname in supported_rolling_funcs:
-    install_rolling_method(fname, rolling_generic)
 
 
 class SeriesIatType(types.Type):
