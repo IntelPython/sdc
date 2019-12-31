@@ -913,7 +913,7 @@ def _hpat_pandas_stringmethods_autogen(method_name):
     return _hpat_pandas_stringmethods_autogen_global_dict[global_dict_name]
 
 
-hpat_pandas_series_str_is_docstring_tmpl = """
+sdc_pandas_series_str_docstring_template = """
         Intel Scalable Dataframe Compiler User Guide
         ********************************************
         Pandas API: pandas.Series.str.{method_name}
@@ -1061,29 +1061,17 @@ def hpat_pandas_stringmethods_isalnum(self):
     return hpat_pandas_stringmethods_isalnum_impl
 
 
-hpat_pandas_stringmethods_istitle.__doc__ = hpat_pandas_series_str_is_docstring_tmpl.format(**{
-    'method_name': 'istitle'
-})
+stringmethods_funcs = {
+    'istitle': hpat_pandas_stringmethods_istitle,
+    'isspace': hpat_pandas_stringmethods_isspace,
+    'isalpha': hpat_pandas_stringmethods_isalpha,
+    'islower': hpat_pandas_stringmethods_islower,
+    'isalnum': hpat_pandas_stringmethods_isalnum
+}
 
 
-hpat_pandas_stringmethods_isspace.__doc__ = hpat_pandas_series_str_is_docstring_tmpl.format(**{
-    'method_name': 'isspace'
-})
-
-
-hpat_pandas_stringmethods_isalpha.__doc__ = hpat_pandas_series_str_is_docstring_tmpl.format(**{
-    'method_name': 'isalpha'
-})
-
-
-hpat_pandas_stringmethods_islower.__doc__ = hpat_pandas_series_str_is_docstring_tmpl.format(**{
-    'method_name': 'islower'
-})
-
-
-hpat_pandas_stringmethods_isalnum.__doc__ = hpat_pandas_series_str_is_docstring_tmpl.format(**{
-    'method_name': 'isalnum'
-})
+for name, method in stringmethods_funcs.items():
+    method.__doc__ = sdc_pandas_series_str_docstring_template.format(**{'method_name': name})
 
 
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))
