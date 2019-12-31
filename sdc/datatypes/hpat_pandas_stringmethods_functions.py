@@ -1062,25 +1062,22 @@ def hpat_pandas_stringmethods_isalnum(self):
 
 
 stringmethods_funcs = {
-    'istitle': hpat_pandas_stringmethods_istitle,
-    'isspace': hpat_pandas_stringmethods_isspace,
-    'isalpha': hpat_pandas_stringmethods_isalpha,
-    'islower': hpat_pandas_stringmethods_islower,
-    'isalnum': hpat_pandas_stringmethods_isalnum
-}
-
-stringmethods_captions = {
-    'istitle': 'Check if each word start with an upper case letter',
-    'isspace': 'Check if all the characters in the text are whitespaces',
-    'isalpha': 'Check whether all characters in each string are alphabetic',
-    'islower': 'Check if all the characters in the text are alphanumeric',
-    'isalnum': 'Check if all the characters in the text are alphanumeric'
+    'istitle': {'method': hpat_pandas_stringmethods_istitle,
+                'caption': 'Check if each word start with an upper case letter'},
+    'isspace': {'method': hpat_pandas_stringmethods_isspace,
+                'caption': 'Check if all the characters in the text are whitespaces'},
+    'isalpha': {'method': hpat_pandas_stringmethods_isalpha,
+                'caption': 'Check whether all characters in each string are alphabetic'},
+    'islower': {'method': hpat_pandas_stringmethods_islower,
+                'caption': 'Check if all the characters in the text are alphanumeric'},
+    'isalnum': {'method': hpat_pandas_stringmethods_isalnum,
+                'caption': 'Check if all the characters in the text are alphanumeric'}
 }
 
 
-for name, method in stringmethods_funcs.items():
-    method.__doc__ = sdc_pandas_series_str_docstring_template.format(**{'method_name': name,
-                                                                        'caption': stringmethods_captions[name]})
+for name, data in stringmethods_funcs.items():
+    data['method'].__doc__ = sdc_pandas_series_str_docstring_template.format(**{'method_name': name,
+                                                                        'caption': data['caption']})
 
 
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))
