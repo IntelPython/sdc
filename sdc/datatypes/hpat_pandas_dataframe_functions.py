@@ -37,8 +37,7 @@ import numpy
 from numba import types
 from numba.extending import (overload, overload_method, overload_attribute)
 from numba.errors import TypingError
-from sdc.hiframes.pd_dataframe_ext import DataFrameType
-import sdc.datatypes.hpat_pandas_dataframe_types
+from sdc.hiframes.pd_dataframe_type import DataFrameType
 
 from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
