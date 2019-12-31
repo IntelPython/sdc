@@ -146,6 +146,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_box1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
@@ -1196,7 +1197,6 @@ class TestDataFrame(TestCase):
     @unittest.skip("Implement iterrows for DataFrame")
     def test_dataframe_iterrows(self):
         def test_impl(df):
-            print(df.iterrows())
             return [row for _, row in df.iterrows()]
 
         df = pd.DataFrame({'A': [1, 2, 3], 'B': [0.2, 0.5, 0.001], 'C': ['a', 'bb', 'ccc']})

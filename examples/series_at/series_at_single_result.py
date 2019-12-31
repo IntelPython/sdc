@@ -26,14 +26,15 @@
 
 import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
 @njit
-def series_at(i):
+def series_at_value():
     series = pd.Series([5, 4, 3, 2, 1], index=[0, 2, 4, 6, 8])
-    return series.at[i]
+    return series.at[4]
+    # Expected Array:
+    # [3]
 
 
-print(series_at(4))
+print(series_at_value())
