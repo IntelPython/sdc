@@ -654,6 +654,7 @@ class SeriesIatType(types.Type):
         super(SeriesIatType, self).__init__(name)
 
 
+# PR135. This needs to be commented out
 if sdc.config.config_pipeline_hpat_default:
     @infer_global(operator.getitem)
     class GetItemSeriesIat(AbstractTemplate):
@@ -772,8 +773,8 @@ if not sdc.config.config_pipeline_hpat_default:
 _non_hpat_pipeline_attrs = [
     'resolve_append', 'resolve_combine', 'resolve_corr', 'resolve_cov',
     'resolve_dropna', 'resolve_fillna', 'resolve_head', 'resolve_nlargest',
-    'resolve_nsmallest', 'resolve_pct_change', 'resolve_rolling', 'resolve_loc',
-    'resolve_value_counts', 'resolve_describe', 'resolve_iloc'
+    'resolve_nsmallest', 'resolve_pct_change', 'resolve_loc', 'resolve_iloc',
+    'resolve_iat', 'resolve_rolling', 'resolve_value_counts', 'resolve_describe'
 ]
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
@@ -789,6 +790,7 @@ if not sdc.config.config_pipeline_hpat_default:
         if attr in SeriesAttribute.__dict__:
             delattr(SeriesAttribute, attr)
 
+# PR135. This needs to be commented out
 if sdc.config.config_pipeline_hpat_default:
     @infer_global(operator.getitem)
     class GetItemSeries(AbstractTemplate):
