@@ -927,7 +927,7 @@ sdc_pandas_series_str_docstring_template = """
         .. literalinclude:: ../../../examples/series/str/series_str_{method_name}.py
            :language: python
            :lines: 27-
-           :caption: Check if each word start with an upper case letter
+           :caption: {caption}
            :name: ex_series_str_{method_name}
 
         .. command-output:: python ./series/str/series_str_{method_name}.py
@@ -1069,9 +1069,18 @@ stringmethods_funcs = {
     'isalnum': hpat_pandas_stringmethods_isalnum
 }
 
+stringmethods_captions = {
+    'istitle': 'Check if each word start with an upper case letter',
+    'isspace': 'Check if all the characters in the text are whitespaces',
+    'isalpha': 'Check whether all characters in each string are alphabetic',
+    'islower': 'Check if all the characters in the text are alphanumeric',
+    'isalnum': 'Check if all the characters in the text are alphanumeric'
+}
+
 
 for name, method in stringmethods_funcs.items():
-    method.__doc__ = sdc_pandas_series_str_docstring_template.format(**{'method_name': name})
+    method.__doc__ = sdc_pandas_series_str_docstring_template.format(**{'method_name': name,
+                                                                        'caption': stringmethods_captions[name]})
 
 
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))
