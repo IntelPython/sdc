@@ -790,15 +790,6 @@ def hpat_pandas_series_rolling_var(self, ddof=1):
 hpat_pandas_series_rolling_apply.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'apply',
     'example_caption': 'Calculate the rolling apply.',
-    'example_result':
-    """
-        0    NaN
-        1    NaN
-        2    4.0
-        3    3.0
-        4    5.0
-        dtype: float64
-    """,
     'limitations_block':
     """
     Limitations
