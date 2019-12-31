@@ -124,47 +124,6 @@ def hpat_pandas_series_accessor_getitem(self, idx):
         # Note: Loc slice and callable with String not implement
         index_is_none = (self.series.index is None or
                          isinstance(self.series.index, numba.types.misc.NoneType))
-        if isinstance(idx, types.SliceType) and not index_is_none:
-            def hpat_pandas_series_loc_slice_impl(self, idx):
-                series = self._series
-                index = series.index
-                start_position = len(index)
-                stop_position = 0
-                max_diff = 0
-                min_diff = 0
-                for i in numba.prange(len(index)):
-                    if idx.start <= idx.stop:
-                        start_cmp = index[i] >= idx.start
-                        stop_cmp = index[i] <= idx.stop
-                    else:
-                        start_cmp = index[i] <= idx.start
-                        stop_cmp = index[i] >= idx.stop
-                    if start_cmp:
-                        start_position = min(start_position, i)
-                    if stop_cmp:
-                        stop_position = max(stop_position, i)
-                    if i > 0:
-                        max_diff = max(max_diff, index[i] - index[i - 1])
-                        min_diff = min(min_diff, index[i] - index[i - 1])
-
-                if max_diff*min_diff < 0:
-                    raise ValueError("Index must be monotonic increasing or decreasing")
-
-                if stop_position < len(index):
-                    stop_position += 1
-
-                if (
-                    start_position >= len(index) or stop_position <= 0 or stop_position <= start_position
-                    or idx.start > idx.stop
-                ):
-                    return pandas.Series(data=series._data[:0], index=series._index[:0], name=series._name)
-
-                return pandas.Series(data=series._data[start_position:stop_position],
-                                     index=index[start_position:stop_position],
-                                     name=series._name)
-
-            return hpat_pandas_series_loc_slice_impl
-
         if isinstance(idx, types.SliceType) and index_is_none:
             def hpat_pandas_series_loc_slice_noidx_impl(self, idx):
                 max_slice = sys.maxsize
