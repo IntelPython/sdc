@@ -1994,7 +1994,7 @@ def hpat_pandas_series_sum(
     .. only:: developer
 
         Tests:
-            python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_sum
+            python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_sum*
 
     Parameters
     ----------
@@ -2055,8 +2055,11 @@ def hpat_pandas_series_sum(
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_sum1
         """
         if skipna is None:
-            skipna = True
-        if skipna:
+            _skipna = True
+        else:
+            _skipna = skipna
+
+        if _skipna:
             return numpy.nansum(self._data)
         return numpy.sum(self._data)
 
@@ -2612,7 +2615,7 @@ def hpat_pandas_series_prod(self, axis=None, skipna=None, level=None, numeric_on
 
     .. only:: developer
 
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_prod
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_prod*
 
     Parameters
     -----------
@@ -2663,9 +2666,11 @@ def hpat_pandas_series_prod(self, axis=None, skipna=None, level=None, numeric_on
 
     def hpat_pandas_series_prod_impl(self, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
         if skipna is None:
-            skipna = True
+            _skipna = True
+        else:
+            _skipna = skipna
 
-        if skipna:
+        if _skipna:
             return numpy.nanprod(self._data)
         else:
             return numpy.prod(self._data)
@@ -2811,7 +2816,7 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
     """
     Pandas Series method :meth:`pandas.Series.min` implementation.
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_min
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_min*
 
     Parameters
     -----------
@@ -2853,9 +2858,11 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
 
     def hpat_pandas_series_min_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
         if skipna is None:
-            skipna = True
+            _skipna = True
+        else:
+            _skipna = skipna
 
-        if skipna:
+        if _skipna:
             return numpy.nanmin(self._data)
 
         return self._data.min()
@@ -2903,7 +2910,7 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
     *************************************************
     Pandas Series method :meth:`pandas.Series.max` implementation.
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_max
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_max*
     Parameters
     -----------
     axis:
@@ -2943,9 +2950,11 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
 
     def hpat_pandas_series_max_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
         if skipna is None:
-            skipna = True
+            _skipna = True
+        else:
+            _skipna = skipna
 
-        if skipna:
+        if _skipna:
             return numpy.nanmax(self._data)
 
         return self._data.max()
@@ -2960,7 +2969,7 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
 
     .. only:: developer
 
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_mean
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_mean*
 
     Parameters
     -----------
@@ -3006,9 +3015,11 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
 
     def hpat_pandas_series_mean_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
         if skipna is None:
-            skipna = True
+            _skipna = True
+        else:
+            _skipna = skipna
 
-        if skipna:
+        if _skipna:
             return numpy.nanmean(self._data)
 
         return self._data.mean()
@@ -3820,7 +3831,7 @@ def hpat_pandas_series_median(self, axis=None, skipna=None, level=None, numeric_
 
     .. only:: developer
 
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_median1
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_median1*
 
     Parameters
     -----------
@@ -3872,9 +3883,11 @@ def hpat_pandas_series_median(self, axis=None, skipna=None, level=None, numeric_
 
     def hpat_pandas_series_median_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
         if skipna is None:
-            skipna = True
+            _skipna = True
+        else:
+            _skipna = skipna
 
-        if skipna:
+        if _skipna:
             return numpy.nanmedian(self._data)
 
         return numpy.median(self._data)

@@ -1213,28 +1213,20 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    def test_min_dataframe(self):
+    def test_min_dataframe_default(self):
         def test_impl(df):
             return df.min()
         sdc_func = sdc.jit(test_impl)
-        df = pd.DataFrame({"A": [12, 4, 5, 44, 1],
-                           "B": [5, 2, 54, 3, 2],
-                           "C": [20, 16, 7, 3, 8],
-                           "D": [14, 3, 17, 2, 6]})
-        pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
-
-    def test_min2_dataframe(self):
-        def test_impl(df):
-            return df.min()
-        sdc_func = sdc.jit(test_impl)
-        df = pd.DataFrame({"A": [12, 4, 5, None, 1],
-                           "B": [5, 2, 54, 3, None],
-                           "C": [20, 16, 7, 3, 8],
-                           "D": [14, 3, None, 2, 6]})
+        df = pd.DataFrame({
+            "A": [12, 4, 5, 44, 1],
+            "B": [5.0, np.nan, 9, 2, -1],
+            "C": ['a', 'aa', 'd', 'cc', None],
+            "D": [True, True, False, True, True]
+        })
         pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
     @skip_sdc_jit
-    def test_median(self):
+    def test_median_default(self):
         def test_impl(df):
             return df.median()
 
@@ -1247,7 +1239,7 @@ class TestDataFrame(TestCase):
                            "F": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    def test_mean(self):
+    def test_mean_default(self):
         def test_impl(df):
             return df.mean()
 
@@ -1260,7 +1252,7 @@ class TestDataFrame(TestCase):
                            "F": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    def test_std(self):
+    def test_std_default(self):
         def test_impl(df):
             return df.std()
 
@@ -1273,7 +1265,7 @@ class TestDataFrame(TestCase):
                            "F": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    def test_var(self):
+    def test_var_default(self):
         def test_impl(df):
             return df.var()
 
@@ -1286,7 +1278,7 @@ class TestDataFrame(TestCase):
                            "F": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    def test_max(self):
+    def test_max_default(self):
         def test_impl(df):
             return df.max()
 
@@ -1300,7 +1292,7 @@ class TestDataFrame(TestCase):
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     @skip_sdc_jit
-    def test_min(self):
+    def test_min_default(self):
         def test_impl(df):
             return df.min()
 
@@ -1313,7 +1305,7 @@ class TestDataFrame(TestCase):
                            "F": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    def test_sum(self):
+    def test_sum_default(self):
         def test_impl(df):
             return df.sum()
 
@@ -1326,7 +1318,7 @@ class TestDataFrame(TestCase):
                            "F": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    def test_prod(self):
+    def test_prod_default(self):
         def test_impl(df):
             return df.prod()
 
@@ -1339,7 +1331,7 @@ class TestDataFrame(TestCase):
                            "F": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    def test_count2(self):
+    def test_count2_default(self):
         def test_impl(df):
             return df.count()
 
