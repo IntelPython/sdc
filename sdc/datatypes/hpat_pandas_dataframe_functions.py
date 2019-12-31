@@ -127,7 +127,7 @@ def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
        .. only:: developer
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_median
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_median*
 
        Parameters
        -----------
@@ -165,7 +165,7 @@ def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
        .. only:: developer
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_mean
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_mean*
 
        Parameters
        -----------
@@ -203,7 +203,7 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
        .. only:: developer
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_std
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_std*
 
        Parameters
        -----------
@@ -243,7 +243,7 @@ def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
        .. only:: developer
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_var
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_var*
 
        Parameters
        -----------
@@ -283,7 +283,7 @@ def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
        .. only:: developer
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_max
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_max*
 
        Parameters
        -----------
@@ -321,7 +321,7 @@ def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
        .. only:: developer
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_min
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_min*
 
        Parameters
        -----------
@@ -359,7 +359,7 @@ def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_
 
        .. only:: developer
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_sum
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_sum*
 
        Parameters
        -----------
@@ -399,7 +399,7 @@ def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min
 
        .. only:: developer
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_prod
+           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_prod*
 
        Parameters
        -----------
@@ -439,7 +439,7 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
 
     .. only:: developer
 
-        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_count
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_count*
 
     Parameters
     -----------
