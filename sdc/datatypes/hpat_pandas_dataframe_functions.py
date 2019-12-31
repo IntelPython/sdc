@@ -31,65 +31,113 @@
 
 import operator
 import pandas
+import copy
+import numpy
 
 from numba import types
 from numba.extending import (overload, overload_method, overload_attribute)
+from sdc.hiframes.pd_dataframe_type import DataFrameType
 from numba.errors import TypingError
 
-from sdc.datatypes.hpat_pandas_dataframe_types import DataFrameType
-from sdc.utils import sdc_overload_method
+from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
+from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 
 
-@sdc_overload_method(DataFrameType, 'count')
-def sdc_pandas_dataframe_count(self, axis=0, level=None, numeric_only=False):
+# Example func_text for func_name='count' columns=('A', 'B'):
+#
+#         def _df_count_impl(df, axis=0, level=None, numeric_only=False):
+#           series_A = init_series(get_dataframe_data(df, 0))
+#           result_A = series_A.count(level=level)
+#           series_B = init_series(get_dataframe_data(df, 1))
+#           result_B = series_B.count(level=level)
+#           return pandas.Series([result_A, result_B], ['A', 'B'])
+
+
+def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, columns):
+    result_name_list = []
+    joined = ', '.join(func_params)
+    func_lines = [f'def _df_{func_name}_impl({joined}):']
+    for i, c in enumerate(columns):
+        result_c = f'result_{c}'
+        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({func_params[0]}, {i}))',
+                       f'  {result_c} = series_{c}.{func_name}({series_params})']
+        result_name_list.append(result_c)
+    all_results = ', '.join(result_name_list)
+    all_columns = ', '.join([f"'{c}'" for c in columns])
+
+    func_lines += [f'  return pandas.Series([{all_results}], [{all_columns}])']
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas, 'np': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
+    all_params = ['df']
+    ser_par = []
+
+    for key, value in params.items():
+        all_params.append('{}={}'.format(key, value))
+    for key, value in ser_params.items():
+        ser_par.append('{}={}'.format(key, value))
+
+    s_par = '{}'.format(', '.join(ser_par[:]))
+
+    df_func_name = f'_df_{func_name}_impl'
+
+    func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, s_par, df.columns)
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _reduce_impl = loc_vars[df_func_name]
+
+    return _reduce_impl
+
+
+@overload_method(DataFrameType, 'count')
+def count_overload(df, axis=0, level=None, numeric_only=False):
     """
     Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.
 
     .. only:: developer
 
-        Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count
+    Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count
+    Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_count1
 
     Parameters
     -----------
     self: :class:`pandas.DataFrame`
-        input arg
+    input arg
     axis:
-        *unsupported*
+    *unsupported*
     level:
-        *unsupported*
+    *unsupported*
     numeric_only:
-        *unsupported*
+    *unsupported*
 
     Returns
     -------
     :obj:`pandas.Series` or `pandas.DataFrame`
-            returns: For each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
+    for each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
     """
 
-    _func_name = 'Method pandas.dataframe.count().'
+    name = 'count'
 
-    if not isinstance(self, DataFrameType):
-        raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker('Method {}().'.format(name))
+    ty_checker.check(df, DataFrameType)
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
-        raise TypingError("{} 'axis' unsupported. Given: {}".format(_func_name, axis))
+        ty_checker.raise_exc(axis, 'unsupported', 'axis')
 
     if not (isinstance(level, types.Omitted) or level is None):
-        raise TypingError("{} 'level' unsupported. Given: {}".format(_func_name, axis))
+        ty_checker.raise_exc(level, 'unsupported', 'level')
 
     if not (isinstance(numeric_only, types.Omitted) or numeric_only is False):
-        raise TypingError("{} 'numeric_only' unsupported. Given: {}".format(_func_name, axis))
+        ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-    def sdc_pandas_dataframe_count_impl(self, axis=0, level=None, numeric_only=False):
-        result_data = []
-        result_index = []
+    params = {'axis': 0, 'level': None, 'numeric_only': False}
+    ser_par = {'level': 'level'}
 
-        for dataframe_item in self._data:
-            item_count = dataframe_item.count()
-            item_name = dataframe_item._name
-            result_data.append(item_count)
-            result_index.append(item_name)
-
-        return pandas.Series(data=result_data, index=result_index)
-
-    return sdc_pandas_dataframe_count_impl
+    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)

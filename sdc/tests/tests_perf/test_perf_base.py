@@ -6,7 +6,7 @@ from sdc.tests.tests_perf.test_perf_utils import *
 
 class TestBase(unittest.TestCase):
     iter_number = 5
-    test_results_class = TestResults
+    results_class = TestResults
 
     @classmethod
     def create_test_results(cls):
@@ -16,7 +16,7 @@ class TestBase(unittest.TestCase):
         if is_true(os.environ.get('SDC_TEST_PERF_CSV', False)):
             drivers.append(CSVResultsDriver('perf_results.csv'))
 
-        results = cls.test_results_class(drivers)
+        results = cls.results_class(drivers)
 
         if is_true(os.environ.get('LOAD_PREV_RESULTS')):
             results.load()
