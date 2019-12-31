@@ -480,3 +480,34 @@ def sdc_check_indexes_equal_overload(A, B):
             return is_index_equal
 
         return sdc_check_indexes_equal_string_impl
+
+
+@numba.njit
+def _sdc_pandas_format_percentiles(arr):
+    """ Function converting float array of percentiles to a list of strings formatted
+        the same as in pandas.io.formats.format.format_percentiles
+    """
+
+    percentiles_strs = []
+    for percentile in arr:
+        p_as_string = str(percentile * 100)
+
+        trim_index = len(p_as_string) - 1
+        while trim_index >= 0:
+            if p_as_string[trim_index] == '0':
+                trim_index -= 1
+                continue
+            elif p_as_string[trim_index] == '.':
+                break
+
+            trim_index += 1
+            break
+
+        if trim_index < 0:
+            p_as_string_trimmed = '0'
+        else:
+            p_as_string_trimmed = p_as_string[:trim_index]
+
+        percentiles_strs.append(p_as_string_trimmed + '%')
+
+    return percentiles_strs
