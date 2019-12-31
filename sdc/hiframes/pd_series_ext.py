@@ -774,7 +774,7 @@ _non_hpat_pipeline_attrs = [
     'resolve_append', 'resolve_combine', 'resolve_corr', 'resolve_cov',
     'resolve_dropna', 'resolve_fillna', 'resolve_head', 'resolve_nlargest',
     'resolve_nsmallest', 'resolve_pct_change', 'resolve_loc', 'resolve_iloc',
-    'resolve_iat', 'resolve_rolling', 'resolve_value_counts'
+    'resolve_iat', 'resolve_rolling', 'resolve_value_counts', 'resolve_describe'
 ]
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
