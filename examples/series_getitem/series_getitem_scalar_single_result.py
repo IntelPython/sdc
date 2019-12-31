@@ -26,23 +26,16 @@
 
 import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
 @njit
-def series_getitem():
+def series_getitem_scalar():
     series = pd.Series(np.arange(10, 0, -1))  # Series of 10, 9, ..., 1
-
-    s = series[0]  # Accessing series by scalar index
-    for x in series[2:6]:  # Accessing series by a slice
-        s += x
-
-    indices = pd.Series(np.asarray([1, 6, 7, 8, 9]))
-    for x in series[indices]:  # Accessing series by another series
-        s += x
-
-    return s  # Expect sum of arithmetic progression == 55
+    return series[0]  # Accessing series by scalar index
+    # Expected Series:
+    # 0    10
+    # dtype: int64
 
 
-print(series_getitem())
+print(series_getitem_scalar())

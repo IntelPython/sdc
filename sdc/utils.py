@@ -42,6 +42,7 @@ import numpy as np
 import sdc
 from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import string_array_type, num_total_chars, pre_alloc_string_array
+from sdc.config import (config_use_parallel_overloads, config_inline_overloads)
 from enum import Enum
 import types as pytypes
 from numba.extending import overload, overload_method, overload_attribute
@@ -565,13 +566,34 @@ def update_globals(func, glbls):
         func.__globals__.update(glbls)
 
 
-def sdc_overload(func, jit_options={}, strict=True, inline='never'):
+def sdc_overload(func, jit_options={}, strict=True, inline=None):
+    if 'parallel' not in jit_options:
+        jit_options = jit_options.copy()
+        jit_options.update({'parallel': config_use_parallel_overloads})
+
+    if inline is None:
+        inline = 'always' if config_inline_overloads else 'never'
+
     return overload(func, jit_options=jit_options, strict=strict, inline=inline)
 
 
-def sdc_overload_method(typ, name, jit_options={}, strict=True, inline='never'):
+def sdc_overload_method(typ, name, jit_options={}, strict=True, inline=None):
+    if 'parallel' not in jit_options:
+        jit_options = jit_options.copy()
+        jit_options.update({'parallel': config_use_parallel_overloads})
+
+    if inline is None:
+        inline = 'always' if config_inline_overloads else 'never'
+
     return overload_method(typ, name, jit_options=jit_options, strict=strict, inline=inline)
 
 
-def sdc_overload_attribute(typ, name, jit_options={}, strict=True, inline='never'):
+def sdc_overload_attribute(typ, name, jit_options={}, strict=True, inline=None):
+    if 'parallel' not in jit_options:
+        jit_options = jit_options.copy()
+        jit_options.update({'parallel': config_use_parallel_overloads})
+
+    if inline is None:
+        inline = 'always' if config_inline_overloads else 'never'
+
     return overload_attribute(typ, name, jit_options=jit_options, strict=strict, inline=inline)

@@ -47,7 +47,13 @@ else:
     _has_opencv = True
     import sdc.cv_ext
 
-config_transport_mpi_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_MPI', 'True'))
+
+def strtobool(val):
+    '''Convert string to True or False'''
+    return bool(distutils_util.strtobool(val))
+
+
+config_transport_mpi_default = strtobool(os.getenv('SDC_CONFIG_MPI', 'True'))
 '''
 Default value for transport used if no function decorator controls the transport
 '''
@@ -58,9 +64,19 @@ Current value for transport controlled by decorator need to initialize this here
 because decorator called later then modules have been initialized
 '''
 
-config_pipeline_hpat_default = distutils_util.strtobool(os.getenv('SDC_CONFIG_PIPELINE_SDC', 'False'))
+config_pipeline_hpat_default = strtobool(os.getenv('SDC_CONFIG_PIPELINE_SDC', 'False'))
 '''
 Default value used to select compiler pipeline in a function decorator
+'''
+
+config_use_parallel_overloads = strtobool(os.getenv('SDC_AUTO_PARALLEL', 'False'))
+'''
+Default value used to select whether auto parallel would be applied to sdc functions
+'''
+
+config_inline_overloads = strtobool(os.getenv('SDC_AUTO_INLINE', 'False'))
+'''
+Default value used to select whether sdc functions would inline
 '''
 
 if not config_pipeline_hpat_default:
@@ -73,7 +89,7 @@ numba_compiler_define_nopython_pipeline_orig = None
 Default value for a pointer intended to use as Numba.DefaultPassBuilder.define_nopython_pipeline() in overloaded function
 '''
 
-test_expected_failure  = distutils_util.strtobool(os.getenv('SDC_TEST_EXPECTED_FAILURE', 'False'))
+test_expected_failure = strtobool(os.getenv('SDC_TEST_EXPECTED_FAILURE', 'False'))
 '''
 If True then replaces skip decorators to expectedFailure decorator.
 '''
