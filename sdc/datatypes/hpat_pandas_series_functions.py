@@ -2246,8 +2246,7 @@ def hpat_pandas_series_sum(
     .. only:: developer
 
         Tests:
-            python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_sum1
-            # python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_sum2
+            python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_sum*
 
     Parameters
     ----------
@@ -2278,10 +2277,10 @@ def hpat_pandas_series_sum(
     if not (isinstance(axis, (types.Integer, types.Omitted)) or axis is None):
         raise TypingError('{} The axis must be an Integer. Currently unsupported. Given: {}'.format(_func_name, axis))
 
-    if not (isinstance(skipna, (types.Boolean, types.Omitted)) or skipna is None):
+    if not (isinstance(skipna, (types.Boolean, types.Omitted, types.NoneType)) or skipna is None):
         raise TypingError('{} The skipna must be a Boolean. Given: {}'.format(_func_name, skipna))
 
-    if not (isinstance(level, (types.Integer, types.StringLiteral, types.Omitted)) or level is None):
+    if not (isinstance(level, (types.Integer, types.StringLiteral, types.Omitted, types.NoneType)) or level is None):
         raise TypingError(
             '{} The level must be an Integer or level name. Currently unsupported. Given: {}'.format(
                 _func_name, level))
@@ -2308,8 +2307,11 @@ def hpat_pandas_series_sum(
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_sum1
         """
         if skipna is None:
-            skipna = True
-        if skipna:
+            _skipna = True
+        else:
+            _skipna = skipna
+
+        if _skipna:
             return numpy.nansum(self._data)
         return numpy.sum(self._data)
 
@@ -2859,13 +2861,13 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
 
 
 @sdc_overload_method(SeriesType, 'prod')
-def hpat_pandas_series_prod(self, axis=None, skipna=True, level=None, numeric_only=None, min_count=0):
+def hpat_pandas_series_prod(self, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
     """
     Pandas Series method :meth:`pandas.Series.prod` implementation.
 
     .. only:: developer
 
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_prod
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_prod*
 
     Parameters
     -----------
@@ -2903,19 +2905,24 @@ def hpat_pandas_series_prod(self, axis=None, skipna=True, level=None, numeric_on
     if not isinstance(self.data.dtype, (types.Integer, types.Float)):
         raise TypingError('{} Non numeric values unsupported. Given: {}'.format(_func_name, self.data.data.dtype))
 
-    if not (isinstance(skipna, (types.Omitted, types.Boolean)) or skipna is True):
+    if not (isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) or skipna is None or skipna is True):
         raise TypingError("{} 'skipna' must be a boolean type. Given: {}".format(_func_name, skipna))
 
-    if not (isinstance(axis, types.Omitted) or axis is None) \
-            or not (isinstance(level, types.Omitted) or level is None) \
-            or not (isinstance(numeric_only, types.Omitted) or numeric_only is None) \
-            or not (isinstance(min_count, types.Omitted) or min_count == 0):
+    if not (isinstance(axis, (types.Omitted, types.NoneType)) or axis is None) \
+            or not (isinstance(level, (types.Omitted, types.NoneType)) or level is None) \
+            or not (isinstance(numeric_only, (types.Omitted, types.NoneType)) or numeric_only is None) \
+            or not (isinstance(min_count, (types.Omitted, types.Integer)) or min_count == 0):
         raise TypingError(
             '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}, min_count: {}'.format(
                 _func_name, axis, level, numeric_only, min_count))
 
-    def hpat_pandas_series_prod_impl(self, axis=None, skipna=True, level=None, numeric_only=None, min_count=0):
-        if skipna:
+    def hpat_pandas_series_prod_impl(self, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
+        if skipna is None:
+            _skipna = True
+        else:
+            _skipna = skipna
+
+        if _skipna:
             return numpy.nanprod(self._data)
         else:
             return numpy.prod(self._data)
@@ -3057,12 +3064,12 @@ def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=
 
 
 @sdc_overload_method(SeriesType, 'min')
-def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_only=None):
+def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.min` implementation.
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_min
-             python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_min_param
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_min*
+
     Parameters
     -----------
     axis:
@@ -3089,19 +3096,25 @@ def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_onl
             '{} Currently function supports only numeric values. Given data type: {}'.format(
                 _func_name, self.data.dtype))
 
-    if not isinstance(skipna, (types.Omitted, types.Boolean)) and skipna is not True:
+    if not isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) and skipna is not True \
+            and skipna is not None:
         raise TypingError(
             '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, skipna))
 
     if not (isinstance(axis, types.Omitted) or axis is None) \
-            or not (isinstance(level, types.Omitted) or level is None) \
+            or not (isinstance(level, (types.Omitted, types.NoneType)) or level is None) \
             or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
         raise TypingError(
             '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
                                                                                             numeric_only))
 
-    def hpat_pandas_series_min_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
-        if skipna:
+    def hpat_pandas_series_min_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
+        if skipna is None:
+            _skipna = True
+        else:
+            _skipna = skipna
+
+        if _skipna:
             return numpy.nanmin(self._data)
 
         return self._data.min()
@@ -3110,7 +3123,7 @@ def hpat_pandas_series_min(self, axis=None, skipna=True, level=None, numeric_onl
 
 
 @sdc_overload_method(SeriesType, 'max')
-def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_only=None):
+def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_only=None):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
@@ -3149,8 +3162,7 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
     *************************************************
     Pandas Series method :meth:`pandas.Series.max` implementation.
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_max
-             python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_max_param
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_max*
     Parameters
     -----------
     axis:
@@ -3176,20 +3188,25 @@ def hpat_pandas_series_max(self, axis=None, skipna=True, level=None, numeric_onl
             '{} Currently function supports only numeric values. Given data type: {}'.format(
                 _func_name, self.data.dtype))
 
-    if not isinstance(skipna, (types.Omitted, types.Boolean)) and skipna is not True:
+    if not (isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) or skipna is True or skipna is None):
         ty_checker.raise_exc(skipna, 'bool', 'skipna')
 
     if not isinstance(axis, types.Omitted) and axis is not None:
         ty_checker.raise_exc(axis, 'None', 'axis')
 
-    if not isinstance(level, types.Omitted) and level is not None:
+    if not isinstance(level, (types.Omitted, types.NoneType)) and level is not None:
         ty_checker.raise_exc(level, 'None', 'level')
 
     if not isinstance(numeric_only, types.Omitted) and numeric_only is not None:
         ty_checker.raise_exc(numeric_only, 'None', 'numeric_only')
 
-    def hpat_pandas_series_max_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
-        if skipna:
+    def hpat_pandas_series_max_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
+        if skipna is None:
+            _skipna = True
+        else:
+            _skipna = skipna
+
+        if _skipna:
             return numpy.nanmax(self._data)
 
         return self._data.max()
@@ -3204,7 +3221,7 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
 
     .. only:: developer
 
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_mean
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_mean*
 
     Parameters
     -----------
@@ -3237,12 +3254,12 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
             '{} Currently function supports only numeric values. Given data type: {}'.format(
                 _func_name, self.data.dtype))
 
-    if not isinstance(skipna, (types.Omitted, types.Boolean)) and skipna is not None:
+    if not isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) and skipna is not None:
         raise TypingError(
             '{} The parameter must be a boolean type. Given type skipna: {}'.format(_func_name, skipna))
 
     if not (isinstance(axis, types.Omitted) or axis is None) \
-            or not (isinstance(level, types.Omitted) or level is None) \
+            or not (isinstance(level, (types.Omitted, types.NoneType)) or level is None) \
             or not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
         raise TypingError(
             '{} Unsupported parameters. Given axis: {}, level: {}, numeric_only: {}'.format(_func_name, axis, level,
@@ -3250,9 +3267,11 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
 
     def hpat_pandas_series_mean_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
         if skipna is None:
-            skipna = True
+            _skipna = True
+        else:
+            _skipna = skipna
 
-        if skipna:
+        if _skipna:
             return numpy.nanmean(self._data)
 
         return self._data.mean()
@@ -4058,15 +4077,13 @@ def hpat_pandas_series_count(self, level=None):
 
 
 @sdc_overload_method(SeriesType, 'median')
-def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_only=None):
+def hpat_pandas_series_median(self, axis=None, skipna=None, level=None, numeric_only=None):
     """
     Pandas Series method :meth:`pandas.Series.median` implementation.
 
     .. only:: developer
 
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_median1
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_median_skipna_default1
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_median_skipna_false1
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_median1*
 
     Parameters
     -----------
@@ -4105,10 +4122,10 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
             '{} The axis must be an Integer or a String. Currently unsupported. Given: {}'.format(
                 _func_name, axis))
 
-    if not (isinstance(skipna, (types.Boolean, types.Omitted)) or skipna):
+    if not (isinstance(skipna, (types.Boolean, types.Omitted, types.NoneType)) or skipna or skipna is None):
         raise TypingError('{} The is_copy must be a boolean. Given: {}'.format(_func_name, skipna))
 
-    if not ((level is None or isinstance(level, types.Omitted))
+    if not ((level is None or isinstance(level, (types.Omitted, types.NoneType)))
             and (numeric_only is None or isinstance(numeric_only, types.Omitted))
             and (axis is None or isinstance(axis, types.Omitted))
             ):
@@ -4116,8 +4133,13 @@ def hpat_pandas_series_median(self, axis=None, skipna=True, level=None, numeric_
             '{} Unsupported parameters. Given level: {}, numeric_only: {}, axis: {}'.format(
                 _func_name, level, numeric_only, axis))
 
-    def hpat_pandas_series_median_impl(self, axis=None, skipna=True, level=None, numeric_only=None):
-        if skipna:
+    def hpat_pandas_series_median_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
+        if skipna is None:
+            _skipna = True
+        else:
+            _skipna = skipna
+
+        if _skipna:
             return numpy.nanmedian(self._data)
 
         return numpy.median(self._data)
