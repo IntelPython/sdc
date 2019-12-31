@@ -24,5 +24,21 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy as np
+import pandas as pd
 
-# import sdc.datatypes.hpat_pandas_dataframe_pass
+from numba import njit
+
+
+@njit
+def series_setitem():
+    value = 0
+    series = pd.Series(np.arange(5, 0, -1))  # Series of 5, 4, 3, 2, 1
+
+    indices = pd.Series(np.asarray([1, 3]))
+    series[indices] = value
+
+    return series       # result Series of 5, 0, 3, 0, 1
+
+
+print(series_setitem())
