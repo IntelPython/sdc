@@ -33,6 +33,10 @@ import numpy as np
 import pandas as pd
 from sdc import *
 from numba.typed import Dict
+from numba.extending import (overload_method, overload, models, register_model, intrinsic)
+from numba.special import literally
+from numba.typing import signature
+from numba import cgutils
 from collections import defaultdict
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
@@ -435,6 +439,56 @@ class TestHpatJitIssues(TestCase):
                                dtype={'A': np.int, 'B': np.float, 'C': str, 'D': np.int})
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    @unittest.expectedFailure
+    def test_literally_with_overload_method(self):
+        class Dummy:
+            def lit(self, a):
+                return a
+
+        class DummyType(numba.types.Type):
+            def __init__(self):
+                super().__init__(name="dummy")
+
+        @register_model(DummyType)
+        class DummyTypeModel(models.StructModel):
+            def __init__(self, dmm, fe_type):
+                members = []
+                super().__init__(dmm, fe_type, members)
+
+        @intrinsic
+        def init_dummy(typingctx):
+            def codegen(context, builder, signature, args):
+                dummy = cgutils.create_struct_proxy(
+                    signature.return_type)(context, builder)
+
+                return dummy._getvalue()
+
+            sig = signature(DummyType())
+            return sig, codegen
+
+        @overload(Dummy)
+        def dummy_overload():
+            def ctor():
+                return init_dummy()
+
+            return ctor
+
+        @overload_method(DummyType, 'lit')
+        def lit_overload(self, a):
+            def impl(self, a):
+                return literally(a)
+                # return a
+
+            return impl
+
+        def test_impl(a):
+            d = Dummy()
+
+            return d.lit(a)
+
+        jtest = numba.njit(test_impl)
+        test_impl(5)
 
 
 if __name__ == "__main__":
