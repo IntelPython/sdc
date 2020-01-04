@@ -39,8 +39,12 @@ from numba.extending import (overload, overload_method, overload_attribute)
 from numba.errors import TypingError
 from sdc.hiframes.pd_dataframe_type import DataFrameType
 
+from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
+from sdc.datatypes.hpat_pandas_rolling_types import (
+    gen_sdc_pandas_rolling, sdc_pandas_rolling_docstring_tmpl)
 from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
+from sdc.utils import sdc_overload_method
 
 
 # Example func_text for func_name='count' columns=('A', 'B'):
@@ -193,6 +197,12 @@ def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     ser_par = {'skipna': 'skipna', 'level': 'level'}
 
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
+
+
+sdc_pandas_dataframe_rolling = sdc_overload_method(DataFrameType, 'rolling')(
+    gen_sdc_pandas_rolling(_hpat_pandas_df_rolling_init, DataFrameType))
+sdc_pandas_dataframe_rolling.__doc__ = sdc_pandas_rolling_docstring_tmpl.format(
+    ty='DataFrame', ty_lower='dataframe')
 
 
 @overload_method(DataFrameType, 'std')
