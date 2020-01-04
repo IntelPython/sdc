@@ -794,7 +794,7 @@ hpat_pandas_series_rolling_apply.__doc__ = hpat_pandas_series_rolling_docstring_
     """
     Limitations
     -----------
-    Supported ``raw`` only can be `None` or `True`.
+    Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
     Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
