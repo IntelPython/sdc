@@ -160,6 +160,31 @@ def arr_quantile(arr, q):
 
 
 @register_jitable
+def _moment(arr, moment):
+    mn = numpy.mean(arr)
+    s = numpy.power((arr - mn), moment)
+
+    return numpy.mean(s)
+
+
+@register_jitable
+def arr_skew(arr):
+    """Calculate unbiased skewness of values"""
+    n = len(arr)
+    if n < 3:
+        return numpy.nan
+
+    m2 = _moment(arr, 2)
+    m3 = _moment(arr, 3)
+    val = 0 if m2 == 0 else m3 / m2 ** 1.5
+
+    if (n > 2) & (m2 > 0):
+        val = numpy.sqrt((n - 1.0) * n) / (n - 2.0) * m3 / m2 ** 1.5
+
+    return val
+
+
+@register_jitable
 def arr_std(arr, ddof):
     """Calculate standard deviation of values"""
     return arr_var(arr, ddof) ** 0.5
@@ -253,6 +278,8 @@ hpat_pandas_rolling_series_median_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_median, float64))
 hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min, float64))
+hpat_pandas_rolling_series_skew_impl = register_jitable(
+    gen_hpat_pandas_series_rolling_impl(arr_skew, float64))
 hpat_pandas_rolling_series_sum_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_sum, float64))
 
@@ -315,7 +342,7 @@ def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
 
     nan_other = isinstance(other, (Omitted, NoneType)) or other is None
 
-    def hpat_pandas_rolling_series_std_impl(self, other=None, pairwise=None):
+    def hpat_pandas_rolling_series_corr_impl(self, other=None, pairwise=None):
         win = self._window
         minp = self._min_periods
 
@@ -356,7 +383,7 @@ def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
 
         return pandas.Series(output_arr)
 
-    return hpat_pandas_rolling_series_std_impl
+    return hpat_pandas_rolling_series_corr_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'count')
@@ -433,7 +460,7 @@ def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
 
     nan_other = isinstance(other, (Omitted, NoneType)) or other is None
 
-    def hpat_pandas_rolling_series_std_impl(self, other=None, pairwise=None, ddof=1):
+    def hpat_pandas_rolling_series_cov_impl(self, other=None, pairwise=None, ddof=1):
         win = self._window
         minp = self._min_periods
 
@@ -474,7 +501,7 @@ def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
 
         return pandas.Series(output_arr)
 
-    return hpat_pandas_rolling_series_std_impl
+    return hpat_pandas_rolling_series_cov_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'max')
@@ -651,6 +678,15 @@ def hpat_pandas_series_rolling_quantile(self, quantile, interpolation='linear'):
     return hpat_pandas_rolling_series_quantile_impl
 
 
+@sdc_overload_method(SeriesRollingType, 'skew')
+def hpat_pandas_series_rolling_skew(self):
+
+    ty_checker = TypeChecker('Method rolling.skew().')
+    ty_checker.check(self, SeriesRollingType)
+
+    return hpat_pandas_rolling_series_skew_impl
+
+
 @sdc_overload_method(SeriesRollingType, 'sum')
 def hpat_pandas_series_rolling_sum(self):
     """
@@ -739,7 +775,7 @@ def hpat_pandas_series_rolling_std(self, ddof=1):
             arr_range = input_arr[:i + 1]
             output_arr[i] = culc_std(arr_range, ddof, minp)
 
-        for i in prange(min(win, length), length):
+        for i in prange(boundary, length):
             arr_range = input_arr[i + 1 - win:i + 1]
             output_arr[i] = culc_std(arr_range, ddof, minp)
 
@@ -883,6 +919,13 @@ hpat_pandas_series_rolling_quantile.__doc__ = hpat_pandas_series_rolling_docstri
     interpolation: :obj:`str`
         This optional parameter specifies the interpolation method to use.
     """
+})
+
+hpat_pandas_series_rolling_skew.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'skew',
+    'example_caption': 'Unbiased rolling skewness.',
+    'limitations_block': '',
+    'extra_params': ''
 })
 
 hpat_pandas_series_rolling_std.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
