@@ -640,45 +640,6 @@ def hpat_pandas_series_rolling_skew(self):
     return hpat_pandas_rolling_series_skew_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'std')
-def hpat_pandas_series_rolling_std(self, ddof=1):
-
-    ty_checker = TypeChecker('Method rolling.std().')
-    ty_checker.check(self, SeriesRollingType)
-
-    if not isinstance(ddof, (int, Integer, Omitted)):
-        ty_checker.raise_exc(ddof, 'int', 'ddof')
-
-    def hpat_pandas_rolling_series_std_impl(self, ddof=1):
-        win = self._window
-        minp = self._min_periods
-
-        input_series = self._data
-        input_arr = input_series._data
-        length = len(input_arr)
-        output_arr = numpy.empty(length, dtype=float64)
-
-        def culc_std(arr, ddof, minp):
-            finite_arr = arr[numpy.isfinite(arr)]
-            if len(finite_arr) < minp:
-                return numpy.nan
-            else:
-                return arr_std(finite_arr, ddof)
-
-        boundary = min(win, length)
-        for i in prange(boundary):
-            arr_range = input_arr[:i + 1]
-            output_arr[i] = culc_std(arr_range, ddof, minp)
-
-        for i in prange(boundary, length):
-            arr_range = input_arr[i + 1 - win:i + 1]
-            output_arr[i] = culc_std(arr_range, ddof, minp)
-
-        return pandas.Series(output_arr, input_series._index, name=input_series._name)
-
-    return hpat_pandas_rolling_series_std_impl
-
-
 @sdc_overload_method(SeriesRollingType, 'sum')
 def hpat_pandas_series_rolling_sum(self):
     """
@@ -735,6 +696,45 @@ def hpat_pandas_series_rolling_sum(self):
     ty_checker.check(self, SeriesRollingType)
 
     return hpat_pandas_rolling_series_sum_impl
+
+
+@sdc_overload_method(SeriesRollingType, 'std')
+def hpat_pandas_series_rolling_std(self, ddof=1):
+
+    ty_checker = TypeChecker('Method rolling.std().')
+    ty_checker.check(self, SeriesRollingType)
+
+    if not isinstance(ddof, (int, Integer, Omitted)):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
+
+    def hpat_pandas_rolling_series_std_impl(self, ddof=1):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        def culc_std(arr, ddof, minp):
+            finite_arr = arr[numpy.isfinite(arr)]
+            if len(finite_arr) < minp:
+                return numpy.nan
+            else:
+                return arr_std(finite_arr, ddof)
+
+        boundary = min(win, length)
+        for i in prange(boundary):
+            arr_range = input_arr[:i + 1]
+            output_arr[i] = culc_std(arr_range, ddof, minp)
+
+        for i in prange(boundary, length):
+            arr_range = input_arr[i + 1 - win:i + 1]
+            output_arr[i] = culc_std(arr_range, ddof, minp)
+
+        return pandas.Series(output_arr, input_series._index, name=input_series._name)
+
+    return hpat_pandas_rolling_series_std_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'var')
