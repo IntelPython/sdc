@@ -1118,7 +1118,7 @@ class TestSeries(TestCase):
         S2 = pd.Series([True, False, False, True])
         pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
-    @skip_parallel
+    # @skip_parallel
     @skip_sdc_jit('Not impl in old style')
     def test_series_getitem_series(self):
         def test_impl(A, B):
