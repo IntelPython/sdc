@@ -397,7 +397,6 @@ class TestCSV(TestIO):
             return pd_read_csv("csv_data_infer1.csv")
         return test_impl
 
-    @skip_numba_jit
     def test_csv_infer1(self):
         test_impl = self.pd_csv_infer1()
         hpat_func = self.jit(test_impl)
@@ -471,7 +470,6 @@ class TestCSV(TestIO):
             return pd_read_csv("csv_data_infer1.csv", skiprows=2)
         return test_impl
 
-    @skip_numba_jit
     def test_csv_infer_skip1(self):
         test_impl = self.pd_csv_infer_skip1()
         hpat_func = self.jit(test_impl)

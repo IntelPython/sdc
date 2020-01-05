@@ -24,5 +24,17 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy as np
+import pandas as pd
+from numba import njit
 
-# import sdc.datatypes.hpat_pandas_dataframe_pass
+
+@njit
+def series_at_many_idx():
+    series = pd.Series([5, 4, 3, 2, 1], index=[0, 2, 0, 6, 0])
+    return series.at[0]
+    # Expected Array:
+    # [5 3 1]
+
+
+print(series_at_many_idx())

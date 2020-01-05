@@ -24,5 +24,23 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy as np
+import pandas as pd
+from numba import njit
 
-# import sdc.datatypes.hpat_pandas_dataframe_pass
+
+@njit
+def series_getitem_series():
+    series = pd.Series(np.arange(10, 0, -1))  # Series of 10, 9, ..., 1
+    indices = pd.Series(np.asarray([1, 6, 7, 8, 9]))
+    return series[indices]  # Accessing series by series
+    # Expected Series:
+    # 1    9
+    # 6    4
+    # 7    3
+    # 8    2
+    # 9    1
+    # dtype: int64
+
+
+print(series_getitem_series())
