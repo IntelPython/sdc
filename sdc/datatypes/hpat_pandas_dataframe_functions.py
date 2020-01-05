@@ -88,7 +88,7 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
     df_func_name = f'_df_{func_name}_impl'
 
     func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, s_par, df.columns)
-
+    print(func_text)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
@@ -130,7 +130,7 @@ def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
        Parameters
        -----------
-       self: :class:`pandas.DataFrame`
+       df: :class:`pandas.DataFrame`
            input arg
        axis:
            *unsupported*
@@ -168,7 +168,7 @@ def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
        Parameters
        -----------
-       self: :class:`pandas.DataFrame`
+       df: :class:`pandas.DataFrame`
            input arg
        axis:
            *unsupported*
@@ -206,7 +206,7 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
        Parameters
        -----------
-       self: :class:`pandas.DataFrame`
+       df: :class:`pandas.DataFrame`
            input arg
        axis:
            *unsupported*
@@ -246,7 +246,7 @@ def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
        Parameters
        -----------
-       self: :class:`pandas.DataFrame`
+       df: :class:`pandas.DataFrame`
            input arg
        axis:
            *unsupported*
@@ -286,7 +286,7 @@ def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
        Parameters
        -----------
-       self: :class:`pandas.DataFrame`
+       df: :class:`pandas.DataFrame`
            input arg
        axis:
            *unsupported*
@@ -324,7 +324,7 @@ def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
        Parameters
        -----------
-       self: :class:`pandas.DataFrame`
+       df: :class:`pandas.DataFrame`
            input arg
        axis:
            *unsupported*
@@ -362,7 +362,7 @@ def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_
 
        Parameters
        -----------
-       self: :class:`pandas.DataFrame`
+       df: :class:`pandas.DataFrame`
            input arg
        axis:
            *unsupported*
@@ -402,7 +402,7 @@ def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min
 
        Parameters
        -----------
-       self: :class:`pandas.DataFrame`
+       df: :class:`pandas.DataFrame`
            input arg
        axis:
            *unsupported*
@@ -442,7 +442,7 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
 
     Parameters
     -----------
-    self: :class:`pandas.DataFrame`
+    df: :class:`pandas.DataFrame`
         input arg
     axis:
         *unsupported*
@@ -454,7 +454,7 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     Returns
     -------
     :obj:`pandas.Series` or `pandas.DataFrame`
-    for each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
+            for each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
     """
 
     name = 'count'
@@ -473,5 +473,56 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
 
     params = {'axis': 0, 'level': None, 'numeric_only': False}
     ser_par = {'level': 'level'}
+
+    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
+
+
+@overload_method(DataFrameType, 'pct_change')
+def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None):
+    """
+    Pandas DataFrame method :meth:`pandas.DataFrame.pct_change` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_pct_change*
+
+    Parameters
+    -----------
+    df: :class:`pandas.DataFrame`
+        input arg
+    periods:
+        *unsupported*
+    fill_method:
+        *unsupported
+    limit:
+        *unsupported*
+    freq:
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series` or `pandas.DataFrame`
+            Percentage change between the current and a prior element.
+    """
+
+    name = 'pct_change'
+
+    ty_checker = TypeChecker('Method {}().'.format(name))
+    ty_checker.check(df, DataFrameType)
+
+    if not isinstance(periods, (types.Integer, types.Omitted)):
+        ty_checker.raise_exc(periods, 'int64', 'periods')
+
+    if not isinstance(fill_method, (str, types.UnicodeType, types.StringLiteral, types.NoneType, types.Omitted)):
+        ty_checker.raise_exc(fill_method, 'string', 'fill_method')
+
+    if not isinstance(limit, (types.Omitted, types.NoneType)):
+        ty_checker.raise_exc(limit, 'None', 'limit')
+
+    if not isinstance(freq, (types.Omitted, types.NoneType)):
+        ty_checker.raise_exc(freq, 'None', 'freq')
+
+    params = {'periods': 1, 'fill_method': '"pad"', 'limit': None, 'freq': None}
+    ser_par = {'periods': 'periods', 'fill_method': 'fill_method', 'limit': 'limit', 'freq': 'freq'}
 
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
