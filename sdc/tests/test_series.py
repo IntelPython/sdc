@@ -1118,6 +1118,7 @@ class TestSeries(TestCase):
         S2 = pd.Series([True, False, False, True])
         pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
+    @skip_parallel
     @skip_sdc_jit('Not impl in old style')
     def test_series_getitem_series(self):
         def test_impl(A, B):
@@ -1691,7 +1692,6 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis1(self):
         '''Verifies Series.fillna() implementation handles 'index' as axis argument'''
@@ -1702,7 +1702,6 @@ class TestSeries(TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis2(self):
         '''Verifies Series.fillna() implementation handles 0 as axis argument'''
@@ -1713,7 +1712,6 @@ class TestSeries(TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis3(self):
         '''Verifies Series.fillna() implementation handles correct non-literal axis argument'''
@@ -1725,7 +1723,6 @@ class TestSeries(TestCase):
         for axis in [0, 'index']:
             pd.testing.assert_series_equal(hpat_func(S, axis), test_impl(S, axis))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_from_df(self):
         '''Verifies Series.fillna() applied to a named float Series obtained from a DataFrame'''
@@ -1737,7 +1734,6 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0, np.inf]})
         pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A), check_names=False)
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index1(self):
         '''Verifies Series.fillna() implementation for float series with default index'''
@@ -1749,7 +1745,6 @@ class TestSeries(TestCase):
             S = pd.Series(data)
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index2(self):
         '''Verifies Series.fillna() implementation for float series with string index'''
@@ -1760,7 +1755,6 @@ class TestSeries(TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf], ['a', 'b', 'c', 'd', 'e'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index3(self):
         def test_impl(S):
@@ -1774,7 +1768,7 @@ class TestSeries(TestCase):
     @skip_inline
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_str_from_df(self):
-        '''Verifies Series.fillna() applied to a named float Series obtained from a DataFrame'''
+        '''Verifies Series.fillna() applied to a named string Series obtained from a DataFrame'''
         def test_impl(S):
             return S.fillna("dd")
         hpat_func = self.jit(test_impl)
@@ -1820,7 +1814,6 @@ class TestSeries(TestCase):
         S = pd.Series(['aa', 'b', None, 'cccd', ''], index=[1, 2, 5, 7, 10])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_inplace1(self):
         '''Verifies Series.fillna() implementation for float series with default index and inplace argument True'''
@@ -1833,7 +1826,6 @@ class TestSeries(TestCase):
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
-    @skip_parallel
     @unittest.skip('TODO: add reflection support and check method return value')
     def test_series_fillna_float_inplace2(self):
         '''Verifies Series.fillna(inplace=True) results are reflected back in the original float series'''
@@ -1847,7 +1839,6 @@ class TestSeries(TestCase):
         self.assertIsNone(test_impl(S2))
         pd.testing.assert_series_equal(S1, S2)
 
-    @skip_parallel
     def test_series_fillna_float_inplace3(self):
         '''Verifies Series.fillna() implementation correcly handles omitted inplace argument as default False'''
         def test_impl(S):
@@ -1859,7 +1850,6 @@ class TestSeries(TestCase):
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S1))
         pd.testing.assert_series_equal(S1, S2)
 
-    @skip_parallel
     def test_series_fillna_inplace_non_literal(self):
         '''Verifies Series.fillna() implementation handles only Boolean literals as inplace argument'''
         def test_impl(S, param):
@@ -1936,7 +1926,6 @@ class TestSeries(TestCase):
         S = pd.Series([pd.NaT, pd.Timestamp('1970-12-01'), pd.Timestamp('2012-07-25')])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     def test_series_fillna_bool_no_index1(self):
         '''Verifies Series.fillna() implementation for bool series with default index'''
         def test_impl(S):
@@ -2391,9 +2380,9 @@ class TestSeries(TestCase):
                 actual = hpat_func(S, skipna)
                 expected = test_impl(S, skipna)
                 if np.isnan(actual) or np.isnan(expected):
-                    self.assertEqual(np.isnan(actual), np.isnan(expected))
+                    self.assertAlmostEqual(np.isnan(actual), np.isnan(expected))
                 else:
-                    self.assertEqual(actual, expected)
+                    self.assertAlmostEqual(actual, expected)
 
     def test_series_var1(self):
         def test_impl(S):
@@ -2819,18 +2808,6 @@ class TestSeries(TestCase):
 
         S = pd.Series([np.nan, -2., 3., 0.5E-01, 0xFF, 0o7, 0b101])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_parallel
-    def test_series_cov1(self):
-        def test_impl(S1, S2):
-            return S1.cov(S2)
-        hpat_func = self.jit(test_impl)
-
-        for pair in _cov_corr_series:
-            S1, S2 = pair
-            np.testing.assert_almost_equal(
-                hpat_func(S1, S2), test_impl(S1, S2),
-                err_msg='S1={}\nS2={}'.format(S1, S2))
 
     @skip_numba_jit
     def test_series_corr1(self):
@@ -5007,7 +4984,17 @@ class TestSeries(TestCase):
             msg = 'Method cumsum(). Unsupported parameters. Given axis: int'
             self.assertIn(msg, str(raises.exception))
 
-    @skip_parallel
+    def test_series_cov1(self):
+        def test_impl(S1, S2):
+            return S1.cov(S2)
+        hpat_func = self.jit(test_impl)
+
+        for pair in _cov_corr_series:
+            S1, S2 = pair
+            np.testing.assert_almost_equal(
+                hpat_func(S1, S2), test_impl(S1, S2),
+                err_msg='S1={}\nS2={}'.format(S1, S2))
+
     @skip_sdc_jit('Series.cov() parameter "min_periods" unsupported')
     def test_series_cov(self):
         def test_series_cov_impl(S1, S2, min_periods=None):
