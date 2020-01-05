@@ -436,6 +436,25 @@ class TestHpatJitIssues(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @unittest.expectedFailure
+    def test_parallel_with_condition_1(self):
+        import numpy
+        import numba
+
+        def test_impl(arr, half=False):
+            size = len(arr)
+            parr = arr[0:size]
+
+            if half:
+                parr = arr[0:size//2]
+
+            return parr.sum()
+
+        jtest = numba.njit(test_impl)
+        ptest = numba.njit(test_impl, parallel=True)
+
+        arr = numpy.ones(128)
+        self.assertEqual(jtest(arr, True), ptest(arr, True))
 
 if __name__ == "__main__":
     unittest.main()
