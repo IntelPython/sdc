@@ -33,6 +33,12 @@ import numpy as np
 import pandas as pd
 from sdc import *
 from numba.typed import Dict
+from numba.extending import (overload_method, overload, models, register_model,
+                             intrinsic, unbox, typeof_impl, make_attribute_wrapper,
+                             NativeValue)
+from numba.special import literally
+from numba.typing import signature
+from numba import cgutils
 from collections import defaultdict
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
@@ -435,6 +441,103 @@ class TestHpatJitIssues(TestCase):
                                dtype={'A': np.int, 'B': np.float, 'C': str, 'D': np.int})
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    @unittest.expectedFailure
+    def test_literally_with_overload_method(self):
+        class Dummy:
+            def lit(self, a):
+                return a
+
+        class DummyType(numba.types.Type):
+            def __init__(self):
+                super().__init__(name="dummy")
+
+        @register_model(DummyType)
+        class DummyTypeModel(models.StructModel):
+            def __init__(self, dmm, fe_type):
+                members = []
+                super().__init__(dmm, fe_type, members)
+
+        @intrinsic
+        def init_dummy(typingctx):
+            def codegen(context, builder, signature, args):
+                dummy = cgutils.create_struct_proxy(
+                    signature.return_type)(context, builder)
+
+                return dummy._getvalue()
+
+            sig = signature(DummyType())
+            return sig, codegen
+
+        @overload(Dummy)
+        def dummy_overload():
+            def ctor():
+                return init_dummy()
+
+            return ctor
+
+        @overload_method(DummyType, 'lit')
+        def lit_overload(self, a):
+            def impl(self, a):
+                return literally(a)
+                # return a
+
+            return impl
+
+        def test_impl(a):
+            d = Dummy()
+
+            return d.lit(a)
+
+        jtest = numba.njit(test_impl)
+        self.assertEqual(jtest(5), 5)
+
+    @unittest.expectedFailure
+    def test_unbox_with_exception(self):
+        class Dummy:
+            def __init__(self, a=0):
+                self.a = a
+
+        class DummyType(numba.types.Type):
+            def __init__(self):
+                super().__init__(name="dummy")
+
+        @register_model(DummyType)
+        class DummyTypeModel(models.StructModel):
+            def __init__(self, dmm, fe_type):
+                members = [('a', numba.types.int64)]
+                super().__init__(dmm, fe_type, members)
+
+        @unbox(DummyType)
+        def unbox_dummy(typ, val, c):
+            context = c.context
+            builder = c.builder
+
+            a_obj = c.pyapi.object_getattr_string(val, "a")
+            a_value = c.pyapi.long_as_longlong(a_obj)
+
+            dmm = cgutils.create_struct_proxy(typ)(context, builder)
+
+            with builder.if_then(a_value):
+                context.call_conv.return_user_exc(
+                    builder, ValueError,
+                    ("exception!",)
+                )
+
+            dmm.a = a_value
+            return NativeValue(dmm._getvalue())
+
+        make_attribute_wrapper(DummyType, 'a', 'a')
+
+        def test_impl(d):
+            return d.a
+
+        @typeof_impl.register(Dummy)
+        def typeof_dummy(val, c):
+            return DummyType()
+
+        jtest = numba.njit(test_impl)
+        print(jtest(Dummy(0)))
 
 
 if __name__ == "__main__":
