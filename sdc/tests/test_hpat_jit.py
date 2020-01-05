@@ -33,7 +33,9 @@ import numpy as np
 import pandas as pd
 from sdc import *
 from numba.typed import Dict
-from numba.extending import (overload_method, overload, models, register_model, intrinsic)
+from numba.extending import (overload_method, overload, models, register_model,
+                             intrinsic, unbox, typeof_impl, make_attribute_wrapper,
+                             NativeValue)
 from numba.special import literally
 from numba.typing import signature
 from numba import cgutils
@@ -488,7 +490,54 @@ class TestHpatJitIssues(TestCase):
             return d.lit(a)
 
         jtest = numba.njit(test_impl)
-        test_impl(5)
+        self.assertEqual(jtest(5), 5)
+
+    @unittest.expectedFailure
+    def test_unbox_with_exception(self):
+        class Dummy:
+            def __init__(self, a=0):
+                self.a = a
+
+        class DummyType(numba.types.Type):
+            def __init__(self):
+                super().__init__(name="dummy")
+
+        @register_model(DummyType)
+        class DummyTypeModel(models.StructModel):
+            def __init__(self, dmm, fe_type):
+                members = [('a', numba.types.int64)]
+                super().__init__(dmm, fe_type, members)
+
+        @unbox(DummyType)
+        def unbox_dummy(typ, val, c):
+            context = c.context
+            builder = c.builder
+
+            a_obj = c.pyapi.object_getattr_string(val, "a")
+            a_value = c.pyapi.long_as_longlong(a_obj)
+
+            dmm = cgutils.create_struct_proxy(typ)(context, builder)
+
+            with builder.if_then(a_value):
+                context.call_conv.return_user_exc(
+                    builder, ValueError,
+                    ("exception!",)
+                )
+
+            dmm.a = a_value
+            return NativeValue(dmm._getvalue())
+
+        make_attribute_wrapper(DummyType, 'a', 'a')
+
+        def test_impl(d):
+            return d.a
+
+        @typeof_impl.register(Dummy)
+        def typeof_dummy(val, c):
+            return DummyType()
+
+        jtest = numba.njit(test_impl)
+        print(jtest(Dummy(0)))
 
 
 if __name__ == "__main__":
