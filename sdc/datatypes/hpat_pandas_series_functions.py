@@ -222,7 +222,7 @@ def hpat_pandas_series_getitem(self, idx):
         return None
 
     # Note: Getitem return Series
-    index_is_none = self.index is None or isinstance(self.index, numba.types.misc.NoneType)
+    index_is_none = isinstance(self.index, numba.types.misc.NoneType)
     index_is_none_or_numeric = index_is_none or (self.index and isinstance(self.index.dtype, types.Number))
     index_is_string = not index_is_none and isinstance(self.index.dtype, (types.UnicodeType, types.StringLiteral))
 
@@ -260,7 +260,7 @@ def hpat_pandas_series_getitem(self, idx):
             return pandas.Series(self._data[idx], self.index[idx], self._name)
         return hpat_pandas_series_getitem_idx_list_impl
 
-    if (isinstance(self.index, types.NoneType) and isinstance(idx, SeriesType)):
+    if (index_is_none and isinstance(idx, SeriesType)):
         if isinstance(idx.data.dtype, (types.Boolean, bool)):
             def hpat_pandas_series_getitem_idx_list_impl(self, idx):
                 index = numpy.arange(len(self._data))
@@ -290,16 +290,19 @@ def hpat_pandas_series_getitem(self, idx):
 
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
             index = self.index
-            res = []
-            for i in numba.prange(len(idx._data)):
-                temp = []
-                for j in numba.prange(len(index)):
-                    if index[j] == idx._data[i]:
-                        temp.append(self._data[j])
-                res.append(temp)
-            new_data = numpy.array([value for arr in res for value in arr])
-            new_index = numpy.array([idx._data[arr] for arr in range(len(res)) for value in range(len(res[arr]))])
-            return pandas.Series(new_data, new_index, self._name)
+            data = self._data
+            size = len(index)
+            data_res = []
+            index_res = []
+            for value in idx._data:
+                mask = numpy.zeros(shape=size, dtype=numpy.bool_)
+                for i in numba.prange(size):
+                    mask[i] = index[i] == value
+
+                data_res.extend(data[mask])
+                index_res.extend(index[mask])
+
+            return pandas.Series(data=data_res, index=index_res, name=self._name)
 
         return hpat_pandas_series_getitem_idx_series_impl
 
