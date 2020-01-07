@@ -37,7 +37,6 @@ import math
 import sys
 
 from numba.errors import TypingError
-from numba.extending import overload, overload_method, overload_attribute
 from numba.typing import signature
 from numba.extending import intrinsic
 from numba import (types, numpy_support, cgutils)
@@ -4648,7 +4647,7 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
     return hpat_pandas_series_pct_change_impl
 
 
-@overload_method(SeriesType, 'describe')
+@sdc_overload_method(SeriesType, 'describe')
 def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=None):
     """
     Pandas Series method :meth:`pandas.Series.describe` implementation.

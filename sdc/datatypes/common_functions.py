@@ -36,12 +36,13 @@ import pandas
 import numba
 from numba import types
 from numba.errors import TypingError
-from numba.extending import overload, register_jitable
+from numba.extending import register_jitable
 from numba import numpy_support
 
 import sdc
 from sdc.str_arr_ext import (string_array_type, num_total_chars, append_string_array_to,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na)
+from sdc.utils import sdc_overload
 
 
 class TypeChecker:
@@ -137,7 +138,7 @@ def hpat_arrays_append(A, B):
     pass
 
 
-@overload(hpat_arrays_append)
+@sdc_overload(hpat_arrays_append, jit_options={'parallel':False})
 def hpat_arrays_append_overload(A, B):
     """Function for appending underlying arrays (A and B) or list/tuple of arrays B to an array A"""
 
@@ -288,7 +289,7 @@ def sdc_join_series_indexes(left, right):
     pass
 
 
-@overload(sdc_join_series_indexes)
+@sdc_overload(sdc_join_series_indexes, jit_options={'parallel':False})
 def sdc_join_series_indexes_overload(left, right):
     """Function for joining arrays left and right in a way similar to pandas.join 'outer' algorithm"""
 
@@ -514,7 +515,7 @@ def sdc_check_indexes_equal(left, right):
     pass
 
 
-@overload(sdc_check_indexes_equal)
+@sdc_overload(sdc_check_indexes_equal, jit_options={'parallel':False})
 def sdc_check_indexes_equal_overload(A, B):
     """Function for checking arrays A and B of the same type are equal"""
 
