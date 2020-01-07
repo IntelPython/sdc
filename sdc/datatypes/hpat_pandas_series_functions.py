@@ -295,7 +295,7 @@ def hpat_pandas_series_getitem(self, idx):
             data_res = []
             index_res = []
             for value in idx._data:
-                mask = numpy.zeros(dtype=numpy.bool_, shape=len(index))
+                mask = numpy.zeros(shape=size, dtype=numpy.bool_)
                 for i in numba.prange(size):
                     mask[i] = index[i] == value
 
