@@ -85,6 +85,12 @@ hpat_pandas_series_rolling_docstring_tmpl = """
 
 
 @register_jitable
+def arr_apply(arr, func):
+    """Apply function for values"""
+    return func(arr)
+
+
+@register_jitable
 def arr_corr(x, y):
     """Calculate correlation of values"""
     if len(x) == 0:
@@ -276,6 +282,47 @@ hpat_pandas_rolling_series_skew_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_skew, float64))
 hpat_pandas_rolling_series_sum_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_sum, float64))
+
+
+@sdc_overload_method(SeriesRollingType, 'apply')
+def hpat_pandas_series_rolling_apply(self, func, raw=None):
+
+    ty_checker = TypeChecker('Method rolling.apply().')
+    ty_checker.check(self, SeriesRollingType)
+
+    raw_accepted = (Omitted, NoneType, Boolean)
+    if not isinstance(raw, raw_accepted) and raw is not None:
+        ty_checker.raise_exc(raw, 'bool', 'raw')
+
+    def hpat_pandas_rolling_series_apply_impl(self, func, raw=None):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        def culc_apply(arr, func, minp):
+            finite_arr = arr.copy()
+            finite_arr[numpy.isinf(arr)] = numpy.nan
+            if len(finite_arr) < minp:
+                return numpy.nan
+            else:
+                return arr_apply(finite_arr, func)
+
+        boundary = min(win, length)
+        for i in prange(boundary):
+            arr_range = input_arr[:i + 1]
+            output_arr[i] = culc_apply(arr_range, func, minp)
+
+        for i in prange(boundary, length):
+            arr_range = input_arr[i + 1 - win:i + 1]
+            output_arr[i] = culc_apply(arr_range, func, minp)
+
+        return pandas.Series(output_arr, input_series._index, name=input_series._name)
+
+    return hpat_pandas_rolling_series_apply_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'corr')
@@ -775,6 +822,26 @@ def hpat_pandas_series_rolling_var(self, ddof=1):
 
     return hpat_pandas_rolling_series_var_impl
 
+
+hpat_pandas_series_rolling_apply.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'apply',
+    'example_caption': 'Calculate the rolling apply.',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """,
+    'extra_params':
+    """
+    func:
+        A single value producer
+    raw: :obj:`bool`
+        False : passes each row or column as a Series to the function.
+        True or None : the passed function will receive ndarray objects instead.
+    """
+})
 
 hpat_pandas_series_rolling_corr.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'corr',
