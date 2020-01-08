@@ -24,16 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
 @njit
-def series_at(i):
-    series = pd.Series([5, 4, 3, 2, 1], index=[0, 2, 4, 6, 8])
-    return series.at[i]
+def series_rolling_skew():
+    series = pd.Series([4, 3, 5, 2, 6])  # Series of 4, 3, 5, 2, 6
+    out_series = series.rolling(3).skew()
+
+    return out_series  # Expect series of NaN, NaN, 0.000000, 0.935220, -1.293343
 
 
-print(series_at(4))
+print(series_rolling_skew())
