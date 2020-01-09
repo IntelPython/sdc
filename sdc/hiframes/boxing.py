@@ -39,7 +39,7 @@ from numba.targets.boxing import box_array, unbox_array, box_list
 from numba.targets.boxing import _NumbaTypeHelper
 from numba.targets import listobj
 
-from sdc.hiframes.pd_dataframe_ext import DataFrameType
+from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.hiframes.pd_timestamp_ext import (datetime_date_type,
                                             unbox_datetime_date_array, box_datetime_date_array)
 from sdc.str_ext import string_type, list_string_array_type
@@ -254,7 +254,7 @@ def box_dataframe(typ, val, c):
 
     # set df.index if necessary
     if typ.index != types.none:
-        arr_obj = box_array(typ.index, dataframe.index, c)
+        arr_obj = _box_series_data(typ.index.dtype, typ.index, dataframe.index, c)
         pyapi.object_setattr_string(df_obj, 'index', arr_obj)
 
     pyapi.decref(class_obj)

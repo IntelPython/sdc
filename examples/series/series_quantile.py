@@ -24,25 +24,17 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
 @njit
-def series_getitem():
-    series = pd.Series(np.arange(10, 0, -1))  # Series of 10, 9, ..., 1
+def series_quantile():
+    s = pd.Series([1, 2, 3, 4])
+    median = .5  # compute median
+    out_series = s.quantile(median)
 
-    s = series[0]  # Accessing series by scalar index
-    for x in series[2:6]:  # Accessing series by a slice
-        s += x
-
-    indices = pd.Series(np.asarray([1, 6, 7, 8, 9]))
-    for x in series[indices]:  # Accessing series by another series
-        s += x
-
-    return s  # Expect sum of arithmetic progression == 55
+    return out_series # Expect median value == 2.5
 
 
-print(series_getitem())
+print(series_quantile())

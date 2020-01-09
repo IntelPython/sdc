@@ -24,31 +24,28 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-from ._version import get_versions
 import numba
 
 # re-export from Numba
 from numba import (typeof, prange, pndindex, gdb, gdb_breakpoint, gdb_init,
                    stencil, threading_layer, jitclass, objmode)
 
+import sdc.config
 import sdc.dict_ext
 import sdc.set_ext
-import sdc.compiler
 import sdc.io
 import sdc.io.np_io
 import sdc.hiframes.pd_timestamp_ext
 import sdc.hiframes.boxing
-import sdc.config
 import sdc.timsort
 from sdc.decorators import jit
 
-multithread_mode = False
+import sdc.datatypes.hpat_pandas_series_functions
+import sdc.datatypes.hpat_pandas_series_rolling_functions
+import sdc.datatypes.hpat_pandas_seriesgroupby_functions
+import sdc.datatypes.hpat_pandas_stringmethods_functions
 
-
-__version__ = get_versions()['version']
-del get_versions
-
+from ._version import get_versions
 
 if not sdc.config.config_pipeline_hpat_default:
     """
@@ -59,8 +56,21 @@ if not sdc.config.config_pipeline_hpat_default:
     TODO: Needs to detect 'import Pandas' and align initialization according to it
     """
 
-    sdc.config.numba_compiler_define_nopython_pipeline_orig = numba.compiler.DefaultPassBuilder.define_nopython_pipeline
-    numba.compiler.DefaultPassBuilder.define_nopython_pipeline = sdc.datatypes.hpat_pandas_dataframe_pass.sdc_nopython_pipeline_lite_register
+    # sdc.config.numba_compiler_define_nopython_pipeline_orig = \
+    # numba.compiler.DefaultPassBuilder.define_nopython_pipeline
+    # numba.compiler.DefaultPassBuilder.define_nopython_pipeline = \
+    # sdc.datatypes.hpat_pandas_dataframe_pass.sdc_nopython_pipeline_lite_register
+
+    import sdc.rewrites.dataframe_constructor
+    import sdc.datatypes.hpat_pandas_functions
+else:
+    import sdc.compiler
+
+multithread_mode = False
+
+
+__version__ = get_versions()['version']
+del get_versions
 
 def _init_extension():
     '''Register Pandas classes and functions with Numba.

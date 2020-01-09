@@ -84,6 +84,8 @@ if __name__ == '__main__':
 
     build_mode = args.build_mode
     python = args.python
+    if python == '3.7':
+        python = '3.7.3'
     numpy = args.numpy
     output_folder = args.output_folder
     conda_prefix = os.getenv('CONDA_PREFIX', args.conda_prefix)
@@ -92,7 +94,7 @@ if __name__ == '__main__':
     use_numba_master = args.use_numba_master
     numba_channel = numba_master_channel if use_numba_master is True else args.numba_channel
     assert conda_prefix is not None, 'CONDA_PREFIX is not defined; Please use --conda-prefix option or activate your conda'
-    
+
     # Init variables
     conda_activate = get_conda_activate_cmd(conda_prefix).replace('"', '')
     build_env = f'sdc-build-env-py{python}-numpy{numpy}'
@@ -116,7 +118,7 @@ if __name__ == '__main__':
             set_environment_variable('INCLUDE', os.path.join('%CONDA_PREFIX%', 'Library', 'include'))
             set_environment_variable('LIB', os.path.join('%CONDA_PREFIX%', 'Library', 'lib'))
 
-        conda_build_packages.extend(['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64'])
+        conda_build_packages.extend(['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64', 'pywin32=223'])
 
     # Build Numba from master
     if use_numba_master is True:
