@@ -832,7 +832,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
-    # @skip_numba_jit
     def test_pct_change1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
@@ -1345,6 +1344,17 @@ class TestDataFrame(TestCase):
                            "E": [-1, np.nan, 1, np.inf],
                            "F": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
+
+    def test_pct_change(self):
+        def test_impl(df):
+            return df.pct_change()
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [14, 4, 5, 4, 1, 55],
+                           "B": [5, 2, None, 3, 2, 32],
+                           "C": [20, 20, 7, 21, 8, None],
+                           "D": [14, None, 6, 2, 6, 4]})
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
 
 if __name__ == "__main__":
