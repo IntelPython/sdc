@@ -32,6 +32,7 @@ import numpy as np
 import sdc
 import numba
 
+from sdc.config import (config_use_parallel_overloads, config_inline_overloads)
 
 test_global_input_data_unicode_kind4 = [
     '¡Y tú quién te crees?',
@@ -142,6 +143,28 @@ def skip_numba_jit(msg_or_func=None):
 def skip_sdc_jit(msg_or_func=None):
     msg, func = msg_and_func(msg_or_func)
     wrapper = unittest.skipIf(sdc.config.config_pipeline_hpat_default, msg or "sdc pipeline not supported")
+    if sdc.config.test_expected_failure:
+        wrapper = unittest.expectedFailure
+    # wrapper = lambda f: f  # disable skipping
+    return wrapper(func) if func else wrapper
+
+
+def sdc_limitation(func):
+    return unittest.expectedFailure(func)
+
+
+def skip_parallel(msg_or_func):
+    msg, func = msg_and_func(msg_or_func)
+    wrapper = unittest.skipIf(config_use_parallel_overloads, msg or "fails in parallel mode")
+    if sdc.config.test_expected_failure:
+        wrapper = unittest.expectedFailure
+    # wrapper = lambda f: f  # disable skipping
+    return wrapper(func) if func else wrapper
+
+
+def skip_inline(msg_or_func):
+    msg, func = msg_and_func(msg_or_func)
+    wrapper = unittest.skipIf(config_inline_overloads, msg or "fails in inline mode")
     if sdc.config.test_expected_failure:
         wrapper = unittest.expectedFailure
     # wrapper = lambda f: f  # disable skipping
