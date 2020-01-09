@@ -108,7 +108,7 @@ def gen_hpat_pandas_rolling_init(ty):
 def gen_sdc_pandas_rolling(initializer, ty):
     """Generate rolling initializer"""
     def sdc_pandas_rolling(self, window, min_periods=None, center=False,
-                                win_type=None, on=None, axis=0, closed=None):
+                           win_type=None, on=None, axis=0, closed=None):
         ty_checker = TypeChecker('Method rolling().')
         ty_checker.check(self, ty)
 
