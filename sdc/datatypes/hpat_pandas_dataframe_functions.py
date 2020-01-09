@@ -478,7 +478,8 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-def sdc_pandas_dataframe_isin_df_codegen(df, values):
+def sdc_pandas_dataframe_isin_df_codegen(df, values, l):
+
     print("DATADATADATA")
 
 
@@ -524,7 +525,12 @@ def isin_overload(df, values):
         ty_checker.raise_exc(values, 'iterable, Series, DataFrame or dict', 'values')
 
     if isinstance(values, DataFrameType):
-        return sdc_pandas_dataframe_isin_df_codegen(df, values)
+        l = []
+        for i in range(len(df.columns)):
+            if not df.columns[i] == values.columns[i]:
+                l.append(df.columns[i])
+        print(l)
+        return sdc_pandas_dataframe_isin_df_codegen(df, values, l)
 
     if isinstance(values, SeriesType):
         return sdc_pandas_dataframe_isin_ser_codegen(df, values)
