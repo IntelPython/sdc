@@ -118,7 +118,7 @@ def _dataframe_reduce_columns_codegen_df(func_name, func_params, series_params, 
     return func_text, global_vars
 
 
-def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
+def sdc_pandas_dataframe_reduce_columns_df(df, func_name, params, ser_params):
     all_params = ['df']
     ser_par = []
 
