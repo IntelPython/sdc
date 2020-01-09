@@ -1345,6 +1345,7 @@ class TestDataFrame(TestCase):
                            "F": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
+    @skip_sdc_jit
     def test_pct_change(self):
         def test_impl(df):
             return df.pct_change()
