@@ -225,8 +225,7 @@ def fill_str_array(data, size, push_back=True):
     result_data = sdc.str_arr_ext.pre_alloc_string_array(size, num_chars)
 
     # Keep NaN values of initial array
-    arr_is_na_mask = numpy.array([sdc.hiframes.api.isna(data, i) for i in
-                                  numba.prange(string_array_size)])
+    arr_is_na_mask = numpy.array([sdc.hiframes.api.isna(data, i) for i in range(string_array_size)])
     data_str_list = sdc.str_arr_ext.to_string_list(data)
     nan_list = [''] * none_array_size
 
@@ -235,23 +234,22 @@ def fill_str_array(data, size, push_back=True):
 
     # Batch=64 iteration to avoid threads competition
     batch_size = 64
+
     if push_back:
-        for i in numba.prange(string_array_size//batch_size + 1):
-            for j in range(i, max(i + batch_size, string_array_size)):
-                if arr_is_na_mask[j]:
-                    str_arr_set_na(result_data, j)
-        for i in numba.prange(none_array_size//batch_size + 1):
-            for j in range(string_array_size, string_array_size + max(i + batch_size, size)):
-                str_arr_set_na(result_data, j)
+        string_array_shift = 0
+        none_array_shift = string_array_size
     else:
-        for i in numba.prange(none_array_size//batch_size + 1):
-            for j in range(i, max(i + batch_size, none_array_size)):
-                str_arr_set_na(result_data, j)
-        for i in numba.prange(string_array_size//batch_size + 1):
-            for j in range(none_array_size, none_array_size + max(i + batch_size, size)):
-                off_set = j - none_array_size
-                if arr_is_na_mask[off_set]:
-                    str_arr_set_na(result_data, j)
+        string_array_shift = none_array_size
+        none_array_shift = 0
+
+    for i in numba.prange(string_array_size//batch_size + 1):
+        for j in range(i*batch_size, min((i+1)*batch_size, string_array_size)):
+            if arr_is_na_mask[j]:
+                str_arr_set_na(result_data, string_array_shift + j)
+
+    for i in numba.prange(none_array_size//batch_size + 1):
+        for j in range(i*batch_size, min((i+1)*batch_size, none_array_size)):
+            str_arr_set_na(result_data, none_array_shift + j)
 
     return result_data
 

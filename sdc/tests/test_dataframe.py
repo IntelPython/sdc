@@ -1138,14 +1138,15 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
+    @skip_sdc_jit
     def test_append_df_diff_types_no_index(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)
 
         hpat_func = self.jit(test_impl)
 
-        df = pd.DataFrame({'A': ['cat', 'dog', np.nan] * 64, 'B': [.2, .3, np.nan] * 64})
-        df2 = pd.DataFrame({'C': [5, 6, 7]*63, 'D': ['a', np.nan, '']*63})
+        df = pd.DataFrame({'A': ['cat', 'dog', np.nan], 'B': [.2, .3, np.nan]})
+        df2 = pd.DataFrame({'C': [5, 6, 7, 8]*64, 'D': ['a', 'b', np.nan, '']*64})
 
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
