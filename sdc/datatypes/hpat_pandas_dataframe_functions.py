@@ -110,7 +110,6 @@ def _dataframe_reduce_columns_codegen_df(func_name, func_params, series_params, 
 
     func_lines += [f'  return pandas.DataFrame([{all_results}], [{all_columns}])']
     func_text = '\n'.join(func_lines)
-    print(func_text)
 
     global_vars = {'pandas': pandas, 'np': numpy,
                    'get_dataframe_data': get_dataframe_data}
