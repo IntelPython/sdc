@@ -26,21 +26,14 @@
 
 import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
 @njit
 def series_argsort():
-    series = pd.Series([3, -10, np.nan, 0, 92])
-    return series.argsort()
-    # Expected Series
-    # 0    1
-    # 1    2
-    # 2   -1
-    # 3    0
-    # 4    3
-    # dtype: int64
+    s = pd.Series([3, -10, np.nan, 0, 92])
+
+    return s.argsort()  # Expect series of 1, 2, -1, 0, 3
 
 
 print(series_argsort())

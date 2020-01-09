@@ -26,7 +26,6 @@
 
 import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
@@ -34,14 +33,8 @@ from numba import njit
 def series_gt():
     s1 = pd.Series([5, 4, 3, 2, 1])
     s2 = pd.Series([0, 2, 3, 6, 8])
-    return s1.gt(s2)
-    # Expected Series
-    # 0     True
-    # 1     True
-    # 2    False
-    # 3    False
-    # 4    False
-    # dtype: bool
+
+    return s1.gt(s2)  # Expect series of True, True, False, False, False
 
 
 print(series_gt())

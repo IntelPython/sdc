@@ -26,20 +26,14 @@
 
 import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
 @njit
 def series_isna():
-    series = pd.Series([4, np.nan, 2, 1])
-    return series.isna()
-    # Expected Series
-    # 0    False
-    # 1     True
-    # 2    False
-    # 3    False
-    # dtype: bool
+    s = pd.Series([4, np.nan, 2, 1])
+
+    return s.isna()  # Expect series of False, True, False, False
 
 
 print(series_isna())

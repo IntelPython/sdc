@@ -1835,7 +1835,7 @@ def hpat_pandas_series_head(self, n=5):
     Pandas Series method :meth:`pandas.Series.head` implementation.
 
     .. only:: developer
-       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_head*
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_head*
 
     Parameters
     -----------
@@ -2143,7 +2143,7 @@ def hpat_pandas_series_notna(self):
 
     .. only:: developer
 
-        Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_notna*
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_notna*
 
     Parameters
     -----------
@@ -2210,7 +2210,7 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     Pandas Series method :meth:`pandas.Series.ne` implementation.
     .. only:: developer
 
-       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8*
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
 
     Parameters
     ----------
@@ -2606,7 +2606,7 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=True):
     *************************************************
     Pandas Series method :meth:`pandas.Series.idxmax` implementation.
     .. only:: developer
-        Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmax*
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_idxmax*
 
     Parameters
     -----------
@@ -3045,7 +3045,7 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
     Pandas Series method :meth:`pandas.Series.pow` implementation.
     .. only:: developer
 
-       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5*
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
 
     Parameters
     ----------
@@ -3662,7 +3662,7 @@ def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
 
     .. only:: developer
 
-       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8*
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
 
     Parameters
     ----------
@@ -3747,7 +3747,7 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
 
     .. only:: developer
 
-       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8*
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
 
     Parameters
     ----------
@@ -3838,7 +3838,7 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True):
 
     .. only:: developer
 
-        Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_idxmin*
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_idxmin*
 
     Parameters
     -----------
@@ -3920,7 +3920,7 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
 
     .. only:: developer
 
-       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8*
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
 
     Parameters
     ----------
@@ -4005,7 +4005,7 @@ def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
 
     .. only:: developer
 
-       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8*
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
 
     Parameters
     ----------
@@ -4090,7 +4090,7 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
 
     .. only:: developer
 
-       Test: python -m -k sdc.runtests sdc.tests.test_series.TestSeries.test_series_op8*
+       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
 
     Parameters
     ----------
@@ -4593,7 +4593,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
         raise TypingError('{} Non-numeric type unsupported. Given: {}'.format(_func_name, self.data.dtype))
 
     if not (isinstance(axis, types.Omitted) or isinstance(axis, types.Integer) or axis == 0):
-        ty_checker.raise_exc(axis, '0', 'axis')
+        ty_checker.raise_exc(axis, 'int64', 'axis')
 
     if not isinstance(kind, (types.Omitted, str, types.UnicodeType, types.StringLiteral)):
         ty_checker.raise_exc(kind, 'quicksort', 'kind')
@@ -4693,7 +4693,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
         :ref:`Series.sort_index <pandas.Series.sort_index>`
             Sort by the Series indices.
-        
+
         :ref:`DataFrame.sort_values <pandas.DataFrame.sort_values>`
             Sort DataFrame by the values along either axis.
 

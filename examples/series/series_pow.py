@@ -26,7 +26,6 @@
 
 import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
@@ -34,14 +33,8 @@ from numba import njit
 def series_pow():
     s1 = pd.Series([5, 4, 3, 2, 1])
     s2 = pd.Series([0, 2, 3, 6, 8])
-    return s1.pow(s2)
-    # Expected Series
-    # 0     1
-    # 1    16
-    # 2    27
-    # 3    64
-    # 4     1
-    # dtype: int64
+
+    return s1.pow(s2)  # Expect series of 1, 16, 27, 64, 1
 
 
 print(series_pow())

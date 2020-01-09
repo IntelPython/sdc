@@ -26,16 +26,14 @@
 
 import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
 @njit
 def series_min():
     series = pd.Series([4, np.nan, 2, 1])
-    return series.min()
-    # Expected Value
-    # 1.0
+
+    return series.min()  # Expect minimum value 1.0
 
 
 print(series_min())

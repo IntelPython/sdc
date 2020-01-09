@@ -26,7 +26,6 @@
 
 import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
@@ -34,14 +33,8 @@ from numba import njit
 def series_lt():
     s1 = pd.Series([5, 4, 3, 2, 1])
     s2 = pd.Series([0, 2, 3, 6, 8])
-    return s1.lt(s2)
-    # Expected Series
-    # 0    False
-    # 1    False
-    # 2    False
-    # 3     True
-    # 4     True
-    # dtype: bool
+
+    return s1.lt(s2)  # Expect series of False, False, False, True, True
 
 
 print(series_lt())

@@ -26,20 +26,14 @@
 
 import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
 @njit
 def series_notna():
     series = pd.Series([4, np.nan, 2, 1])
-    return series.notna()
-    # Expected Series
-    # 0     True
-    # 1    False
-    # 2     True
-    # 3     True
-    # dtype: bool
+
+    return series.notna()  # Expect series of True, False, True, True
 
 
 print(series_notna())

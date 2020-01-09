@@ -26,16 +26,14 @@
 
 import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
 @njit
 def series_idxmin():
-    series = pd.Series([4, np.nan, 2, 1], ['A', 'B', 'C', 'D'])
-    return series.idxmin()
-    # Expected Value
-    # D
+    s = pd.Series([4, np.nan, 2, 1], index=['A', 'B', 'C', 'D'])
+
+    return s.idxmin()  # Expect index of minimum value D
 
 
 print(series_idxmin())

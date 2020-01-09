@@ -26,16 +26,14 @@
 
 import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
 @njit
 def series_idxmax():
-    series = pd.Series([4, np.nan, 2, 1], ['A', 'B', 'C', 'D'])
-    return series.idxmax()
-    # Expected Value
-    # A
+    s = pd.Series([4, np.nan, 2, 1], index=['A', 'B', 'C', 'D'])
+
+    return s.idxmax()  # Expect index of maximum value A
 
 
 print(series_idxmax())
