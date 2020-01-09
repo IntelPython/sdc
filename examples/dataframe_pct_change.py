@@ -47,4 +47,5 @@ def dataframe_pct_change():
 # 4  -0.750000  -0.333333 -0.619048  2.000000
 # 5  54.000000  15.000000 -0.375000 -0.333333
 
+
 print(dataframe_pct_change())
