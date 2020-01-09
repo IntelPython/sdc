@@ -88,7 +88,52 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
     df_func_name = f'_df_{func_name}_impl'
 
     func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, s_par, df.columns)
-    print(func_text)
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _reduce_impl = loc_vars[df_func_name]
+
+    return _reduce_impl
+
+
+def _dataframe_reduce_columns_codegen_df(func_name, func_params, series_params, columns):
+    result_name_list = []
+    joined = ', '.join(func_params)
+    func_lines = [f'def _df_{func_name}_impl({joined}):']
+    for i, c in enumerate(columns):
+        helped_list = []
+        result_c = f'result_{c}'
+        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({func_params[0]}, {i}))',
+                       f'  {result_c} = series_{c}.{func_name}({series_params})']
+        helped_list.append(result_c)
+        result_name_list.append(helped_list)
+    all_results = ', '.join(result_name_list)
+    all_columns = ', '.join([f"'{c}'" for c in columns])
+
+    func_lines += [f'  return pandas.DataFrame([{all_results}], [{all_columns}])']
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas, 'np': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_reduce_columns_df(df, func_name, params, ser_params):
+    all_params = ['df']
+    ser_par = []
+
+    for key, value in params.items():
+        all_params.append('{}={}'.format(key, value))
+    for key, value in ser_params.items():
+        ser_par.append('{}={}'.format(key, value))
+
+    s_par = '{}'.format(', '.join(ser_par[:]))
+
+    df_func_name = f'_df_{func_name}_impl'
+
+    func_text, global_vars = _dataframe_reduce_columns_codegen_df(func_name, all_params, s_par, df.columns)
+
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
@@ -525,4 +570,4 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     params = {'periods': 1, 'fill_method': '"pad"', 'limit': None, 'freq': None}
     ser_par = {'periods': 'periods', 'fill_method': 'fill_method', 'limit': 'limit', 'freq': 'freq'}
 
-    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
+    return sdc_pandas_dataframe_reduce_columns_df(df, name, params, ser_par)
