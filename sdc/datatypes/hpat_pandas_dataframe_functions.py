@@ -38,6 +38,7 @@ from numba import types
 from numba.extending import (overload, overload_method, overload_attribute)
 from numba.errors import TypingError
 from sdc.hiframes.pd_dataframe_type import DataFrameType
+from sdc.hiframes.pd_series_type import SeriesType
 
 from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
@@ -454,7 +455,7 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     Returns
     -------
     :obj:`pandas.Series` or `pandas.DataFrame`
-    for each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
+            for each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
     """
 
     name = 'count'
@@ -475,3 +476,61 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     ser_par = {'level': 'level'}
 
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
+
+
+def sdc_pandas_dataframe_isin_df_codegen(df, values):
+    print("DATADATADATA")
+
+
+def sdc_pandas_dataframe_isin_ser_codegen(df, values):
+    print("SERSERSERSER")
+
+
+def sdc_pandas_dataframe_isin_dict_codegen(df, values):
+    print("DICTDICTDICT")
+
+
+def sdc_pandas_dataframe_isin_iter_codegen(df, values):
+    print("ITERITERITER")
+
+
+@overload_method(DataFrameType, 'isin')
+def isin_overload(df, values):
+    """
+    Pandas DataFrame method :meth:`pandas.DataFrame.isin` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_isin*
+
+    Parameters
+    -----------
+    df: :class:`pandas.DataFrame`
+        input arg
+    values: iterable, Series, DataFrame or dict
+
+    Returns
+    -------
+    :obj:`pandas.Series` or `pandas.DataFrame`
+            Whether each element in the DataFrame is contained in values.
+    """
+
+    name = 'isin'
+
+    ty_checker = TypeChecker('Method {}().'.format(name))
+    ty_checker.check(df, DataFrameType)
+
+    if not isinstance(values, (types.Iterable, SeriesType, DataFrameType, dict)):
+        ty_checker.raise_exc(values, 'iterable, Series, DataFrame or dict', 'values')
+
+    if isinstance(values, DataFrameType):
+        return sdc_pandas_dataframe_isin_df_codegen(df, values)
+
+    if isinstance(values, SeriesType):
+        return sdc_pandas_dataframe_isin_ser_codegen(df, values)
+
+    if isinstance(values, dict):
+        return sdc_pandas_dataframe_isin_dict_codegen(df, values)
+
+    if isinstance(values, types.Iterable):
+        return sdc_pandas_dataframe_isin_iter_codegen(df, values)
