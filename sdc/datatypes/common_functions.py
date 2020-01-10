@@ -575,4 +575,3 @@ def _sdc_pandas_series_check_axis_overload(axis):
         return _sdc_pandas_series_check_axis_impl
 
     return None
-
