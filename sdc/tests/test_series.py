@@ -1295,6 +1295,65 @@ class TestSeries(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(S), test_impl(S))
 
+    @skip_sdc_jit('Not impl in old style')
+    def test_series_slice_nonidx_nostart(self):
+        def test_impl(A):
+            return A.loc[-4:301]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([2, 4, 6, 6, 3], [-22, -5, -2, 300, 40000])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+
+    @skip_sdc_jit('Not impl in old style')
+    def test_series_slice(self):
+        def test_impl(A):
+            return A.loc[1:5]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([2, 4, 6, 6, 3], [1, 3, 5, 13, 22])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit('Not impl in old style')
+    def test_series_slice_loc_start(self):
+        def test_impl(A, n):
+            return A.loc[n:]
+        hpat_func = self.jit(test_impl)
+
+        all_data = [[1, 3, 5, 13, 22], [1, 3, 3, 13, 22], [22, 13, 5, 3, 1], [100, 3, 1, -3, -3]]
+        key = [1, 3, 18]
+        for index in all_data:
+            for n in key:
+                S = pd.Series([2, 4, 6, 6, 3], index)
+                pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
+
+    @skip_sdc_jit('Not impl in old style')
+    def test_series_slice_loc_stop(self):
+        def test_impl(A, n):
+            return A.loc[:n]
+        hpat_func = self.jit(test_impl)
+
+        all_data = [[1, 3, 5, 13, 22], [1, 3, 3, 13, 22], [22, 13, 5, 3, 1], [100, 3, 0, -3, -3]]
+        key = [1, 3, 18]
+        for index in all_data:
+            for n in key:
+                S = pd.Series([2, 4, 6, 6, 3], index)
+                pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
+
+    @skip_sdc_jit('Not impl in old style')
+    def test_series_slice_loc_start_stop(self):
+        def test_impl(A, n, k):
+            return A.loc[n:k]
+        hpat_func = self.jit(test_impl)
+
+        all_data = [[1, 3, 5, 13, 22], [1, 3, 3, 13, 22], [22, 13, 5, 3, 1], [100, 3, 0, -3, -3]]
+        key = [1, 3, 18]
+        for index in all_data:
+            for n in key:
+                for k in key[::-1]:
+                    S = pd.Series([2, 4, 6, 6, 3], index)
+                    pd.testing.assert_series_equal(hpat_func(S, n, k), test_impl(S, n, k))
+
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support comparing Series of different lengths')
     def test_series_op1_integer(self):
         '''Verifies using all various Series arithmetic binary operators on two integer Series with default indexes'''
