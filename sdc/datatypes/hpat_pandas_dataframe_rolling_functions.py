@@ -1,7 +1,7 @@
 
 
 @sdc_overload_method(DataFrameRollingType, 'apply')
-def sdc_pandas_dataframe_rolling_min(self, func, raw=None):
+def sdc_pandas_dataframe_rolling_apply(self, func, raw=None):
 
     ty_checker = TypeChecker('Method rolling.apply().')
     ty_checker.check(self, DataFrameRollingType)
