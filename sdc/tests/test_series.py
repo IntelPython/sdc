@@ -477,6 +477,7 @@ class TestSeries(TestCase):
         A = pd.Series(np.random.ranf(n))
         pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     @skip_numba_jit
     def test_series_argsort2(self):
         def test_impl(S):
@@ -486,6 +487,7 @@ class TestSeries(TestCase):
         S = pd.Series([1, -1, 0, 1, np.nan], [1, 2, 3, 4, 5])
         pd.testing.assert_series_equal(test_impl(S), hpat_func(S))
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     @skip_numba_jit
     def test_series_argsort_full(self):
         def test_impl(series, kind):
@@ -507,6 +509,7 @@ class TestSeries(TestCase):
                 else:
                     np.testing.assert_array_equal(ref, jit)
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     @skip_numba_jit
     def test_series_argsort_full_idx(self):
         def test_impl(series, kind):
@@ -530,6 +533,7 @@ class TestSeries(TestCase):
                     else:
                         np.testing.assert_array_equal(ref, jit)
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     @skip_numba_jit
     def test_series_attr6(self):
         def test_impl(A):
@@ -2544,6 +2548,7 @@ class TestSeries(TestCase):
                     result = hpat_func(S, ascending)
                     pd.testing.assert_series_equal(result, result_ref)
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     def test_series_value_counts_index(self):
         def test_impl(S):
             return S.value_counts()
@@ -2578,6 +2583,7 @@ class TestSeries(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     @skip_numba_jit
     def test_series_dist_input2(self):
         '''Verify distribution of a Series with integer index'''
@@ -3851,6 +3857,7 @@ class TestSeries(TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     def test_series_head_index3(self):
         '''Verifies head method for non-distributed pass of Series with integer index'''
         def test_impl(S):

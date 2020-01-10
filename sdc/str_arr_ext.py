@@ -491,6 +491,7 @@ def str_list_to_array_overload(str_list):
 
     return lambda str_list: str_list
 
+
 if sdc.config.config_pipeline_hpat_default:
     @infer_global(operator.getitem)
     class GetItemStringArray(AbstractTemplate):
@@ -521,6 +522,7 @@ else:
             if isinstance(ary, StringArrayType):
                 if isinstance(idx, types.SliceType):
                     return signature(string_array_type, *args)
+
 
 @infer_global(operator.setitem)
 class SetItemStringArray(AbstractTemplate):
@@ -1230,10 +1232,6 @@ def decode_utf8(typingctx, ptr_t, len_t=None):
     # return builder.call(fn_getitem, [string_array.offsets,
     #                                  string_array.data, args[1]])
 
-
-# below lines are commented to have overload getitem impl called (otherwise old-style impl is called)
-# FIXME: do not comment but place under sdc.config.pipeline branch
-# (requires circular imports of sdc.config to be resolved)
 
 if sdc.config.config_pipeline_hpat_default:
     # FIXME: old-style getitem implementations copy strings but not null bits
