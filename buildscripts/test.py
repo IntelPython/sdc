@@ -83,6 +83,8 @@ if __name__ == '__main__':
     parser.add_argument('--channel-list', default=None, help='List of channels to use: "-c <channel> -c <channel>"')
     parser.add_argument('--benchmark-argv', default='sdc.tests.tests_perf',
                         help='Run performance testing for all or a sigle one"')
+    parser.add_argument('--benchmark-num-threads-list', nargs='+',
+                        help='List of values for NUMBA_NUM_THREADS env variable', type=int)
 
     args = parser.parse_args()
 
@@ -98,6 +100,7 @@ if __name__ == '__main__':
     channel_list = args.channel_list
     use_numba_master = args.use_numba_master
     benchmark_argv = args.benchmark_argv
+    benchmark_num_threads_list = args.benchmark_num_threads_list
     numba_channel = numba_master_channel if use_numba_master is True else args.numba_channel
     assert conda_prefix is not None, 'CONDA_PREFIX is not defined; Please use --conda-prefix option or activate your conda'
 
@@ -267,6 +270,10 @@ if __name__ == '__main__':
 
     # Benchmark tests
     if test_mode == 'benchmark':
+        if benchmark_num_threads_list is None:
+            msg = ("List of values for NUMBA_NUM_THREADS is not defined; "
+                   "Please use --benchmark-num-threads-list option")
+            raise ValueError(msg)
         os.chdir(os.path.dirname(sdc_src))
         sdc_packages = get_sdc_build_packages(build_folder)
         for package in sdc_packages:
@@ -275,4 +282,8 @@ if __name__ == '__main__':
                 create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['openpyxl', 'xlrd'],
                                  conda_channels)
                 run_command(f'{test_env_activate} && conda install -y {package}')
-                run_command(f'{test_env_activate} && python -W ignore -m sdc.runtests {benchmark_argv}')
+                os.environ['LOAD_PREV_RESULTS'] = str(1)
+                for num_threads in benchmark_num_threads_list:
+                    os.environ['NUMBA_NUM_THREADS'] = str(num_threads)
+                    format_print(f'NUMBA_NUM_THREADS is : {num_threads}')
+                    run_command(f'{test_env_activate} && python -W ignore -m sdc.runtests {benchmark_argv}')
