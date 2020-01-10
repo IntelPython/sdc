@@ -83,20 +83,17 @@ def params2list(params):
     return ['{}={}'.format(k, v) for k, v in params.items()]
 
 
-def params2str(params):
-    """Convert parameters from dict to string"""
-    return ', '.join(params2list(params))
-
-
-def sdc_pandas_dataframe_rolling_apply(method_name, self, method_params=None):
-    method_params = method_params or {}
+def sdc_pandas_dataframe_rolling_apply(method_name, self, args=None, kws=None):
+    args = args or []
+    kwargs = kws or {}
 
     rolling_params = ['window', 'min_periods', 'center',
                       'win_type', 'on', 'axis', 'closed']
     rolling_params_as_str = ', '.join(f'self._{p}' for p in rolling_params)
-    method_params_as_str = params2str(method_params)
+    method_params = args + params2list(kwargs)
+    method_params_as_str = ', '.join(method_params)
 
-    impl_params = ['self'] + params2list(method_params)
+    impl_params = ['self'] + method_params
     impl_params_as_str = ', '.join(impl_params)
 
     results = []
