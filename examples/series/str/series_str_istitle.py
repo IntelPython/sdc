@@ -24,5 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from numba import njit
 
-# import sdc.datatypes.hpat_pandas_dataframe_pass
+
+@njit
+def series_str_istitle():
+    series = pd.Series(['Cat', 'dog', 'Bird'])
+    out_series = series.str.istitle()
+
+    return out_series  # Expect series of True, False, True
+
+
+print(series_str_istitle())

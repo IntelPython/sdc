@@ -24,5 +24,21 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy as np
+import pandas as pd
+from numba import njit
 
-# import sdc.datatypes.hpat_pandas_dataframe_pass
+
+@njit
+def series_getitem_slice():
+    series = pd.Series(np.arange(10, 0, -1))  # Series of 10, 9, ..., 1
+    return series[3:7]  # Accessing series by slice index
+    # Expected Series:
+    # 3    7
+    # 4    6
+    # 5    5
+    # 6    4
+    # dtype: int64
+
+
+print(series_getitem_slice())

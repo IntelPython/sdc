@@ -913,6 +913,173 @@ def _hpat_pandas_stringmethods_autogen(method_name):
     return _hpat_pandas_stringmethods_autogen_global_dict[global_dict_name]
 
 
+sdc_pandas_series_str_docstring_template = """
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+        Pandas API: pandas.Series.str.{method_name}
+
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be NaN.
+
+        Examples
+        --------
+        .. literalinclude:: ../../../examples/series/str/series_str_{method_name}.py
+           :language: python
+           :lines: 27-
+           :caption: {caption}
+           :name: ex_series_str_{method_name}
+
+        .. command-output:: python ./series/str/series_str_{method_name}.py
+           :cwd: ../../../examples
+
+        .. seealso::
+            :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
+                Check whether all characters are alphabetic.
+            :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
+                Check whether all characters are numeric.
+            :ref:`Series.str.isalnum <pandas.Series.str.isalnum>`
+                Check whether all characters are alphanumeric.
+            :ref:`Series.str.isdigit <pandas.Series.str.isdigit>`
+                Check whether all characters are digits.
+            :ref:`Series.str.isdecimal <pandas.Series.str.isdecimal>`
+                Check whether all characters are decimal.
+            :ref:`Series.str.isspace <pandas.Series.str.isspace>`
+                Check whether all characters are whitespace.
+            :ref:`Series.str.islower <pandas.Series.str.islower>`
+                Check whether all characters are lowercase.
+            :ref:`Series.str.isupper <pandas.Series.str.isupper>`
+                Check whether all characters are uppercase.
+            :ref:`Series.str.istitle <pandas.Series.str.istitle>`
+                Check whether all characters are titlecase.
+
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+
+        Pandas Series method :meth:`pandas.core.strings.StringMethods.{method_name}()` implementation.
+
+        Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+
+        .. only:: developer
+
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_{method_name}_str
+
+        Parameters
+        ----------
+        self: :class:`pandas.core.strings.StringMethods`
+            input arg
+
+        Returns
+        -------
+        :obj:`pandas.Series`
+             returns :obj:`pandas.Series` object
+"""
+
+
+@overload_method(StringMethodsType, 'istitle')
+def hpat_pandas_stringmethods_istitle(self):
+
+    ty_checker = TypeChecker('Method istitle().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_istitle_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.istitle()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_istitle_impl
+
+
+@overload_method(StringMethodsType, 'isspace')
+def hpat_pandas_stringmethods_isspace(self):
+
+    ty_checker = TypeChecker('Method isspace().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isspace_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isspace()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isspace_impl
+
+
+@overload_method(StringMethodsType, 'isalpha')
+def hpat_pandas_stringmethods_isalpha(self):
+
+    ty_checker = TypeChecker('Method isalpha().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isalpha_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isalpha()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isalpha_impl
+
+
+@overload_method(StringMethodsType, 'islower')
+def hpat_pandas_stringmethods_islower(self):
+
+    ty_checker = TypeChecker('Method islower().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_islower_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.islower()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_islower_impl
+
+
+@overload_method(StringMethodsType, 'isalnum')
+def hpat_pandas_stringmethods_isalnum(self):
+
+    ty_checker = TypeChecker('Method isalnum().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isalnum_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isalnum()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isalnum_impl
+
+
+stringmethods_funcs = {
+    'istitle': {'method': hpat_pandas_stringmethods_istitle,
+                'caption': 'Check if each word start with an upper case letter'},
+    'isspace': {'method': hpat_pandas_stringmethods_isspace,
+                'caption': 'Check if all the characters in the text are whitespaces'},
+    'isalpha': {'method': hpat_pandas_stringmethods_isalpha,
+                'caption': 'Check whether all characters in each string are alphabetic'},
+    'islower': {'method': hpat_pandas_stringmethods_islower,
+                'caption': 'Check if all the characters in the text are alphanumeric'},
+    'isalnum': {'method': hpat_pandas_stringmethods_isalnum,
+                'caption': 'Check if all the characters in the text are alphanumeric'}
+}
+
+
+for name, data in stringmethods_funcs.items():
+    data['method'].__doc__ = sdc_pandas_series_str_docstring_template.format(**{'method_name': name,
+                                                                                'caption': data['caption']})
+
+
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))
 _hpat_pandas_stringmethods_autogen_methods = ['upper', 'lower', 'lstrip', 'rstrip', 'strip']
 """

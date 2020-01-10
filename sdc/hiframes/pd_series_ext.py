@@ -39,8 +39,7 @@ from numba.extending import (
     infer_getattr,
     type_callable,
     infer,
-    overload,
-    make_attribute_wrapper)
+    overload)
 from numba.typing.arraydecl import (get_array_index_type, _expand_integer, ArrayAttribute, SetItemBuffer)
 from numba.typing.npydecl import (
     Numpy_rules_ufunc,
@@ -69,143 +68,7 @@ from sdc.str_arr_ext import (
     StringArrayType,
     GetItemStringArray)
 from sdc.str_ext import string_type, list_string_array_type
-
-
-class SeriesType(types.IterableType):
-    """Temporary type class for Series objects.
-    """
-
-    def __init__(self, dtype, data=None, index=None, is_named=False):
-        # keeping data array in type since operators can make changes such
-        # as making array unaligned etc.
-        data = _get_series_array_type(dtype) if data is None else data
-        # convert Record to tuple (for tuple output of map)
-        # TODO: handle actual Record objects in Series?
-        self.dtype = (types.Tuple(list(dict(dtype.members).values()))
-                      if isinstance(dtype, types.Record) else dtype)
-        self.data = data
-        if index is None:
-            index = types.none
-        self.index = index
-        # keep is_named in type to enable boxing
-        self.is_named = is_named
-        super(SeriesType, self).__init__(
-            name="series({}, {}, {}, {})".format(dtype, data, index, is_named))
-
-    def copy(self, dtype=None):
-        # XXX is copy necessary?
-        index = types.none if self.index == types.none else self.index.copy()
-        dtype = dtype if dtype is not None else self.dtype
-        data = _get_series_array_type(dtype)
-        return SeriesType(dtype, data, index)
-
-    @property
-    def key(self):
-        # needed?
-        return self.dtype, self.data, self.index, self.is_named
-
-    @property
-    def ndim(self):
-        return self.data.ndim
-
-    def unify(self, typingctx, other):
-        if isinstance(other, SeriesType):
-            new_index = types.none
-            if self.index != types.none and other.index != types.none:
-                new_index = self.index.unify(typingctx, other.index)
-            elif other.index != types.none:
-                new_index = other.index
-            elif self.index != types.none:
-                new_index = self.index
-
-            # If dtype matches or other.dtype is undefined (inferred)
-            if other.dtype == self.dtype or not other.dtype.is_precise():
-                return SeriesType(
-                    self.dtype,
-                    self.data.unify(typingctx, other.data),
-                    new_index)
-
-        # XXX: unify Series/Array as Array
-        return super(SeriesType, self).unify(typingctx, other)
-
-    def can_convert_to(self, typingctx, other):
-        # same as types.Array
-        if (isinstance(other, SeriesType) and other.dtype == self.dtype):
-            # called for overload selection sometimes
-            # TODO: fix index
-            if self.index == types.none and other.index == types.none:
-                return self.data.can_convert_to(typingctx, other.data)
-            if self.index != types.none and other.index != types.none:
-                return max(self.data.can_convert_to(typingctx, other.data),
-                           self.index.can_convert_to(typingctx, other.index))
-
-    def is_precise(self):
-        # same as types.Array
-        return self.dtype.is_precise()
-
-    @property
-    def iterator_type(self):
-        # TODO: fix timestamp
-        return SeriesIterator(self)
-
-
-class SeriesIterator(types.SimpleIteratorType):
-    """
-    Type class for iterator over dataframe series.
-    """
-
-    def __init__(self, series_type):
-        self.series_type = series_type
-        self.array_type = series_type.data
-
-        name = f'iter({self.series_type.data})'
-        yield_type = series_type.dtype
-        super(SeriesIterator, self).__init__(name, yield_type)
-
-    @property
-    def _iternext(self):
-        if isinstance(self.array_type, StringArrayType):
-            return iternext_str_array
-        elif isinstance(self.array_type, types.Array):
-            return iternext_series_array
-
-
-@register_model(SeriesIterator)
-class SeriesIteratorModel(models.StructModel):
-    def __init__(self, dmm, fe_type):
-        members = [('index', types.EphemeralPointer(types.uintp)),
-                   ('array', fe_type.series_type.data)]
-
-        models.StructModel.__init__(self, dmm, fe_type, members)
-
-
-def _get_series_array_type(dtype):
-    """get underlying default array type of series based on its dtype
-    """
-    # list(list(str))
-    if dtype == types.List(string_type):
-        # default data layout is list but split view is used if possible
-        return list_string_array_type
-    # string array
-    elif dtype == string_type:
-        return string_array_type
-
-    # categorical
-    if isinstance(dtype, PDCategoricalDtype):
-        return CategoricalArray(dtype)
-
-    # use recarray data layout for series of tuples
-    if isinstance(dtype, types.BaseTuple):
-        if any(not isinstance(t, types.Number) for t in dtype.types):
-            # TODO: support more types. what types can be in recarrays?
-            raise ValueError("series tuple dtype {} includes non-numerics".format(dtype))
-        np_dtype = np.dtype(
-            ','.join(str(t) for t in dtype.types), align=True)
-        dtype = numba.numpy_support.from_dtype(np_dtype)
-
-    # TODO: other types?
-    # regular numpy array
-    return types.Array(dtype, 1, 'C')
+from sdc.hiframes.pd_series_type import (SeriesType, _get_series_array_type)
 
 
 def is_str_series_typ(t):
@@ -222,116 +85,6 @@ def is_timedelta64_series_typ(t):
 
 def is_datetime_date_series_typ(t):
     return isinstance(t, SeriesType) and t.dtype == datetime_date_type
-
-
-# register_model(SeriesType)(models.ArrayModel)
-# need to define model since fix_df_array overload goes to native code
-@register_model(SeriesType)
-class SeriesModel(models.StructModel):
-    def __init__(self, dmm, fe_type):
-        name_typ = string_type if fe_type.is_named else types.none
-        members = [
-            ('data', fe_type.data),
-            ('index', fe_type.index),
-            ('name', name_typ),
-        ]
-        super(SeriesModel, self).__init__(dmm, fe_type, members)
-
-
-make_attribute_wrapper(SeriesType, 'data', '_data')
-make_attribute_wrapper(SeriesType, 'index', '_index')
-make_attribute_wrapper(SeriesType, 'name', '_name')
-
-
-@lower_builtin('getiter', SeriesType)
-def getiter_series(context, builder, sig, args):
-    """
-    Getting iterator for the Series type
-
-    :param context: context descriptor
-    :param builder: llvmlite IR Builder
-    :param sig: iterator signature
-    :param args: tuple with iterator arguments, such as instruction, operands and types
-    :param result: iternext result
-    :return: reference to iterator
-    """
-
-    arraytype = sig.args[0].data
-
-    # Create instruction to get array to iterate
-    zero_member_pointer = context.get_constant(types.intp, 0)
-    zero_member = context.get_constant(types.int32, 0)
-    alloca = args[0].operands[0]
-    gep_result = builder.gep(alloca, [zero_member_pointer, zero_member])
-    array = builder.load(gep_result)
-
-    # TODO: call numba getiter with gep_result for array
-    iterobj = context.make_helper(builder, sig.return_type)
-    zero_index = context.get_constant(types.intp, 0)
-    indexptr = cgutils.alloca_once_value(builder, zero_index)
-
-    iterobj.index = indexptr
-    iterobj.array = array
-
-    if context.enable_nrt:
-        context.nrt.incref(builder, arraytype, array)
-
-    result = iterobj._getvalue()
-    # Note: a decref on the iterator will dereference all internal MemInfo*
-    out = impl_ret_new_ref(context, builder, sig.return_type, result)
-    return out
-
-
-# TODO: call it from numba.targets.arrayobj, need separate function in numba
-def iternext_series_array(context, builder, sig, args, result):
-    """
-    Implementation of iternext() for the ArrayIterator type
-
-    :param context: context descriptor
-    :param builder: llvmlite IR Builder
-    :param sig: iterator signature
-    :param args: tuple with iterator arguments, such as instruction, operands and types
-    :param result: iternext result
-    """
-
-    [iterty] = sig.args
-    [iter] = args
-    arrayty = iterty.array_type
-
-    if arrayty.ndim != 1:
-        raise NotImplementedError("iterating over %dD array" % arrayty.ndim)
-
-    iterobj = context.make_helper(builder, iterty, value=iter)
-    ary = make_array(arrayty)(context, builder, value=iterobj.array)
-
-    nitems, = cgutils.unpack_tuple(builder, ary.shape, count=1)
-
-    index = builder.load(iterobj.index)
-    is_valid = builder.icmp(lc.ICMP_SLT, index, nitems)
-    result.set_valid(is_valid)
-
-    with builder.if_then(is_valid):
-        value = _getitem_array1d(context, builder, arrayty, ary, index,
-                                 wraparound=False)
-        result.yield_(value)
-        nindex = cgutils.increment_index(builder, index)
-        builder.store(nindex, iterobj.index)
-
-
-@lower_builtin('iternext', SeriesIterator)
-@iternext_impl(RefType.BORROWED)
-def iternext_series(context, builder, sig, args, result):
-    """
-    Iternext implementation depending on Array type
-
-    :param context: context descriptor
-    :param builder: llvmlite IR Builder
-    :param sig: iterator signature
-    :param args: tuple with iterator arguments, such as instruction, operands and types
-    :param result: iternext result
-    """
-    iternext_func = sig.args[0]._iternext
-    iternext_func(context=context, builder=builder, sig=sig, args=args, result=result)
 
 
 def series_to_array_type(typ, replace_boxed=False):
@@ -747,7 +500,8 @@ str2str_methods = ['capitalize', 'swapcase', 'title']
 
 str2str_methods_excluded = [
     'upper', 'center', 'endswith', 'find', 'isupper', 'len', 'ljust',
-    'lower', 'lstrip', 'rjust', 'rstrip', 'startswith', 'strip', 'zfill'
+    'lower', 'lstrip', 'rjust', 'rstrip', 'startswith', 'strip', 'zfill',
+    'isspace', 'islower', 'isalpha', 'isalnum', 'istitle'
 ]
 """
     Functions which are used from Numba directly by calling from StringMethodsType
@@ -854,48 +608,44 @@ if sdc.config.config_pipeline_hpat_default:
             self.dtype = dtype
             name = "SeriesRollingType({})".format(dtype)
             super(SeriesRollingType, self).__init__(name)
+
+    @infer_getattr
+    class SeriesRollingAttribute(AttributeTemplate):
+        key = SeriesRollingType
+
+        @bound_function("rolling.apply")
+        def resolve_apply(self, ary, args, kws):
+            # result is always float64 (see Pandas window.pyx:roll_generic)
+            return signature(SeriesType(types.float64), *args)
+
+        @bound_function("rolling.cov")
+        def resolve_cov(self, ary, args, kws):
+            return signature(SeriesType(types.float64), *args)
+
+        @bound_function("rolling.corr")
+        def resolve_corr(self, ary, args, kws):
+            return signature(SeriesType(types.float64), *args)
+
+    # similar to install_array_method in arraydecl.py
+
+    def install_rolling_method(name, generic):
+        my_attr = {"key": "rolling." + name, "generic": generic}
+        temp_class = type("Rolling_" + name, (AbstractTemplate,), my_attr)
+
+        def rolling_attribute_attachment(self, ary):
+            return types.BoundFunction(temp_class, ary)
+
+        setattr(SeriesRollingAttribute, "resolve_" + name, rolling_attribute_attachment)
+
+    def rolling_generic(self, args, kws):
+        # output is always float64
+        return signature(SeriesType(types.float64), *args)
+
+    for fname in supported_rolling_funcs:
+        install_rolling_method(fname, rolling_generic)
+
 else:
     from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
-
-
-@infer_getattr
-class SeriesRollingAttribute(AttributeTemplate):
-    key = SeriesRollingType
-
-    @bound_function("rolling.apply")
-    def resolve_apply(self, ary, args, kws):
-        # result is always float64 (see Pandas window.pyx:roll_generic)
-        return signature(SeriesType(types.float64), *args)
-
-    @bound_function("rolling.cov")
-    def resolve_cov(self, ary, args, kws):
-        return signature(SeriesType(types.float64), *args)
-
-    @bound_function("rolling.corr")
-    def resolve_corr(self, ary, args, kws):
-        return signature(SeriesType(types.float64), *args)
-
-# similar to install_array_method in arraydecl.py
-
-
-def install_rolling_method(name, generic):
-    my_attr = {"key": "rolling." + name, "generic": generic}
-    temp_class = type("Rolling_" + name, (AbstractTemplate,), my_attr)
-
-    def rolling_attribute_attachment(self, ary):
-        return types.BoundFunction(temp_class, ary)
-
-    setattr(SeriesRollingAttribute, "resolve_" + name, rolling_attribute_attachment)
-
-
-def rolling_generic(self, args, kws):
-    # output is always float64
-    return signature(SeriesType(types.float64), *args)
-
-
-for fname in supported_rolling_funcs:
-    install_rolling_method(fname, rolling_generic)
-
 
 class SeriesIatType(types.Type):
     def __init__(self, stype):
@@ -904,6 +654,7 @@ class SeriesIatType(types.Type):
         super(SeriesIatType, self).__init__(name)
 
 
+# PR135. This needs to be commented out
 if sdc.config.config_pipeline_hpat_default:
     @infer_global(operator.getitem)
     class GetItemSeriesIat(AbstractTemplate):
@@ -965,21 +716,22 @@ class CmpOpLESeries(SeriesCompEqual):
 class CmpOpLTSeries(SeriesCompEqual):
     key = '<'
 
-# @infer_global(operator.getitem)
-# class GetItemBuffer(AbstractTemplate):
-#     key = operator.getitem
 
-#     def generic(self, args, kws):
-#         assert not kws
-#         [ary, idx] = args
-#         import pdb; pdb.set_trace()
-#         if not isinstance(ary, SeriesType):
-#             return
-#         out = get_array_index_type(ary, idx)
-#         # check result to be dt64 since it might be sliced array
-#         # replace result with Timestamp
-#         if out is not None and out.result == types.NPDatetime('ns'):
-#             return signature(pandas_timestamp_type, ary, out.index)
+if sdc.config.config_pipeline_hpat_default:
+    @infer_global(operator.getitem)
+    class GetItemBuffer(AbstractTemplate):
+        key = operator.getitem
+
+        def generic(self, args, kws):
+            assert not kws
+            [ary, idx] = args
+            if not isinstance(ary, SeriesType):
+                return
+            out = get_array_index_type(ary, idx)
+            # check result to be dt64 since it might be sliced array
+            # replace result with Timestamp
+            if out is not None and out.result == types.NPDatetime('ns'):
+                return signature(pandas_timestamp_type, ary, out.index)
 
 
 def install_array_method(name, generic):
@@ -1021,8 +773,8 @@ if not sdc.config.config_pipeline_hpat_default:
 _non_hpat_pipeline_attrs = [
     'resolve_append', 'resolve_combine', 'resolve_corr', 'resolve_cov',
     'resolve_dropna', 'resolve_fillna', 'resolve_head', 'resolve_nlargest',
-    'resolve_nsmallest', 'resolve_pct_change', 'resolve_rolling', 'resolve_loc',
-    'resolve_value_counts'
+    'resolve_nsmallest', 'resolve_pct_change', 'resolve_loc', 'resolve_iloc',
+    'resolve_iat', 'resolve_rolling', 'resolve_value_counts', 'resolve_describe'
 ]
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
@@ -1038,6 +790,7 @@ if not sdc.config.config_pipeline_hpat_default:
         if attr in SeriesAttribute.__dict__:
             delattr(SeriesAttribute, attr)
 
+# PR135. This needs to be commented out
 if sdc.config.config_pipeline_hpat_default:
     @infer_global(operator.getitem)
     class GetItemSeries(AbstractTemplate):
@@ -1105,44 +858,44 @@ if sdc.config.config_pipeline_hpat_default:
                     sig.return_type = pandas_timestamp_type
             return sig
 
+if sdc.config.config_pipeline_hpat_default:
+    @infer_global(operator.setitem)
+    class SetItemSeries(SetItemBuffer):
+        def generic(self, args, kws):
+            assert not kws
+            series, idx, val = args
+            if not isinstance(series, SeriesType):
+                return None
+            # TODO: handle any of args being Series independently
+            ary = series_to_array_type(series)
+            is_idx_series = False
+            if isinstance(idx, SeriesType):
+                idx = series_to_array_type(idx)
+                is_idx_series = True
+            is_val_series = False
+            if isinstance(val, SeriesType):
+                val = series_to_array_type(val)
+                is_val_series = True
+            # TODO: strings, dt_index
+            res = super(SetItemSeries, self).generic((ary, idx, val), kws)
+            if res is not None:
+                new_series = if_arr_to_series_type(res.args[0])
+                idx = res.args[1]
+                val = res.args[2]
+                if is_idx_series:
+                    idx = if_arr_to_series_type(idx)
+                if is_val_series:
+                    val = if_arr_to_series_type(val)
+                res.args = (new_series, idx, val)
+                return res
 
-@infer_global(operator.setitem)
-class SetItemSeries(SetItemBuffer):
-    def generic(self, args, kws):
-        assert not kws
-        series, idx, val = args
-        if not isinstance(series, SeriesType):
-            return None
-        # TODO: handle any of args being Series independently
-        ary = series_to_array_type(series)
-        is_idx_series = False
-        if isinstance(idx, SeriesType):
-            idx = series_to_array_type(idx)
-            is_idx_series = True
-        is_val_series = False
-        if isinstance(val, SeriesType):
-            val = series_to_array_type(val)
-            is_val_series = True
-        # TODO: strings, dt_index
-        res = super(SetItemSeries, self).generic((ary, idx, val), kws)
-        if res is not None:
-            new_series = if_arr_to_series_type(res.args[0])
-            idx = res.args[1]
-            val = res.args[2]
-            if is_idx_series:
-                idx = if_arr_to_series_type(idx)
-            if is_val_series:
-                val = if_arr_to_series_type(val)
-            res.args = (new_series, idx, val)
-            return res
-
-
-@infer_global(operator.setitem)
-class SetItemSeriesIat(SetItemSeries):
-    def generic(self, args, kws):
-        # iat[] is the same as regular setitem
-        if isinstance(args[0], SeriesIatType):
-            return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
+if sdc.config.config_pipeline_hpat_default:
+    @infer_global(operator.setitem)
+    class SetItemSeriesIat(SetItemSeries):
+        def generic(self, args, kws):
+            # iat[] is the same as regular setitem
+            if isinstance(args[0], SeriesIatType):
+                return SetItemSeries.generic(self, (args[0].stype, args[1], args[2]), kws)
 
 
 inplace_ops = [
@@ -1316,5 +1069,3 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
         return sdc.hiframes.api.init_series(sdc.hiframes.api.fix_df_array(data), fix_index, name)
 
     return hpat_pandas_series_ctor_impl
-
-from sdc.datatypes.hpat_pandas_series_functions import *

@@ -463,7 +463,7 @@ class TestHiFrames(TestCase):
         hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(df2), test_impl(df2))
 
-    @skip_numba_jit
+    @unittest.skip('Getitem Series with list values not implement')
     def test_str_split_bool_index(self):
         def test_impl(df):
             C = df.A.str.split(',')

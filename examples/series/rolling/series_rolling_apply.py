@@ -24,5 +24,21 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy as np
+import pandas as pd
+from numba import njit
 
-# import sdc.datatypes.hpat_pandas_dataframe_pass
+
+@njit
+def series_rolling_apply():
+    series = pd.Series([4, 3, 5, 2, 6])  # Series of 4, 3, 5, 2, 6
+
+    def get_median(x):
+        return np.median(x)
+
+    out_series = series.rolling(3).apply(get_median)
+
+    return out_series  # Expect series of NaN, NaN, 4.0, 3.0, 5.0
+
+
+print(series_rolling_apply())
