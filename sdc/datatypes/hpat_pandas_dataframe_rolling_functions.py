@@ -99,7 +99,7 @@ def sdc_pandas_dataframe_rolling_apply(method_name, self, method_params=None):
     impl_params = ['self'] + params2list(method_params)
     impl_params_as_str = ', '.join(impl_params)
 
-    results = {}
+    results = []
     impl_name = f'_df_rolling_{method_name}_impl'
     func_lines = [f'def {impl_name}({impl_params_as_str}):']
 
@@ -112,9 +112,9 @@ def sdc_pandas_dataframe_rolling_apply(method_name, self, method_params=None):
             f'  result_{col} = rolling_{col}.{method_name}({method_params_as_str})',
             f'  {res_data} = result_{col}._data'
         ]
-        results[col] = res_data
+        results.append((col, res_data))
 
-    data = ', '.join(f'"{col}": {data}' for col, data in results.items())
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
     func_lines += [f'  return pandas.DataFrame({{{data}}})']
     func_text = '\n'.join(func_lines)
 
