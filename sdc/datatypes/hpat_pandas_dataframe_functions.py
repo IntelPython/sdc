@@ -515,8 +515,7 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
     func_definition.extend([indent + func_line for func_line in func_text])
     func_def = '\n'.join(func_definition)
 
-    global_vars = {'sdc': sdc, 'np': numpy, 'pandas': pandas,
-                   'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
+    global_vars = {'pandas': pandas, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
 
     return func_def, global_vars
 
@@ -536,21 +535,14 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
     Examples
     --------
     .. literalinclude:: ../../../examples/dataframe/dataframe_drop.py
-       :language: python
-       :lines: 27-
-       :caption: Drop specified columns from DataFrame
-       Remove columns by specifying directly index or column names.
-       :name: ex_dataframe_drop
+        :language: python
+        :lines: 37-
+        :caption: Drop specified columns from DataFrame
+        Remove columns by specifying directly index or column names.
+        :name: ex_dataframe_drop
 
-    .. code-block:: console
-
-        > python ./dataframe_drop.py
-            B  C
-        0  4  a
-        1  5  b
-        2  6  c
-        3  7  d
-        dtype: object
+    .. command-output:: python ./dataframe_drop.py
+        :cwd: ../../../examples
 
      .. note::
         Parameters axis, index, level, inplace, errors are currently unsupported

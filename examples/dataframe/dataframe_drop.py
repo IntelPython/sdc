@@ -24,22 +24,22 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+   Expected result:
+       B  C
+   0  4  a
+   1  5  b
+   2  6  c
+   3  7  d
+   dtype: object
+"""
+
 import pandas as pd
 from numba import njit
 
 
 @njit
 def dataframe_drop():
-    """
-    Expected result:
-        B  C
-    0  4  a
-    1  5  b
-    2  6  c
-    3  7  d
-    dtype: object
-    """
-
     df = pd.DataFrame({'A': [1.0, 2.0, 3.0, 1.0], 'B': [4, 5, 6, 7], 'C': ['a', 'b', 'c', 'd']})
 
     return df.drop(columns='A')
