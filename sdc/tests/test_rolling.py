@@ -400,6 +400,30 @@ class TestRolling(TestCase):
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl2(*args))
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl2(*args))
 
+    def _test_rolling_median(self, obj):
+        def test_impl(obj, window, min_periods):
+            return obj.rolling(window, min_periods).median()
+
+        hpat_func = self.jit(test_impl)
+        assert_equal = self._get_assert_equal(obj)
+
+        for window in range(0, len(obj) + 3, 2):
+            for min_periods in range(0, window + 1, 2):
+                with self.subTest(obj=obj, window=window,
+                                  min_periods=min_periods):
+                    jit_result = hpat_func(obj, window, min_periods)
+                    ref_result = test_impl(obj, window, min_periods)
+                    assert_equal(jit_result, ref_result)
+
+    @skip_sdc_jit('DataFrame.rolling.median() unsupported')
+    def test_df_rolling_median(self):
+        all_data = test_global_input_data_float64
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_median(df)
+
     @skip_sdc_jit('Series.rolling.min() unsupported exceptions')
     def test_series_rolling_unsupported_values(self):
         def test_impl(series, window, min_periods, center,
@@ -794,22 +818,11 @@ class TestRolling(TestCase):
 
     @skip_sdc_jit('Series.rolling.median() unsupported Series index')
     def test_series_rolling_median(self):
-        def test_impl(series, window, min_periods):
-            return series.rolling(window, min_periods).median()
-
-        hpat_func = self.jit(test_impl)
-
         all_data = test_global_input_data_float64
         indices = [list(range(len(data)))[::-1] for data in all_data]
         for data, index in zip(all_data, indices):
             series = pd.Series(data, index, name='A')
-            for window in range(0, len(series) + 3, 2):
-                for min_periods in range(0, window + 1, 2):
-                    with self.subTest(series=series, window=window,
-                                      min_periods=min_periods):
-                        jit_result = hpat_func(series, window, min_periods)
-                        ref_result = test_impl(series, window, min_periods)
-                        pd.testing.assert_series_equal(jit_result, ref_result)
+            self._test_rolling_median(series)
 
     @skip_sdc_jit('Series.rolling.min() unsupported Series index')
     def test_series_rolling_min(self):
