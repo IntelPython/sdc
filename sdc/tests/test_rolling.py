@@ -401,12 +401,12 @@ class TestRolling(TestCase):
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl2(*args))
 
     def _test_rolling_apply_mean(self, obj):
-        def test_impl(series, window, min_periods):
+        def test_impl(obj, window, min_periods):
             def func(x):
                 if len(x) == 0:
                     return np.nan
                 return x.mean()
-            return series.rolling(window, min_periods).apply(func)
+            return obj.rolling(window, min_periods).apply(func)
 
         hpat_func = self.jit(test_impl)
         assert_equal = self._get_assert_equal(obj)
@@ -454,7 +454,7 @@ class TestRolling(TestCase):
                         ref_result = test_impl(obj, window, min_periods, q)
                         assert_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.apply() unsupported Series index')
+    @skip_sdc_jit('DataFrame.rolling.apply() unsupported')
     def test_df_rolling_apply_mean(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
