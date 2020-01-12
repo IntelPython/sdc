@@ -78,11 +78,6 @@ sdc_pandas_dataframe_rolling_docstring_tmpl = """
 """
 
 
-def params2list(params):
-    """Convert parameters from dict to list"""
-    return ['{}={}'.format(k, v) for k, v in params.items()]
-
-
 def apply_df_rolling_method(method_name, self, args=None, kws=None):
     args = args or []
     kwargs = kws or {}
@@ -90,10 +85,10 @@ def apply_df_rolling_method(method_name, self, args=None, kws=None):
     rolling_params = ['window', 'min_periods', 'center',
                       'win_type', 'on', 'axis', 'closed']
     rolling_params_as_str = ', '.join(f'self._{p}' for p in rolling_params)
-    method_params = args + params2list(kwargs)
+    method_params = args + ['{}={}'.format(k, k) for k in kwargs]
     method_params_as_str = ', '.join(method_params)
 
-    impl_params = ['self'] + method_params
+    impl_params = ['self'] + args + ['{}={}'.format(k, v) for k, v in kwargs.items()]
     impl_params_as_str = ', '.join(impl_params)
 
     results = []
