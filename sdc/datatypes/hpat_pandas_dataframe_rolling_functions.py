@@ -83,7 +83,7 @@ def params2list(params):
     return ['{}={}'.format(k, v) for k, v in params.items()]
 
 
-def sdc_pandas_dataframe_rolling_apply(method_name, self, args=None, kws=None):
+def apply_df_rolling_method(method_name, self, args=None, kws=None):
     args = args or []
     kwargs = kws or {}
 
@@ -130,7 +130,7 @@ def sdc_pandas_dataframe_rolling_min(self):
     ty_checker = TypeChecker('Method rolling.min().')
     ty_checker.check(self, DataFrameRollingType)
 
-    return sdc_pandas_dataframe_rolling_apply('min', self)
+    return apply_df_rolling_method('min', self)
 
 
 sdc_pandas_dataframe_rolling_min.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
