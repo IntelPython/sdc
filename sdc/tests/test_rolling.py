@@ -400,6 +400,85 @@ class TestRolling(TestCase):
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl2(*args))
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl2(*args))
 
+    def _test_rolling_quantile(self, obj):
+        def test_impl(obj, window, min_periods, quantile):
+            return obj.rolling(window, min_periods).quantile(quantile)
+
+        hpat_func = self.jit(test_impl)
+        assert_equal = self._get_assert_equal(obj)
+
+        quantiles = [0, 0.25, 0.5, 0.75, 1]
+        for window in range(0, len(obj) + 3, 2):
+            for min_periods, q in product(range(0, window, 2), quantiles):
+                with self.subTest(obj=obj, window=window,
+                                  min_periods=min_periods, quantiles=q):
+                    jit_result = hpat_func(obj, window, min_periods, q)
+                    ref_result = test_impl(obj, window, min_periods, q)
+                    assert_equal(jit_result, ref_result)
+
+    def _test_rolling_quantile_exception_unsupported_types(self, obj):
+        def test_impl(obj, quantile, interpolation):
+            return obj.rolling(3, 2).quantile(quantile, interpolation)
+
+        hpat_func = self.jit(test_impl)
+
+        msg_tmpl = 'Method rolling.quantile(). The object {}\n given: {}\n expected: {}'
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, '0.5', 'linear')
+        msg = msg_tmpl.format('quantile', 'unicode_type', 'float')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, 0.5, None)
+        msg = msg_tmpl.format('interpolation', 'none', 'str')
+        self.assertIn(msg, str(raises.exception))
+
+    def _test_rolling_quantile_exception_unsupported_values(self, obj):
+        def test_impl(obj, quantile, interpolation):
+            return obj.rolling(3, 2).quantile(quantile, interpolation)
+
+        hpat_func = self.jit(test_impl)
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(obj, 2, 'linear')
+        self.assertIn('quantile value not in [0, 1]', str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(obj, 0.5, 'lower')
+        self.assertIn('interpolation value not "linear"', str(raises.exception))
+
+    @skip_sdc_jit('DataFrame.rolling.quantile() unsupported')
+    def test_df_rolling_quantile(self):
+        all_data = [
+            list(range(10)), [1., -1., 0., 0.1, -0.1],
+            [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
+            [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
+        ]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_quantile(df)
+
+    @skip_sdc_jit('DataFrame.rolling.quantile() unsupported exceptions')
+    def test_df_rolling_quantile_exception_unsupported_types(self):
+        all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_quantile_exception_unsupported_types(df)
+
+    @skip_sdc_jit('DataFrame.rolling.quantile() unsupported exceptions')
+    def test_df_rolling_quantile_exception_unsupported_values(self):
+        all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_quantile_exception_unsupported_values(df)
+
     @skip_sdc_jit('Series.rolling.min() unsupported exceptions')
     def test_series_rolling_unsupported_values(self):
         def test_impl(series, window, min_periods, center,
@@ -833,63 +912,25 @@ class TestRolling(TestCase):
 
     @skip_sdc_jit('Series.rolling.quantile() unsupported Series index')
     def test_series_rolling_quantile(self):
-        def test_impl(series, window, min_periods, quantile):
-            return series.rolling(window, min_periods).quantile(quantile)
-
-        hpat_func = self.jit(test_impl)
-
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
             [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
             [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
         ]
         indices = [list(range(len(data)))[::-1] for data in all_data]
-        quantiles = [0, 0.25, 0.5, 0.75, 1]
         for data, index in zip(all_data, indices):
             series = pd.Series(data, index, name='A')
-            for window in range(0, len(series) + 3, 2):
-                for min_periods, q in product(range(0, window, 2), quantiles):
-                    with self.subTest(series=series, window=window,
-                                      min_periods=min_periods, quantiles=q):
-                        jit_result = hpat_func(series, window, min_periods, q)
-                        ref_result = test_impl(series, window, min_periods, q)
-                        pd.testing.assert_series_equal(jit_result, ref_result)
+            self._test_rolling_quantile(series)
 
     @skip_sdc_jit('Series.rolling.quantile() unsupported exceptions')
     def test_series_rolling_quantile_exception_unsupported_types(self):
-        def test_impl(quantile, interpolation):
-            series = pd.Series([1., -1., 0., 0.1, -0.1])
-            return series.rolling(3, 2).quantile(quantile, interpolation)
-
-        hpat_func = self.jit(test_impl)
-
-        msg_tmpl = 'Method rolling.quantile(). The object {}\n given: {}\n expected: {}'
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func('0.5', 'linear')
-        msg = msg_tmpl.format('quantile', 'unicode_type', 'float')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(0.5, None)
-        msg = msg_tmpl.format('interpolation', 'none', 'str')
-        self.assertIn(msg, str(raises.exception))
+        series = pd.Series([1., -1., 0., 0.1, -0.1])
+        self._test_rolling_quantile_exception_unsupported_types(series)
 
     @skip_sdc_jit('Series.rolling.quantile() unsupported exceptions')
     def test_series_rolling_quantile_exception_unsupported_values(self):
-        def test_impl(quantile, interpolation):
-            series = pd.Series([1., -1., 0., 0.1, -0.1])
-            return series.rolling(3, 2).quantile(quantile, interpolation)
-
-        hpat_func = self.jit(test_impl)
-
-        with self.assertRaises(ValueError) as raises:
-            hpat_func(2, 'linear')
-        self.assertIn('quantile value not in [0, 1]', str(raises.exception))
-
-        with self.assertRaises(ValueError) as raises:
-            hpat_func(0.5, 'lower')
-        self.assertIn('interpolation value not "linear"', str(raises.exception))
+        series = pd.Series([1., -1., 0., 0.1, -0.1])
+        self._test_rolling_quantile_exception_unsupported_values(series)
 
     @skip_sdc_jit('Series.rolling.skew() unsupported Series index')
     def test_series_rolling_skew(self):
