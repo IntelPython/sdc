@@ -1089,7 +1089,7 @@ class TestDataFrame(TestCase):
         df2 = pd.DataFrame({})
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
-    @unittest.skip("needs dict typing in Numba")
+    # @unittest.skip("needs dict typing in Numba")
     def test_isin_dict1(self):
         def test_impl(df):
             vals = {'A': (2., 3., 4.), 'C': (4., 5., 6.)}

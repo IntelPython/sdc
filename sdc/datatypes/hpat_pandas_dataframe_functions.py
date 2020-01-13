@@ -521,8 +521,18 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-# def sdc_pandas_dataframe_isin_dict_codegen(df, values, name):
-#     print("DICTDICTDICT")
+def sdc_pandas_dataframe_isin_dict_codegen(df, values, func_name):
+    all_params = ['df', 'values']
+    df_func_name = f'_df_{func_name}_impl'
+
+    result_name = []
+    joined = ', '.join(all_params)
+    func_lines = [f'def _df_{func_name}_impl({joined}):']
+    for i, c in enumerate(df.columns):
+        print(values.keys())
+        # if c in list(values.keys()):
+        #     func_text, global_vars = _dataframe_apply_columns_codegen(func_name, all_params, series_params, df.columns)
+    print("DICTDICTDICT")
 
 
 def sdc_pandas_dataframe_isin_iter_codegen(df, values, func_name, ser_param):
@@ -573,7 +583,7 @@ def sdc_pandas_dataframe_isin_ser_codegen(df, values, func_name):
     func_lines += [f'  return pandas.DataFrame({{{data}}})']
     func_text = '\n'.join(func_lines)
 
-    global_vars = {'pandas': pandas, 'np': numpy,
+    global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
 
     loc_vars = {}
@@ -612,7 +622,7 @@ def sdc_pandas_dataframe_isin_df_codegen(df, values, func_name):
     func_lines += [f'  return pandas.DataFrame({{{data}}})']
     func_text = '\n'.join(func_lines)
 
-    global_vars = {'pandas': pandas, 'np': numpy,
+    global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
 
     loc_vars = {}
@@ -644,7 +654,7 @@ def isin_overload(df, values):
     """
 
     name = 'isin'
-    print(type(values))
+
     ty_checker = TypeChecker('Method {}().'.format(name))
     ty_checker.check(df, DataFrameType)
 
@@ -662,6 +672,5 @@ def isin_overload(df, values):
         return sdc_pandas_dataframe_isin_df_codegen(df, values, name)
 
     if isinstance(values, types.DictType):
-        # problem with types.DictType
         print('Dict')
-        # return sdc_pandas_dataframe_isin_dict_codegen(df, values, name)
+        return sdc_pandas_dataframe_isin_dict_codegen(df, values, name)
