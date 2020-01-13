@@ -69,7 +69,7 @@ def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, col
     func_lines += [f'  return pandas.Series([{all_results}], [{all_columns}])']
     func_text = '\n'.join(func_lines)
 
-    global_vars = {'pandas': pandas, 'np': numpy,
+    global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
@@ -97,7 +97,7 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
     return _reduce_impl
 
 
-def _dataframe_reduce_columns_codegen_df(func_name, func_params, series_params, columns):
+def _dataframe_apply_columns_codegen(func_name, func_params, series_params, columns):
     result_name = []
     joined = ', '.join(func_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
@@ -112,13 +112,13 @@ def _dataframe_reduce_columns_codegen_df(func_name, func_params, series_params, 
     func_lines += [f'  return pandas.DataFrame({{{data}}})']
     func_text = '\n'.join(func_lines)
 
-    global_vars = {'pandas': pandas, 'np': numpy,
+    global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
 
 
-def sdc_pandas_dataframe_reduce_columns_df(df, func_name, params, ser_params):
+def sdc_pandas_dataframe_apply_columns(df, func_name, params, ser_params):
     all_params = ['df']
     ser_par = []
 
@@ -131,7 +131,7 @@ def sdc_pandas_dataframe_reduce_columns_df(df, func_name, params, ser_params):
 
     df_func_name = f'_df_{func_name}_impl'
 
-    func_text, global_vars = _dataframe_reduce_columns_codegen_df(func_name, all_params, s_par, df.columns)
+    func_text, global_vars = _dataframe_apply_columns_codegen(func_name, all_params, s_par, df.columns)
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
@@ -529,7 +529,7 @@ def sdc_pandas_dataframe_isin_iter_codegen(df, values, func_name, ser_param):
     all_params = ['df', 'values']
 
     df_func_name = f'_df_{func_name}_impl'
-    func_text, global_vars = _dataframe_reduce_columns_codegen_df(func_name, all_params, ser_param, df.columns)
+    func_text, global_vars = _dataframe_apply_columns_codegen(func_name, all_params, ser_param, df.columns)
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
