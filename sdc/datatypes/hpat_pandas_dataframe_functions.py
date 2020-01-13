@@ -97,7 +97,7 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
     return _reduce_impl
 
 
-def _dataframe_reduce_columns_codegen_df(func_name, func_params, series_params, columns):
+def _dataframe_apply_columns_codegen(func_name, func_params, series_params, columns):
     result_name = []
     joined = ', '.join(func_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
@@ -105,7 +105,7 @@ def _dataframe_reduce_columns_codegen_df(func_name, func_params, series_params, 
         result_c = f'result_{c}'
         func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({func_params[0]}, {i}))',
                        f'  {result_c} = series_{c}.{func_name}({series_params})']
-        result_name.append((f' {result_c}', c))
+        result_name.append((result_c, c))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
 
@@ -127,11 +127,11 @@ def sdc_pandas_dataframe_reduce_columns_df(df, func_name, params, ser_params):
     for key, value in ser_params.items():
         ser_par.append('{}={}'.format(key, value))
 
-    s_par = '{}'.format(', '.join(ser_par[:]))
+    s_par = '{}'.format(', '.join(ser_par))
 
     df_func_name = f'_df_{func_name}_impl'
 
-    func_text, global_vars = _dataframe_reduce_columns_codegen_df(func_name, all_params, s_par, df.columns)
+    func_text, global_vars = _dataframe_apply_columns_codegen(func_name, all_params, s_par, df.columns)
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
@@ -482,23 +482,23 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
 
     .. only:: developer
 
-        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_count*
+      Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_count*
 
     Parameters
     -----------
     df: :class:`pandas.DataFrame`
-        input arg
+      input arg
     axis:
-        *unsupported*
+      *unsupported*
     level:
-        *unsupported*
+      *unsupported*
     numeric_only:
-        *unsupported*
+      *unsupported*
 
     Returns
     -------
     :obj:`pandas.Series` or `pandas.DataFrame`
-            for each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
+      for each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
     """
 
     name = 'count'
@@ -528,25 +528,25 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
 
     .. only:: developer
 
-        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_pct_change*
+      Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_pct_change*
 
     Parameters
     -----------
     df: :class:`pandas.DataFrame`
-        input arg
+      input arg
     periods:
-        *unsupported*
+      *unsupported*
     fill_method:
-        *unsupported
+      *unsupported
     limit:
-        *unsupported*
+      *unsupported*
     freq:
-        *unsupported*
+      *unsupported*
 
     Returns
     -------
     :obj:`pandas.Series` or `pandas.DataFrame`
-            Percentage change between the current and a prior element.
+      Percentage change between the current and a prior element.
     """
 
     name = 'pct_change'
