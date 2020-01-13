@@ -1990,13 +1990,13 @@ def hpat_pandas_series_isnull(self):
     ty_checker.check(self, SeriesType)
 
     if isinstance(self.data.dtype, (types.Integer, types.Float)):
-        def hpat_pandas_series_isna_impl(self):
-            return pandas.Series(numpy.isnan(self._data))
+        def hpat_pandas_series_isnull_impl(self):
+            return pandas.Series(data=numpy.isnan(self._data), index=self._index, name=self._name)
 
-        return hpat_pandas_series_isna_impl
+        return hpat_pandas_series_isnull_impl
 
     if isinstance(self.data.dtype, types.UnicodeType):
-        def hpat_pandas_series_isna_impl(self):
+        def hpat_pandas_series_isnull_impl(self):
             result = numpy.empty(len(self._data), numpy.bool_)
             byte_size = 8
             # iterate over bits in StringArrayType null_bitmap and fill array indicating if array's element are NaN
@@ -2006,9 +2006,9 @@ def hpat_pandas_series_isnull(self):
                 bmap = self._data.null_bitmap[bmap_idx]
                 bit_value = (bmap >> bit_idx) & 1
                 result[i] = bit_value == 0
-            return pandas.Series(result)
+            return pandas.Series(result, index=self._index, name=self._name)
 
-        return hpat_pandas_series_isna_impl
+        return hpat_pandas_series_isnull_impl
 
 
 @sdc_overload_method(SeriesType, 'isna')
@@ -4552,7 +4552,8 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     .. seealso::
 
-        `numpy.absolute <https://docs.scipy.org/doc/numpy/reference/generated/numpy.ndarray.argsort.html#numpy.ndarray.argsort>`_
+        `numpy.absolute 
+        <https://docs.scipy.org/doc/numpy/reference/generated/numpy.ndarray.argsort.html#numpy.ndarray.argsort>`_
             Return indices of the minimum values along the given axis.
 
     Intel Scalable Dataframe Compiler Developer Guide
