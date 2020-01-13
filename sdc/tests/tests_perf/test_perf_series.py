@@ -38,6 +38,17 @@ from .test_perf_base import TestBase
 from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 
+# class Test_min:
+#     def __init__(self, res):
+#         self.res = res
+#
+#     def usecase_series_min(self):
+#         start_time = time.time()
+#         finish_time = time.time()
+#
+#         return finish_time - start_time, self.res
+
+
 def usecase_series_min(input_data):
     start_time = time.time()
     res = input_data.min()
