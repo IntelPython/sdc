@@ -3368,18 +3368,18 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if not isinstance(self.data.dtype, types.Number):
+    if not isinstance(self.data.dtype, (types.Integer, types.Float)):
         raise TypingError(
             '{} Currently function supports only numeric values. Given data type: {}'.format(
                 _func_name, self.data.dtype))
 
-    if not isinstance(skipna, (types.Omitted, types.Boolean)) and skipna is not True:
+    if not (isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) or skipna is True or skipna is None):
         ty_checker.raise_exc(skipna, 'bool', 'skipna')
 
     if not isinstance(axis, types.Omitted) and axis is not None:
         ty_checker.raise_exc(axis, 'None', 'axis')
 
-    if not isinstance(level, types.Omitted) and level is not None:
+    if not isinstance(level, (types.Omitted, types.NoneType)) and level is not None:
         ty_checker.raise_exc(level, 'None', 'level')
 
     if not isinstance(numeric_only, types.Omitted) and numeric_only is not None:
