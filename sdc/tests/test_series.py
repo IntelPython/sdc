@@ -1325,6 +1325,7 @@ class TestSeries(TestCase):
         for index in all_data:
             for n in key:
                 S = pd.Series([2, 4, 6, 6, 3], index)
+                print(index, n)
                 pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
 
     @skip_sdc_jit('Not impl in old style')
@@ -1338,6 +1339,7 @@ class TestSeries(TestCase):
         for index in all_data:
             for n in key:
                 S = pd.Series([2, 4, 6, 6, 3], index)
+                print(index, n)
                 pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
 
     @skip_sdc_jit('Not impl in old style')

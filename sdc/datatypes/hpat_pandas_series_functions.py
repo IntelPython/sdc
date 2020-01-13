@@ -131,8 +131,8 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                 index = series.index
                 start_position = len(index)
                 stop_position = 0
-                max_diff = 0  # max_diff = index[1] - index[0]
-                min_diff = 0  # min_diff = index[1] - index[0]
+                max_diff = 0
+                min_diff = 0
                 for i in numba.prange(len(index)):
                     if idx.start <= idx.stop:
                         start_cmp = index[i] >= idx.start
@@ -153,7 +153,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
                 if stop_position < len(index):
                     stop_position += 1
-
+                print(start_position, stop_position)
                 if (
                     start_position >= len(index) or stop_position <= 0 or stop_position <= start_position
                     or idx.start >= idx.stop
