@@ -84,6 +84,8 @@ def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
     df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
     other_columns_indx = {col_name: i for i, col_name in enumerate(other.columns)}
 
+
+
     # Keep columns that are StringArrayType
     string_type_columns = set(col_name for typ, col_name in zip(df.data, df.columns)
                               if isinstance(typ, StringArrayType))
@@ -134,8 +136,7 @@ def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
     func_definition.extend([indent + func_line for func_line in func_text])
     func_def = '\n'.join(func_definition)
 
-    global_vars = {'sdc': sdc, 'np': numpy, 'pandas': pandas,
-                   'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data,
+    global_vars = {'pandas': pandas, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data,
                    'init_series': sdc.hiframes.api.init_series,
                    'fill_array': sdc.datatypes.common_functions.fill_array,
                    'fill_str_array': sdc.datatypes.common_functions.fill_str_array}

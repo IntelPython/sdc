@@ -219,7 +219,7 @@ def fill_str_array(data, size, push_back=True):
     """
 
     string_array_size = len(data)
-    none_array_size = size - string_array_size
+    nan_array_size = size - string_array_size
     num_chars = sdc.str_arr_ext.num_total_chars(data)
 
     result_data = sdc.str_arr_ext.pre_alloc_string_array(size, num_chars)
@@ -227,29 +227,31 @@ def fill_str_array(data, size, push_back=True):
     # Keep NaN values of initial array
     arr_is_na_mask = numpy.array([sdc.hiframes.api.isna(data, i) for i in range(string_array_size)])
     data_str_list = sdc.str_arr_ext.to_string_list(data)
-    nan_list = [''] * none_array_size
+    nan_list = [''] * nan_array_size
 
     result_list = data_str_list + nan_list if push_back else nan_list + data_str_list
     sdc.str_arr_ext.cp_str_list_to_array(result_data, result_list)
 
     # Batch=64 iteration to avoid threads competition
     batch_size = 64
-
     if push_back:
-        string_array_shift = 0
-        none_array_shift = string_array_size
+        for i in numba.prange(size//batch_size + 1):
+            for j in range(i*batch_size, min((i+1)*batch_size, size)):
+                if j < string_array_size:
+                    if arr_is_na_mask[j]:
+                        str_arr_set_na(result_data, j)
+                else:
+                    str_arr_set_na(result_data, j)
+
     else:
-        string_array_shift = none_array_size
-        none_array_shift = 0
-
-    for i in numba.prange(string_array_size//batch_size + 1):
-        for j in range(i*batch_size, min((i+1)*batch_size, string_array_size)):
-            if arr_is_na_mask[j]:
-                str_arr_set_na(result_data, string_array_shift + j)
-
-    for i in numba.prange(none_array_size//batch_size + 1):
-        for j in range(i*batch_size, min((i+1)*batch_size, none_array_size)):
-            str_arr_set_na(result_data, none_array_shift + j)
+        for i in numba.prange(size//batch_size + 1):
+            for j in range(i*batch_size, min((i+1)*batch_size, size)):
+                if j < nan_array_size:
+                    str_arr_set_na(result_data, j)
+                else:
+                    str_arr_j = j - nan_array_size
+                    if arr_is_na_mask[str_arr_j]:
+                        str_arr_set_na(result_data, j)
 
     return result_data
 
