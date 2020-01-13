@@ -521,45 +521,6 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-def sdc_pandas_dataframe_isin_dict_codegen(df, values, func_name):
-    all_params = ['df', 'values']
-    df_func_name = f'_df_{func_name}_impl'
-
-    result_name = []
-    joined = ', '.join(all_params)
-    func_lines = [f'def _df_{func_name}_impl({joined}):']
-
-    for i, c in enumerate(df.columns):
-        result_c = f'result_{c}'
-        func_lines += [f'  if "{c}" in list(values.keys()):',
-                       f'    series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
-                       f'    {result_c} = series_{c}.{func_name}(values["{c}"])',
-                       f'  else:',
-                       f'    {result_c}=[False] * len(series_{c}._data)',
-                       f'  print({result_c})']
-        # func_lines += [f'  if "{c}" in list(values.keys()):',
-        #                f'    series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
-        #                f'    {result_c} = series_{c}.{func_name}(values.get("{c}"))',
-        #                f'  else:',
-        #                f'    {result_c} = [False] * len(series_{c}._data)']
-        result_name.append((result_c, c))
-
-    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
-
-    func_lines += [f'  return pandas.DataFrame({{{data}}})']
-    func_text = '\n'.join(func_lines)
-    print(func_text)
-
-    global_vars = {'pandas': pandas,
-                   'get_dataframe_data': get_dataframe_data}
-
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _reduce_impl = loc_vars[df_func_name]
-
-    return _reduce_impl
-
-
 def sdc_pandas_dataframe_isin_iter_codegen(df, values, func_name, ser_param):
     all_params = ['df', 'values']
 
@@ -684,7 +645,7 @@ def isin_overload(df, values):
     ty_checker.check(df, DataFrameType)
 
     if not isinstance(values, (SeriesType, types.List, types.Set, DataFrameType, types.DictType)):
-        ty_checker.raise_exc(values, 'iterable, Series, DataFrame or dict', 'values')
+        ty_checker.raise_exc(values, 'iterable, Series, DataFrame', 'values')
 
     if isinstance(values, (types.List, types.Set)):
         ser_par = 'values=values'
@@ -696,5 +657,3 @@ def isin_overload(df, values):
     if isinstance(values, DataFrameType):
         return sdc_pandas_dataframe_isin_df_codegen(df, values, name)
 
-    if isinstance(values, types.DictType):
-        return sdc_pandas_dataframe_isin_dict_codegen(df, values, name)
