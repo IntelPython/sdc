@@ -81,7 +81,7 @@ if __name__ == '__main__':
     parser.add_argument('--use-numba-master', action='store_true',
                         help=f'Test with Numba master from {numba_master_channel}')
     parser.add_argument('--channel-list', default=None, help='List of channels to use: "-c <channel> -c <channel>"')
-    parser.add_argument('--benchmark-argv', default='sdc.tests.tests_perf',
+    parser.add_argument('--benchmark-test-module', default='sdc.tests.tests_perf',
                         help='Run performance testing for all or a sigle one"')
     parser.add_argument('--benchmark-num-threads-list', nargs='+',
                         help='List of values for NUMBA_NUM_THREADS env variable', type=int)
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     run_coverage = args.run_coverage
     channel_list = args.channel_list
     use_numba_master = args.use_numba_master
-    benchmark_argv = args.benchmark_argv
+    benchmark_test_module = args.benchmark_test_module
     benchmark_num_threads_list = args.benchmark_num_threads_list
     numba_channel = numba_master_channel if use_numba_master is True else args.numba_channel
     assert conda_prefix is not None, 'CONDA_PREFIX is not defined; Please use --conda-prefix option or activate your conda'
@@ -282,8 +282,7 @@ if __name__ == '__main__':
                 create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['openpyxl', 'xlrd'],
                                  conda_channels)
                 run_command(f'{test_env_activate} && conda install -y {package}')
-                os.environ['LOAD_PREV_RESULTS'] = str(1)
                 for num_threads in benchmark_num_threads_list:
                     os.environ['NUMBA_NUM_THREADS'] = str(num_threads)
                     format_print(f'NUMBA_NUM_THREADS is : {num_threads}')
-                    run_command(f'{test_env_activate} && python -W ignore -m sdc.runtests {benchmark_argv}')
+                    run_command(f'{test_env_activate} && python -W ignore -m sdc.runtests {benchmark_test_module}')
