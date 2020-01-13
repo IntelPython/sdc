@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -231,10 +231,8 @@ def arr_var(arr, ddof):
     return numpy.var(arr) * length / (length - ddof)
 
 
-def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
+def gen_hpat_pandas_series_rolling_impl(rolling_func):
     """Generate series rolling methods implementations based on input func"""
-    nan_out_type = output_type is None
-
     def impl(self):
         win = self._window
         minp = self._min_periods
@@ -242,8 +240,7 @@ def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
         input_series = self._data
         input_arr = input_series._data
         length = len(input_arr)
-        out_type = input_arr.dtype if nan_out_type == True else output_type  # noqa
-        output_arr = numpy.empty(length, dtype=out_type)
+        output_arr = numpy.empty(length, dtype=float64)
 
         def apply_minp(arr, minp):
             finite_arr = arr[numpy.isfinite(arr)]
@@ -266,49 +263,56 @@ def gen_hpat_pandas_series_rolling_impl(rolling_func, output_type=None):
     return impl
 
 
-def gen_hpat_pandas_series_rolling_zerominp_impl(rolling_func, output_type=None):
-    """Generate series rolling methods implementations with zero min_periods"""
-    nan_out_type = output_type is None
-
-    def impl(self):
+def gen_hpat_pandas_series_rolling_ddof_impl(rolling_func):
+    """Generate series rolling methods implementations with parameter ddof"""
+    def impl(self, ddof=1):
         win = self._window
+        minp = self._min_periods
 
         input_series = self._data
         input_arr = input_series._data
         length = len(input_arr)
-        out_type = input_arr.dtype if nan_out_type == True else output_type  # noqa
-        output_arr = numpy.empty(length, dtype=out_type)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        def apply_minp(arr, ddof, minp):
+            finite_arr = arr[numpy.isfinite(arr)]
+            if len(finite_arr) < minp:
+                return numpy.nan
+            else:
+                return rolling_func(finite_arr, ddof)
 
         boundary = min(win, length)
         for i in prange(boundary):
             arr_range = input_arr[:i + 1]
-            output_arr[i] = rolling_func(arr_range)
+            output_arr[i] = apply_minp(arr_range, ddof, minp)
 
         for i in prange(boundary, length):
             arr_range = input_arr[i + 1 - win:i + 1]
-            output_arr[i] = rolling_func(arr_range)
+            output_arr[i] = apply_minp(arr_range, ddof, minp)
 
         return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
     return impl
 
 
-hpat_pandas_rolling_series_count_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_zerominp_impl(arr_nonnan_count, float64))
 hpat_pandas_rolling_series_kurt_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_kurt, float64))
+    gen_hpat_pandas_series_rolling_impl(arr_kurt))
 hpat_pandas_rolling_series_max_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_max, float64))
+    gen_hpat_pandas_series_rolling_impl(arr_max))
 hpat_pandas_rolling_series_mean_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_mean, float64))
+    gen_hpat_pandas_series_rolling_impl(arr_mean))
 hpat_pandas_rolling_series_median_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_median, float64))
+    gen_hpat_pandas_series_rolling_impl(arr_median))
 hpat_pandas_rolling_series_min_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_min, float64))
+    gen_hpat_pandas_series_rolling_impl(arr_min))
 hpat_pandas_rolling_series_skew_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_skew, float64))
+    gen_hpat_pandas_series_rolling_impl(arr_skew))
+hpat_pandas_rolling_series_std_impl = register_jitable(
+    gen_hpat_pandas_series_rolling_ddof_impl(arr_std))
 hpat_pandas_rolling_series_sum_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_sum, float64))
+    gen_hpat_pandas_series_rolling_impl(arr_sum))
+hpat_pandas_rolling_series_var_impl = register_jitable(
+    gen_hpat_pandas_series_rolling_ddof_impl(arr_var))
 
 
 @sdc_overload_method(SeriesRollingType, 'apply')
@@ -415,54 +419,28 @@ def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
 
 @sdc_overload_method(SeriesRollingType, 'count')
 def hpat_pandas_series_rolling_count(self):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-    Pandas API: pandas.core.window.Rolling.count
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/rolling/series_rolling_count.py
-       :language: python
-       :lines: 27-
-       :caption: Count of any non-NaN observations inside the window.
-       :name: ex_series_rolling_count
-
-    .. command-output:: python ./series/rolling/series_rolling_count.py
-       :cwd: ../../../examples
-
-    .. seealso::
-        :ref:`Series.rolling <pandas.Series.rolling>`
-            Calling object with a Series.
-        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
-            Calling object with a DataFrame.
-        :ref:`Series.count <pandas.Series.count>`
-            Similar method for Series.
-        :ref:`DataFrame.count <pandas.DataFrame.count>`
-            Similar method for DataFrame.
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-
-    Pandas Series method :meth:`pandas.Series.rolling.count()` implementation.
-
-    .. only:: developer
-
-    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_count
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series.rolling`
-        input arg
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
-    """
 
     ty_checker = TypeChecker('Method rolling.count().')
     ty_checker.check(self, SeriesRollingType)
+
+    def hpat_pandas_rolling_series_count_impl(self):
+        win = self._window
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        boundary = min(win, length)
+        for i in prange(boundary):
+            arr_range = input_arr[:i + 1]
+            output_arr[i] = arr_nonnan_count(arr_range)
+
+        for i in prange(boundary, length):
+            arr_range = input_arr[i + 1 - win:i + 1]
+            output_arr[i] = arr_nonnan_count(arr_range)
+
+        return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
     return hpat_pandas_rolling_series_count_impl
 
@@ -542,51 +520,6 @@ def hpat_pandas_series_rolling_kurt(self):
 
 @sdc_overload_method(SeriesRollingType, 'max')
 def hpat_pandas_series_rolling_max(self):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-    Pandas API: pandas.core.window.Rolling.max
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/rolling/series_rolling_max.py
-       :language: python
-       :lines: 27-
-       :caption: Calculate the rolling maximum.
-       :name: ex_series_rolling_max
-
-    .. command-output:: python ./series/rolling/series_rolling_max.py
-       :cwd: ../../../examples
-
-    .. seealso::
-        :ref:`Series.rolling <pandas.Series.rolling>`
-            Calling object with a Series.
-        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
-            Calling object with a DataFrame.
-        :ref:`Series.max <pandas.Series.max>`
-            Similar method for Series.
-        :ref:`DataFrame.max <pandas.DataFrame.max>`
-            Similar method for DataFrame.
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-
-    Pandas Series method :meth:`pandas.Series.rolling.max()` implementation.
-
-    .. only:: developer
-
-    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_max
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series.rolling`
-        input arg
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
-    """
 
     ty_checker = TypeChecker('Method rolling.max().')
     ty_checker.check(self, SeriesRollingType)
@@ -614,51 +547,6 @@ def hpat_pandas_series_rolling_median(self):
 
 @sdc_overload_method(SeriesRollingType, 'min')
 def hpat_pandas_series_rolling_min(self):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-    Pandas API: pandas.core.window.Rolling.min
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/rolling/series_rolling_min.py
-       :language: python
-       :lines: 27-
-       :caption: Calculate the rolling minimum.
-       :name: ex_series_rolling_min
-
-    .. command-output:: python ./series/rolling/series_rolling_min.py
-       :cwd: ../../../examples
-
-    .. seealso::
-        :ref:`Series.rolling <pandas.Series.rolling>`
-            Calling object with a Series.
-        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
-            Calling object with a DataFrame.
-        :ref:`Series.min <pandas.Series.min>`
-            Similar method for Series.
-        :ref:`DataFrame.min <pandas.DataFrame.min>`
-            Similar method for DataFrame.
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-
-    Pandas Series method :meth:`pandas.Series.rolling.min()` implementation.
-
-    .. only:: developer
-
-    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_min
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series.rolling`
-        input arg
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
-    """
 
     ty_checker = TypeChecker('Method rolling.min().')
     ty_checker.check(self, SeriesRollingType)
@@ -723,64 +611,6 @@ def hpat_pandas_series_rolling_skew(self):
     return hpat_pandas_rolling_series_skew_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'sum')
-def hpat_pandas_series_rolling_sum(self):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-    Pandas API: pandas.core.window.Rolling.sum
-
-    Limitations
-    -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/rolling/series_rolling_sum.py
-       :language: python
-       :lines: 27-
-       :caption: Calculate rolling sum of given Series.
-       :name: ex_series_rolling_sum
-
-    .. command-output:: python ./series/rolling/series_rolling_sum.py
-       :cwd: ../../../examples
-
-    .. seealso::
-        :ref:`Series.rolling <pandas.Series.rolling>`
-            Calling object with a Series.
-        :ref:`DataFrame.rolling <pandas.DataFrame.rolling>`
-            Calling object with a DataFrame.
-        :ref:`Series.sum <pandas.Series.sum>`
-            Similar method for Series.
-        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
-            Similar method for DataFrame.
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-
-    Pandas Series method :meth:`pandas.Series.rolling.sum()` implementation.
-
-    .. only:: developer
-
-    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling_sum
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series.rolling`
-        input arg
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
-    """
-
-    ty_checker = TypeChecker('Method rolling.sum().')
-    ty_checker.check(self, SeriesRollingType)
-
-    return hpat_pandas_rolling_series_sum_impl
-
-
 @sdc_overload_method(SeriesRollingType, 'std')
 def hpat_pandas_series_rolling_std(self, ddof=1):
 
@@ -790,34 +620,16 @@ def hpat_pandas_series_rolling_std(self, ddof=1):
     if not isinstance(ddof, (int, Integer, Omitted)):
         ty_checker.raise_exc(ddof, 'int', 'ddof')
 
-    def hpat_pandas_rolling_series_std_impl(self, ddof=1):
-        win = self._window
-        minp = self._min_periods
-
-        input_series = self._data
-        input_arr = input_series._data
-        length = len(input_arr)
-        output_arr = numpy.empty(length, dtype=float64)
-
-        def culc_std(arr, ddof, minp):
-            finite_arr = arr[numpy.isfinite(arr)]
-            if len(finite_arr) < minp:
-                return numpy.nan
-            else:
-                return arr_std(finite_arr, ddof)
-
-        boundary = min(win, length)
-        for i in prange(boundary):
-            arr_range = input_arr[:i + 1]
-            output_arr[i] = culc_std(arr_range, ddof, minp)
-
-        for i in prange(boundary, length):
-            arr_range = input_arr[i + 1 - win:i + 1]
-            output_arr[i] = culc_std(arr_range, ddof, minp)
-
-        return pandas.Series(output_arr, input_series._index, name=input_series._name)
-
     return hpat_pandas_rolling_series_std_impl
+
+
+@sdc_overload_method(SeriesRollingType, 'sum')
+def hpat_pandas_series_rolling_sum(self):
+
+    ty_checker = TypeChecker('Method rolling.sum().')
+    ty_checker.check(self, SeriesRollingType)
+
+    return hpat_pandas_rolling_series_sum_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'var')
@@ -828,33 +640,6 @@ def hpat_pandas_series_rolling_var(self, ddof=1):
 
     if not isinstance(ddof, (int, Integer, Omitted)):
         ty_checker.raise_exc(ddof, 'int', 'ddof')
-
-    def hpat_pandas_rolling_series_var_impl(self, ddof=1):
-        win = self._window
-        minp = self._min_periods
-
-        input_series = self._data
-        input_arr = input_series._data
-        length = len(input_arr)
-        output_arr = numpy.empty(length, dtype=float64)
-
-        def culc_var(arr, ddof, minp):
-            finite_arr = arr[numpy.isfinite(arr)]
-            if len(finite_arr) < minp:
-                return numpy.nan
-            else:
-                return arr_var(finite_arr, ddof)
-
-        boundary = min(win, length)
-        for i in prange(boundary):
-            arr_range = input_arr[:i + 1]
-            output_arr[i] = culc_var(arr_range, ddof, minp)
-
-        for i in prange(boundary, length):
-            arr_range = input_arr[i + 1 - win:i + 1]
-            output_arr[i] = culc_var(arr_range, ddof, minp)
-
-        return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
     return hpat_pandas_rolling_series_var_impl
 
@@ -898,6 +683,13 @@ hpat_pandas_series_rolling_corr.__doc__ = hpat_pandas_series_rolling_docstring_t
     """
 })
 
+hpat_pandas_series_rolling_count.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'count',
+    'example_caption': 'Count of any non-NaN observations inside the window.',
+    'limitations_block': '',
+    'extra_params': ''
+})
+
 hpat_pandas_series_rolling_cov.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'cov',
     'example_caption': 'Calculate rolling covariance.',
@@ -926,6 +718,13 @@ hpat_pandas_series_rolling_kurt.__doc__ = hpat_pandas_series_rolling_docstring_t
     'extra_params': ''
 })
 
+hpat_pandas_series_rolling_max.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'max',
+    'example_caption': 'Calculate the rolling maximum.',
+    'limitations_block': '',
+    'extra_params': ''
+})
+
 hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'mean',
     'example_caption': 'Calculate the rolling mean of the values.',
@@ -941,6 +740,13 @@ hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_t
 hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'median',
     'example_caption': 'Calculate the rolling median.',
+    'limitations_block': '',
+    'extra_params': ''
+})
+
+hpat_pandas_series_rolling_min.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'min',
+    'example_caption': 'Calculate the rolling minimum.',
     'limitations_block': '',
     'extra_params': ''
 })
@@ -985,6 +791,18 @@ hpat_pandas_series_rolling_std.__doc__ = hpat_pandas_series_rolling_docstring_tm
     ddof: :obj:`int`
         Delta Degrees of Freedom.
     """
+})
+
+hpat_pandas_series_rolling_sum.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
+    'method_name': 'sum',
+    'example_caption': 'Calculate rolling sum of given Series.',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """,
+    'extra_params': ''
 })
 
 hpat_pandas_series_rolling_var.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
