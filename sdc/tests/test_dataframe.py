@@ -1110,6 +1110,7 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @skip_sdc_jit
     def test_isin_ser1(self):
         def test_impl(df):
             vals = pd.Series([2, 3, 4])
