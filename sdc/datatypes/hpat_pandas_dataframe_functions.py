@@ -531,17 +531,18 @@ def sdc_pandas_dataframe_isin_dict_codegen(df, values, func_name):
 
     for i, c in enumerate(df.columns):
         result_c = f'result_{c}'
-        func_lines += [f'  if {c} in values.keys():',
+        func_lines += [f'  if "{c}" in list(values.keys()):',
                        f'    series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
-                       f'    {result_c} = series_{c}.{func_name}({values}.setdefault({c}))',
+                       f'    {result_c} = series_{c}.{func_name}(values.get("{c}"))',
                        f'  else:',
-                       f'    result = [False] * len(series_{c}._data)']
+                       f'    {result_c} = [False] * len(series_{c}._data)']
         result_name.append((result_c, c))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
 
     func_lines += [f'  return pandas.DataFrame({{{data}}})']
     func_text = '\n'.join(func_lines)
+    print(func_text)
 
     global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
@@ -690,5 +691,4 @@ def isin_overload(df, values):
         return sdc_pandas_dataframe_isin_df_codegen(df, values, name)
 
     if isinstance(values, types.DictType):
-        print('Dict')
         return sdc_pandas_dataframe_isin_dict_codegen(df, values, name)
