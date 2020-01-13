@@ -1045,7 +1045,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @skip_numba_jit
+    # @skip_numba_jit
     def test_df_drop_inplace2(self):
         # test droping after setting the column
         def test_impl(df):
@@ -1069,7 +1069,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
 
-    # @skip_numba_jit
     def test_isin_df1(self):
         def test_impl(df, df2):
             return df.isin(df2)
@@ -1079,6 +1078,15 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n)**2})
         df2.A[n // 2:] = n
+        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+
+    def test_isin_df2(self):
+        def test_impl(df, df2):
+            return df.isin(df2)
+
+        hpat_func = self.jit(test_impl)
+        df = pd.DataFrame({'A': np.arange(11), 'B': np.arange(11)**2})
+        df2 = pd.DataFrame({})
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
     @unittest.skip("needs dict typing in Numba")

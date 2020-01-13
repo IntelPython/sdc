@@ -592,27 +592,26 @@ def sdc_pandas_dataframe_isin_df_codegen(df, values, func_name):
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     for i, c in enumerate(df.columns):
         result_c = f'result_{c}'
+        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))']
         if c in values.columns:
             func_lines += [
-                f'  series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
+                f'  series_{c}_values = pandas.Series(get_dataframe_data({all_params[1]}, {i}))',
                 f'  result = []',
                 f'  for i in range(len(series_{c}._data)):',
-                f'    if series_{c}._data[i] == values._data[i]:',
+                f'    if series_{c}._data[i] == series_{c}_values._data[i]:',
                 f'      result.append(True)',
                 f'    else:',
-                f'      result.append(False)',
-                f'  {result_c} = pandas.Series(result)']
+                f'      result.append(False)']
         else:
             func_lines += [
-                f'  series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
-                f'  result = [False] * len(series_{c}._data)',
-                f'  {result_c} = pandas.Series(result)']
+                f'  result = [False] * len(series_{c}._data)']
+        func_lines += [f'  {result_c} = pandas.Series(result)']
         result_name.append((result_c, c))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
     func_lines += [f'  return pandas.DataFrame({{{data}}})']
     func_text = '\n'.join(func_lines)
-    print(func_text)
+
     global_vars = {'pandas': pandas, 'np': numpy,
                    'get_dataframe_data': get_dataframe_data}
 
