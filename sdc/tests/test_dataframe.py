@@ -1044,7 +1044,9 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @skip_sdc_jit
     def test_df_drop_tuple_column(self):
+        # Pandas supports only list as a parameter
         def test_impl(df):
             return df.drop(columns=['A', 'B'])
 
@@ -1069,6 +1071,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_sdc_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @skip_sdc_jit
     def test_df_drop_by_column_errors_ignore(self):
         def test_impl(df):
             return df.drop(columns='M', errors='ignore')

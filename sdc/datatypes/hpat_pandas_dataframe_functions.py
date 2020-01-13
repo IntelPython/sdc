@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -502,7 +502,7 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
     for label in drop_cols:
         if label not in df.columns:
             func_text.append(f'if errors == "raise":')
-            func_text.append(f'  raise ValueError("The label {label} is not found in the selected axis")')
+            func_text.append(indent + f'raise ValueError("The label {label} is not found in the selected axis")')
             break
 
     for column in saved_df_columns:
