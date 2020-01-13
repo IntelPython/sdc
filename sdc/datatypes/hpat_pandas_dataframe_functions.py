@@ -97,6 +97,49 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
     return _reduce_impl
 
 
+def _dataframe_reduce_columns_codegen_df(func_name, func_params, series_params, columns):
+    result_name = []
+    joined = ', '.join(func_params)
+    func_lines = [f'def _df_{func_name}_impl({joined}):']
+    for i, c in enumerate(columns):
+        result_c = f'result_{c}'
+        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({func_params[0]}, {i}))',
+                       f'  {result_c} = series_{c}.{func_name}({series_params})']
+        result_name.append((f' {result_c}', c))
+
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
+
+    func_lines += [f'  return pandas.DataFrame({{{data}}})']
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas, 'np': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_reduce_columns_df(df, func_name, params, ser_params):
+    all_params = ['df']
+    ser_par = []
+
+    for key, value in params.items():
+        all_params.append('{}={}'.format(key, value))
+    for key, value in ser_params.items():
+        ser_par.append('{}={}'.format(key, value))
+
+    s_par = '{}'.format(', '.join(ser_par[:]))
+
+    df_func_name = f'_df_{func_name}_impl'
+
+    func_text, global_vars = _dataframe_reduce_columns_codegen_df(func_name, all_params, s_par, df.columns)
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _reduce_impl = loc_vars[df_func_name]
+
+    return _reduce_impl
+
+
 def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, ddof=1, min_count=0):
     ty_checker = TypeChecker('Method {}().'.format(name))
     ty_checker.check(df, DataFrameType)
@@ -478,21 +521,106 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-def sdc_pandas_dataframe_isin_df_codegen(df, values, l):
-
-    print("DATADATADATA")
-
-
-def sdc_pandas_dataframe_isin_ser_codegen(df, values):
-    print("SERSERSERSER")
+# def sdc_pandas_dataframe_isin_dict_codegen(df, values, name):
+#     print("DICTDICTDICT")
 
 
-def sdc_pandas_dataframe_isin_dict_codegen(df, values):
-    print("DICTDICTDICT")
+def sdc_pandas_dataframe_isin_iter_codegen(df, values, func_name, ser_param):
+    all_params = ['df', 'values']
+
+    df_func_name = f'_df_{func_name}_impl'
+    func_text, global_vars = _dataframe_reduce_columns_codegen_df(func_name, all_params, ser_param, df.columns)
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _reduce_impl = loc_vars[df_func_name]
+    return _reduce_impl
 
 
-def sdc_pandas_dataframe_isin_iter_codegen(df, values):
-    print("ITERITERITER")
+def sdc_pandas_dataframe_isin_ser_codegen(df, values, func_name):
+    all_params = ['df', 'values']
+    df_func_name = f'_df_{func_name}_impl'
+
+    result_name = []
+    joined = ', '.join(all_params)
+    func_lines = [f'def _df_{func_name}_impl({joined}):']
+    for i, c in enumerate(df.columns):
+        result_c = f'result_{c}'
+        func_lines += [
+            f'  series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
+            f'  result = []',
+            f'  for i in range(len(series_{c}._data)):',
+            f'    if series_{c}._data[i] == values._data[i]:',
+            f'      result.append(True)',
+            f'    else:',
+            f'      result.append(False)',
+            f'  {result_c} = pandas.Series(result)'
+        ]
+        # not work with index, index=none
+        # func_lines += [
+        #     f'  series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
+        #     f'  result = []',
+        #     f'  for i in series_{c}._index:',
+        #     f'    if series_{c}[i] == values[i]:',
+        #     f'      result.append(True)',
+        #     f'    else:',
+        #     f'      result.append(False)',
+        #     f'  {result_c} = pandas.Series(result, index=series_{c}._index)'
+        # ]
+        result_name.append((result_c, c))
+
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
+    func_lines += [f'  return pandas.DataFrame({{{data}}})']
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas, 'np': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _reduce_impl = loc_vars[df_func_name]
+
+    return _reduce_impl
+
+
+def sdc_pandas_dataframe_isin_df_codegen(df, values, func_name):
+    all_params = ['df', 'values']
+    df_func_name = f'_df_{func_name}_impl'
+
+    result_name = []
+    joined = ', '.join(all_params)
+    func_lines = [f'def _df_{func_name}_impl({joined}):']
+    for i, c in enumerate(df.columns):
+        result_c = f'result_{c}'
+        if c in values.columns:
+            func_lines += [
+                f'  series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
+                f'  result = []',
+                f'  for i in range(len(series_{c}._data)):',
+                f'    if series_{c}._data[i] == values._data[i]:',
+                f'      result.append(True)',
+                f'    else:',
+                f'      result.append(False)',
+                f'  {result_c} = pandas.Series(result)']
+        else:
+            func_lines += [
+                f'  series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
+                f'  result = [False] * len(series_{c}._data)',
+                f'  {result_c} = pandas.Series(result)']
+        result_name.append((result_c, c))
+
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
+    func_lines += [f'  return pandas.DataFrame({{{data}}})']
+    func_text = '\n'.join(func_lines)
+    print(func_text)
+    global_vars = {'pandas': pandas, 'np': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _reduce_impl = loc_vars[df_func_name]
+
+    return _reduce_impl
 
 
 @overload_method(DataFrameType, 'isin')
@@ -517,26 +645,24 @@ def isin_overload(df, values):
     """
 
     name = 'isin'
-
+    print(type(values))
     ty_checker = TypeChecker('Method {}().'.format(name))
     ty_checker.check(df, DataFrameType)
 
-    if not isinstance(values, (types.Iterable, SeriesType, DataFrameType, dict)):
+    if not isinstance(values, (SeriesType, types.List, types.Set, DataFrameType, types.DictType)):
         ty_checker.raise_exc(values, 'iterable, Series, DataFrame or dict', 'values')
 
-    if isinstance(values, DataFrameType):
-        l = []
-        for i in range(len(df.columns)):
-            if not df.columns[i] == values.columns[i]:
-                l.append(df.columns[i])
-        print(l)
-        return sdc_pandas_dataframe_isin_df_codegen(df, values, l)
+    if isinstance(values, (types.List, types.Set)):
+        ser_par = 'values=values'
+        return sdc_pandas_dataframe_isin_iter_codegen(df, values, name, ser_par)
 
     if isinstance(values, SeriesType):
-        return sdc_pandas_dataframe_isin_ser_codegen(df, values)
+        return sdc_pandas_dataframe_isin_ser_codegen(df, values, name)
 
-    if isinstance(values, dict):
-        return sdc_pandas_dataframe_isin_dict_codegen(df, values)
+    if isinstance(values, DataFrameType):
+        return sdc_pandas_dataframe_isin_df_codegen(df, values, name)
 
-    if isinstance(values, types.Iterable):
-        return sdc_pandas_dataframe_isin_iter_codegen(df, values)
+    if isinstance(values, types.DictType):
+        # problem with types.DictType
+        print('Dict')
+        # return sdc_pandas_dataframe_isin_dict_codegen(df, values, name)
