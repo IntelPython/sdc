@@ -32,6 +32,7 @@ import string
 import platform
 import pandas as pd
 import numpy as np
+from itertools import product
 
 import numba
 import sdc
@@ -1369,13 +1370,12 @@ class TestDataFrame(TestCase):
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
                            "F": [np.nan, np.nan, np.inf, np.nan]})
-        for periods in [0, 1, 2, 5, 10, -1, -2, -5]:
-            with self.subTest(periods=periods):
-                for method in [None, 'pad', 'ffill', 'backfill', 'bfill']:
-                    with self.subTest(method=method):
-                        result_ref = test_impl(df, periods, method)
-                        result = hpat_func(df, periods, method)
-                        pd.testing.assert_frame_equal(result, result_ref)
+        params = list(product(*[[0, 1, 2, 5, 10, -1, -2, -5], [None, 'pad', 'ffill', 'backfill', 'bfill']]))
+        for periods, method in params:
+            with self.subTest(periods=periods, method=method):
+                result_ref = test_impl(df, periods, method)
+                result = hpat_func(df, periods, method)
+                pd.testing.assert_frame_equal(result, result_ref)
 
 
 if __name__ == "__main__":
