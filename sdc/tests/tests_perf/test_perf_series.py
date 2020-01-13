@@ -220,8 +220,8 @@ def usecase_series_dropna(input_data):
     finish_time = time.time()
 
     return finish_time - start_time, res
-  
-  
+
+
 def usecase_series_chain_add_and_sum(A, B):
     start_time = time.time()
     res = (A + B).sum()
@@ -253,6 +253,15 @@ def usecase_series_fillna(input_data):
 def usecase_series_isna(input_data):
     start_time = time.time()
     res = input_data.isna()
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
+def usecase_series_cov(A, B):
+    start_time = time.time()
+    res = A.cov(B)
     finish_time = time.time()
     res_time = finish_time - start_time
 
@@ -292,6 +301,7 @@ class TestSeriesMethods(TestBase):
             'series_astype_int': [2 * 10 ** 7],
             'series_fillna': [2 * 10 ** 7],
             'series_isna': [2 * 10 ** 7],
+            'series_cov': [10 ** 8]
         }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
@@ -434,3 +444,6 @@ class TestSeriesMethods(TestBase):
 
     def test_series_float_isna(self):
         self._test_case(usecase_series_fillna, 'series_isna')
+
+    def test_series_float_cov(self):
+        self._test_series_binary_operations(usecase_series_cov, 'series_cov')

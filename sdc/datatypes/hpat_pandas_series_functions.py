@@ -42,6 +42,7 @@ from numba.typing import signature
 from numba.extending import intrinsic
 from numba import (types, numpy_support, cgutils)
 from numba.typed import Dict
+from numba import prange
 
 import sdc
 import sdc.datatypes.common_functions as common_functions
@@ -221,7 +222,7 @@ def hpat_pandas_series_getitem(self, idx):
         return None
 
     # Note: Getitem return Series
-    index_is_none = self.index is None or isinstance(self.index, numba.types.misc.NoneType)
+    index_is_none = isinstance(self.index, numba.types.misc.NoneType)
     index_is_none_or_numeric = index_is_none or (self.index and isinstance(self.index.dtype, types.Number))
     index_is_string = not index_is_none and isinstance(self.index.dtype, (types.UnicodeType, types.StringLiteral))
 
@@ -259,7 +260,7 @@ def hpat_pandas_series_getitem(self, idx):
             return pandas.Series(self._data[idx], self.index[idx], self._name)
         return hpat_pandas_series_getitem_idx_list_impl
 
-    if (isinstance(self.index, types.NoneType) and isinstance(idx, SeriesType)):
+    if (index_is_none and isinstance(idx, SeriesType)):
         if isinstance(idx.data.dtype, (types.Boolean, bool)):
             def hpat_pandas_series_getitem_idx_list_impl(self, idx):
                 index = numpy.arange(len(self._data))
@@ -289,16 +290,19 @@ def hpat_pandas_series_getitem(self, idx):
 
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
             index = self.index
-            res = []
-            for i in numba.prange(len(idx._data)):
-                temp = []
-                for j in numba.prange(len(index)):
-                    if index[j] == idx._data[i]:
-                        temp.append(self._data[j])
-                res.append(temp)
-            new_data = numpy.array([value for arr in res for value in arr])
-            new_index = numpy.array([idx._data[arr] for arr in range(len(res)) for value in range(len(res[arr]))])
-            return pandas.Series(new_data, new_index, self._name)
+            data = self._data
+            size = len(index)
+            data_res = []
+            index_res = []
+            for value in idx._data:
+                mask = numpy.zeros(shape=size, dtype=numpy.bool_)
+                for i in numba.prange(size):
+                    mask[i] = index[i] == value
+
+                data_res.extend(data[mask])
+                index_res.extend(index[mask])
+
+            return pandas.Series(data=data_res, index=index_res, name=self._name)
 
         return hpat_pandas_series_getitem_idx_series_impl
 
@@ -311,7 +315,7 @@ def hpat_pandas_series_setitem(self, idx, value):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
-    Pandas API: pandas.Series.set
+    Pandas API: pandas.Series.__setitem__
 
     Examples
     --------
@@ -4638,32 +4642,31 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
 
     def hpat_pandas_series_cov_impl(self, other, min_periods=None):
 
-        if min_periods is None:
-            min_periods = 1
+        if min_periods is None or min_periods < 2:
+            min_periods = 2
 
-        if len(self._data) == 0 or len(other._data) == 0:
+        min_len = min(len(self._data), len(other._data))
+
+        if min_len == 0:
             return numpy.nan
 
-        self_arr = self._data[:min(len(self._data), len(other._data))]
-        other_arr = other._data[:min(len(self._data), len(other._data))]
+        other_sum = 0.
+        self_sum = 0.
+        self_other_sum = 0.
+        total_count = 0
+        for i in prange(min_len):
+            s = self._data[i]
+            o = other._data[i]
+            if not (numpy.isnan(s) or numpy.isnan(o)):
+                self_sum += s
+                other_sum += o
+                self_other_sum += s*o
+                total_count += 1
 
-        invalid = numpy.isnan(self_arr) | numpy.isnan(other_arr)
-        if invalid.any():
-            self_arr = self_arr[~invalid]
-            other_arr = other_arr[~invalid]
-
-        if len(self_arr) < min_periods:
+        if total_count < min_periods:
             return numpy.nan
 
-        new_self = pandas.Series(self_arr)
-
-        ma = new_self.mean()
-        mb = other.mean()
-
-        if numpy.isinf(mb):
-            return numpy.nan
-
-        return ((self_arr - ma) * (other_arr - mb)).sum() / (new_self.count() - 1.0)
+        return (self_other_sum - self_sum*other_sum/total_count)/(total_count - 1)
 
     return hpat_pandas_series_cov_impl
 
