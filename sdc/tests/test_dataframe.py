@@ -1103,20 +1103,55 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @skip_numba_jit
-    def test_append1(self):
+    def test_append_df_same_cols_no_index(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)
 
         hpat_func = self.jit(test_impl)
         n = 11
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
-        df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n)**2})
+        df2 = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         df2.A[n // 2:] = n
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
-    @skip_numba_jit
-    def test_append2(self):
+    def test_append_df_diff_cols_no_index(self):
+        def test_impl(df, df2):
+            return df.append(df2, ignore_index=True)
+
+        hpat_func = self.jit(test_impl)
+        n1 = 11
+        n2 = n1 * 2
+        df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1)**2})
+        df2 = pd.DataFrame({'C': np.arange(n2), 'D': np.arange(n2)**2, 'E': np.arange(n2) + 100})
+
+        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+
+    def test_append_df_cross_cols_no_index(self):
+        def test_impl(df, df2):
+            return df.append(df2, ignore_index=True)
+
+        hpat_func = self.jit(test_impl)
+        n1 = 11
+        n2 = n1 * 2
+        df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1)**2})
+        df2 = pd.DataFrame({'A': np.arange(n2), 'D': np.arange(n2)**2, 'E': np.arange(n2) + 100})
+
+        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+
+    @skip_sdc_jit
+    def test_append_df_diff_types_no_index(self):
+        def test_impl(df, df2):
+            return df.append(df2, ignore_index=True)
+
+        hpat_func = self.jit(test_impl)
+
+        df = pd.DataFrame({'A': ['cat', 'dog', np.nan], 'B': [.2, .3, np.nan]})
+        df2 = pd.DataFrame({'C': [5, 6, 7, 8]*64, 'D': ['a', 'b', np.nan, '']*64})
+
+        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+
+    @skip_numba_jit('Unsupported functionality df.append([df2, df3])')
+    def test_append_no_index(self):
         def test_impl(df, df2, df3):
             return df.append([df2, df3], ignore_index=True)
 
