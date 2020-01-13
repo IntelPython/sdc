@@ -24,5 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from numba import njit
 
-# import sdc.datatypes.hpat_pandas_dataframe_pass
+
+@njit
+def series_rolling_kurt():
+    series = pd.Series([4, 3, 5, 2, 6])  # Series of 4, 3, 5, 2, 6
+    out_series = series.rolling(4).kurt()
+
+    return out_series  # Expect series of NaN, NaN, NaN, -1.2, -3.3
+
+
+print(series_rolling_kurt())
