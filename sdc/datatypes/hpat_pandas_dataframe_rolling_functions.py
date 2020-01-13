@@ -78,7 +78,7 @@ sdc_pandas_dataframe_rolling_docstring_tmpl = """
 """
 
 
-def apply_df_rolling_method(method_name, self, args=None, kws=None):
+def df_rolling_method_codegen(method_name, self, args=None, kws=None):
     args = args or []
     kwargs = kws or {}
 
@@ -112,11 +112,17 @@ def apply_df_rolling_method(method_name, self, args=None, kws=None):
 
     global_vars = {'pandas': pandas, 'get_dataframe_data': get_dataframe_data}
 
+    return func_text, global_vars
+
+
+def gen_df_rolling_method_impl(method_name, self, args=None, kws=None):
+    func_text, global_vars = df_rolling_method_codegen(method_name, self,
+                                                       args=args, kws=kws)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _apply_impl = loc_vars[impl_name]
+    _impl = loc_vars[f'_df_rolling_{method_name}_impl']
 
-    return _apply_impl
+    return _impl
 
 
 @sdc_overload_method(DataFrameRollingType, 'min')
@@ -125,7 +131,7 @@ def sdc_pandas_dataframe_rolling_min(self):
     ty_checker = TypeChecker('Method rolling.min().')
     ty_checker.check(self, DataFrameRollingType)
 
-    return apply_df_rolling_method('min', self)
+    return gen_df_rolling_method_impl('min', self)
 
 
 sdc_pandas_dataframe_rolling_min.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
