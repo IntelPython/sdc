@@ -534,10 +534,10 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     -----------
     df: :class:`pandas.DataFrame`
       input arg
-    periods:
-      *unsupported*
-    fill_method:
-      *unsupported
+    periods: :obj:`int`, default 1
+        Periods to shift for forming percent change.
+    fill_method: :obj:`str`, default 'pad'
+        How to handle NAs before computing percent changes.
     limit:
       *unsupported*
     freq:

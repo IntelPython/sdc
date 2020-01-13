@@ -1357,6 +1357,23 @@ class TestDataFrame(TestCase):
                            "D": [14, None, 6, 2, 6, 4]})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_pct_change_with_parametrs(self):
+        def test_impl(df, periods, method):
+            return df.pct_change(periods=periods, fill_method=method, limit=None, freq=None)
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [.2, .0, .6, .2],
+                           "B": [.5, .6, .7, .8],
+                           "C": [2, 0, 6, 2],
+                           "D": [.2, .1, np.nan, .5],
+                           "E": [-1, np.nan, 1, np.inf],
+                           "F": [np.nan, np.nan, np.inf, np.nan]})
+        for periods in [0, 1, 2, 5, 10, -1, -2, -5]:
+            for method in [None, 'pad', 'ffill', 'backfill', 'bfill']:
+                result_ref = test_impl(df, periods, method)
+                result = hpat_func(df, periods, method)
+                pd.testing.assert_frame_equal(result, result_ref)
+
 
 if __name__ == "__main__":
     unittest.main()
