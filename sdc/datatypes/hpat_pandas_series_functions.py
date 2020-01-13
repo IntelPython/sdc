@@ -49,7 +49,7 @@ import sdc.datatypes.common_functions as common_functions
 from sdc.datatypes.common_functions import (TypeChecker, check_index_is_numeric, find_common_dtype_from_numpy_dtypes,
                                             sdc_join_series_indexes)
 from sdc.datatypes.hpat_pandas_rolling_types import (
-    gen_sdc_pandas_rolling, sdc_pandas_rolling_docstring_tmpl)
+    gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
 from sdc.datatypes.hpat_pandas_series_rolling_types import _hpat_pandas_series_rolling_init
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.datatypes.hpat_pandas_getitem_types import SeriesGetitemAccessorType
@@ -1058,10 +1058,9 @@ def hpat_pandas_series_index(self):
 
 
 hpat_pandas_series_rolling = sdc_overload_method(SeriesType, 'rolling')(
-    gen_sdc_pandas_rolling(_hpat_pandas_series_rolling_init, SeriesType))
+    gen_sdc_pandas_rolling_overload_body(_hpat_pandas_series_rolling_init, SeriesType))
 hpat_pandas_series_rolling.__doc__ = sdc_pandas_rolling_docstring_tmpl.format(
     ty='Series', ty_lower='series')
-
 
 
 @sdc_overload_attribute(SeriesType, 'size')
