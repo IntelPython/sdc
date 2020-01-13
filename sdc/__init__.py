@@ -40,6 +40,7 @@ import sdc.hiframes.boxing
 import sdc.timsort
 from sdc.decorators import jit
 
+import sdc.datatypes.hpat_pandas_dataframe_rolling_functions
 import sdc.datatypes.hpat_pandas_series_functions
 import sdc.datatypes.hpat_pandas_series_rolling_functions
 import sdc.datatypes.hpat_pandas_seriesgroupby_functions
