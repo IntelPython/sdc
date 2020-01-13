@@ -1370,8 +1370,9 @@ class TestDataFrame(TestCase):
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
                            "F": [np.nan, np.nan, np.inf, np.nan]})
-        params = list(product(*[[0, 1, 2, 5, 10, -1, -2, -5], [None, 'pad', 'ffill', 'backfill', 'bfill']]))
-        for periods, method in params:
+        all_periods = [0, 1, 2, 5, 10, -1, -2, -5]
+        methods = [None, 'pad', 'ffill', 'backfill', 'bfill']
+        for periods, method in product(all_periods, methods):
             with self.subTest(periods=periods, method=method):
                 result_ref = test_impl(df, periods, method)
                 result = hpat_func(df, periods, method)
