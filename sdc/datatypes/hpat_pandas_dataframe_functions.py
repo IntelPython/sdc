@@ -528,11 +528,29 @@ def sdc_pandas_dataframe_isin_dict_codegen(df, values, func_name):
     result_name = []
     joined = ', '.join(all_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
+
     for i, c in enumerate(df.columns):
-        print(values.keys())
-        # if c in list(values.keys()):
-        #     func_text, global_vars = _dataframe_apply_columns_codegen(func_name, all_params, series_params, df.columns)
-    print("DICTDICTDICT")
+        result_c = f'result_{c}'
+        func_lines += [f'  if {c} in values.keys():',
+                       f'    series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
+                       f'    {result_c} = series_{c}.{func_name}({values}.setdefault({c}))',
+                       f'  else:',
+                       f'    result = [False] * len(series_{c}._data)']
+        result_name.append((result_c, c))
+
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
+
+    func_lines += [f'  return pandas.DataFrame({{{data}}})']
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas,
+                   'get_dataframe_data': get_dataframe_data}
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _reduce_impl = loc_vars[df_func_name]
+
+    return _reduce_impl
 
 
 def sdc_pandas_dataframe_isin_iter_codegen(df, values, func_name, ser_param):
