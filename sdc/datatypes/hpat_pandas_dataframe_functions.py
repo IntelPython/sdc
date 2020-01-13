@@ -666,4 +666,3 @@ def isin_overload(df, values):
 
     if isinstance(values, DataFrameType):
         return sdc_pandas_dataframe_isin_df_codegen(df, values, name)
-

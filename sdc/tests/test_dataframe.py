@@ -1045,7 +1045,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    # @skip_numba_jit
+    @skip_numba_jit
     def test_df_drop_inplace2(self):
         # test droping after setting the column
         def test_impl(df):
