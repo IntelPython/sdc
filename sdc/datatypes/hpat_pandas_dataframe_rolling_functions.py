@@ -102,7 +102,7 @@ def df_rolling_method_codegen(method_name, self, args=None, kws=None):
             f'  series_{col} = pandas.Series(data_{col})',
             f'  rolling_{col} = series_{col}.rolling({rolling_params_as_str})',
             f'  result_{col} = rolling_{col}.{method_name}({method_params_as_str})',
-            f'  {res_data} = result_{col}._data'
+            f'  {res_data} = result_{col}._data[:len(data_{col})]'
         ]
         results.append((col, res_data))
 
