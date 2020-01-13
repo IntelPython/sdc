@@ -533,9 +533,15 @@ def sdc_pandas_dataframe_isin_dict_codegen(df, values, func_name):
         result_c = f'result_{c}'
         func_lines += [f'  if "{c}" in list(values.keys()):',
                        f'    series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
-                       f'    {result_c} = series_{c}.{func_name}(values.get("{c}"))',
+                       f'    {result_c} = series_{c}.{func_name}(values["{c}"])',
                        f'  else:',
-                       f'    {result_c} = [False] * len(series_{c}._data)']
+                       f'    {result_c}=[False] * len(series_{c}._data)',
+                       f'  print({result_c})']
+        # func_lines += [f'  if "{c}" in list(values.keys()):',
+        #                f'    series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
+        #                f'    {result_c} = series_{c}.{func_name}(values.get("{c}"))',
+        #                f'  else:',
+        #                f'    {result_c} = [False] * len(series_{c}._data)']
         result_name.append((result_c, c))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
