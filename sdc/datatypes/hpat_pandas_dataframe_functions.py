@@ -41,8 +41,8 @@ from sdc.hiframes.pd_dataframe_type import DataFrameType
 
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
-    gen_sdc_pandas_rolling, sdc_pandas_rolling_docstring_tmpl)
-from sdc.datatypes.hpat_pandas_series_functions import TypeChecker
+    gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
+from sdc.datatypes.common_functions import TypeChecker
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utils import sdc_overload_method
 
@@ -200,7 +200,7 @@ def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
 
 sdc_pandas_dataframe_rolling = sdc_overload_method(DataFrameType, 'rolling')(
-    gen_sdc_pandas_rolling(_hpat_pandas_df_rolling_init, DataFrameType))
+    gen_sdc_pandas_rolling_overload_body(_hpat_pandas_df_rolling_init, DataFrameType))
 sdc_pandas_dataframe_rolling.__doc__ = sdc_pandas_rolling_docstring_tmpl.format(
     ty='DataFrame', ty_lower='dataframe')
 

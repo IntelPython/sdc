@@ -105,8 +105,8 @@ def gen_hpat_pandas_rolling_init(ty):
     return _hpat_pandas_rolling_init
 
 
-def gen_sdc_pandas_rolling(initializer, ty):
-    """Generate rolling initializer"""
+def gen_sdc_pandas_rolling_overload_body(initializer, ty):
+    """Generate code of the overloaded method using associated DataType and constructor."""
     def sdc_pandas_rolling(self, window, min_periods=None, center=False,
                            win_type=None, on=None, axis=0, closed=None):
         ty_checker = TypeChecker('Method rolling().')
