@@ -24,7 +24,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import numpy as np
 import pandas as pd
 from numba import njit
 

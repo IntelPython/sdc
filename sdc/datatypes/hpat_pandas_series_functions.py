@@ -1818,13 +1818,9 @@ def hpat_pandas_series_head(self, n=5):
        :caption: Getting the first n rows.
        :name: ex_series_head
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_head.py
 
-        > python ./series/series_head.py
-        0    7
-        2    6
-        4    5
-        dtype: int64
+        :cwd: ../../../examples
 
     .. seealso::
 
@@ -1853,7 +1849,7 @@ def hpat_pandas_series_head(self, n=5):
     ty_checker.check(self, SeriesType)
 
     if not isinstance(n, (types.Integer, types.Omitted)) and n != 5:
-        raise TypingError('{} The parameter must be an integer type. Given type n: {}'.format(_func_name, n))
+        ty_checker.raise_exc(n, 'int', 'n')
 
     if isinstance(self.index, types.NoneType):
         def hpat_pandas_series_head_impl(self, n=5):
@@ -1954,14 +1950,9 @@ def hpat_pandas_series_isnull(self):
        :caption: Detect missing values.
        :name: ex_series_isnull
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_isnull.py
 
-        > python ./series/series_isnull.py
-        0    False
-        1     True
-        2    False
-        3    False
-        dtype: bool
+        :cwd: ../../../examples
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -1969,9 +1960,7 @@ def hpat_pandas_series_isnull(self):
 
     .. only:: developer
 
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isna1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_str_isna1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isnull1
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_isnull*
 
     Parameters
     -----------
@@ -2027,14 +2016,9 @@ def hpat_pandas_series_isna(self):
        :caption: Detect missing values.
        :name: ex_series_isna
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_isna.py
 
-        > python ./series/series_isna.py
-        0    False
-        1     True
-        2    False
-        3    False
-        dtype: bool
+        :cwd: ../../../examples
 
     .. seealso::
 
@@ -2056,9 +2040,7 @@ def hpat_pandas_series_isna(self):
 
     .. only:: developer
 
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isna1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_str_isna1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isnull1
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_isna*
 
     Parameters
     -----------
@@ -2114,14 +2096,9 @@ def hpat_pandas_series_notna(self):
        :caption: Detect existing (non-missing) values.
        :name: ex_series_notna
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_notna.py
 
-        > python ./series/series_notna.py
-        0     True
-        1    False
-        2     True
-        3     True
-        dtype: bool
+        :cwd: ../../../examples
 
     .. seealso::
 
@@ -2191,15 +2168,9 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
        :caption: Element-wise not equal of one Series by another (binary operator ne)
        :name: ex_series_ne
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_ne.py
 
-        > python ./series/series_ne.py
-        0     True
-        1     True
-        2    False
-        3     True
-        4     True
-        dtype: bool
+        :cwd: ../../../examples
 
     .. note::
 
@@ -2582,10 +2553,9 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=True):
        :caption: Getting the row label of the maximum value.
        :name: ex_series_idxmax
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_idxmax.py
 
-        > python ./series/series_idxmax.py
-        A
+        :cwd: ../../../examples
 
     .. note::
 
@@ -2629,7 +2599,7 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=True):
     ty_checker.check(self, SeriesType)
 
     if not isinstance(self.data.dtype, types.Number):
-        raise TypingError('{} Numeric values supported only. Given: {}'.format(_func_name, self.data.dtype))
+        ty_checker.raise_exc(self.data.dtype, 'int, float', 'self.data.dtype')
 
     if not (isinstance(skipna, (types.Omitted, types.Boolean, bool)) or skipna is True):
         ty_checker.raise_exc(skipna, 'bool', 'skipna')
@@ -3022,15 +2992,9 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
        :caption: Element-wise power of one Series by another (binary operator pow)
        :name: ex_series_pow
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_pow.py
 
-        > python ./series/series_pow.py
-        0     1
-        1    16
-        2    27
-        3    64
-        4     1
-        dtype: int64
+        :cwd: ../../../examples
 
     .. note::
 
@@ -3313,10 +3277,9 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
        :caption: Getting the minimum value of Series elements
        :name: ex_series_min
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_min.py
 
-        > python ./series/series_min.py
-        1.0
+        :cwd: ../../../examples
 
     .. note::
 
@@ -3369,9 +3332,7 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
     ty_checker.check(self, SeriesType)
 
     if not isinstance(self.data.dtype, (types.Integer, types.Float)):
-        raise TypingError(
-            '{} Currently function supports only numeric values. Given data type: {}'.format(
-                _func_name, self.data.dtype))
+        ty_checker.raise_exc(self.data.dtype, 'int, float', 'self.data.dtype')
 
     if not (isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) or skipna is True or skipna is None):
         ty_checker.raise_exc(skipna, 'bool', 'skipna')
@@ -3461,9 +3422,7 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
     ty_checker.check(self, SeriesType)
 
     if not isinstance(self.data.dtype, (types.Integer, types.Float)):
-        raise TypingError(
-            '{} Currently function supports only numeric values. Given data type: {}'.format(
-                _func_name, self.data.dtype))
+        ty_checker.raise_exc(self.data.dtype, 'int, float', 'self.data.dtype')
 
     if not (isinstance(skipna, (types.Omitted, types.Boolean, types.NoneType)) or skipna is True or skipna is None):
         ty_checker.raise_exc(skipna, 'bool', 'skipna')
@@ -3642,15 +3601,9 @@ def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
        :caption: Element-wise equal of one Series by another (binary operator eq)
        :name: ex_series_eq
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_mod.py
 
-        > python ./series/series_eq.py
-        0    False
-        1    False
-        2     True
-        3    False
-        4    False
-        dtype: bool
+        :cwd: ../../../examples
 
     .. note::
 
@@ -3727,15 +3680,9 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
        :caption: Element-wise greater than or equal of one Series by another (binary operator ge)
        :name: ex_series_ge
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_ge.py
 
-        > python ./series/series_ge.py
-        0     True
-        1     True
-        2     True
-        3    False
-        4    False
-        dtype: bool
+        :cwd: ../../../examples
 
     .. note::
 
@@ -3812,10 +3759,9 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True):
        :caption: Getting the row label of the minimum value.
        :name: ex_series_idxmin
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_idxmin.py
 
-        > python ./series/series_idxmin.py
-        D
+        :cwd: ../../../examples
 
     .. note::
 
@@ -3861,7 +3807,7 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True):
     ty_checker.check(self, SeriesType)
 
     if not isinstance(self.data.dtype, types.Number):
-        raise TypingError('{} Numeric values supported only. Given: {}'.format(_func_name, self.data.dtype))
+        ty_checker.raise_exc(self.data.dtype, 'int, float', 'self.data.dtype')
 
     if not (isinstance(skipna, (types.Omitted, types.Boolean, bool)) or skipna is True):
         ty_checker.raise_exc(skipna, 'bool', 'skipna')
@@ -3900,15 +3846,9 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
        :caption: Element-wise less than of one Series by another (binary operator lt)
        :name: ex_series_lt
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_lt.py
 
-        > python ./series/series_lt.py
-        0    False
-        1    False
-        2    False
-        3     True
-        4     True
-        dtype: bool
+        :cwd: ../../../examples
 
     .. note::
 
@@ -3985,15 +3925,9 @@ def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
        :caption: Element-wise greater than of one Series by another (binary operator gt)
        :name: ex_series_gt
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_gt.py
 
-        > python ./series/series_gt.py
-        0     True
-        1     True
-        2    False
-        3    False
-        4    False
-        dtype: bool
+        :cwd: ../../../examples
 
     .. note::
 
@@ -4070,15 +4004,9 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
        :caption: Element-wise less than or equal of one Series by another (binary operator le)
        :name: ex_series_le
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_le.py
 
-        > python ./series/series_le.py
-        0    False
-        1    False
-        2     True
-        3     True
-        4     True
-        dtype: bool
+        :cwd: ../../../examples
 
     .. note::
 
@@ -4536,15 +4464,9 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
        :caption: Override ndarray.argsort.
        :name: ex_series_argsort
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_argsort.py
 
-        > python ./series/series_argsort.py
-        0    1
-        1    2
-        2   -1
-        3    0
-        4    3
-        dtype: int64
+        :cwd: ../../../examples
 
     .. note::
 
@@ -4591,7 +4513,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     ty_checker.check(self, SeriesType)
 
     if not isinstance(self.data.dtype, types.Number):
-        raise TypingError('{} Non-numeric type unsupported. Given: {}'.format(_func_name, self.data.dtype))
+        ty_checker.raise_exc(self.data.dtype, 'int, float', 'self.data.dtype')
 
     if not (isinstance(axis, types.Omitted) or isinstance(axis, types.Integer) or axis == 0):
         ty_checker.raise_exc(axis, 'int64', 'axis')
@@ -4676,15 +4598,9 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
        :caption: Sort by the values.
        :name: ex_series_sort_values
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_sort_values.py
 
-        > python ./series/series_sort_values.py
-        1   -10.0
-        3     0.0
-        0     3.0
-        4    92.0
-        2     NaN
-        dtype: float64
+        :cwd: ../../../examples
 
     .. note::
 
