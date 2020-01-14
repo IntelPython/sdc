@@ -98,7 +98,7 @@ def df_rolling_method_with_other_df_codegen(method_name, self, other, args=None,
     kwargs = kws or {}
 
     rolling_params = df_rolling_params_codegen()
-    method_kws = {k:k for k in kwargs}
+    method_kws = {k: k for k in kwargs}
     impl_params = ['self'] + args + params2list(kwargs)
     impl_params_as_str = ', '.join(impl_params)
 
