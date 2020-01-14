@@ -40,12 +40,11 @@ import pandas
 from numba.errors import TypingError
 from numba import types
 
-import sdc
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.common_functions import (check_index_is_numeric, find_common_dtype_from_numpy_dtypes,
                                             sdc_join_series_indexes, sdc_check_indexes_equal, check_types_comparable)
 from sdc.hiframes.pd_series_type import SeriesType
-from sdc.str_arr_ext import (string_array_type, num_total_chars, str_arr_is_na)
+from sdc.str_arr_ext import (string_array_type, str_arr_is_na)
 from sdc.utils import sdc_overload
 
 
@@ -208,7 +207,7 @@ def sdc_pandas_series_operator_comp_binop(self, other):
     if not isinstance(self, SeriesType):
         return None
 
-    if not isinstance(other, (SeriesType, types.Number)):
+    if not isinstance(other, (SeriesType, types.Number, types.UnicodeType)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
     if isinstance(other, SeriesType):
@@ -225,8 +224,7 @@ def sdc_pandas_series_operator_comp_binop(self, other):
         raise TypingError('{} Not implemented for series with not-comparable indexes. \
         Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    # specializations for numeric series
-    if (isinstance(other, types.Number)):
+    if (isinstance(other, (types.Number, types.UnicodeType))):
         def _series_operator_comp_binop_scalar_impl(self, other):
             return pandas.Series(self._data < other, index=self._index, name=self._name)
 
@@ -268,3 +266,46 @@ def sdc_pandas_series_operator_comp_binop(self, other):
             return _series_operator_comp_binop_common_impl
 
     return None
+
+
+def sdc_str_arr_operator_comp_binop(self, other):
+
+    self_is_str_arr = self == string_array_type
+    other_is_str_arr = other == string_array_type
+    operands_are_arrays = self_is_str_arr and other_is_str_arr
+
+    if not (operands_are_arrays
+            or (self_is_str_arr and isinstance(other, types.UnicodeType))
+            or (isinstance(self, types.UnicodeType) and other_is_str_arr)):
+        return None
+
+    if operands_are_arrays:
+        def _sdc_str_arr_operator_comp_binop_impl(self, other):
+            if len(self) != len(other):
+                raise ValueError("Mismatch of String Arrays sizes in operator.comp_binop")
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = out_list[i] = (self[i] < other[i]
+                                             and not (str_arr_is_na(self, i) or str_arr_is_na(other, i)))
+            return out_list
+
+    elif self_is_str_arr:
+        def _sdc_str_arr_operator_comp_binop_impl(self, other):
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] < other and not (str_arr_is_na(self, i)))
+            return out_list
+
+    elif other_is_str_arr:
+        def _sdc_str_arr_operator_comp_binop_impl(self, other):
+            n = len(other)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self < other[i] and not (str_arr_is_na(other, i)))
+            return out_list
+    else:
+        return None
+
+    return _sdc_str_arr_operator_comp_binop_impl

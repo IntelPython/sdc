@@ -1481,7 +1481,7 @@ class TestSeries(TestCase):
 
     @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support Series indexes')
-    def test_series_op7(self):
+    def test_series_op7_int(self):
         """Verifies using all various Series comparison binary operators on two integer Series with various indexes"""
         n = 11
         data_left = [1, 2, -1, 3, 4, 2, -3, 5, 6, 6, 0]
@@ -1503,11 +1503,47 @@ class TestSeries(TestCase):
 
     @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support comparing to inf')
-    def test_series_op7_scalar(self):
+    def test_series_op7_int_scalar(self):
         """Verifies using all various Series comparison binary operators on an integer Series and scalar values"""
         S = pd.Series([1, 2, -1, 3, 4, 2, -3, 5, 6, 6, 0])
 
-        scalar_values = [2, 2.0, -3, np.inf, -np.inf, np.PZERO, np.NZERO]
+        scalar_values = [2, 2.0, -3, np.inf, np.nan, -np.inf, np.PZERO, np.NZERO]
+        comparison_binops = ('<', '>', '<=', '>=', '!=', '==')
+        for operator in comparison_binops:
+            test_impl = _make_func_use_binop1(operator)
+            hpat_func = self.jit(test_impl)
+            for scalar in scalar_values:
+                with self.subTest(left=S, right=scalar, operator=operator):
+                    pd.testing.assert_series_equal(hpat_func(S, scalar), test_impl(S, scalar))
+
+    @skip_sdc_jit('Comparing StringArrays is not implemented in old-pipeline')
+    def test_series_op7_str(self):
+        """Verifies using all various Series comparison binary operators on two string Series with various indexes"""
+        n = 11
+
+        data_left = ['a', ' ', '', 'b', 'bb', 'ccc', None, None, 'ea', 'a', 'eaa']
+        data_right = ['aa', ' ', 'b', 'a', 'b', 'ccc', None, '', 'ea', 'a', 'ea']
+        dtype_to_index = {'None': None,
+                          'int': np.arange(n, dtype='int'),
+                          'float': np.arange(n, dtype='float'),
+                          'string': ['aa', 'aa', '', '', 'b', 'b', 'cccc', None, 'dd', 'ddd', None]}
+
+        comparison_binops = ('<', '>', '<=', '>=', '!=', '==')
+        for operator in comparison_binops:
+            test_impl = _make_func_use_binop1(operator)
+            hpat_func = self.jit(test_impl)
+            for dtype, index_data in dtype_to_index.items():
+                with self.subTest(operator=operator, index_dtype=dtype, index=index_data):
+                    A = pd.Series(data_left, index=index_data)
+                    B = pd.Series(data_right, index=index_data)
+                    pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+
+    @skip_sdc_jit('Comparing StringArrays is not implemented in old-pipeline')
+    def test_series_op7_str_scalar(self):
+        """Verifies using all various Series comparison binary operators on a string Series and scalar values"""
+        S = pd.Series(['a', ' ', '', 'a', 'b', 'bb', '', 'ccc', None, None, 'ea', 'a', 'eaa'])
+
+        scalar_values = ['a', 'c', ' ', 'ef', 'fe']
         comparison_binops = ('<', '>', '<=', '>=', '!=', '==')
         for operator in comparison_binops:
             test_impl = _make_func_use_binop1(operator)
@@ -5762,7 +5798,6 @@ class TestSeries(TestCase):
         self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit
-    @skip_numba_jit("TODO: support arithemetic operations on StringArrays and extend Series.operator.lt overload")
     def test_series_operator_lt_str(self):
         """Verifies implementation of Series.operator.lt between two string Series with default indexes"""
         def test_impl(A, B):
@@ -5782,7 +5817,7 @@ class TestSeries(TestCase):
 
     @skip_sdc_jit("Series.str.istitle is not supported yet")
     @skip_numba_jit("Not work with None and np.nan")
-    def test_series_istitle_str(self):
+    def test_series_istitle_str_fixme(self):
         series = pd.Series(['Cat', 'dog', 'Bird', None, np.nan])
 
         cfunc = self.jit(istitle_usecase)

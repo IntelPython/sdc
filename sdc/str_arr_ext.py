@@ -530,51 +530,46 @@ class SetItemStringArray(AbstractTemplate):
                 and val == string_type):
             return signature(types.none, *args)
 
+if sdc.config.config_pipeline_hpat_default:
+    @infer
+    @infer_global(operator.eq)
+    @infer_global(operator.ne)
+    @infer_global(operator.ge)
+    @infer_global(operator.gt)
+    @infer_global(operator.le)
+    @infer_global(operator.lt)
+    class CmpOpEqStringArray(AbstractTemplate):
+        key = operator.eq
 
-@infer
-@infer_global(operator.eq)
-@infer_global(operator.ne)
-@infer_global(operator.ge)
-@infer_global(operator.gt)
-@infer_global(operator.le)
-@infer_global(operator.lt)
-class CmpOpEqStringArray(AbstractTemplate):
-    key = '=='
+        def generic(self, args, kws):
+            assert not kws
+            [va, vb] = args
+            # if one of the inputs is string array
+            if va == string_array_type or vb == string_array_type:
+                # inputs should be either string array or string
+                assert is_str_arr_typ(va) or va == string_type
+                assert is_str_arr_typ(vb) or vb == string_type
+                return signature(types.Array(types.boolean, 1, 'C'), va, vb)
 
-    def generic(self, args, kws):
-        assert not kws
-        [va, vb] = args
-        # if one of the inputs is string array
-        if va == string_array_type or vb == string_array_type:
-            # inputs should be either string array or string
-            assert is_str_arr_typ(va) or va == string_type
-            assert is_str_arr_typ(vb) or vb == string_type
-            return signature(types.Array(types.boolean, 1, 'C'), va, vb)
+    @infer
+    class CmpOpNEqStringArray(CmpOpEqStringArray):
+        key = '!='
 
+    @infer
+    class CmpOpGEStringArray(CmpOpEqStringArray):
+        key = '>='
 
-@infer
-class CmpOpNEqStringArray(CmpOpEqStringArray):
-    key = '!='
+    @infer
+    class CmpOpGTStringArray(CmpOpEqStringArray):
+        key = '>'
 
+    @infer
+    class CmpOpLEStringArray(CmpOpEqStringArray):
+        key = '<='
 
-@infer
-class CmpOpGEStringArray(CmpOpEqStringArray):
-    key = '>='
-
-
-@infer
-class CmpOpGTStringArray(CmpOpEqStringArray):
-    key = '>'
-
-
-@infer
-class CmpOpLEStringArray(CmpOpEqStringArray):
-    key = '<='
-
-
-@infer
-class CmpOpLTStringArray(CmpOpEqStringArray):
-    key = '<'
+    @infer
+    class CmpOpLTStringArray(CmpOpEqStringArray):
+        key = '<'
 
 
 def is_str_arr_typ(typ):
@@ -1438,3 +1433,13 @@ def append_string_array_to(result, pos, A):
         j += 1
 
     return i
+
+
+@numba.njit(no_cpython_wrapper=True)
+def make_str_arr_from_list(str_list):
+
+    data_total_chars = np.sum(np.asarray([len(s) for s in str_list]))
+    str_arr = pre_alloc_string_array(len(str_list), data_total_chars)
+    cp_str_list_to_array(str_arr, str_list)
+
+    return str_arr
