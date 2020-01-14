@@ -443,7 +443,7 @@ class TestSeriesMethods(TestBase):
         self._test_case(usecase_series_fillna, 'series_fillna')
 
     def test_series_float_isna(self):
-        self._test_case(usecase_series_fillna, 'series_isna')
+        self._test_case(usecase_series_isna, 'series_isna')
 
     def test_series_float_cov(self):
         self._test_series_binary_operations(usecase_series_cov, 'series_cov')
