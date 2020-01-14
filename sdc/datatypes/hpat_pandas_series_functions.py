@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -48,6 +48,8 @@ import sdc
 import sdc.datatypes.common_functions as common_functions
 from sdc.datatypes.common_functions import (TypeChecker, check_index_is_numeric, find_common_dtype_from_numpy_dtypes,
                                             sdc_join_series_indexes)
+from sdc.datatypes.hpat_pandas_rolling_types import (
+    gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
 from sdc.datatypes.hpat_pandas_series_rolling_types import _hpat_pandas_series_rolling_init
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.datatypes.hpat_pandas_getitem_types import SeriesGetitemAccessorType
@@ -1055,137 +1057,10 @@ def hpat_pandas_series_index(self):
         return hpat_pandas_series_index_impl
 
 
-@sdc_overload_method(SeriesType, 'rolling')
-def hpat_pandas_series_rolling(self, window, min_periods=None, center=False,
-                               win_type=None, on=None, axis=0, closed=None):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-    Pandas API: pandas.Series.rolling
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/rolling/series_rolling_min.py
-       :language: python
-       :lines: 27-
-       :caption: Calculate the rolling minimum.
-       :name: ex_series_rolling
-
-    .. command-output:: python ./series/rolling/series_rolling_min.py
-       :cwd: ../../../examples
-
-    .. todo:: Add support of parameters ``center``, ``win_type``, ``on``, ``axis`` and ``closed``
-
-    .. seealso::
-        :ref:`expanding <pandas.Series.expanding>`
-            Provides expanding transformations.
-        :ref:`ewm <pandas.Series.ewm>`
-            Provides exponential weighted functions.
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-
-    Pandas Series attribute :attr:`pandas.Series.rolling` implementation
-    .. only:: developer
-
-    Test: python -m sdc.runtests -k sdc.tests.test_rolling.TestRolling.test_series_rolling
-
-    Parameters
-    ----------
-    series: :obj:`pandas.Series`
-        Input Series.
-    window: :obj:`int` or :obj:`offset`
-        Size of the moving window.
-    min_periods: :obj:`int`
-        Minimum number of observations in window required to have a value.
-    center: :obj:`bool`
-        Set the labels at the center of the window.
-        *unsupported*
-    win_type: :obj:`str`
-        Provide a window type.
-        *unsupported*
-    on: :obj:`str`
-        Column on which to calculate the rolling window.
-        *unsupported*
-    axis: :obj:`int`, :obj:`str`
-        Axis along which the operation acts
-        0/None/'index' - row-wise operation
-        1/'columns'    - column-wise operation
-        *unsupported*
-    closed: :obj:`str`
-        Make the interval closed on the ‘right’, ‘left’, ‘both’ or ‘neither’ endpoints.
-        *unsupported*
-
-    Returns
-    -------
-    :class:`pandas.Series.rolling`
-        Output class to manipulate with input data.
-    """
-
-    ty_checker = TypeChecker('Method rolling().')
-    ty_checker.check(self, SeriesType)
-
-    if not isinstance(window, types.Integer):
-        ty_checker.raise_exc(window, 'int', 'window')
-
-    minp_accepted = (types.Omitted, types.NoneType, types.Integer)
-    if not isinstance(min_periods, minp_accepted) and min_periods is not None:
-        ty_checker.raise_exc(min_periods, 'None, int', 'min_periods')
-
-    center_accepted = (types.Omitted, types.Boolean)
-    if not isinstance(center, center_accepted) and center is not False:
-        ty_checker.raise_exc(center, 'bool', 'center')
-
-    str_types = (types.Omitted, types.NoneType, types.StringLiteral, types.UnicodeType)
-    if not isinstance(win_type, str_types) and win_type is not None:
-        ty_checker.raise_exc(win_type, 'str', 'win_type')
-
-    if not isinstance(on, str_types) and on is not None:
-        ty_checker.raise_exc(on, 'str', 'on')
-
-    axis_accepted = (types.Omitted, types.Integer, types.StringLiteral, types.UnicodeType)
-    if not isinstance(axis, axis_accepted) and axis != 0:
-        ty_checker.raise_exc(axis, 'int, str', 'axis')
-
-    if not isinstance(closed, str_types) and closed is not None:
-        ty_checker.raise_exc(closed, 'str', 'closed')
-
-    nan_minp = isinstance(min_periods, (types.Omitted, types.NoneType)) or min_periods is None
-
-    def hpat_pandas_series_rolling_impl(self, window, min_periods=None, center=False,
-                                        win_type=None, on=None, axis=0, closed=None):
-        if window < 0:
-            raise ValueError('window must be non-negative')
-
-        if nan_minp == True:  # noqa
-            minp = window
-        else:
-            minp = min_periods
-
-        if minp < 0:
-            raise ValueError('min_periods must be >= 0')
-        if minp > window:
-            raise ValueError('min_periods must be <= window')
-
-        if center != False:  # noqa
-            raise ValueError('Method rolling(). The object center\n expected: False')
-
-        if win_type is not None:
-            raise ValueError('Method rolling(). The object win_type\n expected: None')
-
-        if on is not None:
-            raise ValueError('Method rolling(). The object on\n expected: None')
-
-        if axis != 0:
-            raise ValueError('Method rolling(). The object axis\n expected: 0')
-
-        if closed is not None:
-            raise ValueError('Method rolling(). The object closed\n expected: None')
-
-        return _hpat_pandas_series_rolling_init(self, window, minp, center,
-                                                win_type, on, axis, closed)
-
-    return hpat_pandas_series_rolling_impl
+hpat_pandas_series_rolling = sdc_overload_method(SeriesType, 'rolling')(
+    gen_sdc_pandas_rolling_overload_body(_hpat_pandas_series_rolling_init, SeriesType))
+hpat_pandas_series_rolling.__doc__ = sdc_pandas_rolling_docstring_tmpl.format(
+    ty='Series', ty_lower='series')
 
 
 @sdc_overload_attribute(SeriesType, 'size')
