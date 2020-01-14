@@ -765,8 +765,8 @@ def sdc_pandas_dataframe_isin_iter_codegen(df, values, func_name, ser_param):
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _reduce_impl = loc_vars[df_func_name]
-    return _reduce_impl
+    _apply_impl = loc_vars[df_func_name]
+    return _apply_impl
 
 
 def sdc_pandas_dataframe_isin_ser_codegen(func_name, all_params, columns):
@@ -805,9 +805,9 @@ def sdc_pandas_dataframe_isin_ser(df, values, func_name):
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _reduce_impl = loc_vars[df_func_name]
+    _apply_impl = loc_vars[df_func_name]
 
-    return _reduce_impl
+    return _apply_impl
 
 
 def sdc_pandas_dataframe_isin_df_codegen(func_name, values, all_params, columns):
@@ -850,9 +850,9 @@ def sdc_pandas_dataframe_isin_df(df, values, func_name):
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _reduce_impl = loc_vars[df_func_name]
+    _apply_impl = loc_vars[df_func_name]
 
-    return _reduce_impl
+    return _apply_impl
 
 
 @sdc_overload_method(DataFrameType, 'isin')
