@@ -38,15 +38,6 @@ from .test_perf_base import TestBase
 from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 
-# class Test_min:
-#     def __init__(self, res):
-#         self.res = res
-#
-#     def usecase_series_min(self):
-#         start_time = time.time()
-#         finish_time = time.time()
-#
-#         return finish_time - start_time, self.res
 
 
 def usecase_series_min(input_data):
@@ -279,13 +270,22 @@ def usecase_series_cov(A, B):
     return res_time, res
 
 
+def usecase_series_corr(A, B):
+    start_time = time.time()
+    res = A.corr(B)
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods
 class TestSeriesMethods(TestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.total_data_length = {
-            'series_min': [10 ** 9],
+            'series_min': [10 ** 7],
             'series_max': [10 ** 9],
             'series_abs': [3 * 10 ** 8],
             'series_value_counts': [3 * 10 ** 5],
@@ -312,7 +312,8 @@ class TestSeriesMethods(TestBase):
             'series_astype_int': [2 * 10 ** 7],
             'series_fillna': [2 * 10 ** 7],
             'series_isna': [2 * 10 ** 7],
-            'series_cov': [10 ** 8]
+            'series_cov': [10 ** 8],
+            'series_corr': [10 ** 7]
         }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
@@ -458,3 +459,6 @@ class TestSeriesMethods(TestBase):
 
     def test_series_float_cov(self):
         self._test_series_binary_operations(usecase_series_cov, 'series_cov')
+
+    def test_series_float_corr(self):
+        self._test_series_binary_operations(usecase_series_corr, 'series_corr')
