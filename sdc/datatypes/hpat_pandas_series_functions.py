@@ -1265,12 +1265,12 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
         arr_len = len(self._data)
 
         # Get total chars for new array
-        for i in numba.parfor.internal_prange(arr_len):
+        for i in prange(arr_len):
             item = self._data[i]
             num_chars += len(str(item))  # TODO: check NA
 
         data = sdc.str_arr_ext.pre_alloc_string_array(arr_len, num_chars)
-        for i in numba.parfor.internal_prange(arr_len):
+        for i in prange(arr_len):
             item = self._data[i]
             data[i] = str(item)  # TODO: check NA
 
@@ -4442,7 +4442,7 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
                 n = len(self._data)
                 num_chars = 0
                 # get total chars in new array
-                for i in numba.parfor.internal_prange(n):
+                for i in prange(n):
                     s = self._data[i]
                     if sdc.hiframes.api.isna(self._data, i):
                         num_chars += len(value)
@@ -4450,7 +4450,7 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
                         num_chars += len(s)
 
                 filled_data = sdc.str_arr_ext.pre_alloc_string_array(n, num_chars)
-                for i in numba.parfor.internal_prange(n):
+                for i in prange(n):
                     if sdc.hiframes.api.isna(self._data, i):
                         filled_data[i] = value
                     else:
