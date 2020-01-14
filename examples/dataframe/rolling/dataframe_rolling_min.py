@@ -24,25 +24,18 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from numba.extending import intrinsic, register_model
-from sdc.datatypes.hpat_pandas_rolling_types import (
-    gen_hpat_pandas_rolling_init, RollingType, RollingTypeModel)
+import pandas as pd
+from numba import njit
 
 
-class SeriesRollingType(RollingType):
-    """Type definition for pandas.Series.rolling functions handling."""
-    def __init__(self, data, win_type=None, on=None, closed=None):
-        super(SeriesRollingType, self).__init__('SeriesRollingType',
-                                                data, win_type=win_type,
-                                                on=on, closed=closed)
+@njit
+def df_rolling_min():
+    df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
+    out_df = df.rolling(3).min()
+
+    # Expect DataFrame of
+    # {'A': [NaN, NaN, 3.0, 2.0, 2.0], 'B': [NaN, NaN, -5.0, -5.0, -6.0]}
+    return out_df
 
 
-@register_model(SeriesRollingType)
-class SeriesRollingTypeModel(RollingTypeModel):
-    """Model for SeriesRollingType type."""
-    def __init__(self, dmm, fe_type):
-        super(SeriesRollingTypeModel, self).__init__(dmm, fe_type)
-
-
-_hpat_pandas_series_rolling_init = intrinsic(gen_hpat_pandas_rolling_init(
-    SeriesRollingType))
+print(df_rolling_min())
