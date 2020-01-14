@@ -138,7 +138,7 @@ def hpat_arrays_append(A, B):
     pass
 
 
-@sdc_overload(hpat_arrays_append, jit_options={'parallel':False})
+@sdc_overload(hpat_arrays_append, jit_options={'parallel': False})
 def hpat_arrays_append_overload(A, B):
     """Function for appending underlying arrays (A and B) or list/tuple of arrays B to an array A"""
 
@@ -289,7 +289,7 @@ def sdc_join_series_indexes(left, right):
     pass
 
 
-@sdc_overload(sdc_join_series_indexes, jit_options={'parallel':False})
+@sdc_overload(sdc_join_series_indexes, jit_options={'parallel': False})
 def sdc_join_series_indexes_overload(left, right):
     """Function for joining arrays left and right in a way similar to pandas.join 'outer' algorithm"""
 
@@ -515,7 +515,7 @@ def sdc_check_indexes_equal(left, right):
     pass
 
 
-@sdc_overload(sdc_check_indexes_equal, jit_options={'parallel':False})
+@sdc_overload(sdc_check_indexes_equal, jit_options={'parallel': False})
 def sdc_check_indexes_equal_overload(A, B):
     """Function for checking arrays A and B of the same type are equal"""
 
