@@ -407,7 +407,7 @@ class TestSeriesMethods(TestBase):
         self._test_case(usecase_series_quantile, 'series_quantile')
 
     def test_series_float_mean(self):
-        self._test_case(usecase_series_quantile, 'series_mean')
+        self._test_case(usecase_series_mean, 'series_mean')
 
     def test_series_float_unique(self):
         self._test_case(usecase_series_unique, 'series_unique')
