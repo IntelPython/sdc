@@ -305,12 +305,13 @@ def sdc_pandas_dataframe_apply_columns(df, func_name, params, ser_params):
     all_params = ['df']
     ser_par = []
 
-    for key, value in params.items():
-        all_params.append('{}={}'.format(key, value))
-    for key, value in ser_params.items():
-        ser_par.append('{}={}'.format(key, value))
+    def params2list(params):
+        return ['{}={}'.format(k, v) for k, v in params.items()]
 
-    s_par = '{}'.format(', '.join(ser_par[:]))
+    all_params = ['df'] + params2list(params)
+    ser_par = params2list(ser_params)
+
+    s_par = ', '.join(ser_par)
 
     df_func_name = f'_df_{func_name}_impl'
 
@@ -318,9 +319,9 @@ def sdc_pandas_dataframe_apply_columns(df, func_name, params, ser_params):
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _reduce_impl = loc_vars[df_func_name]
+    _apply_impl = loc_vars[df_func_name]
 
-    return _reduce_impl
+    return _apply_impl
 
 
 def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, ddof=1, min_count=0):
@@ -737,17 +738,6 @@ def sdc_pandas_dataframe_isin_ser_codegen(df, values, func_name):
             f'      result.append(False)',
             f'  {result_c} = pandas.Series(result)'
         ]
-        # not work with index, index=none
-        # func_lines += [
-        #     f'  series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
-        #     f'  result = []',
-        #     f'  for i in series_{c}._index:',
-        #     f'    if series_{c}[i] == values[i]:',
-        #     f'      result.append(True)',
-        #     f'    else:',
-        #     f'      result.append(False)',
-        #     f'  {result_c} = pandas.Series(result, index=series_{c}._index)'
-        # ]
         result_name.append((result_c, c))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
@@ -803,7 +793,7 @@ def sdc_pandas_dataframe_isin_df_codegen(df, values, func_name):
     return _reduce_impl
 
 
-@overload_method(DataFrameType, 'isin')
+@sdc_overload_method(DataFrameType, 'isin')
 def isin_overload(df, values):
     """
     Pandas DataFrame method :meth:`pandas.DataFrame.isin` implementation.
