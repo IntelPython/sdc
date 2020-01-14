@@ -37,7 +37,7 @@ import sdc
 import copy
 
 from numba import types
-from numba.extending import (overload, overload_method, overload_attribute)
+from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.str_arr_ext import StringArrayType
 
@@ -342,7 +342,7 @@ def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, 
         ty_checker.raise_exc(min_count, 'unsupported', 'min_count')
 
 
-@overload_method(DataFrameType, 'median')
+@sdc_overload_method(DataFrameType, 'median')
 def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.median` implementation.
@@ -380,7 +380,7 @@ def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'mean')
+@sdc_overload_method(DataFrameType, 'mean')
 def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.mean` implementation.
@@ -424,7 +424,7 @@ sdc_pandas_dataframe_rolling.__doc__ = sdc_pandas_rolling_docstring_tmpl.format(
     ty='DataFrame', ty_lower='dataframe')
 
 
-@overload_method(DataFrameType, 'std')
+@sdc_overload_method(DataFrameType, 'std')
 def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.std` implementation.
@@ -464,7 +464,7 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'var')
+@sdc_overload_method(DataFrameType, 'var')
 def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.var` implementation.
@@ -504,7 +504,7 @@ def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'max')
+@sdc_overload_method(DataFrameType, 'max')
 def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.max` implementation.
@@ -542,7 +542,7 @@ def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'min')
+@sdc_overload_method(DataFrameType, 'min')
 def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.min` implementation.
@@ -580,7 +580,7 @@ def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'sum')
+@sdc_overload_method(DataFrameType, 'sum')
 def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.sum` implementation.
@@ -620,7 +620,7 @@ def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'prod')
+@sdc_overload_method(DataFrameType, 'prod')
 def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.prod` implementation.
@@ -660,7 +660,7 @@ def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'count')
+@sdc_overload_method(DataFrameType, 'count')
 def count_overload(df, axis=0, level=None, numeric_only=False):
     """
     Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.
@@ -878,7 +878,7 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
     return sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns)
 
 
-@overload_method(DataFrameType, 'pct_change')
+@sdc_overload_method(DataFrameType, 'pct_change')
 def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None):
     """
     Pandas DataFrame method :meth:`pandas.DataFrame.pct_change` implementation.
