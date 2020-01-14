@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,25 +24,28 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from numba.extending import intrinsic, register_model
-from sdc.datatypes.hpat_pandas_rolling_types import (
-    gen_hpat_pandas_rolling_init, RollingType, RollingTypeModel)
+import pandas as pd
+from numba import njit
 
 
-class SeriesRollingType(RollingType):
-    """Type definition for pandas.Series.rolling functions handling."""
-    def __init__(self, data, win_type=None, on=None, closed=None):
-        super(SeriesRollingType, self).__init__('SeriesRollingType',
-                                                data, win_type=win_type,
-                                                on=on, closed=closed)
+@njit
+def dataframe_pct_change():
+    df = pd.DataFrame({"A": [14, 4, 5, 4, 1, 55],
+                       "B": [5, 2, 54, 3, 2, 32],
+                       "C": [20, 20, 7, 21, 8, 5],
+                       "D": [14, 3, 6, 2, 6, 4]})
+    out_df = df.pct_change()
+
+    return out_df
+
+# result DataFrame
+#            A          B         C         D
+# 0        NaN        NaN       NaN       NaN
+# 1  -0.714286  -0.600000  0.000000 -0.785714
+# 2   0.250000  26.000000 -0.650000  1.000000
+# 3  -0.200000  -0.944444  2.000000 -0.666667
+# 4  -0.750000  -0.333333 -0.619048  2.000000
+# 5  54.000000  15.000000 -0.375000 -0.333333
 
 
-@register_model(SeriesRollingType)
-class SeriesRollingTypeModel(RollingTypeModel):
-    """Model for SeriesRollingType type."""
-    def __init__(self, dmm, fe_type):
-        super(SeriesRollingTypeModel, self).__init__(dmm, fe_type)
-
-
-_hpat_pandas_series_rolling_init = intrinsic(gen_hpat_pandas_rolling_init(
-    SeriesRollingType))
+print(dataframe_pct_change())
