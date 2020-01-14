@@ -38,8 +38,6 @@ from .test_perf_base import TestBase
 from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 
-
-
 def usecase_series_min(input_data):
     start_time = time.time()
     res = input_data.min()
@@ -285,7 +283,7 @@ class TestSeriesMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
         cls.total_data_length = {
-            'series_min': [10 ** 7],
+            'series_min': [10 ** 9],
             'series_max': [10 ** 9],
             'series_abs': [3 * 10 ** 8],
             'series_value_counts': [3 * 10 ** 5],
@@ -313,7 +311,7 @@ class TestSeriesMethods(TestBase):
             'series_fillna': [2 * 10 ** 7],
             'series_isna': [2 * 10 ** 7],
             'series_cov': [10 ** 8],
-            'series_corr': [10 ** 7]
+            'series_corr': [10 ** 7],
         }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
