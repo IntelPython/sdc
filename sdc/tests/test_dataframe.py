@@ -1069,40 +1069,10 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
 
-    def test_isin_df1(self):
-        def test_impl(df, df2):
-            return df.isin(df2)
-
-        hpat_func = self.jit(test_impl)
-        n = 11
-        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
-        df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n)**2})
-        df2.A[n // 2:] = n
-        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
-
-    def test_isin_df2(self):
-        def test_impl(df, df2):
-            return df.isin(df2)
-
-        hpat_func = self.jit(test_impl)
-        df = pd.DataFrame({'A': np.arange(11), 'B': np.arange(11)**2})
-        df2 = pd.DataFrame({})
-        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
-
     @unittest.skip("needs dict typing in Numba")
     def test_isin_dict1(self):
         def test_impl(df):
             vals = {'A': (2., 3., 4.), 'C': (4., 5., 6.)}
-            return df.isin(vals)
-
-        hpat_func = self.jit(test_impl)
-        n = 11
-        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
-
-    def test_isin_list1(self):
-        def test_impl(df):
-            vals = [2, 3, 4]
             return df.isin(vals)
 
         hpat_func = self.jit(test_impl)
@@ -1121,15 +1091,19 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    def test_isin_set1(self):
-        def test_impl(df):
-            vals = values = {1, 2, 5, 7, 8}
+    def test_isin(self):
+        def test_impl(df, vals):
             return df.isin(vals)
 
         hpat_func = self.jit(test_impl)
         n = 11
-        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2})
+        df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n) ** 2})
+        df2.A[n // 2:] = n
+        values = [{1, 2, 5, 7, 8}, [2, 3, 4], pd.DataFrame({}), df2]
+        for val in values:
+            with self.subTest(val=val):
+                pd.testing.assert_frame_equal(hpat_func(df, val), test_impl(df, val))
 
     @skip_numba_jit
     def test_append_df_same_cols_no_index(self):

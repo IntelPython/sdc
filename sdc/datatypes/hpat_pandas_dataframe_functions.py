@@ -769,14 +769,11 @@ def sdc_pandas_dataframe_isin_iter_codegen(df, values, func_name, ser_param):
     return _reduce_impl
 
 
-def sdc_pandas_dataframe_isin_ser_codegen(df, values, func_name):
-    all_params = ['df', 'values']
-    df_func_name = f'_df_{func_name}_impl'
-
+def sdc_pandas_dataframe_isin_ser_codegen(func_name, all_params, columns):
     result_name = []
     joined = ', '.join(all_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
-    for i, c in enumerate(df.columns):
+    for i, c in enumerate(columns):
         result_c = f'result_{c}'
         func_lines += [
             f'  series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
@@ -797,6 +794,15 @@ def sdc_pandas_dataframe_isin_ser_codegen(df, values, func_name):
     global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
 
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_isin_ser(df, values, func_name):
+    all_params = ['df', 'values']
+    df_func_name = f'_df_{func_name}_impl'
+
+    func_text, global_vars = sdc_pandas_dataframe_isin_ser_codegen(func_name, all_params, df.columns)
+
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
@@ -804,14 +810,11 @@ def sdc_pandas_dataframe_isin_ser_codegen(df, values, func_name):
     return _reduce_impl
 
 
-def sdc_pandas_dataframe_isin_df_codegen(df, values, func_name):
-    all_params = ['df', 'values']
-    df_func_name = f'_df_{func_name}_impl'
-
+def sdc_pandas_dataframe_isin_df_codegen(func_name, values, all_params, columns):
     result_name = []
     joined = ', '.join(all_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
-    for i, c in enumerate(df.columns):
+    for i, c in enumerate(columns):
         result_c = f'result_{c}'
         func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))']
         if c in values.columns:
@@ -835,6 +838,15 @@ def sdc_pandas_dataframe_isin_df_codegen(df, values, func_name):
 
     global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_isin_df(df, values, func_name):
+    all_params = ['df', 'values']
+    df_func_name = f'_df_{func_name}_impl'
+
+    func_text, global_vars = sdc_pandas_dataframe_isin_df_codegen(func_name, values, all_params, df.columns)
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
@@ -877,7 +889,7 @@ def isin_overload(df, values):
         return sdc_pandas_dataframe_isin_iter_codegen(df, values, name, ser_par)
 
     if isinstance(values, SeriesType):
-        return sdc_pandas_dataframe_isin_ser_codegen(df, values, name)
+        return sdc_pandas_dataframe_isin_ser(df, values, name)
 
     if isinstance(values, DataFrameType):
-        return sdc_pandas_dataframe_isin_df_codegen(df, values, name)
+        return sdc_pandas_dataframe_isin_df(df, values, name)
