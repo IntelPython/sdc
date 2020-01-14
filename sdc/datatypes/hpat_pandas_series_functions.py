@@ -1683,7 +1683,7 @@ def hpat_pandas_series_head(self, n=5):
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
 
-    Pandas API: pandas.Series.div
+    Pandas API: pandas.Series.head
 
     Examples
     --------
@@ -1694,8 +1694,7 @@ def hpat_pandas_series_head(self, n=5):
        :name: ex_series_head
 
     .. command-output:: python ./series/series_head.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. seealso::
 
@@ -1826,12 +1825,11 @@ def hpat_pandas_series_isnull(self):
        :name: ex_series_isnull
 
     .. command-output:: python ./series/series_isnull.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
-    Pandas Series method :meth:`pandas.Series.isna` and :meth:`pandas.Series.isnull` implementation.
+    Pandas Series method :meth:`pandas.Series.isnull` implementation.
 
     .. only:: developer
 
@@ -1892,8 +1890,7 @@ def hpat_pandas_series_isna(self):
        :name: ex_series_isna
 
     .. command-output:: python ./series/series_isna.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. seealso::
 
@@ -1911,7 +1908,7 @@ def hpat_pandas_series_isna(self):
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
-    Pandas Series method :meth:`pandas.Series.isna` and :meth:`pandas.Series.isnull` implementation.
+    Pandas Series method :meth:`pandas.Series.isna` implementation.
 
     .. only:: developer
 
@@ -1972,8 +1969,7 @@ def hpat_pandas_series_notna(self):
        :name: ex_series_notna
 
     .. command-output:: python ./series/series_notna.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. seealso::
 
@@ -2005,7 +2001,7 @@ def hpat_pandas_series_notna(self):
     Returns
     -------
     :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
+        returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method notna().'
@@ -2044,8 +2040,7 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
        :name: ex_series_ne
 
     .. command-output:: python ./series/series_ne.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. note::
 
@@ -2429,8 +2424,7 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=True):
        :name: ex_series_idxmax
 
     .. command-output:: python ./series/series_idxmax.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. note::
 
@@ -2868,8 +2862,7 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
        :name: ex_series_pow
 
     .. command-output:: python ./series/series_pow.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. note::
 
@@ -3153,8 +3146,7 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
        :name: ex_series_min
 
     .. command-output:: python ./series/series_min.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. note::
 
@@ -3477,8 +3469,7 @@ def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
        :name: ex_series_eq
 
     .. command-output:: python ./series/series_mod.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. note::
 
@@ -3556,8 +3547,7 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
        :name: ex_series_ge
 
     .. command-output:: python ./series/series_ge.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. note::
 
@@ -3635,8 +3625,7 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True):
        :name: ex_series_idxmin
 
     .. command-output:: python ./series/series_idxmin.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. note::
 
@@ -3722,8 +3711,7 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
        :name: ex_series_lt
 
     .. command-output:: python ./series/series_lt.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. note::
 
@@ -3801,8 +3789,7 @@ def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
        :name: ex_series_gt
 
     .. command-output:: python ./series/series_gt.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. note::
 
@@ -3880,8 +3867,7 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
        :name: ex_series_le
 
     .. command-output:: python ./series/series_le.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. note::
 
@@ -4340,8 +4326,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
        :name: ex_series_argsort
 
     .. command-output:: python ./series/series_argsort.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. note::
 
@@ -4474,8 +4459,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
        :name: ex_series_sort_values
 
     .. command-output:: python ./series/series_sort_values.py
-
-        :cwd: ../../../examples
+       :cwd: ../../../examples
 
     .. note::
 
