@@ -1162,21 +1162,22 @@ def lower_isin_dummy(context, builder, sig, args):
     return out_obj._getvalue()
 
 
-@overload_method(DataFrameType, 'append')
-def append_overload(df, other, ignore_index=False, verify_integrity=False,
-                    sort=None):
-    if isinstance(other, DataFrameType):
-        return (lambda df, other, ignore_index=False, verify_integrity=False,
-                sort=None: pd.concat((df, other)))
+if sdc.config.config_pipeline_hpat_default:
+    @overload_method(DataFrameType, 'append')
+    def append_overload(df, other, ignore_index=False, verify_integrity=False,
+                        sort=None):
+        if isinstance(other, DataFrameType):
+            return (lambda df, other, ignore_index=False, verify_integrity=False,
+                    sort=None: pd.concat((df, other)))
 
-    # TODO: tuple case
-    # TODO: non-homogenous build_list case
-    if isinstance(other, types.List) and isinstance(other.dtype, DataFrameType):
-        return (lambda df, other, ignore_index=False, verify_integrity=False,
-                sort=None: pd.concat([df] + other))
+        # TODO: tuple case
+        # TODO: non-homogenous build_list case
+        if isinstance(other, types.List) and isinstance(other.dtype, DataFrameType):
+            return (lambda df, other, ignore_index=False, verify_integrity=False,
+                    sort=None: pd.concat([df] + other))
 
-    raise ValueError("invalid df.append() input. Only dataframe and list"
-                     " of dataframes supported")
+        raise ValueError("invalid df.append() input. Only dataframe and list"
+                         " of dataframes supported")
 
 
 @overload_method(DataFrameType, 'pct_change')
