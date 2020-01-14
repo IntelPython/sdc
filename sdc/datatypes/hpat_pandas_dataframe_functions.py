@@ -708,7 +708,7 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'pct_change')
+@sdc_overload_method(DataFrameType, 'pct_change')
 def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None):
     """
     Pandas DataFrame method :meth:`pandas.DataFrame.pct_change` implementation.
