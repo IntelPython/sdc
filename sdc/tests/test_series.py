@@ -1296,25 +1296,6 @@ class TestSeries(TestCase):
             hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
-    def test_series_slice_nonidx_nostart(self):
-        def test_impl(A):
-            return A.loc[-4:301]
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([2, 4, 6, 6, 3], [-22, -5, -2, 300, 40000])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-
-    @skip_sdc_jit('Not impl in old style')
-    def test_series_slice(self):
-        def test_impl(A):
-            return A.loc[1:5]
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([2, 4, 6, 6, 3], [1, 3, 5, 13, 22])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_sdc_jit('Not impl in old style')
     def test_series_slice_loc_start(self):
         def test_impl(A, n):
             return A.loc[n:]
@@ -1324,23 +1305,24 @@ class TestSeries(TestCase):
         key = [1, 3, 18]
         for index in all_data:
             for n in key:
-                S = pd.Series([2, 4, 6, 6, 3], index)
-                print(index, n)
-                pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
+                with self.subTest(index=index, start=n):
+                    S = pd.Series([2, 4, 6, 6, 3], index)
+                    pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
 
     @skip_sdc_jit('Not impl in old style')
     def test_series_slice_loc_stop(self):
-        def test_impl(A, n):
-            return A.loc[:n]
+        def test_impl(A, k, n):
+            return A.loc[k:n]
         hpat_func = self.jit(test_impl)
 
         all_data = [[1, 3, 5, 13, 22], [1, 3, 3, 13, 22], [22, 13, 5, 3, 1], [100, 3, 0, -3, -3]]
         key = [1, 3, 18]
         for index in all_data:
+            k = index[0]
             for n in key:
-                S = pd.Series([2, 4, 6, 6, 3], index)
-                print(index, n)
-                pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
+                with self.subTest(index=index, start=k, stop=n):
+                    S = pd.Series([2, 4, 6, 6, 3], index)
+                    pd.testing.assert_series_equal(hpat_func(S, k, n), test_impl(S, k, n))
 
     @skip_sdc_jit('Not impl in old style')
     def test_series_slice_loc_start_stop(self):
@@ -1351,10 +1333,11 @@ class TestSeries(TestCase):
         all_data = [[1, 3, 5, 13, 22], [1, 3, 3, 13, 22], [22, 13, 5, 3, 1], [100, 3, 0, -3, -3]]
         key = [1, 3, 18]
         for index in all_data:
-            for n in key:
-                for k in key[::-1]:
+            for data_left, data_right in combinations_with_replacement(key, 2):
+                with self.subTest(index=index, left=data_left, right=data_right):
                     S = pd.Series([2, 4, 6, 6, 3], index)
-                    pd.testing.assert_series_equal(hpat_func(S, n, k), test_impl(S, n, k))
+                    pd.testing.assert_series_equal(hpat_func(S, data_left, data_right),
+                                                   test_impl(S, data_left, data_right))
 
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support comparing Series of different lengths')
     def test_series_op1_integer(self):

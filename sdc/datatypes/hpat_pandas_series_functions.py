@@ -123,6 +123,8 @@ def hpat_pandas_series_accessor_getitem(self, idx):
         # Note: Loc return Series
         # Note: Index 0 in slice not supported
         # Note: Loc slice and callable with String not implement
+        min_int64 = numpy.iinfo('int64').min
+        max_int64 = numpy.iinfo('int64').max
         index_is_none = (self.series.index is None or
                          isinstance(self.series.index, numba.types.misc.NoneType))
         if isinstance(idx, types.SliceType) and not index_is_none:
@@ -133,17 +135,19 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                 stop_position = 0
                 max_diff = 0
                 min_diff = 0
+                start_position_inc = len(index)
+                start_position_dec = len(index)
+                stop_position_inc = 0
+                stop_position_dec = 0
                 for i in numba.prange(len(index)):
-                    if idx.start <= idx.stop:
-                        start_cmp = index[i] >= idx.start
-                        stop_cmp = index[i] <= idx.stop
-                    else:
-                        start_cmp = index[i] <= idx.start
-                        stop_cmp = index[i] >= idx.stop
-                    if start_cmp:
-                        start_position = min(start_position, i)
-                    if stop_cmp:
-                        stop_position = max(stop_position, i)
+                    if index[i] >= idx.start:
+                        start_position_inc = min(start_position_inc, i)
+                    if index[i] <= idx.start:
+                        start_position_dec = min(start_position_dec, i)
+                    if index[i] <= idx.stop:
+                        stop_position_inc = max(stop_position_inc, i)
+                    if index[i] >= idx.stop:
+                        stop_position_dec = max(stop_position_dec, i)
                     if i > 0:
                         max_diff = max(max_diff, index[i] - index[i - 1])
                         min_diff = min(min_diff, index[i] - index[i - 1])
@@ -151,12 +155,17 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                 if max_diff*min_diff < 0:
                     raise ValueError("Index must be monotonic increasing or decreasing")
 
-                if stop_position < len(index):
-                    stop_position += 1
-                print(start_position, stop_position)
+                if max_diff > 0:
+                    start_position = start_position_inc
+                    stop_position = stop_position_inc
+                else:
+                    start_position = start_position_dec
+                    stop_position = stop_position_dec if idx.stop != max_int64 else len(index)
+                    
+                stop_position = min(stop_position + 1, len(index))
+
                 if (
                     start_position >= len(index) or stop_position <= 0 or stop_position <= start_position
-                    or idx.start >= idx.stop
                 ):
                     return pandas.Series(data=series._data[:0], index=series._index[:0], name=series._name)
 
