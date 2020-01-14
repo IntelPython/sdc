@@ -268,9 +268,19 @@ def usecase_series_cov(A, B):
     return res_time, res
 
 
+
 def usecase_series_append(A, B):
     start_time = time.time()
     res = A.append(B)
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
+def usecase_series_corr(A, B):
+    start_time = time.time()
+    res = A.corr(B)
     finish_time = time.time()
     res_time = finish_time - start_time
 
@@ -312,6 +322,7 @@ class TestSeriesMethods(TestBase):
             'series_isna': [2 * 10 ** 7],
             'series_cov': [10 ** 8],
             'series_append': [10 ** 7],
+            'series_corr': [10 ** 7],
         }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
@@ -460,3 +471,6 @@ class TestSeriesMethods(TestBase):
 
     def test_series_float_append(self):
         self._test_series_binary_operations(usecase_series_append, 'series_append')
+
+    def test_series_float_corr(self):
+        self._test_series_binary_operations(usecase_series_corr, 'series_corr')
