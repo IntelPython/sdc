@@ -1261,15 +1261,16 @@ class TestSeries(TestCase):
     @skip_sdc_jit('Not impl in old style')
     def test_series_loc_callable(self):
         def test_impl(S):
-            return S.loc[(lambda a: a)]
+            return S.loc[lambda a: a ** 2]
         hpat_func = self.jit(test_impl)
         S = pd.Series([0, 6, 4, 7, 8], [0, 6, 66, 6, 8])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.skip('Loc callable return float Series')
+    # Loc callable return float Series
+    @unittest.expectedFailure
     def test_series_loc_callable2(self):
         def test_impl(S):
-            return S.loc[(lambda a: a)]
+            return S.loc[lambda a: a]
         hpat_func = self.jit(test_impl)
         S = pd.Series([0, 6, 8, 8, 8], [0, 6, 66, 6, 8])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))

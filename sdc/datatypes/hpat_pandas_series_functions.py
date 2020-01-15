@@ -167,8 +167,8 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
         return hpat_pandas_series_loc_callable_impl
 
-        raise TypingError('{} The index must be an Number, Slice, String, List, Array or a callable.\
-                          Given: {}'.format(_func_name, idx))
+    raise TypingError('{} The index must be an Number, Slice, String, List, Array or a callable.\
+                      Given: {}'.format(_func_name, idx))
 
     if accessor == 'at':
         if isinstance(idx, (int, types.Integer, types.UnicodeType, types.StringLiteral)):
