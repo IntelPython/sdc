@@ -277,6 +277,15 @@ def usecase_series_corr(A, B):
     return res_time, res
 
 
+def usecase_series_pct_change(input_data):
+    start_time = time.time()
+    res = input_data.pct_change(periods=1, limit=None, freq=None)
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods
 class TestSeriesMethods(TestBase):
     @classmethod
@@ -312,6 +321,7 @@ class TestSeriesMethods(TestBase):
             'series_isna': [2 * 10 ** 7],
             'series_cov': [10 ** 8],
             'series_corr': [10 ** 7],
+            'series_pct_change': [10 ** 7],
         }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
@@ -460,3 +470,6 @@ class TestSeriesMethods(TestBase):
 
     def test_series_float_corr(self):
         self._test_series_binary_operations(usecase_series_corr, 'series_corr')
+
+    def test_series_float_pct_change(self):
+        self._test_case(usecase_series_pct_change, 'series_pct_change')
