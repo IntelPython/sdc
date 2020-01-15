@@ -123,6 +123,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
         # Note: Loc return Series
         # Note: Index 0 in slice not supported
         # Note: Loc slice and callable with String not implement
+        series_dtype = self.series.data.dtype
         index_is_none = (self.series.index is None or
                          isinstance(self.series.index, numba.types.misc.NoneType))
         if isinstance(idx, types.SliceType) and index_is_none:
@@ -137,6 +138,24 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                 return pandas.Series(result_data, result_index, self._series._name)
 
             return hpat_pandas_series_loc_slice_noidx_impl
+
+        if isinstance(idx, (types.Array, types.List)):
+            def hpat_pandas_series_loc_array_impl(self, idx):
+                index = self._series.index
+                data = self._series._data
+                size = len(index)
+                data_res = []
+                index_res = []
+                for value in idx:
+                    mask = numpy.zeros(shape=size, dtype=numpy.bool_)
+                    for i in numba.prange(size):
+                        mask[i] = index[i] == value
+                    data_res.extend(data[mask])
+                    index_res.extend(index[mask])
+
+                return pandas.Series(data=data_res, index=index_res, name=self._series._name)
+
+            return hpat_pandas_series_loc_array_impl
 
         if isinstance(idx, (int, types.Integer, types.UnicodeType, types.StringLiteral)):
             def hpat_pandas_series_loc_impl(self, idx):
