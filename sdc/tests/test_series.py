@@ -1264,8 +1264,10 @@ class TestSeries(TestCase):
         hpat_func = self.jit(test_impl)
 
         S = pd.Series([1, 2, 4, 8, 6, 0], [1, 2, 4, 0, 6, 0])
-        n = np.array([0, 4, 2])
-        pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
+        n = [0, 4, 2]
+        cases = [n, np.array(n)]
+        for n in cases:
+            pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
 
     @skip_sdc_jit('Not impl in old style')
     def test_series_at_str(self):
