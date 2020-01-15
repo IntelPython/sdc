@@ -123,7 +123,6 @@ def hpat_pandas_series_accessor_getitem(self, idx):
         # Note: Loc return Series
         # Note: Index 0 in slice not supported
         # Note: Loc slice and callable with String not implement
-        series_dtype = self.series.data.dtype
         index_is_none = (self.series.index is None or
                          isinstance(self.series.index, numba.types.misc.NoneType))
         if isinstance(idx, types.SliceType) and index_is_none:
