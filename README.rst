@@ -103,7 +103,7 @@ Building on Linux with setuptools
 ::
 
     PYVER=<3.6 or 3.7>
-    conda create -n SDC -q -y -c numba -c conda-forge -c defaults numba mpich pyarrow=0.15.0 arrow-cpp=0.15.0 gcc_linux-64 gxx_linux-64 gfortran_linux-64 scipy pandas boost python=$PYVER
+    conda create -n SDC -q -y -c numba -c defaults -c conda-forge python=$PYVER numba pandas scipy mpich pyarrow=0.15.1 gcc_linux-64 gxx_linux-64
     source activate SDC
     git clone https://github.com/IntelPython/sdc
     cd sdc
