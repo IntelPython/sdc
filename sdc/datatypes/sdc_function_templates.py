@@ -38,7 +38,6 @@ import operator
 import pandas
 
 from numba.errors import TypingError
-from numba.extending import overload, overload_method, overload_attribute
 from numba import types
 
 import sdc
@@ -47,6 +46,7 @@ from sdc.datatypes.common_functions import (check_index_is_numeric, find_common_
                                             sdc_join_series_indexes, sdc_check_indexes_equal, check_types_comparable)
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_arr_ext import (string_array_type, num_total_chars, str_arr_is_na)
+from sdc.utils import sdc_overload
 
 
 def sdc_pandas_series_operator_binop(self, other):
