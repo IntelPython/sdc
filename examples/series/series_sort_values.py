@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,25 +24,25 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from numba.extending import intrinsic, register_model
-from sdc.datatypes.hpat_pandas_rolling_types import (
-    gen_hpat_pandas_rolling_init, RollingType, RollingTypeModel)
+import numpy as np
+import pandas as pd
+from numba import njit
 
 
-class SeriesRollingType(RollingType):
-    """Type definition for pandas.Series.rolling functions handling."""
-    def __init__(self, data, win_type=None, on=None, closed=None):
-        super(SeriesRollingType, self).__init__('SeriesRollingType',
-                                                data, win_type=win_type,
-                                                on=on, closed=closed)
+@njit
+def series_sort_values():
+    """
+    Expect Series
+    1   -10.0
+    3     0.0
+    0     3.0
+    4    92.0
+    2     NaN
+    dtype: float64
+    """
+    series = pd.Series([3, -10, np.nan, 0, 92])
+
+    return series.sort_values()
 
 
-@register_model(SeriesRollingType)
-class SeriesRollingTypeModel(RollingTypeModel):
-    """Model for SeriesRollingType type."""
-    def __init__(self, dmm, fe_type):
-        super(SeriesRollingTypeModel, self).__init__(dmm, fe_type)
-
-
-_hpat_pandas_series_rolling_init = intrinsic(gen_hpat_pandas_rolling_init(
-    SeriesRollingType))
+print(series_sort_values())
