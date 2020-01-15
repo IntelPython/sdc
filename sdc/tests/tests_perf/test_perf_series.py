@@ -277,6 +277,51 @@ def usecase_series_corr(A, B):
     return res_time, res
 
 
+def usecase_series_std(input_data):
+    start_time = time.time()
+    res = input_data.std()
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
+def usecase_series_pow(A, B):
+    start_time = time.time()
+    res = A.pow(B)
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
+def usecase_series_add(A, B):
+    start_time = time.time()
+    res = A.add(B)
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
+def usecase_series_append(A, B):
+    start_time = time.time()
+    res = A.append(B)
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
+def usecase_series_describe(input_data):
+    start_time = time.time()
+    res = input_data.describe()
+    finish_time = time.time()
+    res_time = finish_time - start_time
+
+    return res_time, res
+
+
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods
 class TestSeriesMethods(TestBase):
     @classmethod
@@ -312,6 +357,11 @@ class TestSeriesMethods(TestBase):
             'series_isna': [2 * 10 ** 7],
             'series_cov': [10 ** 8],
             'series_corr': [10 ** 7],
+            'series_std': [10 ** 7],
+            'series_pow': [10 ** 7],
+            'series_add': [10 ** 7],
+            'series_append': [10 ** 7],
+            'series_describe': [10 ** 7],
         }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
@@ -453,10 +503,25 @@ class TestSeriesMethods(TestBase):
         self._test_case(usecase_series_fillna, 'series_fillna')
 
     def test_series_float_isna(self):
-        self._test_case(usecase_series_fillna, 'series_isna')
+        self._test_case(usecase_series_isna, 'series_isna')
 
     def test_series_float_cov(self):
         self._test_series_binary_operations(usecase_series_cov, 'series_cov')
 
     def test_series_float_corr(self):
         self._test_series_binary_operations(usecase_series_corr, 'series_corr')
+
+    def test_series_float_std(self):
+        self._test_case(usecase_series_std, 'series_std')
+
+    def test_series_float_pow(self):
+        self._test_series_binary_operations(usecase_series_pow, 'series_pow')
+
+    def test_series_float_add(self):
+        self._test_series_binary_operations(usecase_series_add, 'series_add')
+
+    def test_series_float_append(self):
+        self._test_series_binary_operations(usecase_series_append, 'series_append')
+
+    def test_series_float_describe(self):
+        self._test_case(usecase_series_describe, 'series_describe')
