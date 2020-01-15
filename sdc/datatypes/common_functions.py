@@ -37,13 +37,14 @@ import numba
 from numba.targets import quicksort
 from numba import types
 from numba.errors import TypingError
-from numba.extending import overload
+from numba.extending import register_jitable
 from numba import numpy_support
 
 import sdc
 from sdc.str_arr_ext import (string_array_type, num_total_chars, append_string_array_to,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na,
                              cp_str_list_to_array, make_str_arr_from_list)
+from sdc.utils import sdc_overload
 
 
 class TypeChecker:
@@ -139,7 +140,7 @@ def hpat_arrays_append(A, B):
     pass
 
 
-@overload(hpat_arrays_append)
+@sdc_overload(hpat_arrays_append, jit_options={'parallel': False})
 def hpat_arrays_append_overload(A, B):
     """Function for appending underlying arrays (A and B) or list/tuple of arrays B to an array A"""
 
@@ -202,6 +203,62 @@ def hpat_arrays_append_overload(A, B):
             return _append_list_string_array_impl
 
 
+@register_jitable
+def fill_array(data, size, fill_value=numpy.nan, push_back=True):
+    """
+    Fill array with given values to reach the size
+    """
+
+    if push_back:
+        return numpy.append(data, numpy.repeat(fill_value, size - data.size))
+
+    return numpy.append(numpy.repeat(fill_value, size - data.size), data)
+
+
+@register_jitable
+def fill_str_array(data, size, push_back=True):
+    """
+    Fill StringArrayType array with given values to reach the size
+    """
+
+    string_array_size = len(data)
+    nan_array_size = size - string_array_size
+    num_chars = sdc.str_arr_ext.num_total_chars(data)
+
+    result_data = sdc.str_arr_ext.pre_alloc_string_array(size, num_chars)
+
+    # Keep NaN values of initial array
+    arr_is_na_mask = numpy.array([sdc.hiframes.api.isna(data, i) for i in range(string_array_size)])
+    data_str_list = sdc.str_arr_ext.to_string_list(data)
+    nan_list = [''] * nan_array_size
+
+    result_list = data_str_list + nan_list if push_back else nan_list + data_str_list
+    sdc.str_arr_ext.cp_str_list_to_array(result_data, result_list)
+
+    # Batch=64 iteration to avoid threads competition
+    batch_size = 64
+    if push_back:
+        for i in numba.prange(size//batch_size + 1):
+            for j in range(i*batch_size, min((i+1)*batch_size, size)):
+                if j < string_array_size:
+                    if arr_is_na_mask[j]:
+                        str_arr_set_na(result_data, j)
+                else:
+                    str_arr_set_na(result_data, j)
+
+    else:
+        for i in numba.prange(size//batch_size + 1):
+            for j in range(i*batch_size, min((i+1)*batch_size, size)):
+                if j < nan_array_size:
+                    str_arr_set_na(result_data, j)
+                else:
+                    str_arr_j = j - nan_array_size
+                    if arr_is_na_mask[str_arr_j]:
+                        str_arr_set_na(result_data, j)
+
+    return result_data
+
+
 @numba.njit
 def _hpat_ensure_array_capacity(new_size, arr):
     """ Function ensuring that the size of numpy array is at least as specified
@@ -234,7 +291,7 @@ def sdc_join_series_indexes(left, right):
     pass
 
 
-@overload(sdc_join_series_indexes)
+@sdc_overload(sdc_join_series_indexes, jit_options={'parallel': False})
 def sdc_join_series_indexes_overload(left, right):
     """Function for joining arrays left and right in a way similar to pandas.join 'outer' algorithm"""
 
@@ -460,7 +517,7 @@ def sdc_check_indexes_equal(left, right):
     pass
 
 
-@overload(sdc_check_indexes_equal)
+@sdc_overload(sdc_check_indexes_equal, jit_options={'parallel': False})
 def sdc_check_indexes_equal_overload(A, B):
     """Function for checking arrays A and B of the same type are equal"""
 
@@ -519,7 +576,7 @@ def sdc_arrays_argsort(A, kind='quicksort'):
     pass
 
 
-@overload(sdc_arrays_argsort)
+@sdc_overload(sdc_arrays_argsort, jit_options={'parallel': False})
 def sdc_arrays_argsort_overload(A, kind='quicksort'):
     """Function overloading argsort for different 1D array types"""
 
@@ -560,7 +617,7 @@ def _sdc_pandas_series_check_axis(axis):
     pass
 
 
-@overload(_sdc_pandas_series_check_axis)
+@sdc_overload(_sdc_pandas_series_check_axis, jit_options={'parallel': False})
 def _sdc_pandas_series_check_axis_overload(axis):
     if isinstance(axis, types.UnicodeType):
         def _sdc_pandas_series_check_axis_impl(axis):
