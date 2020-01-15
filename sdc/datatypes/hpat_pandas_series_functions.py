@@ -121,8 +121,8 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
     if accessor == 'loc':
         # Note: Loc return Series
-        # Note: Index 0 in slice not supported
         # Note: Loc slice and callable with String not implement
+        # Note: Loc slice without start not support 
         min_int64 = numpy.iinfo('int64').min
         max_int64 = numpy.iinfo('int64').max
         index_is_none = (self.series.index is None or
@@ -139,14 +139,16 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                 start_position_dec = len(index)
                 stop_position_inc = 0
                 stop_position_dec = 0
+                idx_start = idx.start
+                idx_stop = idx.stop
                 for i in numba.prange(len(index)):
-                    if index[i] >= idx.start:
+                    if index[i] >= idx_start:
                         start_position_inc = min(start_position_inc, i)
-                    if index[i] <= idx.start:
+                    if index[i] <= idx_start:
                         start_position_dec = min(start_position_dec, i)
-                    if index[i] <= idx.stop:
+                    if index[i] <= idx_stop:
                         stop_position_inc = max(stop_position_inc, i)
-                    if index[i] >= idx.stop:
+                    if index[i] >= idx_stop:
                         stop_position_dec = max(stop_position_dec, i)
                     if i > 0:
                         max_diff = max(max_diff, index[i] - index[i - 1])
@@ -158,9 +160,13 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                 if max_diff > 0:
                     start_position = start_position_inc
                     stop_position = stop_position_inc
+                    if idx_start <= index[0] and idx_stop < index[0] and start_position == 0 and stop_position == 0:
+                        return pandas.Series(data=series._data[:0], index=series._index[:0], name=series._name)
                 else:
                     start_position = start_position_dec
                     stop_position = stop_position_dec if idx.stop != max_int64 else len(index)
+                    if idx_start >= index[0] and idx_stop > index[0] and start_position == 0 and stop_position == 0:
+                        return pandas.Series(data=series._data[:0], index=series._index[:0], name=series._name)
                     
                 stop_position = min(stop_position + 1, len(index))
 
