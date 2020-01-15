@@ -288,7 +288,7 @@ class TestSeriesMethods(TestBase):
             'series_abs': [3 * 10 ** 8],
             'series_value_counts': [3 * 10 ** 5],
             'series_nsmallest': [10 ** 9],
-            'series_nlargest': [10 ** 9],
+            'series_nlargest': [4 * 10 ** 7],
             'series_var': [5 * 10 ** 8],
             'series_shift': [5 * 10 ** 8],
             'series_copy': [10 ** 8],
