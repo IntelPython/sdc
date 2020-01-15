@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,25 +24,27 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from numba.extending import intrinsic, register_model
-from sdc.datatypes.hpat_pandas_rolling_types import (
-    gen_hpat_pandas_rolling_init, RollingType, RollingTypeModel)
+import pandas as pd
+from numba import njit
 
 
-class SeriesRollingType(RollingType):
-    """Type definition for pandas.Series.rolling functions handling."""
-    def __init__(self, data, win_type=None, on=None, closed=None):
-        super(SeriesRollingType, self).__init__('SeriesRollingType',
-                                                data, win_type=win_type,
-                                                on=on, closed=closed)
+@njit
+def dataframe_append():
+    """
+    Expected result:
+         A  B    C
+    0  1.0  3  NaN
+    1  2.0  4  NaN
+    2  NaN  5  7.0
+    3  NaN  6  8.0
+
+    """
+
+    df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
+    df2 = pd.DataFrame({'B': [5, 6], 'C': [7, 8]})
+    result = df.append(df2)
+
+    return result
 
 
-@register_model(SeriesRollingType)
-class SeriesRollingTypeModel(RollingTypeModel):
-    """Model for SeriesRollingType type."""
-    def __init__(self, dmm, fe_type):
-        super(SeriesRollingTypeModel, self).__init__(dmm, fe_type)
-
-
-_hpat_pandas_series_rolling_init = intrinsic(gen_hpat_pandas_rolling_init(
-    SeriesRollingType))
+print(dataframe_append())
