@@ -29,20 +29,20 @@ from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_hpat_pandas_rolling_init, RollingType, RollingTypeModel)
 
 
-class SeriesRollingType(RollingType):
-    """Type definition for pandas.Series.rolling functions handling."""
+class DataFrameRollingType(RollingType):
+    """Type definition for pandas.DataFrame.rolling functions handling."""
     def __init__(self, data, win_type=None, on=None, closed=None):
-        super(SeriesRollingType, self).__init__('SeriesRollingType',
-                                                data, win_type=win_type,
-                                                on=on, closed=closed)
+        super(DataFrameRollingType, self).__init__('DataFrameRollingType',
+                                                   data, win_type=win_type,
+                                                   on=on, closed=closed)
 
 
-@register_model(SeriesRollingType)
-class SeriesRollingTypeModel(RollingTypeModel):
-    """Model for SeriesRollingType type."""
+@register_model(DataFrameRollingType)
+class DataFrameRollingTypeModel(RollingTypeModel):
+    """Model for DataFrameRollingType type."""
     def __init__(self, dmm, fe_type):
-        super(SeriesRollingTypeModel, self).__init__(dmm, fe_type)
+        super(DataFrameRollingTypeModel, self).__init__(dmm, fe_type)
 
 
-_hpat_pandas_series_rolling_init = intrinsic(gen_hpat_pandas_rolling_init(
-    SeriesRollingType))
+_hpat_pandas_df_rolling_init = intrinsic(gen_hpat_pandas_rolling_init(
+    DataFrameRollingType))
