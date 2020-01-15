@@ -4491,7 +4491,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     inplace: :obj:`bool`, default False
         If True, do operation inplace and return None.
         *unsupported*
-    kind: :obj:'str', {'mergesort', 'quicksort', 'heapsort'}, default: 'quicksort'
+    kind: :obj:'str' or None, {'mergesort', 'quicksort', 'heapsort'}, default: 'quicksort'
         Choice of sorting algorithm.
         Currently only 'mergesort' and 'quicksort' are supported as literal values.
     na_position: {'first' or 'last'}, default 'last'
@@ -4515,10 +4515,10 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     if not isinstance(ascending, ascending_supported_types):
         ty_checker.raise_exc(ascending, 'boolean', 'ascending')
 
-    kind_supported_types = (str, types.Omitted, types.StringLiteral, types.UnicodeType)
+    kind_supported_types = (str, types.Omitted, types.NoneType, types.StringLiteral, types.UnicodeType)
     if not isinstance(kind, kind_supported_types):
         ty_checker.raise_exc(kind, 'string', 'kind')
-    kind_is_default = isinstance(kind, (str, types.Omitted))
+    kind_is_default = isinstance(kind, (str, types.Omitted, types.NoneType))
 
     na_position_supported_types = (str, types.Omitted, types.StringLiteral, types.UnicodeType)
     if not isinstance(na_position, na_position_supported_types):
@@ -4533,7 +4533,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
         common_functions._sdc_pandas_series_check_axis(axis)
 
         # TODO: investigate why 'not in' doesn't work in this context
-        kind_is_valid = kind in ('quicksort', 'mergesort')
+        kind_is_valid = kind is None or kind in ('quicksort', 'mergesort')
         if not kind_is_valid:
             raise ValueError("Method sort_values(). Unsupported parameter. Given kind != 'quicksort', 'mergesort'")
 

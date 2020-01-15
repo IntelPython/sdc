@@ -604,6 +604,8 @@ def sdc_arrays_argsort_overload(A, kind='quicksort'):
             elif kind == 'mergesort':
                 sdc.hiframes.sort.local_sort((data, ), (keys, ))
                 argsorted = list(keys)
+            else:
+                raise ValueError("Unrecognized kind of sort in sdc_arrays_argsort")
 
             argsorted.extend(old_nan_positions)
             return numpy.asarray(argsorted, dtype=numpy.int32)

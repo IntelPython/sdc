@@ -4328,14 +4328,19 @@ class TestSeries(TestCase):
     def test_series_sort_values_kind(self):
         """Verifies Series.sort_values method support of parameter 'kind'
            on a unnamed Series of different dtypes and default index"""
-        def test_impl(A, param_value):
+        def test_impl_literal_kind(A, param_value):
             # FIXME: use literally(kind) because, numpy.argsort is supported by Numba with literal kind value only
             # and literally when applied inside sort_values overload_method impl is not working due to some bug in Numba
             return A.sort_values(kind=literally(param_value))
-        hpat_func = self.jit(test_impl)
+        hpat_func1 = self.jit(test_impl_literal_kind)
+
+        def test_impl_non_literal_kind(A, param_value):
+            return A.sort_values(kind=param_value)
+        hpat_func2 = self.jit(test_impl_non_literal_kind)
 
         # using sequences of unique values because default sorting algorithm is not stable
         n = 11
+        np.random.seed(0)
         data_to_test = [
             [1, -0., 0.2, -3.7, np.inf, np.nan, -1.0, 2/3, 21.2, -np.inf, 9.99],
             np.arange(-10, 20, 1),
@@ -4348,7 +4353,11 @@ class TestSeries(TestCase):
             S = pd.Series(data=data)
             for kind in kind_values:
                 with self.subTest(series_data=data, kind=kind):
-                    pd.testing.assert_series_equal(hpat_func(S, kind), test_impl(S, kind))
+                    pd.testing.assert_series_equal(hpat_func1(S, kind), test_impl_literal_kind(S, kind))
+
+        kind = None
+        with self.subTest(series_data=data, kind=kind):
+            pd.testing.assert_series_equal(hpat_func2(S, kind), test_impl_non_literal_kind(S, kind))
 
     @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_na_position(self):
@@ -4360,6 +4369,7 @@ class TestSeries(TestCase):
         hpat_func = self.jit(test_impl)
 
         n = 11
+        np.random.seed(0)
         data_to_test = [
             [1, -0., 0.2, -3.7, np.inf, np.nan, -1.0, 2/3, 21.2, -np.inf, 9.99],
             np.arange(-10, 20, 1),
@@ -4424,7 +4434,7 @@ class TestSeries(TestCase):
     @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_full_unicode4(self):
         def test_impl(series, ascending, kind):
-            return series.sort_values(axis=0, ascending=ascending, kind=kind, na_position='last')
+            return series.sort_values(axis=0, ascending=ascending, kind=literally(kind), na_position='last')
 
         hpat_func = self.jit(test_impl)
 
