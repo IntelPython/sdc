@@ -123,7 +123,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
     if accessor == 'loc':
         # Note: Loc return Series
         # Note: Loc slice and callable with String not implement
-        # Note: Loc slice without start not support 
+        # Note: Loc slice without start not support
         min_int64 = numpy.iinfo('int64').min
         max_int64 = numpy.iinfo('int64').max
         index_is_none = (self.series.index is None or
@@ -168,7 +168,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                     stop_position = stop_position_dec if idx.stop != max_int64 else len(index)
                     if idx_start >= index[0] and idx_stop > index[0] and start_position == 0 and stop_position == 0:
                         return pandas.Series(data=series._data[:0], index=series._index[:0], name=series._name)
-                    
+
                 stop_position = min(stop_position + 1, len(index))
 
                 if (
