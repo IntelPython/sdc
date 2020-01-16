@@ -56,7 +56,7 @@ class TestDataFrameMethods(TestBase):
         # compilation time
         record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
 
-        cfunc = numba.jit(pyfunc)
+        cfunc = numba.njit(pyfunc)
 
         # Warming up
         cfunc(*args, **kwargs)
