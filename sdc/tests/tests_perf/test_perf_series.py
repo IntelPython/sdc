@@ -39,9 +39,6 @@ from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 
 
-global_vars = {'time': time, 'np': np}
-
-
 def usecase_gen(call_expression):
     func_name = 'usecase_func'
 
@@ -54,7 +51,7 @@ def {func_name}(input_data):
 """
 
     loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
+    exec(func_text, globals(), loc_vars)
     _gen_impl = loc_vars[func_name]
 
     return _gen_impl
@@ -72,7 +69,7 @@ def {func_name}(A, B):
 """
 
     loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
+    exec(func_text, globals(), loc_vars)
     _gen_impl = loc_vars[func_name]
 
     return _gen_impl
@@ -102,42 +99,6 @@ class TestSeriesMethods(TestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.total_data_length = {
-            'series_abs': [3 * 10 ** 8],
-            'series_add': [10 ** 7],
-            'series_append': [10 ** 7],
-            'series_argsort': [10 ** 5],
-            'series_astype_int': [2 * 10 ** 7],
-            'series_chain_add_and_sum': [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7],
-            'series_copy': [10 ** 8],
-            'series_corr': [10 ** 7],
-            'series_count': [2 * 10 ** 9],
-            'series_cov': [10 ** 8],
-            'series_cumsum': [2 * 10 ** 8],
-            'series_describe': [10 ** 7],
-            'series_dropna': [2 * 10 ** 8],
-            'series_fillna': [2 * 10 ** 7],
-            'series_idxmax': [10 ** 9],
-            'series_idxmin': [10 ** 9],
-            'series_isna': [2 * 10 ** 7],
-            'series_max': [10 ** 9],
-            'series_mean': [10 ** 8],
-            'series_median': [10 ** 8],
-            'series_min': [10 ** 9],
-            'series_nlargest': [4 * 10 ** 7],
-            'series_nsmallest': [10 ** 9],
-            'series_nunique': [10 ** 5],
-            'series_pow': [10 ** 7],
-            'series_prod': [5 * 10 ** 8],
-            'series_quantile': [10 ** 8],
-            'series_shift': [5 * 10 ** 8],
-            'series_sort_values': [10 ** 5],
-            'series_std': [10 ** 7],
-            'series_sum': [10 ** 9],
-            'series_value_counts': [3 * 10 ** 5],
-            'series_var': [5 * 10 ** 8],
-            'series_unique': [10 ** 5],
-        }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
         # compilation time
@@ -156,9 +117,9 @@ class TestSeriesMethods(TestBase):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, name, input_data=test_global_input_data_float64):
+    def _test_case(self, pyfunc, name, total_data_length, input_data=test_global_input_data_float64):
         full_input_data_length = sum(len(i) for i in input_data)
-        for data_length in self.total_data_length[name]:
+        for data_length in total_data_length:
             base = {
                 "test_name": name,
                 "data_size": data_length,
@@ -177,10 +138,10 @@ class TestSeriesMethods(TestBase):
             self._test_python(pyfunc, record, test_data)
             self.test_results.add(**record)
 
-    def _test_series_binary_operations(self, pyfunc, name, input_data=None):
+    def _test_series_binary_operations(self, pyfunc, name, total_data_length, input_data=None):
         np.random.seed(0)
         hpat_func = sdc.jit(pyfunc)
-        for data_length in self.total_data_length[name]:
+        for data_length in total_data_length:
 
             # TODO: replace with generic function to generate random sequence of floats
             data1 = np.random.ranf(data_length)
@@ -200,19 +161,21 @@ class TestSeriesMethods(TestBase):
             self.test_results.add(name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
 
     def test_series_float_astype_int(self):
-        self._test_case(usecase_gen('astype(np.int8)'), 'series_astype_int',
+        self._test_case(usecase_gen('astype(np.int8)'), 'series_astype_int', [10 ** 5],
                         input_data=[test_global_input_data_float64[0]])
 
     def test_series_chain_add_and_sum(self):
-        self._test_series_binary_operations(usecase_series_chain_add_and_sum, 'series_chain_add_and_sum')
+        self._test_series_binary_operations(usecase_series_chain_add_and_sum,
+                                            [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7],
+                                            'series_chain_add_and_sum')
 
 
-def test_gen(name, params):
+def test_gen(name, params, data_length):
     func_name = 'func'
 
     func_text = f"""\
 def {func_name}(self):
-  self._test_case(usecase_gen('{name}({params})'), 'series_{name}')
+  self._test_case(usecase_gen('{name}({params})'), 'series_{name}', {data_length})
 """
 
     global_vars = {'usecase_gen': usecase_gen}
@@ -224,12 +187,12 @@ def {func_name}(self):
     return _gen_impl
 
 
-def test_gen_two_par(name, params):
+def test_gen_two_par(name, params, data_length):
     func_name = 'func'
 
     func_text = f"""\
 def {func_name}(self):
-  self._test_series_binary_operations(usecase_gen_two_par('{name}', '{params}'), 'series_{name}')
+  self._test_series_binary_operations(usecase_gen_two_par('{name}', '{params}'), 'series_{name}', {data_length})
 """
 
     global_vars = {'usecase_gen_two_par': usecase_gen_two_par}
@@ -240,52 +203,53 @@ def {func_name}(self):
 
     return _gen_impl
 
-
 cases = {
-    'abs': ('abs', ''),
-    'argsort': ('argsort', ''),
-    'copy': ('copy', ''),
-    'count': ('count', ''),
-    'cumsum': ('cumsum', ''),
-    'describe': ('describe', ''),
-    'dropna': ('dropna', ''),
-    'fillna': ('fillna', '-1'),
-    'idxmax': ('idxmax', ''),
-    'idxmin': ('idxmin', ''),
-    'isna': ('isna', ''),
-    'max': ('max', ''),
-    'mean': ('mean', ''),
-    'median': ('median', ''),
-    'min': ('min', ''),
-    'min_skipna_True': ('min', 'skipna=True'),
-    'nlargest': ('nlargest', ''),
-    'nsmallest': ('nsmallest', ''),
-    'nunique': ('nunique', ''),
-    'prod': ('prod', ''),
-    'quantile': ('quantile', ''),
-    'shift': ('shift', ''),
-    'sort_values': ('sort_values', ''),
-    'std': ('std', ''),
-    'sum': ('sum', ''),
-    'value_counts': ('value_counts', ''),
-    'var': ('var', ''),
-    'unique': ('unique', ''),
+    'abs': ('abs', '', [3 * 10 ** 8]),
+    'argsort': ('argsort', '', [10 ** 5]),
+    'copy': ('copy', '', [10 ** 8]),
+    'count': ('count', '', [2 * 10 ** 9]),
+    'cumsum': ('cumsum', '', [2 * 10 ** 8]),
+    'describe': ('describe', '', [10 ** 7]),
+    'dropna': ('dropna', '', [2 * 10 ** 8]),
+    'fillna': ('fillna', '-1', [2 * 10 ** 7]),
+    'idxmax': ('idxmax', '', [10 ** 9]),
+    'idxmin': ('idxmin', '', [10 ** 9]),
+    'isna': ('isna', '', [2 * 10 ** 7]),
+    'max': ('max', '', [10 ** 9]),
+    'mean': ('mean', '', [10 ** 8]),
+    'median': ('median', '', [10 ** 8]),
+    'min': ('min', '', [10 ** 9]),
+    'min_skipna_True': ('min', 'skipna=True', [10 ** 7]),
+    'nlargest': ('nlargest', '', [4 * 10 ** 7]),
+    'nsmallest': ('nsmallest', '', [10 ** 9]),
+    'nunique': ('nunique', '', [10 ** 5]),
+    'prod': ('prod', '', [5 * 10 ** 8]),
+    'quantile': ('quantile', '', [10 ** 8]),
+    'shift': ('shift', '', [5 * 10 ** 8]),
+    'sort_values': ('sort_values', '', [10 ** 5]),
+    'std': ('std', '', [10 ** 7]),
+    'sum': ('sum', '', [10 ** 9]),
+    'value_counts': ('value_counts', '', [3 * 10 ** 5]),
+    'var': ('var', '', [5 * 10 ** 8]),
+    'unique': ('unique', '', [10 ** 5]),
 }
 
-cases_two_par = {'add': ('add', ''),
-                 'append': ('append', ''),
-                 'corr': ('corr', ''),
-                 'cov': ('cov', ''),
-                 'pow': ('pow', '')}
+cases_two_par = {'add': ('add', '', [10 ** 7]),
+                 'append': ('append', '', [10 ** 7]),
+                 'corr': ('corr', '', [10 ** 7]),
+                 'cov': ('cov', '', [10 ** 8]),
+                 'pow': ('pow', '', [10 ** 7])}
 
-for name, par in cases.items():
-    func = par[0]
-    params = par[1]
+for name, params in cases.items():
+    func = params[0]
+    param = params[1]
+    length = params[2]
     func_name = 'test_series_float_{}'.format(name)
-    setattr(TestSeriesMethods, func_name, test_gen(func, params))
+    setattr(TestSeriesMethods, func_name, test_gen(func, param, length))
 
-for name, par in cases_two_par.items():
-    func = par[0]
-    params = par[1]
+for name, params in cases_two_par.items():
+    func = params[0]
+    param = params[1]
+    length = params[2]
     func_name = 'test_series_float_{}'.format(name)
-    setattr(TestSeriesMethods, func_name, test_gen_two_par(func, params))
+    setattr(TestSeriesMethods, func_name, test_gen_two_par(func, param, length))
