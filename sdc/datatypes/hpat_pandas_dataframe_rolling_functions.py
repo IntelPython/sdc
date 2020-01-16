@@ -104,6 +104,8 @@ def df_rolling_method_with_other_df_codegen(method_name, self, other, args=None,
 
     data_columns = {col: idx for idx, col in enumerate(self.data.columns)}
     other_columns = {col: idx for idx, col in enumerate(other.columns)}
+
+    # columns order matters
     common_columns = [col for col in data_columns if col in other_columns]
     all_columns = [col for col in data_columns]
     for col in other_columns:
