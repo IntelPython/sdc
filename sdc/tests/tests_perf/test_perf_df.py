@@ -26,13 +26,10 @@
 # *****************************************************************************
 
 import pandas as pd
-import numpy as np
-
 import time
-import random
 
 import pandas
-import sdc
+import numba
 
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
@@ -60,14 +57,14 @@ class TestDataFrameMethods(TestBase):
         # compilation time
         record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
 
-        sdc_func = sdc.jit(pyfunc)
+        cfunc = numba.jit(pyfunc)
 
         # Warming up
-        sdc_func(*args, **kwargs)
+        cfunc(*args, **kwargs)
 
         # execution and boxing time
         record["test_results"], record["boxing_results"] = \
-            get_times(sdc_func, *args, **kwargs)
+            get_times(cfunc, *args, **kwargs)
 
     def _test_python(self, pyfunc, record, *args, **kwargs):
         record["test_results"], _ = \
