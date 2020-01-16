@@ -244,30 +244,35 @@ def {func_name}(self):
 
 
 cases = {
-    'abs': [], 'argsort': [],
-    'copy': [], 'count': [], 'cumsum': [],
-    'describe': [], 'dropna': [],
-    'fillna': ['-1'],
-    'idxmax': [], 'idxmin': [], 'isna': [],
-    'max': [], 'mean': [], 'median': [], 'min': [],
-    'nlargest': [], 'nsmallest': [], 'nunique': [],
-    'prod': [],
-    'quantile': [],
-    'shift': [], 'sort_values': [], 'std': [], 'sum': [],
-    'value_counts': [], 'var': [],
-    'unique': [],
+    'abs': ('abs', []), 'argsort': ('argsort', []),
+    'copy': ('copy', []), 'count': ('count', []), 'cumsum': ('cumsum', []),
+    'describe': ('describe', []), 'dropna': ('dropna', []),
+    'fillna': ('fillna', ['-1']),
+    'idxmax': ('idxmax', []), 'idxmin': ('idxmin', []), 'isna': ('isna', []),
+    'max': ('max', []), 'mean': ('mean', []), 'median': ('median', []), 'min': ('min', []),
+    'min_skipna_True': ('min', ['skipna=True']),
+    'nlargest': ('nlargest', []), 'nsmallest': ('nsmallest', []), 'nunique': ('nunique', []),
+    'prod': ('prod', []),
+    'quantile': ('quantile', []),
+    'shift': ('shift', []), 'sort_values': ('sort_values', []), 'std': ('std', []), 'sum': ('sum', []),
+    'value_counts': ('value_counts', []), 'var': ('var', []),
+    'unique': ('unique', []),
 }
 
-cases_two_par = {'add': [], 'append': [],
-                 'corr': [], 'cov': [],
-                 'pow': []}
+cases_two_par = {'add': ('add', []), 'append': ('append', []),
+                 'corr': ('corr', []), 'cov': ('cov', []),
+                 'pow': ('pow', [])}
 
-for name, params in cases.items():
+for name, par in cases.items():
+    func = par[0]
+    params = par[1]
     func_name = 'test_series_float_{}'.format(name)
     params_lst = ', '.join(params)
-    setattr(TestSeriesMethods, func_name, test_gen(name, params_lst))
+    setattr(TestSeriesMethods, func_name, test_gen(func, params_lst))
 
-for name, params in cases_two_par.items():
+for name, par in cases_two_par.items():
+    func = par[0]
+    params = par[1]
     func_name = 'test_series_float_{}'.format(name)
     params_lst = ', '.join(params)
-    setattr(TestSeriesMethods, func_name, test_gen_two_par(name, params_lst))
+    setattr(TestSeriesMethods, func_name, test_gen_two_par(func, params_lst))
