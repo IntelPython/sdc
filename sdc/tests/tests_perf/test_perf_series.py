@@ -171,12 +171,14 @@ class TestSeriesMethods(TestBase):
                                             [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7])
 
 
-def test_gen(name, params, data_length):
+def test_gen(name, params, data_length, call_expression=None):
     func_name = 'func'
+    if call_expression is None:
+        call_expression = '{}({})'.format(name, params)
 
     func_text = f"""\
 def {func_name}(self):
-  self._test_case(usecase_gen('{name}({params})'), 'series_{name}', {data_length})
+  self._test_case(usecase_gen('{call_expression}'), 'series_{name}', {data_length})
 """
 
     global_vars = {'usecase_gen': usecase_gen}
@@ -208,6 +210,7 @@ def {func_name}(self):
 cases = [
     ('abs', '', [3 * 10 ** 8]),
     ('argsort', '', [10 ** 5]),
+    ('at', '', [10 ** 7], 'at[3]'),
     ('copy', '', [10 ** 8]),
     ('count', '', [2 * 10 ** 9]),
     ('cumsum', '', [2 * 10 ** 8]),
@@ -251,12 +254,16 @@ cases_two_par = [
 ]
 
 for params in cases:
-    func, param, length = params
+    if len(params) == 4:
+        func, param, length, call_expression = params
+    else:
+        func, param, length = params
+        call_expression = None
     name = func
     if param:
-        name += to_varname(param)
+        name += "_" + to_varname(param).replace('__', '_')
     func_name = 'test_series_float_{}'.format(name)
-    setattr(TestSeriesMethods, func_name, test_gen(func, param, length))
+    setattr(TestSeriesMethods, func_name, test_gen(func, param, length, call_expression))
 
 for params in cases_two_par:
     func, param, length = params
