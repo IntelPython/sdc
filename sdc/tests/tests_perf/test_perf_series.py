@@ -202,7 +202,8 @@ class TestSeriesMethods(TestBase):
             self.test_results.add(name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
 
     def test_series_float_astype_int(self):
-        self._test_case(usecase_gen('astype(np.int8)'), 'series_astype_int', input_data=[test_global_input_data_float64[0]])
+        self._test_case(usecase_gen('astype(np.int8)'), 'series_astype_int',
+                        input_data=[test_global_input_data_float64[0]])
 
     def test_series_chain_add_and_sum(self):
         self._test_series_binary_operations(usecase_series_chain_add_and_sum, 'series_chain_add_and_sum')
@@ -224,6 +225,7 @@ def {func_name}(self):
 
     return _gen_impl
 
+
 def test_gen_two_par(name, params):
     func_name = 'func'
 
@@ -239,6 +241,7 @@ def {func_name}(self):
     _gen_impl = loc_vars[func_name]
 
     return _gen_impl
+
 
 cases = {
     'abs': [], 'argsort': [],
