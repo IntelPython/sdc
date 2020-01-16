@@ -84,7 +84,7 @@ class TestDataFrameMethods(TestBase):
             }
             data = perf_data_gen_fixed_len(input_data, full_input_data_length,
                                            data_length)
-            test_data = pandas.DataFrame({column: data for column in ('A', 'B', 'C')})
+            test_data = pandas.DataFrame({f"f{i}": data for i in range(3)})
 
             record = base.copy()
             record["test_type"] = 'SDC'
