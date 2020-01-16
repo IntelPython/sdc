@@ -25,6 +25,7 @@
 # *****************************************************************************
 
 
+import string
 import unittest
 import itertools
 import os
@@ -400,6 +401,127 @@ class TestRolling(TestCase):
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl2(*args))
             pd.testing.assert_frame_equal(hpat_func(*args), test_impl2(*args))
 
+    def _get_assert_equal(self, obj):
+        if isinstance(obj, pd.Series):
+            return pd.testing.assert_series_equal
+        elif isinstance(obj, pd.DataFrame):
+            return pd.testing.assert_frame_equal
+        elif isinstance(obj, np.ndarray):
+            return np.testing.assert_array_equal
+
+        return self.assertEqual
+
+    def _test_rolling_unsupported_values(self, obj):
+        def test_impl(obj, window, min_periods, center,
+                      win_type, on, axis, closed):
+            return obj.rolling(window, min_periods, center,
+                               win_type, on, axis, closed).min()
+
+        hpat_func = self.jit(test_impl)
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(obj, -1, None, False, None, None, 0, None)
+        self.assertIn('window must be non-negative', str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(obj, 1, -1, False, None, None, 0, None)
+        self.assertIn('min_periods must be >= 0', str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(obj, 1, 2, False, None, None, 0, None)
+        self.assertIn('min_periods must be <= window', str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(obj, 1, 2, False, None, None, 0, None)
+        self.assertIn('min_periods must be <= window', str(raises.exception))
+
+        msg_tmpl = 'Method rolling(). The object {}\n expected: {}'
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(obj, 1, None, True, None, None, 0, None)
+        msg = msg_tmpl.format('center', 'False')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(obj, 1, None, False, 'None', None, 0, None)
+        msg = msg_tmpl.format('win_type', 'None')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(obj, 1, None, False, None, 'None', 0, None)
+        msg = msg_tmpl.format('on', 'None')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(obj, 1, None, False, None, None, 1, None)
+        msg = msg_tmpl.format('axis', '0')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(obj, 1, None, False, None, None, 0, 'None')
+        msg = msg_tmpl.format('closed', 'None')
+        self.assertIn(msg, str(raises.exception))
+
+    def _test_rolling_unsupported_types(self, obj):
+        def test_impl(obj, window, min_periods, center,
+                      win_type, on, axis, closed):
+            return obj.rolling(window, min_periods, center,
+                               win_type, on, axis, closed).min()
+
+        hpat_func = self.jit(test_impl)
+        msg_tmpl = 'Method rolling(). The object {}\n given: {}\n expected: {}'
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, '1', None, False, None, None, 0, None)
+        msg = msg_tmpl.format('window', 'unicode_type', 'int')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, 1, '1', False, None, None, 0, None)
+        msg = msg_tmpl.format('min_periods', 'unicode_type', 'None, int')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, 1, None, 0, None, None, 0, None)
+        msg = msg_tmpl.format('center', 'int64', 'bool')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, 1, None, False, -1, None, 0, None)
+        msg = msg_tmpl.format('win_type', 'int64', 'str')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, 1, None, False, None, -1, 0, None)
+        msg = msg_tmpl.format('on', 'int64', 'str')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, 1, None, False, None, None, None, None)
+        msg = msg_tmpl.format('axis', 'none', 'int, str')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, 1, None, False, None, None, 0, -1)
+        msg = msg_tmpl.format('closed', 'int64', 'str')
+        self.assertIn(msg, str(raises.exception))
+
+    def _test_rolling_min(self, obj):
+        def test_impl(obj, window, min_periods):
+            return obj.rolling(window, min_periods).min()
+
+        hpat_func = self.jit(test_impl)
+        assert_equal = self._get_assert_equal(obj)
+
+        # TODO: fix the issue when window = 0
+        for window in range(1, len(obj) + 2):
+            for min_periods in range(window + 1):
+                with self.subTest(obj=obj, window=window,
+                                  min_periods=min_periods):
+                    jit_result = hpat_func(obj, window, min_periods)
+                    ref_result = test_impl(obj, window, min_periods)
+                    assert_equal(jit_result, ref_result)
+
     def _test_rolling_var(self, obj):
         test_impl = rolling_var_usecase
         hpat_func = self.jit(test_impl)
@@ -421,6 +543,33 @@ class TestRolling(TestCase):
             hpat_func(obj, 3, 2, '1')
         msg = 'Method rolling.var(). The object ddof\n given: unicode_type\n expected: int'
         self.assertIn(msg, str(raises.exception))
+
+    @skip_sdc_jit('DataFrame.rolling.min() unsupported exceptions')
+    def test_df_rolling_unsupported_values(self):
+        all_data = test_global_input_data_float64
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_unsupported_values(df)
+
+    @skip_sdc_jit('DataFrame.rolling.min() unsupported exceptions')
+    def test_df_rolling_unsupported_types(self):
+        all_data = test_global_input_data_float64
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_unsupported_types(df)
+
+    @skip_sdc_jit('DataFrame.rolling.min() unsupported')
+    def test_df_rolling_min(self):
+        all_data = test_global_input_data_float64
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_min(df)
 
     @skip_sdc_jit('DataFrame.rolling.var() unsupported')
     def test_df_rolling_var(self):
@@ -446,104 +595,13 @@ class TestRolling(TestCase):
 
     @skip_sdc_jit('Series.rolling.min() unsupported exceptions')
     def test_series_rolling_unsupported_values(self):
-        def test_impl(series, window, min_periods, center,
-                      win_type, on, axis, closed):
-            return series.rolling(window, min_periods, center,
-                                  win_type, on, axis, closed).min()
-
-        hpat_func = self.jit(test_impl)
-
         series = pd.Series(test_global_input_data_float64[0])
-
-        with self.assertRaises(ValueError) as raises:
-            hpat_func(series, -1, None, False, None, None, 0, None)
-        self.assertIn('window must be non-negative', str(raises.exception))
-
-        with self.assertRaises(ValueError) as raises:
-            hpat_func(series, 1, -1, False, None, None, 0, None)
-        self.assertIn('min_periods must be >= 0', str(raises.exception))
-
-        with self.assertRaises(ValueError) as raises:
-            hpat_func(series, 1, 2, False, None, None, 0, None)
-        self.assertIn('min_periods must be <= window', str(raises.exception))
-
-        with self.assertRaises(ValueError) as raises:
-            hpat_func(series, 1, 2, False, None, None, 0, None)
-        self.assertIn('min_periods must be <= window', str(raises.exception))
-
-        msg_tmpl = 'Method rolling(). The object {}\n expected: {}'
-
-        with self.assertRaises(ValueError) as raises:
-            hpat_func(series, 1, None, True, None, None, 0, None)
-        msg = msg_tmpl.format('center', 'False')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(ValueError) as raises:
-            hpat_func(series, 1, None, False, 'None', None, 0, None)
-        msg = msg_tmpl.format('win_type', 'None')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(ValueError) as raises:
-            hpat_func(series, 1, None, False, None, 'None', 0, None)
-        msg = msg_tmpl.format('on', 'None')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(ValueError) as raises:
-            hpat_func(series, 1, None, False, None, None, 1, None)
-        msg = msg_tmpl.format('axis', '0')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(ValueError) as raises:
-            hpat_func(series, 1, None, False, None, None, 0, 'None')
-        msg = msg_tmpl.format('closed', 'None')
-        self.assertIn(msg, str(raises.exception))
+        self._test_rolling_unsupported_values(series)
 
     @skip_sdc_jit('Series.rolling.min() unsupported exceptions')
     def test_series_rolling_unsupported_types(self):
-        def test_impl(series, window, min_periods, center,
-                      win_type, on, axis, closed):
-            return series.rolling(window, min_periods, center,
-                                  win_type, on, axis, closed).min()
-
-        hpat_func = self.jit(test_impl)
-
         series = pd.Series(test_global_input_data_float64[0])
-        msg_tmpl = 'Method rolling(). The object {}\n given: {}\n expected: {}'
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, '1', None, False, None, None, 0, None)
-        msg = msg_tmpl.format('window', 'unicode_type', 'int')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, 1, '1', False, None, None, 0, None)
-        msg = msg_tmpl.format('min_periods', 'unicode_type', 'None, int')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, 1, None, 0, None, None, 0, None)
-        msg = msg_tmpl.format('center', 'int64', 'bool')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, 1, None, False, -1, None, 0, None)
-        msg = msg_tmpl.format('win_type', 'int64', 'str')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, 1, None, False, None, -1, 0, None)
-        msg = msg_tmpl.format('on', 'int64', 'str')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, 1, None, False, None, None, None, None)
-        msg = msg_tmpl.format('axis', 'none', 'int, str')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, 1, None, False, None, None, 0, -1)
-        msg = msg_tmpl.format('closed', 'int64', 'str')
-        self.assertIn(msg, str(raises.exception))
+        self._test_rolling_unsupported_types(series)
 
     @skip_sdc_jit('Series.rolling.apply() unsupported Series index')
     def test_series_rolling_apply_mean(self):
@@ -857,23 +915,11 @@ class TestRolling(TestCase):
 
     @skip_sdc_jit('Series.rolling.min() unsupported Series index')
     def test_series_rolling_min(self):
-        def test_impl(series, window, min_periods):
-            return series.rolling(window, min_periods).min()
-
-        hpat_func = self.jit(test_impl)
-
         all_data = test_global_input_data_float64
         indices = [list(range(len(data)))[::-1] for data in all_data]
         for data, index in zip(all_data, indices):
             series = pd.Series(data, index, name='A')
-            # TODO: fix the issue when window = 0
-            for window in range(1, len(series) + 2):
-                for min_periods in range(window + 1):
-                    with self.subTest(series=series, window=window,
-                                      min_periods=min_periods):
-                        jit_result = hpat_func(series, window, min_periods)
-                        ref_result = test_impl(series, window, min_periods)
-                        pd.testing.assert_series_equal(jit_result, ref_result)
+            self._test_rolling_min(series)
 
     @skip_sdc_jit('Series.rolling.quantile() unsupported Series index')
     def test_series_rolling_quantile(self):
