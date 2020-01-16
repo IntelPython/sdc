@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -37,6 +37,7 @@ from numba.extending import (models, overload, register_model, make_attribute_wr
 from numba.datamodel import (register_default, StructModel)
 from numba.typing.templates import signature
 from sdc.hiframes.split_impl import SplitViewStringMethodsType, StringArraySplitViewType
+from sdc.utils import sdc_overload
 
 
 class StringMethodsType(types.IterableType):
@@ -119,7 +120,7 @@ _hpat_pandas_split_view_stringmethods_init = intrinsic(
     _gen_hpat_pandas_stringmethods_init(string_methods_type=SplitViewStringMethodsType))
 
 
-@overload(pandas.core.strings.StringMethods)
+@sdc_overload(pandas.core.strings.StringMethods)
 def hpat_pandas_stringmethods(obj):
     """
     Special Numba procedure to overload Python type pandas.core.strings.StringMethods::ctor()

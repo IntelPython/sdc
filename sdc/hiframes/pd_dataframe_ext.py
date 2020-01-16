@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -992,18 +992,19 @@ def lower_dropna_dummy(context, builder, sig, args):
     return out_obj._getvalue()
 
 
-@overload_method(DataFrameType, 'drop')
-def drop_overload(df, labels=None, axis=0, index=None, columns=None,
+if sdc.config.config_pipeline_hpat_default:
+    @overload_method(DataFrameType, 'drop')
+    def drop_overload(df, labels=None, axis=0, index=None, columns=None,
+                      level=None, inplace=False, errors='raise'):
+
+        # TODO: avoid dummy and generate func here when inlining is possible
+        # TODO: inplace of df with parent (reflection)
+        def _impl(df, labels=None, axis=0, index=None, columns=None,
                   level=None, inplace=False, errors='raise'):
+            return sdc.hiframes.pd_dataframe_ext.drop_dummy(
+                df, labels, axis, columns, inplace)
 
-    # TODO: avoid dummy and generate func here when inlining is possible
-    # TODO: inplace of df with parent (reflection)
-    def _impl(df, labels=None, axis=0, index=None, columns=None,
-              level=None, inplace=False, errors='raise'):
-        return sdc.hiframes.pd_dataframe_ext.drop_dummy(
-            df, labels, axis, columns, inplace)
-
-    return _impl
+        return _impl
 
 
 def drop_dummy(df, labels, axis, columns, inplace):

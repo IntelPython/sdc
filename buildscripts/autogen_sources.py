@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -41,7 +41,7 @@ encoding_info = '# -*- coding: utf-8 -*-'
 
 copyright_header = '''\
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -134,13 +134,13 @@ if __name__ == '__main__':
             for name in arithmetic_binops_symbols:
                 func_text = func_template_arithmetic_binop.replace('binop', name)
                 func_text = func_text.replace(' + ', f' {arithmetic_binops_symbols[name]} ')
-                func_text = func_text.replace('def ', f'@overload(operator.{name})\ndef ', 1)
+                func_text = func_text.replace('def ', f'@sdc_overload(operator.{name})\ndef ', 1)
                 file.write(f'\n\n{func_text}')
 
             for name in comparison_binops_symbols:
                 func_text = func_template_comparison_binop.replace('comp_binop', name)
                 func_text = func_text.replace(' < ', f' {comparison_binops_symbols[name]} ')
-                func_text = func_text.replace('def ', f'@overload(operator.{name})\ndef ', 1)
+                func_text = func_text.replace('def ', f'@sdc_overload(operator.{name})\ndef ', 1)
                 file.write(f'\n\n{func_text}')
 
             exit_status = 0

@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -81,7 +81,6 @@ import numpy
 import pandas
 
 import numba
-from numba.extending import overload_method
 from numba.types import (Boolean, Integer, NoneType,
                          Omitted, StringLiteral, UnicodeType)
 
@@ -799,7 +798,7 @@ def hpat_pandas_stringmethods_startswith(self, pat, na=None):
     return hpat_pandas_stringmethods_startswith_impl
 
 
-@overload_method(StringMethodsType, 'zfill')
+@sdc_overload_method(StringMethodsType, 'zfill')
 def hpat_pandas_stringmethods_zfill(self, width):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -976,7 +975,7 @@ sdc_pandas_series_str_docstring_template = """
 """
 
 
-@overload_method(StringMethodsType, 'istitle')
+@sdc_overload_method(StringMethodsType, 'istitle')
 def hpat_pandas_stringmethods_istitle(self):
 
     ty_checker = TypeChecker('Method istitle().')
@@ -993,7 +992,7 @@ def hpat_pandas_stringmethods_istitle(self):
     return hpat_pandas_stringmethods_istitle_impl
 
 
-@overload_method(StringMethodsType, 'isspace')
+@sdc_overload_method(StringMethodsType, 'isspace')
 def hpat_pandas_stringmethods_isspace(self):
 
     ty_checker = TypeChecker('Method isspace().')
@@ -1010,7 +1009,7 @@ def hpat_pandas_stringmethods_isspace(self):
     return hpat_pandas_stringmethods_isspace_impl
 
 
-@overload_method(StringMethodsType, 'isalpha')
+@sdc_overload_method(StringMethodsType, 'isalpha')
 def hpat_pandas_stringmethods_isalpha(self):
 
     ty_checker = TypeChecker('Method isalpha().')
@@ -1027,7 +1026,7 @@ def hpat_pandas_stringmethods_isalpha(self):
     return hpat_pandas_stringmethods_isalpha_impl
 
 
-@overload_method(StringMethodsType, 'islower')
+@sdc_overload_method(StringMethodsType, 'islower')
 def hpat_pandas_stringmethods_islower(self):
 
     ty_checker = TypeChecker('Method islower().')
@@ -1044,7 +1043,7 @@ def hpat_pandas_stringmethods_islower(self):
     return hpat_pandas_stringmethods_islower_impl
 
 
-@overload_method(StringMethodsType, 'isalnum')
+@sdc_overload_method(StringMethodsType, 'isalnum')
 def hpat_pandas_stringmethods_isalnum(self):
 
     ty_checker = TypeChecker('Method isalnum().')
@@ -1090,4 +1089,4 @@ _hpat_pandas_stringmethods_autogen_exceptions = ['split', 'get', 'replace']
 
 for method_name in _hpat_pandas_stringmethods_autogen_methods:
     if not (method_name.startswith('__') or method_name in _hpat_pandas_stringmethods_autogen_exceptions):
-        overload_method(StringMethodsType, method_name)(_hpat_pandas_stringmethods_autogen(method_name))
+        sdc_overload_method(StringMethodsType, method_name)(_hpat_pandas_stringmethods_autogen(method_name))

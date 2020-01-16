@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -37,7 +37,6 @@ import operator
 import pandas
 
 from numba.errors import TypingError
-from numba.extending import overload, overload_method, overload_attribute
 from numba import types
 
 import sdc
@@ -46,9 +45,10 @@ from sdc.datatypes.common_functions import (check_index_is_numeric, find_common_
                                             sdc_join_series_indexes, sdc_check_indexes_equal, check_types_comparable)
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_arr_ext import (string_array_type, num_total_chars, str_arr_is_na)
+from sdc.utils import sdc_overload
 
 
-@overload(operator.add)
+@sdc_overload(operator.add)
 def sdc_pandas_series_operator_add(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.add` implementation
@@ -180,7 +180,7 @@ def sdc_pandas_series_operator_add(self, other):
     return None
 
 
-@overload(operator.sub)
+@sdc_overload(operator.sub)
 def sdc_pandas_series_operator_sub(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.sub` implementation
@@ -312,7 +312,7 @@ def sdc_pandas_series_operator_sub(self, other):
     return None
 
 
-@overload(operator.mul)
+@sdc_overload(operator.mul)
 def sdc_pandas_series_operator_mul(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.mul` implementation
@@ -444,7 +444,7 @@ def sdc_pandas_series_operator_mul(self, other):
     return None
 
 
-@overload(operator.truediv)
+@sdc_overload(operator.truediv)
 def sdc_pandas_series_operator_truediv(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.truediv` implementation
@@ -576,7 +576,7 @@ def sdc_pandas_series_operator_truediv(self, other):
     return None
 
 
-@overload(operator.floordiv)
+@sdc_overload(operator.floordiv)
 def sdc_pandas_series_operator_floordiv(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.floordiv` implementation
@@ -708,7 +708,7 @@ def sdc_pandas_series_operator_floordiv(self, other):
     return None
 
 
-@overload(operator.mod)
+@sdc_overload(operator.mod)
 def sdc_pandas_series_operator_mod(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.mod` implementation
@@ -840,7 +840,7 @@ def sdc_pandas_series_operator_mod(self, other):
     return None
 
 
-@overload(operator.pow)
+@sdc_overload(operator.pow)
 def sdc_pandas_series_operator_pow(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.pow` implementation
@@ -972,7 +972,7 @@ def sdc_pandas_series_operator_pow(self, other):
     return None
 
 
-@overload(operator.lt)
+@sdc_overload(operator.lt)
 def sdc_pandas_series_operator_lt(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.lt` implementation
@@ -1063,7 +1063,7 @@ def sdc_pandas_series_operator_lt(self, other):
     return None
 
 
-@overload(operator.gt)
+@sdc_overload(operator.gt)
 def sdc_pandas_series_operator_gt(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.gt` implementation
@@ -1154,7 +1154,7 @@ def sdc_pandas_series_operator_gt(self, other):
     return None
 
 
-@overload(operator.le)
+@sdc_overload(operator.le)
 def sdc_pandas_series_operator_le(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.le` implementation
@@ -1245,7 +1245,7 @@ def sdc_pandas_series_operator_le(self, other):
     return None
 
 
-@overload(operator.ge)
+@sdc_overload(operator.ge)
 def sdc_pandas_series_operator_ge(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.ge` implementation
@@ -1336,7 +1336,7 @@ def sdc_pandas_series_operator_ge(self, other):
     return None
 
 
-@overload(operator.ne)
+@sdc_overload(operator.ne)
 def sdc_pandas_series_operator_ne(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.ne` implementation
@@ -1427,7 +1427,7 @@ def sdc_pandas_series_operator_ne(self, other):
     return None
 
 
-@overload(operator.eq)
+@sdc_overload(operator.eq)
 def sdc_pandas_series_operator_eq(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.eq` implementation

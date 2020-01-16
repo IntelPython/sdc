@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -37,14 +37,10 @@ import sdc
 import copy
 
 from numba import types
-from numba.extending import (overload, overload_method, overload_attribute)
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.datatypes.common_functions import TypeChecker
-from numba.errors import TypingError
 from sdc.str_arr_ext import StringArrayType
-from sdc.config import config_pipeline_hpat_default
 
-from sdc.utils import sdc_overload_method
 from sdc.hiframes.pd_dataframe_type import DataFrameType
 
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
@@ -406,7 +402,7 @@ def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, 
         ty_checker.raise_exc(min_count, 'unsupported', 'min_count')
 
 
-@overload_method(DataFrameType, 'median')
+@sdc_overload_method(DataFrameType, 'median')
 def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.median` implementation.
@@ -444,7 +440,7 @@ def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'mean')
+@sdc_overload_method(DataFrameType, 'mean')
 def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.mean` implementation.
@@ -488,7 +484,7 @@ sdc_pandas_dataframe_rolling.__doc__ = sdc_pandas_rolling_docstring_tmpl.format(
     ty='DataFrame', ty_lower='dataframe')
 
 
-@overload_method(DataFrameType, 'std')
+@sdc_overload_method(DataFrameType, 'std')
 def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.std` implementation.
@@ -528,7 +524,7 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'var')
+@sdc_overload_method(DataFrameType, 'var')
 def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.var` implementation.
@@ -568,7 +564,7 @@ def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'max')
+@sdc_overload_method(DataFrameType, 'max')
 def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.max` implementation.
@@ -606,7 +602,7 @@ def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'min')
+@sdc_overload_method(DataFrameType, 'min')
 def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.min` implementation.
@@ -644,7 +640,7 @@ def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'sum')
+@sdc_overload_method(DataFrameType, 'sum')
 def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.sum` implementation.
@@ -684,7 +680,7 @@ def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'prod')
+@sdc_overload_method(DataFrameType, 'prod')
 def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
     """
        Pandas DataFrame method :meth:`pandas.DataFrame.prod` implementation.
@@ -724,13 +720,13 @@ def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'count')
+@sdc_overload_method(DataFrameType, 'count')
 def count_overload(df, axis=0, level=None, numeric_only=False):
     """
     Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.
     .. only:: developer
 
-      Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_count*
+    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_count*
 
     Parameters
     -----------
@@ -769,7 +765,180 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-@overload_method(DataFrameType, 'pct_change')
+def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
+    """
+    Input:
+    df.drop(columns='M', errors='ignore')
+
+    Func generated:
+    def sdc_pandas_dataframe_drop_impl(df, labels=None, axis=0, index=None, columns=None, level=None, inplace=False,
+     errors="raise"):
+        if errors == "raise":
+          raise ValueError("The label M is not found in the selected axis")
+        new_col_A_data_df = get_dataframe_data(df, 0)
+        new_col_B_data_df = get_dataframe_data(df, 1)
+        new_col_C_data_df = get_dataframe_data(df, 2)
+        return pandas.DataFrame({"A": new_col_A_data_df, "B": new_col_B_data_df, "C": new_col_C_data_df})
+
+    """
+    indent = 4 * ' '
+    df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
+    saved_df_columns = [column for column in df.columns if column not in drop_cols]
+    func_definition = [f'def sdc_pandas_dataframe_{func_name}_impl({", ".join(func_args)}):']
+    func_text = []
+    column_list = []
+
+    for label in drop_cols:
+        if label not in df.columns:
+            func_text.append(f'if errors == "raise":')
+            func_text.append(indent + f'raise ValueError("The label {label} is not found in the selected axis")')
+            break
+
+    for column in saved_df_columns:
+        func_text.append(f'new_col_{column}_data_{"df"} = get_dataframe_data({"df"}, {df_columns_indx[column]})')
+        column_list.append((f'new_col_{column}_data_df', column))
+
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
+    # TODO: Handle index
+    func_text.append(f"return pandas.DataFrame({{{data}}})\n")
+    func_definition.extend([indent + func_line for func_line in func_text])
+    func_def = '\n'.join(func_definition)
+
+    global_vars = {'pandas': pandas, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
+
+    return func_def, global_vars
+
+
+@sdc_overload_method(DataFrameType, 'drop')
+def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None, level=None, inplace=False,
+                              errors='raise'):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.drop
+
+    Limitations
+    -----------
+    Parameter columns is expected to be a Literal value with one column name or Tuple with columns names.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_drop.py
+        :language: python
+        :lines: 37-
+        :caption: Drop specified columns from DataFrame
+        Remove columns by specifying directly index or column names.
+        :name: ex_dataframe_drop
+
+    .. command-output:: python ./dataframe_drop.py
+        :cwd: ../../../examples
+
+     .. note::
+        Parameters axis, index, level, inplace, errors are currently unsupported
+        by Intel Scalable Dataframe Compiler
+        Currently multi-indexing is not supported.
+
+    .. seealso::
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Label-location based indexer for selection by label.
+        :ref:`DataFrame.dropna <pandas.DataFrame.dropna>`
+            Return DataFrame with labels on given axis omitted where (all or any) data are missing.
+        :ref:`DataFrame.drop_duplicates <pandas.DataFrame.drop_duplicates>`
+            Return DataFrame with duplicate rows removed, optionally only considering certain columns.
+        :ref:`Series.drop <pandas.Series.drop>`
+            Return Series with specified index labels removed.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.DataFrame.drop` implementation.
+    .. only:: developer
+    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_drop*
+    Parameters
+    -----------
+    df: :obj:`pandas.DataFrame`
+        input arg
+    labels: single label or list-like
+        Column labels to drop
+        *unsupported*
+    axis: :obj:`int` default 0
+        *unsupported*
+    index: single label or list-like
+        *unsupported*
+    columns: single label or list-like
+    level: :obj:`int` or :obj:`str`
+        For MultiIndex, level from which the labels will be removed.
+        *unsupported*
+    inplace: :obj:`bool` default False
+        *unsupported*
+    errors: :obj:`str` default 'raise'
+        If 'ignore', suppress error and only existing labels are dropped.
+        *unsupported*
+
+    Returns
+    -------
+    :obj: `pandas.DataFrame`
+        DataFrame without the removed index or column labels.
+
+    Raises
+    -------
+    KeyError
+        If any of the labels is not found in the selected axis.
+    """
+
+    _func_name = 'drop'
+
+    ty_checker = TypeChecker(f'Method {_func_name}().')
+    ty_checker.check(df, DataFrameType)
+
+    if not isinstance(labels, types.Omitted) and labels is not None:
+        ty_checker.raise_exc(labels, 'None', 'labels')
+
+    if not isinstance(axis, (int, types.Omitted)):
+        ty_checker.raise_exc(axis, 'int', 'axis')
+
+    if not isinstance(index, types.Omitted) and index is not None:
+        ty_checker.raise_exc(index, 'None', 'index')
+
+    if not isinstance(columns, (types.Omitted, types.Tuple, types.Literal)):
+        ty_checker.raise_exc(columns, 'str, tuple of str', 'columns')
+
+    if not isinstance(level, (types.Omitted, types.Literal)) and level is not None:
+        ty_checker.raise_exc(level, 'None', 'level')
+
+    if not isinstance(inplace, (bool, types.Omitted)) and inplace:
+        ty_checker.raise_exc(inplace, 'bool', 'inplace')
+
+    if not isinstance(errors, (str, types.Omitted, types.Literal)):
+        ty_checker.raise_exc(errors, 'str', 'errors')
+
+    args = {'labels': None, 'axis': 0, 'index': None, 'columns': None, 'level': None, 'inplace': False,
+            'errors': f'"raise"'}
+
+    def sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns):
+        func_args = ['df']
+        for key, value in args.items():
+            if key not in func_args:
+                if isinstance(value, types.Literal):
+                    value = value.literal_value
+                func_args.append(f'{key}={value}')
+
+        if isinstance(columns, types.StringLiteral):
+            drop_cols = (columns.literal_value,)
+        elif isinstance(columns, types.Tuple):
+            drop_cols = tuple(column.literal_value for column in columns)
+        else:
+            raise ValueError('Only drop by one column or tuple of columns is currently supported in df.drop()')
+
+        func_def, global_vars = sdc_pandas_dataframe_drop_codegen(_func_name, func_args, df, drop_cols)
+        loc_vars = {}
+        exec(func_def, global_vars, loc_vars)
+        _drop_impl = loc_vars['sdc_pandas_dataframe_drop_impl']
+        return _drop_impl
+
+    return sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns)
+
+
+@sdc_overload_method(DataFrameType, 'pct_change')
 def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None):
     """
     Pandas DataFrame method :meth:`pandas.DataFrame.pct_change` implementation.
