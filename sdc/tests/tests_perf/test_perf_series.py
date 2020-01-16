@@ -244,18 +244,16 @@ cases_two_par = [
     ('pow', '', [10 ** 7])
 ]
 
-for params in cases:
-    func, param, length = params
-    name = func
-    if param:
-        name += to_varname(param)
-    func_name = 'test_series_float_{}'.format(name)
-    setattr(TestSeriesMethods, func_name, test_gen(func, param, length))
 
-for params in cases_two_par:
-    func, param, length = params
-    name = func
-    if param:
-        name += to_varname(param)
-    func_name = 'test_series_float_{}'.format(name)
-    setattr(TestSeriesMethods, func_name, test_gen_two_par(func, param, length))
+def gen(cases, meth):
+    for params in cases:
+        func, param, length = params
+        name = func
+        if param:
+            name += to_varname(param)
+        func_name = 'test_series_float_{}'.format(name)
+        setattr(TestSeriesMethods, func_name, meth(func, param, length))
+
+
+gen(cases, test_gen)
+gen(cases_two_par, test_gen_two_par)
