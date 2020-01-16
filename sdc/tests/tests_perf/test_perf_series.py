@@ -171,7 +171,7 @@ class TestSeriesMethods(TestBase):
                                             [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7])
 
 
-def test_gen(name, params, data_length, call_expression=None):
+def test_gen(name, params, data_length, call_expression):
     func_name = 'func'
     if call_expression is None:
         call_expression = '{}({})'.format(name, params)
