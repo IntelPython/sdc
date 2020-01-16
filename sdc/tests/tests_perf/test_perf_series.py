@@ -83,6 +83,14 @@ def usecase_series_astype_int(input_data):
     return res_time, input_data
 
 
+def usecase_series_at(input_data):
+    start_time = time.time()
+    res = input_data.at[3]
+    finish_time = time.time()
+
+    return finish_time - start_time, res
+
+
 def usecase_series_chain_add_and_sum(A, B):
     start_time = time.time()
     res = (A + B).sum()
@@ -334,6 +342,7 @@ class TestSeriesMethods(TestBase):
             'series_append': [10 ** 7],
             'series_argsort': [10 ** 5],
             'series_astype_int': [2 * 10 ** 7],
+            'series_at': [10 ** 7],
             'series_chain_add_and_sum': [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7],
             'series_copy': [10 ** 8],
             'series_corr': [10 ** 7],
@@ -439,6 +448,9 @@ class TestSeriesMethods(TestBase):
 
     def test_series_float_astype_int(self):
         self._test_case(usecase_series_astype_int, 'series_astype_int', input_data=[test_global_input_data_float64[0]])
+
+    def test_series_float_at(self):
+        self._test_case(usecase_series_at, 'series_at')
 
     def test_series_chain_add_and_sum(self):
         self._test_series_binary_operations(usecase_series_chain_add_and_sum, 'series_chain_add_and_sum')
