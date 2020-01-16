@@ -24,19 +24,25 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+   Expected result:
+       B  C
+   0  4  a
+   1  5  b
+   2  6  c
+   3  7  d
+   dtype: object
+"""
+
 import pandas as pd
 from numba import njit
 
 
 @njit
-def df_rolling_std():
-    df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
-    out_df = df.rolling(3).std()
+def dataframe_drop():
+    df = pd.DataFrame({'A': [1.0, 2.0, 3.0, 1.0], 'B': [4, 5, 6, 7], 'C': ['a', 'b', 'c', 'd']})
 
-    # Expect DataFrame of
-    # {'A': [NaN, NaN, 1.000000, 1.527525, 2.081666],
-    #  'B': [NaN, NaN, 1.000000, 1.527525, 2.081666]}
-    return out_df
+    return df.drop(columns='A')
 
 
-print(df_rolling_std())
+print(dataframe_drop())

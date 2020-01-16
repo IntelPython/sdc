@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -29,14 +29,22 @@ from numba import njit
 
 
 @njit
-def df_rolling_std():
-    df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
-    out_df = df.rolling(3).std()
+def dataframe_append():
+    """
+    Expected result:
+         A  B    C
+    0  1.0  3  NaN
+    1  2.0  4  NaN
+    2  NaN  5  7.0
+    3  NaN  6  8.0
 
-    # Expect DataFrame of
-    # {'A': [NaN, NaN, 1.000000, 1.527525, 2.081666],
-    #  'B': [NaN, NaN, 1.000000, 1.527525, 2.081666]}
-    return out_df
+    """
+
+    df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
+    df2 = pd.DataFrame({'B': [5, 6], 'C': [7, 8]})
+    result = df.append(df2)
+
+    return result
 
 
-print(df_rolling_std())
+print(dataframe_append())

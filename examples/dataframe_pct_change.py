@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -29,14 +29,23 @@ from numba import njit
 
 
 @njit
-def df_rolling_std():
-    df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
-    out_df = df.rolling(3).std()
+def dataframe_pct_change():
+    df = pd.DataFrame({"A": [14, 4, 5, 4, 1, 55],
+                       "B": [5, 2, 54, 3, 2, 32],
+                       "C": [20, 20, 7, 21, 8, 5],
+                       "D": [14, 3, 6, 2, 6, 4]})
+    out_df = df.pct_change()
 
-    # Expect DataFrame of
-    # {'A': [NaN, NaN, 1.000000, 1.527525, 2.081666],
-    #  'B': [NaN, NaN, 1.000000, 1.527525, 2.081666]}
     return out_df
 
+# result DataFrame
+#            A          B         C         D
+# 0        NaN        NaN       NaN       NaN
+# 1  -0.714286  -0.600000  0.000000 -0.785714
+# 2   0.250000  26.000000 -0.650000  1.000000
+# 3  -0.200000  -0.944444  2.000000 -0.666667
+# 4  -0.750000  -0.333333 -0.619048  2.000000
+# 5  54.000000  15.000000 -0.375000 -0.333333
 
-print(df_rolling_std())
+
+print(dataframe_pct_change())

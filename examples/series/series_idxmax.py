@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,19 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy as np
 import pandas as pd
 from numba import njit
 
 
 @njit
-def df_rolling_std():
-    df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
-    out_df = df.rolling(3).std()
+def series_idxmax():
+    s = pd.Series([4, np.nan, 2, 1], index=['A', 'B', 'C', 'D'])
 
-    # Expect DataFrame of
-    # {'A': [NaN, NaN, 1.000000, 1.527525, 2.081666],
-    #  'B': [NaN, NaN, 1.000000, 1.527525, 2.081666]}
-    return out_df
+    return s.idxmax()  # Expect index of maximum value A
 
 
-print(df_rolling_std())
+print(series_idxmax())

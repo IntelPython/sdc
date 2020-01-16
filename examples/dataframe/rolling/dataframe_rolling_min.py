@@ -29,14 +29,13 @@ from numba import njit
 
 
 @njit
-def df_rolling_std():
+def df_rolling_min():
     df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
-    out_df = df.rolling(3).std()
+    out_df = df.rolling(3).min()
 
     # Expect DataFrame of
-    # {'A': [NaN, NaN, 1.000000, 1.527525, 2.081666],
-    #  'B': [NaN, NaN, 1.000000, 1.527525, 2.081666]}
+    # {'A': [NaN, NaN, 3.0, 2.0, 2.0], 'B': [NaN, NaN, -5.0, -5.0, -6.0]}
     return out_df
 
 
-print(df_rolling_std())
+print(df_rolling_min())

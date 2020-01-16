@@ -24,19 +24,25 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import pandas as pd
-from numba import njit
+from numba.extending import intrinsic, register_model
+from sdc.datatypes.hpat_pandas_rolling_types import (
+    gen_hpat_pandas_rolling_init, RollingType, RollingTypeModel)
 
 
-@njit
-def df_rolling_std():
-    df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
-    out_df = df.rolling(3).std()
-
-    # Expect DataFrame of
-    # {'A': [NaN, NaN, 1.000000, 1.527525, 2.081666],
-    #  'B': [NaN, NaN, 1.000000, 1.527525, 2.081666]}
-    return out_df
+class DataFrameRollingType(RollingType):
+    """Type definition for pandas.DataFrame.rolling functions handling."""
+    def __init__(self, data, win_type=None, on=None, closed=None):
+        super(DataFrameRollingType, self).__init__('DataFrameRollingType',
+                                                   data, win_type=win_type,
+                                                   on=on, closed=closed)
 
 
-print(df_rolling_std())
+@register_model(DataFrameRollingType)
+class DataFrameRollingTypeModel(RollingTypeModel):
+    """Model for DataFrameRollingType type."""
+    def __init__(self, dmm, fe_type):
+        super(DataFrameRollingTypeModel, self).__init__(dmm, fe_type)
+
+
+_hpat_pandas_df_rolling_init = intrinsic(gen_hpat_pandas_rolling_init(
+    DataFrameRollingType))
