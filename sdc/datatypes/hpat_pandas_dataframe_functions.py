@@ -52,7 +52,67 @@ from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
-from sdc.utils import sdc_overload_method
+from sdc.utils import sdc_overload_method, sdc_overload_attribute
+
+
+@sdc_overload_attribute(DataFrameType, 'index')
+def hpat_pandas_dataframe_index(df):
+    """
+       Intel Scalable Dataframe Compiler User Guide
+       ********************************************
+       Pandas API: pandas.DataFrame.index
+       Examples
+       --------
+       .. literalinclude:: ../../../examples/dataframe_index.py
+          :language: python
+          :lines: 27-
+          :caption: The index (row labels) of the DataFrame.
+          :name: ex_dataframe_index
+
+       .. command-output:: python ./dataframe_index.py
+           :cwd: ../../../examples
+
+       Intel Scalable Dataframe Compiler Developer Guide
+       *************************************************
+       Pandas DataFrame attribute :attr:`pandas.DataFrame.index` implementation.
+       .. only:: developer
+       Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_index*
+       Parameters
+       -----------
+       df: :obj:`pandas.DataFrame`
+           input arg
+       Returns
+       -------
+       :obj: `numpy.Array`
+           return the index of DataFrame
+    """
+
+    ty_checker = TypeChecker(f'Attribute index.')
+    ty_checker.check(df, DataFrameType)
+
+    def sdc_pandas_dataframe_index_impl(df):
+        indent = 4 * ' '
+        func_args = ['df']
+
+        func_definition = [f'def sdc_pandas_dataframe_index_impl({", ".join(func_args)}):']
+        func_text = []
+        if isinstance(df.index, types.NoneType):
+            func_text.append("df_len = len(get_dataframe_data(df, 0))")
+            func_text.append("return numpy.arange(df_len)")
+        else:
+            func_text.append("return df._index\n")
+
+        func_definition.extend([indent + func_line for func_line in func_text])
+        func_def = '\n'.join(func_definition)
+
+        global_vars = {'numpy': numpy, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
+        loc_vars = {}
+
+        exec(func_def, global_vars, loc_vars)
+        _index_impl = loc_vars['sdc_pandas_dataframe_index_impl']
+        return _index_impl
+
+    return sdc_pandas_dataframe_index_impl(df)
 
 
 def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
