@@ -245,14 +245,14 @@ cases_two_par = [
 ]
 
 
-def gen(cases, meth):
+def gen(cases, method):
     for params in cases:
         func, param, length = params
         name = func
         if param:
             name += to_varname(param)
         func_name = 'test_series_float_{}'.format(name)
-        setattr(TestSeriesMethods, func_name, meth(func, param, length))
+        setattr(TestSeriesMethods, func_name, method(func, param, length))
 
 
 gen(cases, test_gen)
