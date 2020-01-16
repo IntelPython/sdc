@@ -171,12 +171,14 @@ class TestSeriesMethods(TestBase):
                                             [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7])
 
 
-def test_gen(name, params, data_length):
+def test_gen(name, params, data_length, call_expression):
     func_name = 'func'
+    if call_expression is None:
+        call_expression = '{}({})'.format(name, params)
 
     func_text = f"""\
 def {func_name}(self):
-  self._test_case(usecase_gen('{name}({params})'), 'series_{name}', {data_length})
+  self._test_case(usecase_gen('{call_expression}'), 'series_{name}', {data_length})
 """
 
     global_vars = {'usecase_gen': usecase_gen}
@@ -208,12 +210,14 @@ def {func_name}(self):
 cases = [
     ('abs', '', [3 * 10 ** 8]),
     ('argsort', '', [10 ** 5]),
+    ('at', '', [10 ** 7], 'at[3]'),
     ('copy', '', [10 ** 8]),
     ('count', '', [2 * 10 ** 9]),
     ('cumsum', '', [2 * 10 ** 8]),
     ('describe', '', [10 ** 7]),
     ('dropna', '', [2 * 10 ** 8]),
     ('fillna', '-1', [2 * 10 ** 7]),
+    ('head', '', [10 ** 8]),
     ('idxmax', '', [10 ** 9]),
     ('idxmin', '', [10 ** 9]),
     ('isna', '', [2 * 10 ** 7]),
@@ -226,6 +230,7 @@ cases = [
     ('nsmallest', '', [10 ** 9]),
     ('nunique', '', [10 ** 5]),
     ('prod', '', [5 * 10 ** 8]),
+    ('pct_change', 'periods=1, limit=None, freq=None', [10 ** 7]),
     ('quantile', '', [10 ** 8]),
     ('shift', '', [5 * 10 ** 8]),
     ('sort_values', '', [10 ** 5]),
@@ -241,16 +246,24 @@ cases_two_par = [
     ('append', '', [10 ** 7]),
     ('corr', '', [10 ** 7]),
     ('cov', '', [10 ** 8]),
-    ('pow', '', [10 ** 7])
+    ('div', '', [10 ** 7]),
+    ('eq', '', [10 ** 7]),
+    ('floordiv', '', [10 ** 7]),
+    ('ge', '', [10 ** 7]),
+    ('pow', '', [10 ** 7]),
 ]
 
 for params in cases:
-    func, param, length = params
+    if len(params) == 4:
+        func, param, length, call_expression = params
+    else:
+        func, param, length = params
+        call_expression = None
     name = func
     if param:
-        name += to_varname(param)
+        name += "_" + to_varname(param).replace('__', '_')
     func_name = 'test_series_float_{}'.format(name)
-    setattr(TestSeriesMethods, func_name, test_gen(func, param, length))
+    setattr(TestSeriesMethods, func_name, test_gen(func, param, length, call_expression))
 
 for params in cases_two_par:
     func, param, length = params
