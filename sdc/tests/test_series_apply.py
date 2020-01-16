@@ -27,6 +27,8 @@
 import pandas as pd
 import numpy as np
 
+import numba
+
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_sdc_jit
 
@@ -78,9 +80,22 @@ class TestSeries_apply(object):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit("'Var' object has no attribute 'py_func'")
-    def test_series_apply_log(self):
+    def test_series_apply_np(self):
         def test_impl(S):
             return S.apply(np.log)
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(DATA)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit("'function' object has no attribute 'py_func'")
+    def test_series_apply_register_jitable(self):
+        @numba.extending.register_jitable
+        def square(x):
+            return x ** 2
+
+        def test_impl(S):
+            return S.apply(square)
         hpat_func = self.jit(test_impl)
 
         S = pd.Series(DATA)
