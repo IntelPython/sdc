@@ -245,9 +245,7 @@ cases_two_par = [
 ]
 
 for params in cases:
-    func = params[0]
-    param = params[1]
-    length = params[2]
+    func, param, length = params
     name = func
     if param:
         name += to_varname(param)
@@ -255,9 +253,7 @@ for params in cases:
     setattr(TestSeriesMethods, func_name, test_gen(func, param, length))
 
 for params in cases_two_par:
-    func = params[0]
-    param = params[1]
-    length = params[2]
+    func, param, length = params
     name = func
     if param:
         name += to_varname(param)
