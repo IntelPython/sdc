@@ -234,11 +234,13 @@ cases = {
     'unique': ('unique', '', [10 ** 5]),
 }
 
-cases_two_par = {'add': ('add', '', [10 ** 7]),
-                 'append': ('append', '', [10 ** 7]),
-                 'corr': ('corr', '', [10 ** 7]),
-                 'cov': ('cov', '', [10 ** 8]),
-                 'pow': ('pow', '', [10 ** 7])}
+cases_two_par = {
+    'add': ('add', '', [10 ** 7]),
+    'append': ('append', '', [10 ** 7]),
+    'corr': ('corr', '', [10 ** 7]),
+    'cov': ('cov', '', [10 ** 8]),
+    'pow': ('pow', '', [10 ** 7])
+}
 
 for name, params in cases.items():
     func = params[0]
