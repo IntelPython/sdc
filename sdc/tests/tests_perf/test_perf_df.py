@@ -35,6 +35,25 @@ from sdc.tests.tests_perf.test_perf_utils import calc_compilation, get_times, pe
 from sdc.tests.test_utils import test_global_input_data_float64
 
 
+def usecase_gen(call_expression):
+    func_name = 'usecase_func'
+
+    func_text = f"""\
+def {func_name}(input_data):
+  start_time = time.time()
+  res = input_data.{call_expression}
+  finish_time = time.time()
+  return finish_time - start_time, res
+"""
+
+    loc_vars = {}
+    exec(func_text, globals(), loc_vars)
+    _gen_impl = loc_vars[func_name]
+
+    return _gen_impl
+
+
+
 def usecase_df_min(input_data):
     start_time = time.time()
     res = input_data.min()
