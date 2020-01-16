@@ -166,8 +166,8 @@ class TestSeriesMethods(TestBase):
 
     def test_series_chain_add_and_sum(self):
         self._test_series_binary_operations(usecase_series_chain_add_and_sum,
-                                            [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7],
-                                            'series_chain_add_and_sum')
+                                            'series_chain_add_and_sum',
+                                            [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7])
 
 
 def test_gen(name, params, data_length):
