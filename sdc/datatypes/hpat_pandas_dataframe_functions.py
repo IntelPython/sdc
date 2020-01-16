@@ -30,11 +30,9 @@
 '''
 
 
-import operator
 import pandas
 import numpy
 import sdc
-import copy
 
 from numba import types
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
@@ -79,7 +77,7 @@ def hpat_pandas_dataframe_index(df):
            input arg
        Returns
        -------
-       :obj: `numpy.Array`
+       :obj: `numpy.array`
            return the index of DataFrame
     """
 
