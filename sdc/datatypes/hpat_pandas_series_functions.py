@@ -161,12 +161,12 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                 if max_diff > 0:
                     start_position = start_position_inc
                     stop_position = stop_position_inc
-                    if idx_stop < index[0]:
+                    if idx_start <= index[0] and idx_stop < index[0] and start_position == 0 and stop_position == 0:
                         return pandas.Series(data=series._data[:0], index=series._index[:0], name=series._name)
                 else:
                     start_position = start_position_dec
                     stop_position = stop_position_dec if idx.stop != max_int64 else len(index)
-                    if idx_stop > index[0]:
+                    if idx_start >= index[0] and idx_stop > index[0] and start_position == 0 and stop_position == 0:
                         return pandas.Series(data=series._data[:0], index=series._index[:0], name=series._name)
 
                 stop_position = min(stop_position + 1, len(index))
