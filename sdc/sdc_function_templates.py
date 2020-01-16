@@ -286,8 +286,8 @@ def sdc_str_arr_operator_comp_binop(self, other):
             n = len(self)
             out_list = [False] * n
             for i in numba.prange(n):
-                out_list[i] = out_list[i] = (self[i] < other[i]
-                                             and not (str_arr_is_na(self, i) or str_arr_is_na(other, i)))
+                out_list[i] = (self[i] < other[i]
+                               and not (str_arr_is_na(self, i) or str_arr_is_na(other, i)))
             return out_list
 
     elif self_is_str_arr:

@@ -530,6 +530,7 @@ class SetItemStringArray(AbstractTemplate):
                 and val == string_type):
             return signature(types.none, *args)
 
+
 if sdc.config.config_pipeline_hpat_default:
     @infer
     @infer_global(operator.eq)
@@ -1436,10 +1437,13 @@ def append_string_array_to(result, pos, A):
 
 
 @numba.njit(no_cpython_wrapper=True)
-def make_str_arr_from_list(str_list):
+def create_str_arr_from_list(str_list):
 
-    data_total_chars = np.sum(np.asarray([len(s) for s in str_list]))
-    str_arr = pre_alloc_string_array(len(str_list), data_total_chars)
+    n = len(str_list)
+    data_total_chars = 0
+    for i in numba.prange(n):
+        data_total_chars += len(str_list[i])
+    str_arr = pre_alloc_string_array(n, data_total_chars)
     cp_str_list_to_array(str_arr, str_list)
 
     return str_arr
