@@ -33,6 +33,7 @@ import numba
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from sdc.tests.test_utils import test_global_input_data_float64
+from sdc.io.csv_ext import to_varname
 
 
 def usecase_gen(call_expression):
@@ -53,23 +54,11 @@ def {func_name}(input_data):
     return _gen_impl
 
 
-
-def usecase_df_min(input_data):
-    start_time = time.time()
-    res = input_data.min()
-    finish_time = time.time()
-
-    return finish_time - start_time, res
-
-
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_df.TestDataFrameMethods
 class TestDataFrameMethods(TestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.total_data_length = {
-            'min': [10 ** 7],
-        }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
         # compilation time
@@ -88,11 +77,11 @@ class TestDataFrameMethods(TestBase):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, data_name, test_name=None, input_data=test_global_input_data_float64):
+    def _test_case(self, pyfunc, data_name, total_data_length, test_name=None, input_data=test_global_input_data_float64):
         test_name = test_name or data_name
 
         full_input_data_length = sum(len(i) for i in input_data)
-        for data_length in self.total_data_length[data_name]:
+        for data_length in total_data_length:
             base = {
                 "test_name": test_name,
                 "data_size": data_length,
@@ -111,5 +100,41 @@ class TestDataFrameMethods(TestBase):
             self._test_python(pyfunc, record, test_data)
             self.test_results.add(**record)
 
-    def test_df_min(self):
-        self._test_case(usecase_df_min, 'min', 'DataFrame.min')
+
+def test_gen(name, params, data_length):
+    func_name = 'func'
+
+    func_text = f"""\
+def {func_name}(self):
+  self._test_case(usecase_gen('{name}({params})'), '{name}', {data_length}, 'DataFrame.{name}')
+"""
+
+    global_vars = {'usecase_gen': usecase_gen}
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _gen_impl = loc_vars[func_name]
+
+    return _gen_impl
+
+
+cases = [
+    ('count', '', [10 ** 7]),
+    ('max', '', [10 ** 7]),
+    ('mean', '', [10 ** 7]),
+    ('median', '', [10 ** 7]),
+    ('min', '', [10 ** 7]),
+    ('pct_change', '', [10 ** 7]),
+    ('prod', '', [10 ** 7]),
+    ('std', '', [10 ** 7]),
+    ('sum', '', [10 ** 7]),
+    ('var', '', [10 ** 7]),
+]
+
+for params in cases:
+    func, param, length = params
+    name = func
+    if param:
+        name += to_varname(param)
+    func_name = 'test_df_{}'.format(name)
+    setattr(TestDataFrameMethods, func_name, test_gen(func, param, length))
