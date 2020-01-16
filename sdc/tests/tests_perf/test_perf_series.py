@@ -39,6 +39,9 @@ from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 
 
+global_vars = {'time': time, 'np': np}
+
+
 def usecase_gen(call_expression):
     func_name = 'usecase_func'
 
@@ -49,9 +52,6 @@ def {func_name}(input_data):
   finish_time = time.time()
   return finish_time - start_time, res
 """
-
-    global_vars = {'time': time,
-                   'np': np}
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
@@ -70,9 +70,6 @@ def {func_name}(A, B):
   finish_time = time.time()
   return finish_time - start_time, res
 """
-
-    global_vars = {'time': time,
-                   'np': np}
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
@@ -245,35 +242,50 @@ def {func_name}(self):
 
 
 cases = {
-    'abs': ('abs', []), 'argsort': ('argsort', []),
-    'copy': ('copy', []), 'count': ('count', []), 'cumsum': ('cumsum', []),
-    'describe': ('describe', []), 'dropna': ('dropna', []),
-    'fillna': ('fillna', ['-1']),
-    'idxmax': ('idxmax', []), 'idxmin': ('idxmin', []), 'isna': ('isna', []),
-    'max': ('max', []), 'mean': ('mean', []), 'median': ('median', []), 'min': ('min', []),
-    'min_skipna_True': ('min', ['skipna=True']),
-    'nlargest': ('nlargest', []), 'nsmallest': ('nsmallest', []), 'nunique': ('nunique', []),
-    'prod': ('prod', []),
-    'quantile': ('quantile', []),
-    'shift': ('shift', []), 'sort_values': ('sort_values', []), 'std': ('std', []), 'sum': ('sum', []),
-    'value_counts': ('value_counts', []), 'var': ('var', []),
-    'unique': ('unique', []),
+    'abs': ('abs', ''),
+    'argsort': ('argsort', ''),
+    'copy': ('copy', ''),
+    'count': ('count', ''),
+    'cumsum': ('cumsum', ''),
+    'describe': ('describe', ''),
+    'dropna': ('dropna', ''),
+    'fillna': ('fillna', '-1'),
+    'idxmax': ('idxmax', ''),
+    'idxmin': ('idxmin', ''),
+    'isna': ('isna', ''),
+    'max': ('max', ''),
+    'mean': ('mean', ''),
+    'median': ('median', ''),
+    'min': ('min', ''),
+    'min_skipna_True': ('min', 'skipna=True'),
+    'nlargest': ('nlargest', ''),
+    'nsmallest': ('nsmallest', ''),
+    'nunique': ('nunique', ''),
+    'prod': ('prod', ''),
+    'quantile': ('quantile', ''),
+    'shift': ('shift', ''),
+    'sort_values': ('sort_values', ''),
+    'std': ('std', ''),
+    'sum': ('sum', ''),
+    'value_counts': ('value_counts', ''),
+    'var': ('var', ''),
+    'unique': ('unique', ''),
 }
 
-cases_two_par = {'add': ('add', []), 'append': ('append', []),
-                 'corr': ('corr', []), 'cov': ('cov', []),
-                 'pow': ('pow', [])}
+cases_two_par = {'add': ('add', ''),
+                 'append': ('append', ''),
+                 'corr': ('corr', ''),
+                 'cov': ('cov', ''),
+                 'pow': ('pow', '')}
 
 for name, par in cases.items():
     func = par[0]
     params = par[1]
     func_name = 'test_series_float_{}'.format(name)
-    params_lst = ', '.join(params)
-    setattr(TestSeriesMethods, func_name, test_gen(func, params_lst))
+    setattr(TestSeriesMethods, func_name, test_gen(func, params))
 
 for name, par in cases_two_par.items():
     func = par[0]
     params = par[1]
     func_name = 'test_series_float_{}'.format(name)
-    params_lst = ', '.join(params)
-    setattr(TestSeriesMethods, func_name, test_gen_two_par(func, params_lst))
+    setattr(TestSeriesMethods, func_name, test_gen_two_par(func, params))
