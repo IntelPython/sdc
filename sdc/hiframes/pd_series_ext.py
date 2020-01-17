@@ -771,7 +771,7 @@ if not sdc.config.config_pipeline_hpat_default:
         _not_series_array_attrs.append(attr)
 
 _non_hpat_pipeline_attrs = [
-    'resolve_append', 'resolve_combine', 'resolve_corr', 'resolve_cov',
+    'resolve_append', 'resolve_apply', 'resolve_combine', 'resolve_corr', 'resolve_cov',
     'resolve_dropna', 'resolve_fillna', 'resolve_head', 'resolve_nlargest',
     'resolve_nsmallest', 'resolve_pct_change', 'resolve_loc', 'resolve_iloc',
     'resolve_iat', 'resolve_rolling', 'resolve_value_counts', 'resolve_describe',

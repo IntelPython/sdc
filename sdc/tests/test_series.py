@@ -44,6 +44,9 @@ from numba.config import IS_32BITS
 from numba.errors import TypingError
 from numba.special import literally
 
+from .test_series_apply import TestSeries_apply
+
+
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
     (
         [np.nan, -2., 3., 9.1],
@@ -249,7 +252,7 @@ def isalnum_usecase(series):
 GLOBAL_VAL = 2
 
 
-class TestSeries(TestCase):
+class TestSeries(TestSeries_apply, TestCase):
 
     @skip_numba_jit
     def test_create1(self):
@@ -2869,15 +2872,6 @@ class TestSeries(TestCase):
         S1 = pd.Series([1.0, 2., 3., 4., 5.])
         S2 = pd.Series([6.0, 21., 3.6, 5., 0.0])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
-
-    @skip_numba_jit
-    def test_series_apply1(self):
-        def test_impl(S):
-            return S.apply(lambda a: 2 * a)
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_abs1(self):
         def test_impl(S):
