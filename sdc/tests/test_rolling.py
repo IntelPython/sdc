@@ -550,6 +550,7 @@ class TestRolling(TestCase):
         self._test_rolling_min(df)
 
     @unittest.expectedFailure
+    @unittest.skipIf(platform.system() == 'Darwin', 'Segmentation fault on Mac')
     @skip_sdc_jit('DataFrame.rolling.min() unsupported')
     def test_df_rolling_min_exception_many_columns(self):
         def test_impl(df):
