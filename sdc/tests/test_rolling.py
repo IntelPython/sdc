@@ -604,7 +604,7 @@ class TestRolling(TestCase):
         self._test_rolling_corr(df, other)
 
     @skip_sdc_jit('DataFrame.rolling.corr() unsupported')
-    def test_df_rolling_corr_with_no_other(self):
+    def test_df_rolling_corr_no_other(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
             [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
