@@ -4574,7 +4574,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     kind_supported_types = (str, types.Omitted, types.NoneType, types.StringLiteral, types.UnicodeType)
     if not isinstance(kind, kind_supported_types):
         ty_checker.raise_exc(kind, 'string', 'kind')
-    kind_is_default = isinstance(kind, (str, types.Omitted, types.NoneType))
+    kind_is_none_or_default = isinstance(kind, (str, types.Omitted, types.NoneType))
 
     na_position_supported_types = (str, types.Omitted, types.StringLiteral, types.UnicodeType)
     if not isinstance(na_position, na_position_supported_types):
@@ -4588,19 +4588,16 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
         common_functions._sdc_pandas_series_check_axis(axis)
 
-        # TODO: investigate why 'not in' doesn't work in this context
-        kind_is_valid = kind is None or kind in ('quicksort', 'mergesort')
-        if not kind_is_valid:
+        if not (kind_is_none_or_default or kind in ('quicksort', 'mergesort')):
             raise ValueError("Method sort_values(). Unsupported parameter. Given kind != 'quicksort', 'mergesort'")
 
-        na_position_is_valid = na_position in ('last', 'first')
-        if not na_position_is_valid:
+        if na_position not in ('last', 'first'):
             raise ValueError("Method sort_values(). Unsupported parameter. Given na_position != 'last', 'first'")
 
         data_nan_mask = sdc.hiframes.api.get_nan_mask(self._data)
         good = ~data_nan_mask
 
-        if kind_is_default == True:  # noqa
+        if kind_is_none_or_default == True:  # noqa
             argsort_res = sdc_arrays_argsort(self._data[good], kind='quicksort')
         else:
             argsort_res = sdc_arrays_argsort(self._data[good], kind=kind)
