@@ -100,7 +100,6 @@ class TestSeries_apply(object):
         S = pd.Series(DATA)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit("'args' in apply is not supported")
     @skip_sdc_jit("'args' in apply is not supported")
     def test_series_apply_args(self):
         @numba.extending.register_jitable

@@ -26,6 +26,7 @@
 
 import numpy
 import pandas
+import numba
 
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.utils import sdc_overload_method
@@ -94,6 +95,14 @@ def hpat_pandas_series_apply(self, func, convert_dtype=True, args=()):
     ty_checker.check(self, SeriesType)
 
     def impl(self, func, convert_dtype=True, args=()):
-        return pandas.Series(list(map(func, self._data)), index=self._index, name=self._name)
+        input_arr = self._data
+        length = len(input_arr)
+
+        output_arr = numpy.empty(length, dtype=numba.types.float64)
+
+        for i in numba.prange(length):
+            output_arr[i] = func(input_arr[i], *args)
+
+        return pandas.Series(output_arr, index=self._index, name=self._name)
 
     return impl
