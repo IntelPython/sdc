@@ -238,14 +238,14 @@ class SeriesAttribute(AttributeTemplate):
     #     sig.return_type = if_arr_to_series_type(sig.return_type)
     #     return sig
 
-    # @bound_function("series.sort_values")
-    # def resolve_sort_values(self, ary, args, kws):
-    #     # output will have permuted input index
-    #     out_index = ary.index
-    #     if out_index == types.none:
-    #         out_index = types.Array(types.intp, 1, 'C')
-    #     out = SeriesType(ary.dtype, ary.data, out_index)
-    #     return signature(out, *args)
+    @bound_function("series.sort_values")
+    def resolve_sort_values(self, ary, args, kws):
+        # output will have permuted input index
+        out_index = ary.index
+        if out_index == types.none:
+            out_index = types.Array(types.intp, 1, 'C')
+        out = SeriesType(ary.dtype, ary.data, out_index)
+        return signature(out, *args)
 
 #     @bound_function("array.take")
 #     def resolve_take(self, ary, args, kws):
@@ -655,7 +655,6 @@ class SeriesIatType(types.Type):
         super(SeriesIatType, self).__init__(name)
 
 
-# PR135. This needs to be commented out
 if sdc.config.config_pipeline_hpat_default:
     @infer_global(operator.getitem)
     class GetItemSeriesIat(AbstractTemplate):
@@ -775,7 +774,8 @@ _non_hpat_pipeline_attrs = [
     'resolve_append', 'resolve_apply', 'resolve_combine', 'resolve_corr', 'resolve_cov',
     'resolve_dropna', 'resolve_fillna', 'resolve_head', 'resolve_nlargest',
     'resolve_nsmallest', 'resolve_pct_change', 'resolve_loc', 'resolve_iloc',
-    'resolve_iat', 'resolve_rolling', 'resolve_value_counts', 'resolve_describe'
+    'resolve_iat', 'resolve_rolling', 'resolve_value_counts', 'resolve_describe',
+    'resolve_sort_values'
 ]
 
 # use ArrayAttribute for attributes not defined in SeriesAttribute
@@ -791,7 +791,6 @@ if not sdc.config.config_pipeline_hpat_default:
         if attr in SeriesAttribute.__dict__:
             delattr(SeriesAttribute, attr)
 
-# PR135. This needs to be commented out
 if sdc.config.config_pipeline_hpat_default:
     @infer_global(operator.getitem)
     class GetItemSeries(AbstractTemplate):
