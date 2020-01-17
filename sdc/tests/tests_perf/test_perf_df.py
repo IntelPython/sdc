@@ -122,7 +122,7 @@ class TestDataFrameMethods(TestBase):
             self.test_results.add(**record)
 
     def _test_df_binary_operations(self, pyfunc, name, total_data_length, test_name=None,
-                   input_data=test_global_input_data_float64):
+                                   input_data=test_global_input_data_float64):
         np.random.seed(0)
         hpat_func = sdc.jit(pyfunc)
         for data_length in total_data_length:
@@ -166,7 +166,8 @@ def test_gen_two_par(name, params, data_length):
 
     func_text = f"""\
 def {func_name}(self):
-  self._test_df_binary_operations(usecase_gen_two_par('{name}', '{params}'), '{name}', {data_length}, 'DataFrame.{name}')
+  self._test_df_binary_operations(usecase_gen_two_par('{name}', '{params}'), 
+                                  '{name}', {data_length}, 'DataFrame.{name}')
 """
 
     global_vars = {'usecase_gen_two_par': usecase_gen_two_par}
