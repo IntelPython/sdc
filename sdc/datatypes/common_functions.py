@@ -94,6 +94,11 @@ class TypeChecker:
             self.raise_exc(data, accepted_type.__name__, name=name)
 
 
+def params2list(params):
+    """Convert parameters dict to a list of string of a format 'key=value'"""
+    return ['{}={}'.format(k, v) for k, v in params.items()]
+
+
 def has_literal_value(var, value):
     """Used during typing to check that variable var is a Numba literal value equal to value"""
 

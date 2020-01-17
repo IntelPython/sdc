@@ -27,7 +27,7 @@ import numpy
 import pandas
 
 from numba.types import float64, Boolean, Omitted, NoneType
-from sdc.datatypes.common_functions import TypeChecker
+from sdc.datatypes.common_functions import TypeChecker, params2list
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import DataFrameRollingType
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.hiframes.pd_dataframe_type import DataFrameType
@@ -80,11 +80,6 @@ sdc_pandas_dataframe_rolling_docstring_tmpl = """
     :obj:`pandas.DataFrame`
          returns :obj:`pandas.DataFrame` object
 """
-
-
-def params2list(params):
-    """Converts parameters from dict to list"""
-    return ['{}={}'.format(k, v) for k, v in params.items()]
 
 
 def df_rolling_params_codegen():
@@ -186,35 +181,7 @@ def df_rolling_method_tail_codegen(method_params, df_columns, method_name):
     return func_lines
 
 
-def df_rolling_method_without_other_codegen(method_name, self, args=None, kws=None):
-    args = args or []
-    kwargs = kws or {}
-
-    impl_params = ['self'] + args + params2list(kwargs)
-    impl_params_as_str = ', '.join(impl_params)
-
-    impl_name = f'_df_rolling_{method_name}_without_other_impl'
-    func_lines = [f'def {impl_name}({impl_params_as_str}):']
-
-    if 'pairwise' in kwargs:
-        func_lines += [
-            '  if pairwise is None:',
-            '    _pairwise = True',
-            '  else:',
-            '    _pairwise = pairwise',
-            '  if _pairwise:',
-            '    raise ValueError("Method rolling.corr(). The object pairwise\\n expected: False")'
-        ]
-    method_params = args + ['{}={}'.format(k, k) for k in kwargs if k != 'other']
-    func_lines += df_rolling_method_tail_codegen(method_params, self.data.columns, method_name)
-    func_text = '\n'.join(func_lines)
-
-    global_vars = {'pandas': pandas, 'get_dataframe_data': get_dataframe_data}
-
-    return func_text, global_vars
-
-
-def df_rolling_method_codegen(method_name, self, args=None, kws=None):
+def df_rolling_method_codegen(method_name, self, with_other=False, args=None, kws=None):
     args = args or []
     kwargs = kws or {}
 
@@ -224,7 +191,20 @@ def df_rolling_method_codegen(method_name, self, args=None, kws=None):
     impl_name = f'_df_rolling_{method_name}_impl'
     func_lines = [f'def {impl_name}({impl_params_as_str}):']
 
-    method_params = args + ['{}={}'.format(k, k) for k in kwargs]
+    if 'other' in kwargs and not with_other:
+        if 'pairwise' in kwargs:
+            func_lines += [
+                '  if pairwise is None:',
+                '    _pairwise = True',
+                '  else:',
+                '    _pairwise = pairwise',
+                '  if _pairwise:',
+                '    raise ValueError("Method rolling.corr(). The object pairwise\\n expected: False")'
+            ]
+        method_params = args + ['{}={}'.format(k, k) for k in kwargs if k != 'other']
+    else:
+        method_params = args + ['{}={}'.format(k, k) for k in kwargs]
+
     func_lines += df_rolling_method_tail_codegen(method_params, self.data.columns, method_name)
     func_text = '\n'.join(func_lines)
 
@@ -243,18 +223,8 @@ def gen_df_rolling_method_with_other_df_impl(method_name, self, other, args=None
     return _impl
 
 
-def gen_df_rolling_method_without_other_impl(method_name, self, args=None, kws=None):
-    func_text, global_vars = df_rolling_method_without_other_codegen(method_name, self,
-                                                                     args=args, kws=kws)
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _impl = loc_vars[f'_df_rolling_{method_name}_without_other_impl']
-
-    return _impl
-
-
-def gen_df_rolling_method_impl(method_name, self, args=None, kws=None):
-    func_text, global_vars = df_rolling_method_codegen(method_name, self,
+def gen_df_rolling_method_impl(method_name, self, with_other=False, args=None, kws=None):
+    func_text, global_vars = df_rolling_method_codegen(method_name, self, with_other=with_other,
                                                        args=args, kws=kws)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
@@ -269,7 +239,7 @@ def sdc_pandas_dataframe_rolling_corr(self, other=None, pairwise=None):
     ty_checker = TypeChecker('Method rolling.corr().')
     ty_checker.check(self, DataFrameRollingType)
 
-    accepted_other = (bool, Omitted, NoneType, DataFrameType, SeriesType)
+    accepted_other = (Omitted, NoneType, DataFrameType, SeriesType)
     if not isinstance(other, accepted_other) and other is not None:
         ty_checker.raise_exc(other, 'DataFrame, Series', 'other')
 
@@ -277,16 +247,13 @@ def sdc_pandas_dataframe_rolling_corr(self, other=None, pairwise=None):
     if not isinstance(pairwise, accepted_pairwise) and pairwise is not None:
         ty_checker.raise_exc(pairwise, 'bool', 'pairwise')
 
-    nan_other = isinstance(other, (Omitted, NoneType)) or other is None
     kws = {'other': 'None', 'pairwise': 'None'}
-
-    if nan_other:
-        return gen_df_rolling_method_without_other_impl('corr', self, kws=kws)
 
     if isinstance(other, DataFrameType):
         return gen_df_rolling_method_with_other_df_impl('corr', self, other, kws=kws)
 
-    return gen_df_rolling_method_impl('corr', self, kws=kws)
+    with_other = not isinstance(other, (Omitted, NoneType)) and other is not None
+    return gen_df_rolling_method_impl('corr', self, with_other=with_other, kws=kws)
 
 
 @sdc_overload_method(DataFrameRollingType, 'min')
@@ -309,8 +276,8 @@ sdc_pandas_dataframe_rolling_corr.__doc__ = sdc_pandas_dataframe_rolling_docstri
     """,
     'extra_params':
     """
-    other: :obj:`Series`
-        Other Series.
+    other: :obj:`Series` or :obj:`DataFrame`
+        Other Series or DataFrame.
     pairwise: :obj:`bool`
         Calculate pairwise combinations of columns within a DataFrame.
     """
