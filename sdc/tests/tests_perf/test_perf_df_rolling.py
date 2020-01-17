@@ -127,8 +127,9 @@ class TestDFRollingMethods(TestBase):
             self._test_python(pyfunc, record, test_data)
             self.test_results.add(**record)
 
-    def _test_df_rolling_method(self, name):
-        usecase = gen_df_rolling_usecase(name)
+    def _test_df_rolling_method(self, name, rolling_params=None, method_params=''):
+        usecase = gen_df_rolling_usecase(name, rolling_params=rolling_params,
+                                         method_params=method_params)
         test_name = f'DataFrame.rolling.{name}'
         self._test_case(usecase, name, test_name=test_name)
 
