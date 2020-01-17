@@ -26,9 +26,11 @@
 # *****************************************************************************
 
 import time
+import numpy as np
 
 import pandas
 import numba
+import sdc
 
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
@@ -43,6 +45,24 @@ def usecase_gen(call_expression):
 def {func_name}(input_data):
   start_time = time.time()
   res = input_data.{call_expression}
+  finish_time = time.time()
+  return finish_time - start_time, res
+"""
+
+    loc_vars = {}
+    exec(func_text, globals(), loc_vars)
+    _gen_impl = loc_vars[func_name]
+
+    return _gen_impl
+
+
+def usecase_gen_two_par(name, par):
+    func_name = 'usecase_func'
+
+    func_text = f"""\
+def {func_name}(A, B):
+  start_time = time.time()
+  res = A.{name}(B, {par})
   finish_time = time.time()
   return finish_time - start_time, res
 """
@@ -101,6 +121,28 @@ class TestDataFrameMethods(TestBase):
             self._test_python(pyfunc, record, test_data)
             self.test_results.add(**record)
 
+    def _test_df_binary_operations(self, pyfunc, name, total_data_length, test_name=None,
+                   input_data=test_global_input_data_float64):
+        np.random.seed(0)
+        hpat_func = sdc.jit(pyfunc)
+        for data_length in total_data_length:
+            # TODO: replace with generic function to generate random sequence of floats
+            data1 = np.random.ranf(data_length)
+            data2 = np.random.ranf(data_length)
+            A = pandas.DataFrame({f"f{i}": data1 for i in range(3)})
+            B = pandas.DataFrame({f"f{i}": data2 for i in range(3)})
+
+            compile_results = calc_compilation(pyfunc, A, B, iter_number=self.iter_number)
+
+            # Warming up
+            hpat_func(A, B)
+
+            exec_times, boxing_times = get_times(hpat_func, A, B, iter_number=self.iter_number)
+            self.test_results.add(name, 'JIT', A.size, exec_times, boxing_times,
+                                  compile_results=compile_results, num_threads=self.num_threads)
+            exec_times, _ = get_times(pyfunc, A, B, iter_number=self.iter_number)
+            self.test_results.add(name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
+
 
 def test_gen(name, params, data_length):
     func_name = 'func'
@@ -119,8 +161,26 @@ def {func_name}(self):
     return _gen_impl
 
 
+def test_gen_two_par(name, params, data_length):
+    func_name = 'func'
+
+    func_text = f"""\
+def {func_name}(self):
+  self._test_df_binary_operations(usecase_gen_two_par('{name}', '{params}'), '{name}', {data_length}, 'DataFrame.{name}')
+"""
+
+    global_vars = {'usecase_gen_two_par': usecase_gen_two_par}
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _gen_impl = loc_vars[func_name]
+
+    return _gen_impl
+
+
 cases = [
     ('count', '', [10 ** 7]),
+    ('drop', 'columns="f0"', [10 ** 8]),
     ('max', '', [10 ** 7]),
     ('mean', '', [10 ** 7]),
     ('median', '', [10 ** 7]),
@@ -132,10 +192,20 @@ cases = [
     ('var', '', [10 ** 7]),
 ]
 
-for params in cases:
-    func, param, length = params
-    name = func
-    if param:
-        name += to_varname(param)
-    func_name = 'test_df_{}'.format(name)
-    setattr(TestDataFrameMethods, func_name, test_gen(func, param, length))
+cases_two_par = [
+    ('append', '', [10 ** 7]),
+]
+
+
+def gen(cases, method):
+    for params in cases:
+        func, param, length = params
+        name = func
+        if param:
+            name += "_" + to_varname(param).replace('__', '_')
+        func_name = 'test_df_{}'.format(name)
+        setattr(TestDataFrameMethods, func_name, method(func, param, length))
+
+
+gen(cases, test_gen)
+gen(cases_two_par, test_gen_two_par)
