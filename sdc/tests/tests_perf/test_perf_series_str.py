@@ -49,7 +49,7 @@ def {func_name}(input_data):
   finish_time = time.time()
   return finish_time - start_time, res
 """
-
+    print(func_text)
     loc_vars = {}
     exec(func_text, globals(), loc_vars)
     _gen_impl = loc_vars[func_name]
@@ -107,15 +107,19 @@ def {func_name}(self):
 
 
 cases = [
-    ('len', ''),
     ('capitalize', ''),
+    ('center', 'width=1'),
+    ('endswith', '"e"'),
+    ('find', '"e"'),
+    ('len', ''),
     ('lower', ''),
+    ('lstrip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    ('rstrip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    ('startswith', '"e"'),
+    ('strip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
     ('swapcase', ''),
     ('title', ''),
     ('upper', ''),
-    ('lstrip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
-    ('rstrip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
-    ('strip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
 ]
 
 
@@ -129,4 +133,5 @@ for params in cases:
     if param:
         name += "_" + to_varname(param).replace('__', '_')
     func_name = 'test_series_str_{}'.format(name)
+    print(func_name)
     setattr(TestSeriesStringMethods, func_name, test_gen(func, param, input_data))
