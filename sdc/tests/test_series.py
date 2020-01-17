@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -1294,6 +1294,49 @@ class TestSeries(TestCase):
         S = pd.Series(np.arange(n)**2)
         pd.testing.assert_series_equal(
             hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit('Not impl in old style')
+    def test_series_slice_loc_start(self):
+        def test_impl(A, n):
+            return A.loc[n:]
+        hpat_func = self.jit(test_impl)
+
+        all_data = [[1, 3, 5, 13, 22], [1, 3, 3, 13, 22], [22, 13, 5, 3, 1], [100, 3, 1, -3, -3]]
+        key = [1, 3, 18]
+        for index in all_data:
+            for n in key:
+                with self.subTest(index=index, start=n):
+                    S = pd.Series([2, 4, 6, 6, 3], index)
+                    pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
+
+    @unittest.expectedFailure
+    def test_series_slice_loc_stop(self):
+        def test_impl(A, n):
+            return A.loc[:n]
+        hpat_func = self.jit(test_impl)
+
+        all_data = [[1, 3, 5, 13, 22], [1, 3, 3, 13, 22], [22, 13, 5, 3, 1], [100, 3, 0, -3, -3]]
+        key = [1, 3, 18]
+        for index in all_data:
+            for n in key:
+                with self.subTest(index=index, stop=n):
+                    S = pd.Series([2, 4, 6, 6, 3], index)
+                    pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
+
+    @skip_sdc_jit('Not impl in old style')
+    def test_series_slice_loc_start_stop(self):
+        def test_impl(A, n, k):
+            return A.loc[n:k]
+        hpat_func = self.jit(test_impl)
+
+        all_data = [[1, 3, 5, 13, 22], [1, 3, 3, 13, 22], [22, 13, 5, 3, 1], [100, 3, 0, -3, -3]]
+        key = [-100, 1, 3, 18, 22, 100]
+        for index in all_data:
+            for data_left, data_right in combinations_with_replacement(key, 2):
+                with self.subTest(index=index, left=data_left, right=data_right):
+                    S = pd.Series([2, 4, 6, 6, 3], index)
+                    pd.testing.assert_series_equal(hpat_func(S, data_left, data_right),
+                                                   test_impl(S, data_left, data_right))
 
     @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support comparing Series of different lengths')
