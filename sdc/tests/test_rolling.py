@@ -66,6 +66,16 @@ def series_rolling_var_usecase(series, window, min_periods, ddof):
 
 
 class TestRolling(TestCase):
+
+    @skip_numba_jit
+    def test_series_rolling1(self):
+        def test_impl(S):
+            return S.rolling(3).sum()
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([1.0, 2., 3., 4., 5.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     @skip_numba_jit
     def test_fixed1(self):
         # test sequentially with manually created dfs
