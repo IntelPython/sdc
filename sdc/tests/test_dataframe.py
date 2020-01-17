@@ -544,49 +544,42 @@ class TestDataFrame(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def _test_df_index(self, df):
+        def test_impl(df):
+            return df.index
+
+        sdc_func = self.jit(test_impl)
+        np.testing.assert_array_equal(sdc_func(df), test_impl(df))
+
     @skip_sdc_jit
     def test_index_attribute(self):
         index_to_test = [[1, 2, 3, 4, 5],
                          [.1, .2, .3, .4, .5],
                          ['a', 'b', 'c', 'd', 'e']]
         n = 5
+        np.random.seed(0)
         A = np.ones(n)
         B = np.random.ranf(n)
-
-        def test_impl(df):
-            return df.index
-
-        sdc_func = self.jit(test_impl)
 
         for index in index_to_test:
             with self.subTest(index=index):
                 df = pd.DataFrame({'A': A, 'B': B}, index=index)
-                actual = sdc_func(df)
-                ref = test_impl(df)
-                np.testing.assert_array_equal(actual, ref)
+                self._test_df_index(df)
 
     @skip_sdc_jit
     def test_index_attribute_empty(self):
-        def test_impl(df):
-            return df.index
-
-        sdc_func = self.jit(test_impl)
         n = 5
+        np.random.seed(0)
         A = np.ones(n)
         B = np.random.ranf(n)
         df = pd.DataFrame({'A': A, 'B': B})
 
-        np.testing.assert_array_equal(sdc_func(df), test_impl(df))
+        self._test_df_index(df)
 
     @skip_sdc_jit
     def test_index_attribute_empty_df(self):
-        def test_impl(df):
-            return df.index
-
-        sdc_func = self.jit(test_impl)
         df = pd.DataFrame()
-
-        np.testing.assert_array_equal(sdc_func(df), test_impl(df))
+        self._test_df_index(df)
 
     @skip_sdc_jit
     @skip_numba_jit
