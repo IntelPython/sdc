@@ -579,6 +579,16 @@ class TestDataFrame(TestCase):
         np.testing.assert_array_equal(sdc_func(df), test_impl(df))
 
     @skip_sdc_jit
+    def test_index_attribute_empty_df(self):
+        def test_impl(df):
+            return df.index
+
+        sdc_func = self.jit(test_impl)
+        df = pd.DataFrame()
+
+        np.testing.assert_array_equal(sdc_func(df), test_impl(df))
+
+    @skip_sdc_jit
     @skip_numba_jit
     def test_df_apply(self):
         def test_impl(n):

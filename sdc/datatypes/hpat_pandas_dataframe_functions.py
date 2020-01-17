@@ -84,9 +84,14 @@ def hpat_pandas_dataframe_index(df):
     ty_checker = TypeChecker(f'Attribute index.')
     ty_checker.check(df, DataFrameType)
 
-    if isinstance(df.index, types.NoneType):
+    if isinstance(df.index, types.NoneType) or df.index is None:
+        empty_df = not df.columns
+
         def hpat_pandas_df_index_none_impl(df):
-            df_len = len(get_dataframe_data(df, 0))
+            if empty_df == True:  # nq
+                df_len = 0
+            else:
+                df_len = len(get_dataframe_data(df, 0))
             return numpy.arange(df_len)
 
         return hpat_pandas_df_index_none_impl
