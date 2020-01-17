@@ -84,29 +84,17 @@ def hpat_pandas_dataframe_index(df):
     ty_checker = TypeChecker(f'Attribute index.')
     ty_checker.check(df, DataFrameType)
 
-    def sdc_pandas_dataframe_index_impl(df):
-        indent = 4 * ' '
-        func_args = ['df']
+    if isinstance(df.index, types.NoneType):
+        def hpat_pandas_df_index_none_impl(df):
+            df_len = len(get_dataframe_data(df, 0))
+            return numpy.arange(df_len)
 
-        func_definition = [f'def sdc_pandas_dataframe_index_impl({", ".join(func_args)}):']
-        func_text = []
-        if isinstance(df.index, types.NoneType):
-            func_text.append("df_len = len(get_dataframe_data(df, 0))")
-            func_text.append("return numpy.arange(df_len)")
-        else:
-            func_text.append("return df._index\n")
+        return hpat_pandas_df_index_none_impl
+    else:
+        def hpat_pandas_df_index_impl(df):
+            return df._index
 
-        func_definition.extend([indent + func_line for func_line in func_text])
-        func_def = '\n'.join(func_definition)
-
-        global_vars = {'numpy': numpy, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
-        loc_vars = {}
-
-        exec(func_def, global_vars, loc_vars)
-        _index_impl = loc_vars['sdc_pandas_dataframe_index_impl']
-        return _index_impl
-
-    return sdc_pandas_dataframe_index_impl(df)
+        return hpat_pandas_df_index_impl
 
 
 def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
