@@ -122,10 +122,66 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
     if accessor == 'loc':
         # Note: Loc return Series
-        # Note: Index 0 in slice not supported
-        # Note: Loc slice and callable with String not implement
+        # Note: Loc slice and callable with String is not implemented
+        # Note: Loc slice without start is not supported
+        min_int64 = numpy.iinfo('int64').min
+        max_int64 = numpy.iinfo('int64').max
         index_is_none = (self.series.index is None or
                          isinstance(self.series.index, numba.types.misc.NoneType))
+        if isinstance(idx, types.SliceType) and not index_is_none:
+            def hpat_pandas_series_loc_slice_impl(self, idx):
+                series = self._series
+                index = series.index
+                start_position = len(index)
+                stop_position = 0
+                max_diff = 0
+                min_diff = 0
+                start_position_inc = len(index)
+                start_position_dec = len(index)
+                stop_position_inc = 0
+                stop_position_dec = 0
+                idx_start = idx.start
+                idx_stop = idx.stop
+                for i in numba.prange(len(index)):
+                    if index[i] >= idx_start:
+                        start_position_inc = min(start_position_inc, i)
+                    if index[i] <= idx_start:
+                        start_position_dec = min(start_position_dec, i)
+                    if index[i] <= idx_stop:
+                        stop_position_inc = max(stop_position_inc, i)
+                    if index[i] >= idx_stop:
+                        stop_position_dec = max(stop_position_dec, i)
+                    if i > 0:
+                        max_diff = max(max_diff, index[i] - index[i - 1])
+                        min_diff = min(min_diff, index[i] - index[i - 1])
+
+                if max_diff*min_diff < 0:
+                    raise ValueError("Index must be monotonic increasing or decreasing")
+
+                if max_diff > 0:
+                    start_position = start_position_inc
+                    stop_position = stop_position_inc
+                    if idx_stop < index[0]:
+                        return pandas.Series(data=series._data[:0], index=series._index[:0], name=series._name)
+                else:
+                    start_position = start_position_dec
+                    stop_position = stop_position_dec if idx.stop != max_int64 else len(index)
+                    if idx_stop > index[0] and idx_stop != max_int64:
+                        return pandas.Series(data=series._data[:0], index=series._index[:0], name=series._name)
+
+                stop_position = min(stop_position + 1, len(index))
+
+                if (
+                    start_position >= len(index) or stop_position <= 0 or stop_position <= start_position
+                ):
+                    return pandas.Series(data=series._data[:0], index=series._index[:0], name=series._name)
+
+                return pandas.Series(data=series._data[start_position:stop_position],
+                                     index=index[start_position:stop_position],
+                                     name=series._name)
+
+            return hpat_pandas_series_loc_slice_impl
+
         if isinstance(idx, types.SliceType) and index_is_none:
             def hpat_pandas_series_loc_slice_noidx_impl(self, idx):
                 max_slice = sys.maxsize
