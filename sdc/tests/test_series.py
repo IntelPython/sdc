@@ -1522,7 +1522,6 @@ class TestSeries(TestCase):
         A = pd.Series(np.arange(n))
         pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
-    @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support Series indexes')
     def test_series_op7_int(self):
         """Verifies using all various Series comparison binary operators on two integer Series with various indexes"""
@@ -1544,7 +1543,6 @@ class TestSeries(TestCase):
                     B = pd.Series(data_right, index=index_data)
                     pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
 
-    @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support comparing to inf')
     def test_series_op7_int_scalar(self):
         """Verifies using all various Series comparison binary operators on an integer Series and scalar values"""
