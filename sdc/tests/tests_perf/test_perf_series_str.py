@@ -39,6 +39,13 @@ from sdc.tests.tests_perf.test_perf_utils import *
 from sdc.io.csv_ext import to_varname
 
 
+test_global_input_data_unicode_kind1 = [
+    'ascii',
+    '12345',
+    '1234567890',
+]
+
+
 def usecase_gen(call_expression):
     func_name = 'usecase_func'
 
@@ -49,7 +56,7 @@ def {func_name}(input_data):
   finish_time = time.time()
   return finish_time - start_time, res
 """
-    print(func_text)
+
     loc_vars = {}
     exec(func_text, globals(), loc_vars)
     _gen_impl = loc_vars[func_name]
@@ -108,18 +115,21 @@ def {func_name}(self):
 
 cases = [
     ('capitalize', ''),
-    ('center', 'width=1'),
+    ('center', '1', test_global_input_data_unicode_kind1),
     ('endswith', '"e"'),
     ('find', '"e"'),
     ('len', ''),
+    ('ljust', '1', test_global_input_data_unicode_kind1),
     ('lower', ''),
     ('lstrip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    ('rjust', '1', test_global_input_data_unicode_kind1),
     ('rstrip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
     ('startswith', '"e"'),
     ('strip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
     ('swapcase', ''),
     ('title', ''),
     ('upper', ''),
+    ('zfill', '1', test_global_input_data_unicode_kind1),
 ]
 
 
@@ -133,5 +143,4 @@ for params in cases:
     if param:
         name += "_" + to_varname(param).replace('__', '_')
     func_name = 'test_series_str_{}'.format(name)
-    print(func_name)
     setattr(TestSeriesStringMethods, func_name, test_gen(func, param, input_data))
