@@ -86,22 +86,7 @@ lid = [PREFIX_DIR + '/lib', ]
 eca = ['-std=c++11', ]  # '-g', '-O0']
 ela = ['-std=c++11', ]
 
-MPI_LIBS = ['mpi']
-
-use_impi = False
-if use_impi:
-    MPI_ROOT = os.environ['I_MPI_ROOT']
-    MPI_INC = MPI_ROOT + '/include64/'
-    MPI_LIBDIR = MPI_ROOT + '/lib64/'
-    MPI_LIBS = ['mpifort', 'mpi', 'mpigi']
-    ind = [PREFIX_DIR + '/include', MPI_INC]
-    lid = [PREFIX_DIR + '/lib', MPI_LIBDIR]
-
-if is_win:
-    # use Intel MPI on Windows
-    MPI_LIBS = ['impi']
-
-io_libs = MPI_LIBS
+io_libs = [] 
 boost_libs = []
 
 if not is_win:
@@ -120,17 +105,6 @@ ext_io = Extension(name="sdc.hio",
                    extra_link_args=ela,
                    language="c++"
                    )
-
-ext_transport_mpi = Extension(name="sdc.transport_mpi",
-                              sources=["sdc/transport/hpat_transport_mpi.cpp"],
-                              depends=["sdc/_distributed.h"],
-                              libraries=io_libs,
-                              include_dirs=ind,
-                              library_dirs=lid,
-                              extra_compile_args=eca,
-                              extra_link_args=ela,
-                              language="c++"
-                              )
 
 ext_transport_seq = Extension(name="sdc.transport_seq",
                               sources=["sdc/transport/hpat_transport_single_process.cpp"],
@@ -237,7 +211,7 @@ ext_cv_wrapper = Extension(name="sdc.cv_wrapper",
                            language="c++",
                            )
 
-_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_dt, ext_io, ext_transport_mpi, ext_transport_seq]
+_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq]
 
 if _has_pyarrow:
     _ext_mods.append(ext_parquet)
