@@ -35,7 +35,6 @@ from docs.source.buildscripts.sdc_build_doc import SDCBuildDoc
 # should be able to run without Numpy for pip to discover the
 # build dependencies
 import numpy.distutils.misc_util as np_misc
-#import copy
 import versioneer
 
 # String constants for Intel SDC project configuration
@@ -86,7 +85,7 @@ lid = [PREFIX_DIR + '/lib', ]
 eca = ['-std=c++11', ]  # '-g', '-O0']
 ela = ['-std=c++11', ]
 
-io_libs = [] 
+io_libs = []
 boost_libs = []
 
 if not is_win:
@@ -207,7 +206,6 @@ ext_cv_wrapper = Extension(name="sdc.cv_wrapper",
                            include_dirs=[OPENCV_DIR + '/include'] + ind,
                            library_dirs=[os.path.join(OPENCV_DIR, 'lib')] + lid,
                            libraries=cv_libs,
-                           #extra_link_args = cv_link_args,
                            language="c++",
                            )
 
