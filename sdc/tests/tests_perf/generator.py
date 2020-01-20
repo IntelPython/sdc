@@ -53,7 +53,7 @@ def {func_name}(input_data):
   finish_time = time.time()
   return finish_time - start_time, res
 """
-    print(func_text)
+
     loc_vars = {}
     exec(func_text, globals(), loc_vars)
     _gen_impl = loc_vars[func_name]
