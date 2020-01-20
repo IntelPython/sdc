@@ -39,13 +39,13 @@ from numba.errors import TypingError
 from sdc.hiframes.rolling import supported_rolling_funcs
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_OneDs,
-                                 count_array_REPs,
-                                 count_parfor_OneDs,
-                                 count_parfor_REPs,
-                                 dist_IR_contains,
-                                 skip_numba_jit,
-                                 skip_sdc_jit,
-                                 test_global_input_data_float64)
+                                  count_array_REPs,
+                                  count_parfor_OneDs,
+                                  count_parfor_REPs,
+                                  dist_IR_contains,
+                                  skip_numba_jit,
+                                  skip_sdc_jit,
+                                  test_global_input_data_float64)
 
 
 LONG_TEST = (int(os.environ['SDC_LONG_ROLLING_TEST']) != 0
