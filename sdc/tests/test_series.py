@@ -6014,7 +6014,6 @@ class TestSeries(TestSeries_apply, TestCase):
         cfunc = self.jit(isnumeric_usecase)
         for ser in series:
             S = pd.Series(ser)
-            print(cfunc(S))
             pd.testing.assert_series_equal(cfunc(S), isnumeric_usecase(S))
 
     @skip_sdc_jit('Old-style implementation returns string, but not series')
