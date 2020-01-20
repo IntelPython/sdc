@@ -25,7 +25,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import time
 import numpy as np
 
 import pandas
@@ -127,5 +126,5 @@ cases_two_par = [
 ]
 
 
-gen(cases, test_gen, TestDataFrameMethods)
-gen(cases_two_par, test_gen_two_par, TestDataFrameMethods)
+gen(cases, test_gen, TestDataFrameMethods, 'df')
+gen(cases_two_par, test_gen_two_par, TestDataFrameMethods, 'df')

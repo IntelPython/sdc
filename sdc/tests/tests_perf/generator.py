@@ -2,7 +2,7 @@ import time
 from sdc.io.csv_ext import to_varname
 
 
-def gen(cases, method, class_add, prefix):
+def gen(cases, method, class_add, type, prefix=''):
     for params in cases:
         if len(params) == 4:
             func, param, length, call_expression = params
@@ -15,13 +15,14 @@ def gen(cases, method, class_add, prefix):
             length = None
         name = func
         if param:
-            name += "_" + to_varname(param).replace('__', '_')
-        func_name = 'test_{}_{}'.format(prefix, name)
+            name += "_" + to_varname(param)
+        func_name = 'test_{}_{}_{}'.format(type, prefix, name)
+        func_name = to_varname(func_name).replace('__', '_')
 
         setattr(class_add, func_name, method(func, param, length, call_expression, prefix))
 
 
-def test_gen(name, params, data_length, call_expression, prefix=''):
+def test_gen(name, params, data_length, call_expression, prefix):
     func_name = 'func'
     if call_expression is None:
         call_expression = '{}{}({})'.format(prefix, name, params)

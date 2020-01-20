@@ -99,4 +99,4 @@ cases = [
     ('zfill', '1', test_global_input_data_unicode_kind1),
 ]
 
-gen(cases, test_gen, TestSeriesStringMethods, 'str.')
+gen(cases, test_gen, TestSeriesStringMethods, 'series', 'str.')

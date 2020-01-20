@@ -191,5 +191,5 @@ cases_two_par = [
 ]
 
 
-gen(cases, test_gen, TestSeriesMethods)
-gen(cases_two_par, test_gen_two_par, TestSeriesMethods)
+gen(cases, test_gen, TestSeriesMethods, 'series')
+gen(cases_two_par, test_gen_two_par, TestSeriesMethods, 'series')
