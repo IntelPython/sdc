@@ -1076,6 +1076,54 @@ def hpat_pandas_stringmethods_isnumeric(self):
     return hpat_pandas_stringmethods_isnumeric_impl
 
 
+@sdc_overload_method(StringMethodsType, 'isdigit')
+def hpat_pandas_stringmethods_isdigit(self):
+    ty_checker = TypeChecker('Method isdigit().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isdigit_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isdigit()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isdigit_impl
+
+
+@sdc_overload_method(StringMethodsType, 'isdecimal')
+def hpat_pandas_stringmethods_isdecimal(self):
+    ty_checker = TypeChecker('Method isdecimal().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isdecimal_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isdecimal()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isdecimal_impl
+
+
+@sdc_overload_method(StringMethodsType, 'isupper')
+def hpat_pandas_stringmethods_isupper(self):
+    ty_checker = TypeChecker('Method isupper().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isupper_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isupper()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isupper_impl
+
+
 stringmethods_funcs = {
     'istitle': {'method': hpat_pandas_stringmethods_istitle,
                 'caption': 'Check if each word start with an upper case letter'},
@@ -1086,7 +1134,15 @@ stringmethods_funcs = {
     'islower': {'method': hpat_pandas_stringmethods_islower,
                 'caption': 'Check if all the characters in the text are alphanumeric'},
     'isalnum': {'method': hpat_pandas_stringmethods_isalnum,
-                'caption': 'Check if all the characters in the text are alphanumeric'}
+                'caption': 'Check if all the characters in the text are alphanumeric'},
+    'isnumeric': {'method': hpat_pandas_stringmethods_isnumeric,
+                  'caption': 'Check whether all characters in each string are numeric.'},
+    'isdigit': {'method': hpat_pandas_stringmethods_isdigit,
+                'caption': 'Check whether all characters in each string in the Series/Index are digits.'},
+    'isdecimal': {'method': hpat_pandas_stringmethods_isdecimal,
+                  'caption': 'Check whether all characters in each string are decimal.'},
+    'isupper': {'method': hpat_pandas_stringmethods_isupper,
+                'caption': 'Check whether all characters in each string are uppercase.'},
 }
 
 
