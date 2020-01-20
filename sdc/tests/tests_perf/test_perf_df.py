@@ -195,6 +195,7 @@ cases = [
 
 cases_two_par = [
     ('append', '', [10 ** 7]),
+    ('isin', '', [10 ** 7]),
 ]
 
 
