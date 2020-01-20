@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -974,9 +974,9 @@ class HiFramesTypedPassImpl(object):
             func = series_replace_funcs[func_name]
             return self._replace_func(func, [series_var, S2])
 
-        # if func_name in ('argsort', 'sort_values'):
-        #     return self._handle_series_sort(
-        #         lhs, rhs, series_var, func_name == 'argsort')
+        if func_name in ('argsort', 'sort_values'):
+            return self._handle_series_sort(
+                lhs, rhs, series_var, func_name == 'argsort')
 
         if func_name == 'rolling':
             # XXX: remove rolling setup call, assuming still available in definitions
