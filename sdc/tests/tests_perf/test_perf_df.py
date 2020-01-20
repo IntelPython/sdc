@@ -35,46 +35,10 @@ import sdc
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from sdc.tests.test_utils import test_global_input_data_float64
-from sdc.io.csv_ext import to_varname
+from .generator import *
 
 
-def usecase_gen(call_expression):
-    func_name = 'usecase_func'
-
-    func_text = f"""\
-def {func_name}(input_data):
-  start_time = time.time()
-  res = input_data.{call_expression}
-  finish_time = time.time()
-  return finish_time - start_time, res
-"""
-
-    loc_vars = {}
-    exec(func_text, globals(), loc_vars)
-    _gen_impl = loc_vars[func_name]
-
-    return _gen_impl
-
-
-def usecase_gen_two_par(name, par):
-    func_name = 'usecase_func'
-
-    func_text = f"""\
-def {func_name}(A, B):
-  start_time = time.time()
-  res = A.{name}(B, {par})
-  finish_time = time.time()
-  return finish_time - start_time, res
-"""
-
-    loc_vars = {}
-    exec(func_text, globals(), loc_vars)
-    _gen_impl = loc_vars[func_name]
-
-    return _gen_impl
-
-
-# python -m sdc.runtests sdc.tests.tests_perf.test_perf_df.TestDataFrameMethods
+# python -m sdc.runtests sdc.tests.tests_perf.test_perf_df.TestDataFrameMethods.test_df_{method_name}
 class TestDataFrameMethods(TestBase):
     @classmethod
     def setUpClass(cls):
@@ -97,9 +61,8 @@ class TestDataFrameMethods(TestBase):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, data_name, total_data_length, test_name=None,
-                   input_data=test_global_input_data_float64):
-        test_name = test_name or data_name
+    def _test_case(self, pyfunc, data_name, total_data_length, input_data=test_global_input_data_float64):
+        test_name = 'DataFrame.{}'.format(data_name)
 
         full_input_data_length = sum(len(i) for i in input_data)
         for data_length in total_data_length:
@@ -121,7 +84,7 @@ class TestDataFrameMethods(TestBase):
             self._test_python(pyfunc, record, test_data)
             self.test_results.add(**record)
 
-    def _test_df_binary_operations(self, pyfunc, name, total_data_length, test_name=None,
+    def _test_binary_operations(self, pyfunc, name, total_data_length,
                                    input_data=test_global_input_data_float64):
         np.random.seed(0)
         hpat_func = sdc.jit(pyfunc)
@@ -144,41 +107,6 @@ class TestDataFrameMethods(TestBase):
             self.test_results.add(name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
 
 
-def test_gen(name, params, data_length):
-    func_name = 'func'
-
-    func_text = f"""\
-def {func_name}(self):
-  self._test_case(usecase_gen('{name}({params})'), '{name}', {data_length}, 'DataFrame.{name}')
-"""
-
-    global_vars = {'usecase_gen': usecase_gen}
-
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _gen_impl = loc_vars[func_name]
-
-    return _gen_impl
-
-
-def test_gen_two_par(name, params, data_length):
-    func_name = 'func'
-
-    func_text = f"""\
-def {func_name}(self):
-  self._test_df_binary_operations(usecase_gen_two_par('{name}', '{params}'), 
-                                  '{name}', {data_length}, 'DataFrame.{name}')
-"""
-
-    global_vars = {'usecase_gen_two_par': usecase_gen_two_par}
-
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _gen_impl = loc_vars[func_name]
-
-    return _gen_impl
-
-
 cases = [
     ('count', '', [10 ** 7]),
     ('drop', 'columns="f0"', [10 ** 8]),
@@ -198,15 +126,5 @@ cases_two_par = [
 ]
 
 
-def gen(cases, method):
-    for params in cases:
-        func, param, length = params
-        name = func
-        if param:
-            name += "_" + to_varname(param).replace('__', '_')
-        func_name = 'test_df_{}'.format(name)
-        setattr(TestDataFrameMethods, func_name, method(func, param, length))
-
-
-gen(cases, test_gen)
-gen(cases_two_par, test_gen_two_par)
+gen(cases, test_gen, TestDataFrameMethods, 'df')
+gen(cases_two_par, test_gen_two_par, TestDataFrameMethods, 'df')

@@ -37,43 +37,7 @@ import sdc
 from .test_perf_base import TestBase
 from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
-from sdc.io.csv_ext import to_varname
-
-
-def usecase_gen(call_expression):
-    func_name = 'usecase_func'
-
-    func_text = f"""\
-def {func_name}(input_data):
-  start_time = time.time()
-  res = input_data.{call_expression}
-  finish_time = time.time()
-  return finish_time - start_time, res
-"""
-
-    loc_vars = {}
-    exec(func_text, globals(), loc_vars)
-    _gen_impl = loc_vars[func_name]
-
-    return _gen_impl
-
-
-def usecase_gen_two_par(name, par):
-    func_name = 'usecase_func'
-
-    func_text = f"""\
-def {func_name}(A, B):
-  start_time = time.time()
-  res = A.{name}(B, {par})
-  finish_time = time.time()
-  return finish_time - start_time, res
-"""
-
-    loc_vars = {}
-    exec(func_text, globals(), loc_vars)
-    _gen_impl = loc_vars[func_name]
-
-    return _gen_impl
+from .generator import *
 
 
 def usecase_series_astype_int(input_data):
@@ -95,7 +59,7 @@ def usecase_series_chain_add_and_sum(A, B):
     return res_time, res
 
 
-# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods
+# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods.test_series_{method_name}
 class TestSeriesMethods(TestBase):
     @classmethod
     def setUpClass(cls):
@@ -119,10 +83,11 @@ class TestSeriesMethods(TestBase):
             get_times(pyfunc, *args, **kwargs)
 
     def _test_case(self, pyfunc, name, total_data_length, input_data=test_global_input_data_float64):
+        test_name = 'Series.{}'.format(name)
         full_input_data_length = sum(len(i) for i in input_data)
         for data_length in total_data_length:
             base = {
-                "test_name": name,
+                "test_name": test_name,
                 "data_size": data_length,
             }
             data = perf_data_gen_fixed_len(input_data, full_input_data_length,
@@ -139,7 +104,7 @@ class TestSeriesMethods(TestBase):
             self._test_python(pyfunc, record, test_data)
             self.test_results.add(**record)
 
-    def _test_series_binary_operations(self, pyfunc, name, total_data_length, input_data=None):
+    def _test_binary_operations(self, pyfunc, name, total_data_length, input_data=None):
         np.random.seed(0)
         hpat_func = sdc.jit(pyfunc)
         for data_length in total_data_length:
@@ -171,42 +136,6 @@ class TestSeriesMethods(TestBase):
                                             [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7])
 
 
-def test_gen(name, params, data_length, call_expression):
-    func_name = 'func'
-    if call_expression is None:
-        call_expression = '{}({})'.format(name, params)
-
-    func_text = f"""\
-def {func_name}(self):
-  self._test_case(usecase_gen('{call_expression}'), 'series_{name}', {data_length})
-"""
-
-    global_vars = {'usecase_gen': usecase_gen}
-
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _gen_impl = loc_vars[func_name]
-
-    return _gen_impl
-
-
-def test_gen_two_par(name, params, data_length):
-    func_name = 'func'
-
-    func_text = f"""\
-def {func_name}(self):
-  self._test_series_binary_operations(usecase_gen_two_par('{name}', '{params}'), 'series_{name}', {data_length})
-"""
-
-    global_vars = {'usecase_gen_two_par': usecase_gen_two_par}
-
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _gen_impl = loc_vars[func_name]
-
-    return _gen_impl
-
-
 cases = [
     ('abs', '', [3 * 10 ** 8]),
     ('apply', 'lambda x: x', [10 ** 7]),
@@ -225,7 +154,7 @@ cases = [
     ('max', '', [10 ** 9]),
     ('mean', '', [10 ** 8]),
     ('median', '', [10 ** 8]),
-    ('min', '', [10 ** 9]),
+    ('min', '', [10 ** 7]),
     ('min', 'skipna=True', [10 ** 7]),
     ('nlargest', '', [4 * 10 ** 7]),
     ('nsmallest', '', [10 ** 9]),
@@ -254,22 +183,6 @@ cases_two_par = [
     ('pow', '', [10 ** 7]),
 ]
 
-for params in cases:
-    if len(params) == 4:
-        func, param, length, call_expression = params
-    else:
-        func, param, length = params
-        call_expression = None
-    name = func
-    if param:
-        name += "_" + to_varname(param).replace('__', '_')
-    func_name = 'test_series_float_{}'.format(name)
-    setattr(TestSeriesMethods, func_name, test_gen(func, param, length, call_expression))
 
-for params in cases_two_par:
-    func, param, length = params
-    name = func
-    if param:
-        name += to_varname(param)
-    func_name = 'test_series_float_{}'.format(name)
-    setattr(TestSeriesMethods, func_name, test_gen_two_par(func, param, length))
+gen(cases, test_gen, TestSeriesMethods, 'series')
+gen(cases_two_par, test_gen_two_par, TestSeriesMethods, 'series')
