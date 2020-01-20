@@ -321,6 +321,7 @@ class TestBasic(BaseTest):
             self.assertEqual(count_parfor_REPs(), 0)
 
     @skip_numba_jit
+    @skip_sdc_jit
     def test_array_reduce(self):
         binops = ['+=', '*=', '+=', '*=', '|=', '|=']
         dtypes = ['np.float32', 'np.float32', 'np.float64', 'np.float64', 'np.int32', 'np.int64']
