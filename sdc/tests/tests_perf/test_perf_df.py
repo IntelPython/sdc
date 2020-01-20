@@ -86,6 +86,7 @@ class TestDataFrameMethods(TestBase):
 
     def _test_binary_operations(self, pyfunc, name, total_data_length,
                                    input_data=test_global_input_data_float64):
+        test_name = 'DataFrame.{}'.format(name)
         np.random.seed(0)
         hpat_func = sdc.jit(pyfunc)
         for data_length in total_data_length:
@@ -101,10 +102,10 @@ class TestDataFrameMethods(TestBase):
             hpat_func(A, B)
 
             exec_times, boxing_times = get_times(hpat_func, A, B, iter_number=self.iter_number)
-            self.test_results.add(name, 'JIT', A.size, exec_times, boxing_times,
+            self.test_results.add(test_name, 'JIT', A.size, exec_times, boxing_times,
                                   compile_results=compile_results, num_threads=self.num_threads)
             exec_times, _ = get_times(pyfunc, A, B, iter_number=self.iter_number)
-            self.test_results.add(name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
+            self.test_results.add(test_name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
 
 
 cases = [
@@ -126,5 +127,5 @@ cases_two_par = [
 ]
 
 
-gen(cases, test_gen, TestDataFrameMethods, 'df')
-gen(cases_two_par, test_gen_two_par, TestDataFrameMethods, 'df')
+gen(cases, test_gen, TestDataFrameMethods)
+gen(cases_two_par, test_gen_two_par, TestDataFrameMethods)

@@ -105,6 +105,7 @@ class TestSeriesMethods(TestBase):
             self.test_results.add(**record)
 
     def _test_binary_operations(self, pyfunc, name, total_data_length, input_data=None):
+        test_name = 'Series.{}'.format(name)
         np.random.seed(0)
         hpat_func = sdc.jit(pyfunc)
         for data_length in total_data_length:
@@ -121,10 +122,10 @@ class TestSeriesMethods(TestBase):
             hpat_func(A, B)
 
             exec_times, boxing_times = get_times(hpat_func, A, B, iter_number=self.iter_number)
-            self.test_results.add(name, 'JIT', A.size, exec_times, boxing_times,
+            self.test_results.add(test_name, 'JIT', A.size, exec_times, boxing_times,
                                   compile_results=compile_results, num_threads=self.num_threads)
             exec_times, _ = get_times(pyfunc, A, B, iter_number=self.iter_number)
-            self.test_results.add(name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
+            self.test_results.add(test_name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
 
     def test_series_float_astype_int(self):
         self._test_case(usecase_gen('astype(np.int8)'), 'series_astype_int', [10 ** 5],
@@ -168,6 +169,7 @@ cases = [
     ('std', '', [10 ** 7]),
     ('sub', '10', [10 ** 8]),
     ('sum', '', [10 ** 9]),
+    ('truediv', '2', [10 ** 7]),
     ('value_counts', '', [3 * 10 ** 5]),
     ('var', '', [5 * 10 ** 8]),
     ('unique', '', [10 ** 5]),
@@ -185,8 +187,9 @@ cases_two_par = [
     ('mul', '', [10 ** 8]),
     ('pow', '', [10 ** 7]),
     ('sub', '', [10 ** 9]),
+    ('truediv', '', [10 ** 7]),
 ]
 
 
-gen(cases, test_gen, TestSeriesMethods, 'series')
-gen(cases_two_par, test_gen_two_par, TestSeriesMethods, 'series')
+gen(cases, test_gen, TestSeriesMethods)
+gen(cases_two_par, test_gen_two_par, TestSeriesMethods)

@@ -2,7 +2,7 @@ import time
 from sdc.io.csv_ext import to_varname
 
 
-def gen(cases, method, class_add, type):
+def gen(cases, method, class_add, prefix):
     for params in cases:
         if len(params) == 4:
             func, param, length, call_expression = params
@@ -16,18 +16,15 @@ def gen(cases, method, class_add, type):
         name = func
         if param:
             name += "_" + to_varname(param).replace('__', '_')
-        func_name = 'test_{}_{}'.format(type, name)
+        func_name = 'test_{}_{}'.format(prefix, name)
 
-        setattr(class_add, func_name, method(func, param, length, call_expression, type))
+        setattr(class_add, func_name, method(func, param, length, call_expression, prefix))
 
 
-def test_gen(name, params, data_length, call_expression, type):
+def test_gen(name, params, data_length, call_expression, prefix=''):
     func_name = 'func'
     if call_expression is None:
-        if type == 'series_str':
-            call_expression = 'str.{}({})'.format(name, params)
-        else:
-            call_expression = '{}({})'.format(name, params)
+        call_expression = '{}{}({})'.format(prefix, name, params)
 
     func_text = f"""\
 def {func_name}(self):
@@ -38,13 +35,13 @@ def {func_name}(self):
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _gen_impl = loc_vars[func_name]
+    func = loc_vars[func_name]
 
-    return _gen_impl
+    return func
 
 
 def usecase_gen(call_expression):
-    func_name = 'usecase_func'
+    func_name = 'func'
 
     func_text = f"""\
 def {func_name}(input_data):
@@ -56,12 +53,12 @@ def {func_name}(input_data):
 
     loc_vars = {}
     exec(func_text, globals(), loc_vars)
-    _gen_impl = loc_vars[func_name]
+    func = loc_vars[func_name]
 
-    return _gen_impl
+    return func
 
 
-def test_gen_two_par(name, params, data_length, call_expression, cls):
+def test_gen_two_par(name, params, data_length, *args, **kwargs):
     func_name = 'func'
 
     func_text = f"""\
@@ -74,13 +71,13 @@ def {func_name}(self):
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _gen_impl = loc_vars[func_name]
+    func = loc_vars[func_name]
 
-    return _gen_impl
+    return func
 
 
 def usecase_gen_two_par(name, par):
-    func_name = 'usecase_func'
+    func_name = 'func'
 
     func_text = f"""\
 def {func_name}(A, B):
@@ -92,6 +89,6 @@ def {func_name}(A, B):
 
     loc_vars = {}
     exec(func_text, globals(), loc_vars)
-    _gen_impl = loc_vars[func_name]
+    func = loc_vars[func_name]
 
-    return _gen_impl
+    return func
