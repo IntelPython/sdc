@@ -34,7 +34,7 @@ import sdc
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from sdc.tests.test_utils import test_global_input_data_float64
-from .generator import *
+from .generator import gen, test_gen, test_gen_two_par
 
 
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_df.TestDataFrameMethods.test_df_{method_name}
@@ -101,12 +101,13 @@ class TestDataFrameMethods(TestBase):
             hpat_func(A, B)
 
             exec_times, boxing_times = get_times(hpat_func, A, B, iter_number=self.iter_number)
-            self.test_results.add(test_name, 'JIT', A.size, exec_times, boxing_times,
+            self.test_results.add(test_name, 'SDC', A.size, exec_times, boxing_times,
                                   compile_results=compile_results, num_threads=self.num_threads)
             exec_times, _ = get_times(pyfunc, A, B, iter_number=self.iter_number)
-            self.test_results.add(test_name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
+            self.test_results.add(test_name, 'Python', A.size, exec_times, num_threads=self.num_threads)
 
 
+#  (method_name, parametrs, total_data_length, call_expression)
 cases = [
     ('count', '', [10 ** 7]),
     ('drop', 'columns="f0"', [10 ** 8]),

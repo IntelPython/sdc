@@ -36,7 +36,7 @@ import pandas as pd
 from sdc.tests.test_utils import *
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import *
-from .generator import *
+from .generator import gen, test_gen
 
 
 test_global_input_data_unicode_kind1 = [
@@ -73,13 +73,14 @@ class TestSeriesStringMethods(TestBase):
             hpat_func(test_data)
 
             exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)
-            self.test_results.add(test_name, 'JIT', test_data.size, exec_times, data_width,
+            self.test_results.add(test_name, 'SDC', test_data.size, exec_times, data_width,
                                   boxing_times, compile_results=compile_results, num_threads=self.num_threads)
             exec_times, _ = get_times(pyfunc, test_data, iter_number=self.iter_number)
-            self.test_results.add(test_name, 'Reference', test_data.size, exec_times, data_width,
+            self.test_results.add(test_name, 'Python', test_data.size, exec_times, data_width,
                                   num_threads=self.num_threads)
 
 
+# (method_name, parameters, input_data)
 cases = [
     ('capitalize', ''),
     ('center', '1', test_global_input_data_unicode_kind1),

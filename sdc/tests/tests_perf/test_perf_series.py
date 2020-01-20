@@ -37,7 +37,7 @@ import sdc
 from .test_perf_base import TestBase
 from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
-from .generator import *
+from .generator import gen, test_gen, test_gen_two_par, usecase_gen
 
 
 def usecase_series_astype_int(input_data):
@@ -122,10 +122,10 @@ class TestSeriesMethods(TestBase):
             hpat_func(A, B)
 
             exec_times, boxing_times = get_times(hpat_func, A, B, iter_number=self.iter_number)
-            self.test_results.add(test_name, 'JIT', A.size, exec_times, boxing_times,
+            self.test_results.add(test_name, 'SDC', A.size, exec_times, boxing_times,
                                   compile_results=compile_results, num_threads=self.num_threads)
             exec_times, _ = get_times(pyfunc, A, B, iter_number=self.iter_number)
-            self.test_results.add(test_name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
+            self.test_results.add(test_name, 'Python', A.size, exec_times, num_threads=self.num_threads)
 
     def test_series_float_astype_int(self):
         self._test_case(usecase_gen('astype(np.int8)'), 'series_astype_int', [10 ** 5],
@@ -137,6 +137,7 @@ class TestSeriesMethods(TestBase):
                                             [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7])
 
 
+# (method_name, parameters, total_data_length, call_expression)
 cases = [
     ('abs', '', [3 * 10 ** 8]),
     ('apply', 'lambda x: x', [10 ** 7]),
@@ -157,7 +158,6 @@ cases = [
     ('median', '', [10 ** 8]),
     ('min', '', [10 ** 9]),
     ('min', 'skipna=True', [10 ** 7]),
-    ('mul', '2', [10 ** 8]),
     ('nlargest', '', [4 * 10 ** 7]),
     ('nsmallest', '', [10 ** 9]),
     ('nunique', '', [10 ** 5]),
@@ -167,9 +167,7 @@ cases = [
     ('shift', '', [5 * 10 ** 8]),
     ('sort_values', '', [10 ** 5]),
     ('std', '', [10 ** 7]),
-    ('sub', '10', [10 ** 8]),
     ('sum', '', [10 ** 9]),
-    ('truediv', '2', [10 ** 7]),
     ('value_counts', '', [3 * 10 ** 5]),
     ('var', '', [5 * 10 ** 8]),
     ('unique', '', [10 ** 5]),
@@ -184,10 +182,7 @@ cases_two_par = [
     ('eq', '', [10 ** 7]),
     ('floordiv', '', [10 ** 7]),
     ('ge', '', [10 ** 7]),
-    ('mul', '', [10 ** 8]),
     ('pow', '', [10 ** 7]),
-    ('sub', '', [10 ** 9]),
-    ('truediv', '', [10 ** 7]),
 ]
 
 
