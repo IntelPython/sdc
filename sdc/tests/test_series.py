@@ -26,25 +26,31 @@
 
 
 # -*- coding: utf-8 -*-
-import string
-import unittest
-import platform
-import pandas as pd
 import numpy as np
+import pandas as pd
+import platform
 import pyarrow.parquet as pq
 import sdc
-from itertools import islice, permutations, product, combinations, combinations_with_replacement
-from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (
-    count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end,
-    skip_numba_jit, skip_sdc_jit, sdc_limitation, skip_parallel, skip_inline)
-from sdc.tests.gen_test_data import ParquetGenerator
+import string
+import unittest
+from itertools import combinations, combinations_with_replacement, islice, permutations, product
 from numba import types
 from numba.config import IS_32BITS
 from numba.errors import TypingError
 from numba.special import literally
 
 from .test_series_apply import TestSeries_apply
+from sdc.tests.test_base import TestCase
+from sdc.tests.test_utils import (count_array_OneDs,
+                                  count_array_REPs,
+                                  count_parfor_REPs,
+                                  get_start_end,
+                                  sdc_limitation,
+                                  skip_inline,
+                                  skip_numba_jit,
+                                  skip_parallel,
+                                  skip_sdc_jit)
+from sdc.tests.gen_test_data import ParquetGenerator
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -4831,6 +4837,7 @@ class TestSeries(TestSeries_apply, TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_series_quantile(self):
         def test_impl():
             A = pd.Series([1, 2.5, .5, 3, 5])

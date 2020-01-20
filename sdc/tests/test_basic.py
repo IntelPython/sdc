@@ -24,14 +24,12 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
 import itertools
+import numba
 import numpy as np
 import pandas as pd
 import random
 import unittest
-
-import numba
 from numba import types
 
 import sdc
@@ -205,6 +203,7 @@ class TestBasic(BaseTest):
         self.assertEqual(count_parfor_REPs(), 0)
 
     @skip_numba_jit("hang with numba.jit. ok with sdc.jit")
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_strided_getitem(self):
         def test_impl(N):
             A = np.ones(N)
@@ -298,6 +297,7 @@ class TestBasic(BaseTest):
             self.assertEqual(count_parfor_REPs(), 0)
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_reduce_filter1(self):
         import sys
         dtypes = ['float32', 'float64', 'int32', 'int64']
@@ -328,7 +328,7 @@ class TestBasic(BaseTest):
             self.assertEqual(count_parfor_REPs(), 0)
 
     @skip_numba_jit
-    @skip_sdc_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_array_reduce(self):
         binops = ['+=', '*=', '+=', '*=', '|=', '|=']
         dtypes = ['np.float32', 'np.float32', 'np.float64', 'np.float64', 'np.int32', 'np.int64']
@@ -397,6 +397,7 @@ class TestBasic(BaseTest):
         np.testing.assert_allclose(hpat_func(arr) / self.num_ranks, test_impl(arr))
         self.assertEqual(count_array_OneDs(), 1)
 
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
     def test_rebalance(self):
         def test_impl(N):
@@ -415,6 +416,7 @@ class TestBasic(BaseTest):
         finally:
             sdc.distributed_analysis.auto_rebalance = False
 
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
     def test_rebalance_loop(self):
         def test_impl(N):
