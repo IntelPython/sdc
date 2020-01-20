@@ -1060,6 +1060,22 @@ def hpat_pandas_stringmethods_isalnum(self):
     return hpat_pandas_stringmethods_isalnum_impl
 
 
+@sdc_overload_method(StringMethodsType, 'isnumeric')
+def hpat_pandas_stringmethods_isnumeric(self):
+    ty_checker = TypeChecker('Method isnumeric().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isnumeric_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isnumeric()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isnumeric_impl
+
+
 stringmethods_funcs = {
     'istitle': {'method': hpat_pandas_stringmethods_istitle,
                 'caption': 'Check if each word start with an upper case letter'},
