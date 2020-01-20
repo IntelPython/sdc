@@ -76,6 +76,24 @@ def {func_name}(A, B):
     return _gen_impl
 
 
+def usecase_operators(name):
+    func_name = 'usecase_func'
+
+    func_text = f"""\
+def {func_name}(A, B):
+  start_time = time.time()
+  res = A {name} B
+  finish_time = time.time()
+  return finish_time - start_time, res
+"""
+
+    loc_vars = {}
+    exec(func_text, globals(), loc_vars)
+    _gen_impl = loc_vars[func_name]
+
+    return _gen_impl
+
+
 def usecase_series_astype_int(input_data):
     # astype to int8
     start_time = time.time()
@@ -190,6 +208,23 @@ def {func_name}(self):
     return _gen_impl
 
 
+def test_gen_operators(name, data_length):
+    func_name = 'func'
+
+    func_text = f"""\
+def {func_name}(self):
+  self._test_series_binary_operations(usecase_operators('{name}'), 'series_{name}', {data_length})
+"""
+
+    global_vars = {'usecase_operators': usecase_operators}
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _gen_impl = loc_vars[func_name]
+
+    return _gen_impl
+
+
 def test_gen_two_par(name, params, data_length):
     func_name = 'func'
 
@@ -254,6 +289,22 @@ cases_two_par = [
     ('pow', '', [10 ** 7]),
 ]
 
+cases_operators = [
+    ('+', [10 ** 7]),
+    ('-', [10 ** 7]),
+    ('*', [10 ** 7]),
+    ('**', [10 ** 7]),
+    ('/', [10 ** 7]),
+    ('//', [10 ** 7]),
+    ('%', [10 ** 7]),
+    ('<', [10 ** 7]),
+    ('>', [10 ** 7]),
+    ('<=', [10 ** 7]),
+    ('>=', [10 ** 7]),
+    ('!=', [10 ** 7]),
+    ('==', [10 ** 7]),
+]
+
 for params in cases:
     if len(params) == 4:
         func, param, length, call_expression = params
@@ -273,3 +324,9 @@ for params in cases_two_par:
         name += to_varname(param)
     func_name = 'test_series_float_{}'.format(name)
     setattr(TestSeriesMethods, func_name, test_gen_two_par(func, param, length))
+
+for params in cases_operators:
+    func, length = params
+    name = func
+    func_name = 'test_series_float_{}'.format(name)
+    setattr(TestSeriesMethods, func_name, test_gen_operators(func, length))
