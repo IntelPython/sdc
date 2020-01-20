@@ -30,11 +30,9 @@
 '''
 
 
-import operator
 import pandas
 import numpy
 import sdc
-import copy
 
 from numba import types
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
@@ -48,7 +46,59 @@ from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
-from sdc.utils import sdc_overload_method
+from sdc.utils import sdc_overload_method, sdc_overload_attribute
+
+
+@sdc_overload_attribute(DataFrameType, 'index')
+def hpat_pandas_dataframe_index(df):
+    """
+       Intel Scalable Dataframe Compiler User Guide
+       ********************************************
+       Pandas API: pandas.DataFrame.index
+
+       Examples
+       --------
+       .. literalinclude:: ../../../examples/dataframe/dataframe_index.py
+          :language: python
+          :lines: 27-
+          :caption: The index (row labels) of the DataFrame.
+          :name: ex_dataframe_index
+
+       .. command-output:: python ./dataframe/dataframe_index.py
+           :cwd: ../../../examples
+
+       Intel Scalable Dataframe Compiler Developer Guide
+       *************************************************
+       Pandas DataFrame attribute :attr:`pandas.DataFrame.index` implementation.
+       .. only:: developer
+       Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_index*
+       Parameters
+       -----------
+       df: :obj:`pandas.DataFrame`
+           input arg
+       Returns
+       -------
+       :obj: `numpy.array`
+           return the index of DataFrame
+    """
+
+    ty_checker = TypeChecker(f'Attribute index.')
+    ty_checker.check(df, DataFrameType)
+
+    if isinstance(df.index, types.NoneType) or df.index is None:
+        empty_df = not df.columns
+
+        def hpat_pandas_df_index_none_impl(df):
+            df_len = len(get_dataframe_data(df, 0)) if empty_df == False else 0  # noqa
+
+            return numpy.arange(df_len)
+
+        return hpat_pandas_df_index_none_impl
+    else:
+        def hpat_pandas_df_index_impl(df):
+            return df._index
+
+        return hpat_pandas_df_index_impl
 
 
 def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
@@ -83,8 +133,6 @@ def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
 
     df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
     other_columns_indx = {col_name: i for i, col_name in enumerate(other.columns)}
-
-
 
     # Keep columns that are StringArrayType
     string_type_columns = set(col_name for typ, col_name in zip(df.data, df.columns)
@@ -149,17 +197,19 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
+
     Pandas API: pandas.DataFrame.append
+
     Examples
     --------
-    .. literalinclude:: ../../../examples/dataframe_append.py
-       :language: python
-       :lines: 27-
-       :caption: Appending rows of other to the end of caller, returning a new object.
-       Columns in other that are not in the caller are added as new columns.
-       :name: ex_dataframe_append
+    .. literalinclude:: ../../../examples/dataframe/dataframe_append.py
+        :language: python
+        :lines: 37-
+        :caption: Appending rows of other to the end of caller, returning a new object. Columns in other that are not
+                  in the caller are added as new columns.
+        :name: ex_dataframe_append
 
-    .. command-output:: python ./dataframe_append.py
+    .. command-output:: python ./dataframe/dataframe_append.py
         :cwd: ../../../examples
 
     .. note::
@@ -170,6 +220,7 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     .. seealso::
         `pandas.concat <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.concat.html>`_
             General function to concatenate DataFrame or Series objects.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas DataFrame method :meth:`pandas.DataFrame.append` implementation.
@@ -766,11 +817,10 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
     .. literalinclude:: ../../../examples/dataframe/dataframe_drop.py
         :language: python
         :lines: 37-
-        :caption: Drop specified columns from DataFrame
-        Remove columns by specifying directly index or column names.
+        :caption: Drop specified columns from DataFrame.
         :name: ex_dataframe_drop
 
-    .. command-output:: python ./dataframe_drop.py
+    .. command-output:: python ./dataframe/dataframe_drop.py
         :cwd: ../../../examples
 
      .. note::

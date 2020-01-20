@@ -24,27 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-"""
-    Expected result:
-         A  B    C
-    0  1.0  3  NaN
-    1  2.0  4  NaN
-    2  NaN  5  7.0
-    3  NaN  6  8.0
-
-"""
-
 import pandas as pd
 from numba import njit
 
 
 @njit
-def dataframe_append():
-    df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
-    df2 = pd.DataFrame({'B': [5, 6], 'C': [7, 8]})
-    result = df.append(df2)
+def dataframe_index():
+    df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]}, index=['a', 'b'])
+    result = df.index
 
-    return result
+    return result  # Numpy array of index values ['a', 'b']
 
 
-print(dataframe_append())
+print(dataframe_index())

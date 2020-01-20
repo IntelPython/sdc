@@ -24,27 +24,23 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-"""
-    Expected result:
-         A  B    C
-    0  1.0  3  NaN
-    1  2.0  4  NaN
-    2  NaN  5  7.0
-    3  NaN  6  8.0
-
-"""
+# Expected:
+# London      2.995732
+# New York    3.044522
+# Helsinki    2.484907
+# dtype: float64
 
 import pandas as pd
+import numpy as np
 from numba import njit
 
 
 @njit
-def dataframe_append():
-    df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
-    df2 = pd.DataFrame({'B': [5, 6], 'C': [7, 8]})
-    result = df.append(df2)
+def series_apply():
+    s = pd.Series([20, 21, 12],
+                  index=['London', 'New York', 'Helsinki'])
 
-    return result
+    return s.apply(np.log)
 
 
-print(dataframe_append())
+print(series_apply())
