@@ -68,7 +68,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
     Parameters
     ----------
     self: :class:`pandas.Series`
-        input arg
+        input Series
     other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`, :obj:`slice`, :obj:`list`
         input arg
 
@@ -242,7 +242,7 @@ def hpat_pandas_series_getitem(self, idx):
     Parameters
     ----------
     self: :class:`pandas.Series`
-        input arg
+        input Series
     other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`, :obj:`slice`, :obj:`list`
         input arg
 
@@ -520,6 +520,13 @@ def hpat_pandas_series_loc(self):
 
     Pandas API: pandas.Series.loc
 
+    Limitations
+    -----------
+    - Loc returns Series
+    - Loc slice and callable with String is not implemented
+    - Loc slice without start is not supported
+    - Loc callable returns float Series
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series_loc/series_loc_single_result.py
@@ -548,15 +555,6 @@ def hpat_pandas_series_loc(self):
 
     .. command-output:: python ./series_loc/series_loc_slice.py
        :cwd: ../../../examples
-
-    .. note::
-        Loc return Series
-    .. note::
-        Loc slice and callable with String not implement
-    .. note::
-        Loc slice without start not support
-    .. note::
-        Loc callable return float Series
 
     .. seealso::
 
