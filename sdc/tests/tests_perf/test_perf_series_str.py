@@ -82,7 +82,6 @@ class TestSeriesStringMethods(TestBase):
 
 # (method_name, parameters, input_data)
 cases = [
-    ('capitalize', ''),
     ('center', '1', test_global_input_data_unicode_kind1),
     ('endswith', '"e"'),
     ('find', '"e"'),
@@ -94,8 +93,6 @@ cases = [
     ('rstrip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
     ('startswith', '"e"'),
     ('strip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
-    ('swapcase', ''),
-    ('title', ''),
     ('upper', ''),
     ('zfill', '1', test_global_input_data_unicode_kind1),
 ]

@@ -34,16 +34,7 @@ from sdc.tests.test_utils import test_global_input_data_float64
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import (calc_compilation, get_times,
                                                   perf_data_gen_fixed_len)
-
-
-rolling_usecase_tmpl = """
-def df_rolling_{method_name}_usecase(data):
-    start_time = time.time()
-    res = data.rolling({rolling_params}).{method_name}({method_params})
-    end_time = time.time()
-
-    return end_time - start_time, res
-"""
+from .generator import gen, test_gen
 
 
 def get_rolling_params(window=100, min_periods=None):
@@ -55,25 +46,6 @@ def get_rolling_params(window=100, min_periods=None):
     return ', '.join(rolling_params)
 
 
-def gen_df_rolling_usecase(method_name, rolling_params=None, method_params=''):
-    """Generate df rolling method use case"""
-    if not rolling_params:
-        rolling_params = get_rolling_params()
-
-    func_text = rolling_usecase_tmpl.format(**{
-        'method_name': method_name,
-        'rolling_params': rolling_params,
-        'method_params': method_params
-    })
-
-    global_vars = {'time': time}
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _df_rolling_usecase = loc_vars[f'df_rolling_{method_name}_usecase']
-
-    return _df_rolling_usecase
-
-
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_df_rolling.TestDFRollingMethods
 class TestDFRollingMethods(TestBase):
     # more than 19 columns raise SystemError: CPUDispatcher() returned a result with an error set
@@ -82,9 +54,6 @@ class TestDFRollingMethods(TestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.total_data_length = {
-            'min': [2 * 10 ** 5],
-        }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
         # compilation time
@@ -101,15 +70,15 @@ class TestDFRollingMethods(TestBase):
     def _test_python(self, pyfunc, record, *args, **kwargs):
         record['test_results'], _ = get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, data_name, test_name=None,
+    def _test_case(self, pyfunc, name, total_data_length, test_name=None,
                    input_data=test_global_input_data_float64, columns_num=10):
         if columns_num > self.max_columns_num:
             columns_num = self.max_columns_num
 
-        test_name = test_name or data_name
+        test_name = 'DataFrame.rolling.{}'.format(name)
 
         full_input_data_length = sum(len(i) for i in input_data)
-        for data_length in self.total_data_length[data_name]:
+        for data_length in total_data_length:
             base = {
                 'test_name': test_name,
                 'data_size': data_length,
@@ -127,11 +96,9 @@ class TestDFRollingMethods(TestBase):
             self._test_python(pyfunc, record, test_data)
             self.test_results.add(**record)
 
-    def _test_df_rolling_method(self, name, rolling_params=None, method_params=''):
-        usecase = gen_df_rolling_usecase(name, rolling_params=rolling_params,
-                                         method_params=method_params)
-        test_name = f'DataFrame.rolling.{name}'
-        self._test_case(usecase, name, test_name=test_name)
 
-    def test_df_rolling_min(self):
-        self._test_df_rolling_method('min')
+cases = [
+    ('min', '', [2 * 10 ** 5]),
+]
+
+gen(cases, test_gen, TestDFRollingMethods, 'df', 'rolling({}).'.format(get_rolling_params()))
