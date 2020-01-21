@@ -94,11 +94,16 @@ def hpat_pandas_series_apply(self, func, convert_dtype=True, args=()):
     ty_checker = TypeChecker("Method apply().")
     ty_checker.check(self, SeriesType)
 
+    if isinstance(func, numba.types.Dispatcher):
+        output_type = func.dispatcher.get_call_template([self.dtype], {})[0].cases[0].return_type
+    else:
+        output_type = self.dtype
+
     def impl(self, func, convert_dtype=True, args=()):
         input_arr = self._data
         length = len(input_arr)
 
-        output_arr = numpy.empty(length, dtype=numba.types.float64)
+        output_arr = numpy.empty(length, dtype=output_type)
 
         for i in numba.prange(length):
             output_arr[i] = func(input_arr[i], *args)
