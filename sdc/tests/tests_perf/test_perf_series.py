@@ -157,7 +157,7 @@ cases = [
     ('mean', '', [10 ** 8]),
     ('median', '', [10 ** 8]),
     ('min', '', [10 ** 9]),
-    ('min', 'skipna=True', [10 ** 7]),
+    ('min', 'skipna=False', [10 ** 7]),
     ('nlargest', '', [4 * 10 ** 7]),
     ('nsmallest', '', [10 ** 9]),
     ('nunique', '', [10 ** 5]),
