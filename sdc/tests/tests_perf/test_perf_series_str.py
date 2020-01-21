@@ -36,7 +36,7 @@ import pandas as pd
 from sdc.tests.test_utils import *
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import *
-from .generator import test_perf_generator
+from .generator import generate_test_cases
 
 
 test_global_input_data_unicode_kind1 = [
@@ -97,4 +97,4 @@ cases = [
     ('zfill', '1', test_global_input_data_unicode_kind1),
 ]
 
-test_perf_generator(cases, TestSeriesStringMethods, 'series', 'str.')
+generate_test_cases(cases, TestSeriesStringMethods, 'series', 'str.')

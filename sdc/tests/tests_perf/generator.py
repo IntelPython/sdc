@@ -3,8 +3,12 @@ from collections import namedtuple
 from sdc.io.csv_ext import to_varname
 
 
-TestCase = namedtuple('TestCase', 'name params size call_expression')
-TestCase.__new__.__defaults__ = ('', '', None, None)
+class TestCase:
+    def __init__(self, name='', params='', size=None, call_expression=None):
+        self.name = name
+        self.params = params
+        self.size = size
+        self.call_expression = call_expression
 
 
 def gen(cases, method, class_add, type, prefix=''):
@@ -93,9 +97,9 @@ def {func_name}(A, B):
     return func
 
 
-def test_perf_generator(cases, class_add, type, prefix=''):
+def generate_test_cases(cases, class_add, type, prefix=''):
     return gen(cases, test_gen, class_add, type, prefix)
 
 
-def test_perf_generator_two_par(cases, class_add, type, prefix=''):
+def generate_test_cases_two_params(cases, class_add, type, prefix=''):
     return gen(cases, test_gen_two_par, class_add, type, prefix)
