@@ -254,6 +254,7 @@ def islower_usecase(series):
 def isalnum_usecase(series):
     return series.str.isalnum()
 
+
 def isnumeric_usecase(series):
     return series.str.isnumeric()
 
