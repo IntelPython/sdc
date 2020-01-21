@@ -106,7 +106,8 @@ def hpat_pandas_series_apply(self, func, convert_dtype=True, args=()):
         output_arr = numpy.empty(length, dtype=output_type)
 
         for i in numba.prange(length):
-            output_arr[i] = func(input_arr[i], *args)
+            # output_arr[i] = func(input_arr[i], *args)
+            output_arr[i] = func(input_arr[i])
 
         return pandas.Series(output_arr, index=self._index, name=self._name)
 
