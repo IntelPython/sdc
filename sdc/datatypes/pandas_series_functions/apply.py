@@ -106,6 +106,7 @@ def hpat_pandas_series_apply(self, func, convert_dtype=True, args=()):
         output_arr = numpy.empty(length, dtype=output_type)
 
         for i in numba.prange(length):
+            # Numba issue https://github.com/numba/numba/issues/5065
             # output_arr[i] = func(input_arr[i], *args)
             output_arr[i] = func(input_arr[i])
 
