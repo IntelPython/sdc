@@ -512,25 +512,50 @@ class TestDataFrame(TestCase):
         df2 = df.copy()
         np.testing.assert_almost_equal(hpat_func(df, arr), test_impl(df2, arr))
 
-    @skip_numba_jit
-    def test_df_values1(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
-            return df.values
-
-        hpat_func = self.jit(test_impl)
-        n = 11
-        np.testing.assert_array_equal(hpat_func(n), test_impl(n))
-
-    @skip_numba_jit
-    def test_df_values2(self):
+    def _test_df_values_unboxing(self, df):
         def test_impl(df):
             return df.values
 
-        hpat_func = self.jit(test_impl)
-        n = 11
-        df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
-        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        sdc_func = self.jit(test_impl)
+        np.testing.assert_array_equal(sdc_func(df), test_impl(df))
+
+    @skip_numba_jit("Hang on Windows")
+    def test_df_values_unboxing(self):
+        values_to_test = [[1, 2, 3, 4, 5],
+                          [.1, .2, .3, .4, .5],
+                          [np.nan, np.inf, .0, .1, -1.]]
+        n = 5
+        np.random.seed(0)
+        A = np.ones(n)
+        B = np.random.ranf(n)
+
+        for values in values_to_test:
+            with self.subTest(values=values):
+                df = pd.DataFrame({'A': A, 'B': B, 'C': values})
+                self._test_df_values_unboxing(df)
+
+    def _test_df_values(self, df):
+        def test_impl(n, values):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n), 'C': values})
+            return df.values
+
+        sdc_func = self.jit(test_impl)
+        np.testing.assert_array_equal(sdc_func(df), test_impl(df))
+
+    def test_dataframe_values(self):
+        def test_impl(n, values):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n), 'C': values})
+            return df.values
+
+        sdc_func = self.jit(test_impl)
+        n = 5
+        values_to_test = [[1, 2, 3, 4, 5],
+                          [.1, .2, .3, .4, .5],
+                          [np.nan, np.inf, .0, .1, -1.]]
+
+        for values in values_to_test:
+            with self.subTest(values=values):
+                np.testing.assert_array_equal(sdc_func(n, values), test_impl(n, values))
 
     @skip_numba_jit
     def test_df_values_parallel1(self):

@@ -34,7 +34,7 @@ import pandas
 import numpy
 import sdc
 
-from numba import types
+from numba import types, prange, literal_unroll
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.str_arr_ext import StringArrayType
@@ -44,9 +44,10 @@ from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
-from sdc.datatypes.common_functions import TypeChecker
+from sdc.datatypes.common_functions import TypeChecker, hpat_arrays_append_overload, find_common_dtype_from_numpy_dtypes
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utils import sdc_overload_method, sdc_overload_attribute
+from numba.errors import TypingError
 
 
 @sdc_overload_attribute(DataFrameType, 'index')
@@ -99,6 +100,85 @@ def hpat_pandas_dataframe_index(df):
             return df._index
 
         return hpat_pandas_df_index_impl
+
+
+@sdc_overload_attribute(DataFrameType, 'values')
+def hpat_pandas_dataframe_values(df):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.values
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_values.py
+      :language: python
+      :lines: 27-
+      :caption: The values data of the DataFrame.
+      :name: ex_dataframe_values
+
+    .. command-output:: python ./dataframe/dataframe_values.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.to_numpy <pandas.DataFrame.to_numpy>`
+            Recommended alternative to this method.
+        :ref:`DataFrame.index <pandas.DataFrame.index>`
+            Retrieve the index labels.
+        :ref:`DataFrame.columns <pandas.DataFrame.columns>`
+            Retrieving the column names.
+
+    .. note::
+
+        The dtype will be a lower-common-denominator dtype (implicit upcasting);
+        that is to say if the dtypes (even of numeric types) are mixed, the one that accommodates all will be chosen.
+        Use this with care if you are not dealing with the blocks.
+        e.g. If the dtypes are float16 and float32, dtype will be upcast to float32. If dtypes are int32 and uint8,
+        dtype will be upcast to int32. By numpy.find_common_type() convention,
+        mixing int64 and uint64 will result in a float64 dtype.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame attribute :attr:`pandas.DataFrame.values` implementation.
+    .. only:: developer
+    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_values*
+    Parameters
+    -----------
+    df: :obj:`pandas.DataFrame`
+       input arg
+    Returns
+    -------
+    :obj: `numpy.ndarray`
+       return a Numpy representation of the DataFrame
+    """
+
+    func_name = 'Attribute values'
+    ty_checker = TypeChecker(func_name)
+    ty_checker.check(df, DataFrameType)
+
+    # TODO: Handle StringArrayType
+    for column in df.data:
+        if isinstance(column, StringArrayType):
+            raise TypingError(f'{func_name}: String type is currently unsupported')
+
+    numba_common_dtype = find_common_dtype_from_numpy_dtypes([column.dtype for column in df.data], [])
+
+    def hpat_pandas_df_values_impl(df):
+        df_values = []
+        row_len = len(get_dataframe_data(df, 0))
+        local_data = literal_unroll(df._data)
+        column_len = len(local_data)
+
+        for i in prange(row_len):
+            row = numpy.empty(column_len, numba_common_dtype)
+            for j in range(column_len):
+                row[j] = numpy.array(local_data[j])[i]
+            df_values.append(row)
+
+        return df_values
+
+    return hpat_pandas_df_values_impl
 
 
 def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):

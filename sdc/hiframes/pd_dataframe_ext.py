@@ -61,11 +61,12 @@ class DataFrameAttribute(AttributeTemplate):
     def resolve_loc(self, ary):
         return DataFrameLocType(ary)
 
-    def resolve_values(self, ary):
-        # using np.stack(data, 1) for both typing and implementation
-        stack_sig = self.context.resolve_function_type(
-            np.stack, (types.Tuple(ary.data), types.IntegerLiteral(1)), {})
-        return stack_sig.return_type
+    if sdc.config.config_pipeline_hpat_default:
+        def resolve_values(self, ary):
+            # using np.stack(data, 1) for both typing and implementation
+            stack_sig = self.context.resolve_function_type(
+                np.stack, (types.Tuple(ary.data), types.IntegerLiteral(1)), {})
+            return stack_sig.return_type
 
     @bound_function("df.apply")
     def resolve_apply(self, df, args, kws):
