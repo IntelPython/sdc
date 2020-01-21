@@ -60,8 +60,8 @@ class TestDataFrameMethods(TestBase):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, data_name, total_data_length, input_data=test_global_input_data_float64):
-        test_name = 'DataFrame.{}'.format(data_name)
+    def _test_case(self, pyfunc, name, total_data_length, input_data=test_global_input_data_float64):
+        test_name = 'DataFrame.{}'.format(name)
 
         full_input_data_length = sum(len(i) for i in input_data)
         for data_length in total_data_length:
