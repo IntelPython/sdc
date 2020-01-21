@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,13 +24,7 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import pandas as pd
-from numba import njit
-
-
-@njit
-def dataframe_append():
-    """
+"""
     Expected result:
          A  B    C
     0  1.0  3  NaN
@@ -38,8 +32,14 @@ def dataframe_append():
     2  NaN  5  7.0
     3  NaN  6  8.0
 
-    """
+"""
 
+import pandas as pd
+from numba import njit
+
+
+@njit
+def dataframe_append():
     df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
     df2 = pd.DataFrame({'B': [5, 6], 'C': [7, 8]})
     result = df.append(df2)
