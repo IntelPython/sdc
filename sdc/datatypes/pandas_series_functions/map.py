@@ -24,57 +24,59 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import pandas as pd
-import numpy as np
-
+import numpy
+import pandas
 import numba
 
-from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import skip_sdc_jit, skip_numba_jit
+from sdc.hiframes.pd_series_ext import SeriesType
+from sdc.utils import sdc_overload_method
+
+from ..common_functions import TypeChecker
 
 
-GLOBAL_VAL = 2
+@sdc_overload_method(SeriesType, 'map')
+def hpat_pandas_series_map(self, arg, na_action=None):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
+    Pandas API: pandas.Series.map
 
-class TestSeries_map(object):
+    Limitations
+    -----------
 
-    # @skip_numba_jit
-    def test_series_map1(self):
-        def test_impl(S):
-            return S.map(lambda a: 2 * a)
-        hpat_func = self.jit(test_impl)
+    Examples
+    --------
 
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+    .. seealso::
 
-    @skip_numba_jit
-    def test_series_map_global1(self):
-        def test_impl(S):
-            return S.map(lambda a: a + GLOBAL_VAL)
-        hpat_func = self.jit(test_impl)
+        :ref:`Series.map <pandas.Series.apply>`
+            For applying more complex functions on a Series.
+        :ref:`DataFrame.apply <pandas.DataFrame.apply>`
+            Apply a function row-/column-wise.
+        :ref:`DataFrame.applymap <pandas.DataFrame.applymap>`
+            Apply a function elementwise on a whole DataFrame.
 
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
 
-    @skip_numba_jit
-    def test_series_map_tup1(self):
-        def test_impl(S):
-            return S.map(lambda a: (a, 2 * a))
-        hpat_func = self.jit(test_impl)
+    .. only:: developer
+        Test: python -m sdc.runtests sdc.tests.test_series -k map
+    """
 
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+    ty_checker = TypeChecker("Method map().")
+    ty_checker.check(self, SeriesType)
 
-    @skip_numba_jit
-    def test_series_map_tup_map1(self):
-        def test_impl(S):
-            A = S.map(lambda a: (a, 2 * a))
-            return A.map(lambda a: a[1])
-        hpat_func = self.jit(test_impl)
+    if isinstance(arg, numba.types.Callable):
+        def impl(self, arg, na_action=None):
+            input_arr = self._data
+            length = len(input_arr)
 
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+            output_arr = numpy.empty(length, dtype=numba.types.float64)
 
+            for i in numba.prange(length):
+                output_arr[i] = arg(input_arr[i])
 
-class _Test(TestSeries_map, TestCase):
-    pass
+            return pandas.Series(output_arr, index=self._index, name=self._name)
+
+        return impl
