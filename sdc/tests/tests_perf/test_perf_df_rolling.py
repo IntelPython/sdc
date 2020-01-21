@@ -34,7 +34,7 @@ from sdc.tests.test_utils import test_global_input_data_float64
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import (calc_compilation, get_times,
                                                   perf_data_gen_fixed_len)
-from .generator import gen, test_gen
+from .generator import test_perf_generator
 
 
 def get_rolling_params(window=100, min_periods=None):
@@ -101,4 +101,4 @@ cases = [
     ('min', '', [2 * 10 ** 5]),
 ]
 
-gen(cases, test_gen, TestDFRollingMethods, 'df', 'rolling({}).'.format(get_rolling_params()))
+test_perf_generator(cases, TestDFRollingMethods, 'df', 'rolling({}).'.format(get_rolling_params()))

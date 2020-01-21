@@ -34,7 +34,7 @@ import sdc
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from sdc.tests.test_utils import test_global_input_data_float64
-from .generator import gen, test_gen, test_gen_two_par
+from .generator import test_perf_generator, test_perf_generator_two_par
 
 
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_df.TestDataFrameMethods.test_df_{method_name}
@@ -127,5 +127,5 @@ cases_two_par = [
 ]
 
 
-gen(cases, test_gen, TestDataFrameMethods, 'df')
-gen(cases_two_par, test_gen_two_par, TestDataFrameMethods, 'df')
+test_perf_generator(cases, TestDataFrameMethods, 'df')
+test_perf_generator_two_par(cases_two_par, TestDataFrameMethods, 'df')

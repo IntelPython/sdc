@@ -1,25 +1,22 @@
 import time
+from collections import namedtuple
 from sdc.io.csv_ext import to_varname
+
+
+TestCase = namedtuple('TestCase', 'name params size call_expression')
+TestCase.__new__.__defaults__ = ('', '', None, None)
 
 
 def gen(cases, method, class_add, type, prefix=''):
     for params in cases:
-        if len(params) == 4:
-            func, param, length, call_expression = params
-        elif len(params) == 3:
-            func, param, length = params
-            call_expression = None
-        else:
-            func, param = params
-            call_expression = None
-            length = None
-        name = func
-        if param:
-            name += "_" + to_varname(param)
+        test_params = TestCase(*params)
+        name = test_params.name
+        if test_params.params:
+            name += "_" + to_varname(test_params.params)
         func_name = 'test_{}_{}_{}'.format(type, prefix, name)
         func_name = to_varname(func_name).replace('__', '_')
 
-        setattr(class_add, func_name, method(func, param, length, call_expression, prefix))
+        setattr(class_add, func_name, method(test_params.name, test_params.params, test_params.size, test_params.call_expression, prefix))
 
 
 def test_gen(name, params, data_length, call_expression, prefix):
@@ -93,3 +90,11 @@ def {func_name}(A, B):
     func = loc_vars[func_name]
 
     return func
+
+
+def test_perf_generator(cases, class_add, type, prefix=''):
+    return gen(cases, test_gen, class_add, type, prefix)
+
+
+def test_perf_generator_two_par(cases, class_add, type, prefix=''):
+    return gen(cases, test_gen_two_par, class_add, type, prefix)

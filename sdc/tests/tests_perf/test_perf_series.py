@@ -37,7 +37,7 @@ import sdc
 from .test_perf_base import TestBase
 from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
-from .generator import gen, test_gen, test_gen_two_par, usecase_gen
+from .generator import test_perf_generator, test_perf_generator_two_par, usecase_gen
 
 
 def usecase_series_astype_int(input_data):
@@ -186,5 +186,5 @@ cases_two_par = [
 ]
 
 
-gen(cases, test_gen, TestSeriesMethods, 'series')
-gen(cases_two_par, test_gen_two_par, TestSeriesMethods, 'series')
+test_perf_generator(cases, TestSeriesMethods, 'series')
+test_perf_generator_two_par(cases_two_par, TestSeriesMethods, 'series')
