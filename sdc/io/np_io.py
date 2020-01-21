@@ -64,10 +64,7 @@ def _handle_np_fromfile(assign, lhs, rhs):
 
     # FIXME: import here since hio has hdf5 which might not be available
     from .. import hio
-    if sdc.config.config_transport_mpi:
-        from .. import transport_mpi as transport
-    else:
-        from .. import transport_seq as transport
+    from .. import transport_seq as transport
 
     import llvmlite.binding as ll
     ll.add_symbol('get_file_size', transport.get_file_size)
@@ -108,10 +105,7 @@ def get_dtype_size(typingctx, dtype=None):
 def tofile_overload(arr, fname):
     # FIXME: import here since hio has hdf5 which might not be available
     from .. import hio
-    if sdc.config.config_transport_mpi:
-        from .. import transport_mpi as transport
-    else:
-        from .. import transport_seq as transport
+    from .. import transport_seq as transport
 
     import llvmlite.binding as ll
     ll.add_symbol('file_write', hio.file_write)
