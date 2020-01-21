@@ -16,7 +16,8 @@ def gen(cases, method, class_add, type, prefix=''):
         func_name = 'test_{}_{}_{}'.format(type, prefix, name)
         func_name = to_varname(func_name).replace('__', '_')
 
-        setattr(class_add, func_name, method(test_params.name, test_params.params, test_params.size, test_params.call_expression, prefix))
+        setattr(class_add, func_name, method(test_params.name, test_params.params,
+                                             test_params.size, test_params.call_expression, prefix))
 
 
 def test_gen(name, params, data_length, call_expression, prefix):
