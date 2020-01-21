@@ -655,6 +655,23 @@ class TestRolling(TestCase):
 
         self._test_rolling_min(df)
 
+    @unittest.expectedFailure
+    @unittest.skipIf(platform.system() == 'Darwin', 'Segmentation fault on Mac')
+    @skip_sdc_jit('DataFrame.rolling.min() unsupported')
+    def test_df_rolling_min_exception_many_columns(self):
+        def test_impl(df):
+            return df.rolling(3).min()
+
+        hpat_func = self.jit(test_impl)
+
+        # more than 19 columns raise SystemError: CPUDispatcher() returned a result with an error set
+        all_data = test_global_input_data_float64 * 5
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
     @skip_sdc_jit('Series.rolling.min() unsupported exceptions')
     def test_series_rolling_unsupported_values(self):
         series = pd.Series(test_global_input_data_float64[0])

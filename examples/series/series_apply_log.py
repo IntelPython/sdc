@@ -24,22 +24,23 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+# Expected:
+# London      2.995732
+# New York    3.044522
+# Helsinki    2.484907
+# dtype: float64
 
-import daal4py
-import daal4py.hpat
-import sdc
+import pandas as pd
 import numpy as np
+from numba import njit
 
 
-@sdc.jit(nopython=True)
-def kmeans(N, D, nClusters, maxit):
-    a = np.random.ranf((N, D))  # doesn't make much sense, but ok for now
-    kmi = daal4py.kmeans_init(nClusters, method='plusPlusDense')
-    km = daal4py.kmeans(nClusters, maxit)
-    kmr = km.compute(a, kmi.compute(a).centroids)
-    return (kmr.centroids, kmr.assignments, kmr.objectiveFunction, kmr.goalFunction, kmr.nIterations)
+@njit
+def series_apply():
+    s = pd.Series([20, 21, 12],
+                  index=['London', 'New York', 'Helsinki'])
+
+    return s.apply(np.log)
 
 
-print(kmeans(10000, 20, 2, 30))
-
-sdc.distribution_report()
+print(series_apply())
