@@ -24,32 +24,26 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+# Expected:
+# London      400
+# New York    441
+# Helsinki    144
+# dtype: int64
 
 import pandas as pd
 import numpy as np
-import sdc
+from numba import njit
 
 
-@sdc.jit
-def get_mean(df):
-    ser = pd.Series(df['Bonus %'])
-    m = ser.mean()
-    return m
+@njit
+def series_apply():
+    s = pd.Series([20, 21, 12],
+                  index=['London', 'New York', 'Helsinki'])
+
+    def square(x):
+        return x ** 2
+
+    return s.apply(square)
 
 
-@sdc.jit
-def sort_name(df):
-    ser = pd.Series(df['First Name'])
-    m = ser.sort_values()
-    return m
-
-
-file = "employees.csv"
-df = pd.read_csv(file)
-
-
-# find mean of one column
-print(get_mean(df))
-
-# Sort the names in ascending order
-print(sort_name(df))
+print(series_apply())

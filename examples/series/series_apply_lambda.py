@@ -24,20 +24,23 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+# Expected:
+# London      400
+# New York    441
+# Helsinki    144
+# dtype: int64
 
 import pandas as pd
 import numpy as np
-import sdc
+from numba import njit
 
 
-@sdc.jit
-def df_sort(df):
-    df2 = df.sort_values('A')
-    print(df2.A.values)
-    print(df2.B.values)
+@njit
+def series_apply():
+    s = pd.Series([20, 21, 12],
+                  index=['London', 'New York', 'Helsinki'])
+
+    return s.apply(lambda x: x ** 2)
 
 
-n = 11
-df = pd.DataFrame({'A': np.random.ranf(n), 'B': np.arange(n), 'C': np.random.ranf(n)})
-# computation is sequential since df is passed in
-df_sort(df)
+print(series_apply())
