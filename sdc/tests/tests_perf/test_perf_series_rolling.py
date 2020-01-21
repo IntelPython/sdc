@@ -46,8 +46,8 @@ def get_rolling_params(window=100, min_periods=None):
     return ', '.join(rolling_params)
 
 
-# python -m sdc.runtests sdc.tests.tests_perf.test_perf_df_rolling.TestDFRollingMethods
-class TestDFRollingMethods(TestBase):
+# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series_rolling.TestSeriesRollingMethods
+class TestSeriesRollingMethods(TestBase):
     # more than 19 columns raise SystemError: CPUDispatcher() returned a result with an error set
     max_columns_num = 19
 
@@ -95,5 +95,7 @@ class TestDFRollingMethods(TestBase):
 
 
 cases = [
-    ()
+    ('apply', 'func=2+3', [10]),
 ]
+
+test_perf_generator(cases, TestSeriesRollingMethods, 'df', 'rolling({}).'.format(get_rolling_params()))
