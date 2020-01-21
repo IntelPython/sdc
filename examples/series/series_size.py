@@ -26,13 +26,14 @@
 
 import numpy as np
 import pandas as pd
-
 from numba import njit
 
+
 @njit
-def series_nsmallest():
+def series_size():
     series = pd.Series(np.arange(10))
-    return series.nsmallest(4)
+
+    return series.size  # Expect value: 10
 
 
-print(series_nsmallest())
+print(series_size())
