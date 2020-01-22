@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -48,10 +48,7 @@ from sdc.str_arr_ext import (string_array_type, num_total_chars, StringArray,
                               get_data_ptr, convert_len_arr_to_offset)
 from sdc.utils import (debug_prints, empty_like_type, _numba_to_c_type_map, unliteral_all)
 
-if sdc.config.config_transport_mpi:
-    from . import transport_mpi as transport
-else:
-    from . import transport_seq as transport
+from . import transport_seq as transport
 
 
 ll.add_symbol('c_alltoall', transport.c_alltoall)
