@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,28 +24,23 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+# Expected:
+# London      2.995732
+# New York    3.044522
+# Helsinki    2.484907
+# dtype: float64
 
 import pandas as pd
 import numpy as np
-import sdc
+from numba import njit
 
 
-@sdc.jit
-def shift_df1(n):
-    df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.random.ranf(n)})
-    Ac = df.A.shift(1)
-    return Ac.sum()
+@njit
+def series_apply():
+    s = pd.Series([20, 21, 12],
+                  index=['London', 'New York', 'Helsinki'])
+
+    return s.apply(np.log)
 
 
-@sdc.jit
-def shift_df2(n):
-    df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.random.ranf(n)})
-    Ac = df.A.pct_change()
-    return Ac
-
-
-n = 10
-print("shift 1:")
-print(shift_df1(n))
-print("pct_change:")
-print(shift_df2(n))
+print(series_apply())

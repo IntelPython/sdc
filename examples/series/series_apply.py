@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,30 +24,26 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+# Expected:
+# London      400
+# New York    441
+# Helsinki    144
+# dtype: int64
 
-import sdc
+import pandas as pd
 import numpy as np
-import argparse
-import time
+from numba import njit
 
 
-@sdc.jit
-def calc_pi(n):
-    t1 = time.time()
-    x = 2 * np.random.ranf(n) - 1
-    y = 2 * np.random.ranf(n) - 1
-    pi = 4 * np.sum(x**2 + y**2 < 1) / n
-    print("Execution time:", time.time() - t1, "\nresult:", pi)
-    return pi
+@njit
+def series_apply():
+    s = pd.Series([20, 21, 12],
+                  index=['London', 'New York', 'Helsinki'])
+
+    def square(x):
+        return x ** 2
+
+    return s.apply(square)
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Monte Carlo Pi Calculation.')
-    parser.add_argument('--points', dest='points', type=int, default=200000000)
-    args = parser.parse_args()
-    points = args.points
-    calc_pi(points)
-
-
-if __name__ == '__main__':
-    main()
+print(series_apply())

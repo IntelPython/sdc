@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,24 +24,29 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import string
-import unittest
 import itertools
+import numba
+import numpy as np
 import os
 import pandas as pd
 import platform
-import numpy as np
-import numba
 import sdc
+import string
+import unittest
 from itertools import product
 from numba.errors import TypingError
-from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                  count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
-                                  skip_numba_jit, skip_sdc_jit,
-                                  test_global_input_data_float64)
+
 from sdc.hiframes.rolling import supported_rolling_funcs
+from sdc.tests.test_base import TestCase
+from sdc.tests.test_utils import (count_array_OneDs,
+                                  count_array_REPs,
+                                  count_parfor_OneDs,
+                                  count_parfor_REPs,
+                                  dist_IR_contains,
+                                  skip_numba_jit,
+                                  skip_sdc_jit,
+                                  test_global_input_data_float64)
+
 
 LONG_TEST = (int(os.environ['SDC_LONG_ROLLING_TEST']) != 0
              if 'SDC_LONG_ROLLING_TEST' in os.environ else False)
@@ -573,6 +578,23 @@ class TestRolling(TestCase):
         df = pd.DataFrame(data)
 
         self._test_rolling_min(df)
+
+    @unittest.expectedFailure
+    @unittest.skipIf(platform.system() == 'Darwin', 'Segmentation fault on Mac')
+    @skip_sdc_jit('DataFrame.rolling.min() unsupported')
+    def test_df_rolling_min_exception_many_columns(self):
+        def test_impl(df):
+            return df.rolling(3).min()
+
+        hpat_func = self.jit(test_impl)
+
+        # more than 19 columns raise SystemError: CPUDispatcher() returned a result with an error set
+        all_data = test_global_input_data_float64 * 5
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     @skip_sdc_jit('Series.rolling.min() unsupported exceptions')
     def test_series_rolling_unsupported_values(self):
