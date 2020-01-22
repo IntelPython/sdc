@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -27,20 +27,22 @@
 
 # -*- coding: utf-8 -*-
 
-import unittest
-import platform
-import sdc
+import gc
+import glob
 import numpy as np
 import pandas as pd
-import glob
-import gc
-import re
+import platform
 import pyarrow.parquet as pq
+import re
+import sdc
+import unittest
+
 from sdc.str_arr_ext import StringArray
-from sdc.str_ext import unicode_to_std_str, std_str_to_unicode
-from sdc.tests.test_base import TestCase
+from sdc.str_ext import std_str_to_unicode, unicode_to_std_str
 from sdc.tests.gen_test_data import ParquetGenerator
+from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
+
 
 class TestStrings(TestCase):
 

@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,19 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
 import pandas as pd
-import numpy as np
-import sdc
+from numba import njit
 
 
-@sdc.jit
-def merge_df(n):
-    df1 = pd.DataFrame({'key1': np.arange(n), 'A': np.arange(n) + 1.0})
-    df2 = pd.DataFrame({'key2': n - np.arange(n), 'B': n + np.arange(n) + 1.0})
-    df3 = pd.merge(df1, df2, left_on='key1', right_on='key2')
-    return df3.B.sum()
+@njit
+def dataframe_index():
+    df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]}, index=['a', 'b'])
+    result = df.index
+
+    return result  # Numpy array of index values ['a', 'b']
 
 
-n = 10
-print(merge_df(n))
+print(dataframe_index())
