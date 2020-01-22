@@ -146,14 +146,14 @@ class TestDFRollingMethods(TestBase):
         usecase = gen_df_rolling_usecase(name, rolling_params=rolling_params,
                                          extra_usecase_params=extra_usecase_params,
                                          method_params=method_params)
-        test_name = f'DataFrame.rolling.{name}'
+        test_name = f'DF.rolling.{name}'
         test_data_num = 1
         if extra_usecase_params:
             test_data_num += len(extra_usecase_params.split(', '))
         self._test_case(usecase, name, test_name=test_name, test_data_num=test_data_num)
 
-    def test_df_rolling_min(self):
-        self._test_df_rolling_method('min')
-
     def test_df_rolling_corr(self):
         self._test_df_rolling_method('corr', extra_usecase_params='other', method_params='other=other')
+
+    def test_df_rolling_min(self):
+        self._test_df_rolling_method('min')
