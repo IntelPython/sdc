@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -48,10 +48,7 @@ from sdc.utils import _numba_to_c_type_map
 from sdc.distributed_api import mpi_req_numba_type, ReqArrayType, req_array_type
 from . import hdist
 
-if sdc.config.config_transport_mpi:
-    from . import transport_mpi as transport
-else:
-    from . import transport_seq as transport
+from . import transport_seq as transport
 
 
 ll.add_symbol('hpat_dist_get_rank', transport.hpat_dist_get_rank)

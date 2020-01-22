@@ -33,9 +33,6 @@ requirements:
     - pyarrow {{ PYARROW_VERSION }}
     - arrow-cpp {{ ARROW_CPP_VERSION }}
     - boost
-    - mpich                           # [not win]
-    - impi_rt                         # [win]
-    - impi-devel                      # [win]
     - conda-package-handling ==1.3.11 # [win]
     - wheel
 
@@ -47,8 +44,6 @@ requirements:
     - arrow-cpp {{ ARROW_CPP_VERSION }}
     - boost
     - numba {{ NUMBA_VERSION }}
-    - mpich                           # [not win]
-    - impi_rt                         # [win]
     - conda-package-handling ==1.3.11 # [win]
 
 test:
@@ -75,9 +70,6 @@ outputs:
         - pyarrow {{ PYARROW_VERSION }}
         - arrow-cpp {{ PYARROW_VERSION }}
         - boost
-        - mpich                           # [not win]
-        - impi_rt                         # [win]
-        - impi-devel                      # [win]
         - conda-package-handling ==1.3.11 # [win]
 
 about:
