@@ -187,7 +187,7 @@ cases = [
     ('unique', '', [10 ** 5]),
 ]
 
-cases_two_par = [
+cases_two_params = [
     ('add', '', [10 ** 7]),
     ('append', '', [10 ** 7]),
     ('corr', '', [10 ** 7]),
@@ -209,4 +209,4 @@ cases_two_par = [
 
 
 generate_test_cases(cases, TestSeriesMethods, 'series')
-generate_test_cases_two_params(cases_two_par, TestSeriesMethods, 'series')
+generate_test_cases_two_params(cases_two_params, TestSeriesMethods, 'series')

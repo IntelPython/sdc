@@ -122,10 +122,10 @@ cases = [
     ('var', '', [10 ** 7]),
 ]
 
-cases_two_par = [
+cases_two_params = [
     ('append', '', [10 ** 7]),
 ]
 
 
 generate_test_cases(cases, TestDataFrameMethods, 'df')
-generate_test_cases_two_params(cases_two_par, TestDataFrameMethods, 'df')
+generate_test_cases_two_params(cases_two_params, TestDataFrameMethods, 'df')

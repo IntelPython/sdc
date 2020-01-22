@@ -1,14 +1,13 @@
 import time
-from collections import namedtuple
 from sdc.io.csv_ext import to_varname
+from typing import NamedTuple
 
 
-class TestCase:
-    def __init__(self, name='', params='', size=None, call_expression=None):
-        self.name = name
-        self.params = params
-        self.size = size
-        self.call_expression = call_expression
+class TestCase(NamedTuple):
+    name: str
+    params: str
+    size: int = None
+    call_expression: str = None
 
 
 def gen(cases, method, class_add, type, prefix=''):
