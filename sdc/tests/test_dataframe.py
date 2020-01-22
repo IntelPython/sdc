@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,25 +24,28 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import unittest
+import numba
+import numpy as np
+import pandas as pd
 import platform
 import random
 import string
-import platform
-import pandas as pd
-import numpy as np
+import unittest
 from itertools import product
-
-import numba
-import sdc
-from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs,
-                                   count_array_OneDs, dist_IR_contains, get_start_end, check_numba_version,
-                                   skip_numba_jit, skip_sdc_jit)
-
-from sdc.tests.gen_test_data import ParquetGenerator
 from numba.config import IS_32BITS
+
+import sdc
+from sdc.tests.gen_test_data import ParquetGenerator
+from sdc.tests.test_base import TestCase
+from sdc.tests.test_utils import (check_numba_version,
+                                  count_array_OneDs,
+                                  count_array_REPs,
+                                  count_parfor_OneDs,
+                                  count_parfor_REPs,
+                                  dist_IR_contains,
+                                  get_start_end,
+                                  skip_numba_jit,
+                                  skip_sdc_jit)
 
 
 @sdc.jit
@@ -544,6 +547,43 @@ class TestDataFrame(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def _test_df_index(self, df):
+        def test_impl(df):
+            return df.index
+
+        sdc_func = self.jit(test_impl)
+        np.testing.assert_array_equal(sdc_func(df), test_impl(df))
+
+    @skip_sdc_jit
+    def test_index_attribute(self):
+        index_to_test = [[1, 2, 3, 4, 5],
+                         [.1, .2, .3, .4, .5],
+                         ['a', 'b', 'c', 'd', 'e']]
+        n = 5
+        np.random.seed(0)
+        A = np.ones(n)
+        B = np.random.ranf(n)
+
+        for index in index_to_test:
+            with self.subTest(index=index):
+                df = pd.DataFrame({'A': A, 'B': B}, index=index)
+                self._test_df_index(df)
+
+    @skip_sdc_jit
+    def test_index_attribute_empty(self):
+        n = 5
+        np.random.seed(0)
+        A = np.ones(n)
+        B = np.random.ranf(n)
+        df = pd.DataFrame({'A': A, 'B': B})
+
+        self._test_df_index(df)
+
+    @skip_sdc_jit
+    def test_index_attribute_empty_df(self):
+        df = pd.DataFrame()
+        self._test_df_index(df)
+
     @skip_sdc_jit
     @skip_numba_jit
     def test_df_apply(self):
@@ -569,6 +609,7 @@ class TestDataFrame(TestCase):
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_df_describe(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float32),

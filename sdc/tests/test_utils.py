@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -25,14 +25,13 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numba
+import numpy as np
 import unittest
 
-import numpy as np
-
 import sdc
-import numba
+from sdc.config import config_inline_overloads, config_use_parallel_overloads
 
-from sdc.config import (config_use_parallel_overloads, config_inline_overloads)
 
 test_global_input_data_unicode_kind4 = [
     '¡Y tú quién te crees?',

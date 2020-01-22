@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,23 +24,27 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import os
-import unittest
-import platform
-import pandas as pd
-from pandas.api.types import CategoricalDtype
 import numpy as np
+import os
+import pandas as pd
+import platform
 import pyarrow.parquet as pq
-import sdc
-from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                   count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_rank,
-                                   get_start_end,
-                                   skip_numba_jit, skip_sdc_jit)
+import unittest
 from numba.config import IS_32BITS
+from pandas.api.types import CategoricalDtype
 
+import sdc
 from sdc.io.csv_ext import pandas_read_csv as pd_read_csv
+from sdc.tests.test_base import TestCase
+from sdc.tests.test_utils import (count_array_OneDs,
+                                  count_array_REPs,
+                                  count_parfor_OneDs,
+                                  count_parfor_REPs,
+                                  dist_IR_contains,
+                                  get_rank,
+                                  get_start_end,
+                                  skip_numba_jit,
+                                  skip_sdc_jit)
 
 
 kde_file = 'kde.parquet'
@@ -807,6 +811,7 @@ class TestNumpy(TestIO):
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_np_io2(self):
         # parallel version
         def test_impl():

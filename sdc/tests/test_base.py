@@ -1,5 +1,5 @@
-import unittest
 import warnings
+import unittest
 
 
 class TestCase(unittest.TestCase):
