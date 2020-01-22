@@ -596,6 +596,10 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
 
     Pandas API: pandas.Series.nsmallest
 
+    Limitations
+    -----------
+    - Parameter 'keep' except 'first' is currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_nsmallest.py
@@ -675,12 +679,16 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
 
     Pandas API: pandas.Series.nlargest
 
+    Limitations
+    -----------
+    - Parameter 'keep' except 'first' is currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_nlargest.py
        :language: python
        :lines: 27-
-       :caption: Return the smallest n elements.
+       :caption: Return the largest n elements.
        :name: ex_series_nlargest
 
     .. command-output:: python ./series/series_nlargest.py
@@ -804,6 +812,14 @@ def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, num
 
     Pandas API: pandas.Series.std
 
+    Limitations
+    -----------
+    - Parameters skipna, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. note::
+
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_std.py
@@ -870,13 +886,13 @@ def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, num
     if not isinstance(ddof, (types.Omitted, int, types.Integer)):
         ty_checker.raise_exc(ddof, 'int', 'ddof')
 
-    if not isinstance(axis, types.Omitted) and axis is not None:
+    if not isinstance(axis, (types.Omitted, types.NoneType)) and axis is not None:
         ty_checker.raise_exc(axis, 'None', 'axis')
 
     if not isinstance(level, (types.Omitted, types.NoneType)) and level is not None:
         ty_checker.raise_exc(level, 'None', 'level')
 
-    if not isinstance(numeric_only, types.Omitted) and numeric_only is not None:
+    if not isinstance(numeric_only, (types.Omitted, types.NoneType)) and numeric_only is not None:
         ty_checker.raise_exc(numeric_only, 'None', 'numeric_only')
 
     def hpat_pandas_series_std_impl(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
@@ -1139,6 +1155,14 @@ def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
 
     Pandas API: pandas.Series.var
 
+    Limitations
+    -----------
+    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. note::
+
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_var.py
@@ -1205,13 +1229,13 @@ def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
     if not isinstance(ddof, (types.Omitted, int, types.Integer)):
         ty_checker.raise_exc(ddof, 'int', 'ddof')
 
-    if not isinstance(axis, types.Omitted) and axis is not None:
+    if not isinstance(axis, (types.Omitted, types.NoneType)) and axis is not None:
         ty_checker.raise_exc(axis, 'None', 'axis')
 
     if not isinstance(level, (types.Omitted, types.NoneType)) and level is not None:
         ty_checker.raise_exc(level, 'None', 'level')
 
-    if not isinstance(numeric_only, types.Omitted) and numeric_only is not None:
+    if not isinstance(numeric_only, (types.Omitted, types.NoneType)) and numeric_only is not None:
         ty_checker.raise_exc(numeric_only, 'None', 'numeric_only')
 
     def hpat_pandas_series_var_impl(self, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
@@ -1650,6 +1674,14 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
     ********************************************
 
     Pandas API: pandas.Series.shift
+
+    Limitations
+    -----------
+    - Parameter freq is currently unsupported by Intel Scalable Dataframe Compiler
+
+    .. note::
+
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------

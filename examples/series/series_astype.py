@@ -29,17 +29,17 @@ import pandas as pd
 from numba import njit
 
 
+"""
+Expect Series
+0      3.000000
+1    -10.000000
+2           nan
+3      0.000000
+4     92.000000
+dtype: object
+"""
 @njit
 def series_astype():
-    """
-    Expect Series
-    0      3.000000
-    1    -10.000000
-    2           nan
-    3      0.000000
-    4     92.000000
-    dtype: object
-    """
     series = pd.Series([3, -10, np.nan, 0, 92])
 
     return series.astype(str)

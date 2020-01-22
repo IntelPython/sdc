@@ -33,7 +33,7 @@ from numba import njit
 def series_shape():
     series = pd.Series(np.arange(10))
 
-    return series.shape  # Expect series of 9, 8, 7, 6
+    return series.shape  # Expect (10,)
 
 
 print(series_shape())

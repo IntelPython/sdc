@@ -4620,7 +4620,7 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(test_global_input_data_unicode_kind4)
         with self.assertRaises(TypingError) as raises:
             cfunc(series)
-        msg = 'Method shift(). The object must be a number. Given self.data.dtype: {}'
+        msg = 'Method shift(). The object self.data.dtype\n given: unicode_type\n expected: number\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
     def test_series_shift_fill_str(self):
@@ -4631,7 +4631,7 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(test_global_input_data_float64[0])
         with self.assertRaises(TypingError) as raises:
             cfunc(series, fill_value='unicode')
-        msg = 'Method shift(). The object must be a number. Given fill_value: {}'
+        msg = 'Method shift(). The object fill_value\n given: unicode_type\n expected: number\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
     def test_series_shift_unsupported_params(self):
@@ -4642,7 +4642,7 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(test_global_input_data_float64[0])
         with self.assertRaises(TypingError) as raises:
             cfunc(series, freq='12H', axis=0)
-        msg = 'Method shift(). Unsupported parameters. Given freq: {}'
+        msg = 'Method shift(). The object freq\n given: unicode_type\n expected: None\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
@@ -4942,7 +4942,7 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(test_global_input_data_unicode_kind4)
         with self.assertRaises(TypingError) as raises:
             cfunc(series)
-        msg = 'Method std(). The object must be a number. Given self.data.dtype: {}'
+        msg = 'Method std(). The object self.data\n given: StringArrayType()\n expected: number\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
     @skip_sdc_jit('Series.std() parameters "axis", "level", "numeric_only" unsupported')
@@ -4952,18 +4952,20 @@ class TestSeries(TestSeries_apply, TestCase):
 
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_float64[0])
-        msg = 'Method std(). Unsupported parameters. Given {}: {}'
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=1, level=None, numeric_only=None)
-        self.assertIn(msg.format('axis', 'int'), str(raises.exception))
+        msg = 'Method std(). The object axis\n given: int64\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=None, level=1, numeric_only=None)
-        self.assertIn(msg.format('level', 'int'), str(raises.exception))
+        msg = 'Method std(). The object level\n given: int64\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=None, level=None, numeric_only=True)
-        self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
+        msg = 'Method std(). The object numeric_only\n given: bool\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
     def test_series_nunique(self):
         def test_series_nunique_impl(S):
@@ -5062,8 +5064,8 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(test_global_input_data_unicode_kind4)
         with self.assertRaises(TypingError) as raises:
             cfunc(series)
-        msg = 'Method var(). The object must be a number. Given self.data.dtype: {}'
-        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+        msg = 'Method var(). The object self.data\n given: StringArrayType()\n expected: number\n'
+        self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('Series.var() parameters "axis", "level", "numeric_only" unsupported')
     def test_series_var_unsupported_params(self):
@@ -5072,18 +5074,20 @@ class TestSeries(TestSeries_apply, TestCase):
 
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_float64[0])
-        msg = 'Method var(). Unsupported parameters. Given {}: {}'
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=1, level=None, numeric_only=None)
-        self.assertIn(msg.format('axis', 'int'), str(raises.exception))
+        msg = 'Method var(). The object axis\n given: int64\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=None, level=1, numeric_only=None)
-        self.assertIn(msg.format('level', 'int'), str(raises.exception))
+        msg = 'Method var(). The object level\n given: int64\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=None, level=None, numeric_only=True)
-        self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
+        msg = 'Method var(). The object numeric_only\n given: bool\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
     def test_series_count(self):
         def test_series_count_impl(S):

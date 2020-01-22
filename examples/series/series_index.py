@@ -31,9 +31,9 @@ from numba import njit
 
 @njit
 def series_index():
-    series = pd.Series(np.arange(5))
+    series = pd.Series(np.arange(5), index=['one', 'two', 'three', 'four', 'five'])
 
-    return series.index  # Expect array of 0, 1, 2, 3, 4
+    return series.index  # Expect array of 'one' 'two' 'three' 'four' 'five'
 
 
 print(series_index())

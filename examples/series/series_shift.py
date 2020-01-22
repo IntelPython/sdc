@@ -29,17 +29,17 @@ import pandas as pd
 from numba import njit
 
 
+"""
+Expect Series
+0     NaN
+1     3.0
+2   -10.0
+3     NaN
+4     0.0
+dtype: float64
+"""
 @njit
 def series_shift():
-    """
-    Expect Series
-    0     NaN
-    1     3.0
-    2   -10.0
-    3     NaN
-    4     0.0
-    dtype: float64
-    """
     series = pd.Series([3, -10, np.nan, 0, 92])
 
     return series.shift()

@@ -33,7 +33,7 @@ from numba import njit
 def series_std():
     series = pd.Series(np.arange(10))
 
-    return series.std()  # Expect series of 9, 8, 7, 6
+    return series.std()  # Expect value: 3.0276503540974917
 
 
 print(series_std())
