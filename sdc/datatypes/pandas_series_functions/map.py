@@ -50,6 +50,14 @@ def hpat_pandas_series_map(self, arg, na_action=None):
 
     Examples
     --------
+    .. literalinclude:: ../../../examples/series/series_map.py
+       :language: python
+       :lines: 36-
+       :caption: `map()` accepts a function.
+       :name: ex_series_map
+
+    .. command-output:: python ./series/series_map.py
+       :cwd: ../../../examples
 
     .. seealso::
 
