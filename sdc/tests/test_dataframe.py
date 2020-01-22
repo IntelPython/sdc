@@ -53,6 +53,9 @@ def inner_get_column(df):
 
 
 COL_IND = 0
+global_index_to_test = [[1, 2, 3, 4],
+                        [.1, .2, .3, .4],
+                        ['a', 'b', 'c', 'd']]
 
 
 class TestDataFrame(TestCase):
@@ -1073,29 +1076,69 @@ class TestDataFrame(TestCase):
         h_out = hpat_func(df)
         pd.testing.assert_frame_equal(out, h_out)
 
-    def test_df_drop_one_column(self):
+    def test_df_drop_one_column_unboxing(self):
         def test_impl(df):
             return df.drop(columns='A')
 
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]})
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+        index_to_test = global_index_to_test + [None]
 
-    @skip_sdc_jit
-    def test_df_drop_tuple_column(self):
-        # Pandas supports only list as a parameter
+        sdc_func = self.jit(test_impl)
+
+        for index in index_to_test:
+            with self.subTest(index=index):
+                df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
+                                  index=index)
+                pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    def test_df_drop_one_column(self):
+        def test_impl(index):
+            df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
+                              index=index)
+            return df.drop(columns='A')
+
+        sdc_func = self.jit(test_impl)
+
+        for index in global_index_to_test:
+            with self.subTest(index=index):
+                pd.testing.assert_frame_equal(sdc_func(index), test_impl(index))
+
+    def test_df_drop_tuple_column_unboxing(self):
         def test_impl(df):
-            return df.drop(columns=['A', 'B'])
+            return df.drop(columns=['A', 'C'])
 
         # Numba supports only tuple iteration
         def test_sdc_impl(df):
-            return df.drop(columns=('A', 'B'))
+            return df.drop(columns=('A', 'C'))
 
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]})
-        hpat_func = self.jit(test_sdc_impl)
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+        index_to_test = global_index_to_test + [None]
 
-    @unittest.skip("Implement Index for DataFrames")
+        sdc_func = self.jit(test_sdc_impl)
+
+        for index in index_to_test:
+            with self.subTest(index=index):
+                df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
+                                  index=index)
+                pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    def test_df_drop_tuple_column(self):
+        def test_impl(index):
+            df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
+                              index=index)
+            return df.drop(columns=['A', 'C'])
+
+        # Numba supports only tuple iteration
+        def test_sdc_impl(index):
+            df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
+                              index=index)
+            return df.drop(columns=('A', 'C'))
+
+        sdc_func = self.jit(test_sdc_impl)
+
+        for index in global_index_to_test:
+            with self.subTest(index=index):
+                pd.testing.assert_frame_equal(sdc_func(index), test_impl(index))
+
+    @unittest.skip("Error in return empty DataFrame")
     def test_df_drop_tuple_columns_all(self):
         def test_impl(df):
             return df.drop(columns=['A', 'B', 'C'])

@@ -790,8 +790,8 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
         column_list.append((f'new_col_{column}_data_df', column))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
-    # TODO: Handle index
-    func_text.append(f"return pandas.DataFrame({{{data}}})\n")
+    func_text.append(f'return pandas.DataFrame({{{data}}}, index=df.index)\n')
+
     func_definition.extend([indent + func_line for func_line in func_text])
     func_def = '\n'.join(func_definition)
 
