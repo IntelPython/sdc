@@ -9,10 +9,7 @@ if errorlevel 1 exit 1
 
 @rem TODO investigate root cause of NumbaPerformanceWarning
 @rem http://numba.pydata.org/numba-doc/latest/user/parallel.html#diagnostics
-IF "%SDC_NP_MPI%" == "" (
-    python -W ignore -u -m sdc.runtests -v
-    ) ELSE (
-    mpiexec -localonly -n %SDC_NP_MPI% python -W ignore -u -m sdc.runtests -v)
+python -W ignore -u -m sdc.runtests -v
 if errorlevel 1 exit 1
 
 REM Link check for Documentation using Sphinx's in-built linkchecker
