@@ -690,10 +690,7 @@ def write_data_send_buff_overload(meta_tup, node_id, ind, data, key_meta):
     return write_impl
 
 
-if hpat_config.config_transport_mpi:
-    from .. import transport_mpi as transport
-else:
-    from .. import transport_seq as transport
+from .. import transport_seq as transport
 
 ll.add_symbol('get_join_sendrecv_counts', transport.get_join_sendrecv_counts)
 ll.add_symbol('c_alltoallv', transport.c_alltoallv)
