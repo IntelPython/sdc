@@ -83,6 +83,7 @@ class TestDFRollingMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
         cls.total_data_length = {
+            'mean': [2 * 10 ** 5],
             'min': [2 * 10 ** 5],
         }
 
@@ -132,6 +133,9 @@ class TestDFRollingMethods(TestBase):
                                          method_params=method_params)
         test_name = f'DataFrame.rolling.{name}'
         self._test_case(usecase, name, test_name=test_name)
+
+    def test_df_rolling_mean(self):
+        self._test_df_rolling_method('mean')
 
     def test_df_rolling_min(self):
         self._test_df_rolling_method('min')
