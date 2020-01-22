@@ -84,6 +84,7 @@ class TestDFRollingMethods(TestBase):
         super().setUpClass()
         cls.total_data_length = {
             'min': [2 * 10 ** 5],
+            'skew': [2 * 10 ** 5],
         }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
@@ -135,3 +136,6 @@ class TestDFRollingMethods(TestBase):
 
     def test_df_rolling_min(self):
         self._test_df_rolling_method('min')
+
+    def test_df_rolling_skew(self):
+        self._test_df_rolling_method('skew')
