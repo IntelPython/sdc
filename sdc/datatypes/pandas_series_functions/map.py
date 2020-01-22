@@ -26,7 +26,8 @@
 
 import numpy
 import pandas
-import numba
+from numba import prange, types
+from numba.targets.registry import cpu_target
 
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.utils import sdc_overload_method
@@ -67,14 +68,17 @@ def hpat_pandas_series_map(self, arg, na_action=None):
     ty_checker = TypeChecker("Method map().")
     ty_checker.check(self, SeriesType)
 
-    if isinstance(arg, numba.types.Callable):
+    if isinstance(arg, types.Callable):
+        sig = arg.get_call_type(cpu_target.typing_context, [self.dtype], {})
+        output_type = sig.return_type
+
         def impl(self, arg, na_action=None):
             input_arr = self._data
             length = len(input_arr)
 
-            output_arr = numpy.empty(length, dtype=numba.types.float64)
+            output_arr = numpy.empty(length, dtype=output_type)
 
-            for i in numba.prange(length):
+            for i in prange(length):
                 output_arr[i] = arg(input_arr[i])
 
             return pandas.Series(output_arr, index=self._index, name=self._name)

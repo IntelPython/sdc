@@ -38,7 +38,6 @@ GLOBAL_VAL = 2
 
 class TestSeries_map(object):
 
-    # @skip_numba_jit
     def test_series_map1(self):
         def test_impl(S):
             return S.map(lambda a: 2 * a)
@@ -47,7 +46,6 @@ class TestSeries_map(object):
         S = pd.Series([1.0, 2., 3., 4., 5.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_numba_jit
     def test_series_map_global1(self):
         def test_impl(S):
             return S.map(lambda a: a + GLOBAL_VAL)
