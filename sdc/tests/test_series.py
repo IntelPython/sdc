@@ -1271,6 +1271,18 @@ class TestSeries(TestSeries_apply, TestCase):
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
+    def test_series_loc_array(self):
+        def test_impl(A, n):
+            return A.loc[n]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 4, 8, 6, 0], [1, 2, 4, 0, 6, 0])
+        n = [0, 4, 2]
+        cases = [n, np.array(n)]
+        for n in cases:
+            pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
+
+    @skip_sdc_jit('Not impl in old style')
     def test_series_at_str(self):
         def test_impl(A):
             return A.at['1']
@@ -2945,6 +2957,7 @@ class TestSeries(TestSeries_apply, TestCase):
         msg = msg_tmpl.format('given: int64\n expected: str')
         self.assertIn(msg, str(raises.exception))
 
+    @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2348
     def test_series_str_center_exception_unsupported_kind4(self):
         def test_impl(series, width):
             return series.str.center(width)
@@ -2955,10 +2968,9 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(data)
         width = max(len(s) for s in data) + 10
 
-        with self.assertRaises(SystemError) as raises:
-            hpat_func(series, width)
-        msg = 'NULL object passed to Py_BuildValue'
-        self.assertIn(msg, str(raises.exception))
+        jit_result = hpat_func(series, width)
+        ref_result = test_impl(series, width)
+        pd.testing.assert_series_equal(jit_result, ref_result)
 
     def test_series_str_endswith(self):
         def test_impl(series, pat):
@@ -3098,17 +3110,17 @@ class TestSeries(TestSeries_apply, TestCase):
                 cfunc(series, width, 5)
             self.assertIn(msg_tmpl.format(name), str(raises.exception))
 
+    @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2348
     def test_series_str_just_exception_unsupported_kind4(self):
         data = test_global_input_data_unicode_kind4
         series = pd.Series(data)
         width = max(len(s) for s in data) + 5
-        msg = 'NULL object passed to Py_BuildValue'
 
         for pyfunc in [ljust_usecase, rjust_usecase]:
             cfunc = self.jit(pyfunc)
-            with self.assertRaises(SystemError) as raises:
-                cfunc(series, width)
-            self.assertIn(msg, str(raises.exception))
+            jit_result = cfunc(series, width)
+            ref_result = pyfunc(series, width)
+            pd.testing.assert_series_equal(jit_result, ref_result)
 
     def test_series_str_startswith(self):
         def test_impl(series, pat):
@@ -3161,6 +3173,7 @@ class TestSeries(TestSeries_apply, TestCase):
                 ref_result = test_impl(series, width)
                 pd.testing.assert_series_equal(jit_result, ref_result)
 
+    @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2348
     def test_series_str_zfill_exception_unsupported_kind4(self):
         def test_impl(series, width):
             return series.str.zfill(width)
@@ -3171,10 +3184,9 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(data)
         width = max(len(s) for s in data) + 5
 
-        with self.assertRaises(SystemError) as raises:
-            hpat_func(series, width)
-        msg = 'NULL object passed to Py_BuildValue'
-        self.assertIn(msg, str(raises.exception))
+        jit_result = hpat_func(series, width)
+        ref_result = test_impl(series, width)
+        pd.testing.assert_series_equal(jit_result, ref_result)
 
     def test_series_str2str(self):
         common_methods = ['lower', 'upper', 'isupper']
