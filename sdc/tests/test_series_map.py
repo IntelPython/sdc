@@ -25,7 +25,6 @@
 # *****************************************************************************
 
 import pandas as pd
-import numpy as np
 
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
