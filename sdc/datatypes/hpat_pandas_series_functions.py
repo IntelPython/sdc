@@ -1682,7 +1682,7 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
 
     .. note::
 
-        Parameters method is currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter method except 'pearson' is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. note::
 
@@ -1715,7 +1715,12 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
         input series
     other: :obj:`pandas.Series`
         input series
-    method:
+    method: {'pearson', 'kendall', 'spearman'} or callable
+        pearson : standard correlation coefficient
+        kendall : Kendall Tau correlation coefficient
+        spearman : Spearman rank correlation
+        callable: callable with input two 1d ndarrays
+        and returning a float.
         *unsupported
     min_periods: :obj:`int`, default None
 
@@ -1727,7 +1732,7 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
 
     _func_name = 'Method corr().'
 
-    ty_checker = TypeChecker('Method corr().')
+    ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
     ty_checker.check(other, SeriesType)
@@ -1742,6 +1747,8 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
         ty_checker.raise_exc(min_periods, 'int64', 'min_periods')
 
     def hpat_pandas_series_corr_impl(self, other, method='pearson', min_periods=None):
+        if method not in ('pearson', ''):
+            raise ValueError("Method corr(). Unsupported parameter. Given method != 'pearson'")
 
         if min_periods is None:
             min_periods = 1
@@ -2824,7 +2831,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
 
     if isinstance(other, SeriesType):
         def hpat_pandas_series_div_impl(self, other, level=None, fill_value=None, axis=0):
- 
+
             if axis != 0:
                 raise ValueError('Method div(). The object axis\n expected: 0')
 
@@ -2834,7 +2841,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
         def hpat_pandas_series_div_number_impl(self, other, level=None, fill_value=None, axis=0):
- 
+
             if axis != 0:
                 raise ValueError('Method div(). The object axis\n expected: 0')
 
@@ -4324,7 +4331,7 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True):
 
     .. seealso::
 
-        `pandas.absolute 
+        `pandas.absolute
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.core.window.Expanding.sum.html#pandas.core.window.Expanding.sum>`_
             Similar functionality but ignores NaN values.
 
@@ -4930,7 +4937,7 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
         :ref:`DataFrame.dropna <pandas.DataFrame.dropna>`
             Drop rows or columns which contain NA values.
 
-        `pandas.absolute 
+        `pandas.absolute
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Index.dropna.html#pandas.Index.dropna>`_
             Return Index without NA/NaN values
 
@@ -5003,15 +5010,15 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
 
     .. seealso::
 
-        `pandas.absolute 
+        `pandas.absolute
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.interpolate.html#pandas.Series.interpolate>`_
             Fill NaN values using interpolation.
 
-        `pandas.absolute 
+        `pandas.absolute
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.reindex.html#pandas.Series.reindex>`_
             Conform object to new index.
 
-        `pandas.absolute 
+        `pandas.absolute
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.asfreq.html#pandas.Series.asfreq>`_
             Convert TimeSeries to specified frequency.
 

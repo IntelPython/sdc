@@ -29,16 +29,16 @@ import pandas as pd
 from numba import njit
 
 
+"""
+Expect Series
+0    4.0
+1    0.0
+2    2.0
+3    1.0
+dtype: float64
+"""
 @njit
 def series_fillna():
-    """
-    Expect Series
-    0    4.0
-    1    0.0
-    2    2.0
-    3    1.0
-    dtype: float64
-    """
     s = pd.Series([4, np.nan, 2, 1])
 
     return s.fillna(0)

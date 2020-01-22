@@ -29,12 +29,20 @@ import pandas as pd
 from numba import njit
 
 
+"""
+0    0
+1    1
+2    2
+3    3
+4    4
+Name: new_series, dtype: int64
+"""
 @njit
 def series_rename():
     s = pd.Series(np.arange(5))
     s.rename("new_series")
 
-    return s  # Expect series of 0, 1, 2, 3, 4
+    return s
 
 
 print(series_rename())
