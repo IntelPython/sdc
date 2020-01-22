@@ -27,10 +27,8 @@
 import pandas as pd
 import numpy as np
 
-import numba
-
 from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import skip_sdc_jit, skip_numba_jit
+from sdc.tests.test_utils import skip_numba_jit
 
 
 GLOBAL_VAL = 2
