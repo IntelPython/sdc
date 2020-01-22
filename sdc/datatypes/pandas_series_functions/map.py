@@ -45,6 +45,8 @@ def hpat_pandas_series_map(self, arg, na_action=None):
 
     Limitations
     -----------
+    `arg` could be only function. The function should return scalar type.
+    `na_action` is unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
