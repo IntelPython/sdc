@@ -1271,6 +1271,18 @@ class TestSeries(TestSeries_apply, TestCase):
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
+    def test_series_loc_array(self):
+        def test_impl(A, n):
+            return A.loc[n]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 4, 8, 6, 0], [1, 2, 4, 0, 6, 0])
+        n = [0, 4, 2]
+        cases = [n, np.array(n)]
+        for n in cases:
+            pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
+
+    @skip_sdc_jit('Not impl in old style')
     def test_series_at_str(self):
         def test_impl(A):
             return A.at['1']
