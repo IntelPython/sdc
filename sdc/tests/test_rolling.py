@@ -24,24 +24,24 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import string
-import unittest
 import itertools
 import os
-import pandas as pd
 import platform
-import numpy as np
-import numba
-import sdc
+import string
+import unittest
 from copy import deepcopy
 from itertools import product
+
+import numpy as np
+import pandas as pd
+
 from numba.errors import TypingError
+from sdc.hiframes.rolling import supported_rolling_funcs
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                  count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
                                   skip_numba_jit, skip_sdc_jit,
                                   test_global_input_data_float64)
-from sdc.hiframes.rolling import supported_rolling_funcs
+
 
 LONG_TEST = (int(os.environ['SDC_LONG_ROLLING_TEST']) != 0
              if 'SDC_LONG_ROLLING_TEST' in os.environ else False)
