@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,42 +24,23 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+# Expected:
+# London      400
+# New York    441
+# Helsinki    144
+# dtype: int64
 
-import pyarrow.parquet as pq
-import sdc
-from sdc import prange
+import pandas as pd
 import numpy as np
-import argparse
-import time
+from numba import njit
 
 
-@sdc.jit
-def kde():
-    t = pq.read_table('hdfs://localhost:9016/user/etotoni/kde.parquet')
-    df = t.to_pandas()
-    X = df['points'].values
-    b = 0.5
-    points = np.array([-1.0, 2.0, 5.0])
-    N = points.shape[0]
-    n = X.shape[0]
-    exps = 0
-    t1 = time.time()
-    for i in prange(n):
-        p = X[i]
-        d = (-(p - points)**2) / (2 * b**2)
-        m = np.min(d)
-        exps += m - np.log(b * N) + np.log(np.sum(np.exp(d - m)))
-    t = time.time() - t1
-    print("Execution time:", t, "\nresult:", exps)
-    return exps
+@njit
+def series_apply():
+    s = pd.Series([20, 21, 12],
+                  index=['London', 'New York', 'Helsinki'])
+
+    return s.apply(lambda x: x ** 2)
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Kernel-Density')
-    args = parser.parse_args()
-
-    res = kde()
-
-
-if __name__ == '__main__':
-    main()
+print(series_apply())

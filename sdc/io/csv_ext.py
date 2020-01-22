@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -233,15 +233,7 @@ ll.add_symbol('csv_file_chunk_reader', hio.csv_file_chunk_reader)
 
 
 def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, targetctx, dist_pass):
-    parallel = True
-
-    if sdc.config.config_transport_mpi:
-        for v in csv_node.out_vars:
-            if (array_dists[v.name] != distributed.Distribution.OneD
-                    and array_dists[v.name] != distributed.Distribution.OneD_Var):
-                parallel = False
-    else:
-        parallel = False
+    parallel = False
 
     n_cols = len(csv_node.out_vars)
     # TODO: rebalance if output distributions are 1D instead of 1D_Var
