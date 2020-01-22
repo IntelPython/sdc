@@ -13,8 +13,4 @@ python -m sdc.tests.gen_test_data
 
 # TODO investigate root cause of NumbaPerformanceWarning
 # http://numba.pydata.org/numba-doc/latest/user/parallel.html#diagnostics
-if [ -z "$SDC_NP_MPI" ]; then
-  python -W ignore -u -m sdc.runtests -v
-else
-  mpiexec -n $SDC_NP_MPI python -W ignore -u -m sdc.runtests -v
-fi
+python -W ignore -u -m sdc.runtests -v

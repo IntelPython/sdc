@@ -26,25 +26,31 @@
 
 
 # -*- coding: utf-8 -*-
-import string
-import unittest
-import platform
-import pandas as pd
 import numpy as np
+import pandas as pd
+import platform
 import pyarrow.parquet as pq
 import sdc
-from itertools import islice, permutations, product, combinations, combinations_with_replacement
-from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (
-    count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end,
-    skip_numba_jit, skip_sdc_jit, sdc_limitation, skip_parallel, skip_inline)
-from sdc.tests.gen_test_data import ParquetGenerator
+import string
+import unittest
+from itertools import combinations, combinations_with_replacement, islice, permutations, product
 from numba import types
 from numba.config import IS_32BITS
 from numba.errors import TypingError
 from numba.special import literally
 
 from .test_series_apply import TestSeries_apply
+from sdc.tests.test_base import TestCase
+from sdc.tests.test_utils import (count_array_OneDs,
+                                  count_array_REPs,
+                                  count_parfor_REPs,
+                                  get_start_end,
+                                  sdc_limitation,
+                                  skip_inline,
+                                  skip_numba_jit,
+                                  skip_parallel,
+                                  skip_sdc_jit)
+from sdc.tests.gen_test_data import ParquetGenerator
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -1279,6 +1285,18 @@ class TestSeries(TestSeries_apply, TestCase):
 
         S = pd.Series([2, 4, 6], ['1', '3', '5'])
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+
+    @skip_sdc_jit('Not impl in old style')
+    def test_series_loc_array(self):
+        def test_impl(A, n):
+            return A.loc[n]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 4, 8, 6, 0], [1, 2, 4, 0, 6, 0])
+        n = [0, 4, 2]
+        cases = [n, np.array(n)]
+        for n in cases:
+            pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
 
     @skip_sdc_jit('Not impl in old style')
     def test_series_at_str(self):
@@ -2955,6 +2973,7 @@ class TestSeries(TestSeries_apply, TestCase):
         msg = msg_tmpl.format('given: int64\n expected: str')
         self.assertIn(msg, str(raises.exception))
 
+    @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2348
     def test_series_str_center_exception_unsupported_kind4(self):
         def test_impl(series, width):
             return series.str.center(width)
@@ -2965,10 +2984,9 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(data)
         width = max(len(s) for s in data) + 10
 
-        with self.assertRaises(SystemError) as raises:
-            hpat_func(series, width)
-        msg = 'NULL object passed to Py_BuildValue'
-        self.assertIn(msg, str(raises.exception))
+        jit_result = hpat_func(series, width)
+        ref_result = test_impl(series, width)
+        pd.testing.assert_series_equal(jit_result, ref_result)
 
     def test_series_str_endswith(self):
         def test_impl(series, pat):
@@ -3108,17 +3126,17 @@ class TestSeries(TestSeries_apply, TestCase):
                 cfunc(series, width, 5)
             self.assertIn(msg_tmpl.format(name), str(raises.exception))
 
+    @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2348
     def test_series_str_just_exception_unsupported_kind4(self):
         data = test_global_input_data_unicode_kind4
         series = pd.Series(data)
         width = max(len(s) for s in data) + 5
-        msg = 'NULL object passed to Py_BuildValue'
 
         for pyfunc in [ljust_usecase, rjust_usecase]:
             cfunc = self.jit(pyfunc)
-            with self.assertRaises(SystemError) as raises:
-                cfunc(series, width)
-            self.assertIn(msg, str(raises.exception))
+            jit_result = cfunc(series, width)
+            ref_result = pyfunc(series, width)
+            pd.testing.assert_series_equal(jit_result, ref_result)
 
     def test_series_str_startswith(self):
         def test_impl(series, pat):
@@ -3171,6 +3189,7 @@ class TestSeries(TestSeries_apply, TestCase):
                 ref_result = test_impl(series, width)
                 pd.testing.assert_series_equal(jit_result, ref_result)
 
+    @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2348
     def test_series_str_zfill_exception_unsupported_kind4(self):
         def test_impl(series, width):
             return series.str.zfill(width)
@@ -3181,10 +3200,9 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(data)
         width = max(len(s) for s in data) + 5
 
-        with self.assertRaises(SystemError) as raises:
-            hpat_func(series, width)
-        msg = 'NULL object passed to Py_BuildValue'
-        self.assertIn(msg, str(raises.exception))
+        jit_result = hpat_func(series, width)
+        ref_result = test_impl(series, width)
+        pd.testing.assert_series_equal(jit_result, ref_result)
 
     def test_series_str2str(self):
         common_methods = ['lower', 'upper', 'isupper']
@@ -4847,6 +4865,7 @@ class TestSeries(TestSeries_apply, TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_series_quantile(self):
         def test_impl():
             A = pd.Series([1, 2.5, .5, 3, 5])
