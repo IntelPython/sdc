@@ -95,7 +95,17 @@ class TestSeriesRollingMethods(TestBase):
 
 
 cases = [
-    ('apply', 'func=2+3', [10]),
+    ('apply', 'func=lambda x: numpy.nan if len(x) == 0 else x.mean()', [10 ** 7]),
+    ('count', '', [10 ** 7]),
+    ('kurt', '', [10 ** 7]),
+    ('max', '', [10 ** 7]),
+    ('mean', '', [10 ** 7]),
+    ('median', '', [10 ** 7]),
+    ('min', '', [10 ** 7]),
+    ('skew', '', [10 ** 7]),
+    ('std', '', [10 ** 7]),
+    ('sum', '', [10 ** 7]),
+    ('var', '', [10 ** 7]),
 ]
 
-test_perf_generator(cases, TestSeriesRollingMethods, 'df', 'rolling({}).'.format(get_rolling_params()))
+test_perf_generator(cases, TestSeriesRollingMethods, 'series', 'rolling({}).'.format(get_rolling_params()))

@@ -1,4 +1,5 @@
 import time
+import numpy
 from collections import namedtuple
 from sdc.io.csv_ext import to_varname
 
