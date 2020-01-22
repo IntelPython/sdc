@@ -24,13 +24,12 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import pandas as pd
-import numpy as np
-
 import numba
+import numpy as np
+import pandas as pd
 
 from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import skip_sdc_jit, skip_numba_jit
+from sdc.tests.test_utils import skip_numba_jit, skip_sdc_jit
 
 
 DATA = [1.0, 2., 3., 4., 5.]
