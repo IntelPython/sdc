@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -47,6 +47,7 @@ from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
 from numba.targets.hashing import _Py_hash_t
 import llvmlite.llvmpy.core as lc
 from glob import glob
+from numba.special import prange
 
 char_typ = types.uint8
 offset_typ = types.uint32
@@ -139,18 +140,6 @@ class StringArrayModel(models.StructModel):
     def __init__(self, dmm, fe_type):
 
         models.StructModel.__init__(self, dmm, fe_type, str_arr_model_members)
-
-# TODO: fix overload for things like 'getitem'
-# @overload(operator.getitem)
-# def str_arr_getitem_bool_overload(str_arr_tp, bool_arr_tp):
-#     import pdb; pdb.set_trace()
-#     if str_arr_tp == string_array_type and bool_arr_tp == types.Array(types.bool_, 1, 'C'):
-#         def str_arr_bool_impl(str_arr, bool_arr):
-#             n = len(str_arr)
-#             if n!=len(bool_arr):
-#                 raise IndexError("boolean index did not match indexed array along dimension 0")
-#             return str_arr
-#         return str_arr_bool_impl
 
 
 class StringArrayIterator(types.SimpleIteratorType):
@@ -503,22 +492,36 @@ def str_list_to_array_overload(str_list):
     return lambda str_list: str_list
 
 
-@infer_global(operator.getitem)
-class GetItemStringArray(AbstractTemplate):
-    key = operator.getitem
+if sdc.config.config_pipeline_hpat_default:
+    @infer_global(operator.getitem)
+    class GetItemStringArray(AbstractTemplate):
+        key = operator.getitem
 
-    def generic(self, args, kws):
-        assert not kws
-        [ary, idx] = args
-        if isinstance(ary, StringArrayType):
-            if isinstance(idx, types.SliceType):
-                return signature(string_array_type, *args)
-            # elif isinstance(idx, types.Integer):
-            #     return signature(string_type, *args)
-            elif idx == types.Array(types.bool_, 1, 'C'):
-                return signature(string_array_type, *args)
-            elif idx == types.Array(types.intp, 1, 'C'):
-                return signature(string_array_type, *args)
+        def generic(self, args, kws):
+            assert not kws
+            [ary, idx] = args
+            if isinstance(ary, StringArrayType):
+                if isinstance(idx, types.SliceType):
+                    return signature(string_array_type, *args)
+                # elif isinstance(idx, types.Integer):
+                #     return signature(string_type, *args)
+
+                elif idx == types.Array(types.bool_, 1, 'C'):
+                    return signature(string_array_type, *args)
+                elif idx == types.Array(types.intp, 1, 'C'):
+                    return signature(string_array_type, *args)
+else:
+    # use old-implementation in the new pipeline if idx is of types.SliceType type
+    @infer_global(operator.getitem)
+    class GetItemStringArray(AbstractTemplate):
+        key = operator.getitem
+
+        def generic(self, args, kws):
+            assert not kws
+            [ary, idx] = args
+            if isinstance(ary, StringArrayType):
+                if isinstance(idx, types.SliceType):
+                    return signature(string_array_type, *args)
 
 
 @infer_global(operator.setitem)
@@ -1109,13 +1112,20 @@ def _memcpy(typingctx, dest_t, src_t, count_t, item_size_t=None):
     return types.void(types.voidptr, types.voidptr, types.intp, types.intp), codegen
 
 
-# TODO: use overload
+# TODO: use overload for all getitem cases (currently implemented via lower_builtin)
 @overload(operator.getitem)
-def str_arr_getitem_int(A, i):
-    if A == string_array_type and isinstance(i, types.Integer):
-        def str_arr_getitem_impl(A, i):
-            start_offset = getitem_str_offset(A, i)
-            end_offset = getitem_str_offset(A, i + 1)
+def str_arr_getitem_int(A, arg):
+
+    if (A != string_array_type):
+        return None
+
+    if isinstance(arg, types.Integer):
+        def str_arr_getitem_by_integer_impl(A, arg):
+            if arg < 0 or arg >= len(A):
+                raise IndexError("StringArray getitem with index out of bounds")
+
+            start_offset = getitem_str_offset(A, arg)
+            end_offset = getitem_str_offset(A, arg + 1)
             length = end_offset - start_offset
             ptr = get_data_ptr_ind(A, start_offset)
             ret = decode_utf8(ptr, length)
@@ -1123,7 +1133,32 @@ def str_arr_getitem_int(A, i):
             # _memcpy(ret._data, ptr, length, 1)
             return ret
 
-        return str_arr_getitem_impl
+        return str_arr_getitem_by_integer_impl
+    elif (isinstance(arg, types.Array) and isinstance(arg.dtype, (types.Boolean, types.Integer))):
+        def str_arr_getitem_by_array_impl(A, arg):
+
+            if len(A) != len(arg):
+                raise IndexError("Mismatch of boolean index and indexed array sizes")
+
+            idxs = np.arange(len(A))
+            taken_idxs = idxs[arg]
+
+            result_size = len(taken_idxs)
+            total_chars = 0
+            for i in prange(result_size):
+                total_chars += len(A[taken_idxs[i]])
+
+            ret = pre_alloc_string_array(result_size, total_chars)
+            for i in prange(result_size):
+                ret[i] = A[taken_idxs[i]]
+                if str_arr_is_na(A, taken_idxs[i]):
+                    str_arr_set_na(ret, i)
+
+            return ret
+
+        return str_arr_getitem_by_array_impl
+
+    return None
 
 
 @intrinsic
@@ -1198,54 +1233,55 @@ def decode_utf8(typingctx, ptr_t, len_t=None):
     #                                  string_array.data, args[1]])
 
 
-@lower_builtin(operator.getitem, StringArrayType, types.Array(types.bool_, 1, 'C'))
-def lower_string_arr_getitem_bool(context, builder, sig, args):
-    def str_arr_bool_impl(str_arr, bool_arr):
-        n = len(str_arr)
-        if n != len(bool_arr):
-            raise IndexError("boolean index did not match indexed array along dimension 0")
-        n_strs = 0
-        n_chars = 0
-        for i in range(n):
-            if bool_arr[i]:
+if sdc.config.config_pipeline_hpat_default:
+    # FIXME: old-style getitem implementations copy strings but not null bits
+    @lower_builtin(operator.getitem, StringArrayType, types.Array(types.bool_, 1, 'C'))
+    def lower_string_arr_getitem_bool(context, builder, sig, args):
+        def str_arr_bool_impl(str_arr, bool_arr):
+            n = len(str_arr)
+            if n != len(bool_arr):
+                raise IndexError("boolean index did not match indexed array along dimension 0")
+            n_strs = 0
+            n_chars = 0
+            for i in range(n):
+                if bool_arr[i]:
+                    # TODO: use get_cstr_and_len instead of getitem
+                    _str = str_arr[i]
+                    n_strs += 1
+                    n_chars += get_utf8_size(_str)
+            out_arr = pre_alloc_string_array(n_strs, n_chars)
+            str_ind = 0
+            for i in range(n):
+                if bool_arr[i]:
+                    _str = str_arr[i]
+                    out_arr[str_ind] = _str
+                    str_ind += 1
+            return out_arr
+        res = context.compile_internal(builder, str_arr_bool_impl, sig, args)
+        return res
+
+    @lower_builtin(operator.getitem, StringArrayType, types.Array(types.intp, 1, 'C'))
+    def lower_string_arr_getitem_arr(context, builder, sig, args):
+        def str_arr_arr_impl(str_arr, ind_arr):
+            n = len(ind_arr)
+            # get lengths
+            n_strs = 0
+            n_chars = 0
+            for i in range(n):
                 # TODO: use get_cstr_and_len instead of getitem
-                _str = str_arr[i]
+                _str = str_arr[ind_arr[i]]
                 n_strs += 1
                 n_chars += get_utf8_size(_str)
-        out_arr = pre_alloc_string_array(n_strs, n_chars)
-        str_ind = 0
-        for i in range(n):
-            if bool_arr[i]:
-                _str = str_arr[i]
+
+            out_arr = pre_alloc_string_array(n_strs, n_chars)
+            str_ind = 0
+            for i in range(n):
+                _str = str_arr[ind_arr[i]]
                 out_arr[str_ind] = _str
                 str_ind += 1
-        return out_arr
-    res = context.compile_internal(builder, str_arr_bool_impl, sig, args)
-    return res
-
-
-@lower_builtin(operator.getitem, StringArrayType, types.Array(types.intp, 1, 'C'))
-def lower_string_arr_getitem_arr(context, builder, sig, args):
-    def str_arr_arr_impl(str_arr, ind_arr):
-        n = len(ind_arr)
-        # get lengths
-        n_strs = 0
-        n_chars = 0
-        for i in range(n):
-            # TODO: use get_cstr_and_len instead of getitem
-            _str = str_arr[ind_arr[i]]
-            n_strs += 1
-            n_chars += get_utf8_size(_str)
-
-        out_arr = pre_alloc_string_array(n_strs, n_chars)
-        str_ind = 0
-        for i in range(n):
-            _str = str_arr[ind_arr[i]]
-            out_arr[str_ind] = _str
-            str_ind += 1
-        return out_arr
-    res = context.compile_internal(builder, str_arr_arr_impl, sig, args)
-    return res
+            return out_arr
+        res = context.compile_internal(builder, str_arr_arr_impl, sig, args)
+        return res
 
 
 @lower_builtin(operator.getitem, StringArrayType, types.SliceType)
@@ -1438,3 +1474,24 @@ def append_string_array_to(result, pos, A):
         j += 1
 
     return i
+
+
+@numba.njit(no_cpython_wrapper=True)
+def make_str_arr_from_list(str_list):
+
+    data_total_chars = np.sum(np.asarray([len(s) for s in str_list]))
+    str_arr = pre_alloc_string_array(len(str_list), data_total_chars)
+    cp_str_list_to_array(str_arr, str_list)
+
+    return str_arr
+
+
+@numba.njit(no_cpython_wrapper=True)
+def str_arr_set_na_by_mask(str_arr, nan_mask):
+    # precondition: (1) str_arr and nan_mask have the same size
+    #               (2) elements for which na bits are set all have zero lenght
+    idxs = np.arange(len(str_arr))
+    for i in idxs[nan_mask]:
+        str_arr_set_na(str_arr, i)
+
+    return str_arr

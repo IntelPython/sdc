@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,19 +24,24 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import unittest
-import pandas as pd
-import numpy as np
-from math import sqrt
 import numba
+import numpy as np
+import pandas as pd
+import unittest
+from math import sqrt
+
 import sdc
 from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                   count_parfor_OneDs, count_array_OneDs,
-                                   count_parfor_OneD_Vars, count_array_OneD_Vars,
-                                   dist_IR_contains,
-                                   skip_numba_jit, skip_sdc_jit)
+from sdc.tests.test_utils import (count_array_OneD_Vars,
+                                  count_array_OneDs,
+                                  count_array_REPs,
+                                  count_parfor_OneD_Vars,
+                                  count_parfor_OneDs,
+                                  count_parfor_REPs,
+                                  dist_IR_contains,
+                                  skip_numba_jit,
+                                  skip_sdc_jit)
+
 from datetime import datetime
 import random
 
