@@ -16,8 +16,7 @@ def gen(cases, method, class_add, typ, prefix=''):
         name = test_params.name
         if test_params.params:
             name += "_" + test_params.params
-        func_name = 'test_{}_{}_{}'.format(typ, prefix, name)
-        func_name = to_varname(func_name)
+        func_name = to_varname('test_{}_{}_{}'.format(typ, prefix, name))
 
         setattr(class_add, func_name, method(test_params.name, test_params.params,
                                              test_params.size, test_params.call_expression, prefix))
