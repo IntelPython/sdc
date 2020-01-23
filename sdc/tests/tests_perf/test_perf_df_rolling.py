@@ -28,6 +28,7 @@ import string
 import time
 
 import numba
+import numpy
 import pandas
 
 from sdc.tests.test_utils import test_global_input_data_float64
