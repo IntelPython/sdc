@@ -433,66 +433,6 @@ def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
 
 @sdc_overload_method(StringMethodsType, 'isupper')
 def hpat_pandas_stringmethods_isupper(self):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-    Pandas API: pandas.Series.str.isupper
-
-    Limitations
-    -----------
-    Series elements are expected to be Unicode strings. Elements cannot be NaN.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/str/series_str_isupper.py
-       :language: python
-       :lines: 27-
-       :caption: Check whether all characters in each string are uppercase
-       :name: ex_series_str_isupper
-
-    .. command-output:: python ./series/str/series_str_isupper.py
-       :cwd: ../../../examples
-
-    .. seealso::
-        :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
-            Check whether all characters are alphabetic.
-        :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
-            Check whether all characters are numeric.
-        :ref:`Series.str.isalnum <pandas.Series.str.isalnum>`
-            Check whether all characters are alphanumeric.
-        :ref:`Series.str.isdigit <pandas.Series.str.isdigit>`
-            Check whether all characters are digits.
-        :ref:`Series.str.isdecimal <pandas.Series.str.isdecimal>`
-            Check whether all characters are decimal.
-        :ref:`Series.str.isspace <pandas.Series.str.isspace>`
-            Check whether all characters are whitespace.
-        :ref:`Series.str.islower <pandas.Series.str.islower>`
-            Check whether all characters are lowercase.
-        :ref:`Series.str.istitle <pandas.Series.str.istitle>`
-            Check whether all characters are titlecase.
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-
-    Pandas Series method :meth:`pandas.core.strings.StringMethods.isupper()` implementation.
-
-    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
-    .. only:: developer
-
-    Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_str2str
-
-    Parameters
-    ----------
-    self: :class:`pandas.core.strings.StringMethods`
-        input arg
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
-    """
-
     ty_checker = TypeChecker('Method isupper().')
     ty_checker.check(self, StringMethodsType)
 
@@ -1060,6 +1000,54 @@ def hpat_pandas_stringmethods_isalnum(self):
     return hpat_pandas_stringmethods_isalnum_impl
 
 
+@sdc_overload_method(StringMethodsType, 'isnumeric')
+def hpat_pandas_stringmethods_isnumeric(self):
+    ty_checker = TypeChecker('Method isnumeric().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isnumeric_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isnumeric()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isnumeric_impl
+
+
+@sdc_overload_method(StringMethodsType, 'isdigit')
+def hpat_pandas_stringmethods_isdigit(self):
+    ty_checker = TypeChecker('Method isdigit().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isdigit_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isdigit()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isdigit_impl
+
+
+@sdc_overload_method(StringMethodsType, 'isdecimal')
+def hpat_pandas_stringmethods_isdecimal(self):
+    ty_checker = TypeChecker('Method isdecimal().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_isdecimal_impl(self):
+        item_count = len(self._data)
+        result = numpy.empty(item_count, numba.types.boolean)
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.isdecimal()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_isdecimal_impl
+
+
 stringmethods_funcs = {
     'istitle': {'method': hpat_pandas_stringmethods_istitle,
                 'caption': 'Check if each word start with an upper case letter'},
@@ -1070,7 +1058,15 @@ stringmethods_funcs = {
     'islower': {'method': hpat_pandas_stringmethods_islower,
                 'caption': 'Check if all the characters in the text are alphanumeric'},
     'isalnum': {'method': hpat_pandas_stringmethods_isalnum,
-                'caption': 'Check if all the characters in the text are alphanumeric'}
+                'caption': 'Check if all the characters in the text are alphanumeric'},
+    'isnumeric': {'method': hpat_pandas_stringmethods_isnumeric,
+                  'caption': 'Check whether all characters in each string are numeric.'},
+    'isdigit': {'method': hpat_pandas_stringmethods_isdigit,
+                'caption': 'Check whether all characters in each string in the Series/Index are digits.'},
+    'isdecimal': {'method': hpat_pandas_stringmethods_isdecimal,
+                  'caption': 'Check whether all characters in each string are decimal.'},
+    'isupper': {'method': hpat_pandas_stringmethods_isupper,
+                'caption': 'Check whether all characters in each string are uppercase.'},
 }
 
 

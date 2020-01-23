@@ -39,6 +39,12 @@ test_global_input_data_unicode_kind4 = [
     '大处 着眼，c小处着手c。大大c大处',
 ]
 
+test_global_input_data_unicode_kind1 = [
+    'ascii',
+    '12345',
+    '1234567890',
+]
+
 min_float64 = np.finfo('float64').min
 max_float64 = np.finfo('float64').max
 
