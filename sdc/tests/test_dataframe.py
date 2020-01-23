@@ -522,7 +522,7 @@ class TestDataFrame(TestCase):
         sdc_func = self.jit(test_impl)
         np.testing.assert_array_equal(sdc_func(df), test_impl(df))
 
-    @skip_numba_jit("Hang on Windows")
+    @skip_numba_jit
     def test_df_values_unboxing(self):
         values_to_test = [[1, 2, 3, 4, 5],
                           [.1, .2, .3, .4, .5],
@@ -537,15 +537,7 @@ class TestDataFrame(TestCase):
                 df = pd.DataFrame({'A': A, 'B': B, 'C': values})
                 self._test_df_values_unboxing(df)
 
-    def _test_df_values(self, df):
-        def test_impl(n, values):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n), 'C': values})
-            return df.values
-
-        sdc_func = self.jit(test_impl)
-        np.testing.assert_array_equal(sdc_func(df), test_impl(df))
-
-    def test_dataframe_values(self):
+    def test_df_values(self):
         def test_impl(n, values):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n), 'C': values})
             return df.values

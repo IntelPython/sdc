@@ -47,7 +47,6 @@ from sdc.datatypes.hpat_pandas_rolling_types import (
 from sdc.datatypes.common_functions import TypeChecker, hpat_arrays_append_overload, find_common_dtype_from_numpy_dtypes
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utils import sdc_overload_method, sdc_overload_attribute
-from numba.errors import TypingError
 
 
 @sdc_overload_attribute(DataFrameType, 'index')
@@ -153,30 +152,31 @@ def hpat_pandas_dataframe_values(df):
        return a Numpy representation of the DataFrame
     """
 
-    func_name = 'Attribute values'
+    func_name = 'Attribute values.'
     ty_checker = TypeChecker(func_name)
     ty_checker.check(df, DataFrameType)
 
     # TODO: Handle StringArrayType
-    for column in df.data:
+    for i, column in enumerate(df.data):
         if isinstance(column, StringArrayType):
-            raise TypingError(f'{func_name}: String type is currently unsupported')
+            ty_checker.raise_exc(column, 'Numeric type', f'df.data["{df.columns[i]}"]')
 
     numba_common_dtype = find_common_dtype_from_numpy_dtypes([column.dtype for column in df.data], [])
 
     def hpat_pandas_df_values_impl(df):
-        df_values = []
         row_len = len(get_dataframe_data(df, 0))
         local_data = literal_unroll(df._data)
         column_len = len(local_data)
 
-        for i in prange(row_len):
-            row = numpy.empty(column_len, numba_common_dtype)
-            for j in range(column_len):
-                row[j] = numpy.array(local_data[j])[i]
-            df_values.append(row)
+        df_values = numpy.empty(row_len*column_len, numba_common_dtype)
 
-        return df_values
+        flatten_index = 0
+        for i in prange(row_len):
+            for j in range(column_len):
+                df_values[flatten_index] = numpy.array(local_data[j])[i]
+                flatten_index += 1
+
+        return df_values.reshape((row_len, column_len))
 
     return hpat_pandas_df_values_impl
 
