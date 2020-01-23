@@ -24,42 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import pyarrow.parquet as pq
-import sdc
-from sdc import prange
-import numpy as np
-import argparse
-import time
+import pandas as pd
+from numba import njit
 
 
-@sdc.jit
-def kde():
-    t = pq.read_table('hdfs://localhost:9016/user/etotoni/kde.parquet')
-    df = t.to_pandas()
-    X = df['points'].values
-    b = 0.5
-    points = np.array([-1.0, 2.0, 5.0])
-    N = points.shape[0]
-    n = X.shape[0]
-    exps = 0
-    t1 = time.time()
-    for i in prange(n):
-        p = X[i]
-        d = (-(p - points)**2) / (2 * b**2)
-        m = np.min(d)
-        exps += m - np.log(b * N) + np.log(np.sum(np.exp(d - m)))
-    t = time.time() - t1
-    print("Execution time:", t, "\nresult:", exps)
-    return exps
+@njit
+def series_str_isdecimal():
+    series = pd.Series(['23', '³', '⅕', ''])
+    out_series = series.str.isdecimal()
+
+    return out_series  # Expect series of True, False, False, False
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Kernel-Density')
-    args = parser.parse_args()
-
-    res = kde()
-
-
-if __name__ == '__main__':
-    main()
+print(series_str_isdecimal())

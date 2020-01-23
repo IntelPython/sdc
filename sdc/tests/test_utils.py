@@ -25,19 +25,24 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numba
+import numpy as np
 import unittest
 
-import numpy as np
-
 import sdc
-import numba
+from sdc.config import config_inline_overloads, config_use_parallel_overloads
 
-from sdc.config import (config_use_parallel_overloads, config_inline_overloads)
 
 test_global_input_data_unicode_kind4 = [
     '¡Y tú quién te crees?',
     '🐍⚡',
     '大处 着眼，c小处着手c。大大c大处',
+]
+
+test_global_input_data_unicode_kind1 = [
+    'ascii',
+    '12345',
+    '1234567890',
 ]
 
 min_float64 = np.finfo('float64').min

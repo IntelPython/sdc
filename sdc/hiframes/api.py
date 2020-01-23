@@ -87,10 +87,7 @@ enable_hiframes_remove_dead = True
 
 # quantile imports?
 
-if sdc.config.config_transport_mpi:
-    from .. import transport_mpi as transport
-else:
-    from .. import transport_seq as transport
+from .. import transport_seq as transport
 
 ll.add_symbol('quantile_parallel', transport.quantile_parallel)
 ll.add_symbol('nth_sequential', transport.nth_sequential)
@@ -200,8 +197,7 @@ def median(arr, parallel=False):
     # similar to numpy/lib/function_base.py:_median
     # TODO: check return types, e.g. float32 -> float32
 
-    if not sdc.config.config_transport_mpi:
-        parallel = False
+    parallel = False
 
     n = len(arr)
     if parallel:

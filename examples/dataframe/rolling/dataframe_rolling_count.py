@@ -24,32 +24,19 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import pandas as pd
 import numpy as np
-import sdc
+import pandas as pd
+from numba import njit
 
 
-@sdc.jit
-def get_mean(df):
-    ser = pd.Series(df['Bonus %'])
-    m = ser.mean()
-    return m
+@njit
+def df_rolling_count():
+    df = pd.DataFrame({'A': [4, 3, 2, np.nan, 6], 'B': [4, np.nan, 2, np.nan, 6]})
+    out_df = df.rolling(3).count()
+
+    # Expect DataFrame of
+    # {'A': [1.0, 2.0, 3.0, 2.0, 2.0], 'B': [1.0, 1.0, 2.0, 1.0, 2.0]}
+    return out_df
 
 
-@sdc.jit
-def sort_name(df):
-    ser = pd.Series(df['First Name'])
-    m = ser.sort_values()
-    return m
-
-
-file = "employees.csv"
-df = pd.read_csv(file)
-
-
-# find mean of one column
-print(get_mean(df))
-
-# Sort the names in ascending order
-print(sort_name(df))
+print(df_rolling_count())
