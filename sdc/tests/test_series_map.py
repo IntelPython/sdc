@@ -70,6 +70,14 @@ class TestSeries_map(object):
         S = pd.Series([1.0, 2., 3., 4., 5.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_map_dict(self):
+        def test_impl(S):
+            return S.map({2.: 42., 4.: 3.14})
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([1., 2., 3., 4., 5.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
 
 class _Test(TestSeries_map, TestCase):
     pass

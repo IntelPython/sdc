@@ -45,7 +45,8 @@ def hpat_pandas_series_map(self, arg, na_action=None):
 
     Limitations
     -----------
-    `arg` could be only function. The function should return scalar type.
+    String data types are not supported by Intel Scalable Dataframe Compiler.
+    `arg` could be function or dict and could not be Series. The function should return scalar type.
     `na_action` is unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
@@ -90,6 +91,22 @@ def hpat_pandas_series_map(self, arg, na_action=None):
 
             for i in prange(length):
                 output_arr[i] = arg(input_arr[i])
+
+            return pandas.Series(output_arr, index=self._index, name=self._name)
+
+        return impl
+
+    if isinstance(arg, types.DictType):
+        output_type = self.dtype
+
+        def impl(self, arg, na_action=None):
+            input_arr = self._data
+            length = len(input_arr)
+
+            output_arr = numpy.empty(length, dtype=output_type)
+
+            for i in prange(length):
+                output_arr[i] = arg.get(input_arr[i], numpy.nan)
 
             return pandas.Series(output_arr, index=self._index, name=self._name)
 
