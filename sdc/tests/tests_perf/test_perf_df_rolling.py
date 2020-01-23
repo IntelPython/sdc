@@ -28,6 +28,7 @@ import string
 import time
 
 import numba
+import numpy
 import pandas
 
 from sdc.tests.test_utils import test_global_input_data_float64
@@ -66,7 +67,7 @@ def gen_df_rolling_usecase(method_name, rolling_params=None, method_params=''):
         'method_params': method_params
     })
 
-    global_vars = {'time': time}
+    global_vars = {'np': numpy, 'time': time}
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _df_rolling_usecase = loc_vars[f'df_rolling_{method_name}_usecase']
@@ -83,6 +84,8 @@ class TestDFRollingMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
         cls.total_data_length = {
+            'apply': [2 * 10 ** 5],
+            'count': [8 * 10 ** 5],
             'min': [2 * 10 ** 5],
         }
 
@@ -132,6 +135,13 @@ class TestDFRollingMethods(TestBase):
                                          method_params=method_params)
         test_name = f'DataFrame.rolling.{name}'
         self._test_case(usecase, name, test_name=test_name)
+
+    def test_df_rolling_apply_mean(self):
+        method_params = 'lambda x: np.nan if len(x) == 0 else x.mean()'
+        self._test_df_rolling_method('apply', method_params=method_params)
+
+    def test_df_rolling_count(self):
+        self._test_df_rolling_method('count')
 
     def test_df_rolling_min(self):
         self._test_df_rolling_method('min')
