@@ -25,6 +25,7 @@
 # *****************************************************************************
 import pandas
 
+from numba.types import Boolean, NoneType, Omitted
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import DataFrameRollingType
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
@@ -125,6 +126,20 @@ def gen_df_rolling_method_impl(method_name, self, args=None, kws=None):
     return _impl
 
 
+@sdc_overload_method(DataFrameRollingType, 'apply')
+def sdc_pandas_dataframe_rolling_apply(self, func, raw=None):
+
+    ty_checker = TypeChecker('Method rolling.apply().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    raw_accepted = (Omitted, NoneType, Boolean)
+    if not isinstance(raw, raw_accepted) and raw is not None:
+        ty_checker.raise_exc(raw, 'bool', 'raw')
+
+    return gen_df_rolling_method_impl('apply', self, args=['func'],
+                                      kws={'raw': 'None'})
+
+
 @sdc_overload_method(DataFrameRollingType, 'max')
 def sdc_pandas_dataframe_rolling_max(self):
 
@@ -142,6 +157,26 @@ def sdc_pandas_dataframe_rolling_min(self):
 
     return gen_df_rolling_method_impl('min', self)
 
+
+sdc_pandas_dataframe_rolling_apply.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'apply',
+    'example_caption': 'Calculate the rolling apply.',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
+    DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """,
+    'extra_params':
+    """
+    func:
+        A single value producer
+    raw: :obj:`bool`
+        False : passes each row or column as a Series to the function.
+        True or None : the passed function will receive ndarray objects instead.
+    """
+})
 
 sdc_pandas_dataframe_rolling_max.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
     'method_name': 'max',
