@@ -214,10 +214,7 @@ if __name__ == '__main__':
         failed_examples = []
         expected_failures = []
         unexpected_success = []
-        expected_failures_list = [
-            'series/series_map_dict.py',
-            'series/series_map_format.py',
-        ]
+        expected_failures_list = []
 
         os.chdir(sdc_examples)
         sdc_packages = get_sdc_build_packages(build_folder)
