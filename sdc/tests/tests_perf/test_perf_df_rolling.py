@@ -100,6 +100,7 @@ class TestDFRollingMethods(TestBase):
 
 cases = [
     ('min', '', [2 * 10 ** 5]),
+    ('count', '', [8 * 10 ** 5]),
 ]
 
 generate_test_cases(cases, TestDFRollingMethods, 'df', 'rolling({}).'.format(get_rolling_params()))
