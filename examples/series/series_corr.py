@@ -34,7 +34,7 @@ def series_corr():
     s1 = pd.Series([3.2, -10, np.nan, 0.23, 9.2])
     s2 = pd.Series([5., 0, 3.3, np.nan, 9.2])
 
-    return s1.corr(s2)  # Expect value: 0.9867362434412109
+    return s1.corr(s2)  # Expect value: 0.98673...
 
 
 print(series_corr())

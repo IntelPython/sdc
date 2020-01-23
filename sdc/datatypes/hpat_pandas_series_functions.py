@@ -1682,7 +1682,7 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
 
     Limitations
     -----------
-    - Parameter method except 'pearson' is currently unsupported by Intel Scalable Dataframe Compiler
+    - 'method' parameter accepts only 'pearson' value. Other values are not supported
     - Unsupported mixed numeric and string data
 
     Examples
