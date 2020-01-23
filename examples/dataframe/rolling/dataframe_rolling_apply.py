@@ -24,22 +24,23 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import daal4py
-import daal4py.hpat
-import sdc
 import numpy as np
+import pandas as pd
+from numba import njit
 
 
-@sdc.jit(nopython=True)
-def kmeans(N, D, nClusters, maxit):
-    a = np.random.ranf((N, D))  # doesn't make much sense, but ok for now
-    kmi = daal4py.kmeans_init(nClusters, method='plusPlusDense')
-    km = daal4py.kmeans(nClusters, maxit)
-    kmr = km.compute(a, kmi.compute(a).centroids)
-    return (kmr.centroids, kmr.assignments, kmr.objectiveFunction, kmr.goalFunction, kmr.nIterations)
+@njit
+def df_rolling_apply():
+    df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
+
+    def get_median(x):
+        return np.median(x)
+
+    out_df = df.rolling(3).apply(get_median)
+
+    # Expect DataFrame of
+    # {'A': [NaN, NaN, 4.0, 3.0, 5.0], 'B': [NaN, NaN, -4.0, -3.0, -5.0]}
+    return out_df
 
 
-print(kmeans(10000, 20, 2, 30))
-
-sdc.distribution_report()
+print(df_rolling_apply())
