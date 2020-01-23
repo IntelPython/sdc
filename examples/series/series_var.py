@@ -33,7 +33,7 @@ from numba import njit
 def series_var():
     series = pd.Series(np.arange(10))
 
-    return series.var()  # Expect value: 9.166666666666666
+    return series.var()  # Expect value: 9.16666...
 
 
 print(series_var())
