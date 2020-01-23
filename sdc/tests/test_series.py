@@ -53,6 +53,7 @@ from sdc.tests.test_utils import (count_array_OneDs,
 from sdc.tests.gen_test_data import ParquetGenerator
 
 from sdc.tests.test_utils import test_global_input_data_unicode_kind4 as test_global_input_data_unicode
+from sdc.tests.test_utils import test_global_input_data_unicode_kind1
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -107,12 +108,6 @@ test_global_input_data_unicode_kind4 = [
     '¡Y tú quién te crees?',
     '🐍⚡',
     '大处着眼，小处着手。',
-]
-
-test_global_input_data_unicode_kind1 = [
-    'ascii',
-    '12345',
-    '1234567890',
 ]
 
 def gen_srand_array(size, nchars=8):
@@ -6037,7 +6032,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_sdc_jit("Series.str.isnumeric is not supported yet")
     def test_series_isnumeric_str(self):
         cfunc = self.jit(isnumeric_usecase)
-        test_data = test_global_input_data_unicode_kind4 + test_global_input_data_unicode_kind1
+        test_data = [test_global_input_data_unicode, test_global_input_data_unicode_kind1]
         for data in test_data:
             S = pd.Series(data)
             pd.testing.assert_series_equal(cfunc(S), isnumeric_usecase(S))
@@ -6045,8 +6040,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_sdc_jit("Series.str.isdigit is not supported yet")
     def test_series_isdigit_str(self):
         cfunc = self.jit(isdigit_usecase)
-        test_data = [test_global_input_data_unicode_kind4, test_global_input_data_unicode,
-                     test_global_input_data_unicode_kind1]
+        test_data = [test_global_input_data_unicode, test_global_input_data_unicode_kind1]
         for data in test_data:
             S = pd.Series(data)
             pd.testing.assert_series_equal(cfunc(S), isdigit_usecase(S))
@@ -6054,8 +6048,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_sdc_jit("Series.str.isdecimal is not supported yet")
     def test_series_isdecimal_str(self):
         cfunc = self.jit(isdecimal_usecase)
-        test_data = [test_global_input_data_unicode_kind4, test_global_input_data_unicode,
-                     test_global_input_data_unicode_kind1]
+        test_data = [test_global_input_data_unicode, test_global_input_data_unicode_kind1]
         for data in test_data:
             S = pd.Series(data)
             pd.testing.assert_series_equal(cfunc(S), isdecimal_usecase(S))
@@ -6063,8 +6056,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_sdc_jit("Series.str.isupper is not supported yet")
     def test_series_isupper_str(self):
         cfunc = self.jit(isupper_usecase)
-        test_data = [test_global_input_data_unicode_kind4, test_global_input_data_unicode,
-                     test_global_input_data_unicode_kind1]
+        test_data = [test_global_input_data_unicode, test_global_input_data_unicode_kind1]
         for data in test_data:
             S = pd.Series(data)
             pd.testing.assert_series_equal(cfunc(S), isupper_usecase(S))
