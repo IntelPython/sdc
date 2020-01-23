@@ -282,6 +282,8 @@ if __name__ == '__main__':
                 create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['openpyxl', 'xlrd'],
                                  conda_channels)
                 run_command(f'{test_env_activate} && conda install -y {package}')
+                os.environ['SDC_AUTO_PARALLEL'] = str(1)
+                format_print(f"SDC_AUTO_PARALLEL is : {os.environ['SDC_AUTO_PARALLEL']}")
                 for num_threads in benchmark_num_threads_list:
                     os.environ['NUMBA_NUM_THREADS'] = str(num_threads)
                     format_print(f'NUMBA_NUM_THREADS is : {num_threads}')
