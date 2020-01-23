@@ -170,11 +170,9 @@ def hpat_pandas_dataframe_values(df):
 
         df_values = numpy.empty(row_len*column_len, numba_common_dtype)
 
-        flatten_index = 0
         for i in prange(row_len):
             for j in range(column_len):
-                df_values[flatten_index] = numpy.array(local_data[j])[i]
-                flatten_index += 1
+                df_values[i*column_len + j] = numpy.array(local_data[j])[i]
 
         return df_values.reshape((row_len, column_len))
 
