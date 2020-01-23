@@ -140,6 +140,15 @@ def sdc_pandas_dataframe_rolling_apply(self, func, raw=None):
                                       kws={'raw': 'None'})
 
 
+@sdc_overload_method(DataFrameRollingType, 'count')
+def sdc_pandas_dataframe_rolling_count(self):
+
+    ty_checker = TypeChecker('Method rolling.count().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    return gen_df_rolling_method_impl('count', self)
+
+
 @sdc_overload_method(DataFrameRollingType, 'min')
 def sdc_pandas_dataframe_rolling_min(self):
 
@@ -167,6 +176,13 @@ sdc_pandas_dataframe_rolling_apply.__doc__ = sdc_pandas_dataframe_rolling_docstr
         False : passes each row or column as a Series to the function.
         True or None : the passed function will receive ndarray objects instead.
     """
+})
+
+sdc_pandas_dataframe_rolling_count.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'count',
+    'example_caption': 'Count of any non-NaN observations inside the window.',
+    'limitations_block': '',
+    'extra_params': ''
 })
 
 sdc_pandas_dataframe_rolling_min.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
