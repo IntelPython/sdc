@@ -1775,7 +1775,6 @@ class TestSeries(TestSeries_apply, TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis1(self):
         '''Verifies Series.fillna() implementation handles 'index' as axis argument'''
@@ -1786,7 +1785,6 @@ class TestSeries(TestSeries_apply, TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis2(self):
         '''Verifies Series.fillna() implementation handles 0 as axis argument'''
@@ -1797,7 +1795,6 @@ class TestSeries(TestSeries_apply, TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis3(self):
         '''Verifies Series.fillna() implementation handles correct non-literal axis argument'''
@@ -1809,7 +1806,6 @@ class TestSeries(TestSeries_apply, TestCase):
         for axis in [0, 'index']:
             pd.testing.assert_series_equal(hpat_func(S, axis), test_impl(S, axis))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_from_df(self):
         '''Verifies Series.fillna() applied to a named float Series obtained from a DataFrame'''
@@ -1821,7 +1817,6 @@ class TestSeries(TestSeries_apply, TestCase):
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0, np.inf]})
         pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A), check_names=False)
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index1(self):
         '''Verifies Series.fillna() implementation for float series with default index'''
@@ -1833,7 +1828,6 @@ class TestSeries(TestSeries_apply, TestCase):
             S = pd.Series(data)
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index2(self):
         '''Verifies Series.fillna() implementation for float series with string index'''
@@ -1844,7 +1838,6 @@ class TestSeries(TestSeries_apply, TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf], ['a', 'b', 'c', 'd', 'e'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index3(self):
         def test_impl(S):
@@ -2404,7 +2397,7 @@ class TestSeries(TestSeries_apply, TestCase):
                     # con not compare Nan != Nan directly
                     self.assertEqual(np.isnan(actual), np.isnan(expected))
                 else:
-                    self.assertEqual(actual, expected)
+                    self.assertAlmostEqual(actual, expected)
 
     def test_series_prod_skipna_default(self):
         def test_impl(S):
@@ -5132,7 +5125,6 @@ class TestSeries(TestSeries_apply, TestCase):
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
 
-    @skip_parallel
     @skip_sdc_jit('Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum(self):
         def test_impl():
@@ -5143,7 +5135,6 @@ class TestSeries(TestSeries_apply, TestCase):
         cfunc = self.jit(pyfunc)
         pd.testing.assert_series_equal(pyfunc(), cfunc())
 
-    @skip_parallel
     @skip_sdc_jit('Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum_unboxing(self):
         def test_impl(s):
@@ -5156,7 +5147,6 @@ class TestSeries(TestSeries_apply, TestCase):
             series = pd.Series(data)
             pd.testing.assert_series_equal(pyfunc(series), cfunc(series))
 
-    @skip_parallel
     @skip_sdc_jit('Series.cumsum() parameters "axis", "skipna" unsupported')
     def test_series_cumsum_full(self):
         def test_impl(s, axis, skipna):
