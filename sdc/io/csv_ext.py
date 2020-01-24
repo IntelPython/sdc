@@ -390,7 +390,7 @@ def to_varname(string):
     Replaces unavailable symbols with _ and insert _ if string starts with digit.
     """
     import re
-    return re.sub(r'\W|^(?=\d)', '_', string)
+    return re.sub(r'\W|^(?=\d)','_', string)
 
 
 def to_varname_without_excess_underscores(string):
