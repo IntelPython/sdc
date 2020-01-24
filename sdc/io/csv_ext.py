@@ -388,7 +388,8 @@ def _sanitize_varname(varname):
 def to_varname(string):
     """Converts string to correct Python variable name.
     Replaces unavailable symbols with _ and insert _ if string starts with digit.
-    In case where many underscores in a row, replace by 1 underscore.
+    Multiple underscores are replacing with single one.
+    Also are removing underscores at start and end of the string.
     """
     import re
     var_name = re.sub(r'\W|^(?=\d)', '_', string)
