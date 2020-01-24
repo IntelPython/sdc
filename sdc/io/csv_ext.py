@@ -388,13 +388,15 @@ def _sanitize_varname(varname):
 def to_varname(string):
     """Converts string to correct Python variable name.
     Replaces unavailable symbols with _ and insert _ if string starts with digit.
-    Multiple underscores are replacing with single one.
-    Also are removing underscores at start and end of the string.
     """
     import re
-    var_name = re.sub(r'\W|^(?=\d)', '_', string)
-    return '_'.join(i for i in var_name.split('_') if i)
+    return re.sub(r'\W|^(?=\d)', '_', string)
 
+
+def to_varname_without_excess_underscores(string):
+    """Replaces unavailable symbols with underscores.
+     Are removing excess underscores from the string."""
+    return '_'.join(i for i in to_varname(string).split('_') if i)
 
 @contextlib.contextmanager
 def pyarrow_cpu_count(cpu_count=pyarrow.cpu_count()):
