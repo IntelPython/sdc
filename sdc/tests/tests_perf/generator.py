@@ -1,5 +1,5 @@
 import time
-from sdc.io.csv_ext import to_varname
+from sdc.io.csv_ext import to_varname_without_excess_underscores
 from typing import NamedTuple
 
 
@@ -13,10 +13,10 @@ class TestCase(NamedTuple):
 def gen(cases, method, class_add, typ, prefix=''):
     for params in cases:
         test_params = TestCase(*params)
-        func_params = ['test', typ, prefix, test_params.name, test_params.params]
-        func_name = to_varname('_'.join(func_params))
+        test_name_parts = ['test', typ, prefix, test_params.name, test_params.params]
+        test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
 
-        setattr(class_add, func_name, method(test_params.name, test_params.params,
+        setattr(class_add, test_name, method(test_params.name, test_params.params,
                                              test_params.size, prefix, test_params.call_expression))
 
 
