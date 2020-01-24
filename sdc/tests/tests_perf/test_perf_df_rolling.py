@@ -87,6 +87,7 @@ class TestDFRollingMethods(TestBase):
             'apply': [2 * 10 ** 5],
             'count': [8 * 10 ** 5],
             'kurt': [4 * 10 ** 5],
+            'max': [2 * 10 ** 5],
             'min': [2 * 10 ** 5],
         }
 
@@ -146,6 +147,9 @@ class TestDFRollingMethods(TestBase):
 
     def test_df_rolling_kurt(self):
         self._test_df_rolling_method('kurt')
+
+    def test_df_rolling_max(self):
+        self._test_df_rolling_method('max')
 
     def test_df_rolling_min(self):
         self._test_df_rolling_method('min')
