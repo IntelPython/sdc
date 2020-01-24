@@ -393,10 +393,6 @@ def to_varname(string):
     return re.sub(r'\W|^(?=\d)','_', string)
 
 
-def to_varname_without_excess_underscores(string):
-    """Removing excess underscores from the string."""
-    return '_'.join(i for i in to_varname(string).split('_') if i)
-
 @contextlib.contextmanager
 def pyarrow_cpu_count(cpu_count=pyarrow.cpu_count()):
     old_cpu_count = pyarrow.cpu_count()

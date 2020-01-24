@@ -1,5 +1,5 @@
 import time
-from sdc.io.csv_ext import to_varname_without_excess_underscores
+from sdc.io.csv_ext import to_varname
 from typing import NamedTuple
 
 
@@ -8,6 +8,12 @@ class TestCase(NamedTuple):
     params: str = ''
     size: list = []
     call_expression: str = None
+
+
+
+def to_varname_without_excess_underscores(string):
+    """Removing excess underscores from the string."""
+    return '_'.join(i for i in to_varname(string).split('_') if i)
 
 
 def gen(cases, method, class_add, typ, prefix=''):
@@ -21,15 +27,17 @@ def gen(cases, method, class_add, typ, prefix=''):
 
 def test_gen(name, params, data_length, prefix, call_expression):
     func_name = 'func'
-    if call_expression is None:
-        parts = [prefix, '{}({})'.format(name, params)]
-        call_expression = '.'.join(parts)
     input_data = 'input_data'
-    function_called = '{}.{}'.format(input_data, call_expression)
+    if call_expression is None:
+        if prefix == '':
+            parts = [input_data, '{}({})'.format(name, params)]
+        else:
+            parts = [input_data, prefix, '{}({})'.format(name, params)]
+        call_expression = '.'.join(parts)
 
     func_text = f"""\
 def {func_name}(self):
-  self._test_case(usecase_gen('{input_data}', '{function_called}'), '{name}', {data_length})
+  self._test_case(usecase_gen('{input_data}', '{call_expression}'), '{name}', {data_length})
 """
 
     global_vars = {'usecase_gen': usecase_gen}
@@ -44,13 +52,15 @@ def {func_name}(self):
 def test_gen_two_par(name, params, data_length, prefix, *args, **kwargs):
     func_name = 'func'
     input_data = 'A, B'
-    parts = [prefix, name]
-    method = '.'.join(parts)
-    function_called = 'A.{}(B, {})'.format(method, params)
-
+    if prefix == '':
+        parts = ['A', '{}(B, {})'.format(name, params)]
+    else:
+        parts = ['A', prefix, '{}(B, {})'.format(name, params)]
+    call_expression = '.'.join(parts)
+    
     func_text = f"""\
 def {func_name}(self):
-  self._test_binary_operations(usecase_gen('{input_data}', '{function_called}'), '{name}', {data_length})
+  self._test_binary_operations(usecase_gen('{input_data}', '{call_expression}'), '{name}', {data_length})
 """
 
     global_vars = {'usecase_gen': usecase_gen}
