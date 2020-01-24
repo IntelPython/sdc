@@ -89,6 +89,7 @@ class TestDFRollingMethods(TestBase):
             'apply': [2 * 10 ** 5],
             'corr': [10 ** 5],
             'count': [8 * 10 ** 5],
+            'max': [2 * 10 ** 5],
             'min': [2 * 10 ** 5],
         }
 
@@ -174,6 +175,9 @@ class TestDFRollingMethods(TestBase):
 
     def test_df_rolling_count(self):
         self._test_df_rolling_method('count')
+
+    def test_df_rolling_max(self):
+        self._test_df_rolling_method('max')
 
     def test_df_rolling_min(self):
         self._test_df_rolling_method('min')
