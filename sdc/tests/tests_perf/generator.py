@@ -6,7 +6,7 @@ from typing import NamedTuple
 class TestCase(NamedTuple):
     name: str
     params: str = ''
-    size: list = None
+    size: list = []
     call_expression: str = None
 
 

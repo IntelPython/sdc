@@ -394,8 +394,7 @@ def to_varname(string):
 
 
 def to_varname_without_excess_underscores(string):
-    """Using to_varname.
-    Removing excess underscores from the string."""
+    """Removing excess underscores from the string."""
     return '_'.join(i for i in to_varname(string).split('_') if i)
 
 @contextlib.contextmanager
