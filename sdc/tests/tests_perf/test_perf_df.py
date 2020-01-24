@@ -34,7 +34,7 @@ import sdc
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from sdc.tests.test_utils import test_global_input_data_float64
-from .generator import generate_test_cases, generate_test_cases_two_params
+from .generator import TestCase, generate_test_cases, generate_test_cases_two_params
 
 
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_df.TestDataFrameMethods.test_df_{method_name}
@@ -109,21 +109,21 @@ class TestDataFrameMethods(TestBase):
 
 #  (method_name, parametrs, total_data_length, call_expression)
 cases = [
-    ('count', '', [10 ** 7]),
-    ('drop', 'columns="f0"', [10 ** 8]),
-    ('max', '', [10 ** 7]),
-    ('mean', '', [10 ** 7]),
-    ('median', '', [10 ** 7]),
-    ('min', '', [10 ** 7]),
-    ('pct_change', '', [10 ** 7]),
-    ('prod', '', [10 ** 7]),
-    ('std', '', [10 ** 7]),
-    ('sum', '', [10 ** 7]),
-    ('var', '', [10 ** 7]),
+    TestCase(name='count', size=[10 ** 7]),
+    TestCase(name='drop', params='columns="f0"', size=[10 ** 8]),
+    TestCase(name='max', size=[10 ** 7]),
+    TestCase(name='mean', size=[10 ** 7]),
+    TestCase(name='median', size=[10 ** 7]),
+    TestCase(name='min', size=[10 ** 7]),
+    TestCase(name='pct_change', size=[10 ** 7]),
+    TestCase(name='prod', size=[10 ** 7]),
+    TestCase(name='std', size=[10 ** 7]),
+    TestCase(name='sum', size=[10 ** 7]),
+    TestCase(name='var', size=[10 ** 7]),
 ]
 
 cases_two_params = [
-    ('append', '', [10 ** 7]),
+    TestCase(name='append', size=[10 ** 7]),
 ]
 
 

@@ -36,7 +36,7 @@ import pandas as pd
 from sdc.tests.test_utils import *
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import *
-from .generator import generate_test_cases
+from .generator import TestCase, generate_test_cases
 
 
 test_global_input_data_unicode_kind1 = [
@@ -81,20 +81,21 @@ class TestSeriesStringMethods(TestBase):
 
 
 # (method_name, parameters, input_data)
+# in these tuples, named parameter 'size' is 'input_data'
 cases = [
-    ('center', '1', test_global_input_data_unicode_kind1),
-    ('endswith', '"e"'),
-    ('find', '"e"'),
-    ('len', ''),
-    ('ljust', '1', test_global_input_data_unicode_kind1),
-    ('lower', ''),
-    ('lstrip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
-    ('rjust', '1', test_global_input_data_unicode_kind1),
-    ('rstrip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
-    ('startswith', '"e"'),
-    ('strip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
-    ('upper', ''),
-    ('zfill', '1', test_global_input_data_unicode_kind1),
+    TestCase(name='center', params='1', size=test_global_input_data_unicode_kind1),
+    TestCase(name='endswith', params='"e"'),
+    TestCase(name='find', params='"e"'),
+    TestCase(name='len'),
+    TestCase(name='ljust', params='1', size=test_global_input_data_unicode_kind1),
+    TestCase(name='lower'),
+    TestCase(name='lstrip', size=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    TestCase(name='rjust', params='1', size=test_global_input_data_unicode_kind1),
+    TestCase(name='rstrip', size=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    TestCase(name='startswith', params='"e"'),
+    TestCase(name='strip', size=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    TestCase(name='upper'),
+    TestCase(name='zfill', params='1', size=test_global_input_data_unicode_kind1),
 ]
 
 generate_test_cases(cases, TestSeriesStringMethods, 'series', 'str.')

@@ -5,14 +5,13 @@ from typing import NamedTuple
 
 class TestCase(NamedTuple):
     name: str
-    params: str
-    size: int = None
+    params: str = ''
+    size: list = None
     call_expression: str = None
 
 
 def gen(cases, method, class_add, typ, prefix=''):
-    for params in cases:
-        test_params = TestCase(*params)
+    for test_params in cases:
         test_name_parts = ['test', typ, prefix, test_params.name, test_params.params]
         test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
 
