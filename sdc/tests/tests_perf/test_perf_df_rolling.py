@@ -101,6 +101,7 @@ class TestDFRollingMethods(TestBase):
 
 cases = [
     TC(name='count', size=[8 * 10 ** 5]),
+    TC(name='kurt', size=[4 * 10 ** 5]),
     TC(name='max', size=[2 * 10 ** 5]),
     TC(name='min', size=[2 * 10 ** 5]),
 ]

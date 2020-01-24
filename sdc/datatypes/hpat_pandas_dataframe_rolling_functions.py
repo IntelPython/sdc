@@ -149,6 +149,15 @@ def sdc_pandas_dataframe_rolling_count(self):
     return gen_df_rolling_method_impl('count', self)
 
 
+@sdc_overload_method(DataFrameRollingType, 'kurt')
+def sdc_pandas_dataframe_rolling_kurt(self):
+
+    ty_checker = TypeChecker('Method rolling.kurt().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    return gen_df_rolling_method_impl('kurt', self)
+
+
 @sdc_overload_method(DataFrameRollingType, 'max')
 def sdc_pandas_dataframe_rolling_max(self):
 
@@ -190,6 +199,13 @@ sdc_pandas_dataframe_rolling_apply.__doc__ = sdc_pandas_dataframe_rolling_docstr
 sdc_pandas_dataframe_rolling_count.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
     'method_name': 'count',
     'example_caption': 'Count of any non-NaN observations inside the window.',
+    'limitations_block': '',
+    'extra_params': ''
+})
+
+sdc_pandas_dataframe_rolling_kurt.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'kurt',
+    'example_caption': 'Calculate unbiased rolling kurtosis.',
     'limitations_block': '',
     'extra_params': ''
 })
