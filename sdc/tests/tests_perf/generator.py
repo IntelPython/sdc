@@ -69,13 +69,13 @@ def {func_name}(self):
     return func
 
 
-def usecase_gen(input_data, function_called):
+def usecase_gen(input_data, call_expr):
     func_name = 'func'
 
     func_text = f"""\
 def {func_name}({input_data}):
   start_time = time.time()
-  res = {function_called}
+  res = {call_expr}
   finish_time = time.time()
   return finish_time - start_time, res
 """
