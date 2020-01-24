@@ -486,7 +486,7 @@ class TestSeries(TestSeries_apply, TestCase):
         np.testing.assert_array_equal(hpat_func(df.A), test_impl(df.A))
 
     def test_series_getattr_ndim(self):
-        '''Verifies getting Series attribute ndim is supported'''
+        """Verifies getting Series attribute ndim is supported"""
         def test_impl(S):
             return S.ndim
         hpat_func = self.jit(test_impl)
@@ -496,7 +496,7 @@ class TestSeries(TestSeries_apply, TestCase):
         self.assertEqual(hpat_func(S), test_impl(S))
 
     def test_series_getattr_T(self):
-        '''Verifies getting Series attribute T is supported'''
+        """Verifies getting Series attribute T is supported"""
         def test_impl(S):
             return S.T
         hpat_func = self.jit(test_impl)
@@ -619,9 +619,9 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_inline
     def test_series_astype_int_to_str1(self):
-        '''Verifies Series.astype implementation with function 'str' as argument
+        """Verifies Series.astype implementation with function 'str' as argument
            converts integer series to series of strings
-        '''
+        """
         def test_impl(S):
             return S.astype(str)
         hpat_func = self.jit(test_impl)
@@ -633,9 +633,9 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_inline
     def test_series_astype_int_to_str2(self):
-        '''Verifies Series.astype implementation with a string literal dtype argument
+        """Verifies Series.astype implementation with a string literal dtype argument
            converts integer series to series of strings
-        '''
+        """
         def test_impl(S):
             return S.astype('str')
         hpat_func = self.jit(test_impl)
@@ -647,9 +647,9 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_inline
     def test_series_astype_str_to_str1(self):
-        '''Verifies Series.astype implementation with function 'str' as argument
+        """Verifies Series.astype implementation with function 'str' as argument
            handles string series not changing it
-        '''
+        """
         def test_impl(S):
             return S.astype(str)
         hpat_func = self.jit(test_impl)
@@ -660,9 +660,9 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_inline
     def test_series_astype_str_to_str2(self):
-        '''Verifies Series.astype implementation with a string literal dtype argument
+        """Verifies Series.astype implementation with a string literal dtype argument
            handles string series not changing it
-        '''
+        """
         def test_impl(S):
             return S.astype('str')
         hpat_func = self.jit(test_impl)
@@ -673,9 +673,9 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_inline
     def test_series_astype_str_to_str_index_str(self):
-        '''Verifies Series.astype implementation with function 'str' as argument
+        """Verifies Series.astype implementation with function 'str' as argument
            handles string series not changing it
-        '''
+        """
 
         def test_impl(S):
             return S.astype(str)
@@ -688,9 +688,9 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_inline
     def test_series_astype_str_to_str_index_int(self):
-        '''Verifies Series.astype implementation with function 'str' as argument
+        """Verifies Series.astype implementation with function 'str' as argument
            handles string series not changing it
-        '''
+        """
 
         def test_impl(S):
             return S.astype(str)
@@ -702,9 +702,9 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip('TODO: requires str(datetime64) support in Numba')
     def test_series_astype_dt_to_str1(self):
-        '''Verifies Series.astype implementation with function 'str' as argument
+        """Verifies Series.astype implementation with function 'str' as argument
            converts datetime series to series of strings
-        '''
+        """
         def test_impl(A):
             return A.astype(str)
         hpat_func = self.jit(test_impl)
@@ -720,9 +720,9 @@ class TestSeries(TestSeries_apply, TestCase):
                    '[right]:  [0.0, 1.0, 2.0, 3.0, ...'
                    'TODO: needs alignment to NumPy on Numba side')
     def test_series_astype_float_to_str1(self):
-        '''Verifies Series.astype implementation with function 'str' as argument
+        """Verifies Series.astype implementation with function 'str' as argument
            converts float series to series of strings
-        '''
+        """
         def test_impl(A):
             return A.astype(str)
         hpat_func = self.jit(test_impl)
@@ -732,9 +732,9 @@ class TestSeries(TestSeries_apply, TestCase):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_astype_int32_to_int64(self):
-        '''Verifies Series.astype implementation with NumPy dtype argument
+        """Verifies Series.astype implementation with NumPy dtype argument
            converts series with dtype=int32 to series with dtype=int64
-        '''
+        """
         def test_impl(A):
             return A.astype(np.int64)
         hpat_func = self.jit(test_impl)
@@ -744,9 +744,9 @@ class TestSeries(TestSeries_apply, TestCase):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_astype_int_to_float64(self):
-        '''Verifies Series.astype implementation with NumPy dtype argument
+        """Verifies Series.astype implementation with NumPy dtype argument
            converts named integer series to series of float
-        '''
+        """
         def test_impl(A):
             return A.astype(np.float64)
         hpat_func = self.jit(test_impl)
@@ -756,9 +756,9 @@ class TestSeries(TestSeries_apply, TestCase):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_astype_float_to_int32(self):
-        '''Verifies Series.astype implementation with NumPy dtype argument
+        """Verifies Series.astype implementation with NumPy dtype argument
            converts float series to series of integers
-        '''
+        """
         def test_impl(A):
             return A.astype(np.int32)
         hpat_func = self.jit(test_impl)
@@ -768,9 +768,9 @@ class TestSeries(TestSeries_apply, TestCase):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_astype_literal_dtype1(self):
-        '''Verifies Series.astype implementation with a string literal dtype argument
+        """Verifies Series.astype implementation with a string literal dtype argument
            converts float series to series of integers
-        '''
+        """
         def test_impl(A):
             return A.astype('int32')
         hpat_func = self.jit(test_impl)
@@ -781,9 +781,9 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip('TODO: needs Numba astype impl support converting unicode_type to int')
     def test_series_astype_str_to_int32(self):
-        '''Verifies Series.astype implementation with NumPy dtype argument
+        """Verifies Series.astype implementation with NumPy dtype argument
            converts series of strings to series of integers
-        '''
+        """
         import numba
 
         def test_impl(A):
@@ -796,9 +796,9 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip('TODO: needs Numba astype impl support converting unicode_type to float')
     def test_series_astype_str_to_float64(self):
-        '''Verifies Series.astype implementation with NumPy dtype argument
+        """Verifies Series.astype implementation with NumPy dtype argument
            converts series of strings to series of float
-        '''
+        """
         def test_impl(A):
             return A.astype(np.float64)
         hpat_func = self.jit(test_impl)
@@ -809,9 +809,9 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_inline
     def test_series_astype_str_index_str(self):
-        '''Verifies Series.astype implementation with function 'str' as argument
+        """Verifies Series.astype implementation with function 'str' as argument
            handles string series not changing it
-        '''
+        """
 
         def test_impl(S):
             return S.astype(str)
@@ -823,9 +823,9 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_inline
     def test_series_astype_str_index_int(self):
-        '''Verifies Series.astype implementation with function 'str' as argument
+        """Verifies Series.astype implementation with function 'str' as argument
            handles string series not changing it
-        '''
+        """
 
         def test_impl(S):
             return S.astype(str)
@@ -836,9 +836,9 @@ class TestSeries(TestSeries_apply, TestCase):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_astype_errors_ignore_return_self_str(self):
-        '''Verifies Series.astype implementation return self object on error
+        """Verifies Series.astype implementation return self object on error
            if errors='ignore' is passed in arguments
-        '''
+        """
 
         def test_impl(S):
             return S.astype(np.float64, errors='ignore')
@@ -1296,7 +1296,7 @@ class TestSeries(TestSeries_apply, TestCase):
                     S = pd.Series([2, 4, 6, 6, 3], index)
                     pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
 
-    '''
+    """
         For a pandas series: S = pd.Series([2, 4, 6, 6, 3], index=[100, 3, 0, -3, -3])
         pandas implementation of loc with slice returns different results if slice has start defined,
         and if it's omitted:
@@ -1314,7 +1314,7 @@ class TestSeries(TestSeries_apply, TestCase):
             -3    3
             dtype: int64
         Current Numba SliceType implementation doesn't allow to distinguish these cases.
-    '''
+    """
     @unittest.expectedFailure  # add reference to Numba issue!
     def test_series_slice_loc_stop(self):
         def test_impl(A, n):
@@ -1347,7 +1347,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support comparing Series of different lengths')
     def test_series_op1_integer(self):
-        '''Verifies using all various Series arithmetic binary operators on two integer Series with default indexes'''
+        """Verifies using all various Series arithmetic binary operators on two integer Series with default indexes"""
         n = 11
         np.random.seed(0)
         data_to_test = [np.arange(-5, -5 + n, dtype=np.int32),
@@ -1372,8 +1372,8 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support division/modulo/etc by zero')
     def test_series_op2_integer(self):
-        '''Verifies using all various Series arithmetic binary operators
-           on an integer Series with default index and a scalar value'''
+        """Verifies using all various Series arithmetic binary operators
+           on an integer Series with default index and a scalar value"""
         n = 11
         np.random.seed(0)
         data_to_test = [np.arange(-5, -5 + n, dtype=np.int32),
@@ -1399,7 +1399,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support comparing Series of different lengths')
     def test_series_op1_float(self):
-        '''Verifies using all various Series arithmetic binary operators on two float Series with default indexes'''
+        """Verifies using all various Series arithmetic binary operators on two float Series with default indexes"""
         n = 11
         np.random.seed(0)
         data_to_test = [np.arange(-5, -5 + n, dtype=np.float32),
@@ -1420,8 +1420,8 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support division/modulo/etc by zero')
     def test_series_op2_float(self):
-        '''Verifies using all various Series arithmetic binary operators
-           on a float Series with default index and a scalar value'''
+        """Verifies using all various Series arithmetic binary operators
+           on a float Series with default index and a scalar value"""
         n = 11
         np.random.seed(0)
         data_to_test = [np.arange(-5, -5 + n, dtype=np.float32),
@@ -1776,7 +1776,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis1(self):
-        '''Verifies Series.fillna() implementation handles 'index' as axis argument'''
+        """Verifies Series.fillna() implementation handles 'index' as axis argument"""
         def test_impl(S):
             return S.fillna(5.0, axis='index')
         hpat_func = self.jit(test_impl)
@@ -1787,7 +1787,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis2(self):
-        '''Verifies Series.fillna() implementation handles 0 as axis argument'''
+        """Verifies Series.fillna() implementation handles 0 as axis argument"""
         def test_impl(S):
             return S.fillna(5.0, axis=0)
         hpat_func = self.jit(test_impl)
@@ -1798,7 +1798,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis3(self):
-        '''Verifies Series.fillna() implementation handles correct non-literal axis argument'''
+        """Verifies Series.fillna() implementation handles correct non-literal axis argument"""
         def test_impl(S, axis):
             return S.fillna(5.0, axis=axis)
         hpat_func = self.jit(test_impl)
@@ -1810,7 +1810,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float(self):
-        '''Verifies Series.fillna() applied to a named float Series with default index'''
+        """Verifies Series.fillna() applied to a named float Series with default index"""
         def test_impl(S):
             return S.fillna(5.0)
         hpat_func = self.jit(test_impl)
@@ -1821,7 +1821,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index1(self):
-        '''Verifies Series.fillna() implementation for float series with default index'''
+        """Verifies Series.fillna() implementation for float series with default index"""
         def test_impl(S):
             return S.fillna(5.0)
         hpat_func = self.jit(test_impl)
@@ -1833,7 +1833,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index2(self):
-        '''Verifies Series.fillna() implementation for float series with string index'''
+        """Verifies Series.fillna() implementation for float series with string index"""
         def test_impl(S):
             return S.fillna(5.0)
         hpat_func = self.jit(test_impl)
@@ -1855,7 +1855,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_inline
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_str_index1(self):
-        '''Verifies Series.fillna() applied to a named string Series with default index'''
+        """Verifies Series.fillna() applied to a named string Series with default index"""
         def test_impl(S):
             return S.fillna("dd")
         hpat_func = self.jit(test_impl)
@@ -1867,7 +1867,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_inline
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_str_index2(self):
-        '''Verifies Series.fillna() implementation for series of strings with string index'''
+        """Verifies Series.fillna() implementation for series of strings with string index"""
         def test_impl(S):
             return S.fillna("dd")
         hpat_func = self.jit(test_impl)
@@ -1890,7 +1890,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_inplace1(self):
-        '''Verifies Series.fillna() implementation for float series with default index and inplace argument True'''
+        """Verifies Series.fillna() implementation for float series with default index and inplace argument True"""
         def test_impl(S):
             S.fillna(5.0, inplace=True)
             return S
@@ -1903,7 +1903,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @unittest.skip('TODO: add reflection support and check method return value')
     def test_series_fillna_float_inplace2(self):
-        '''Verifies Series.fillna(inplace=True) results are reflected back in the original float series'''
+        """Verifies Series.fillna(inplace=True) results are reflected back in the original float series"""
         def test_impl(S):
             return S.fillna(inplace=True)
         hpat_func = self.jit(test_impl)
@@ -1916,7 +1916,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_parallel
     def test_series_fillna_float_inplace3(self):
-        '''Verifies Series.fillna() implementation correcly handles omitted inplace argument as default False'''
+        """Verifies Series.fillna() implementation correcly handles omitted inplace argument as default False"""
         def test_impl(S):
             return S.fillna(5.0)
         hpat_func = self.jit(test_impl)
@@ -1928,7 +1928,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_parallel
     def test_series_fillna_inplace_non_literal(self):
-        '''Verifies Series.fillna() implementation handles only Boolean literals as inplace argument'''
+        """Verifies Series.fillna() implementation handles only Boolean literals as inplace argument"""
         def test_impl(S, param):
             S.fillna(5.0, inplace=param)
             return S
@@ -1941,9 +1941,9 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_numba_jit('TODO: investigate why Numba types inplace as bool (non-literal value)')
     def test_series_fillna_str_inplace1(self):
-        '''Verifies Series.fillna() implementation for series of strings
+        """Verifies Series.fillna() implementation for series of strings
            with default index and inplace argument True
-        '''
+        """
         def test_impl(S):
             S.fillna("dd", inplace=True)
             return S
@@ -1956,7 +1956,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @unittest.skip('TODO (both): support StringArrayType reflection'
                    'TODO (new-style): investigate why Numba infers inplace type as bool (non-literal value)')
     def test_series_fillna_str_inplace2(self):
-        '''Verifies Series.fillna(inplace=True) results are reflected back in the original string series'''
+        """Verifies Series.fillna(inplace=True) results are reflected back in the original string series"""
         def test_impl(S):
             return S.fillna("dd", inplace=True)
         hpat_func = self.jit(test_impl)
@@ -1984,7 +1984,7 @@ class TestSeries(TestSeries_apply, TestCase):
                    '[left]:  [NaT, 1970-12-01T00:00:00.000000000, 2012-07-25T00:00:00.000000000]\n'
                    '[right]: [2020-05-03T00:00:00.000000000, 1970-12-01T00:00:00.000000000, 2012-07-25T00:00:00.000000000]')
     def test_series_fillna_dt_no_index1(self):
-        '''Verifies Series.fillna() implementation for datetime series and np.datetime64 value'''
+        """Verifies Series.fillna() implementation for datetime series and np.datetime64 value"""
         def test_impl(S, value):
             return S.fillna(value)
         hpat_func = self.jit(test_impl)
@@ -1995,7 +1995,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip('TODO: change unboxing of pd.Timestamp Series or support conversion between PandasTimestampType and datetime64')
     def test_series_fillna_dt_no_index2(self):
-        '''Verifies Series.fillna() implementation for datetime series and pd.Timestamp value'''
+        """Verifies Series.fillna() implementation for datetime series and pd.Timestamp value"""
         def test_impl(S):
             value = pd.Timestamp('2020-05-03')
             return S.fillna(value)
@@ -2006,7 +2006,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_parallel
     def test_series_fillna_bool_no_index1(self):
-        '''Verifies Series.fillna() implementation for bool series with default index'''
+        """Verifies Series.fillna() implementation for bool series with default index"""
         def test_impl(S):
             return S.fillna(True)
         hpat_func = self.jit(test_impl)
@@ -2018,7 +2018,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_int_no_index1(self):
-        '''Verifies Series.fillna() implementation for integer series with default index'''
+        """Verifies Series.fillna() implementation for integer series with default index"""
         def test_impl(S):
             return S.fillna(7)
         hpat_func = self.jit(test_impl)
@@ -2030,7 +2030,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit('No support of axis argument in old-style Series.dropna() impl')
     def test_series_dropna_axis1(self):
-        '''Verifies Series.dropna() implementation handles 'index' as axis argument'''
+        """Verifies Series.dropna() implementation handles 'index' as axis argument"""
         def test_impl(S):
             return S.dropna(axis='index')
         hpat_func = self.jit(test_impl)
@@ -2041,7 +2041,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit('No support of axis argument in old-style Series.dropna() impl')
     def test_series_dropna_axis2(self):
-        '''Verifies Series.dropna() implementation handles 0 as axis argument'''
+        """Verifies Series.dropna() implementation handles 0 as axis argument"""
         def test_impl(S):
             return S.dropna(axis=0)
         hpat_func = self.jit(test_impl)
@@ -2052,7 +2052,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit('No support of axis argument in old-style Series.dropna() impl')
     def test_series_dropna_axis3(self):
-        '''Verifies Series.dropna() implementation handles correct non-literal axis argument'''
+        """Verifies Series.dropna() implementation handles correct non-literal axis argument"""
         def test_impl(S, axis):
             return S.dropna(axis=axis)
         hpat_func = self.jit(test_impl)
@@ -2064,7 +2064,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit('BUG: old-style dropna impl returns series without index')
     def test_series_dropna_float_index1(self):
-        '''Verifies Series.dropna() implementation for float series with default index'''
+        """Verifies Series.dropna() implementation for float series with default index"""
         def test_impl(S):
             return S.dropna()
         hpat_func = self.jit(test_impl)
@@ -2076,7 +2076,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit('BUG: old-style dropna impl returns series without index')
     def test_series_dropna_float_index2(self):
-        '''Verifies Series.dropna() implementation for float series with string index'''
+        """Verifies Series.dropna() implementation for float series with string index"""
         def test_impl(S):
             return S.dropna()
         hpat_func = self.jit(test_impl)
@@ -2087,7 +2087,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit('BUG: old-style dropna impl returns series without index')
     def test_series_dropna_str_index1(self):
-        '''Verifies Series.dropna() implementation for series of strings with default index'''
+        """Verifies Series.dropna() implementation for series of strings with default index"""
         def test_impl(S):
             return S.dropna()
         hpat_func = self.jit(test_impl)
@@ -2098,7 +2098,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit('BUG: old-style dropna impl returns series without index')
     def test_series_dropna_str_index2(self):
-        '''Verifies Series.dropna() implementation for series of strings with string index'''
+        """Verifies Series.dropna() implementation for series of strings with string index"""
         def test_impl(S):
             return S.dropna()
         hpat_func = self.jit(test_impl)
@@ -2120,7 +2120,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip('BUG: old-style dropna impl returns series without index, in new-style inplace is unsupported')
     def test_series_dropna_float_inplace_no_index1(self):
-        '''Verifies Series.dropna() implementation for float series with default index and inplace argument True'''
+        """Verifies Series.dropna() implementation for float series with default index and inplace argument True"""
         def test_impl(S):
             S.dropna(inplace=True)
             return S
@@ -2132,7 +2132,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip('TODO: add reflection support and check method return value')
     def test_series_dropna_float_inplace_no_index2(self):
-        '''Verifies Series.dropna(inplace=True) results are reflected back in the original float series'''
+        """Verifies Series.dropna(inplace=True) results are reflected back in the original float series"""
         def test_impl(S):
             return S.dropna(inplace=True)
         hpat_func = self.jit(test_impl)
@@ -2145,9 +2145,9 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip('BUG: old-style dropna impl returns series without index, in new-style inplace is unsupported')
     def test_series_dropna_str_inplace_no_index1(self):
-        '''Verifies Series.dropna() implementation for series of strings
+        """Verifies Series.dropna() implementation for series of strings
            with default index and inplace argument True
-        '''
+        """
         def test_impl(S):
             S.dropna(inplace=True)
             return S
@@ -2159,7 +2159,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip('TODO: add reflection support and check method return value')
     def test_series_dropna_str_inplace_no_index2(self):
-        '''Verifies Series.dropna(inplace=True) results are reflected back in the original string series'''
+        """Verifies Series.dropna(inplace=True) results are reflected back in the original string series"""
         def test_impl(S):
             return S.dropna(inplace=True)
         hpat_func = self.jit(test_impl)
@@ -2172,7 +2172,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_numba_jit
     def test_series_dropna_str_parallel1(self):
-        '''Verifies Series.dropna() distributed work for series of strings with default index'''
+        """Verifies Series.dropna() distributed work for series of strings with default index"""
         def test_impl(A):
             B = A.dropna()
             return (B == 'gg').sum()
@@ -2191,7 +2191,7 @@ class TestSeries(TestSeries_apply, TestCase):
                    '[left]:  3, Int64Index([0, 1, 2], dtype=\'int64\')\n'
                    '[right]: 2, Int64Index([1, 2], dtype=\'int64\')')
     def test_series_dropna_dt_no_index1(self):
-        '''Verifies Series.dropna() implementation for datetime series with default index'''
+        """Verifies Series.dropna() implementation for datetime series with default index"""
         def test_impl(S):
             return S.dropna()
         hpat_func = self.jit(test_impl)
@@ -2201,7 +2201,7 @@ class TestSeries(TestSeries_apply, TestCase):
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
     def test_series_dropna_bool_no_index1(self):
-        '''Verifies Series.dropna() implementation for bool series with default index'''
+        """Verifies Series.dropna() implementation for bool series with default index"""
         def test_impl(S):
             return S.dropna()
         hpat_func = self.jit(test_impl)
@@ -2212,7 +2212,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit('BUG: old-style dropna impl returns series without index')
     def test_series_dropna_int_no_index1(self):
-        '''Verifies Series.dropna() implementation for integer series with default index'''
+        """Verifies Series.dropna() implementation for integer series with default index"""
         def test_impl(S):
             return S.dropna()
         hpat_func = self.jit(test_impl)
@@ -2646,7 +2646,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_numba_jit
     def test_series_dist_input1(self):
-        '''Verify distribution of a Series without index'''
+        """Verify distribution of a Series without index"""
         def test_impl(S):
             return S.max()
         hpat_func = self.jit(distributed={'S'})(test_impl)
@@ -2660,7 +2660,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_numba_jit
     def test_series_dist_input2(self):
-        '''Verify distribution of a Series with integer index'''
+        """Verify distribution of a Series with integer index"""
         def test_impl(S):
             return S.max()
         hpat_func = self.jit(distributed={'S'})(test_impl)
@@ -2674,7 +2674,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip("Passed if run single")
     def test_series_dist_input3(self):
-        '''Verify distribution of a Series with string index'''
+        """Verify distribution of a Series with string index"""
         def test_impl(S):
             return S.max()
         hpat_func = self.jit(distributed={'S'})(test_impl)
@@ -3205,7 +3205,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @sdc_limitation
     def test_series_append_same_names(self):
-        '''SDC discards name'''
+        """SDC discards name"""
         def test_impl():
             s1 = pd.Series(data=[0, 1, 2], name='A')
             s2 = pd.Series(data=[3, 4, 5], name='A')
@@ -3216,7 +3216,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("Old-style append implementation doesn't handle ignore_index argument")
     def test_series_append_single_ignore_index(self):
-        '''Verify Series.append() concatenates Series with other single Series ignoring indexes'''
+        """Verify Series.append() concatenates Series with other single Series ignoring indexes"""
         def test_impl(S, other):
             return S.append(other, ignore_index=True)
         hpat_func = self.jit(test_impl)
@@ -3231,7 +3231,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("Old-style append implementation doesn't handle ignore_index argument")
     def test_series_append_list_ignore_index(self):
-        '''Verify Series.append() concatenates Series with list of other Series ignoring indexes'''
+        """Verify Series.append() concatenates Series with list of other Series ignoring indexes"""
         def test_impl(S1, S2, S3):
             return S1.append([S2, S3], ignore_index=True)
         hpat_func = self.jit(test_impl)
@@ -3246,7 +3246,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip('BUG: Pandas 0.25.1 Series.append() doesn\'t support tuple as appending values')
     def test_series_append_tuple_ignore_index(self):
-        '''Verify Series.append() concatenates Series with tuple of other Series ignoring indexes'''
+        """Verify Series.append() concatenates Series with tuple of other Series ignoring indexes"""
         def test_impl(S1, S2, S3):
             return S1.append((S2, S3, ), ignore_index=True)
         hpat_func = self.jit(test_impl)
@@ -3262,7 +3262,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("BUG: old-style append implementation doesn't handle series index")
     def test_series_append_single_index_default(self):
-        '''Verify Series.append() concatenates Series with other single Series respecting default indexes'''
+        """Verify Series.append() concatenates Series with other single Series respecting default indexes"""
         def test_impl(S, other):
             return S.append(other)
         hpat_func = self.jit(test_impl)
@@ -3278,7 +3278,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("BUG: old-style append implementation doesn't handle series index")
     def test_series_append_list_index_default(self):
-        '''Verify Series.append() concatenates Series with list of other Series respecting default indexes'''
+        """Verify Series.append() concatenates Series with list of other Series respecting default indexes"""
         def test_impl(S1, S2, S3):
             return S1.append([S2, S3])
         hpat_func = self.jit(test_impl)
@@ -3294,7 +3294,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip('BUG: Pandas 0.25.1 Series.append() doesn\'t support tuple as appending values')
     def test_series_append_tuple_index_default(self):
-        '''Verify Series.append() concatenates Series with tuple of other Series respecting default indexes'''
+        """Verify Series.append() concatenates Series with tuple of other Series respecting default indexes"""
         def test_impl(S1, S2, S3):
             return S1.append((S2, S3, ))
         hpat_func = self.jit(test_impl)
@@ -3310,7 +3310,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("BUG: old-style append implementation doesn't handle series index")
     def test_series_append_single_index_int(self):
-        '''Verify Series.append() concatenates Series with other single Series respecting integer indexes'''
+        """Verify Series.append() concatenates Series with other single Series respecting integer indexes"""
         def test_impl(S, other):
             return S.append(other)
         hpat_func = self.jit(test_impl)
@@ -3327,7 +3327,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("BUG: old-style append implementation doesn't handle series index")
     def test_series_append_list_index_int(self):
-        '''Verify Series.append() concatenates Series with list of other Series respecting integer indexes'''
+        """Verify Series.append() concatenates Series with list of other Series respecting integer indexes"""
         def test_impl(S1, S2, S3):
             return S1.append([S2, S3])
         hpat_func = self.jit(test_impl)
@@ -3344,7 +3344,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip('BUG: Pandas 0.25.1 Series.append() doesn\'t support tuple as appending values')
     def test_series_append_tuple_index_int(self):
-        '''Verify Series.append() concatenates Series with tuple of other Series respecting integer indexes'''
+        """Verify Series.append() concatenates Series with tuple of other Series respecting integer indexes"""
         def test_impl(S1, S2, S3):
             return S1.append((S2, S3, ))
         hpat_func = self.jit(test_impl)
@@ -3361,7 +3361,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("BUG: old-style append implementation doesn't handle series index")
     def test_series_append_single_index_str(self):
-        '''Verify Series.append() concatenates Series with other single Series respecting string indexes'''
+        """Verify Series.append() concatenates Series with other single Series respecting string indexes"""
         def test_impl(S, other):
             return S.append(other)
         hpat_func = self.jit(test_impl)
@@ -3378,7 +3378,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("BUG: old-style append implementation doesn't handle series index")
     def test_series_append_list_index_str(self):
-        '''Verify Series.append() concatenates Series with list of other Series respecting string indexes'''
+        """Verify Series.append() concatenates Series with list of other Series respecting string indexes"""
         def test_impl(S1, S2, S3):
             return S1.append([S2, S3])
         hpat_func = self.jit(test_impl)
@@ -3395,7 +3395,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip('BUG: Pandas 0.25.1 Series.append() doesn\'t support tuple as appending values')
     def test_series_append_tuple_index_str(self):
-        '''Verify Series.append() concatenates Series with tuple of other Series respecting string indexes'''
+        """Verify Series.append() concatenates Series with tuple of other Series respecting string indexes"""
         def test_impl(S1, S2, S3):
             return S1.append((S2, S3, ))
         hpat_func = self.jit(test_impl)
@@ -3412,7 +3412,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("Old-style append implementation doesn't handle ignore_index argument")
     def test_series_append_ignore_index_literal(self):
-        '''Verify Series.append() implementation handles ignore_index argument as Boolean literal'''
+        """Verify Series.append() implementation handles ignore_index argument as Boolean literal"""
         def test_impl(S, other):
             return S.append(other, ignore_index=False)
         hpat_func = self.jit(test_impl)
@@ -3423,7 +3423,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("Old-style append implementation doesn't handle ignore_index argument")
     def test_series_append_ignore_index_non_literal(self):
-        '''Verify Series.append() implementation raises if ignore_index argument is not a Boolean literal'''
+        """Verify Series.append() implementation raises if ignore_index argument is not a Boolean literal"""
         def test_impl(S, other, param):
             return S.append(other, ignore_index=param)
         hpat_func = self.jit(test_impl)
@@ -3438,7 +3438,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("BUG: old-style append implementation doesn't handle series index")
     def test_series_append_single_dtype_promotion(self):
-        '''Verify Series.append() implementation handles appending single Series with different dtypes'''
+        """Verify Series.append() implementation handles appending single Series with different dtypes"""
         def test_impl(S, other):
             return S.append(other)
         hpat_func = self.jit(test_impl)
@@ -3449,7 +3449,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("BUG: old-style append implementation doesn't handle series index")
     def test_series_append_list_dtype_promotion(self):
-        '''Verify Series.append() implementation handles appending list of Series with different dtypes'''
+        """Verify Series.append() implementation handles appending list of Series with different dtypes"""
         def test_impl(S1, S2, S3):
             return S1.append([S2, S3])
         hpat_func = self.jit(test_impl)
@@ -3876,7 +3876,7 @@ class TestSeries(TestSeries_apply, TestCase):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_head_default1(self):
-        '''Verifies default head method for non-distributed pass of Series with no index'''
+        """Verifies default head method for non-distributed pass of Series with no index"""
         def test_impl(S):
             return S.head()
         hpat_func = self.jit(test_impl)
@@ -3887,7 +3887,7 @@ class TestSeries(TestSeries_apply, TestCase):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_head_index1(self):
-        '''Verifies head method for Series with integer index created inside jitted function'''
+        """Verifies head method for Series with integer index created inside jitted function"""
         def test_impl():
             S = pd.Series([6, 9, 2, 3, 6, 4, 5], [8, 1, 6, 0, 9, 1, 3])
             return S.head(3)
@@ -3896,7 +3896,7 @@ class TestSeries(TestSeries_apply, TestCase):
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
     def test_series_head_index_named(self):
-        '''Verifies head method for Series with integer index created inside jitted function'''
+        """Verifies head method for Series with integer index created inside jitted function"""
         def test_impl():
             S = pd.Series([6, 9, 2, 3, 6, 4, 5], [8, 1, 6, 0, 9, 1, 3], name='A')
             return S.head(3)
@@ -3905,7 +3905,7 @@ class TestSeries(TestSeries_apply, TestCase):
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
     def test_series_head_index2(self):
-        '''Verifies head method for Series with string index created inside jitted function'''
+        """Verifies head method for Series with string index created inside jitted function"""
         def test_impl():
             S = pd.Series([6, 9, 2, 3, 6, 4, 5], ['a', 'ab', 'abc', 'c', 'f', 'hh', ''])
             return S.head(3)
@@ -3914,7 +3914,7 @@ class TestSeries(TestSeries_apply, TestCase):
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
     def test_series_head_index3(self):
-        '''Verifies head method for non-distributed pass of Series with integer index'''
+        """Verifies head method for non-distributed pass of Series with integer index"""
         def test_impl(S):
             return S.head(3)
         hpat_func = self.jit(test_impl)
@@ -3924,7 +3924,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit('Breaks other tests')
     def test_series_head_index4(self):
-        '''Verifies head method for non-distributed pass of Series with string index'''
+        """Verifies head method for non-distributed pass of Series with string index"""
         def test_impl(S):
             return S.head(3)
         hpat_func = self.jit(test_impl)
@@ -3934,7 +3934,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_numba_jit
     def test_series_head_parallel1(self):
-        '''Verifies head method for distributed Series with string data and no index'''
+        """Verifies head method for distributed Series with string data and no index"""
         def test_impl(S):
             return S.head(7)
 
@@ -3951,7 +3951,7 @@ class TestSeries(TestSeries_apply, TestCase):
     @skip_numba_jit
     @unittest.expectedFailure
     def test_series_head_index_parallel1(self):
-        '''Verifies head method for distributed Series with integer index'''
+        """Verifies head method for distributed Series with integer index"""
         def test_impl(S):
             return S.head(3)
         hpat_func = self.jit(distributed={'S'})(test_impl)
@@ -3963,7 +3963,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @unittest.skip("Passed if run single")
     def test_series_head_index_parallel2(self):
-        '''Verifies head method for distributed Series with string index'''
+        """Verifies head method for distributed Series with string index"""
         def test_impl(S):
             return S.head(3)
         hpat_func = self.jit(distributed={'S'})(test_impl)
@@ -4052,7 +4052,7 @@ class TestSeries(TestSeries_apply, TestCase):
                     pd.testing.assert_series_equal(result_param1, result_param1_ref)
 
     def test_series_median1(self):
-        '''Verifies median implementation for float and integer series of random data'''
+        """Verifies median implementation for float and integer series of random data"""
         def test_impl(S):
             return S.median()
         hpat_func = self.jit(test_impl)
@@ -4075,7 +4075,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("BUG: old-style median implementation doesn't filter NaNs")
     def test_series_median_skipna_default1(self):
-        '''Verifies median implementation with default skipna=True argument on a series with NA values'''
+        """Verifies median implementation with default skipna=True argument on a series with NA values"""
         def test_impl(S):
             return S.median()
         hpat_func = self.jit(test_impl)
@@ -4085,7 +4085,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("Skipna argument is not supported in old-style")
     def test_series_median_skipna_false1(self):
-        '''Verifies median implementation with skipna=False on a series with NA values'''
+        """Verifies median implementation with skipna=False on a series with NA values"""
         def test_impl(S):
             return S.median(skipna=False)
         hpat_func = self.jit(test_impl)
@@ -4562,7 +4562,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @sdc_limitation
     def test_series_shift_0period(self):
-        '''SDC implementation always changes dtype to float. Even in case of period = 0'''
+        """SDC implementation always changes dtype to float. Even in case of period = 0"""
         def pyfunc():
             series = pd.Series([6, 4, 3])
             return series.shift(periods=0)
@@ -4582,7 +4582,7 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @sdc_limitation
     def test_series_shift_uint_int(self):
-        '''SDC assumes fill_value is int and unifies unsigned int and int to float. Even if fill_value is positive'''
+        """SDC assumes fill_value is int and unifies unsigned int and int to float. Even if fill_value is positive"""
         def pyfunc():
             series = pd.Series([max_uint64])
             return series.shift(fill_value=0)
