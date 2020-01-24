@@ -27,6 +27,8 @@
 import numpy
 import pandas
 
+from functools import partial
+
 from numba import prange
 from numba.extending import register_jitable
 from numba.types import (float64, Boolean, Integer, NoneType, Number,
@@ -35,6 +37,10 @@ from numba.types import (float64, Boolean, Integer, NoneType, Number,
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.utils import sdc_overload_method
+
+
+# disabling parallel execution for rolling due to numba issue https://github.com/numba/numba/issues/5098
+sdc_rolling_overload = partial(sdc_overload_method, parallel=False)
 
 
 hpat_pandas_series_rolling_docstring_tmpl = """
@@ -315,7 +321,7 @@ hpat_pandas_rolling_series_var_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_var))
 
 
-@sdc_overload_method(SeriesRollingType, 'apply')
+@sdc_rolling_overload(SeriesRollingType, 'apply')
 def hpat_pandas_series_rolling_apply(self, func, raw=None):
 
     ty_checker = TypeChecker('Method rolling.apply().')
@@ -356,7 +362,7 @@ def hpat_pandas_series_rolling_apply(self, func, raw=None):
     return hpat_pandas_rolling_series_apply_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'corr')
+@sdc_rolling_overload(SeriesRollingType, 'corr')
 def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
 
     ty_checker = TypeChecker('Method rolling.corr().')
@@ -417,7 +423,7 @@ def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
     return hpat_pandas_rolling_series_corr_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'count')
+@sdc_rolling_overload(SeriesRollingType, 'count')
 def hpat_pandas_series_rolling_count(self):
 
     ty_checker = TypeChecker('Method rolling.count().')
@@ -445,7 +451,7 @@ def hpat_pandas_series_rolling_count(self):
     return hpat_pandas_rolling_series_count_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'cov')
+@sdc_rolling_overload(SeriesRollingType, 'cov')
 def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
 
     ty_checker = TypeChecker('Method rolling.cov().')
@@ -509,7 +515,7 @@ def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
     return hpat_pandas_rolling_series_cov_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'kurt')
+@sdc_rolling_overload(SeriesRollingType, 'kurt')
 def hpat_pandas_series_rolling_kurt(self):
 
     ty_checker = TypeChecker('Method rolling.kurt().')
@@ -518,7 +524,7 @@ def hpat_pandas_series_rolling_kurt(self):
     return hpat_pandas_rolling_series_kurt_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'max')
+@sdc_rolling_overload(SeriesRollingType, 'max')
 def hpat_pandas_series_rolling_max(self):
 
     ty_checker = TypeChecker('Method rolling.max().')
@@ -527,7 +533,7 @@ def hpat_pandas_series_rolling_max(self):
     return hpat_pandas_rolling_series_max_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'mean')
+@sdc_rolling_overload(SeriesRollingType, 'mean')
 def hpat_pandas_series_rolling_mean(self):
 
     ty_checker = TypeChecker('Method rolling.mean().')
@@ -536,7 +542,7 @@ def hpat_pandas_series_rolling_mean(self):
     return hpat_pandas_rolling_series_mean_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'median')
+@sdc_rolling_overload(SeriesRollingType, 'median')
 def hpat_pandas_series_rolling_median(self):
 
     ty_checker = TypeChecker('Method rolling.median().')
@@ -545,7 +551,7 @@ def hpat_pandas_series_rolling_median(self):
     return hpat_pandas_rolling_series_median_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'min')
+@sdc_rolling_overload(SeriesRollingType, 'min')
 def hpat_pandas_series_rolling_min(self):
 
     ty_checker = TypeChecker('Method rolling.min().')
@@ -554,7 +560,7 @@ def hpat_pandas_series_rolling_min(self):
     return hpat_pandas_rolling_series_min_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'quantile')
+@sdc_rolling_overload(SeriesRollingType, 'quantile')
 def hpat_pandas_series_rolling_quantile(self, quantile, interpolation='linear'):
 
     ty_checker = TypeChecker('Method rolling.quantile().')
@@ -602,7 +608,7 @@ def hpat_pandas_series_rolling_quantile(self, quantile, interpolation='linear'):
     return hpat_pandas_rolling_series_quantile_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'skew')
+@sdc_rolling_overload(SeriesRollingType, 'skew')
 def hpat_pandas_series_rolling_skew(self):
 
     ty_checker = TypeChecker('Method rolling.skew().')
@@ -611,7 +617,7 @@ def hpat_pandas_series_rolling_skew(self):
     return hpat_pandas_rolling_series_skew_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'std')
+@sdc_rolling_overload(SeriesRollingType, 'std')
 def hpat_pandas_series_rolling_std(self, ddof=1):
 
     ty_checker = TypeChecker('Method rolling.std().')
@@ -623,7 +629,7 @@ def hpat_pandas_series_rolling_std(self, ddof=1):
     return hpat_pandas_rolling_series_std_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'sum')
+@sdc_rolling_overload(SeriesRollingType, 'sum')
 def hpat_pandas_series_rolling_sum(self):
 
     ty_checker = TypeChecker('Method rolling.sum().')
@@ -632,7 +638,7 @@ def hpat_pandas_series_rolling_sum(self):
     return hpat_pandas_rolling_series_sum_impl
 
 
-@sdc_overload_method(SeriesRollingType, 'var')
+@sdc_rolling_overload(SeriesRollingType, 'var')
 def hpat_pandas_series_rolling_var(self, ddof=1):
 
     ty_checker = TypeChecker('Method rolling.var().')
