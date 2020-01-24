@@ -298,6 +298,15 @@ def sdc_pandas_dataframe_rolling_corr(self, other=None, pairwise=None):
     return gen_df_rolling_method_impl('corr', self, kws=kws)
 
 
+@sdc_overload_method(DataFrameRollingType, 'count')
+def sdc_pandas_dataframe_rolling_count(self):
+
+    ty_checker = TypeChecker('Method rolling.count().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    return gen_df_rolling_method_impl('count', self)
+
+
 @sdc_overload_method(DataFrameRollingType, 'min')
 def sdc_pandas_dataframe_rolling_min(self):
 
@@ -343,6 +352,13 @@ sdc_pandas_dataframe_rolling_corr.__doc__ = sdc_pandas_dataframe_rolling_docstri
     pairwise: :obj:`bool`
         Calculate pairwise combinations of columns within a DataFrame.
     """
+})
+
+sdc_pandas_dataframe_rolling_count.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'count',
+    'example_caption': 'Count of any non-NaN observations inside the window.',
+    'limitations_block': '',
+    'extra_params': ''
 })
 
 sdc_pandas_dataframe_rolling_min.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
