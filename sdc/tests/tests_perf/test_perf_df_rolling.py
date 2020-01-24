@@ -114,7 +114,7 @@ class TestDFRollingMethods(TestBase):
 
     def _test_case(self, pyfunc, data_name, test_name=None,
                    input_data=test_global_input_data_float64,
-                   columns_num=10, extra_data_num=1):
+                   columns_num=10, extra_data_num=0):
         """
         Test DataFrame.rolling method
         :param pyfunc: Python function to test which calls tested method inside
