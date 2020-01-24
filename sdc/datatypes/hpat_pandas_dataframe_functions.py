@@ -998,7 +998,7 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, all_params, columns):
             f'  series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
             f'  result = []',
             f'  for i in range(len(series_{c}._data)):',
-            f'    if series_{c}._data[i] == values._data[i]:',
+            f'    if series_{c}._data[i] in values._data:',
             f'      result.append(True)',
             f'    else:',
             f'      result.append(False)',
@@ -1041,7 +1041,7 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, values, all_params, columns)
                 f'  series_{c}_values = pandas.Series(get_dataframe_data({all_params[1]}, {i}))',
                 f'  result = []',
                 f'  for i in range(len(series_{c}._data)):',
-                f'    if series_{c}._data[i] == series_{c}_values._data[i]:',
+                f'    if series_{c}._data[i] in series_{c}_values._data:',
                 f'      result.append(True)',
                 f'    else:',
                 f'      result.append(False)']
