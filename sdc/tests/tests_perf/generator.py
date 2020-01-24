@@ -13,10 +13,8 @@ class TestCase(NamedTuple):
 def gen(cases, method, class_add, typ, prefix=''):
     for params in cases:
         test_params = TestCase(*params)
-        name = test_params.name
-        if test_params.params:
-            name += "_" + test_params.params
-        func_name = to_varname('test_{}_{}_{}'.format(typ, prefix, name))
+        func_params = ['test', typ, prefix, test_params.name, test_params.params]
+        func_name = to_varname('_'.join(func_params))
 
         setattr(class_add, func_name, method(test_params.name, test_params.params,
                                              test_params.size, prefix, test_params.call_expression))
