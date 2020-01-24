@@ -24,22 +24,27 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
 import itertools
+import numba
 import numpy as np
 import pandas as pd
 import random
 import unittest
-
-import numba
 from numba import types
 
 import sdc
 from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                   count_parfor_OneDs, count_array_OneDs, count_array_OneD_Vars,
-                                   dist_IR_contains, get_rank, get_start_end, check_numba_version,
-                                   skip_numba_jit)
+from sdc.tests.test_utils import (check_numba_version,
+                                  count_array_OneD_Vars,
+                                  count_array_OneDs,
+                                  count_array_REPs,
+                                  count_parfor_OneDs,
+                                  count_parfor_REPs,
+                                  dist_IR_contains,
+                                  get_rank,
+                                  get_start_end,
+                                  skip_numba_jit,
+                                  skip_sdc_jit)
 
 
 def get_np_state_ptr():
@@ -198,6 +203,7 @@ class TestBasic(BaseTest):
         self.assertEqual(count_parfor_REPs(), 0)
 
     @skip_numba_jit("hang with numba.jit. ok with sdc.jit")
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_strided_getitem(self):
         def test_impl(N):
             A = np.ones(N)
@@ -291,6 +297,7 @@ class TestBasic(BaseTest):
             self.assertEqual(count_parfor_REPs(), 0)
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_reduce_filter1(self):
         import sys
         dtypes = ['float32', 'float64', 'int32', 'int64']
@@ -321,6 +328,7 @@ class TestBasic(BaseTest):
             self.assertEqual(count_parfor_REPs(), 0)
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_array_reduce(self):
         binops = ['+=', '*=', '+=', '*=', '|=', '|=']
         dtypes = ['np.float32', 'np.float32', 'np.float64', 'np.float64', 'np.int32', 'np.int64']
@@ -359,7 +367,7 @@ class TestBasic(BaseTest):
         self.assertEqual(count_array_OneDs(), 1)
         self.assertEqual(count_parfor_OneDs(), 1)
 
-    @unittest.expectedFailure # https://github.com/numba/numba/issues/4690
+    @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
     def test_dist_return_tuple(self):
         def test_impl(N):
             A = np.arange(N)
@@ -389,6 +397,7 @@ class TestBasic(BaseTest):
         np.testing.assert_allclose(hpat_func(arr) / self.num_ranks, test_impl(arr))
         self.assertEqual(count_array_OneDs(), 1)
 
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
     def test_rebalance(self):
         def test_impl(N):
@@ -407,6 +416,7 @@ class TestBasic(BaseTest):
         finally:
             sdc.distributed_analysis.auto_rebalance = False
 
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
     def test_rebalance_loop(self):
         def test_impl(N):

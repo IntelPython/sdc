@@ -1,4 +1,3 @@
-mpich
 scipy
 pandas>=0.23
 numba>=0.44

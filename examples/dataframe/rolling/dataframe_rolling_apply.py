@@ -24,20 +24,23 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import pandas as pd
 import numpy as np
-import sdc
+import pandas as pd
+from numba import njit
 
 
-@sdc.jit
-def df_sort(df):
-    df2 = df.sort_values('A')
-    print(df2.A.values)
-    print(df2.B.values)
+@njit
+def df_rolling_apply():
+    df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
+
+    def get_median(x):
+        return np.median(x)
+
+    out_df = df.rolling(3).apply(get_median)
+
+    # Expect DataFrame of
+    # {'A': [NaN, NaN, 4.0, 3.0, 5.0], 'B': [NaN, NaN, -4.0, -3.0, -5.0]}
+    return out_df
 
 
-n = 11
-df = pd.DataFrame({'A': np.random.ranf(n), 'B': np.arange(n), 'C': np.random.ranf(n)})
-# computation is sequential since df is passed in
-df_sort(df)
+print(df_rolling_apply())
