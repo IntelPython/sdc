@@ -95,6 +95,22 @@ def usecase_series_chain_add_and_sum(A, B):
     return res_time, res
 
 
+def usecase_series_getitem(input_data):
+    start_time = time.time()
+    res = input_data[1000000]
+    finish_time = time.time()
+
+    return finish_time - start_time, res
+
+
+def usecase_series_setitem(input_data):
+    start_time = time.time()
+    res = input_data[100000] = 0.
+    finish_time = time.time()
+
+    return finish_time - start_time, res
+
+
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods
 class TestSeriesMethods(TestBase):
     @classmethod
@@ -169,6 +185,14 @@ class TestSeriesMethods(TestBase):
         self._test_series_binary_operations(usecase_series_chain_add_and_sum,
                                             'series_chain_add_and_sum',
                                             [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7])
+
+    def test_series_float_getitem(self):
+        self._test_case(usecase_series_getitem, 'series_getitem', [10 ** 7],
+                        input_data=[test_global_input_data_float64[0]])
+
+    def test_series_float_setitem(self):
+        self._test_case(usecase_series_setitem, 'series_setitem', [10 ** 8],
+                        input_data=[test_global_input_data_float64[0]])
 
 
 def test_gen(name, params, data_length, call_expression):
