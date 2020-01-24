@@ -103,4 +103,4 @@ cases = [
     TestCase(name='count', size=[8 * 10 ** 5]),
 ]
 
-generate_test_cases(cases, TestDFRollingMethods, 'df', 'rolling({}).'.format(get_rolling_params()))
+generate_test_cases(cases, TestDFRollingMethods, 'df', 'rolling({})'.format(get_rolling_params()))

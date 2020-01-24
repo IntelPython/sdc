@@ -98,4 +98,4 @@ cases = [
     TestCase(name='zfill', params='1', size=test_global_input_data_unicode_kind1),
 ]
 
-generate_test_cases(cases, TestSeriesStringMethods, 'series', 'str.')
+generate_test_cases(cases, TestSeriesStringMethods, 'series', 'str')

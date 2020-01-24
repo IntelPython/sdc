@@ -22,7 +22,8 @@ def gen(cases, method, class_add, typ, prefix=''):
 def test_gen(name, params, data_length, prefix, call_expression):
     func_name = 'func'
     if call_expression is None:
-        call_expression = '{}{}({})'.format(prefix, name, params)
+        parts = [prefix, '{}({})'.format(name, params)]
+        call_expression = '.'.join(parts)
     input_data = 'input_data'
     function_called = '{}.{}'.format(input_data, call_expression)
 
@@ -43,7 +44,9 @@ def {func_name}(self):
 def test_gen_two_par(name, params, data_length, prefix, *args, **kwargs):
     func_name = 'func'
     input_data = 'A, B'
-    function_called = 'A.{}{}(B, {})'.format(prefix, name, params)
+    parts = [prefix, name]
+    method = '.'.join(parts)
+    function_called = 'A.{}(B, {})'.format(method, params)
 
     func_text = f"""\
 def {func_name}(self):
