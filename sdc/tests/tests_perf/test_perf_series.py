@@ -51,15 +51,6 @@ def usecase_series_astype_int(input_data):
     return res_time, input_data
 
 
-def usecase_series_chain_add_and_sum(A, B):
-    start_time = time.time()
-    res = (A + B).sum()
-    finish_time = time.time()
-    res_time = finish_time - start_time
-
-    return res_time, res
-
-
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods.test_series_{method_name}
 class TestSeriesMethods(TestBase):
     @classmethod
@@ -132,11 +123,6 @@ class TestSeriesMethods(TestBase):
         self._test_case(usecase_gen('astype(np.int8)'), 'series_astype_int', [10 ** 5],
                         input_data=[test_global_input_data_float64[0]])
 
-    def test_series_chain_add_and_sum(self):
-        self._test_series_binary_operations(usecase_series_chain_add_and_sum,
-                                            'series_chain_add_and_sum',
-                                            [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7])
-
 
 # (method_name, parameters, total_data_length, call_expression)
 cases = [
@@ -191,6 +177,7 @@ cases = [
 cases_two_params = [
     TC(name='add', size=[10 ** 7]),
     TC(name='append', size=[10 ** 7]),
+    TC(name='chain_add_and_sum', size=[20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7], call_expression='(A + B).sum()'),
     TC(name='corr', size=[10 ** 7]),
     TC(name='cov', size=[10 ** 8]),
     TC(name='div', size=[10 ** 7]),

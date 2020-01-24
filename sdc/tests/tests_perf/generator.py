@@ -29,11 +29,9 @@ def test_gen(name, params, data_length, prefix, call_expression):
     func_name = 'func'
     input_data = 'input_data'
     if call_expression is None:
-        if prefix == '':
-            parts = [input_data, '{}({})'.format(name, params)]
-        else:
-            parts = [input_data, prefix, '{}({})'.format(name, params)]
-        call_expression = '.'.join(parts)
+        prefix_as_list = [prefix] if prefix else []
+        expr_parts = ['input_data'] + prefix_as_list + ['{}({})'.format(name, params)]
+        call_expression = '.'.join(expr_parts)
 
     func_text = f"""\
 def {func_name}(self):
@@ -49,15 +47,14 @@ def {func_name}(self):
     return func
 
 
-def test_gen_two_par(name, params, data_length, prefix, *args, **kwargs):
+def test_gen_two_par(name, params, data_length, prefix, call_expression):
     func_name = 'func'
     input_data = 'A, B'
-    if prefix == '':
-        parts = ['A', '{}(B, {})'.format(name, params)]
-    else:
-        parts = ['A', prefix, '{}(B, {})'.format(name, params)]
-    call_expression = '.'.join(parts)
-    
+    if call_expression is None:
+        prefix_as_list = [prefix] if prefix else []
+        expr_parts = ['A'] + prefix_as_list + ['{}(B, {})'.format(name, params)]
+        call_expression = '.'.join(expr_parts)
+
     func_text = f"""\
 def {func_name}(self):
   self._test_binary_operations(usecase_gen('{input_data}', '{call_expression}'), '{name}', {data_length})
