@@ -149,6 +149,15 @@ def sdc_pandas_dataframe_rolling_count(self):
     return gen_df_rolling_method_impl('count', self)
 
 
+@sdc_overload_method(DataFrameRollingType, 'max')
+def sdc_pandas_dataframe_rolling_max(self):
+
+    ty_checker = TypeChecker('Method rolling.max().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    return gen_df_rolling_method_impl('max', self)
+
+
 @sdc_overload_method(DataFrameRollingType, 'mean')
 def sdc_pandas_dataframe_rolling_mean(self):
 
@@ -190,6 +199,13 @@ sdc_pandas_dataframe_rolling_apply.__doc__ = sdc_pandas_dataframe_rolling_docstr
 sdc_pandas_dataframe_rolling_count.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
     'method_name': 'count',
     'example_caption': 'Count of any non-NaN observations inside the window.',
+    'limitations_block': '',
+    'extra_params': ''
+})
+
+sdc_pandas_dataframe_rolling_max.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'max',
+    'example_caption': 'Calculate the rolling maximum.',
     'limitations_block': '',
     'extra_params': ''
 })
