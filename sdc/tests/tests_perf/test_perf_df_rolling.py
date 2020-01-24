@@ -38,7 +38,7 @@ from sdc.tests.tests_perf.test_perf_utils import (calc_compilation, get_times,
 
 
 rolling_usecase_tmpl = """
-def df_rolling_{method_name}_usecase(data{extra_usecase_params}):
+def df_rolling_{method_name}_usecase(data, {extra_usecase_params}):
     start_time = time.time()
     res = data.rolling({rolling_params}).{method_name}({method_params})
     end_time = time.time()
@@ -64,7 +64,7 @@ def gen_df_rolling_usecase(method_name, rolling_params=None,
 
     func_text = rolling_usecase_tmpl.format(**{
         'method_name': method_name,
-        'extra_usecase_params': ', '.join(['', extra_usecase_params]),
+        'extra_usecase_params': extra_usecase_params,
         'rolling_params': rolling_params,
         'method_params': method_params
     })
@@ -107,9 +107,13 @@ class TestDFRollingMethods(TestBase):
     def _test_python(self, pyfunc, record, *args, **kwargs):
         record['test_results'], _ = get_times(pyfunc, *args, **kwargs)
 
+    def _gen_df(self, data, columns_num=10):
+        """Generate DataFrame based on input data"""
+        return pandas.DataFrame({col: data for col in string.ascii_uppercase[:columns_num]})
+
     def _test_case(self, pyfunc, data_name, test_name=None,
                    input_data=test_global_input_data_float64,
-                   columns_num=10, test_data_num=1):
+                   columns_num=10, extra_data_num=1):
         """
         Test DataFrame.rolling method
         :param pyfunc: Python function to test which calls tested method inside
@@ -117,7 +121,7 @@ class TestDFRollingMethods(TestBase):
         :param test_name: name of the test for the report, e.g. DF.rolling.min
         :param input_data: initial data used for generating test data
         :param columns_num: number of columns in generated DataFrame
-        :param test_data_num: number of generated DataFrames, e.g. 2 if other
+        :param extra_data_num: number of additionally generated DataFrames
         """
         if columns_num > self.max_columns_num:
             columns_num = self.max_columns_num
@@ -131,8 +135,13 @@ class TestDFRollingMethods(TestBase):
                 'data_size': data_length,
             }
             data = perf_data_gen_fixed_len(input_data, full_input_data_length, data_length)
-            test_data = pandas.DataFrame({col: data for col in string.ascii_uppercase[:columns_num]})
-            args = [test_data] * test_data_num
+            test_data = self._gen_df(data, columns_num=columns_num)
+
+            args = [test_data]
+            for i in range(extra_data_num):
+                numpy.random.seed(i)
+                extra_data = numpy.random.ranf(data_length)
+                args.append(self._gen_df(extra_data, columns_num=columns_num))
 
             record = base.copy()
             record['test_type'] = 'SDC'
@@ -150,10 +159,10 @@ class TestDFRollingMethods(TestBase):
                                          extra_usecase_params=extra_usecase_params,
                                          method_params=method_params)
         test_name = f'DF.rolling.{name}'
-        test_data_num = 1
+        extra_data_num = 0
         if extra_usecase_params:
-            test_data_num += len(extra_usecase_params.split(', '))
-        self._test_case(usecase, name, test_name=test_name, test_data_num=test_data_num)
+            extra_data_num += len(extra_usecase_params.split(', '))
+        self._test_case(usecase, name, test_name=test_name, extra_data_num=extra_data_num)
 
     def test_df_rolling_apply_mean(self):
         method_params = 'lambda x: np.nan if len(x) == 0 else x.mean()'
