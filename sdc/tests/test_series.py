@@ -52,6 +52,8 @@ from sdc.tests.test_utils import (count_array_OneDs,
                                   skip_sdc_jit)
 from sdc.tests.gen_test_data import ParquetGenerator
 
+from sdc.tests.test_utils import test_global_input_data_unicode_kind1
+
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
     (
@@ -105,12 +107,6 @@ test_global_input_data_unicode_kind4 = [
     '¡Y tú quién te crees?',
     '🐍⚡',
     '大处着眼，小处着手。',
-]
-
-test_global_input_data_unicode_kind1 = [
-    'ascii',
-    '12345',
-    '1234567890',
 ]
 
 def gen_srand_array(size, nchars=8):
@@ -253,6 +249,22 @@ def islower_usecase(series):
 
 def isalnum_usecase(series):
     return series.str.isalnum()
+
+
+def isnumeric_usecase(series):
+    return series.str.isnumeric()
+
+
+def isdigit_usecase(series):
+    return series.str.isdigit()
+
+
+def isdecimal_usecase(series):
+    return series.str.isdecimal()
+
+
+def isupper_usecase(series):
+    return series.str.isupper()
 
 
 GLOBAL_VAL = 2
@@ -1775,7 +1787,6 @@ class TestSeries(TestSeries_apply, TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis1(self):
         '''Verifies Series.fillna() implementation handles 'index' as axis argument'''
@@ -1786,7 +1797,6 @@ class TestSeries(TestSeries_apply, TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis2(self):
         '''Verifies Series.fillna() implementation handles 0 as axis argument'''
@@ -1797,7 +1807,6 @@ class TestSeries(TestSeries_apply, TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis3(self):
         '''Verifies Series.fillna() implementation handles correct non-literal axis argument'''
@@ -1809,7 +1818,6 @@ class TestSeries(TestSeries_apply, TestCase):
         for axis in [0, 'index']:
             pd.testing.assert_series_equal(hpat_func(S, axis), test_impl(S, axis))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_from_df(self):
         '''Verifies Series.fillna() applied to a named float Series obtained from a DataFrame'''
@@ -1821,7 +1829,6 @@ class TestSeries(TestSeries_apply, TestCase):
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0, np.inf]})
         pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A), check_names=False)
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index1(self):
         '''Verifies Series.fillna() implementation for float series with default index'''
@@ -1833,7 +1840,6 @@ class TestSeries(TestSeries_apply, TestCase):
             S = pd.Series(data)
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index2(self):
         '''Verifies Series.fillna() implementation for float series with string index'''
@@ -1844,7 +1850,6 @@ class TestSeries(TestSeries_apply, TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf], ['a', 'b', 'c', 'd', 'e'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index3(self):
         def test_impl(S):
@@ -2404,7 +2409,7 @@ class TestSeries(TestSeries_apply, TestCase):
                     # con not compare Nan != Nan directly
                     self.assertEqual(np.isnan(actual), np.isnan(expected))
                 else:
-                    self.assertEqual(actual, expected)
+                    self.assertAlmostEqual(actual, expected)
 
     def test_series_prod_skipna_default(self):
         def test_impl(S):
@@ -5132,7 +5137,6 @@ class TestSeries(TestSeries_apply, TestCase):
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
 
-    @skip_parallel
     @skip_sdc_jit('Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum(self):
         def test_impl():
@@ -5143,7 +5147,6 @@ class TestSeries(TestSeries_apply, TestCase):
         cfunc = self.jit(pyfunc)
         pd.testing.assert_series_equal(pyfunc(), cfunc())
 
-    @skip_parallel
     @skip_sdc_jit('Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum_unboxing(self):
         def test_impl(s):
@@ -5156,7 +5159,6 @@ class TestSeries(TestSeries_apply, TestCase):
             series = pd.Series(data)
             pd.testing.assert_series_equal(pyfunc(series), cfunc(series))
 
-    @skip_parallel
     @skip_sdc_jit('Series.cumsum() parameters "axis", "skipna" unsupported')
     def test_series_cumsum_full(self):
         def test_impl(s, axis, skipna):
@@ -6009,16 +6011,43 @@ class TestSeries(TestSeries_apply, TestCase):
 
     @skip_sdc_jit("Series.str.isalnum is not supported yet")
     def test_series_isalnum_str(self):
-        series = [['one', 'one1', '1', ''],
-                  ['A B', '1.5', '3,000'],
-                  ['23', '⅕', ''],
-                  ['leopard', 'Golden Eagle', 'SNAKE', '']
-                  ]
-
         cfunc = self.jit(isalnum_usecase)
-        for ser in series:
-            S = pd.Series(ser)
+        test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
+        for data in test_data:
+            S = pd.Series(data)
             pd.testing.assert_series_equal(cfunc(S), isalnum_usecase(S))
+
+    @skip_sdc_jit("Series.str.isnumeric is not supported yet")
+    def test_series_isnumeric_str(self):
+        cfunc = self.jit(isnumeric_usecase)
+        test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
+        for data in test_data:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(S), isnumeric_usecase(S))
+
+    @skip_sdc_jit("Series.str.isdigit is not supported yet")
+    def test_series_isdigit_str(self):
+        cfunc = self.jit(isdigit_usecase)
+        test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
+        for data in test_data:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(S), isdigit_usecase(S))
+
+    @skip_sdc_jit("Series.str.isdecimal is not supported yet")
+    def test_series_isdecimal_str(self):
+        cfunc = self.jit(isdecimal_usecase)
+        test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
+        for data in test_data:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(S), isdecimal_usecase(S))
+
+    @skip_sdc_jit("Series.str.isupper is not supported yet")
+    def test_series_isupper_str(self):
+        cfunc = self.jit(isupper_usecase)
+        test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
+        for data in test_data:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(S), isupper_usecase(S))
 
     @skip_sdc_jit('Old-style implementation returns string, but not series')
     def test_series_describe_numeric(self):
