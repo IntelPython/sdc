@@ -196,6 +196,24 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
             return hpat_pandas_series_loc_slice_noidx_impl
 
+        if isinstance(idx, (types.Array, types.List)):
+            def hpat_pandas_series_loc_array_impl(self, idx):
+                index = self._series.index
+                data = self._series._data
+                size = len(index)
+                data_res = []
+                index_res = []
+                for value in idx:
+                    mask = numpy.zeros(shape=size, dtype=numpy.bool_)
+                    for i in numba.prange(size):
+                        mask[i] = index[i] == value
+                    data_res.extend(data[mask])
+                    index_res.extend(index[mask])
+
+                return pandas.Series(data=data_res, index=index_res, name=self._series._name)
+
+            return hpat_pandas_series_loc_array_impl
+
         if isinstance(idx, (int, types.Integer, types.UnicodeType, types.StringLiteral)):
             def hpat_pandas_series_loc_impl(self, idx):
                 index = self._series.index
@@ -1472,7 +1490,7 @@ def hpat_pandas_series_len(self):
     return hpat_pandas_series_len_impl
 
 
-@sdc_overload_method(SeriesType, 'astype')
+@sdc_overload_method(SeriesType, 'astype', parallel=False)
 def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
     """
     Pandas Series method :meth:`pandas.Series.astype` implementation.
@@ -4585,7 +4603,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     .. seealso::
 
-        `numpy.absolute 
+        `numpy.absolute
         <https://docs.scipy.org/doc/numpy/reference/generated/numpy.ndarray.argsort.html#numpy.ndarray.argsort>`_
             Return indices of the minimum values along the given axis.
 
@@ -4693,7 +4711,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     return hpat_pandas_series_argsort_noidx_impl
 
 
-@sdc_overload_method(SeriesType, 'sort_values')
+@sdc_overload_method(SeriesType, 'sort_values', parallel=False)
 def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, kind='quicksort', na_position='last'):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -5061,7 +5079,7 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
     return hpat_pandas_series_cov_impl
 
 
-@sdc_overload_method(SeriesType, 'pct_change')
+@sdc_overload_method(SeriesType, 'pct_change', parallel=False)
 def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None, freq=None):
     """
     Pandas Series method :meth:`pandas.Series.pct_change` implementation.

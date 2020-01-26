@@ -24,28 +24,19 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
 import pandas as pd
-import numpy as np
-import sdc
+from numba import njit
 
 
-@sdc.jit
-def shift_df1(n):
-    df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.random.ranf(n)})
-    Ac = df.A.shift(1)
-    return Ac.sum()
+@njit
+def df_rolling_mean():
+    df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
+    out_df = df.rolling(3).mean()
+
+    # Expect DataFrame of
+    # {'A': [NaN, NaN, 4.000000, 3.333333, 4.333333],
+    #  'B': [NaN, NaN, -4.000000, -3.333333, -4.333333]}
+    return out_df
 
 
-@sdc.jit
-def shift_df2(n):
-    df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.random.ranf(n)})
-    Ac = df.A.pct_change()
-    return Ac
-
-
-n = 10
-print("shift 1:")
-print(shift_df1(n))
-print("pct_change:")
-print(shift_df2(n))
+print(df_rolling_mean())

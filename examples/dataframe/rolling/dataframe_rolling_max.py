@@ -24,30 +24,18 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import sdc
-import numpy as np
-import argparse
-import time
+import pandas as pd
+from numba import njit
 
 
-@sdc.jit
-def calc_pi(n):
-    t1 = time.time()
-    x = 2 * np.random.ranf(n) - 1
-    y = 2 * np.random.ranf(n) - 1
-    pi = 4 * np.sum(x**2 + y**2 < 1) / n
-    print("Execution time:", time.time() - t1, "\nresult:", pi)
-    return pi
+@njit
+def df_rolling_max():
+    df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
+    out_df = df.rolling(3).max()
+
+    # Expect DataFrame of
+    # {'A': [NaN, NaN, 5.0, 5.0, 6.0], 'B': [NaN, NaN, -3.0, -2.0, -2.0]}
+    return out_df
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Monte Carlo Pi Calculation.')
-    parser.add_argument('--points', dest='points', type=int, default=200000000)
-    args = parser.parse_args()
-    points = args.points
-    calc_pi(points)
-
-
-if __name__ == '__main__':
-    main()
+print(df_rolling_max())

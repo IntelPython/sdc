@@ -24,19 +24,18 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
 import pandas as pd
-import numpy as np
-import sdc
+from numba import njit
 
 
-@sdc.jit
-def cumsum_df(n):
-    df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.random.ranf(n)})
-    Ac = df.A.cumsum()
-    return Ac.sum()
+@njit
+def df_rolling_median():
+    df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
+    out_df = df.rolling(3).median()
+
+    # Expect DataFrame of
+    # {'A': [NaN, NaN, 4.0, 3.0, 5.0], 'B': [NaN, NaN, -4.0, -3.0, -5.0]}
+    return out_df
 
 
-n = 10
-print(cumsum_df(n))
-sdc.distribution_report()
+print(df_rolling_median())
