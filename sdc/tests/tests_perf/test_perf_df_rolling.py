@@ -92,6 +92,7 @@ class TestDFRollingMethods(TestBase):
             'kurt': [4 * 10 ** 5],
             'max': [2 * 10 ** 5],
             'mean': [2 * 10 ** 5],
+            'median': [2 * 10 ** 5],
             'min': [2 * 10 ** 5],
         }
 
@@ -186,6 +187,9 @@ class TestDFRollingMethods(TestBase):
 
     def test_df_rolling_mean(self):
         self._test_df_rolling_method('mean')
+
+    def test_df_rolling_median(self):
+        self._test_df_rolling_method('median')
 
     def test_df_rolling_min(self):
         self._test_df_rolling_method('min')
