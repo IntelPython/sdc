@@ -129,7 +129,7 @@ cases = [
     TC(name='abs', size=[10 ** 8]),
     TC(name='apply', params='lambda x: x', size=[10 ** 7]),
     TC(name='argsort', size=[10 ** 4]),
-    TC(name='at', size=[10 ** 7], call_expression='at[3]'),
+    TC(name='at', size=[10 ** 7], call_expression='input_data.at[3]'),
     TC(name='copy', size=[10 ** 8]),
     TC(name='count', size=[10 ** 7]),
     TC(name='cumsum', size=[10 ** 8]),
@@ -177,7 +177,7 @@ cases = [
 cases_two_params = [
     TC(name='add', size=[10 ** 7]),
     TC(name='append', size=[10 ** 7]),
-    TC(name='chain_add_and_sum', size=[20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7], call_expression='(A + B).sum()'),
+    TC(name='chain_add_and_sum', size=[20 * 10 ** 6, 25 * 10 ** 6, 30 * 10 ** 6], call_expression='(A + B).sum()'),
     TC(name='corr', size=[10 ** 7]),
     TC(name='cov', size=[10 ** 8]),
     TC(name='div', size=[10 ** 7]),
