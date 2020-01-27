@@ -224,7 +224,13 @@ def box_dataframe(typ, val, c):
 
     mod_name = context.insert_const_string(c.builder.module, "pandas")
     class_obj = pyapi.import_module_noblock(mod_name)
-    df_obj = pyapi.call_method(class_obj, "DataFrame", ())
+
+    # set df.index if necessary
+    if typ.index != types.none:
+        arr_obj = _box_series_data(typ.index.dtype, typ.index, dataframe.index, c)
+        df_obj = pyapi.call_method(class_obj, "DataFrame", (c.pyapi.make_none(), arr_obj))
+    else:
+        df_obj = pyapi.call_method(class_obj, "DataFrame", ())
 
     for i, cname, arr, arr_typ, dtype in zip(range(n_cols), col_names, col_arrs, arr_typs, dtypes):
         # df['cname'] = boxed_arr
@@ -261,11 +267,6 @@ def box_dataframe(typ, val, c):
 
         # pyapi.decref(arr_obj)
         pyapi.decref(cname_obj)
-
-    # set df.index if necessary
-    if typ.index != types.none:
-        arr_obj = _box_series_data(typ.index.dtype, typ.index, dataframe.index, c)
-        pyapi.object_setattr_string(df_obj, 'index', arr_obj)
 
     pyapi.decref(class_obj)
     # pyapi.gil_release(gil_state)    # release GIL
