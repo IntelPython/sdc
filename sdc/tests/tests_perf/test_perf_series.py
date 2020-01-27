@@ -132,6 +132,8 @@ cases = [
     TC(name='le', size=[10 ** 7], names_extra_data='obj2', data_num=2),
     TC(name='loc', size=[10 ** 7], call_expression='obj.loc[0]'),
     TC(name='lt', size=[10 ** 7], names_extra_data='obj2', data_num=2),
+    TC(name='map', params='lambda x: x * 2', size=[10 ** 7]),
+    TC(name='map', params='{2.: 42., 4.: 3.14}', size=[10 ** 7]),
     TC(name='max', size=[10 ** 8]),
     TC(name='max', params='skipna=False', size=[10 ** 8]),
     TC(name='mean', size=[10 ** 8]),
