@@ -334,6 +334,15 @@ def sdc_pandas_dataframe_rolling_mean(self):
     return gen_df_rolling_method_impl('mean', self)
 
 
+@sdc_overload_method(DataFrameRollingType, 'median')
+def sdc_pandas_dataframe_rolling_median(self):
+
+    ty_checker = TypeChecker('Method rolling.median().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    return gen_df_rolling_method_impl('median', self)
+
+
 @sdc_overload_method(DataFrameRollingType, 'min')
 def sdc_pandas_dataframe_rolling_min(self):
 
@@ -420,6 +429,13 @@ sdc_pandas_dataframe_rolling_mean.__doc__ = sdc_pandas_dataframe_rolling_docstri
     -----------
     DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
+    'extra_params': ''
+})
+
+sdc_pandas_dataframe_rolling_median.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'median',
+    'example_caption': 'Calculate the rolling median.',
+    'limitations_block': '',
     'extra_params': ''
 })
 
