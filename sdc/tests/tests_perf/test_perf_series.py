@@ -41,16 +41,6 @@ from .generator import generate_test_cases
 from .generator import TestCase as TC
 
 
-def usecase_series_astype_int(input_data):
-    # astype to int8
-    start_time = time.time()
-    input_data.astype(np.int8)
-    finish_time = time.time()
-    res_time = finish_time - start_time
-
-    return res_time, input_data
-
-
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods.test_series_{method_name}
 class TestSeriesMethods(TestBase):
     @classmethod
