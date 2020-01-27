@@ -65,22 +65,20 @@ from .pandas_series_functions import apply
 @sdc_overload(operator.getitem)
 def hpat_pandas_series_accessor_getitem(self, idx):
     """
-    Pandas Series operator :attr:`pandas.Series.get` implementation
-    **Algorithm**: result = series[idx]
-
-    **Test**: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_static_getitem_series1
+    Pandas Series operator :attr:`pandas.Series.__getitem__` implementation
+    for methods `pandas.Series.iloc`, `pandas.Series.loc`, `pandas.Series.iat`, `pandas.Series.at`
 
     Parameters
     ----------
-    series: :obj:`pandas.Series`
-           input series
-    idx: :obj:`int`, :obj:`slice` or :obj:`pandas.Series`
-        input index
+    self: :class:`pandas.Series`
+        input Series
+    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`, :obj:`slice`, :obj:`list`
+        input arg
 
     Returns
     -------
-    :class:`pandas.Series` or an element of the underneath type
-            object of :class:`pandas.Series`
+    :class:`pandas.Series` or a value of :obj:`pandas.Series.dtype`
+        returns object
     """
 
     _func_name = 'Operator getitem().'
@@ -251,24 +249,62 @@ def hpat_pandas_series_getitem(self, idx):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
-    Pandas API: pandas.Series.get
+    Pandas API: pandas.Series.__getitem__
 
     Limitations
     -----------
     Supported ``key`` can be one of the following:
         - Integer scalar, e.g. :obj:`series[0]`
+        - An array or a list, e.g. :obj:`series[0,2,5]`
+        - A list of booleans, e.g. :obj:`series[True,False]`
         - A slice, e.g. :obj:`series[2:5]`
         - Another series
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_getitem.py
+    .. literalinclude:: ../../../examples/series_getitem/series_getitem_scalar_single_result.py
        :language: python
        :lines: 27-
-       :caption: Getting Pandas Series elements
+       :caption: Getting Pandas Series elements. Returns single value.
        :name: ex_series_getitem
 
-    .. command-output:: python ./series_getitem.py
+    .. command-output:: python ./series_getitem/series_getitem_scalar_single_result.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/series_getitem/series_getitem_scalar_multiple_result.py
+       :language: python
+       :lines: 27-
+       :caption: Getting Pandas Series elements. Returns multiple value.
+       :name: ex_series_getitem
+
+    .. command-output:: python ./series_getitem/series_getitem_scalar_multiple_result.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/series_getitem/series_getitem_slice.py
+       :language: python
+       :lines: 27-
+       :caption: Getting Pandas Series elements by slice.
+       :name: ex_series_getitem
+
+    .. command-output:: python ./series_getitem/series_getitem_slice.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/series_getitem/series_getitem_bool_array.py
+       :language: python
+       :lines: 27-
+       :caption: Getting Pandas Series elements by array of booleans.
+       :name: ex_series_getitem
+
+    .. command-output:: python ./series_getitem/series_getitem_bool_array.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/series_getitem/series_getitem_series.py
+       :language: python
+       :lines: 27-
+       :caption: Getting Pandas Series elements by another Series.
+       :name: ex_series_getitem
+
+    .. command-output:: python ./series_getitem/series_getitem_series.py
        :cwd: ../../../examples
 
     .. todo:: Fix SDC behavior and add the expected output of the > python ./series_getitem.py to the docstring
@@ -276,22 +312,21 @@ def hpat_pandas_series_getitem(self, idx):
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
 
-    Pandas Series operator :attr:`pandas.Series.get` implementation
-    **Algorithm**: result = series[idx]
+    Pandas Series operator :attr:`pandas.Series.__getitem__` implementation
 
-    **Test**: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_static_getitem_series1
+    Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_getitem_series*
 
     Parameters
     ----------
-    series: :obj:`pandas.Series`
-        input series
-    idx: :obj:`int`, :obj:`slice` or :obj:`pandas.Series`
-        input index
+    self: :class:`pandas.Series`
+        input Series
+    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`, :obj:`slice`, :obj:`list`
+        input arg
 
     Returns
     -------
-    :class:`pandas.Series` or an element of the underneath type
-            object of :class:`pandas.Series`
+    :class:`pandas.Series` or a value of :obj:`pandas.Series.dtype`
+        returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Operator getitem().'
@@ -489,6 +524,44 @@ def hpat_pandas_series_setitem(self, idx, value):
 @sdc_overload_attribute(SeriesType, 'iloc')
 def hpat_pandas_series_iloc(self):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.iloc
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series_iloc/series_iloc_value.py
+       :language: python
+       :lines: 27-
+       :caption: With a scalar integer.
+       :name: ex_series_iloc
+
+    .. command-output:: python ./series_iloc/series_iloc_value.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/series_iloc/series_iloc_slice.py
+       :language: python
+       :lines: 27-
+       :caption: With a slice object.
+       :name: ex_series_iloc
+
+    .. command-output:: python ./series_iloc/series_iloc_slice.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Fast integer location scalar accessor.
+
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Purely label-location based indexer for selection by label.
+
+        :ref:`Series.iloc <pandas.Series.iloc>`
+            Purely integer-location based indexing for selection by position.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.iloc` implementation.
 
     .. only:: developer
@@ -519,6 +592,63 @@ def hpat_pandas_series_iloc(self):
 @sdc_overload_attribute(SeriesType, 'loc')
 def hpat_pandas_series_loc(self):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.loc
+
+    Limitations
+    -----------
+    - Loc returns Series
+    - Loc slice and callable with String is not implemented
+    - Loc slice without start is not supported
+    - Loc callable returns float Series
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series_loc/series_loc_single_result.py
+       :language: python
+       :lines: 27-
+       :caption: With a scalar integer. Returns single value.
+       :name: ex_series_loc
+
+    .. command-output:: python ./series_loc/series_loc_single_result.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/series_loc/series_loc_multiple_result.py
+       :language: python
+       :lines: 27-
+       :caption: With a scalar integer. Returns multiple value.
+       :name: ex_series_loc
+
+    .. command-output:: python ./series_loc/series_loc_multiple_result.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/series_loc/series_loc_slice.py
+       :language: python
+       :lines: 27-
+       :caption: With a slice object. Returns multiple value.
+       :name: ex_series_loc
+
+    .. command-output:: python ./series_loc/series_loc_slice.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.at <pandas.DataFrame.at>`
+            Access a single value for a row/column label pair.
+
+        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+            Access group of rows and columns by integer position(s).
+
+        :ref:`DataFrame.xs <pandas.DataFrame.xs>`
+            Returns a cross-section (row(s) or column(s)) from the Series/DataFrame.
+
+        :ref:`Series.loc <pandas.Series.loc>`
+            Access group of values using labels.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.loc` implementation.
 
     .. only:: developer
@@ -549,6 +679,35 @@ def hpat_pandas_series_loc(self):
 @sdc_overload_attribute(SeriesType, 'iat')
 def hpat_pandas_series_iat(self):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.iat
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series_iat.py
+       :language: python
+       :lines: 27-
+       :caption: Get value at specified index position.
+       :name: ex_series_iat
+
+    .. command-output:: python ./series_iat.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.at <pandas.DataFrame.at>`
+            Access a single value for a row/column label pair.
+
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Purely label-location based indexer for selection by label.
+
+        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+            Access group of rows and columns by integer position(s).
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.iat` implementation.
 
     .. only:: developer
@@ -579,6 +738,44 @@ def hpat_pandas_series_iat(self):
 @sdc_overload_attribute(SeriesType, 'at')
 def hpat_pandas_series_at(self):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.at
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series_at/series_at_single_result.py
+       :language: python
+       :lines: 27-
+       :caption: With a scalar integer. Returns single value.
+       :name: ex_series_at
+
+    .. command-output:: python ./series_at/series_at_single_result.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/series_at/series_at_multiple_result.py
+       :language: python
+       :lines: 27-
+       :caption: With a scalar integer. Returns multiple value.
+       :name: ex_series_at
+
+    .. command-output:: python ./series_at/series_at_multiple_result.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Access a single value for a row/column pair by integer position.
+
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Access a group of rows and columns by label(s).
+
+        :ref:`Series.at <pandas.Series.at>`
+            Access a single value using a label.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.at` implementation.
 
     .. only:: developer
@@ -1545,7 +1742,7 @@ def hpat_pandas_series_len(self):
     return hpat_pandas_series_len_impl
 
 
-@sdc_overload_method(SeriesType, 'astype')
+@sdc_overload_method(SeriesType, 'astype', parallel=False)
 def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -4749,7 +4946,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     .. seealso::
 
-        `numpy.absolute 
+        `numpy.absolute
         <https://docs.scipy.org/doc/numpy/reference/generated/numpy.ndarray.argsort.html#numpy.ndarray.argsort>`_
             Return indices of the minimum values along the given axis.
 
@@ -4857,7 +5054,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     return hpat_pandas_series_argsort_noidx_impl
 
 
-@sdc_overload_method(SeriesType, 'sort_values')
+@sdc_overload_method(SeriesType, 'sort_values', parallel=False)
 def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, kind='quicksort', na_position='last'):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -5225,7 +5422,7 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
     return hpat_pandas_series_cov_impl
 
 
-@sdc_overload_method(SeriesType, 'pct_change')
+@sdc_overload_method(SeriesType, 'pct_change', parallel=False)
 def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None, freq=None):
     """
     Pandas Series method :meth:`pandas.Series.pct_change` implementation.
