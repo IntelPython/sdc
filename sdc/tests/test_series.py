@@ -40,6 +40,7 @@ from numba.errors import TypingError
 from numba.special import literally
 
 from .test_series_apply import TestSeries_apply
+from .test_series_map import TestSeries_map
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_OneDs,
                                   count_array_REPs,
@@ -267,10 +268,11 @@ def isupper_usecase(series):
     return series.str.isupper()
 
 
-GLOBAL_VAL = 2
-
-
-class TestSeries(TestSeries_apply, TestCase):
+class TestSeries(
+    TestSeries_apply,
+    TestSeries_map,
+    TestCase
+):
 
     @skip_numba_jit
     def test_create1(self):
@@ -2754,43 +2756,6 @@ class TestSeries(TestSeries_apply, TestCase):
         S1 = pd.Series([1.0, 2., 3., 4., 5.])
         S2 = pd.Series([6., 7.])
         np.testing.assert_array_equal(hpat_func(S1, S2), test_impl(S1, S2))
-
-    @skip_numba_jit
-    def test_series_map1(self):
-        def test_impl(S):
-            return S.map(lambda a: 2 * a)
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_numba_jit
-    def test_series_map_global1(self):
-        def test_impl(S):
-            return S.map(lambda a: a + GLOBAL_VAL)
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_numba_jit
-    def test_series_map_tup1(self):
-        def test_impl(S):
-            return S.map(lambda a: (a, 2 * a))
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_numba_jit
-    def test_series_map_tup_map1(self):
-        def test_impl(S):
-            A = S.map(lambda a: (a, 2 * a))
-            return A.map(lambda a: a[1])
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @skip_numba_jit
     def test_series_combine(self):
