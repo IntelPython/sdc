@@ -54,6 +54,16 @@ class TestSeries_apply(object):
         S = pd.Series(DATA)
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    def test_series_apply_convert_type(self):
+        def test_impl(S):
+            def to_int(x):
+                return int(x)
+            return S.apply(to_int)
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(DATA)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     @skip_sdc_jit("Series.index values are different")
     def test_series_apply_index(self):
         test_impl = series_apply_square_usecase

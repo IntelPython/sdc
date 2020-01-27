@@ -209,7 +209,7 @@ def {func_name}(self):
 
 cases = [
     ('abs', '', [3 * 10 ** 8]),
-    ('apply', 'lambda x: x', [10 ** 7]),
+    ('apply', 'lambda x: x * 2', [10 ** 7]),
     ('argsort', '', [10 ** 5]),
     ('at', '', [10 ** 7], 'at[3]'),
     ('copy', '', [10 ** 8]),
