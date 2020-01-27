@@ -61,7 +61,7 @@ class TestSeriesStringMethods(TestBase):
         cls.num_threads = int(os.environ.get('NUMBA_NUM_THREADS', config.NUMBA_NUM_THREADS))
         cls.threading_layer = os.environ.get('NUMBA_THREADING_LAYER', config.THREADING_LAYER)
 
-    def _test_case(self, pyfunc, name, input_data=None):
+    def _test_case(self, pyfunc, name, input_data=None, *args, **kwargs):
         test_name = 'series_str_{}'.format(name)
         input_data = input_data or test_global_input_data_unicode_kind4
         hpat_func = sdc.jit(pyfunc)
@@ -81,22 +81,20 @@ class TestSeriesStringMethods(TestBase):
                                   num_threads=self.num_threads)
 
 
-# (method_name, parameters, input_data)
-# in these tuples, named parameter 'size' is 'input_data'
 cases = [
-    TC(name='center', params='1', size=test_global_input_data_unicode_kind1),
+    TC(name='center', params='1', input_data=test_global_input_data_unicode_kind1),
     TC(name='endswith', params='"e"'),
     TC(name='find', params='"e"'),
     TC(name='len'),
-    TC(name='ljust', params='1', size=test_global_input_data_unicode_kind1),
+    TC(name='ljust', params='1', input_data=test_global_input_data_unicode_kind1),
     TC(name='lower'),
-    TC(name='lstrip', size=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
-    TC(name='rjust', params='1', size=test_global_input_data_unicode_kind1),
-    TC(name='rstrip', size=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    TC(name='lstrip', input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    TC(name='rjust', params='1', input_data=test_global_input_data_unicode_kind1),
+    TC(name='rstrip', input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
     TC(name='startswith', params='"e"'),
-    TC(name='strip', size=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    TC(name='strip', input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
     TC(name='upper'),
-    TC(name='zfill', params='1', size=test_global_input_data_unicode_kind1),
+    TC(name='zfill', params='1', input_data=test_global_input_data_unicode_kind1),
 ]
 
 generate_test_cases(cases, TestSeriesStringMethods, 'series', 'str')
