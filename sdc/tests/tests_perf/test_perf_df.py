@@ -64,7 +64,7 @@ class TestDataFrameMethods(TestBase):
     def _test_case(self, pyfunc, name, total_data_length, data_num=1,
                    input_data=test_global_input_data_float64):
 
-        if input_data == []:
+        if input_data is None:
             input_data = test_global_input_data_float64
 
         test_name = 'DataFrame.{}'.format(name)
@@ -97,7 +97,7 @@ class TestDataFrameMethods(TestBase):
 
 
 cases = [
-    TC(name='append', size=[10 ** 7], data_num=2),
+    TC(name='append', size=[10 ** 7], names_extra_data='obj2', data_num=2),
     TC(name='count', size=[10 ** 7]),
     TC(name='drop', params='columns="f0"', size=[10 ** 8]),
     TC(name='max', size=[10 ** 7]),
@@ -110,6 +110,5 @@ cases = [
     TC(name='sum', size=[10 ** 7]),
     TC(name='var', size=[10 ** 7]),
 ]
-
 
 generate_test_cases(cases, TestDataFrameMethods, 'df')
