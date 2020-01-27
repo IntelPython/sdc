@@ -131,6 +131,26 @@ def check_index_is_numeric(ty_series):
 
 
 def check_types_comparable(ty_left, ty_right):
+    """Used during typing to check that specified types can be compared"""
+
+    if hasattr(ty_left, 'dtype'):
+        ty_left = ty_left.dtype
+
+    if hasattr(ty_right, 'dtype'):
+        ty_right = ty_right.dtype
+
+    # add the rest of supported types here
+    if isinstance(ty_left, types.Number):
+        return isinstance(ty_right, types.Number)
+    if isinstance(ty_left, types.UnicodeType):
+        return isinstance(ty_right, types.UnicodeType)
+    if isinstance(ty_left, types.Boolean):
+        return isinstance(ty_right, types.Boolean)
+
+    return False
+
+
+def check_arrays_comparable(ty_left, ty_right):
     """Used during typing to check that underlying arrays of specified types can be compared"""
     return ((ty_left == string_array_type and ty_right == string_array_type)
             or (check_is_numeric_array(ty_left) and check_is_numeric_array(ty_right)))

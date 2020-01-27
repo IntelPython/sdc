@@ -43,7 +43,7 @@ from numba import types
 import sdc
 from sdc.datatypes.common_functions import TypeChecker
 from sdc.datatypes.common_functions import (check_index_is_numeric, find_common_dtype_from_numpy_dtypes,
-                                            sdc_join_series_indexes, sdc_check_indexes_equal, check_types_comparable)
+                                            sdc_join_series_indexes, sdc_check_indexes_equal, check_arrays_comparable)
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_arr_ext import (string_array_type, num_total_chars, str_arr_is_na)
 from sdc.utils import sdc_overload
@@ -87,8 +87,8 @@ def sdc_pandas_series_operator_binop(self, other):
     if isinstance(other, SeriesType):
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_types_comparable(self.data, other.data)
-        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_data_comparable = check_arrays_comparable(self.data, other.data)
+        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
 
     if isinstance(other, SeriesType) and not series_data_comparable:
         raise TypingError('{} Not supported for series with not-comparable data. \
@@ -214,8 +214,8 @@ def sdc_pandas_series_operator_comp_binop(self, other):
     if isinstance(other, SeriesType):
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_types_comparable(self.data, other.data)
-        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_data_comparable = check_arrays_comparable(self.data, other.data)
+        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
 
     if isinstance(other, SeriesType) and not series_data_comparable:
         raise TypingError('{} Not supported for series with not-comparable data. \
