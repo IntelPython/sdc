@@ -118,6 +118,7 @@ cases = [
     TC(name='mean', size=[2 * 10 ** 5]),
     TC(name='median', size=[2 * 10 ** 5]),
     TC(name='min', size=[2 * 10 ** 5]),
+    TC(name='skew', size=[2 * 10 ** 5])
 ]
 
 generate_test_cases(cases, TestDFRollingMethods, 'df', 'rolling({})'.format(get_rolling_params()))

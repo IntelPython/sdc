@@ -70,6 +70,7 @@ class TestSeriesStringMethods(TestBase):
             hpat_func(test_data)
 
             exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)
+
             self.test_results.add(test_name, 'SDC', test_data.size, exec_times, data_width,
                                   boxing_times, compile_results=compile_results, num_threads=self.num_threads)
             exec_times, _ = get_times(pyfunc, test_data, iter_number=self.iter_number)
