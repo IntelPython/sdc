@@ -81,8 +81,8 @@ def sdc_astype_overload(self, dtype, order='K', casting='unsafe', subok=True, co
     if not isinstance(copy, (bool, types.Omitted, types.Boolean)):
         ty_checker.raise_exc(copy, 'boolean', 'copy')
 
-    if ((isinstance(dtype, types.Function) and dtype.typing_key == str)
-        or (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
+    if ((isinstance(dtype, types.Function) and dtype.typing_key == str) or
+        (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
         def sdc_astype_number_to_string_impl(self, dtype, order='K', casting='unsafe', subok=True, copy=True):
             num_chars = 0
             arr_len = len(self)
@@ -105,6 +105,7 @@ def sdc_astype_overload(self, dtype, order='K', casting='unsafe', subok=True, co
     if (isinstance(self, types.Array) and isinstance(dtype, types.functions.NumberClass)):
         other_numba_dtype = dtype.instance_type
         numba_self = self.dtype
+
         def sdc_astype_number_impl(self, dtype, order='K', casting='unsafe', subok=True, copy=True):
             if numba_self == other_numba_dtype:
                 return self
@@ -120,6 +121,7 @@ def sdc_astype_overload(self, dtype, order='K', casting='unsafe', subok=True, co
         other_numpy_dtype = numpy.dtype(dtype.literal_value)
         other_numba_dtype = numpy_support.from_dtype(other_numpy_dtype)
         numba_self = self.dtype
+
         def sdc_astype_number_literal_impl(self, dtype, order='K', casting='unsafe', subok=True, copy=True):
             if other_numba_dtype == numba_self:
                 return self
