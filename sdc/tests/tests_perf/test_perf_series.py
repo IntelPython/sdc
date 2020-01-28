@@ -107,7 +107,7 @@ cases = [
        input_data=[test_global_input_data_float64[0]]),
     TC(name='at', size=[10 ** 7], call_expr='data.at[3]', usecase_params='data'),
     TC(name='chain_add_and_sum', size=[20 * 10 ** 6, 25 * 10 ** 6, 30 * 10 ** 6], call_expr='(A + B).sum()',
-      usecase_params='A, B', data_num=2),
+       usecase_params='A, B', data_num=2),
     TC(name='copy', size=[10 ** 8]),
     TC(name='corr',  size=[10 ** 7],params='other', data_num=2),
     TC(name='count', size=[10 ** 7]),
