@@ -2676,6 +2676,7 @@ class TestSeries(
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     @skip_numba_jit
     def test_series_dist_input2(self):
         """Verify distribution of a Series with integer index"""
@@ -3894,6 +3895,7 @@ class TestSeries(
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     def test_series_head_index3(self):
         """Verifies head method for non-distributed pass of Series with integer index"""
         def test_impl(S):
