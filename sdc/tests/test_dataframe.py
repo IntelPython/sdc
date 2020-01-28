@@ -522,7 +522,6 @@ class TestDataFrame(TestCase):
         sdc_func = self.jit(test_impl)
         np.testing.assert_array_equal(sdc_func(df), test_impl(df))
 
-    @skip_numba_jit
     def test_df_values_unboxing(self):
         values_to_test = [[1, 2, 3, 4, 5],
                           [.1, .2, .3, .4, .5],

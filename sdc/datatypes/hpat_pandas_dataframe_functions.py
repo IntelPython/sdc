@@ -101,6 +101,55 @@ def hpat_pandas_dataframe_index(df):
         return hpat_pandas_df_index_impl
 
 
+def sdc_pandas_dataframe_values_codegen(df, numba_common_dtype):
+    """
+    Input:
+    column_len = 3
+    numba_common_dtype = float64
+
+    Func generated:
+    def sdc_pandas_dataframe_values_impl(df):
+        row_len = len(get_dataframe_data(df, 0))
+        df_col_A = get_dataframe_data(df, 0)
+        df_col_B = get_dataframe_data(df, 1)
+        df_col_C = get_dataframe_data(df, 2)
+        df_values = numpy.empty(row_len*3, numpy.dtype("float64"))
+        for i in range(row_len):
+            df_values[i * 3 + 0] = df_col_A[i]
+            df_values[i * 3 + 1] = df_col_B[i]
+            df_values[i * 3 + 2] = df_col_C[i]
+        return df_values.reshape(row_len, 3)
+
+    """
+
+    indent = 4 * ' '
+    func_args = ['df']
+
+    func_definition = [f'def sdc_pandas_dataframe_values_impl({", ".join(func_args)}):']
+    func_text = []
+    column_list = []
+    column_len = len(df.columns)
+    func_text.append(f'row_len = len(get_dataframe_data(df, 0))')
+
+    for index, column_name in enumerate(df.columns):
+        func_text.append(f'df_col_{column_name} = get_dataframe_data(df, {index})')
+        column_list.append(f'df_col_{column_name}')
+
+    func_text.append(f'df_values = numpy.empty(row_len*{column_len}, numpy.dtype("{numba_common_dtype}"))')
+    func_text.append('for i in range(row_len):')
+    for j in range(column_len):
+        func_text.append(indent + f'df_values[i * {column_len} + {j}] = {column_list[j]}[i]')
+
+    func_text.append(f"return df_values.reshape(row_len, {column_len})\n")
+    func_definition.extend([indent + func_line for func_line in func_text])
+    func_def = '\n'.join(func_definition)
+
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
+
+    return func_def, global_vars
+
+
 @sdc_overload_attribute(DataFrameType, 'values')
 def hpat_pandas_dataframe_values(df):
     """
@@ -163,20 +212,15 @@ def hpat_pandas_dataframe_values(df):
 
     numba_common_dtype = find_common_dtype_from_numpy_dtypes([column.dtype for column in df.data], [])
 
-    def hpat_pandas_df_values_impl(df):
-        row_len = len(get_dataframe_data(df, 0))
-        local_data = literal_unroll(df._data)
-        column_len = len(local_data)
+    def hpat_pandas_df_values_impl(df, numba_common_dtype):
+        loc_vars = {}
+        func_def, global_vars = sdc_pandas_dataframe_values_codegen(df, numba_common_dtype)
 
-        df_values = numpy.empty(row_len*column_len, numba_common_dtype)
+        exec(func_def, global_vars, loc_vars)
+        _values_impl = loc_vars['sdc_pandas_dataframe_values_impl']
+        return _values_impl
 
-        for i in prange(row_len):
-            for j in range(column_len):
-                df_values[i*column_len + j] = numpy.array(local_data[j])[i]
-
-        return df_values.reshape((row_len, column_len))
-
-    return hpat_pandas_df_values_impl
+    return hpat_pandas_df_values_impl(df, numba_common_dtype)
 
 
 def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
