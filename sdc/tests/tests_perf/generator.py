@@ -5,12 +5,21 @@ from typing import NamedTuple
 
 
 class TestCase(NamedTuple):
+    """
+    name: name of the API item, e.g. method, operator
+    size: size of the generated data for tests
+    params: method parameters in format 'par1, par2, ...'
+    call_expr: call expression as a string, e.g. '(A+B).sum()' where A, B are Series or DF
+    usecase_params: input parameters for usecase in format 'par1, par2, ...', e.g. 'data, other'
+    data_num: total number of generated data, e.g. 2 (data, other)
+    input_data: input data for generating test data
+    """
     name: str
     size: list
     params: str = ''
-    call_expression: str = None
+    call_expr: str = None
     usecase_params: str = None
-    extra_data_num: int = 0
+    data_num: int = 1
     input_data: list = None
 
 
@@ -21,47 +30,62 @@ def to_varname_without_excess_underscores(string):
 
 def generate_test_cases(cases, class_add, typ, prefix=''):
     for test_case in cases:
-        params_parts = test_case.params.split(', ', test_case.extra_data_num)
-        if len(params_parts) > test_case.extra_data_num:
-            params = params_parts[test_case.extra_data_num]
-        else:
-            params = ''
-        test_name_parts = ['test', typ, prefix, test_case.name, params]
+        test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case)]
         test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
 
         setattr(class_add, test_name, test_gen(test_case, prefix))
 
 
+def gen_params_wo_data(test_case):
+    """Generate API item parameters without parameters with data, e.g. without parameter other"""
+    extra_data_num = test_case.data_num - 1
+    method_params = test_case.params.split(', ')[extra_data_num:]
+
+    return ', '.join(method_params)
+
+
+def gen_usecase_params(test_case):
+    """Generate usecase parameters based on method parameters and number of extra generated data"""
+    extra_data_num = test_case.data_num - 1
+    extra_usecase_params = test_case.params.split(', ')[:extra_data_num]
+    usecase_params_parts = ['data'] + extra_usecase_params
+
+    return ', '.join(usecase_params_parts)
+
+
+def gen_call_expr(test_case, prefix):
+    """Generate call expression based on method name and parameters and method prefix, e.g. str"""
+    prefix_as_list = [prefix] if prefix else []
+    call_expr_parts = ['data'] + prefix_as_list + ['{}({})'.format(test_case.name, test_case.params)]
+
+    return '.'.join(call_expr_parts)
+
+
 def test_gen(test_case, prefix):
     func_name = 'func'
     usecase_params = test_case.usecase_params
-    call_expression = test_case.call_expression
-    if test_case.call_expression is None:
+    call_expr = test_case.call_expr
+    if call_expr is None:
         if usecase_params is None:
-            other = test_case.params.split(', ', test_case.extra_data_num).pop()
-            usecase_params_parts = ['data'] + [other]
-            usecase_params = ', '.join(usecase_params_parts)
-        prefix_as_list = [prefix] if prefix else []
-        call_expression_parts = ['data'] + prefix_as_list + ['{}({})'.format(test_case.name, test_case.params)]
-        call_expression = '.'.join(call_expression_parts)
+            usecase_params = gen_usecase_params(test_case)
+        call_expr = gen_call_expr(test_case, prefix)
+
+    usecase = gen_usecase(usecase_params, call_expr)
 
     func_text = f"""\
 def {func_name}(self):
-  self._test_case(usecase_gen('{usecase_params}', '{call_expression}'), name='{test_case.name}', 
-                               total_data_length={test_case.size}, extra_data_num={test_case.extra_data_num},
-                               input_data={test_case.input_data})
+  self._test_case(usecase, name='{test_case.name}', total_data_length={test_case.size},
+                  data_num={test_case.data_num}, input_data={test_case.input_data})
 """
 
-    global_vars = {'usecase_gen': usecase_gen}
-
     loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
+    exec(func_text, {'usecase': usecase}, loc_vars)
     func = loc_vars[func_name]
 
     return func
 
 
-def usecase_gen(input_data, call_expr):
+def gen_usecase(input_data, call_expr):
     func_name = 'func'
 
     func_text = f"""\

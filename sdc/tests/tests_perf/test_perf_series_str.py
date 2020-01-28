@@ -78,22 +78,22 @@ class TestSeriesStringMethods(TestBase):
 
 
 cases = [
-    TC(name='center', size=[10 ** 4, 10 ** 5], params='1', input_data=test_global_input_data_unicode_kind1),
-    TC(name='endswith', size=[10 ** 4, 10 ** 5], params='"e"'),
-    TC(name='find', size=[10 ** 4, 10 ** 5], params='"e"'),
+    TC(name='center', params='1', size=[10 ** 4, 10 ** 5],  input_data=test_global_input_data_unicode_kind1),
+    TC(name='endswith', params='"e"', size=[10 ** 4, 10 ** 5]),
+    TC(name='find', params='"e"', size=[10 ** 4, 10 ** 5]),
     TC(name='len', size=[10 ** 4, 10 ** 5]),
-    TC(name='ljust', size=[10 ** 4, 10 ** 5], params='1', input_data=test_global_input_data_unicode_kind1),
+    TC(name='ljust', params='1', size=[10 ** 4, 10 ** 5], input_data=test_global_input_data_unicode_kind1),
     TC(name='lower', size=[10 ** 4, 10 ** 5]),
     TC(name='lstrip', size=[10 ** 4, 10 ** 5],
        input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
-    TC(name='rjust', size=[10 ** 4, 10 ** 5], params='1', input_data=test_global_input_data_unicode_kind1),
+    TC(name='rjust', params='1', size=[10 ** 4, 10 ** 5], input_data=test_global_input_data_unicode_kind1),
     TC(name='rstrip', size=[10 ** 4, 10 ** 5],
        input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
-    TC(name='startswith', size=[10 ** 4, 10 ** 5], params='"e"'),
+    TC(name='startswith', params='"e"', size=[10 ** 4, 10 ** 5]),
     TC(name='strip', size=[10 ** 4, 10 ** 5],
        input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
     TC(name='upper', size=[10 ** 4, 10 ** 5]),
-    TC(name='zfill', size=[10 ** 4, 10 ** 5], params='1', input_data=test_global_input_data_unicode_kind1),
+    TC(name='zfill', params='1', size=[10 ** 4, 10 ** 5], input_data=test_global_input_data_unicode_kind1),
 ]
 
 generate_test_cases(cases, TestSeriesStringMethods, 'series', 'str')

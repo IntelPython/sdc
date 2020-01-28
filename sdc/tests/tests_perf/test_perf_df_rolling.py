@@ -111,7 +111,7 @@ class TestDFRollingMethods(TestBase):
 
 cases = [
     TC(name='apply', params='lambda x: np.nan if len(x) == 0 else x.mean()', size=[2 * 10 ** 5]),
-    TC(name='corr', size=[10 ** 5], names_extra_data='obj2', data_num=2),
+    TC(name='corr', size=[10 ** 5], params='other', data_num=2),
     TC(name='count', size=[8 * 10 ** 5]),
     TC(name='kurt', size=[4 * 10 ** 5]),
     TC(name='max', size=[2 * 10 ** 5]),
