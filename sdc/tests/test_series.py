@@ -412,6 +412,7 @@ class TestSeries(TestSeries_apply, TestCase):
         A = pd.Series(np.random.ranf(n))
         pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     def test_series_argsort2(self):
         def test_impl(S):
             return S.argsort()
@@ -420,6 +421,7 @@ class TestSeries(TestSeries_apply, TestCase):
         S = pd.Series([1, -1, 0, 2, np.nan], [1, 2, 3, 4, 5])
         pd.testing.assert_series_equal(test_impl(S), hpat_func(S))
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     def test_series_argsort_full(self):
         def test_impl(series, kind):
             return series.argsort(axis=0, kind=kind, order=None)
@@ -442,6 +444,7 @@ class TestSeries(TestSeries_apply, TestCase):
                         series_values_from_argsort_result(S, result_ref)
                     )
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     def test_series_argsort_full_idx(self):
         def test_impl(series, kind):
             return series.argsort(axis=0, kind=kind, order=None)
@@ -466,7 +469,7 @@ class TestSeries(TestSeries_apply, TestCase):
                             series_values_from_argsort_result(S, result_ref)
                         )
 
-    @skip_numba_jit
+    @skip_sdc_jit("Fails to compile with latest Numba")
     def test_series_attr6(self):
         def test_impl(A):
             return A.take([2, 3]).values
@@ -936,6 +939,7 @@ class TestSeries(TestSeries_apply, TestCase):
         test_impl(A2, 0)
         np.testing.assert_array_equal(A1, A2)
 
+    @skip_sdc_jit("Not implemented in old-pipeline")
     @skip_numba_jit("TODO: support this case in setitem overload")
     def test_series_setitem4(self):
         def test_impl(A):
@@ -949,6 +953,7 @@ class TestSeries(TestSeries_apply, TestCase):
         test_impl(S2)
         pd.testing.assert_series_equal(S1, S2)
 
+    @skip_sdc_jit("Not implemented in old-pipeline")
     @skip_numba_jit("TODO: support this case in setitem overload")
     def test_series_setitem5(self):
         def test_impl(A):
@@ -1450,9 +1455,12 @@ class TestSeries(TestSeries_apply, TestCase):
 
             # TODO: extend to test arithmetic operations between numeric Series of different dtypes
             n = 11
-            S1 = pd.Series(np.arange(1, n, dtype=np.float64), name='A')
-            S2 = pd.Series(np.ones(n - 1), name='B')
-            pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+            A1 = pd.Series(np.arange(1, n, dtype=np.float64), name='A')
+            A2 = A1.copy(deep=True)
+            B = pd.Series(np.ones(n - 1), name='B')
+            hpat_func(A1, B)
+            test_impl(A2, B)
+            pd.testing.assert_series_equal(A1, A2)
 
     @skip_parallel
     @skip_numba_jit('Not implemented in new-pipeline yet')
@@ -1465,8 +1473,11 @@ class TestSeries(TestSeries_apply, TestCase):
 
             # TODO: extend to test arithmetic operations between numeric Series of different dtypes
             n = 11
-            S = pd.Series(np.arange(1, n, dtype=np.float64), name='A')
-            pd.testing.assert_series_equal(hpat_func(S, 1), test_impl(S, 1))
+            S1 = pd.Series(np.arange(1, n, dtype=np.float64), name='A')
+            S2 = S1.copy(deep=True)
+            hpat_func(S1, 1)
+            test_impl(S2, 1)
+            pd.testing.assert_series_equal(S1, S2)
 
     @skip_parallel
     def test_series_op5(self):
