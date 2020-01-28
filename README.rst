@@ -30,46 +30,6 @@ Installing Binary Packages (conda)
    conda install -c intel -c intel/label/test sdc
 
 
-Example
-#######
-
-Here is a Pi calculation example in Intel SDC:
-
-.. code:: python
-
-    import sdc
-    import numpy as np
-    import time
-
-    @sdc.jit
-    def calc_pi(n):
-        t1 = time.time()
-        x = 2 * np.random.ranf(n) - 1
-        y = 2 * np.random.ranf(n) - 1
-        pi = 4 * np.sum(x**2 + y**2 < 1) / n
-        print("Execution time:", time.time()-t1, "\nresult:", pi)
-        return pi
-
-    calc_pi(2 * 10**8)
-
-Save this in a file named `pi.py` and run (on 8 cores)::
-
-    mpiexec -n 8 python pi.py
-
-This should demonstrate about 100x speedup compared to regular Python version
-without `@sdc.jit` and `mpiexec`.
-
-
-References
-##########
-
-These academic papers describe the underlying methods in Intel SDC:
-
-- `HPAT paper at ICS'17 <http://dl.acm.org/citation.cfm?id=3079099>`_
-- `HPAT at HotOS'17 <http://dl.acm.org/citation.cfm?id=3103004>`_
-- `HiFrames on arxiv <https://arxiv.org/abs/1704.02341>`_
-
-
 Building Intel® SDC from Source on Linux
 ----------------------------------------
 
@@ -323,3 +283,12 @@ Running unit tests
 
     python sdc/tests/gen_test_data.py
     python -m unittest
+
+References
+##########
+
+Intel SDC follows ideas and initial code base of High-Performance Analytics Toolkit (HPAT). These academic papers describe ideas and methods behind HPAT:
+
+- `HPAT paper at ICS'17 <http://dl.acm.org/citation.cfm?id=3079099>`_
+- `HPAT at HotOS'17 <http://dl.acm.org/citation.cfm?id=3103004>`_
+- `HiFrames on arxiv <https://arxiv.org/abs/1704.02341>`_
