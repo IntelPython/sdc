@@ -352,6 +352,15 @@ def sdc_pandas_dataframe_rolling_min(self):
     return gen_df_rolling_method_impl('min', self)
 
 
+@sdc_overload_method(DataFrameRollingType, 'skew')
+def sdc_pandas_dataframe_rolling_skew(self):
+
+    ty_checker = TypeChecker('Method rolling.skew().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    return gen_df_rolling_method_impl('skew', self)
+
+
 sdc_pandas_dataframe_rolling_apply.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
     'method_name': 'apply',
     'example_caption': 'Calculate the rolling apply.',
@@ -433,6 +442,13 @@ sdc_pandas_dataframe_rolling_median.__doc__ = sdc_pandas_dataframe_rolling_docst
 sdc_pandas_dataframe_rolling_min.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
     'method_name': 'min',
     'example_caption': 'Calculate the rolling minimum.',
+    'limitations_block': '',
+    'extra_params': ''
+})
+
+sdc_pandas_dataframe_rolling_skew.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'skew',
+    'example_caption': 'Unbiased rolling skewness.',
     'limitations_block': '',
     'extra_params': ''
 })

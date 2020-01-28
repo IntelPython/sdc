@@ -156,10 +156,10 @@ class TestSeriesMethods(TestBase):
             hpat_func(A, B)
 
             exec_times, boxing_times = get_times(hpat_func, A, B, iter_number=self.iter_number)
-            self.test_results.add(name, 'JIT', A.size, exec_times, boxing_times,
+            self.test_results.add(name, 'SDC', A.size, exec_times, boxing_times,
                                   compile_results=compile_results, num_threads=self.num_threads)
             exec_times, _ = get_times(pyfunc, A, B, iter_number=self.iter_number)
-            self.test_results.add(name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
+            self.test_results.add(name, 'Python', A.size, exec_times, num_threads=self.num_threads)
 
     def test_series_float_astype_int(self):
         self._test_case(usecase_gen('astype(np.int8)'), 'series_astype_int', [10 ** 5],
