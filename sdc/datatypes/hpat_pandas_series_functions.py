@@ -94,7 +94,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
             def hpat_pandas_series_iloc_list_slice_impl(self, idx):
                 result_data = self._series._data[idx]
                 result_index = self._series.index[idx]
-                return pandas.Series(result_data, result_index, self._series._name)
+                return pandas.Series(data=result_data, index=result_index, name=self._series._name)
 
             return hpat_pandas_series_iloc_list_slice_impl
 
@@ -106,7 +106,11 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
         def hpat_pandas_series_iloc_callable_impl(self, idx):
             index = numpy.asarray(list(map(idx, self._series._data)))
-            return pandas.Series(self._series._data[index], self._series.index[index], self._series._name)
+            return pandas.Series(
+                data=self._series._data[index],
+                index=self._series.index[index],
+                name=self._series._name
+            )
 
         return hpat_pandas_series_iloc_callable_impl
 
@@ -193,7 +197,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                     stop = max_slice - 1
                 result_data = self._series._data[start:stop+1]
                 result_index = numpy.arange(start, stop + 1)
-                return pandas.Series(result_data, result_index, self._series._name)
+                return pandas.Series(data=result_data, index=result_index, name=self._series._name)
 
             return hpat_pandas_series_loc_slice_noidx_impl
 
@@ -221,7 +225,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                 mask = numpy.empty(len(self._series._data), numpy.bool_)
                 for i in numba.prange(len(index)):
                     mask[i] = index[i] == idx
-                return pandas.Series(self._series._data[mask], index[mask], self._series._name)
+                return pandas.Series(data=self._series._data[mask], index=index[mask], name=self._series._name)
 
             return hpat_pandas_series_loc_impl
 

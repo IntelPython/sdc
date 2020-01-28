@@ -996,17 +996,16 @@ class TestSeries(
         test_impl(A2, B)
         pd.testing.assert_series_equal(A1, A2)
 
-    @skip_sdc_jit('Not impl in old style')
-    def test_static_getitem_series1(self):
+    def test_series_static_getitem(self):
         def test_impl(A):
             return A[1]
         hpat_func = self.jit(test_impl)
 
-        A = pd.Series([1, 3, 5], ['1', '4', '2'])
+        A = pd.Series([1, 3, 5], ['1', '4', '2'], name='A')
         self.assertEqual(hpat_func(A), test_impl(A))
 
     @skip_sdc_jit('Not impl in old style')
-    def test_getitem_series1(self):
+    def test_series_getitem_idx_int1(self):
         def test_impl(A, i):
             return A[i]
         hpat_func = self.jit(test_impl)
@@ -1021,7 +1020,7 @@ class TestSeries(
         self.assertEqual(len(result), 1)
 
     @skip_sdc_jit('Not impl in old style')
-    def test_getitem_series2(self):
+    def test_series_getitem_idx_int2(self):
         def test_impl(A, i):
             return A[i]
         hpat_func = self.jit(test_impl)
@@ -1035,7 +1034,7 @@ class TestSeries(
         self.assertEqual(result, result_ref)
 
     @skip_sdc_jit('Not impl in old style')
-    def test_getitem_series_str1(self):
+    def test_series_getitem_idx_int3(self):
         def test_impl(A, i):
             return A[i]
         hpat_func = self.jit(test_impl)
@@ -1054,7 +1053,7 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         n = 11
-        S = pd.Series(np.arange(n)**2)
+        S = pd.Series(np.arange(n)**2, name='A')
         self.assertEqual(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
@@ -1066,67 +1065,78 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         n = 11
-        S = pd.Series(np.arange(n)**2)
+        S = pd.Series(np.arange(n)**2, name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
-    def test_series_getitem_series_list(self):
+    def test_series_getitem_idx_bool_arr(self):
         def test_impl(A, B):
             return A[B]
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([1, 2, 3, 4], [6, 7, 8, 9])
+        S = pd.Series([1, 2, 3, 4], [6, 7, 8, 9], name='A')
         n = np.array([True, False, False, True])
         pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
 
     @skip_sdc_jit('Not impl in old style')
-    def test_series_getitem_series_list_bool(self):
+    def test_series_getitem_idx_bool_series1(self):
         def test_impl(A, B):
             return A[B]
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([2, 3, 1, 5], [11, 2, 44, 5])
+        S = pd.Series([2, 3, 1, 5], [11, 2, 44, 5], name='A')
         S2 = pd.Series([True, False, False, True], [11, 2, 44, 5])
         pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
     @skip_sdc_jit('Not impl in old style')
-    def test_series_getitem_series_list_bool2(self):
+    def test_series_getitem_idx_bool_series2(self):
         def test_impl(A, B):
             return A[B]
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([2, 3, 1, 5])
+        S = pd.Series([2, 3, 1, 5], name='A')
         S2 = pd.Series([True, False, False, True])
         pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
     @skip_sdc_jit('Not impl in old style')
-    def test_series_getitem_series(self):
+    def test_series_getitem_idx_series(self):
         def test_impl(A, B):
             return A[B]
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([1, 2, 3, 4, 5], [6, 0, 8, 0, 0])
+        S = pd.Series([1, 2, 3, 4, 5], [6, 0, 8, 0, 0], name='A')
         S2 = pd.Series([8, 6, 0], [12, 11, 14])
         pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
     @skip_sdc_jit('Not impl in old style')
-    def test_series_getitem_series_noidx(self):
+    def test_series_getitem_idx_series_noidx(self):
         def test_impl(A, B):
             return A[B]
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([1, 2, 3, 4, 5])
+        S = pd.Series([1, 2, 3, 4, 5], name='A')
         S2 = pd.Series([3, 2, 0])
         pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
     @skip_sdc_jit('Getitem Series with str index not implement in old-style')
-    def test_series_getitem_series1(self):
+    def test_series_getitem_idx_series_index_str(self):
         def test_impl(A, B):
             return A[B]
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series(['1', '2', '3', '4', '5'], ['6', '7', '8', '9', '0'])
+        S = pd.Series(['1', '2', '3', '4', '5'], ['6', '7', '8', '9', '0'], name='A')
         S2 = pd.Series(['8', '6', '0'], ['12', '11', '14'])
+        pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
+
+    @skip_sdc_jit('Not impl in old style')
+    @skip_numba_jit("TODO: support named Series indexes")
+    def test_series_getitem_idx_series_named(self):
+        def test_impl(A, B):
+            return A[B]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(['1', '2', '3', '4', '5'], ['6', '7', '8', '9', '0'], name='A')
+        S2 = pd.Series(['8', '6', '0'], ['12', '11', '14'], name='B')
         pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
     def test_series_iloc1(self):
@@ -1148,7 +1158,7 @@ class TestSeries(
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
-    def test_series_getitem(self):
+    def test_series_getitem_idx_int4(self):
         def test_impl(S, key):
             return S[key]
 
@@ -1157,20 +1167,20 @@ class TestSeries(
         keys = [2, 2, 3]
         indices = [[2, 3, 5], [2, 3, 5], [2, 3, 5]]
         for key, index in zip(keys, indices):
-            S = pd.Series([11, 22, 33], index)
+            S = pd.Series([11, 22, 33], index, name='A')
             np.testing.assert_array_equal(jit_impl(S, key).data, np.array(test_impl(S, key)))
 
     @skip_sdc_jit('Not impl in old style')
-    def test_series_getitem_return_ser(self):
+    def test_series_getitem_duplicate_index(self):
         def test_impl(A):
             return A[3]
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([2, 4, 6, 33, 7], [1, 3, 5, 3, 3])
+        S = pd.Series([2, 4, 6, 33, 7], [1, 3, 5, 3, 3], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
-    def test_series_getitem_slice(self):
+    def test_series_getitem_idx_int_slice(self):
         def test_impl(S, start, end):
             return S[start:end]
 
@@ -1180,19 +1190,19 @@ class TestSeries(
         ends = [2, 2]
         indices = [[2, 3, 5], ['2', '3', '5'], ['2', '3', '5']]
         for start, end, index in zip(starts, ends, indices):
-            S = pd.Series([11, 22, 33], index)
+            S = pd.Series([11, 22, 33], index, name='A')
             ref_result = test_impl(S, start, end)
             jit_result = jit_impl(S, start, end)
             pd.testing.assert_series_equal(jit_result, ref_result)
 
     @skip_sdc_jit('Not impl in old style')
     @skip_numba_jit('TODO: implement String slice support')
-    def test_series_getitem_str(self):
+    def test_series_getitem_idx_str_slice(self):
         def test_impl(A):
             return A['1':'7']
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series(['1', '4', '6', '33', '7'], ['1', '3', '5', '4', '7'])
+        S = pd.Series(['1', '4', '6', '33', '7'], ['1', '3', '5', '4', '7'], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_at(self):
@@ -1205,7 +1215,7 @@ class TestSeries(
         all_data = [[11, 22, 33], [11, 22, 33]]
         indices = [['2', '22', '0'], ['2', '3', '5']]
         for key, data, index in zip(keys, all_data, indices):
-            S = pd.Series(data, index)
+            S = pd.Series(data, index, name='A')
             self.assertEqual(jit_impl(S, key), test_impl(S, key))
 
     def test_series_at_array(self):
@@ -1213,7 +1223,7 @@ class TestSeries(
             return A.at[3]
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([2, 4, 6, 12, 0], [1, 3, 5, 3, 3])
+        S = pd.Series([2, 4, 6, 12, 0], [1, 3, 5, 3, 3], name='A')
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
@@ -1227,7 +1237,7 @@ class TestSeries(
         all_data = [[11, 22, 33], [11, 22, 33], [11, 22, 33]]
         indices = [[2, 3, 5], [2, 2, 2], [2, 4, 15]]
         for key, data, index in zip(keys, all_data, indices):
-            S = pd.Series(data, index)
+            S = pd.Series(data, index, name='A')
             np.testing.assert_array_equal(jit_impl(S, key).data, np.array(test_impl(S, key)))
 
     @skip_sdc_jit('Not impl in old style')
@@ -1236,7 +1246,7 @@ class TestSeries(
             return A.loc['1']
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([2, 4, 6], ['1', '3', '5'])
+        S = pd.Series([2, 4, 6], ['1', '3', '5'], name='A')
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
@@ -1245,7 +1255,7 @@ class TestSeries(
             return A.loc[n]
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([1, 2, 4, 8, 6, 0], [1, 2, 4, 0, 6, 0])
+        S = pd.Series([1, 2, 4, 8, 6, 0], [1, 2, 4, 0, 6, 0], name='A')
         n = [0, 4, 2]
         cases = [n, np.array(n)]
         for n in cases:
@@ -1257,25 +1267,25 @@ class TestSeries(
             return A.at['1']
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([2, 4, 6], ['1', '3', '5'])
+        S = pd.Series([2, 4, 6], ['1', '3', '5'], name='A')
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
-    def test_series_slice_nonidx(self):
+    def test_series_loc_slice_nonidx(self):
         def test_impl(A):
             return A.loc[1:3]
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([2, 4, 6, 6, 3])
+        S = pd.Series([2, 4, 6, 6, 3], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @unittest.skip('Slice string index not impl')
-    def test_series_slice_empty(self):
+    def test_series_loc_slice_empty(self):
         def test_impl(A):
             return A.loc['301':'-4']
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([2, 4, 6, 6, 3], ['-22', '-5', '-2', '300', '40000'])
+        S = pd.Series([2, 4, 6, 6, 3], ['-22', '-5', '-2', '300', '40000'], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
@@ -1285,7 +1295,7 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         n = 11
-        S = pd.Series(np.arange(n)**2)
+        S = pd.Series(np.arange(n)**2, name='A')
         pd.testing.assert_series_equal(
             hpat_func(S), test_impl(S))
 
@@ -1300,7 +1310,7 @@ class TestSeries(
         for index in all_data:
             for n in key:
                 with self.subTest(index=index, start=n):
-                    S = pd.Series([2, 4, 6, 6, 3], index)
+                    S = pd.Series([2, 4, 6, 6, 3], index, name='A')
                     pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
 
     """
@@ -1333,7 +1343,7 @@ class TestSeries(
         for index in all_data:
             for n in key:
                 with self.subTest(index=index, stop=n):
-                    S = pd.Series([2, 4, 6, 6, 3], index)
+                    S = pd.Series([2, 4, 6, 6, 3], index, name='A')
                     pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
 
     @skip_sdc_jit('Not impl in old style')
@@ -1347,7 +1357,7 @@ class TestSeries(
         for index in all_data:
             for data_left, data_right in combinations_with_replacement(key, 2):
                 with self.subTest(index=index, left=data_left, right=data_right):
-                    S = pd.Series([2, 4, 6, 6, 3], index)
+                    S = pd.Series([2, 4, 6, 6, 3], index, name='A')
                     pd.testing.assert_series_equal(hpat_func(S, data_left, data_right),
                                                    test_impl(S, data_left, data_right))
 
