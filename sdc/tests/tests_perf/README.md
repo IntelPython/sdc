@@ -36,14 +36,14 @@ class TestSuite(unittest.TestCase):
             exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)
 
             # add these times to the results for further processing
-            self.test_results.add('test_series_smth', 'JIT', test_data.size, exec_times,
+            self.test_results.add('test_series_smth', 'SDC', test_data.size, exec_times,
                                   boxing_times, compile_results=compile_results)
 
             # calculate execution times of `pyfunc`
             exec_times, _ = get_times(pyfunc, test_data, iter_number=self.iter_number)
 
             # add these times to the results for further processing
-            self.test_results.add('test_series_smth', 'Reference', test_data.size, exec_times)
+            self.test_results.add('test_series_smth', 'Python', test_data.size, exec_times)
 ```
 
 ##### Extras:
