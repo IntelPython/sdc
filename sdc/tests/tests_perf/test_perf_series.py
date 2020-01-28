@@ -156,10 +156,10 @@ class TestSeriesMethods(TestBase):
             hpat_func(A, B)
 
             exec_times, boxing_times = get_times(hpat_func, A, B, iter_number=self.iter_number)
-            self.test_results.add(name, 'JIT', A.size, exec_times, boxing_times,
+            self.test_results.add(name, 'SDC', A.size, exec_times, boxing_times,
                                   compile_results=compile_results, num_threads=self.num_threads)
             exec_times, _ = get_times(pyfunc, A, B, iter_number=self.iter_number)
-            self.test_results.add(name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
+            self.test_results.add(name, 'Python', A.size, exec_times, num_threads=self.num_threads)
 
     def test_series_float_astype_int(self):
         self._test_case(usecase_gen('astype(np.int8)'), 'series_astype_int', [10 ** 5],
@@ -209,7 +209,7 @@ def {func_name}(self):
 
 cases = [
     ('abs', '', [3 * 10 ** 8]),
-    ('apply', 'lambda x: x', [10 ** 7]),
+    ('apply', 'lambda x: x * 2', [10 ** 7]),
     ('argsort', '', [10 ** 5]),
     ('at', '', [10 ** 7], 'at[3]'),
     ('copy', '', [10 ** 8]),
@@ -228,6 +228,8 @@ cases = [
     ('isna', '', [2 * 10 ** 7]),
     ('loc', '', [10 ** 7], 'loc[0]'),
     ('isnull', '', [10 ** 7]),
+    ('map', 'lambda x: x * 2', [10 ** 7]),
+    ('map', '{2.: 42., 4.: 3.14}', [10 ** 7]),
     ('max', '', [10 ** 8]),
     ('max', 'skipna=False', [10 ** 8]),
     ('mean', '', [10 ** 8]),
