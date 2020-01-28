@@ -996,6 +996,7 @@ class TestSeries(
         test_impl(A2, B)
         pd.testing.assert_series_equal(A1, A2)
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     def test_series_static_getitem(self):
         def test_impl(A):
             return A[1]
@@ -2640,6 +2641,7 @@ class TestSeries(
                     result = hpat_func(S, ascending)
                     pd.testing.assert_series_equal(result, result_ref)
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     def test_series_value_counts_index(self):
         def test_impl(S):
             return S.value_counts()
