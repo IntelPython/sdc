@@ -9,9 +9,8 @@ class TestCase(NamedTuple):
     size: list
     params: str = ''
     call_expression: str = None
-    name_data: str = 'obj'
-    names_extra_data: str = ''
-    data_num: int = 1
+    usecase_params: str = None
+    extra_data_num: int = 0
     input_data: list = None
 
 
@@ -21,31 +20,36 @@ def to_varname_without_excess_underscores(string):
 
 
 def generate_test_cases(cases, class_add, typ, prefix=''):
-    for test_params in cases:
-        test_name_parts = ['test', typ, prefix, test_params.name, test_params.params]
+    for test_case in cases:
+        params_parts = test_case.params.split(', ', test_case.extra_data_num)
+        if len(params_parts) > test_case.extra_data_num:
+            params = params_parts[test_case.extra_data_num]
+        else:
+            params = ''
+        test_name_parts = ['test', typ, prefix, test_case.name, params]
         test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
 
-        setattr(class_add, test_name, test_gen(test_params, prefix))
+        setattr(class_add, test_name, test_gen(test_case, prefix))
 
 
-def test_gen(test_params, prefix):
+def test_gen(test_case, prefix):
     func_name = 'func'
-    input_data = ','.join([test_params.name_data, test_params.names_extra_data])
-    call_expression = test_params.call_expression
-    if test_params.call_expression is None:
+    usecase_params = test_case.usecase_params
+    call_expression = test_case.call_expression
+    if test_case.call_expression is None:
+        if usecase_params is None:
+            other = test_case.params.split(', ', test_case.extra_data_num).pop()
+            usecase_params_parts = ['data'] + [other]
+            usecase_params = ', '.join(usecase_params_parts)
         prefix_as_list = [prefix] if prefix else []
-        if test_params.names_extra_data != '' and test_params.params != '':
-            params = ','.join([test_params.names_extra_data, test_params.params])
-        else:
-            params = test_params.names_extra_data + test_params.params
-        expr_parts = [test_params.name_data] + prefix_as_list + ['{}({})'.format(test_params.name, params)]
-        call_expression = '.'.join(expr_parts)
+        call_expression_parts = ['data'] + prefix_as_list + ['{}({})'.format(test_case.name, test_case.params)]
+        call_expression = '.'.join(call_expression_parts)
 
     func_text = f"""\
 def {func_name}(self):
-  self._test_case(usecase_gen('{input_data}', '{call_expression}'), name='{test_params.name}', 
-                               total_data_length={test_params.size}, data_num={test_params.data_num},
-                               input_data={test_params.input_data})
+  self._test_case(usecase_gen('{usecase_params}', '{call_expression}'), name='{test_case.name}', 
+                               total_data_length={test_case.size}, extra_data_num={test_case.extra_data_num},
+                               input_data={test_case.input_data})
 """
 
     global_vars = {'usecase_gen': usecase_gen}
