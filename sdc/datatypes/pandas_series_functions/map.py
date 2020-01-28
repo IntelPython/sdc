@@ -27,6 +27,7 @@
 import numpy
 import pandas
 from numba import prange, types
+from numba.extending import register_jitable
 from numba.targets.registry import cpu_target
 
 from sdc.hiframes.pd_series_ext import SeriesType
@@ -83,6 +84,16 @@ def hpat_pandas_series_map(self, arg, na_action=None):
         sig = arg.get_call_type(cpu_target.typing_context, [self.dtype], {})
         output_type = sig.return_type
 
+        # @register_jitable
+        # def apply_nan_ignore(func, x):
+        #     if np.isnan(x):
+        #         return x
+        #     return func(x)
+
+        # @register_jitable
+        # def apply(func, x):
+        #     return func(x)
+
         def impl(self, arg, na_action=None):
             input_arr = self._data
             length = len(input_arr)
@@ -90,7 +101,12 @@ def hpat_pandas_series_map(self, arg, na_action=None):
             output_arr = numpy.empty(length, dtype=output_type)
 
             for i in prange(length):
-                output_arr[i] = arg(input_arr[i])
+                value = input_arr[i]
+                if na_action == 'ignore' and numpy.isnan(value):
+                    output_arr[i] = value
+                else:
+                    output_arr[i] = arg(value)
+                # output_arr[i] = arg(input_arr[i])
 
             return pandas.Series(output_arr, index=self._index, name=self._name)
 
@@ -107,6 +123,23 @@ def hpat_pandas_series_map(self, arg, na_action=None):
 
             for i in prange(length):
                 output_arr[i] = arg.get(input_arr[i], numpy.nan)
+
+            return pandas.Series(output_arr, index=self._index, name=self._name)
+
+        return impl
+
+    if isinstance(arg, SeriesType):
+        output_type = self.dtype
+
+        def impl(self, arg, na_action=None):
+            input_arr = self._data
+            length = len(input_arr)
+
+            output_arr = numpy.empty(length, dtype=output_type)
+
+            for i in prange(length):
+                # output_arr[i] = input_arr[i]
+                output_arr[i] = arg[i]
 
             return pandas.Series(output_arr, index=self._index, name=self._name)
 

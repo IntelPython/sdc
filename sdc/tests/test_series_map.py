@@ -25,6 +25,7 @@
 # *****************************************************************************
 
 import pandas as pd
+import numpy as np
 
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit, skip_sdc_jit
@@ -41,6 +42,18 @@ class TestSeries_map(object):
         hpat_func = self.jit(test_impl)
 
         S = pd.Series([1.0, 2., 3., 4., 5.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_map_func_nan_ignore(self):
+        def test_impl(S):
+            def nan_to_1(x):
+                if np.isnan(x):
+                    return 1
+                return x
+            return S.map(nan_to_1, na_action='ignore')
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([1.0, 2., np.nan, 4., 5.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_map_global1(self):
@@ -79,6 +92,24 @@ class TestSeries_map(object):
         S = pd.Series([1., 2., 3., 4., 5.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @skip_sdc_jit
+    def test_series_map_dict_nan_ignore(self):
+        def test_impl(S):
+            return S.map({np.nan: 1.}, na_action='ignore')
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([1., 2., np.nan, 4., 5.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        print(test_impl(S))
+
+    # def test_series_map_series(self):
+    #     def test_impl(S, S2):
+    #         return S.map(S2)
+    #     hpat_func = self.jit(test_impl)
+
+    #     S = pd.Series([1., 2., 3., 4., 5.])
+    #     S2 = pd.Series([5., 4., 3., 2., 1.])
+    #     pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
 class _Test(TestSeries_map, TestCase):
     pass
