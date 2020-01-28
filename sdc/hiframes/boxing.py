@@ -65,7 +65,9 @@ def typeof_pd_dataframe(val, c):
     col_names = tuple(val.columns.tolist())
     # TODO: support other types like string and timestamp
     col_types = get_hiframes_dtypes(val)
-    return DataFrameType(col_types, None, col_names, True)
+    index_type = _infer_index_type(val.index)
+
+    return DataFrameType(col_types, index_type, col_names, True)
 
 
 # register series types for import
@@ -105,6 +107,14 @@ def unbox_dataframe(typ, val, c):
     # TODO: support unboxing index
     if typ.index == types.none:
         dataframe.index = c.context.get_constant(types.none, None)
+    if typ.index == string_array_type:
+        index_obj = c.pyapi.object_getattr_string(val, "index")
+        dataframe.index = unbox_str_series(string_array_type, index_obj, c).value
+    if isinstance(typ.index, types.Array):
+        index_obj = c.pyapi.object_getattr_string(val, "index")
+        index_data = c.pyapi.object_getattr_string(index_obj, "_data")
+        dataframe.index = unbox_array(typ.index, index_data, c).value
+
     dataframe.columns = column_tup
     dataframe.unboxed = unboxed_tup
     dataframe.parent = val

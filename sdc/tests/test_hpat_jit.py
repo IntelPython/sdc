@@ -24,16 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import unittest
-import platform
-import sdc
 import numba
 import numpy as np
 import pandas as pd
-from sdc import *
-from numba.typed import Dict
+import platform
+import unittest
 from collections import defaultdict
+from numba.typed import Dict
+
+import sdc
+from sdc import *
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
 

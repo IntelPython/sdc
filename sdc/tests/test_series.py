@@ -26,22 +26,34 @@
 
 
 # -*- coding: utf-8 -*-
-import string
-import unittest
-import platform
-import pandas as pd
 import numpy as np
+import pandas as pd
+import platform
 import pyarrow.parquet as pq
 import sdc
-from itertools import islice, permutations, product, combinations, combinations_with_replacement
-from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (
-    count_array_REPs, count_parfor_REPs, count_array_OneDs, get_start_end,
-    skip_numba_jit, skip_sdc_jit, sdc_limitation, skip_parallel, skip_inline)
-from sdc.tests.gen_test_data import ParquetGenerator
+import string
+import unittest
+from itertools import combinations, combinations_with_replacement, islice, permutations, product
 from numba import types
 from numba.config import IS_32BITS
 from numba.errors import TypingError
+from numba.special import literally
+
+from .test_series_apply import TestSeries_apply
+from .test_series_map import TestSeries_map
+from sdc.tests.test_base import TestCase
+from sdc.tests.test_utils import (count_array_OneDs,
+                                  count_array_REPs,
+                                  count_parfor_REPs,
+                                  get_start_end,
+                                  sdc_limitation,
+                                  skip_inline,
+                                  skip_numba_jit,
+                                  skip_parallel,
+                                  skip_sdc_jit)
+from sdc.tests.gen_test_data import ParquetGenerator
+
+from sdc.tests.test_utils import test_global_input_data_unicode_kind1
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -96,12 +108,6 @@ test_global_input_data_unicode_kind4 = [
     '¡Y tú quién te crees?',
     '🐍⚡',
     '大处着眼，小处着手。',
-]
-
-test_global_input_data_unicode_kind1 = [
-    'ascii',
-    '12345',
-    '1234567890',
 ]
 
 def gen_srand_array(size, nchars=8):
@@ -246,10 +252,27 @@ def isalnum_usecase(series):
     return series.str.isalnum()
 
 
-GLOBAL_VAL = 2
+def isnumeric_usecase(series):
+    return series.str.isnumeric()
 
 
-class TestSeries(TestCase):
+def isdigit_usecase(series):
+    return series.str.isdigit()
+
+
+def isdecimal_usecase(series):
+    return series.str.isdecimal()
+
+
+def isupper_usecase(series):
+    return series.str.isupper()
+
+
+class TestSeries(
+    TestSeries_apply,
+    TestSeries_map,
+    TestCase
+):
 
     @skip_numba_jit
     def test_create1(self):
@@ -477,6 +500,7 @@ class TestSeries(TestCase):
         A = pd.Series(np.random.ranf(n))
         pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     @skip_numba_jit
     def test_series_argsort2(self):
         def test_impl(S):
@@ -486,6 +510,7 @@ class TestSeries(TestCase):
         S = pd.Series([1, -1, 0, 1, np.nan], [1, 2, 3, 4, 5])
         pd.testing.assert_series_equal(test_impl(S), hpat_func(S))
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     @skip_numba_jit
     def test_series_argsort_full(self):
         def test_impl(series, kind):
@@ -507,6 +532,7 @@ class TestSeries(TestCase):
                 else:
                     np.testing.assert_array_equal(ref, jit)
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     @skip_numba_jit
     def test_series_argsort_full_idx(self):
         def test_impl(series, kind):
@@ -530,6 +556,7 @@ class TestSeries(TestCase):
                     else:
                         np.testing.assert_array_equal(ref, jit)
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     @skip_numba_jit
     def test_series_attr6(self):
         def test_impl(A):
@@ -1258,6 +1285,18 @@ class TestSeries(TestCase):
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
     @skip_sdc_jit('Not impl in old style')
+    def test_series_loc_array(self):
+        def test_impl(A, n):
+            return A.loc[n]
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([1, 2, 4, 8, 6, 0], [1, 2, 4, 0, 6, 0])
+        n = [0, 4, 2]
+        cases = [n, np.array(n)]
+        for n in cases:
+            pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
+
+    @skip_sdc_jit('Not impl in old style')
     def test_series_at_str(self):
         def test_impl(A):
             return A.at['1']
@@ -1784,7 +1823,6 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis1(self):
         '''Verifies Series.fillna() implementation handles 'index' as axis argument'''
@@ -1795,7 +1833,6 @@ class TestSeries(TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis2(self):
         '''Verifies Series.fillna() implementation handles 0 as axis argument'''
@@ -1806,7 +1843,6 @@ class TestSeries(TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis3(self):
         '''Verifies Series.fillna() implementation handles correct non-literal axis argument'''
@@ -1818,7 +1854,6 @@ class TestSeries(TestCase):
         for axis in [0, 'index']:
             pd.testing.assert_series_equal(hpat_func(S, axis), test_impl(S, axis))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_from_df(self):
         '''Verifies Series.fillna() applied to a named float Series obtained from a DataFrame'''
@@ -1830,7 +1865,6 @@ class TestSeries(TestCase):
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0, np.inf]})
         pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A), check_names=False)
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index1(self):
         '''Verifies Series.fillna() implementation for float series with default index'''
@@ -1842,7 +1876,6 @@ class TestSeries(TestCase):
             S = pd.Series(data)
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index2(self):
         '''Verifies Series.fillna() implementation for float series with string index'''
@@ -1853,7 +1886,6 @@ class TestSeries(TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf], ['a', 'b', 'c', 'd', 'e'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index3(self):
         def test_impl(S):
@@ -2413,7 +2445,7 @@ class TestSeries(TestCase):
                     # con not compare Nan != Nan directly
                     self.assertEqual(np.isnan(actual), np.isnan(expected))
                 else:
-                    self.assertEqual(actual, expected)
+                    self.assertAlmostEqual(actual, expected)
 
     def test_series_prod_skipna_default(self):
         def test_impl(S):
@@ -2651,6 +2683,7 @@ class TestSeries(TestCase):
                     result = hpat_func(S, ascending)
                     pd.testing.assert_series_equal(result, result_ref)
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     def test_series_value_counts_index(self):
         def test_impl(S):
             return S.value_counts()
@@ -2685,6 +2718,7 @@ class TestSeries(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     @skip_numba_jit
     def test_series_dist_input2(self):
         '''Verify distribution of a Series with integer index'''
@@ -2756,43 +2790,6 @@ class TestSeries(TestCase):
         S1 = pd.Series([1.0, 2., 3., 4., 5.])
         S2 = pd.Series([6., 7.])
         np.testing.assert_array_equal(hpat_func(S1, S2), test_impl(S1, S2))
-
-    @skip_numba_jit
-    def test_series_map1(self):
-        def test_impl(S):
-            return S.map(lambda a: 2 * a)
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_numba_jit
-    def test_series_map_global1(self):
-        def test_impl(S):
-            return S.map(lambda a: a + GLOBAL_VAL)
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_numba_jit
-    def test_series_map_tup1(self):
-        def test_impl(S):
-            return S.map(lambda a: (a, 2 * a))
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_numba_jit
-    def test_series_map_tup_map1(self):
-        def test_impl(S):
-            A = S.map(lambda a: (a, 2 * a))
-            return A.map(lambda a: a[1])
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @skip_numba_jit
     def test_series_combine(self):
@@ -2898,15 +2895,6 @@ class TestSeries(TestCase):
         S2 = pd.Series([6.0, 21., 3.6, 5., 0.0])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
-    @skip_numba_jit
-    def test_series_apply1(self):
-        def test_impl(S):
-            return S.apply(lambda a: 2 * a)
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
     def test_series_abs1(self):
         def test_impl(S):
             return S.abs()
@@ -2973,6 +2961,7 @@ class TestSeries(TestCase):
         msg = msg_tmpl.format('given: int64\n expected: str')
         self.assertIn(msg, str(raises.exception))
 
+    @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2348
     def test_series_str_center_exception_unsupported_kind4(self):
         def test_impl(series, width):
             return series.str.center(width)
@@ -2983,10 +2972,9 @@ class TestSeries(TestCase):
         series = pd.Series(data)
         width = max(len(s) for s in data) + 10
 
-        with self.assertRaises(SystemError) as raises:
-            hpat_func(series, width)
-        msg = 'NULL object passed to Py_BuildValue'
-        self.assertIn(msg, str(raises.exception))
+        jit_result = hpat_func(series, width)
+        ref_result = test_impl(series, width)
+        pd.testing.assert_series_equal(jit_result, ref_result)
 
     def test_series_str_endswith(self):
         def test_impl(series, pat):
@@ -3126,17 +3114,17 @@ class TestSeries(TestCase):
                 cfunc(series, width, 5)
             self.assertIn(msg_tmpl.format(name), str(raises.exception))
 
+    @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2348
     def test_series_str_just_exception_unsupported_kind4(self):
         data = test_global_input_data_unicode_kind4
         series = pd.Series(data)
         width = max(len(s) for s in data) + 5
-        msg = 'NULL object passed to Py_BuildValue'
 
         for pyfunc in [ljust_usecase, rjust_usecase]:
             cfunc = self.jit(pyfunc)
-            with self.assertRaises(SystemError) as raises:
-                cfunc(series, width)
-            self.assertIn(msg, str(raises.exception))
+            jit_result = cfunc(series, width)
+            ref_result = pyfunc(series, width)
+            pd.testing.assert_series_equal(jit_result, ref_result)
 
     def test_series_str_startswith(self):
         def test_impl(series, pat):
@@ -3189,6 +3177,7 @@ class TestSeries(TestCase):
                 ref_result = test_impl(series, width)
                 pd.testing.assert_series_equal(jit_result, ref_result)
 
+    @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2348
     def test_series_str_zfill_exception_unsupported_kind4(self):
         def test_impl(series, width):
             return series.str.zfill(width)
@@ -3199,10 +3188,9 @@ class TestSeries(TestCase):
         series = pd.Series(data)
         width = max(len(s) for s in data) + 5
 
-        with self.assertRaises(SystemError) as raises:
-            hpat_func(series, width)
-        msg = 'NULL object passed to Py_BuildValue'
-        self.assertIn(msg, str(raises.exception))
+        jit_result = hpat_func(series, width)
+        ref_result = test_impl(series, width)
+        pd.testing.assert_series_equal(jit_result, ref_result)
 
     def test_series_str2str(self):
         common_methods = ['lower', 'upper', 'isupper']
@@ -3958,6 +3946,7 @@ class TestSeries(TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @skip_sdc_jit("Fails to compile with latest Numba")
     def test_series_head_index3(self):
         '''Verifies head method for non-distributed pass of Series with integer index'''
         def test_impl(S):
@@ -4323,52 +4312,174 @@ class TestSeries(TestCase):
                 else:
                     self.assertEqual(result, result_ref)
 
-    def test_series_sort_values1(self):
+    @skip_sdc_jit('Old-style impl returns array but not Series')
+    def test_series_sort_values_default(self):
+        """Verifies Series.sort_values method with default parameters
+            on a named Series of different dtypes and default index"""
         def test_impl(A):
             return A.sort_values()
         hpat_func = self.jit(test_impl)
 
         n = 11
         np.random.seed(0)
-        S = pd.Series(np.random.ranf(n))
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        # using sequences of unique values because default sorting algorithm is not stable
+        data_to_test = [
+            [1, -0., 0.2, -3.7, np.inf, np.nan, -1.0, 2/3, 21.2, -np.inf, 9.99],
+            np.arange(-10, 20, 1),
+            np.unique(np.random.ranf(n)),
+            np.unique(np.random.randint(0, 100, n)),
+            ['ac', 'c', 'cb', 'ca', None, 'da', 'cc', 'ddd', 'd']
+        ]
+        for data in data_to_test:
+            with self.subTest(series_data=data):
+                S = pd.Series(data, name='A')
+                pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    def test_series_sort_values2(self):
-        def test_impl(S):
+    @skip_sdc_jit('Old-style impl returns array but not Series')
+    def test_series_sort_values_ascending(self):
+        """Verifies Series.sort_values method handles parameter 'ascending' as a literal and non-literal value"""
+        def test_impl(S, param_value):
+            return S.sort_values(ascending=param_value)
+
+        def test_impl_literal(S):
             return S.sort_values(ascending=False)
+
+        hpat_func1 = self.jit(test_impl)
+        hpat_func2 = self.jit(test_impl_literal)
+
+        S = pd.Series(['ac', 'c', 'cb', 'ca', None, 'da', 'cc', 'ddd', 'd'])
+        for ascending in (False, True):
+            with self.subTest(literal_value='no', ascending=ascending):
+                pd.testing.assert_series_equal(hpat_func1(S, ascending), test_impl(S, ascending))
+
+        with self.subTest(literal_value='yes'):
+            pd.testing.assert_series_equal(hpat_func2(S), test_impl_literal(S))
+
+    @skip_sdc_jit('Old-style impl returns array but not Series')
+    def test_series_sort_values_invalid_axis(self):
+        """Verifies Series.sort_values method raises with invalid value of parameter 'axis'"""
+        def test_impl(S, param_value):
+            return S.sort_values(axis=param_value)
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series(['a', 'd', 'r', 'cc'])
-        pd.testing.assert_series_equal(test_impl(S), hpat_func(S))
+        S = pd.Series(['ac', 'c', 'cb', 'ca', None, 'da', 'cc', 'ddd', 'd'])
+        unsupported_values = [1, 'columns', 'abcde']
+        for axis in unsupported_values:
+            with self.assertRaises(Exception) as context:
+                test_impl(S, axis)
+            pandas_exception = context.exception
 
-    def test_series_sort_values_index1(self):
-        def test_impl(A, B):
-            S = pd.Series(A, B)
-            return S.sort_values()
+            self.assertRaises(type(pandas_exception), hpat_func, S, axis)
+
+    @skip_sdc_jit('Old-style impl returns array but not Series')
+    @skip_numba_jit('TODO: inplace sorting is not implemented yet')
+    def test_series_sort_values_inplace(self):
+        def test_impl(S):
+            S.sort_values(inplace=True)
+            return S
+        hpat_func = self.jit(test_impl)
+
+        S1 = pd.Series(['ac', 'c', 'cb', 'ca', None, 'da', 'cc', 'ddd', 'd'])
+        S2 = S1.copy()
+        pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
+
+    @skip_sdc_jit('Old-style impl returns array but not Series')
+    def test_series_sort_values_kind(self):
+        """Verifies Series.sort_values method support of parameter 'kind'
+           on a unnamed Series of different dtypes and default index"""
+        def test_impl_literal_kind(A, param_value):
+            # FIXME: use literally(kind) because, numpy.argsort is supported by Numba with literal kind value only
+            # and literally when applied inside sort_values overload_method impl is not working due to some bug in Numba
+            return A.sort_values(kind=literally(param_value))
+        hpat_func1 = self.jit(test_impl_literal_kind)
+
+        def test_impl_non_literal_kind(A, param_value):
+            return A.sort_values(kind=param_value)
+        hpat_func2 = self.jit(test_impl_non_literal_kind)
+
+        # using sequences of unique values because default sorting algorithm is not stable
+        n = 11
+        np.random.seed(0)
+        data_to_test = [
+            [1, -0., 0.2, -3.7, np.inf, np.nan, -1.0, 2/3, 21.2, -np.inf, 9.99],
+            np.arange(-10, 20, 1),
+            np.unique(np.random.ranf(n)),
+            np.unique(np.random.randint(0, 100, n)),
+            ['ac', 'c', 'cb', 'ca', None, 'da', 'cc', 'ddd', 'd']
+        ]
+        kind_values = ['quicksort', 'mergesort']
+        for data in data_to_test:
+            S = pd.Series(data=data)
+            for kind in kind_values:
+                with self.subTest(series_data=data, kind=kind):
+                    pd.testing.assert_series_equal(hpat_func1(S, kind), test_impl_literal_kind(S, kind))
+
+        kind = None
+        with self.subTest(series_data=data, kind=kind):
+            pd.testing.assert_series_equal(hpat_func2(S, kind), test_impl_non_literal_kind(S, kind))
+
+    @skip_sdc_jit('Old-style impl returns array but not Series')
+    def test_series_sort_values_na_position(self):
+        """Verifies Series.sort_values method support of parameter 'na_position'
+           on a unnamed Series of different dtypes and default index"""
+        def test_impl(S, param_value):
+            # kind=mergesort is used for sort stability
+            return S.sort_values(kind='mergesort', na_position=param_value)
         hpat_func = self.jit(test_impl)
 
         n = 11
         np.random.seed(0)
-        # TODO: support passing Series with Index
-        # S = pd.Series(np.random.ranf(n), np.random.randint(0, 100, n))
-        A = np.random.ranf(n)
-        B = np.random.ranf(n)
-        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+        data_to_test = [
+            [1, -0., 0.2, -3.7, np.inf, np.nan, -1.0, 2/3, 21.2, -np.inf, 9.99],
+            np.arange(-10, 20, 1),
+            np.random.ranf(n),
+            np.random.randint(0, 100, n),
+            ['ac', 'c', None, '', 'cb', 'ca', None, 'da', 'cc', 'ddd', '', '', 'd']
+        ]
+        na_position_values = ['first', 'last']
+        for data in data_to_test:
+            S = pd.Series(data=data)
+            for na_position in na_position_values:
+                with self.subTest(series_data=data, na_position=na_position):
+                    pd.testing.assert_series_equal(hpat_func(S, na_position), test_impl(S, na_position))
+
+    @skip_sdc_jit('Old-style impl returns array but not Series')
+    def test_series_sort_values_index(self):
+        """Verifies Series.sort_values method with default parameters
+           on an unnamed integer Series and different indexes"""
+        def test_impl(S):
+            # kind=mergesort is used for sort stability
+            return S.sort_values(kind='mergesort')
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        np.random.seed(0)
+        data = np.random.randint(0, 100, n)
+        use_indexes = ['id1', None, '', 'abc', 'a', 'dd', 'd1', '23']
+        dtype_to_index = {'None': None,
+                          'int': np.arange(n, dtype='int'),
+                          'float': np.arange(n, dtype='float'),
+                          'string': [use_indexes[i] for i in np.random.randint(0, len(use_indexes), n)]}
+
+        for dtype, index_data in dtype_to_index.items():
+            with self.subTest(index_dtype=dtype, index=index_data):
+                S = pd.Series(data, index=index_data)
+                pd.testing.assert_series_equal(hpat_func(S), test_impl(S), check_names=False)
 
     @skip_parallel
+    @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_full(self):
         def test_impl(series, ascending, kind):
-            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind=kind, na_position='last')
+            return series.sort_values(axis=0, ascending=ascending, kind=literally(kind), na_position='last')
 
         hpat_func = self.jit(test_impl)
 
         all_data = test_global_input_data_numeric + [test_global_input_data_unicode_kind1]
 
         for data in all_data:
-            data = data * 3
+            series = pd.Series(data * 3)
             for ascending in [True, False]:
                 for kind in ['quicksort', 'mergesort']:
-                    series = pd.Series(data)
                     ref_result = test_impl(series, ascending, kind=kind)
                     jit_result = hpat_func(series, ascending, kind=kind)
                     ref = restore_series_sort_values(series, ref_result.index, ascending)
@@ -4379,20 +4490,19 @@ class TestSeries(TestCase):
                         np.testing.assert_array_equal(ref_result.data, jit_result.data)
                         self.assertEqual(ref, jit)
 
-    @unittest.skip("Creating Python string/unicode object failed")
+    @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_full_unicode4(self):
         def test_impl(series, ascending, kind):
-            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind=kind, na_position='last')
+            return series.sort_values(axis=0, ascending=ascending, kind=literally(kind), na_position='last')
 
         hpat_func = self.jit(test_impl)
 
         all_data = [test_global_input_data_unicode_kind1]
 
         for data in all_data:
-            data = data * 3
+            series = pd.Series(data * 3)
             for ascending in [True, False]:
                 for kind in ['quicksort', 'mergesort']:
-                    series = pd.Series(data)
                     ref_result = test_impl(series, ascending, kind=kind)
                     jit_result = hpat_func(series, ascending, kind=kind)
                     ref = restore_series_sort_values(series, ref_result.index, ascending)
@@ -4404,16 +4514,17 @@ class TestSeries(TestCase):
                         self.assertEqual(ref, jit)
 
     @skip_parallel
+    @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_full_idx(self):
         def test_impl(series, ascending, kind):
-            return series.sort_values(axis=0, ascending=ascending, inplace=False, kind=kind, na_position='last')
+            return series.sort_values(axis=0, ascending=ascending, kind=literally(kind), na_position='last')
 
         hpat_func = self.jit(test_impl)
 
         all_data = test_global_input_data_numeric + [test_global_input_data_unicode_kind1]
 
         for data in all_data:
-            data = data * 3
+            series = pd.Series(data * 3)
             for index in [gen_srand_array(len(data)), gen_frand_array(len(data)), range(len(data))]:
                 for ascending in [True, False]:
                     for kind in ['quicksort', 'mergesort']:
@@ -4531,7 +4642,7 @@ class TestSeries(TestCase):
         series = pd.Series(test_global_input_data_unicode_kind4)
         with self.assertRaises(TypingError) as raises:
             cfunc(series)
-        msg = 'Method shift(). The object must be a number. Given self.data.dtype: {}'
+        msg = 'Method shift(). The object self.data.dtype\n given: unicode_type\n expected: number\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
     def test_series_shift_fill_str(self):
@@ -4542,7 +4653,7 @@ class TestSeries(TestCase):
         series = pd.Series(test_global_input_data_float64[0])
         with self.assertRaises(TypingError) as raises:
             cfunc(series, fill_value='unicode')
-        msg = 'Method shift(). The object must be a number. Given fill_value: {}'
+        msg = 'Method shift(). The object fill_value\n given: unicode_type\n expected: number\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
     def test_series_shift_unsupported_params(self):
@@ -4553,7 +4664,7 @@ class TestSeries(TestCase):
         series = pd.Series(test_global_input_data_float64[0])
         with self.assertRaises(TypingError) as raises:
             cfunc(series, freq='12H', axis=0)
-        msg = 'Method shift(). Unsupported parameters. Given freq: {}'
+        msg = 'Method shift(). The object freq\n given: unicode_type\n expected: None\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
@@ -4742,6 +4853,7 @@ class TestSeries(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_series_quantile(self):
         def test_impl():
             A = pd.Series([1, 2.5, .5, 3, 5])
@@ -4853,7 +4965,7 @@ class TestSeries(TestCase):
         series = pd.Series(test_global_input_data_unicode_kind4)
         with self.assertRaises(TypingError) as raises:
             cfunc(series)
-        msg = 'Method std(). The object must be a number. Given self.data.dtype: {}'
+        msg = 'Method std(). The object self.data\n given: StringArrayType()\n expected: number\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
     @skip_sdc_jit('Series.std() parameters "axis", "level", "numeric_only" unsupported')
@@ -4863,18 +4975,20 @@ class TestSeries(TestCase):
 
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_float64[0])
-        msg = 'Method std(). Unsupported parameters. Given {}: {}'
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=1, level=None, numeric_only=None)
-        self.assertIn(msg.format('axis', 'int'), str(raises.exception))
+        msg = 'Method std(). The object axis\n given: int64\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=None, level=1, numeric_only=None)
-        self.assertIn(msg.format('level', 'int'), str(raises.exception))
+        msg = 'Method std(). The object level\n given: int64\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=None, level=None, numeric_only=True)
-        self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
+        msg = 'Method std(). The object numeric_only\n given: bool\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
     def test_series_nunique(self):
         def test_series_nunique_impl(S):
@@ -4973,8 +5087,8 @@ class TestSeries(TestCase):
         series = pd.Series(test_global_input_data_unicode_kind4)
         with self.assertRaises(TypingError) as raises:
             cfunc(series)
-        msg = 'Method var(). The object must be a number. Given self.data.dtype: {}'
-        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+        msg = 'Method var(). The object self.data\n given: StringArrayType()\n expected: number\n'
+        self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('Series.var() parameters "axis", "level", "numeric_only" unsupported')
     def test_series_var_unsupported_params(self):
@@ -4983,18 +5097,20 @@ class TestSeries(TestCase):
 
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_float64[0])
-        msg = 'Method var(). Unsupported parameters. Given {}: {}'
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=1, level=None, numeric_only=None)
-        self.assertIn(msg.format('axis', 'int'), str(raises.exception))
+        msg = 'Method var(). The object axis\n given: int64\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=None, level=1, numeric_only=None)
-        self.assertIn(msg.format('level', 'int'), str(raises.exception))
+        msg = 'Method var(). The object level\n given: int64\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=None, level=None, numeric_only=True)
-        self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
+        msg = 'Method var(). The object numeric_only\n given: bool\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
     def test_series_count(self):
         def test_series_count_impl(S):
@@ -5024,7 +5140,6 @@ class TestSeries(TestCase):
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
 
-    @skip_parallel
     @skip_sdc_jit('Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum(self):
         def test_impl():
@@ -5035,7 +5150,6 @@ class TestSeries(TestCase):
         cfunc = self.jit(pyfunc)
         pd.testing.assert_series_equal(pyfunc(), cfunc())
 
-    @skip_parallel
     @skip_sdc_jit('Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum_unboxing(self):
         def test_impl(s):
@@ -5048,7 +5162,6 @@ class TestSeries(TestCase):
             series = pd.Series(data)
             pd.testing.assert_series_equal(pyfunc(series), cfunc(series))
 
-    @skip_parallel
     @skip_sdc_jit('Series.cumsum() parameters "axis", "skipna" unsupported')
     def test_series_cumsum_full(self):
         def test_impl(s, axis, skipna):
@@ -5625,7 +5738,6 @@ class TestSeries(TestCase):
         B = pd.Series(np.random.ranf(n), index=index2)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
-    @skip_numba_jit
     @skip_sdc_jit('Test hangs due to a call of Series.sort_values')
     def test_series_operator_add_align_index_str_capacity(self):
         """Verifies implementation of Series.operator.add and alignment of string indexes of large size"""
@@ -5901,16 +6013,43 @@ class TestSeries(TestCase):
 
     @skip_sdc_jit("Series.str.isalnum is not supported yet")
     def test_series_isalnum_str(self):
-        series = [['one', 'one1', '1', ''],
-                  ['A B', '1.5', '3,000'],
-                  ['23', '⅕', ''],
-                  ['leopard', 'Golden Eagle', 'SNAKE', '']
-                  ]
-
         cfunc = self.jit(isalnum_usecase)
-        for ser in series:
-            S = pd.Series(ser)
+        test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
+        for data in test_data:
+            S = pd.Series(data)
             pd.testing.assert_series_equal(cfunc(S), isalnum_usecase(S))
+
+    @skip_sdc_jit("Series.str.isnumeric is not supported yet")
+    def test_series_isnumeric_str(self):
+        cfunc = self.jit(isnumeric_usecase)
+        test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
+        for data in test_data:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(S), isnumeric_usecase(S))
+
+    @skip_sdc_jit("Series.str.isdigit is not supported yet")
+    def test_series_isdigit_str(self):
+        cfunc = self.jit(isdigit_usecase)
+        test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
+        for data in test_data:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(S), isdigit_usecase(S))
+
+    @skip_sdc_jit("Series.str.isdecimal is not supported yet")
+    def test_series_isdecimal_str(self):
+        cfunc = self.jit(isdecimal_usecase)
+        test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
+        for data in test_data:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(S), isdecimal_usecase(S))
+
+    @skip_sdc_jit("Series.str.isupper is not supported yet")
+    def test_series_isupper_str(self):
+        cfunc = self.jit(isupper_usecase)
+        test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
+        for data in test_data:
+            S = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(S), isupper_usecase(S))
 
     @skip_sdc_jit('Old-style implementation returns string, but not series')
     def test_series_describe_numeric(self):

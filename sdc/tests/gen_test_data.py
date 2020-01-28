@@ -24,10 +24,9 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
 import numpy as np
-import pyarrow.parquet as pq
 import pyarrow as pa
+import pyarrow.parquet as pq
 import pandas as pd
 
 
