@@ -77,7 +77,7 @@ def test_gen(test_case, prefix):
 
     skip = '@skip_numba_jit\n' if test_case.skip else ''
 
-    func_text = f"""\
+    func_text = f"""
 {skip}def {func_name}(self):
   self._test_case(usecase, name='{test_case.name}', total_data_length={test_case.size},
                   data_num={test_case.data_num}, input_data={test_case.input_data})
@@ -95,7 +95,7 @@ def test_gen(test_case, prefix):
 def gen_usecase(input_data, call_expr):
     func_name = 'func'
 
-    func_text = f"""\
+    func_text = f"""
 def {func_name}({input_data}):
   start_time = time.time()
   res = {call_expr}
