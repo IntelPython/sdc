@@ -1070,6 +1070,23 @@ stringmethods_funcs = {
 }
 
 
+@sdc_overload_method(StringMethodsType, 'capitalize')
+def hpat_pandas_stringmethods_capitalize(self):
+    ty_checker = TypeChecker('Method capitalize().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_capitalize_impl(self):
+        # item_count = len(self._data)
+        # result = [''] * item_count
+        # for idx, item in enumerate(self._data._data):
+        #     result[idx] = item.capitalize()
+        #
+        # return pandas.Series(result, self._data._index, name=self._data._name)
+        return self._data
+
+    return hpat_pandas_stringmethods_capitalize_impl
+
+
 for name, data in stringmethods_funcs.items():
     data['method'].__doc__ = sdc_pandas_series_str_docstring_template.format(**{'method_name': name,
                                                                                 'caption': data['caption']})

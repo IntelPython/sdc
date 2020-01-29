@@ -3185,6 +3185,16 @@ class TestSeries(
                 pd.testing.assert_series_equal(hpat_func(S), test_impl(S),
                                                check_names=check_names)
 
+    def test_series_str_capitalize(self):
+        def test_impl(S):
+            return S.str.capitalize
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
+        print(s)
+        print(sdc_func(s))
+        # pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
     @skip_sdc_jit('Series.str.<method>() unsupported')
     def test_series_str2str_unsupported(self):
         unsupported_methods = ['capitalize', 'swapcase', 'title']
