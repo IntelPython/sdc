@@ -50,7 +50,7 @@ def astype(self, dtype, order='K', casting='unsafe', subok=True, copy=True):
     pass
 
 
-@sdc_overload(astype, jit_options={'parallel': True})
+@sdc_overload(astype)
 def sdc_astype_overload(self, dtype, order='K', casting='unsafe', subok=True, copy=True):
     """
     Intel Scalable Dataframe Compiler Developer Guide
@@ -59,7 +59,7 @@ def sdc_astype_overload(self, dtype, order='K', casting='unsafe', subok=True, co
 
     .. only:: developer
 
-       Test: python -m sdc.runtests -k sdc.tests.test_sdc_numpy.TestArrays.test_astype*
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k astype
 
     """
 
@@ -68,18 +68,6 @@ def sdc_astype_overload(self, dtype, order='K', casting='unsafe', subok=True, co
 
     if not isinstance(dtype, (types.StringLiteral, types.UnicodeType, types.Function, types.functions.NumberClass)):
         ty_checker.raise_exc(dtype, 'string or type', 'dtype')
-
-    if not isinstance(order, (str, types.Omitted, types.StringLiteral, types.UnicodeType)):
-        ty_checker.raise_exc(order, 'string', 'order')
-
-    if not isinstance(casting, (str, types.Omitted, types.StringLiteral, types.UnicodeType)):
-        ty_checker.raise_exc(casting, 'string', 'casting')
-
-    if not isinstance(subok, (bool, types.Omitted, types.Boolean)):
-        ty_checker.raise_exc(subok, 'boolean', 'subok')
-
-    if not isinstance(copy, (bool, types.Omitted, types.Boolean)):
-        ty_checker.raise_exc(copy, 'boolean', 'copy')
 
     if ((isinstance(dtype, types.Function) and dtype.typing_key == str) or
         (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
@@ -106,30 +94,19 @@ def sdc_astype_overload(self, dtype, order='K', casting='unsafe', subok=True, co
         other_numba_dtype = dtype.instance_type
         numba_self = self.dtype
 
-        def sdc_astype_number_impl(self, dtype, order='K', casting='unsafe', subok=True, copy=True):
-            if numba_self == other_numba_dtype:
-                return self
-            arr = numpy.empty(len(self), dtype=dtype)
-            for i in numba.prange(len(self)):
-                arr[i] = self[i]
-
-            return arr
-
-        return sdc_astype_number_impl
-
     if (isinstance(self, types.Array) and isinstance(dtype, (types.StringLiteral, types.UnicodeType))):
         other_numpy_dtype = numpy.dtype(dtype.literal_value)
         other_numba_dtype = numpy_support.from_dtype(other_numpy_dtype)
         numba_self = self.dtype
 
-        def sdc_astype_number_literal_impl(self, dtype, order='K', casting='unsafe', subok=True, copy=True):
-            if other_numba_dtype == numba_self:
-                return self
+    def sdc_astype_number_impl(self, dtype, order='K', casting='unsafe', subok=True, copy=True):
+        if other_numba_dtype == numba_self:
+            return self
 
-            arr = numpy.empty(len(self), dtype=numpy.dtype(dtype))
-            for i in numba.prange(len(self)):
-                arr[i] = self[i]
+        arr = numpy.empty(len(self), dtype=numpy.dtype(dtype))
+        for i in numba.prange(len(self)):
+            arr[i] = self[i]
 
-            return arr
+        return arr
 
-        return sdc_astype_number_literal_impl
+    return sdc_astype_number_impl

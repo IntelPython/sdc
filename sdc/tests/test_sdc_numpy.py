@@ -35,7 +35,7 @@ from sdc.str_arr_ext import StringArray
 from sdc.str_ext import std_str_to_unicode, unicode_to_std_str
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
-from sdc.numpy.sdc_numpy_modified_functions import astype
+from sdc.functions.numpy_like import astype
 
 
 class TestArrays(TestCase):
