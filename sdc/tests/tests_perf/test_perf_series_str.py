@@ -80,6 +80,7 @@ class TestSeriesStringMethods(TestBase):
 
 cases = [
     TC(name='center', params='1', size=[10 ** 4, 10 ** 5],  input_data=test_global_input_data_unicode_kind1),
+    # TC(name='capitalize', size=[10 ** 4, 10 ** 5]),
     TC(name='endswith', params='"e"', size=[10 ** 4, 10 ** 5]),
     TC(name='find', params='"e"', size=[10 ** 4, 10 ** 5]),
     TC(name='len', size=[10 ** 4, 10 ** 5]),
@@ -93,6 +94,8 @@ cases = [
     TC(name='startswith', params='"e"', size=[10 ** 4, 10 ** 5]),
     TC(name='strip', size=[10 ** 4, 10 ** 5],
        input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    # TC(name='swapcase', size=[10 ** 4, 10 ** 5]),
+    # TC(name='title', size=[10 ** 4, 10 ** 5]),
     TC(name='upper', size=[10 ** 4, 10 ** 5]),
     TC(name='zfill', params='1', size=[10 ** 4, 10 ** 5], input_data=test_global_input_data_unicode_kind1),
 ]

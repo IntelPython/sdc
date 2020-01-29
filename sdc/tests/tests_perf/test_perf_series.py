@@ -25,13 +25,12 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import pandas as pd
+import pandas
 import numpy as np
 
 import time
 import random
 
-import pandas
 import sdc
 
 from .test_perf_base import TestBase
