@@ -79,8 +79,8 @@ class TestSeriesStringMethods(TestBase):
 
 
 cases = [
-    TC(name='center', params='1', size=[10 ** 4, 10 ** 5],  input_data=test_global_input_data_unicode_kind1),
     TC(name='capitalize', size=[10 ** 4, 10 ** 5], skip=True),
+    TC(name='center', params='1', size=[10 ** 4, 10 ** 5],  input_data=test_global_input_data_unicode_kind1),
     TC(name='endswith', params='"e"', size=[10 ** 4, 10 ** 5]),
     TC(name='find', params='"e"', size=[10 ** 4, 10 ** 5]),
     TC(name='len', size=[10 ** 4, 10 ** 5]),
