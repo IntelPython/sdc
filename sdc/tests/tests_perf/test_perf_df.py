@@ -138,10 +138,10 @@ class TestDataFrameMethods(TestBase):
             hpat_func(A, B)
 
             exec_times, boxing_times = get_times(hpat_func, A, B, iter_number=self.iter_number)
-            self.test_results.add(name, 'JIT', A.size, exec_times, boxing_times,
+            self.test_results.add(name, 'SDC', A.size, exec_times, boxing_times,
                                   compile_results=compile_results, num_threads=self.num_threads)
             exec_times, _ = get_times(pyfunc, A, B, iter_number=self.iter_number)
-            self.test_results.add(name, 'Reference', A.size, exec_times, num_threads=self.num_threads)
+            self.test_results.add(name, 'Python', A.size, exec_times, num_threads=self.num_threads)
 
 
 def test_gen(name, params, data_length):
@@ -166,7 +166,7 @@ def test_gen_two_par(name, params, data_length):
 
     func_text = f"""\
 def {func_name}(self):
-  self._test_df_binary_operations(usecase_gen_two_par('{name}', '{params}'), 
+  self._test_df_binary_operations(usecase_gen_two_par('{name}', '{params}'),
                                   '{name}', {data_length}, 'DataFrame.{name}')
 """
 

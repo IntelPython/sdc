@@ -40,6 +40,7 @@ from numba.errors import TypingError
 from numba.special import literally
 
 from .test_series_apply import TestSeries_apply
+from .test_series_map import TestSeries_map
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_OneDs,
                                   count_array_REPs,
@@ -267,10 +268,11 @@ def isupper_usecase(series):
     return series.str.isupper()
 
 
-GLOBAL_VAL = 2
-
-
-class TestSeries(TestSeries_apply, TestCase):
+class TestSeries(
+    TestSeries_apply,
+    TestSeries_map,
+    TestCase
+):
 
     @skip_numba_jit
     def test_create1(self):
@@ -1787,7 +1789,6 @@ class TestSeries(TestSeries_apply, TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertTrue(isinstance(hpat_func(df.A), np.ndarray))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis1(self):
         '''Verifies Series.fillna() implementation handles 'index' as axis argument'''
@@ -1798,7 +1799,6 @@ class TestSeries(TestSeries_apply, TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis2(self):
         '''Verifies Series.fillna() implementation handles 0 as axis argument'''
@@ -1809,7 +1809,6 @@ class TestSeries(TestSeries_apply, TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('No support of axis argument in old-style Series.fillna() impl')
     def test_series_fillna_axis3(self):
         '''Verifies Series.fillna() implementation handles correct non-literal axis argument'''
@@ -1821,7 +1820,6 @@ class TestSeries(TestSeries_apply, TestCase):
         for axis in [0, 'index']:
             pd.testing.assert_series_equal(hpat_func(S, axis), test_impl(S, axis))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_from_df(self):
         '''Verifies Series.fillna() applied to a named float Series obtained from a DataFrame'''
@@ -1833,7 +1831,6 @@ class TestSeries(TestSeries_apply, TestCase):
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0, np.inf]})
         pd.testing.assert_series_equal(hpat_func(df.A), test_impl(df.A), check_names=False)
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index1(self):
         '''Verifies Series.fillna() implementation for float series with default index'''
@@ -1845,7 +1842,6 @@ class TestSeries(TestSeries_apply, TestCase):
             S = pd.Series(data)
             pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index2(self):
         '''Verifies Series.fillna() implementation for float series with string index'''
@@ -1856,7 +1852,6 @@ class TestSeries(TestSeries_apply, TestCase):
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf], ['a', 'b', 'c', 'd', 'e'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_index3(self):
         def test_impl(S):
@@ -2416,7 +2411,7 @@ class TestSeries(TestSeries_apply, TestCase):
                     # con not compare Nan != Nan directly
                     self.assertEqual(np.isnan(actual), np.isnan(expected))
                 else:
-                    self.assertEqual(actual, expected)
+                    self.assertAlmostEqual(actual, expected)
 
     def test_series_prod_skipna_default(self):
         def test_impl(S):
@@ -2761,43 +2756,6 @@ class TestSeries(TestSeries_apply, TestCase):
         S1 = pd.Series([1.0, 2., 3., 4., 5.])
         S2 = pd.Series([6., 7.])
         np.testing.assert_array_equal(hpat_func(S1, S2), test_impl(S1, S2))
-
-    @skip_numba_jit
-    def test_series_map1(self):
-        def test_impl(S):
-            return S.map(lambda a: 2 * a)
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_numba_jit
-    def test_series_map_global1(self):
-        def test_impl(S):
-            return S.map(lambda a: a + GLOBAL_VAL)
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_numba_jit
-    def test_series_map_tup1(self):
-        def test_impl(S):
-            return S.map(lambda a: (a, 2 * a))
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_numba_jit
-    def test_series_map_tup_map1(self):
-        def test_impl(S):
-            A = S.map(lambda a: (a, 2 * a))
-            return A.map(lambda a: a[1])
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1.0, 2., 3., 4., 5.])
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     @skip_numba_jit
     def test_series_combine(self):
@@ -4650,7 +4608,7 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(test_global_input_data_unicode_kind4)
         with self.assertRaises(TypingError) as raises:
             cfunc(series)
-        msg = 'Method shift(). The object must be a number. Given self.data.dtype: {}'
+        msg = 'Method shift(). The object self.data.dtype\n given: unicode_type\n expected: number\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
     def test_series_shift_fill_str(self):
@@ -4661,7 +4619,7 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(test_global_input_data_float64[0])
         with self.assertRaises(TypingError) as raises:
             cfunc(series, fill_value='unicode')
-        msg = 'Method shift(). The object must be a number. Given fill_value: {}'
+        msg = 'Method shift(). The object fill_value\n given: unicode_type\n expected: number\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
     def test_series_shift_unsupported_params(self):
@@ -4672,7 +4630,7 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(test_global_input_data_float64[0])
         with self.assertRaises(TypingError) as raises:
             cfunc(series, freq='12H', axis=0)
-        msg = 'Method shift(). Unsupported parameters. Given freq: {}'
+        msg = 'Method shift(). The object freq\n given: unicode_type\n expected: None\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
@@ -4973,7 +4931,7 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(test_global_input_data_unicode_kind4)
         with self.assertRaises(TypingError) as raises:
             cfunc(series)
-        msg = 'Method std(). The object must be a number. Given self.data.dtype: {}'
+        msg = 'Method std(). The object self.data\n given: StringArrayType()\n expected: number\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
     @skip_sdc_jit('Series.std() parameters "axis", "level", "numeric_only" unsupported')
@@ -4983,18 +4941,20 @@ class TestSeries(TestSeries_apply, TestCase):
 
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_float64[0])
-        msg = 'Method std(). Unsupported parameters. Given {}: {}'
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=1, level=None, numeric_only=None)
-        self.assertIn(msg.format('axis', 'int'), str(raises.exception))
+        msg = 'Method std(). The object axis\n given: int64\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=None, level=1, numeric_only=None)
-        self.assertIn(msg.format('level', 'int'), str(raises.exception))
+        msg = 'Method std(). The object level\n given: int64\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=None, level=None, numeric_only=True)
-        self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
+        msg = 'Method std(). The object numeric_only\n given: bool\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
     def test_series_nunique(self):
         def test_series_nunique_impl(S):
@@ -5093,8 +5053,8 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(test_global_input_data_unicode_kind4)
         with self.assertRaises(TypingError) as raises:
             cfunc(series)
-        msg = 'Method var(). The object must be a number. Given self.data.dtype: {}'
-        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+        msg = 'Method var(). The object self.data\n given: StringArrayType()\n expected: number\n'
+        self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('Series.var() parameters "axis", "level", "numeric_only" unsupported')
     def test_series_var_unsupported_params(self):
@@ -5103,18 +5063,20 @@ class TestSeries(TestSeries_apply, TestCase):
 
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_float64[0])
-        msg = 'Method var(). Unsupported parameters. Given {}: {}'
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=1, level=None, numeric_only=None)
-        self.assertIn(msg.format('axis', 'int'), str(raises.exception))
+        msg = 'Method var(). The object axis\n given: int64\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=None, level=1, numeric_only=None)
-        self.assertIn(msg.format('level', 'int'), str(raises.exception))
+        msg = 'Method var(). The object level\n given: int64\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             cfunc(series, axis=None, level=None, numeric_only=True)
-        self.assertIn(msg.format('numeric_only', 'bool'), str(raises.exception))
+        msg = 'Method var(). The object numeric_only\n given: bool\n expected: None\n'
+        self.assertIn(msg, str(raises.exception))
 
     def test_series_count(self):
         def test_series_count_impl(S):
@@ -5144,7 +5106,6 @@ class TestSeries(TestSeries_apply, TestCase):
             result = hpat_func(S)
             self.assertEqual(result, result_ref)
 
-    @skip_parallel
     @skip_sdc_jit('Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum(self):
         def test_impl():
@@ -5155,7 +5116,6 @@ class TestSeries(TestSeries_apply, TestCase):
         cfunc = self.jit(pyfunc)
         pd.testing.assert_series_equal(pyfunc(), cfunc())
 
-    @skip_parallel
     @skip_sdc_jit('Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum_unboxing(self):
         def test_impl(s):
@@ -5168,7 +5128,6 @@ class TestSeries(TestSeries_apply, TestCase):
             series = pd.Series(data)
             pd.testing.assert_series_equal(pyfunc(series), cfunc(series))
 
-    @skip_parallel
     @skip_sdc_jit('Series.cumsum() parameters "axis", "skipna" unsupported')
     def test_series_cumsum_full(self):
         def test_impl(s, axis, skipna):
@@ -5194,7 +5153,7 @@ class TestSeries(TestSeries_apply, TestCase):
         series = pd.Series(test_global_input_data_unicode_kind4)
         with self.assertRaises(TypingError) as raises:
             cfunc(series)
-        msg = 'Method cumsum(). The object must be a number. Given self.data.dtype: {}'
+        msg = 'Method cumsum(). The object self.data.dtype\n given: unicode_type\n expected: numeric\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
     @skip_sdc_jit('Series.cumsum() parameter "axis" unsupported')
@@ -5207,7 +5166,7 @@ class TestSeries(TestSeries_apply, TestCase):
         for axis in [0, 1]:
             with self.assertRaises(TypingError) as raises:
                 cfunc(series, axis=axis)
-            msg = 'Method cumsum(). Unsupported parameters. Given axis: int'
+            msg = 'Method cumsum(). The object axis\n given: int64\n expected: None\n'
             self.assertIn(msg, str(raises.exception))
 
     def test_series_cov1(self):
