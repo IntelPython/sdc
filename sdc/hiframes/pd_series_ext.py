@@ -503,7 +503,8 @@ str2str_methods_excluded = [
     'upper', 'center', 'endswith', 'find', 'isupper', 'len', 'ljust',
     'lower', 'lstrip', 'rjust', 'rstrip', 'startswith', 'strip', 'zfill',
     'isspace', 'islower', 'isalpha', 'isalnum', 'istitle', 'isnumeric',
-    'isdigit', 'isdecimal', 'isupper', 'capitalize',
+    'isdigit', 'isdecimal', 'isupper', 'capitalize', 'title', 'swapcase',
+    'casefold'
 ]
 """
     Functions which are used from Numba directly by calling from StringMethodsType

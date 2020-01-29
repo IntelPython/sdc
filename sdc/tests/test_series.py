@@ -3187,13 +3187,35 @@ class TestSeries(
 
     def test_series_str_capitalize(self):
         def test_impl(S):
-            return S.str.capitalize
+            return S.str.capitalize()
 
         sdc_func = self.jit(test_impl)
         s = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
-        print(s)
-        print(sdc_func(s))
-        # pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_str_title(self):
+        def test_impl(S):
+            return S.str.title()
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_str_swapcase(self):
+        def test_impl(S):
+            return S.str.swapcase()
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_str_casefold(self):
+        def test_impl(S):
+            return S.str.casefold()
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     @skip_sdc_jit('Series.str.<method>() unsupported')
     def test_series_str2str_unsupported(self):

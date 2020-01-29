@@ -1076,15 +1076,62 @@ def hpat_pandas_stringmethods_capitalize(self):
     ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_capitalize_impl(self):
-        # item_count = len(self._data)
-        # result = [''] * item_count
-        # for idx, item in enumerate(self._data._data):
-        #     result[idx] = item.capitalize()
-        #
-        # return pandas.Series(result, self._data._index, name=self._data._name)
-        return self._data
+        item_count = len(self._data)
+        result = [''] * item_count
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.capitalize()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
 
     return hpat_pandas_stringmethods_capitalize_impl
+
+
+@sdc_overload_method(StringMethodsType, 'title')
+def hpat_pandas_stringmethods_title(self):
+    ty_checker = TypeChecker('Method title().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_title_impl(self):
+        item_count = len(self._data)
+        result = [''] * item_count
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.title()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_title_impl
+
+
+@sdc_overload_method(StringMethodsType, 'swapcase')
+def hpat_pandas_stringmethods_swapcase(self):
+    ty_checker = TypeChecker('Method swapcase().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_swapcase_impl(self):
+        item_count = len(self._data)
+        result = [''] * item_count
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.swapcase()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_swapcase_impl
+
+
+@sdc_overload_method(StringMethodsType, 'casefold')
+def hpat_pandas_stringmethods_casefold(self):
+    ty_checker = TypeChecker('Method casefold().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_casefold_impl(self):
+        item_count = len(self._data)
+        result = [''] * item_count
+        for idx, item in enumerate(self._data._data):
+            result[idx] = item.casefold()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_casefold_impl
 
 
 for name, data in stringmethods_funcs.items():
