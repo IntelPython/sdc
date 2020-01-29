@@ -26,19 +26,13 @@
 
 
 # -*- coding: utf-8 -*-
-import gc
-import glob
 import numpy as np
 import pandas as pd
-import platform
-import pyarrow.parquet as pq
-import re
 import sdc
 import unittest
 
 from sdc.str_arr_ext import StringArray
 from sdc.str_ext import std_str_to_unicode, unicode_to_std_str
-from sdc.tests.gen_test_data import ParquetGenerator
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
 from sdc.numpy.sdc_numpy_modified_functions import astype
@@ -57,13 +51,13 @@ class TestArrays(TestCase):
 
         cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan]]
         cases_type = [np.float64, np.int64]
-        for i in cases:
-            for j in cases_type:
-                a = np.array(i)
-                with self.subTest(data=i, type=j):
-                    np.testing.assert_array_equal(sdc_func(a, j), ref_impl(a, j))
+        for case in cases:
+            a = np.array(case)
+            for type_ in cases_type:
+                with self.subTest(data=case, type=type_):
+                    np.testing.assert_array_equal(sdc_func(a, type_), ref_impl(a, type_))
 
-    @unittest.skip('Numba cant unbox literal value as type')
+    @unittest.skip("Numba can't unbox literal value as type")
     def test_astype_to_num_unbox(self):
         def ref_impl(a, t):
             return a.astype(t)
@@ -75,11 +69,11 @@ class TestArrays(TestCase):
 
         cases = [[5, 2, 0, 333, -4], [3.3, 5.4, 3.4]]
         cases_type = ['float64', 'int64']
-        for i in cases:
-            for j in cases_type:
-                a = np.array(i)
-                with self.subTest(data=i, type=j):
-                    np.testing.assert_array_equal(sdc_func(a, j), ref_impl(a, j))
+        for case in cases:
+            a = np.array(case)
+            for type_ in cases_type:
+                with self.subTest(data=case, type=type_):
+                    np.testing.assert_array_equal(sdc_func(a, type_), ref_impl(a, type_))
 
     def test_astype_to_float(self):
         def ref_impl(a):
@@ -91,9 +85,9 @@ class TestArrays(TestCase):
         sdc_func = self.jit(sdc_impl)
 
         cases = [[2, 3, 0], [4., 5.6, np.nan]]
-        for i in cases:
-            a = np.array(i)
-            with self.subTest(data=i):
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
                 np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
 
     def test_astype_to_int(self):
@@ -106,9 +100,9 @@ class TestArrays(TestCase):
         sdc_func = self.jit(sdc_impl)
 
         cases = [[2, 3, 0], [4., 5.6, np.nan]]
-        for i in cases:
-            a = np.array(i)
-            with self.subTest(data=i):
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
                 np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
 
     def test_astype_int_to_str(self):
@@ -160,11 +154,11 @@ class TestArrays(TestCase):
 
         cases = [['a', 'cc', 'd'], ['3.3', '5', '.4'], ['¡Y', 'tú quién ', 'te crees']]
         cases_type = [np.float64, np.int64]
-        for i in cases:
-            for j in cases_type:
-                a = np.array(i)
-                with self.subTest(data=i, type=j):
-                    np.testing.assert_array_equal(sdc_func(a, j), ref_impl(a, j))
+        for case in cases:
+            a = np.array(case)
+            for type_ in cases_type:
+                with self.subTest(data=case, type=type_):
+                    np.testing.assert_array_equal(sdc_func(a, type_), ref_impl(a, type_))
 
 
 if __name__ == "__main__":
