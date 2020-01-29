@@ -94,7 +94,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
             def hpat_pandas_series_iloc_list_slice_impl(self, idx):
                 result_data = self._series._data[idx]
                 result_index = self._series.index[idx]
-                return pandas.Series(result_data, result_index, self._series._name)
+                return pandas.Series(data=result_data, index=result_index, name=self._series._name)
 
             return hpat_pandas_series_iloc_list_slice_impl
 
@@ -106,7 +106,11 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
         def hpat_pandas_series_iloc_callable_impl(self, idx):
             index = numpy.asarray(list(map(idx, self._series._data)))
-            return pandas.Series(self._series._data[index], self._series.index[index], self._series._name)
+            return pandas.Series(
+                data=self._series._data[index],
+                index=self._series.index[index],
+                name=self._series._name
+            )
 
         return hpat_pandas_series_iloc_callable_impl
 
@@ -193,7 +197,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                     stop = max_slice - 1
                 result_data = self._series._data[start:stop+1]
                 result_index = numpy.arange(start, stop + 1)
-                return pandas.Series(result_data, result_index, self._series._name)
+                return pandas.Series(data=result_data, index=result_index, name=self._series._name)
 
             return hpat_pandas_series_loc_slice_noidx_impl
 
@@ -221,7 +225,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                 mask = numpy.empty(len(self._series._data), numpy.bool_)
                 for i in numba.prange(len(index)):
                     mask[i] = index[i] == idx
-                return pandas.Series(self._series._data[mask], index[mask], self._series._name)
+                return pandas.Series(data=self._series._data[mask], index=index[mask], name=self._series._name)
 
             return hpat_pandas_series_loc_impl
 
@@ -349,7 +353,7 @@ def hpat_pandas_series_getitem(self, idx):
             mask = numpy.empty(len(self._data), numpy.bool_)
             for i in numba.prange(len(index)):
                 mask[i] = index[i] == idx
-            return pandas.Series(self._data[mask], index[mask], self._name)
+            return pandas.Series(data=self._data[mask], index=index[mask], name=self._name)
 
         return hpat_pandas_series_getitem_index_impl
 
@@ -362,7 +366,7 @@ def hpat_pandas_series_getitem(self, idx):
     if isinstance(idx, types.SliceType):
         # Return slice for str values not implement
         def hpat_pandas_series_getitem_idx_slice_impl(self, idx):
-            return pandas.Series(self._data[idx], self.index[idx], self._name)
+            return pandas.Series(data=self._data[idx], index=self.index[idx], name=self._name)
 
         return hpat_pandas_series_getitem_idx_slice_impl
 
@@ -371,7 +375,7 @@ def hpat_pandas_series_getitem(self, idx):
         isinstance(idx.dtype, (types.Boolean, bool))
     ):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
-            return pandas.Series(self._data[idx], self.index[idx], self._name)
+            return pandas.Series(data=self._data[idx], index=self.index[idx], name=self._name)
         return hpat_pandas_series_getitem_idx_list_impl
 
     if (index_is_none and isinstance(idx, SeriesType)):
@@ -379,7 +383,7 @@ def hpat_pandas_series_getitem(self, idx):
             def hpat_pandas_series_getitem_idx_list_impl(self, idx):
                 index = numpy.arange(len(self._data))
                 if (index != idx.index).sum() == 0:
-                    return pandas.Series(self._data[idx._data], index[idx._data], self._name)
+                    return pandas.Series(data=self._data[idx._data], index=index[idx._data], name=self._name)
 
             return hpat_pandas_series_getitem_idx_list_impl
 
@@ -390,7 +394,7 @@ def hpat_pandas_series_getitem(self, idx):
                 for j in numba.prange(len(index)):
                     if j == idx._data[i]:
                         res[i] = self._data[j]
-            return pandas.Series(res, index[idx._data], self._name)
+            return pandas.Series(data=res, index=index[idx._data], name=self._name)
         return hpat_pandas_series_getitem_idx_list_impl
 
     if (isinstance(idx, SeriesType) and not isinstance(self.index, types.NoneType)):
@@ -398,7 +402,7 @@ def hpat_pandas_series_getitem(self, idx):
             # Series with str index not implement
             def hpat_pandas_series_getitem_idx_series_impl(self, idx):
                 if (self._index != idx._index).sum() == 0:
-                    return pandas.Series(self._data[idx._data], self._index[idx._data], self._name)
+                    return pandas.Series(data=self._data[idx._data], index=self._index[idx._data], name=self._name)
 
             return hpat_pandas_series_getitem_idx_series_impl
 
@@ -1834,19 +1838,19 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
             item = self._data[i]
             data[i] = str(item)  # TODO: check NA
 
-        return pandas.Series(data, self._index, self._name)
+        return pandas.Series(data=data, index=self._index, name=self._name)
 
     # Return npytypes.Array from npytypes.Array for astype(types.functions.NumberClass), example - astype(np.int64)
     def hpat_pandas_series_astype_numba_impl(self, dtype, copy=True, errors='raise'):
-        return pandas.Series(self._data.astype(dtype), self._index, self._name)
+        return pandas.Series(data=self._data.astype(dtype), index=self._index, name=self._name)
 
     # Return npytypes.Array from npytypes.Array for astype(types.StringLiteral), example - astype('int64')
     def hpat_pandas_series_astype_literal_type_numba_impl(self, dtype, copy=True, errors='raise'):
-        return pandas.Series(self._data.astype(numpy.dtype(dtype)), self._index, self._name)
+        return pandas.Series(data=self._data.astype(numpy.dtype(dtype)), index=self._index, name=self._name)
 
     # Return self
     def hpat_pandas_series_astype_no_modify_impl(self, dtype, copy=True, errors='raise'):
-        return pandas.Series(self._data, self._index, self._name)
+        return pandas.Series(data=self._data, index=self._index, name=self._name)
 
 
     if ((isinstance(dtype, types.Function) and dtype.typing_key == str)
@@ -3908,7 +3912,7 @@ def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=
 
     if not isinstance(level, (types.Omitted, types.UnicodeType,
                               types.StringLiteral, types.Integer)) and level is not None:
-        ty_checker.raise_exc(level, 'Integer or srting', 'level')
+        ty_checker.raise_exc(level, 'Integer or string', 'level')
 
     def hpat_pandas_series_rename_idx_impl(self, index=None, copy=True, inplace=False, level=None):
         if copy is True:
@@ -5719,13 +5723,13 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
                         filled_data[i] = value
                     else:
                         filled_data[i] = self._data[i]
-                return pandas.Series(filled_data, self._index, self._name)
+                return pandas.Series(data=filled_data, index=self._index, name=self._name)
 
             return hpat_pandas_series_str_fillna_impl
 
         elif isinstance(self.dtype, (types.Integer, types.Boolean)):
             def hpat_pandas_series_no_nan_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
-                return pandas.Series(numpy.copy(self._data), self._index, self._name)
+                return pandas.Series(data=numpy.copy(self._data), index=self._index, name=self._name)
 
             return hpat_pandas_series_no_nan_fillna_impl
 
@@ -5734,7 +5738,7 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
                 na_data_arr = sdc.hiframes.api.get_nan_mask(self._data)
                 filled_data = numpy.copy(self._data)
                 filled_data[na_data_arr] = value
-                return pandas.Series(filled_data, self._index, self._name)
+                return pandas.Series(data=filled_data, index=self._index, name=self._name)
 
             return hpat_pandas_series_fillna_impl
 
