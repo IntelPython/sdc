@@ -36,7 +36,7 @@ def generate_test_cases(cases, class_add, typ, prefix=''):
         test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case)]
         test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
 
-        setattr(class_add, test_name, test_gen(test_case, prefix))
+        setattr(class_add, test_name, gen_test(test_case, prefix))
 
 
 def gen_params_wo_data(test_case):
@@ -64,16 +64,10 @@ def gen_call_expr(test_case, prefix):
     return '.'.join(call_expr_parts)
 
 
-def test_gen(test_case, prefix):
+def gen_test(test_case, prefix):
     func_name = 'func'
-    usecase_params = test_case.usecase_params
-    call_expr = test_case.call_expr
-    if call_expr is None:
-        if usecase_params is None:
-            usecase_params = gen_usecase_params(test_case)
-        call_expr = gen_call_expr(test_case, prefix)
 
-    usecase = gen_usecase(usecase_params, call_expr)
+    usecase = gen_usecase(test_case, prefix)
 
     skip = '@skip_numba_jit\n' if test_case.skip else ''
 
@@ -92,11 +86,18 @@ def test_gen(test_case, prefix):
     return func
 
 
-def gen_usecase(input_data, call_expr):
+def gen_usecase(test_case, prefix):
     func_name = 'func'
 
+    usecase_params = test_case.usecase_params
+    call_expr = test_case.call_expr
+    if call_expr is None:
+        if usecase_params is None:
+            usecase_params = gen_usecase_params(test_case)
+        call_expr = gen_call_expr(test_case, prefix)
+
     func_text = f"""
-def {func_name}({input_data}):
+def {func_name}({usecase_params}):
   start_time = time.time()
   res = {call_expr}
   finish_time = time.time()
