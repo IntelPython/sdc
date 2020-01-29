@@ -14,6 +14,7 @@ class TestCase(NamedTuple):
     usecase_params: input parameters for usecase in format 'par1, par2, ...', e.g. 'data, other'
     data_num: total number of generated data, e.g. 2 (data, other)
     input_data: input data for generating test data
+    skip: flag for skipping a test
     """
     name: str
     size: list
