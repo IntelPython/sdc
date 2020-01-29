@@ -1,7 +1,8 @@
 import time
 import numpy as np
-from sdc.io.csv_ext import to_varname
 from typing import NamedTuple
+from sdc.io.csv_ext import to_varname
+from sdc.tests.test_utils import *
 
 
 class TestCase(NamedTuple):
@@ -21,6 +22,7 @@ class TestCase(NamedTuple):
     usecase_params: str = None
     data_num: int = 1
     input_data: list = None
+    skip: bool = False
 
 
 def to_varname_without_excess_underscores(string):
@@ -72,14 +74,18 @@ def test_gen(test_case, prefix):
 
     usecase = gen_usecase(usecase_params, call_expr)
 
+    skip = '@skip_numba_jit\n' if test_case.skip else ''
+
     func_text = f"""\
-def {func_name}(self):
+{skip}def {func_name}(self):
   self._test_case(usecase, name='{test_case.name}', total_data_length={test_case.size},
                   data_num={test_case.data_num}, input_data={test_case.input_data})
 """
 
     loc_vars = {}
-    exec(func_text, {'usecase': usecase}, loc_vars)
+    global_vars = {'usecase': usecase,
+                   'skip_numba_jit': skip_numba_jit}
+    exec(func_text, global_vars, loc_vars)
     func = loc_vars[func_name]
 
     return func
