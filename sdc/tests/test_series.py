@@ -5153,7 +5153,7 @@ class TestSeries(
         series = pd.Series(test_global_input_data_unicode_kind4)
         with self.assertRaises(TypingError) as raises:
             cfunc(series)
-        msg = 'Method cumsum(). The object must be a number. Given self.data.dtype: {}'
+        msg = 'Method cumsum(). The object self.data.dtype\n given: unicode_type\n expected: numeric\n'
         self.assertIn(msg.format(types.unicode_type), str(raises.exception))
 
     @skip_sdc_jit('Series.cumsum() parameter "axis" unsupported')
@@ -5166,7 +5166,7 @@ class TestSeries(
         for axis in [0, 1]:
             with self.assertRaises(TypingError) as raises:
                 cfunc(series, axis=axis)
-            msg = 'Method cumsum(). Unsupported parameters. Given axis: int'
+            msg = 'Method cumsum(). The object axis\n given: int64\n expected: None\n'
             self.assertIn(msg, str(raises.exception))
 
     def test_series_cov1(self):
