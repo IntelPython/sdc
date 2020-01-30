@@ -26,7 +26,7 @@
 import numpy
 import pandas
 
-from numba.types import float64, Boolean, Omitted, NoneType
+from numba.types import float64, Boolean, Integer, Omitted, NoneType
 from sdc.datatypes.common_functions import TypeChecker, params2list
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import DataFrameRollingType
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
@@ -119,7 +119,7 @@ def df_rolling_method_other_df_codegen(method_name, self, other, args=None, kws=
             '  else:',
             '    _pairwise = pairwise',
             '  if _pairwise:',
-            '    raise ValueError("Method rolling.corr(). The object pairwise\\n expected: False, None")'
+            f'    raise ValueError("Method rolling.{method_name}(). The object pairwise\\n expected: False, None")'
         ]
 
     data_length = 'len(get_dataframe_data(self._data, 0))' if data_columns else '0'
@@ -138,7 +138,7 @@ def df_rolling_method_other_df_codegen(method_name, self, other, args=None, kws=
                 f'  series_{col} = pandas.Series(data_{col})',
                 f'  {other_series} = pandas.Series(other_data_{col})',
                 f'  rolling_{col} = series_{col}.rolling({rolling_params})',
-                f'  result_{col} = rolling_{col}.corr({method_params})',
+                f'  result_{col} = rolling_{col}.{method_name}({method_params})',
                 f'  {res_data} = result_{col}._data[:length]'
             ]
         else:
@@ -198,7 +198,7 @@ def df_rolling_method_other_none_codegen(method_name, self, args=None, kws=None)
             '  else:',
             '    _pairwise = pairwise',
             '  if _pairwise:',
-            '    raise ValueError("Method rolling.corr(). The object pairwise\\n expected: False")'
+            f'    raise ValueError("Method rolling.{method_name}(). The object pairwise\\n expected: False")'
         ]
     method_params = args + ['{}={}'.format(k, k) for k in kwargs if k != 'other']
     func_lines += df_rolling_method_main_codegen(method_params, self.data.columns, method_name)
@@ -307,6 +307,35 @@ def sdc_pandas_dataframe_rolling_count(self):
     return gen_df_rolling_method_impl('count', self)
 
 
+@sdc_overload_method(DataFrameRollingType, 'cov')
+def sdc_pandas_dataframe_rolling_cov(self, other=None, pairwise=None, ddof=1):
+
+    ty_checker = TypeChecker('Method rolling.cov().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    accepted_other = (Omitted, NoneType, DataFrameType, SeriesType)
+    if not isinstance(other, accepted_other) and other is not None:
+        ty_checker.raise_exc(other, 'DataFrame, Series', 'other')
+
+    accepted_pairwise = (bool, Boolean, Omitted, NoneType)
+    if not isinstance(pairwise, accepted_pairwise) and pairwise is not None:
+        ty_checker.raise_exc(pairwise, 'bool', 'pairwise')
+
+    if not isinstance(ddof, (int, Integer, Omitted)):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
+
+    none_other = isinstance(other, (Omitted, NoneType)) or other is None
+    kws = {'other': 'None', 'pairwise': 'None', 'ddof': '1'}
+
+    if none_other:
+        return gen_df_rolling_method_other_none_impl('_df_cov', self, kws=kws)
+
+    if isinstance(other, DataFrameType):
+        return gen_df_rolling_method_other_df_impl('cov', self, other, kws=kws)
+
+    return gen_df_rolling_method_impl('cov', self, kws=kws)
+
+
 @sdc_overload_method(DataFrameRollingType, 'kurt')
 def sdc_pandas_dataframe_rolling_kurt(self):
 
@@ -404,6 +433,28 @@ sdc_pandas_dataframe_rolling_count.__doc__ = sdc_pandas_dataframe_rolling_docstr
     'example_caption': 'Count of any non-NaN observations inside the window.',
     'limitations_block': '',
     'extra_params': ''
+})
+
+sdc_pandas_dataframe_rolling_cov.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'cov',
+    'example_caption': 'Calculate rolling covariance.',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    Different size of `self` and `other` can produce result different from the result of Pandas
+    due to different float rounding in Python and SDC.
+    """,
+    'extra_params':
+    """
+    other: :obj:`Series` or :obj:`DataFrame`
+        Other Series or DataFrame.
+    pairwise: :obj:`bool`
+        Calculate pairwise combinations of columns within a DataFrame.
+    ddof: :obj:`int`
+        Delta Degrees of Freedom.
+    """
 })
 
 sdc_pandas_dataframe_rolling_kurt.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{

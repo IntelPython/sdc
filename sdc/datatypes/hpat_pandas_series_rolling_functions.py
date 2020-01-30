@@ -34,8 +34,9 @@ from numba.extending import register_jitable
 from numba.types import (float64, Boolean, Integer, NoneType, Number,
                          Omitted, StringLiteral, UnicodeType)
 
-from sdc.datatypes.common_functions import TypeChecker
+from sdc.datatypes.common_functions import TypeChecker, _sdc_pandas_series_align
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
+from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utils import sdc_overload_method
 
 
@@ -109,15 +110,6 @@ def arr_corr(x, y):
 def arr_nonnan_count(arr):
     """Count non-NaN values"""
     return len(arr) - numpy.isnan(arr).sum()
-
-
-@register_jitable
-def arr_cov(x, y, ddof):
-    """Calculate covariance of values 1D arrays x and y of the same size"""
-    if len(x) == 0:
-        return numpy.nan
-
-    return numpy.cov(x, y, ddof=ddof)[0, 1]
 
 
 @register_jitable
@@ -451,16 +443,15 @@ def hpat_pandas_series_rolling_count(self):
     return hpat_pandas_rolling_series_count_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'cov')
-def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
-
-    ty_checker = TypeChecker('Method rolling.cov().')
+def _hpat_pandas_series_rolling_cov_check_types(method_name, self, other=None,
+                                                pairwise=None, ddof=1):
+    """Check types of parameters of series.rolling.cov()"""
+    ty_checker = TypeChecker('Method rolling.{}().'.format(method_name))
     ty_checker.check(self, SeriesRollingType)
 
-    # TODO: check `other` is Series after a circular import of SeriesType fixed
-    # accepted_other = (bool, Omitted, NoneType, SeriesType)
-    # if not isinstance(other, accepted_other) and other is not None:
-    #     ty_checker.raise_exc(other, 'Series', 'other')
+    accepted_other = (bool, Omitted, NoneType, SeriesType)
+    if not isinstance(other, accepted_other) and other is not None:
+        ty_checker.raise_exc(other, 'Series', 'other')
 
     accepted_pairwise = (bool, Boolean, Omitted, NoneType)
     if not isinstance(pairwise, accepted_pairwise) and pairwise is not None:
@@ -469,50 +460,48 @@ def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
     if not isinstance(ddof, (int, Integer, Omitted)):
         ty_checker.raise_exc(ddof, 'int', 'ddof')
 
+
+def _gen_hpat_pandas_rolling_series_cov_impl(other, align_finiteness=False):
+    """Generate series.rolling.cov() implementation based on series alignment"""
     nan_other = isinstance(other, (Omitted, NoneType)) or other is None
 
-    def hpat_pandas_rolling_series_cov_impl(self, other=None, pairwise=None, ddof=1):
+    def _impl(self, other=None, pairwise=None, ddof=1):
         win = self._window
         minp = self._min_periods
 
         main_series = self._data
-        main_arr = main_series._data
-        main_arr_length = len(main_arr)
-
         if nan_other == True:  # noqa
-            other_arr = main_arr
+            other_series = main_series
         else:
-            other_arr = other._data
+            other_series = other
 
-        other_arr_length = len(other_arr)
-        length = max(main_arr_length, other_arr_length)
-        output_arr = numpy.empty(length, dtype=float64)
+        main_aligned, other_aligned = _sdc_pandas_series_align(main_series, other_series,
+                                                               finiteness=align_finiteness)
+        count = (main_aligned + other_aligned).rolling(win).count()
+        bias_adj = count / (count - ddof)
 
-        def calc_cov(main, other, ddof, minp):
-            # align arrays `main` and `other` by size and finiteness
-            min_length = min(len(main), len(other))
-            main_valid_indices = numpy.isfinite(main[:min_length])
-            other_valid_indices = numpy.isfinite(other[:min_length])
-            valid = main_valid_indices & other_valid_indices
+        def mean(series):
+            return series.rolling(win, min_periods=minp).mean()
 
-            if len(main[valid]) < minp:
-                return numpy.nan
-            else:
-                return arr_cov(main[valid], other[valid], ddof)
+        return (mean(main_aligned * other_aligned) - mean(main_aligned) * mean(other_aligned)) * bias_adj
 
-        for i in prange(min(win, length)):
-            main_arr_range = main_arr[:i + 1]
-            other_arr_range = other_arr[:i + 1]
-            output_arr[i] = calc_cov(main_arr_range, other_arr_range, ddof, minp)
+    return _impl
 
-        for i in prange(win, length):
-            main_arr_range = main_arr[i + 1 - win:i + 1]
-            other_arr_range = other_arr[i + 1 - win:i + 1]
-            output_arr[i] = calc_cov(main_arr_range, other_arr_range, ddof, minp)
 
-        return pandas.Series(output_arr)
+@sdc_rolling_overload(SeriesRollingType, 'cov')
+def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
+    _hpat_pandas_series_rolling_cov_check_types('cov', self, other=other,
+                                                pairwise=pairwise, ddof=ddof)
 
-    return hpat_pandas_rolling_series_cov_impl
+    return _gen_hpat_pandas_rolling_series_cov_impl(other, align_finiteness=True)
+
+
+@sdc_rolling_overload(SeriesRollingType, '_df_cov')
+def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
+    _hpat_pandas_series_rolling_cov_check_types('_df_cov', self, other=other,
+                                                pairwise=pairwise, ddof=ddof)
+
+    return _gen_hpat_pandas_rolling_series_cov_impl(other)
 
 
 @sdc_rolling_overload(SeriesRollingType, 'kurt')
