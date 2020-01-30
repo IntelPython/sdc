@@ -26,13 +26,15 @@
 
 import numpy as np
 import pandas as pd
-
 from numba import njit
 
+
 @njit
-def series_nsmallest():
-    series = pd.Series(np.arange(10))
-    return series.nsmallest(4)
+def series_copy():
+    s1 = pd.Series(np.arange(5))
+    s2 = s1.copy()
+
+    return s2  # Expect new series of 0, 1, 2, 3, 4
 
 
-print(series_nsmallest())
+print(series_copy())

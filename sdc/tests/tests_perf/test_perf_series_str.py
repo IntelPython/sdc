@@ -135,24 +135,27 @@ class TestSeriesStringMethods(TestBase):
             hpat_func(test_data)
 
             exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)
-            self.test_results.add(name, 'JIT', test_data.size, exec_times, data_width,
+            self.test_results.add(name, 'SDC', test_data.size, exec_times, data_width,
                                   boxing_times, compile_results=compile_results, num_threads=self.num_threads)
             exec_times, _ = get_times(pyfunc, test_data, iter_number=self.iter_number)
-            self.test_results.add(name, 'Reference', test_data.size, exec_times, data_width,
+            self.test_results.add(name, 'Python', test_data.size, exec_times, data_width,
                                   num_threads=self.num_threads)
 
     def test_series_str_len(self):
         self._test_series_str(usecase_series_len, 'series_str_len')
 
+    @skip_numba_jit
     def test_series_str_capitalize(self):
         self._test_series_str(usecase_series_capitalize, 'series_str_capitalize')
 
     def test_series_str_lower(self):
         self._test_series_str(usecase_series_lower, 'series_str_lower')
 
+    @skip_numba_jit
     def test_series_str_swapcase(self):
         self._test_series_str(usecase_series_swapcase, 'series_str_swapcase')
 
+    @skip_numba_jit
     def test_series_str_title(self):
         self._test_series_str(usecase_series_title, 'series_str_title')
 
