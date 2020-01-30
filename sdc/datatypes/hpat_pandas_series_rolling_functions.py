@@ -443,10 +443,10 @@ def hpat_pandas_series_rolling_count(self):
     return hpat_pandas_rolling_series_count_impl
 
 
-def _hpat_pandas_series_rolling_cov_check_types(method_name, self, other=None,
+def _hpat_pandas_series_rolling_cov_check_types(self, other=None,
                                                 pairwise=None, ddof=1):
     """Check types of parameters of series.rolling.cov()"""
-    ty_checker = TypeChecker('Method rolling.{}().'.format(method_name))
+    ty_checker = TypeChecker('Method rolling.cov().')
     ty_checker.check(self, SeriesRollingType)
 
     accepted_other = (bool, Omitted, NoneType, SeriesType)
@@ -490,7 +490,7 @@ def _gen_hpat_pandas_rolling_series_cov_impl(other, align_finiteness=False):
 
 @sdc_rolling_overload(SeriesRollingType, 'cov')
 def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
-    _hpat_pandas_series_rolling_cov_check_types('cov', self, other=other,
+    _hpat_pandas_series_rolling_cov_check_types(self, other=other,
                                                 pairwise=pairwise, ddof=ddof)
 
     return _gen_hpat_pandas_rolling_series_cov_impl(other, align_finiteness=True)
@@ -498,7 +498,7 @@ def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
 
 @sdc_rolling_overload(SeriesRollingType, '_df_cov')
 def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
-    _hpat_pandas_series_rolling_cov_check_types('_df_cov', self, other=other,
+    _hpat_pandas_series_rolling_cov_check_types(self, other=other,
                                                 pairwise=pairwise, ddof=ddof)
 
     return _gen_hpat_pandas_rolling_series_cov_impl(other)
