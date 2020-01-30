@@ -69,14 +69,18 @@ def gen_test(test_case, prefix):
 
     usecase = gen_usecase(test_case, prefix)
 
-    skip = '@skip_numba_jit\n' if test_case.skip else ''
+    decorators = []
+    if test_case.skip:
+        decorators.append('@skip_numba_jit')
+    decorators = '\n'.join(decorators)
 
     test_name = test_case.name
     if test_case.params:
         test_name = f'{test_name}({test_case.params})'
 
     func_text = f"""
-{skip}def {func_name}(self):
+{decorators}
+def {func_name}(self):
   self._test_case(usecase, name='{test_name}', total_data_length={test_case.size},
                   data_num={test_case.data_num}, input_data={test_case.input_data})
 """
