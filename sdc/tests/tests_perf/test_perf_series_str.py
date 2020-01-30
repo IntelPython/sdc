@@ -36,7 +36,8 @@ import pandas as pd
 from sdc.tests.test_utils import *
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import *
-from .generator import test_perf_generator
+from .generator import generate_test_cases
+from .generator import TestCase as TC
 
 
 test_global_input_data_unicode_kind1 = [
@@ -54,17 +55,13 @@ class TestSeriesStringMethods(TestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-
-        cls.total_data_length = [10**4, 10**5]
         cls.width = [16, 64, 512, 1024]
-        cls.num_threads = int(os.environ.get('NUMBA_NUM_THREADS', config.NUMBA_NUM_THREADS))
-        cls.threading_layer = os.environ.get('NUMBA_THREADING_LAYER', config.THREADING_LAYER)
 
-    def _test_case(self, pyfunc, name, input_data=None):
+    def _test_case(self, pyfunc, name, total_data_length, input_data=None, *args, **kwargs):
         test_name = 'series_str_{}'.format(name)
         input_data = input_data or test_global_input_data_unicode_kind4
         hpat_func = sdc.jit(pyfunc)
-        for data_length, data_width in itertools.product(self.total_data_length, self.width):
+        for data_length, data_width in itertools.product(total_data_length, self.width):
             data = perf_data_gen_fixed_len(input_data, data_width, data_length)
             test_data = pd.Series(data)
 
@@ -73,6 +70,7 @@ class TestSeriesStringMethods(TestBase):
             hpat_func(test_data)
 
             exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)
+
             self.test_results.add(test_name, 'SDC', test_data.size, exec_times, data_width,
                                   boxing_times, compile_results=compile_results, num_threads=self.num_threads)
             exec_times, _ = get_times(pyfunc, test_data, iter_number=self.iter_number)
@@ -80,21 +78,26 @@ class TestSeriesStringMethods(TestBase):
                                   num_threads=self.num_threads)
 
 
-# (method_name, parameters, input_data)
 cases = [
-    ('center', '1', test_global_input_data_unicode_kind1),
-    ('endswith', '"e"'),
-    ('find', '"e"'),
-    ('len', ''),
-    ('ljust', '1', test_global_input_data_unicode_kind1),
-    ('lower', ''),
-    ('lstrip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
-    ('rjust', '1', test_global_input_data_unicode_kind1),
-    ('rstrip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
-    ('startswith', '"e"'),
-    ('strip', '', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
-    ('upper', ''),
-    ('zfill', '1', test_global_input_data_unicode_kind1),
+    TC(name='capitalize', size=[10 ** 4, 10 ** 5], skip=True),
+    TC(name='center', params='1', size=[10 ** 4, 10 ** 5],  input_data=test_global_input_data_unicode_kind1),
+    TC(name='endswith', params='"e"', size=[10 ** 4, 10 ** 5]),
+    TC(name='find', params='"e"', size=[10 ** 4, 10 ** 5]),
+    TC(name='len', size=[10 ** 4, 10 ** 5]),
+    TC(name='ljust', params='1', size=[10 ** 4, 10 ** 5], input_data=test_global_input_data_unicode_kind1),
+    TC(name='lower', size=[10 ** 4, 10 ** 5]),
+    TC(name='lstrip', size=[10 ** 4, 10 ** 5],
+       input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    TC(name='rjust', params='1', size=[10 ** 4, 10 ** 5], input_data=test_global_input_data_unicode_kind1),
+    TC(name='rstrip', size=[10 ** 4, 10 ** 5],
+       input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    TC(name='startswith', params='"e"', size=[10 ** 4, 10 ** 5]),
+    TC(name='strip', size=[10 ** 4, 10 ** 5],
+       input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    TC(name='swapcase', size=[10 ** 4, 10 ** 5], skip=True),
+    TC(name='title', size=[10 ** 4, 10 ** 5], skip=True),
+    TC(name='upper', size=[10 ** 4, 10 ** 5]),
+    TC(name='zfill', params='1', size=[10 ** 4, 10 ** 5], input_data=test_global_input_data_unicode_kind1),
 ]
 
-test_perf_generator(cases, TestSeriesStringMethods, 'series', 'str.')
+generate_test_cases(cases, TestSeriesStringMethods, 'series', 'str')

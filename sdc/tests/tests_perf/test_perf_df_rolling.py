@@ -28,13 +28,15 @@ import string
 import time
 
 import numba
+import numpy as np
 import pandas
 
 from sdc.tests.test_utils import test_global_input_data_float64
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import (calc_compilation, get_times,
                                                   perf_data_gen_fixed_len)
-from .generator import test_perf_generator
+from .generator import generate_test_cases
+from .generator import TestCase as TC
 
 
 def get_rolling_params(window=100, min_periods=None):
@@ -70,10 +72,14 @@ class TestDFRollingMethods(TestBase):
     def _test_python(self, pyfunc, record, *args, **kwargs):
         record['test_results'], _ = get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, name, total_data_length, test_name=None,
+    def _test_case(self, pyfunc, name, total_data_length, data_num=1,
                    input_data=test_global_input_data_float64, columns_num=10):
+
         if columns_num > self.max_columns_num:
             columns_num = self.max_columns_num
+
+        if input_data is None:
+            input_data = test_global_input_data_float64
 
         test_name = 'DataFrame.rolling.{}'.format(name)
 
@@ -86,19 +92,33 @@ class TestDFRollingMethods(TestBase):
             data = perf_data_gen_fixed_len(input_data, full_input_data_length, data_length)
             test_data = pandas.DataFrame({col: data for col in string.ascii_uppercase[:columns_num]})
 
+            args = [test_data]
+            for i in range(data_num - 1):
+                np.random.seed(i)
+                extra_data = np.random.ranf(data_length)
+                args.append(pandas.DataFrame({col: extra_data for col in string.ascii_uppercase[:columns_num]}))
+
             record = base.copy()
             record['test_type'] = 'SDC'
-            self._test_jitted(pyfunc, record, test_data)
+            self._test_jitted(pyfunc, record, *args)
             self.test_results.add(**record)
 
             record = base.copy()
             record['test_type'] = 'Python'
-            self._test_python(pyfunc, record, test_data)
+            self._test_python(pyfunc, record, *args)
             self.test_results.add(**record)
 
 
 cases = [
-    ('min', '', [2 * 10 ** 5]),
+    TC(name='apply', params='lambda x: np.nan if len(x) == 0 else x.mean()', size=[2 * 10 ** 5]),
+    TC(name='corr', size=[10 ** 5], params='other', data_num=2),
+    TC(name='count', size=[8 * 10 ** 5]),
+    TC(name='kurt', size=[4 * 10 ** 5]),
+    TC(name='max', size=[2 * 10 ** 5]),
+    TC(name='mean', size=[2 * 10 ** 5]),
+    TC(name='median', size=[2 * 10 ** 5]),
+    TC(name='min', size=[2 * 10 ** 5]),
+    TC(name='skew', size=[2 * 10 ** 5])
 ]
 
-test_perf_generator(cases, TestDFRollingMethods, 'df', 'rolling({}).'.format(get_rolling_params()))
+generate_test_cases(cases, TestDFRollingMethods, 'df', 'rolling({})'.format(get_rolling_params()))

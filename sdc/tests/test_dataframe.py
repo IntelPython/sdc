@@ -24,25 +24,28 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import unittest
+import numba
+import numpy as np
+import pandas as pd
 import platform
 import random
 import string
-import platform
-import pandas as pd
-import numpy as np
+import unittest
 from itertools import product
-
-import numba
-import sdc
-from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs,
-                                   count_array_OneDs, dist_IR_contains, get_start_end, check_numba_version,
-                                   skip_numba_jit, skip_sdc_jit)
-
-from sdc.tests.gen_test_data import ParquetGenerator
 from numba.config import IS_32BITS
+
+import sdc
+from sdc.tests.gen_test_data import ParquetGenerator
+from sdc.tests.test_base import TestCase
+from sdc.tests.test_utils import (check_numba_version,
+                                  count_array_OneDs,
+                                  count_array_REPs,
+                                  count_parfor_OneDs,
+                                  count_parfor_REPs,
+                                  dist_IR_contains,
+                                  get_start_end,
+                                  skip_numba_jit,
+                                  skip_sdc_jit)
 
 
 @sdc.jit
@@ -68,7 +71,35 @@ class TestDataFrame(TestCase):
         B = np.random.ranf(n)
         pd.testing.assert_frame_equal(hpat_func(n, A, B), test_impl(n, A, B))
 
-    def test_create_with_series(self):
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_create2(self):
+        def test_impl():
+            df = pd.DataFrame({'A': [1, 2, 3]})
+            return (df.A == 1).sum()
+        hpat_func = self.jit(test_impl)
+
+        self.assertEqual(hpat_func(), test_impl())
+
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_create3(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n)})
+            return (df.A == 2).sum()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_create_str(self):
+        def test_impl():
+            df = pd.DataFrame({'A': ['a', 'b', 'c']})
+            return (df.A == 'a').sum()
+        hpat_func = self.jit(test_impl)
+
+        self.assertEqual(hpat_func(), test_impl())
+
+    def test_create_with_series1(self):
         def test_impl(n):
             A = pd.Series(np.ones(n, dtype=np.int64))
             B = pd.Series(np.zeros(n, dtype=np.float64))
@@ -78,6 +109,18 @@ class TestDataFrame(TestCase):
         hpat_func = sdc.jit(test_impl)
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_create_with_series2(self):
+        # test creating dataframe from passed series
+        def test_impl(A):
+            df = pd.DataFrame({'A': A})
+            return (df.A == 2).sum()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
     @skip_sdc_jit
     def test_create_string_index(self):
@@ -114,6 +157,25 @@ class TestDataFrame(TestCase):
 
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_pass_df1(self):
+        def test_impl(df):
+            return (df.A == 2).sum()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        self.assertEqual(hpat_func(df), test_impl(df))
+
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_pass_df_str(self):
+        def test_impl(df):
+            return (df.A == 'a').sum()
+        hpat_func = self.jit(test_impl)
+
+        df = pd.DataFrame({'A': ['a', 'b', 'c']})
+        self.assertEqual(hpat_func(df), test_impl(df))
 
     def test_unbox1(self):
         def test_impl(df):
@@ -606,6 +668,7 @@ class TestDataFrame(TestCase):
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_df_describe(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float32),
@@ -1484,6 +1547,20 @@ class TestDataFrame(TestCase):
                 result_ref = test_impl(df, periods, method)
                 result = hpat_func(df, periods, method)
                 pd.testing.assert_frame_equal(result, result_ref)
+
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_list_convert(self):
+        def test_impl():
+            df = pd.DataFrame({'one': np.array([-1, np.nan, 2.5]),
+                               'two': ['foo', 'bar', 'baz'],
+                               'three': [True, False, True]})
+            return df.one.values, df.two.values, df.three.values
+        hpat_func = self.jit(test_impl)
+
+        one, two, three = hpat_func()
+        self.assertTrue(isinstance(one, np.ndarray))
+        self.assertTrue(isinstance(two, np.ndarray))
+        self.assertTrue(isinstance(three, np.ndarray))
 
 
 if __name__ == "__main__":

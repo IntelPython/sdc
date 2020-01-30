@@ -33,5 +33,6 @@ class TestBase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        # TODO: https://jira.devtools.intel.com/browse/SAT-2371
         cls.test_results.print()
         cls.test_results.dump()

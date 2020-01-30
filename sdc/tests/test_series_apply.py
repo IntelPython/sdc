@@ -24,13 +24,12 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import pandas as pd
-import numpy as np
-
 import numba
+import numpy as np
+import pandas as pd
 
 from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import skip_sdc_jit, skip_numba_jit
+from sdc.tests.test_utils import skip_numba_jit, skip_sdc_jit
 
 
 DATA = [1.0, 2., 3., 4., 5.]
@@ -50,6 +49,16 @@ class TestSeries_apply(object):
 
     def test_series_apply(self):
         test_impl = series_apply_square_usecase
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series(DATA)
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_series_apply_convert_type(self):
+        def test_impl(S):
+            def to_int(x):
+                return int(x)
+            return S.apply(to_int)
         hpat_func = self.jit(test_impl)
 
         S = pd.Series(DATA)

@@ -80,9 +80,4 @@ def jit(signature_or_function=None, **options):
     if not isinstance(mpi_transport_requested, (int, bool)):
         raise ValueError("Option MPI or SDC_CONFIG_MPI environment variable should be boolean")
 
-    if mpi_transport_requested:
-        sdc.config.config_transport_mpi = True
-    else:
-        sdc.config.config_transport_mpi = False
-
     return numba.jit(signature_or_function, pipeline_class=sdc.compiler.SDCPipeline, **options)
