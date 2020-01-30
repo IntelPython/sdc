@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -39,7 +39,7 @@ from numba.targets.boxing import box_array, unbox_array, box_list
 from numba.targets.boxing import _NumbaTypeHelper
 from numba.targets import listobj
 
-from sdc.hiframes.pd_dataframe_ext import DataFrameType
+from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.hiframes.pd_timestamp_ext import (datetime_date_type,
                                             unbox_datetime_date_array, box_datetime_date_array)
 from sdc.str_ext import string_type, list_string_array_type
@@ -65,7 +65,9 @@ def typeof_pd_dataframe(val, c):
     col_names = tuple(val.columns.tolist())
     # TODO: support other types like string and timestamp
     col_types = get_hiframes_dtypes(val)
-    return DataFrameType(col_types, None, col_names, True)
+    index_type = _infer_index_type(val.index)
+
+    return DataFrameType(col_types, index_type, col_names, True)
 
 
 # register series types for import
@@ -105,6 +107,14 @@ def unbox_dataframe(typ, val, c):
     # TODO: support unboxing index
     if typ.index == types.none:
         dataframe.index = c.context.get_constant(types.none, None)
+    if typ.index == string_array_type:
+        index_obj = c.pyapi.object_getattr_string(val, "index")
+        dataframe.index = unbox_str_series(string_array_type, index_obj, c).value
+    if isinstance(typ.index, types.Array):
+        index_obj = c.pyapi.object_getattr_string(val, "index")
+        index_data = c.pyapi.object_getattr_string(index_obj, "_data")
+        dataframe.index = unbox_array(typ.index, index_data, c).value
+
     dataframe.columns = column_tup
     dataframe.unboxed = unboxed_tup
     dataframe.parent = val

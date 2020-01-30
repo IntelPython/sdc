@@ -30,46 +30,6 @@ Installing Binary Packages (conda)
    conda install -c intel -c intel/label/test sdc
 
 
-Example
-#######
-
-Here is a Pi calculation example in Intel SDC:
-
-.. code:: python
-
-    import sdc
-    import numpy as np
-    import time
-
-    @sdc.jit
-    def calc_pi(n):
-        t1 = time.time()
-        x = 2 * np.random.ranf(n) - 1
-        y = 2 * np.random.ranf(n) - 1
-        pi = 4 * np.sum(x**2 + y**2 < 1) / n
-        print("Execution time:", time.time()-t1, "\nresult:", pi)
-        return pi
-
-    calc_pi(2 * 10**8)
-
-Save this in a file named `pi.py` and run (on 8 cores)::
-
-    mpiexec -n 8 python pi.py
-
-This should demonstrate about 100x speedup compared to regular Python version
-without `@sdc.jit` and `mpiexec`.
-
-
-References
-##########
-
-These academic papers describe the underlying methods in Intel SDC:
-
-- `HPAT paper at ICS'17 <http://dl.acm.org/citation.cfm?id=3079099>`_
-- `HPAT at HotOS'17 <http://dl.acm.org/citation.cfm?id=3103004>`_
-- `HiFrames on arxiv <https://arxiv.org/abs/1704.02341>`_
-
-
 Building Intel® SDC from Source on Linux
 ----------------------------------------
 
@@ -103,7 +63,7 @@ Building on Linux with setuptools
 ::
 
     PYVER=<3.6 or 3.7>
-    conda create -n SDC -q -y -c numba -c conda-forge -c defaults numba mpich pyarrow=0.15.0 arrow-cpp=0.15.0 gcc_linux-64 gxx_linux-64 gfortran_linux-64 scipy pandas boost python=$PYVER
+    conda create -n SDC -q -y -c numba -c defaults -c conda-forge python=$PYVER numba pandas scipy mpich pyarrow=0.15.1 gcc_linux-64 gxx_linux-64
     source activate SDC
     git clone https://github.com/IntelPython/sdc
     cd sdc
@@ -166,11 +126,10 @@ Building documentation
 ----------------------
 Building Intel SDC User's Guide documentation requires pre-installed Intel SDC package along with compatible Pandas* version as well as Sphinx* 2.2.1 or later.
 
-You can install Sphinx* using either ``conda`` or ``pip``:
+Use ``pip`` to install Sphinx* and extensions:
 ::
 
-    conda install sphinx
-    pip install sphinx
+    pip install sphinx sphinxcontrib-programoutput
 
 Currently the build precedure is based on ``make`` located at ``./sdc/docs/`` folder. While it is not generally required we recommended that you clean up the system from previous documentaiton build by running
 ::
@@ -324,3 +283,12 @@ Running unit tests
 
     python sdc/tests/gen_test_data.py
     python -m unittest
+
+References
+##########
+
+Intel SDC follows ideas and initial code base of High-Performance Analytics Toolkit (HPAT). These academic papers describe ideas and methods behind HPAT:
+
+- `HPAT paper at ICS'17 <http://dl.acm.org/citation.cfm?id=3079099>`_
+- `HPAT at HotOS'17 <http://dl.acm.org/citation.cfm?id=3103004>`_
+- `HiFrames on arxiv <https://arxiv.org/abs/1704.02341>`_

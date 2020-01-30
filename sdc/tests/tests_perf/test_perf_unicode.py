@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -94,7 +94,7 @@ def usecase_center(input_data):
 
 
 class TestStringMethods(TestBase):
-    test_results_class = TestResultsStr
+    results_class = TestResultsStr
 
     @classmethod
     def setUpClass(cls):
@@ -108,8 +108,8 @@ class TestStringMethods(TestBase):
         for data_size in self.total_data_size_bytes:
             for data_width in self.width:
                 test_data = perf_data_gen(test_global_input_data_unicode_kind4, data_width, data_size)
-                self.test_results.add(name, 'JIT', len(test_data), hpat_func(test_data), data_width)
-                self.test_results.add(name, 'Reference', len(test_data), pyfunc(test_data), data_width)
+                self.test_results.add(name, 'SDC', len(test_data), hpat_func(test_data), data_width)
+                self.test_results.add(name, 'Python', len(test_data), pyfunc(test_data), data_width)
 
     def test_unicode_split(self):
         self._test_unicode(usecase_split, 'unicode_split')

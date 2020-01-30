@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,81 +24,25 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from numba import cgutils, types
-from numba.datamodel import StructModel
-from numba.extending import (intrinsic, make_attribute_wrapper,
-                             models, register_model)
-from numba.typing.templates import signature
+from numba.extending import intrinsic, register_model
+from sdc.datatypes.hpat_pandas_rolling_types import (
+    gen_hpat_pandas_rolling_init, RollingType, RollingTypeModel)
 
 
-class SeriesRollingType(types.Type):
+class SeriesRollingType(RollingType):
     """Type definition for pandas.Series.rolling functions handling."""
     def __init__(self, data, win_type=None, on=None, closed=None):
-        self.data = data
-        self.win_type = win_type or types.none
-        self.on = on or types.none
-        self.closed = closed or types.none
-
-        name_tmpl = 'SeriesRollingType({}, win_type={}, on={}, closed={})'
-        name = name_tmpl.format(data, self.win_type, self.on, self.closed)
-        super(SeriesRollingType, self).__init__(name)
+        super(SeriesRollingType, self).__init__('SeriesRollingType',
+                                                data, win_type=win_type,
+                                                on=on, closed=closed)
 
 
 @register_model(SeriesRollingType)
-class SeriesRollingTypeModel(StructModel):
+class SeriesRollingTypeModel(RollingTypeModel):
     """Model for SeriesRollingType type."""
     def __init__(self, dmm, fe_type):
-        members = [
-            ('data', fe_type.data),
-            # window is able to be offset
-            ('window', types.intp),
-            ('min_periods', types.intp),
-            ('center', types.boolean),
-            ('win_type', fe_type.win_type),
-            ('on', fe_type.on),
-            # axis is able to be unicode type
-            ('axis', types.intp),
-            ('closed', fe_type.closed),
-        ]
-        models.StructModel.__init__(self, dmm, fe_type, members)
+        super(SeriesRollingTypeModel, self).__init__(dmm, fe_type)
 
 
-make_attribute_wrapper(SeriesRollingType, 'data', '_data')
-make_attribute_wrapper(SeriesRollingType, 'window', '_window')
-make_attribute_wrapper(SeriesRollingType, 'min_periods', '_min_periods')
-make_attribute_wrapper(SeriesRollingType, 'center', '_center')
-make_attribute_wrapper(SeriesRollingType, 'win_type', '_win_type')
-make_attribute_wrapper(SeriesRollingType, 'on', '_on')
-make_attribute_wrapper(SeriesRollingType, 'axis', '_axis')
-make_attribute_wrapper(SeriesRollingType, 'closed', '_closed')
-
-
-@intrinsic
-def _hpat_pandas_series_rolling_init(typingctx, self, window, min_periods=None,
-                                     center=False, win_type=None,
-                                     on=None, axis=0, closed=None):
-    """Internal Numba required function to register SeriesRollingType."""
-
-    ret_typ = SeriesRollingType(self, win_type, on, closed)
-    sig = signature(ret_typ, self, window, min_periods,
-                    center, win_type, on, axis, closed)
-
-    def _codegen(context, builder, sig, args):
-        """Create SeriesRollingTypeModel structure."""
-        data, window, min_periods, center, win_type, on, axis, closed = args
-        rolling = cgutils.create_struct_proxy(sig.return_type)(context, builder)
-        rolling.data = data
-        rolling.window = window
-        rolling.min_periods = min_periods
-        rolling.center = center
-        rolling.win_type = win_type
-        rolling.on = on
-        rolling.axis = axis
-        rolling.closed = closed
-
-        if context.enable_nrt:
-            context.nrt.incref(builder, self, rolling.data)
-
-        return rolling._getvalue()
-
-    return sig, _codegen
+_hpat_pandas_series_rolling_init = intrinsic(gen_hpat_pandas_rolling_init(
+    SeriesRollingType))

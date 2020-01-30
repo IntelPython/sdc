@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,23 +24,27 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import os
-import unittest
-import platform
-import pandas as pd
-from pandas.api.types import CategoricalDtype
 import numpy as np
+import os
+import pandas as pd
+import platform
 import pyarrow.parquet as pq
-import sdc
-from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                   count_parfor_OneDs, count_array_OneDs, dist_IR_contains, get_rank,
-                                   get_start_end,
-                                   skip_numba_jit, skip_sdc_jit)
+import unittest
 from numba.config import IS_32BITS
+from pandas.api.types import CategoricalDtype
 
+import sdc
 from sdc.io.csv_ext import pandas_read_csv as pd_read_csv
+from sdc.tests.test_base import TestCase
+from sdc.tests.test_utils import (count_array_OneDs,
+                                  count_array_REPs,
+                                  count_parfor_OneDs,
+                                  count_parfor_REPs,
+                                  dist_IR_contains,
+                                  get_rank,
+                                  get_start_end,
+                                  skip_numba_jit,
+                                  skip_sdc_jit)
 
 
 kde_file = 'kde.parquet'
@@ -276,13 +280,13 @@ class TestCSV(TestIO):
             def test_impl():
                 return pd.read_csv("csv_data1.csv",
                                    names=['A', 'B', 'C', 'D'],
-                                   dtype={'A': np.intp, 'B': np.float, 'C': np.float, 'D': np.intp},
+                                   dtype={'A': np.intp, 'B': np.float, 'C': np.float, 'D': str},
                                    )
         else:
             def test_impl():
                 return pd.read_csv("csv_data1.csv",
                                    names=['A', 'B', 'C', 'D'],
-                                   dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},
+                                   dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str},
                                    )
         return test_impl
 
@@ -291,13 +295,13 @@ class TestCSV(TestIO):
             def test_impl():
                 return pd_read_csv("csv_data1.csv",
                                    names=['A', 'B', 'C', 'D'],
-                                   dtype={'A': np.intp, 'B': np.float, 'C': np.float, 'D': np.intp},
+                                   dtype={'A': np.intp, 'B': np.float, 'C': np.float, 'D': str},
                                    )
         else:
             def test_impl():
                 return pd_read_csv("csv_data1.csv",
                                    names=['A', 'B', 'C', 'D'],
-                                   dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},
+                                   dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str},
                                    )
         return test_impl
 
@@ -310,14 +314,14 @@ class TestCSV(TestIO):
     def pd_csv_keys1(self):
         if platform.system() == 'Windows' and not IS_32BITS:
             def test_impl():
-                dtype = {'A': np.intp, 'B': np.float, 'C': np.float, 'D': np.intp}
+                dtype = {'A': np.intp, 'B': np.float, 'C': np.float, 'D': str}
                 return pd.read_csv("csv_data1.csv",
                                    names=dtype.keys(),
                                    dtype=dtype,
                                    )
         else:
             def test_impl():
-                dtype = {'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int}
+                dtype = {'A': np.int, 'B': np.float, 'C': np.float, 'D': str}
                 return pd.read_csv("csv_data1.csv",
                                    names=dtype.keys(),
                                    dtype=dtype,
@@ -327,14 +331,14 @@ class TestCSV(TestIO):
     def pa_csv_keys1(self):
         if platform.system() == 'Windows' and not IS_32BITS:
             def test_impl():
-                dtype = {'A': np.intp, 'B': np.float, 'C': np.float, 'D': np.intp}
+                dtype = {'A': np.intp, 'B': np.float, 'C': np.float, 'D': str}
                 return pd_read_csv("csv_data1.csv",
                                    names=dtype.keys(),
                                    dtype=dtype,
                                    )
         else:
             def test_impl():
-                dtype = {'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int}
+                dtype = {'A': np.int, 'B': np.float, 'C': np.float, 'D': str}
                 return pd_read_csv("csv_data1.csv",
                                    names=dtype.keys(),
                                    dtype=dtype,
@@ -350,14 +354,14 @@ class TestCSV(TestIO):
     def pd_csv_const_dtype1(self):
         if platform.system() == 'Windows' and not IS_32BITS:
             def test_impl():
-                dtype = {'A': 'int64', 'B': 'float64', 'C': 'float', 'D': 'int64'}
+                dtype = {'A': 'int64', 'B': 'float64', 'C': 'float', 'D': 'str'}
                 return pd.read_csv("csv_data1.csv",
                                    names=dtype.keys(),
                                    dtype=dtype,
                                    )
         else:
             def test_impl():
-                dtype = {'A': 'int', 'B': 'float64', 'C': 'float', 'D': 'int64'}
+                dtype = {'A': 'int', 'B': 'float64', 'C': 'float', 'D': 'str'}
                 return pd.read_csv("csv_data1.csv",
                                    names=dtype.keys(),
                                    dtype=dtype,
@@ -367,14 +371,14 @@ class TestCSV(TestIO):
     def pa_csv_const_dtype1(self):
         if platform.system() == 'Windows' and not IS_32BITS:
             def test_impl():
-                dtype = {'A': 'int64', 'B': 'float64', 'C': 'float', 'D': 'int64'}
+                dtype = {'A': 'int64', 'B': 'float64', 'C': 'float', 'D': 'str'}
                 return pd_read_csv("csv_data1.csv",
                                    names=dtype.keys(),
                                    dtype=dtype,
                                    )
         else:
             def test_impl():
-                dtype = {'A': 'int', 'B': 'float64', 'C': 'float', 'D': 'int64'}
+                dtype = {'A': 'int', 'B': 'float64', 'C': 'float', 'D': 'str'}
                 return pd_read_csv("csv_data1.csv",
                                    names=dtype.keys(),
                                    dtype=dtype,
@@ -397,7 +401,6 @@ class TestCSV(TestIO):
             return pd_read_csv("csv_data_infer1.csv")
         return test_impl
 
-    @skip_numba_jit
     def test_csv_infer1(self):
         test_impl = self.pd_csv_infer1()
         hpat_func = self.jit(test_impl)
@@ -406,13 +409,13 @@ class TestCSV(TestIO):
     def pd_csv_infer_parallel1(self):
         def test_impl():
             df = pd.read_csv("csv_data_infer1.csv")
-            return df.A.sum(), df.B.sum(), df.C.sum(), df.D.sum()
+            return df.A.sum(), df.B.sum(), df.C.sum()
         return test_impl
 
     def pa_csv_infer_parallel1(self):
         def test_impl():
             df = pd_read_csv("csv_data_infer1.csv")
-            return df.A.sum(), df.B.sum(), df.C.sum(), df.D.sum()
+            return df.A.sum(), df.B.sum(), df.C.sum()
         return test_impl
 
     @skip_numba_jit
@@ -426,14 +429,14 @@ class TestCSV(TestIO):
             def test_impl():
                 return pd.read_csv("csv_data1.csv",
                                    names=['A', 'B', 'C', 'D'],
-                                   dtype={'A': np.int64, 'B': np.float, 'C': np.float, 'D': np.int64},
+                                   dtype={'A': np.int64, 'B': np.float, 'C': np.float, 'D': str},
                                    skiprows=2,
                                    )
         else:
             def test_impl():
                 return pd.read_csv("csv_data1.csv",
                                    names=['A', 'B', 'C', 'D'],
-                                   dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},
+                                   dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str},
                                    skiprows=2,
                                    )
         return test_impl
@@ -443,14 +446,14 @@ class TestCSV(TestIO):
             def test_impl():
                 return pd_read_csv("csv_data1.csv",
                                    names=['A', 'B', 'C', 'D'],
-                                   dtype={'A': np.int64, 'B': np.float, 'C': np.float, 'D': np.int64},
+                                   dtype={'A': np.int64, 'B': np.float, 'C': np.float, 'D': str},
                                    skiprows=2,
                                    )
         else:
             def test_impl():
                 return pd_read_csv("csv_data1.csv",
                                    names=['A', 'B', 'C', 'D'],
-                                   dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},
+                                   dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str},
                                    skiprows=2,
                                    )
         return test_impl
@@ -471,7 +474,6 @@ class TestCSV(TestIO):
             return pd_read_csv("csv_data_infer1.csv", skiprows=2)
         return test_impl
 
-    @skip_numba_jit
     def test_csv_infer_skip1(self):
         test_impl = self.pd_csv_infer_skip1()
         hpat_func = self.jit(test_impl)
@@ -481,14 +483,14 @@ class TestCSV(TestIO):
         def test_impl():
             df = pd.read_csv("csv_data_infer1.csv", skiprows=2,
                              names=['A', 'B', 'C', 'D'])
-            return df.A.sum(), df.B.sum(), df.C.sum(), df.D.sum()
+            return df.A.sum(), df.B.sum(), df.C.sum()
         return test_impl
 
     def pa_csv_infer_skip_parallel1(self):
         def test_impl():
             df = pd_read_csv("csv_data_infer1.csv", skiprows=2,
                              names=['A', 'B', 'C', 'D'])
-            return df.A.sum(), df.B.sum(), df.C.sum(), df.D.sum()
+            return df.A.sum(), df.B.sum(), df.C.sum()
         return test_impl
 
     @skip_numba_jit
@@ -501,7 +503,7 @@ class TestCSV(TestIO):
         def test_impl():
             df = pd.read_csv("csv_data1.csv",
                              names=['A', 'B', 'C', 'D'],
-                             dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},)
+                             dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str},)
             return df.B.values
         return test_impl
 
@@ -509,7 +511,7 @@ class TestCSV(TestIO):
         def test_impl():
             df = pd_read_csv("csv_data1.csv",
                              names=['A', 'B', 'C', 'D'],
-                             dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},)
+                             dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str},)
             return df.B.values
         return test_impl
 
@@ -591,16 +593,16 @@ class TestCSV(TestIO):
         def test_impl():
             df = pd.read_csv("csv_data1.csv",
                              names=['A', 'B', 'C', 'D'],
-                             dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int})
-            return (df.A.sum(), df.B.sum(), df.C.sum(), df.D.sum())
+                             dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str})
+            return (df.A.sum(), df.B.sum(), df.C.sum())
         return test_impl
 
     def pa_csv_parallel1(self):
         def test_impl():
             df = pd_read_csv("csv_data1.csv",
                              names=['A', 'B', 'C', 'D'],
-                             dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int})
-            return (df.A.sum(), df.B.sum(), df.C.sum(), df.D.sum())
+                             dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str})
+            return (df.A.sum(), df.B.sum(), df.C.sum())
         return test_impl
 
     @skip_numba_jit
@@ -809,6 +811,7 @@ class TestNumpy(TestIO):
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_np_io2(self):
         # parallel version
         def test_impl():

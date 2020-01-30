@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -33,6 +33,8 @@ import re
 import subprocess
 import sys
 import traceback
+
+from pathlib import Path
 
 from utilities import create_conda_env
 from utilities import format_print
@@ -79,21 +81,26 @@ if __name__ == '__main__':
     parser.add_argument('--use-numba-master', action='store_true',
                         help=f'Test with Numba master from {numba_master_channel}')
     parser.add_argument('--channel-list', default=None, help='List of channels to use: "-c <channel> -c <channel>"')
-    parser.add_argument('--benchmark-argv', default='sdc.tests.tests_perf',
+    parser.add_argument('--benchmark-test-module', default='sdc.tests.tests_perf',
                         help='Run performance testing for all or a sigle one"')
+    parser.add_argument('--benchmark-num-threads-list', nargs='+',
+                        help='List of values for NUMBA_NUM_THREADS env variable', type=int)
 
     args = parser.parse_args()
 
     test_mode = args.test_mode
     package_type = args.package_type
     python = args.python
+    if python == '3.7':
+        python = '3.7.3'
     numpy = args.numpy
     build_folder = args.build_folder
     conda_prefix = os.getenv('CONDA_PREFIX', args.conda_prefix)
     run_coverage = args.run_coverage
     channel_list = args.channel_list
     use_numba_master = args.use_numba_master
-    benchmark_argv = args.benchmark_argv
+    benchmark_test_module = args.benchmark_test_module
+    benchmark_num_threads_list = args.benchmark_num_threads_list
     numba_channel = numba_master_channel if use_numba_master is True else args.numba_channel
     assert conda_prefix is not None, 'CONDA_PREFIX is not defined; Please use --conda-prefix option or activate your conda'
 
@@ -206,7 +213,8 @@ if __name__ == '__main__':
         passed_examples = []
         failed_examples = []
         expected_failures = []
-        expected_failures_list = ['basic_workflow.py', 'basic_workflow_parallel.py']
+        unexpected_success = []
+        expected_failures_list = []
 
         os.chdir(sdc_examples)
         sdc_packages = get_sdc_build_packages(build_folder)
@@ -215,42 +223,57 @@ if __name__ == '__main__':
                 format_print(f'Run examples for sdc conda package: {package}')
                 create_conda_env(conda_activate, test_env, python, sdc_env['test'], conda_channels)
                 run_command(f'{test_env_activate} && conda install -y {package}')
-                for item in os.listdir(sdc_examples):
-                    if os.path.isfile(item) and re.search(r'^\w+\.py$', item):
-                        format_print(f'Execute {item}')
-                        try:
-                            run_command(f'{test_env_activate} && python {item}')
-                        except Exception:
-                            if item in expected_failures_list:
-                                expected_failures.append(item)
-                            else:
-                                failed_examples.append(item)
-                            format_print(f'{item} FAILED', new_block=False)
-                            traceback.print_exc()
+                for item in Path('.').glob('**/*.py'):
+                    item = str(item)
+                    if 'old_examples' in item:
+                        continue
+
+                    format_print(f'Execute {item}')
+                    try:
+                        run_command(f'{test_env_activate} && python {item}')
+                        if item in expected_failures_list:
+                            unexpected_success.append(item)
+                    except Exception:
+                        if item in expected_failures_list:
+                            expected_failures.append(item)
                         else:
-                            format_print(f'{item} PASSED', new_block=False)
-                            passed_examples.append(item)
+                            failed_examples.append(item)
+                        format_print(f'{item} FAILED', new_block=False)
+                        traceback.print_exc()
+                    else:
+                        format_print(f'{item} PASSED', new_block=False)
+                        passed_examples.append(item)
 
         total_passed = len(passed_examples)
         total_failed = len(failed_examples)
         total_expected_failures = len(expected_failures)
-        total_run = total_passed + total_failed + total_expected_failures
+        total_unexpected_success = len(unexpected_success)
+        total_run = total_passed + total_failed + total_expected_failures + total_unexpected_success
         format_print(' '.join([f'SDC examples summary:',
                                f'{total_run} RUN,',
                                f'{total_passed} PASSED,',
                                f'{total_failed} FAILED,',
-                               f'{total_expected_failures} EXPECTED FAILURES']))
+                               f'{total_expected_failures} EXPECTED FAILURES',
+                               f'{total_unexpected_success} UNEXPECTED SUCCESS',
+                               ]))
         for item in passed_examples:
             format_print(f' - {item}: PASSED', new_block=False)
         for item in failed_examples:
             format_print(f' - {item}: FAILED', new_block=False)
         for item in expected_failures:
             format_print(f' - {item}: EXPECTED FAILED', new_block=False)
+        for item in unexpected_success:
+            format_print(f' - {item}: UNEXPECTED SUCCESS', new_block=False)
 
-        sys.exit(0 if total_failed == 0 else -1)
+        success = (total_failed + total_unexpected_success) == 0
+        sys.exit(0 if success else -1)
 
     # Benchmark tests
     if test_mode == 'benchmark':
+        if benchmark_num_threads_list is None:
+            msg = ("List of values for NUMBA_NUM_THREADS is not defined; "
+                   "Please use --benchmark-num-threads-list option")
+            raise ValueError(msg)
         os.chdir(os.path.dirname(sdc_src))
         sdc_packages = get_sdc_build_packages(build_folder)
         for package in sdc_packages:
@@ -259,4 +282,7 @@ if __name__ == '__main__':
                 create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['openpyxl', 'xlrd'],
                                  conda_channels)
                 run_command(f'{test_env_activate} && conda install -y {package}')
-                run_command(f'{test_env_activate} && python -W ignore -m sdc.runtests {benchmark_argv}')
+                for num_threads in benchmark_num_threads_list:
+                    os.environ['NUMBA_NUM_THREADS'] = str(num_threads)
+                    format_print(f'NUMBA_NUM_THREADS is : {num_threads}')
+                    run_command(f'{test_env_activate} && python -W ignore -m sdc.runtests {benchmark_test_module}')

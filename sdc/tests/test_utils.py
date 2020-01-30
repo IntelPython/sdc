@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -25,18 +25,24 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numba
+import numpy as np
 import unittest
 
-import numpy as np
-
 import sdc
-import numba
+from sdc.config import config_inline_overloads, config_use_parallel_overloads
 
 
 test_global_input_data_unicode_kind4 = [
     '¡Y tú quién te crees?',
     '🐍⚡',
     '大处 着眼，c小处着手c。大大c大处',
+]
+
+test_global_input_data_unicode_kind1 = [
+    'ascii',
+    '12345',
+    '1234567890',
 ]
 
 min_float64 = np.finfo('float64').min
@@ -142,6 +148,28 @@ def skip_numba_jit(msg_or_func=None):
 def skip_sdc_jit(msg_or_func=None):
     msg, func = msg_and_func(msg_or_func)
     wrapper = unittest.skipIf(sdc.config.config_pipeline_hpat_default, msg or "sdc pipeline not supported")
+    if sdc.config.test_expected_failure:
+        wrapper = unittest.expectedFailure
+    # wrapper = lambda f: f  # disable skipping
+    return wrapper(func) if func else wrapper
+
+
+def sdc_limitation(func):
+    return unittest.expectedFailure(func)
+
+
+def skip_parallel(msg_or_func):
+    msg, func = msg_and_func(msg_or_func)
+    wrapper = unittest.skipIf(config_use_parallel_overloads, msg or "fails in parallel mode")
+    if sdc.config.test_expected_failure:
+        wrapper = unittest.expectedFailure
+    # wrapper = lambda f: f  # disable skipping
+    return wrapper(func) if func else wrapper
+
+
+def skip_inline(msg_or_func):
+    msg, func = msg_and_func(msg_or_func)
+    wrapper = unittest.skipIf(config_inline_overloads, msg or "fails in inline mode")
     if sdc.config.test_expected_failure:
         wrapper = unittest.expectedFailure
     # wrapper = lambda f: f  # disable skipping

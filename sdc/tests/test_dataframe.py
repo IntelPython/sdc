@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,24 +24,28 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import unittest
+import numba
+import numpy as np
+import pandas as pd
 import platform
 import random
 import string
-import platform
-import pandas as pd
-import numpy as np
-
-import numba
-import sdc
-from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs, count_parfor_OneDs,
-                                   count_array_OneDs, dist_IR_contains, get_start_end, check_numba_version,
-                                   skip_numba_jit, skip_sdc_jit)
-
-from sdc.tests.gen_test_data import ParquetGenerator
+import unittest
+from itertools import product
 from numba.config import IS_32BITS
+
+import sdc
+from sdc.tests.gen_test_data import ParquetGenerator
+from sdc.tests.test_base import TestCase
+from sdc.tests.test_utils import (check_numba_version,
+                                  count_array_OneDs,
+                                  count_array_REPs,
+                                  count_parfor_OneDs,
+                                  count_parfor_REPs,
+                                  dist_IR_contains,
+                                  get_start_end,
+                                  skip_numba_jit,
+                                  skip_sdc_jit)
 
 
 @sdc.jit
@@ -67,7 +71,35 @@ class TestDataFrame(TestCase):
         B = np.random.ranf(n)
         pd.testing.assert_frame_equal(hpat_func(n, A, B), test_impl(n, A, B))
 
-    def test_create_with_series(self):
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_create2(self):
+        def test_impl():
+            df = pd.DataFrame({'A': [1, 2, 3]})
+            return (df.A == 1).sum()
+        hpat_func = self.jit(test_impl)
+
+        self.assertEqual(hpat_func(), test_impl())
+
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_create3(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n)})
+            return (df.A == 2).sum()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        self.assertEqual(hpat_func(n), test_impl(n))
+
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_create_str(self):
+        def test_impl():
+            df = pd.DataFrame({'A': ['a', 'b', 'c']})
+            return (df.A == 'a').sum()
+        hpat_func = self.jit(test_impl)
+
+        self.assertEqual(hpat_func(), test_impl())
+
+    def test_create_with_series1(self):
         def test_impl(n):
             A = pd.Series(np.ones(n, dtype=np.int64))
             B = pd.Series(np.zeros(n, dtype=np.float64))
@@ -77,6 +109,18 @@ class TestDataFrame(TestCase):
         hpat_func = sdc.jit(test_impl)
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_create_with_series2(self):
+        # test creating dataframe from passed series
+        def test_impl(A):
+            df = pd.DataFrame({'A': A})
+            return (df.A == 2).sum()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
     @skip_sdc_jit
     def test_create_string_index(self):
@@ -114,6 +158,25 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_pass_df1(self):
+        def test_impl(df):
+            return (df.A == 2).sum()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n)})
+        self.assertEqual(hpat_func(df), test_impl(df))
+
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_pass_df_str(self):
+        def test_impl(df):
+            return (df.A == 'a').sum()
+        hpat_func = self.jit(test_impl)
+
+        df = pd.DataFrame({'A': ['a', 'b', 'c']})
+        self.assertEqual(hpat_func(df), test_impl(df))
+
     def test_unbox1(self):
         def test_impl(df):
             return df
@@ -146,6 +209,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit
     def test_box1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
@@ -542,6 +606,43 @@ class TestDataFrame(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    def _test_df_index(self, df):
+        def test_impl(df):
+            return df.index
+
+        sdc_func = self.jit(test_impl)
+        np.testing.assert_array_equal(sdc_func(df), test_impl(df))
+
+    @skip_sdc_jit
+    def test_index_attribute(self):
+        index_to_test = [[1, 2, 3, 4, 5],
+                         [.1, .2, .3, .4, .5],
+                         ['a', 'b', 'c', 'd', 'e']]
+        n = 5
+        np.random.seed(0)
+        A = np.ones(n)
+        B = np.random.ranf(n)
+
+        for index in index_to_test:
+            with self.subTest(index=index):
+                df = pd.DataFrame({'A': A, 'B': B}, index=index)
+                self._test_df_index(df)
+
+    @skip_sdc_jit
+    def test_index_attribute_empty(self):
+        n = 5
+        np.random.seed(0)
+        A = np.ones(n)
+        B = np.random.ranf(n)
+        df = pd.DataFrame({'A': A, 'B': B})
+
+        self._test_df_index(df)
+
+    @skip_sdc_jit
+    def test_index_attribute_empty_df(self):
+        df = pd.DataFrame()
+        self._test_df_index(df)
+
     @skip_sdc_jit
     @skip_numba_jit
     def test_df_apply(self):
@@ -567,6 +668,7 @@ class TestDataFrame(TestCase):
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_df_describe(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float32),
@@ -831,7 +933,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit
     def test_pct_change1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
@@ -841,7 +942,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit
     def test_mean1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -852,7 +952,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit
     def test_median1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -863,7 +962,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit
     def test_std1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -874,7 +972,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit
     def test_var1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -885,7 +982,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit
     def test_max1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -896,7 +992,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit
     def test_min1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -907,7 +1002,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit("DataFrame.sum() not implemented in new style")
     def test_sum1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -918,7 +1012,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit
     def test_prod1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -929,7 +1022,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit
     def test_count(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)})
@@ -939,7 +1031,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit
     def test_count1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
@@ -1045,12 +1136,47 @@ class TestDataFrame(TestCase):
         h_out = hpat_func(df)
         pd.testing.assert_frame_equal(out, h_out)
 
-    @skip_numba_jit
-    def test_df_drop1(self):
+    def test_df_drop_one_column(self):
         def test_impl(df):
-            return df.drop(columns=['A'])
+            return df.drop(columns='A')
 
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7]})
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    @skip_sdc_jit
+    def test_df_drop_tuple_column(self):
+        # Pandas supports only list as a parameter
+        def test_impl(df):
+            return df.drop(columns=['A', 'B'])
+
+        # Numba supports only tuple iteration
+        def test_sdc_impl(df):
+            return df.drop(columns=('A', 'B'))
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = self.jit(test_sdc_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    @unittest.skip("Implement Index for DataFrames")
+    def test_df_drop_tuple_columns_all(self):
+        def test_impl(df):
+            return df.drop(columns=['A', 'B', 'C'])
+
+        # Numba supports only tuple iteration
+        def test_sdc_impl(df):
+            return df.drop(columns=('A', 'B', 'C'))
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = self.jit(test_sdc_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    @skip_sdc_jit
+    def test_df_drop_by_column_errors_ignore(self):
+        def test_impl(df):
+            return df.drop(columns='M', errors='ignore')
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]})
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
@@ -1112,20 +1238,55 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @skip_numba_jit
-    def test_append1(self):
+    def test_append_df_same_cols_no_index(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)
 
         hpat_func = self.jit(test_impl)
         n = 11
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
-        df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n)**2})
+        df2 = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         df2.A[n // 2:] = n
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
-    @skip_numba_jit
-    def test_append2(self):
+    def test_append_df_diff_cols_no_index(self):
+        def test_impl(df, df2):
+            return df.append(df2, ignore_index=True)
+
+        hpat_func = self.jit(test_impl)
+        n1 = 11
+        n2 = n1 * 2
+        df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1)**2})
+        df2 = pd.DataFrame({'C': np.arange(n2), 'D': np.arange(n2)**2, 'E': np.arange(n2) + 100})
+
+        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+
+    def test_append_df_cross_cols_no_index(self):
+        def test_impl(df, df2):
+            return df.append(df2, ignore_index=True)
+
+        hpat_func = self.jit(test_impl)
+        n1 = 11
+        n2 = n1 * 2
+        df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1)**2})
+        df2 = pd.DataFrame({'A': np.arange(n2), 'D': np.arange(n2)**2, 'E': np.arange(n2) + 100})
+
+        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+
+    @skip_sdc_jit
+    def test_append_df_diff_types_no_index(self):
+        def test_impl(df, df2):
+            return df.append(df2, ignore_index=True)
+
+        hpat_func = self.jit(test_impl)
+
+        df = pd.DataFrame({'A': ['cat', 'dog', np.nan], 'B': [.2, .3, np.nan]})
+        df2 = pd.DataFrame({'C': [5, 6, 7, 8]*64, 'D': ['a', 'b', np.nan, '']*64})
+
+        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+
+    @skip_numba_jit('Unsupported functionality df.append([df2, df3])')
+    def test_append_no_index(self):
         def test_impl(df, df2, df3):
             return df.append([df2, df3], ignore_index=True)
 
@@ -1206,7 +1367,6 @@ class TestDataFrame(TestCase):
     @unittest.skip("Implement iterrows for DataFrame")
     def test_dataframe_iterrows(self):
         def test_impl(df):
-            print(df.iterrows())
             return [row for _, row in df.iterrows()]
 
         df = pd.DataFrame({'A': [1, 2, 3], 'B': [0.2, 0.5, 0.001], 'C': ['a', 'bb', 'ccc']})
@@ -1222,6 +1382,185 @@ class TestDataFrame(TestCase):
         n = 100
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
+
+    def test_min_dataframe_default(self):
+        def test_impl(df):
+            return df.min()
+
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({
+            "A": [12, 4, 5, 44, 1],
+            "B": [5.0, np.nan, 9, 2, -1],
+            # unsupported
+            # "C": ['a', 'aa', 'd', 'cc', None],
+            # "D": [True, True, False, True, True]
+        })
+        pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
+
+    @skip_sdc_jit
+    def test_median_default(self):
+        def test_impl(df):
+            return df.median()
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [.2, .0, .6, .2],
+                           "B": [.5, .6, .7, .8],
+                           "C": [2, 0, 6, 2],
+                           "D": [.2, .1, np.nan, .5],
+                           "E": [-1, np.nan, 1, np.inf],
+                           "F": [np.nan, np.nan, np.inf, np.nan]})
+        pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
+
+    def test_mean_default(self):
+        def test_impl(df):
+            return df.mean()
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [.2, .0, .6, .2],
+                           "B": [.5, .6, .7, .8],
+                           "C": [2, 0, 6, 2],
+                           "D": [.2, .1, np.nan, .5],
+                           "E": [-1, np.nan, 1, np.inf],
+                           "F": [np.nan, np.nan, np.inf, np.nan]})
+        pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
+
+    def test_std_default(self):
+        def test_impl(df):
+            return df.std()
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [.2, .0, .6, .2],
+                           "B": [.5, .6, .7, .8],
+                           "C": [2, 0, 6, 2],
+                           "D": [.2, .1, np.nan, .5],
+                           "E": [-1, np.nan, 1, np.inf],
+                           "F": [np.nan, np.nan, np.inf, np.nan]})
+        pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
+
+    def test_var_default(self):
+        def test_impl(df):
+            return df.var()
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [.2, .0, .6, .2],
+                           "B": [.5, .6, .7, .8],
+                           "C": [2, 0, 6, 2],
+                           "D": [.2, .1, np.nan, .5],
+                           "E": [-1, np.nan, 1, np.inf],
+                           "F": [np.nan, np.nan, np.inf, np.nan]})
+        pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
+
+    def test_max_default(self):
+        def test_impl(df):
+            return df.max()
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [.2, .0, .6, .2],
+                           "B": [.5, .6, .7, .8],
+                           "C": [2, 0, 6, 2],
+                           "D": [.2, .1, np.nan, .5],
+                           "E": [-1, np.nan, 1, np.inf],
+                           "F": [np.nan, np.nan, np.inf, np.nan]})
+        pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
+
+    @skip_sdc_jit
+    def test_min_default(self):
+        def test_impl(df):
+            return df.min()
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [.2, .0, .6, .2],
+                           "B": [.5, .6, .7, .8],
+                           "C": [2, 0, 6, 2],
+                           "D": [.2, .1, np.nan, .5],
+                           "E": [-1, np.nan, 1, np.inf],
+                           "F": [np.nan, np.nan, np.inf, np.nan]})
+        pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
+
+    def test_sum_default(self):
+        def test_impl(df):
+            return df.sum()
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [.2, .0, .6, .2],
+                           "B": [.5, .6, .7, .8],
+                           "C": [2, 0, 6, 2],
+                           "D": [.2, .1, np.nan, .5],
+                           "E": [-1, np.nan, 1, np.inf],
+                           "F": [np.nan, np.nan, np.inf, np.nan]})
+        pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
+
+    def test_prod_default(self):
+        def test_impl(df):
+            return df.prod()
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [.2, .0, .6, .2],
+                           "B": [.5, .6, .7, .8],
+                           "C": [2, 0, 6, 2],
+                           "D": [.2, .1, np.nan, .5],
+                           "E": [-1, np.nan, 1, np.inf],
+                           "F": [np.nan, np.nan, np.inf, np.nan]})
+        pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
+
+    def test_count2_default(self):
+        def test_impl(df):
+            return df.count()
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [.2, .0, .6, .2],
+                           "B": [.5, .6, .7, .8],
+                           "C": [2, 0, 6, 2],
+                           "D": [.2, .1, np.nan, .5],
+                           "E": [-1, np.nan, 1, np.inf],
+                           "F": [np.nan, np.nan, np.inf, np.nan]})
+        pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
+
+    @skip_sdc_jit
+    def test_pct_change(self):
+        def test_impl(df):
+            return df.pct_change()
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [14, 4, 5, 4, 1, 55],
+                           "B": [5, 2, None, 3, 2, 32],
+                           "C": [20, 20, 7, 21, 8, None],
+                           "D": [14, None, 6, 2, 6, 4]})
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    @skip_sdc_jit
+    def test_pct_change_with_parametrs(self):
+        def test_impl(df, periods, method):
+            return df.pct_change(periods=periods, fill_method=method, limit=None, freq=None)
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [.2, .0, .6, .2],
+                           "B": [.5, .6, .7, .8],
+                           "C": [2, 0, 6, 2],
+                           "D": [.2, .1, np.nan, .5],
+                           "E": [-1, np.nan, 1, np.inf],
+                           "F": [np.nan, np.nan, np.inf, np.nan]})
+        all_periods = [0, 1, 2, 5, 10, -1, -2, -5]
+        methods = [None, 'pad', 'ffill', 'backfill', 'bfill']
+        for periods, method in product(all_periods, methods):
+            with self.subTest(periods=periods, method=method):
+                result_ref = test_impl(df, periods, method)
+                result = hpat_func(df, periods, method)
+                pd.testing.assert_frame_equal(result, result_ref)
+
+    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
+    def test_list_convert(self):
+        def test_impl():
+            df = pd.DataFrame({'one': np.array([-1, np.nan, 2.5]),
+                               'two': ['foo', 'bar', 'baz'],
+                               'three': [True, False, True]})
+            return df.one.values, df.two.values, df.three.values
+        hpat_func = self.jit(test_impl)
+
+        one, two, three = hpat_func()
+        self.assertTrue(isinstance(one, np.ndarray))
+        self.assertTrue(isinstance(two, np.ndarray))
+        self.assertTrue(isinstance(three, np.ndarray))
 
 
 if __name__ == "__main__":

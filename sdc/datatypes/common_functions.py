@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -34,14 +34,17 @@ import numpy
 import pandas
 
 import numba
+from numba.targets import quicksort
 from numba import types
 from numba.errors import TypingError
-from numba.extending import overload
+from numba.extending import register_jitable
 from numba import numpy_support
 
 import sdc
 from sdc.str_arr_ext import (string_array_type, num_total_chars, append_string_array_to,
-                             str_arr_is_na, pre_alloc_string_array, str_arr_set_na)
+                             str_arr_is_na, pre_alloc_string_array, str_arr_set_na,
+                             cp_str_list_to_array, make_str_arr_from_list)
+from sdc.utils import sdc_overload
 
 
 class TypeChecker:
@@ -93,6 +96,11 @@ class TypeChecker:
             self.raise_exc(data, accepted_type.__name__, name=name)
 
 
+def params2list(params):
+    """Convert parameters dict to a list of string of a format 'key=value'"""
+    return ['{}={}'.format(k, v) for k, v in params.items()]
+
+
 def has_literal_value(var, value):
     """Used during typing to check that variable var is a Numba literal value equal to value"""
 
@@ -117,16 +125,27 @@ def has_python_value(var, value):
         return var == value
 
 
+def check_is_numeric_array(type_var):
+    """Used during typing to check that type_var is a numeric numpy arrays"""
+    return isinstance(type_var, types.Array) and isinstance(type_var.dtype, types.Number)
+
+
 def check_index_is_numeric(ty_series):
     """Used during typing to check that series has numeric index"""
-    return isinstance(ty_series.index, types.Array) and isinstance(ty_series.index.dtype, types.Number)
+    return check_is_numeric_array(ty_series.index)
+
+
+def check_types_comparable(ty_left, ty_right):
+    """Used during typing to check that underlying arrays of specified types can be compared"""
+    return ((ty_left == string_array_type and ty_right == string_array_type)
+            or (check_is_numeric_array(ty_left) and check_is_numeric_array(ty_right)))
 
 
 def hpat_arrays_append(A, B):
     pass
 
 
-@overload(hpat_arrays_append)
+@sdc_overload(hpat_arrays_append, jit_options={'parallel': False})
 def hpat_arrays_append_overload(A, B):
     """Function for appending underlying arrays (A and B) or list/tuple of arrays B to an array A"""
 
@@ -189,6 +208,62 @@ def hpat_arrays_append_overload(A, B):
             return _append_list_string_array_impl
 
 
+@register_jitable
+def fill_array(data, size, fill_value=numpy.nan, push_back=True):
+    """
+    Fill array with given values to reach the size
+    """
+
+    if push_back:
+        return numpy.append(data, numpy.repeat(fill_value, size - data.size))
+
+    return numpy.append(numpy.repeat(fill_value, size - data.size), data)
+
+
+@register_jitable
+def fill_str_array(data, size, push_back=True):
+    """
+    Fill StringArrayType array with given values to reach the size
+    """
+
+    string_array_size = len(data)
+    nan_array_size = size - string_array_size
+    num_chars = sdc.str_arr_ext.num_total_chars(data)
+
+    result_data = sdc.str_arr_ext.pre_alloc_string_array(size, num_chars)
+
+    # Keep NaN values of initial array
+    arr_is_na_mask = numpy.array([sdc.hiframes.api.isna(data, i) for i in range(string_array_size)])
+    data_str_list = sdc.str_arr_ext.to_string_list(data)
+    nan_list = [''] * nan_array_size
+
+    result_list = data_str_list + nan_list if push_back else nan_list + data_str_list
+    sdc.str_arr_ext.cp_str_list_to_array(result_data, result_list)
+
+    # Batch=64 iteration to avoid threads competition
+    batch_size = 64
+    if push_back:
+        for i in numba.prange(size//batch_size + 1):
+            for j in range(i*batch_size, min((i+1)*batch_size, size)):
+                if j < string_array_size:
+                    if arr_is_na_mask[j]:
+                        str_arr_set_na(result_data, j)
+                else:
+                    str_arr_set_na(result_data, j)
+
+    else:
+        for i in numba.prange(size//batch_size + 1):
+            for j in range(i*batch_size, min((i+1)*batch_size, size)):
+                if j < nan_array_size:
+                    str_arr_set_na(result_data, j)
+                else:
+                    str_arr_j = j - nan_array_size
+                    if arr_is_na_mask[str_arr_j]:
+                        str_arr_set_na(result_data, j)
+
+    return result_data
+
+
 @numba.njit
 def _hpat_ensure_array_capacity(new_size, arr):
     """ Function ensuring that the size of numpy array is at least as specified
@@ -217,12 +292,12 @@ def find_common_dtype_from_numpy_dtypes(array_types, scalar_types):
     return numba_common_dtype
 
 
-def hpat_join_series_indexes(left, right):
+def sdc_join_series_indexes(left, right):
     pass
 
 
-@overload(hpat_join_series_indexes)
-def hpat_join_series_indexes_overload(left, right):
+@sdc_overload(sdc_join_series_indexes, jit_options={'parallel': False})
+def sdc_join_series_indexes_overload(left, right):
     """Function for joining arrays left and right in a way similar to pandas.join 'outer' algorithm"""
 
     # TODO: eliminate code duplication by merging implementations for numeric and StringArray
@@ -232,7 +307,7 @@ def hpat_join_series_indexes_overload(left, right):
         numba_common_dtype = find_common_dtype_from_numpy_dtypes([left.dtype, right.dtype], [])
         if isinstance(numba_common_dtype, types.Number):
 
-            def hpat_join_series_indexes_impl(left, right):
+            def sdc_join_series_indexes_impl(left, right):
 
                 # allocate result arrays
                 lsize = len(left)
@@ -321,7 +396,7 @@ def hpat_join_series_indexes_overload(left, right):
 
                 return joined[:k], lidx[:k], ridx[:k]
 
-            return hpat_join_series_indexes_impl
+            return sdc_join_series_indexes_impl
 
         else:
             # TODO: support joining indexes with common dtype=object - requires Numba
@@ -330,7 +405,7 @@ def hpat_join_series_indexes_overload(left, right):
 
     elif (left == string_array_type and right == string_array_type):
 
-        def hpat_join_series_indexes_impl(left, right):
+        def sdc_join_series_indexes_impl(left, right):
 
             # allocate result arrays
             lsize = len(left)
@@ -438,6 +513,129 @@ def hpat_join_series_indexes_overload(left, right):
 
             return joined, lidx, ridx
 
-        return hpat_join_series_indexes_impl
+        return sdc_join_series_indexes_impl
+
+    return None
+
+
+def sdc_check_indexes_equal(left, right):
+    pass
+
+
+@sdc_overload(sdc_check_indexes_equal, jit_options={'parallel': False})
+def sdc_check_indexes_equal_overload(A, B):
+    """Function for checking arrays A and B of the same type are equal"""
+
+    if isinstance(A, types.Array):
+        def sdc_check_indexes_equal_numeric_impl(A, B):
+            return numpy.array_equal(A, B)
+        return sdc_check_indexes_equal_numeric_impl
+
+    elif A == string_array_type:
+        def sdc_check_indexes_equal_string_impl(A, B):
+            # TODO: replace with StringArrays comparison
+            is_index_equal = (len(A) == len(B)
+                              and num_total_chars(A) == num_total_chars(B))
+            for i in numpy.arange(len(A)):
+                if (A[i] != B[i]
+                        or str_arr_is_na(A, i) is not str_arr_is_na(B, i)):
+                    return False
+
+            return is_index_equal
+
+        return sdc_check_indexes_equal_string_impl
+
+
+@numba.njit
+def _sdc_pandas_format_percentiles(arr):
+    """ Function converting float array of percentiles to a list of strings formatted
+        the same as in pandas.io.formats.format.format_percentiles
+    """
+
+    percentiles_strs = []
+    for percentile in arr:
+        p_as_string = str(percentile * 100)
+
+        trim_index = len(p_as_string) - 1
+        while trim_index >= 0:
+            if p_as_string[trim_index] == '0':
+                trim_index -= 1
+                continue
+            elif p_as_string[trim_index] == '.':
+                break
+
+            trim_index += 1
+            break
+
+        if trim_index < 0:
+            p_as_string_trimmed = '0'
+        else:
+            p_as_string_trimmed = p_as_string[:trim_index]
+
+        percentiles_strs.append(p_as_string_trimmed + '%')
+
+    return percentiles_strs
+
+
+def sdc_arrays_argsort(A, kind='quicksort'):
+    pass
+
+
+@sdc_overload(sdc_arrays_argsort, jit_options={'parallel': False})
+def sdc_arrays_argsort_overload(A, kind='quicksort'):
+    """Function overloading argsort for different 1D array types"""
+
+    # kind is not known at compile time, so get this function here and use in impl if needed
+    quicksort_func = quicksort.make_jit_quicksort().run_quicksort
+
+    if isinstance(A, types.Array):
+        def _sdc_arrays_argsort_numeric_impl(A, kind='quicksort'):
+            return numpy.argsort(A, kind=kind)
+        return _sdc_arrays_argsort_numeric_impl
+
+    elif A == string_array_type:
+        def _sdc_arrays_argsort_str_impl(A, kind='quicksort'):
+
+            nan_mask = sdc.hiframes.api.get_nan_mask(A)
+            idx = numpy.arange(len(A))
+            old_nan_positions = idx[nan_mask]
+
+            data = A[~nan_mask]
+            keys = idx[~nan_mask]
+            if kind == 'quicksort':
+                zipped = list(zip(list(data), list(keys)))
+                zipped = quicksort_func(zipped)
+                argsorted = [zipped[i][1] for i in numpy.arange(len(data))]
+            elif kind == 'mergesort':
+                sdc.hiframes.sort.local_sort((data, ), (keys, ))
+                argsorted = list(keys)
+            else:
+                raise ValueError("Unrecognized kind of sort in sdc_arrays_argsort")
+
+            argsorted.extend(old_nan_positions)
+            return numpy.asarray(argsorted, dtype=numpy.int32)
+
+        return _sdc_arrays_argsort_str_impl
+
+    return None
+
+
+def _sdc_pandas_series_check_axis(axis):
+    pass
+
+
+@sdc_overload(_sdc_pandas_series_check_axis, jit_options={'parallel': False})
+def _sdc_pandas_series_check_axis_overload(axis):
+    if isinstance(axis, types.UnicodeType):
+        def _sdc_pandas_series_check_axis_impl(axis):
+            if axis != 'index':
+                raise ValueError("Method sort_values(). Unsupported parameter. Given axis != 'index'")
+        return _sdc_pandas_series_check_axis_impl
+
+    elif isinstance(axis, types.Integer):
+        def _sdc_pandas_series_check_axis_impl(axis):
+            if axis != 0:
+                raise ValueError("Method sort_values(). Unsupported parameter. Given axis != 0")
+        return _sdc_pandas_series_check_axis_impl
 
     return None
