@@ -353,15 +353,6 @@ def sdc_pandas_dataframe_rolling_min(self):
     return gen_df_rolling_method_impl('min', self)
 
 
-@sdc_overload_method(DataFrameRollingType, 'skew')
-def sdc_pandas_dataframe_rolling_skew(self):
-
-    ty_checker = TypeChecker('Method rolling.skew().')
-    ty_checker.check(self, DataFrameRollingType)
-
-    return gen_df_rolling_method_impl('skew', self)
-
-
 @sdc_overload_method(DataFrameRollingType, 'quantile')
 def sdc_pandas_dataframe_rolling_quantile(self, quantile, interpolation='linear'):
 
@@ -377,6 +368,24 @@ def sdc_pandas_dataframe_rolling_quantile(self, quantile, interpolation='linear'
 
     return gen_df_rolling_method_impl('quantile', self, args=['quantile'],
                                       kws={'interpolation': '"linear"'})
+
+
+@sdc_overload_method(DataFrameRollingType, 'skew')
+def sdc_pandas_dataframe_rolling_skew(self):
+
+    ty_checker = TypeChecker('Method rolling.skew().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    return gen_df_rolling_method_impl('skew', self)
+
+
+@sdc_overload_method(DataFrameRollingType, 'sum')
+def sdc_pandas_dataframe_rolling_sum(self):
+
+    ty_checker = TypeChecker('Method rolling.sum().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    return gen_df_rolling_method_impl('sum', self)
 
 
 sdc_pandas_dataframe_rolling_apply.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
@@ -464,13 +473,6 @@ sdc_pandas_dataframe_rolling_min.__doc__ = sdc_pandas_dataframe_rolling_docstrin
     'extra_params': ''
 })
 
-sdc_pandas_dataframe_rolling_skew.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
-    'method_name': 'skew',
-    'example_caption': 'Unbiased rolling skewness.',
-    'limitations_block': '',
-    'extra_params': ''
-})
-
 sdc_pandas_dataframe_rolling_quantile.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
     'method_name': 'quantile',
     'example_caption': 'Calculate the rolling quantile.',
@@ -488,4 +490,23 @@ sdc_pandas_dataframe_rolling_quantile.__doc__ = sdc_pandas_dataframe_rolling_doc
     interpolation: :obj:`str`
         This optional parameter specifies the interpolation method to use.
     """
+})
+
+sdc_pandas_dataframe_rolling_skew.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'skew',
+    'example_caption': 'Unbiased rolling skewness.',
+    'limitations_block': '',
+    'extra_params': ''
+})
+
+sdc_pandas_dataframe_rolling_sum.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'sum',
+    'example_caption': 'Calculate rolling sum of given Series.',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """,
+    'extra_params': ''
 })
