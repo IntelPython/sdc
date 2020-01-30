@@ -111,10 +111,10 @@ if __name__ == '__main__':
     test_env_activate = get_activate_env_cmd(conda_activate, test_env)
     develop_env_activate = get_activate_env_cmd(conda_activate, develop_env)
 
-    conda_channels = f'-c {numba_channel} -c conda-forge -c intel -c defaults --override-channels'
+    conda_channels = f'-c {numba_channel} -c defaults -c conda-forge --override-channels'
     # If numba is taken from custom channel, need to add numba channel to get dependencies
     if numba_channel != 'numba':
-        conda_channels = f'-c {numba_channel} -c numba -c conda-forge -c intel -c defaults --override-channels'
+        conda_channels = f'-c {numba_channel} -c numba -c defaults -c conda-forge --override-channels'
     if channel_list:
         conda_channels = f'{channel_list} --override-channels'
 
