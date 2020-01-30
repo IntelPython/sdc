@@ -192,3 +192,9 @@ class TestDFRollingMethods(TestBase):
 
     def test_df_rolling_median(self):
         self._test_df_rolling_method('median')
+
+    def test_df_rolling_min(self):
+        self._test_df_rolling_method('min')
+
+    def test_df_rolling_skew(self):
+        self._test_df_rolling_method('skew')
