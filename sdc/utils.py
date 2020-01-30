@@ -594,7 +594,7 @@ def sdc_overload(func, jit_options={}, parallel=None, strict=True, inline=None):
 
 def patched_register_jitable(*args, **kwargs):
     """
-    register_jitable patched according this:
+    register_jitable patched according to this:
     https://github.com/numba/numba/issues/5142#issuecomment-579704346
     """
     def wrap(fn):
