@@ -502,7 +502,8 @@ str2str_methods = ['capitalize', 'swapcase', 'title']
 str2str_methods_excluded = [
     'upper', 'center', 'endswith', 'find', 'isupper', 'len', 'ljust',
     'lower', 'lstrip', 'rjust', 'rstrip', 'startswith', 'strip', 'zfill',
-    'isspace', 'islower', 'isalpha', 'isalnum', 'istitle'
+    'isspace', 'islower', 'isalpha', 'isalnum', 'istitle', 'isnumeric',
+    'isdigit', 'isdecimal', 'isupper',
 ]
 """
     Functions which are used from Numba directly by calling from StringMethodsType
@@ -772,7 +773,7 @@ if not sdc.config.config_pipeline_hpat_default:
 
 _non_hpat_pipeline_attrs = [
     'resolve_append', 'resolve_apply', 'resolve_combine', 'resolve_corr', 'resolve_cov',
-    'resolve_dropna', 'resolve_fillna', 'resolve_head', 'resolve_nlargest',
+    'resolve_dropna', 'resolve_fillna', 'resolve_head', 'resolve_map', 'resolve_nlargest',
     'resolve_nsmallest', 'resolve_pct_change', 'resolve_loc', 'resolve_iloc',
     'resolve_iat', 'resolve_rolling', 'resolve_value_counts', 'resolve_describe',
     'resolve_sort_values'
