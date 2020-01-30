@@ -45,11 +45,10 @@ from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.extending import overload, lower_builtin
 import sdc
-from sdc.utils import (is_call_assign, is_var_assign, is_assign, debug_prints,
-                        alloc_arr_tup, empty_like_type)
+from sdc.utilities.utils import (is_call_assign, is_var_assign, is_assign, debug_prints,
+                                 alloc_arr_tup, empty_like_type, unliteral_all)
 from sdc import distributed, distributed_analysis
 from sdc.distributed_analysis import Distribution
-from sdc.utils import unliteral_all
 from sdc.str_ext import string_type
 from sdc.set_ext import num_total_chars_set_string, build_set
 from sdc.str_arr_ext import (string_array_type, pre_alloc_string_array,

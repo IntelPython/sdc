@@ -49,12 +49,13 @@ from numba.analysis import compute_cfg_from_blocks
 from numba.compiler_machinery import FunctionPass, register_pass
 
 import sdc
-from sdc import utils, config
+from sdc import config
+# from sdc.utilities import utils
 import sdc.io
 from sdc.io import parquet_pio
 from sdc.hiframes import filter, join, aggregate, sort
-from sdc.utils import (get_constant, NOT_CONSTANT, debug_prints,
-                        inline_new_blocks, ReplaceFunc, is_call, is_assign, update_globals)
+from sdc.utilities.utils import (get_constant, NOT_CONSTANT, debug_prints,
+                                    inline_new_blocks, ReplaceFunc, is_call, is_assign, update_globals)
 import sdc.hiframes.api
 from sdc.str_ext import string_type
 from sdc.str_arr_ext import string_array_type

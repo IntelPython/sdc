@@ -59,14 +59,8 @@ from sdc.hiframes.rolling import supported_rolling_funcs
 from sdc.hiframes.split_impl import (SplitViewStringMethodsType,
                                      string_array_split_view_type,
                                      GetItemStringArraySplitView)
-from sdc.str_arr_ext import (
-    string_array_type,
-    iternext_str_array,
-    offset_typ,
-    char_typ,
-    str_arr_payload_type,
-    StringArrayType,
-    GetItemStringArray)
+
+from sdc.str_arr_ext import (string_array_type, GetItemStringArray)
 from sdc.str_ext import string_type, list_string_array_type
 
 from sdc.hiframes.pd_series_type import (SeriesType, _get_series_array_type)

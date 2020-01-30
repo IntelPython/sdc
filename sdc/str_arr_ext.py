@@ -25,66 +25,70 @@
 # *****************************************************************************
 
 
-from . import hstr_ext
 import llvmlite.binding as ll
-from llvmlite import ir as lir
-from numba.targets.listobj import ListInstance
-import operator
-import numpy as np
+import llvmlite.llvmpy.core as lc
 import numba
+import numpy as np
+import operator
 import sdc
-from numba import types
+
+from sdc import hstr_ext
+from glob import glob
+from llvmlite import ir as lir
+from numba import types, cgutils
+from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
+                             lower_builtin, box, unbox, lower_getattr, intrinsic,
+                             overload_method, overload, overload_attribute)
+from numba.targets.hashing import _Py_hash_t
+from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed, iternext_impl, RefType)
+from numba.targets.listobj import ListInstance
 from numba.typing.templates import (infer_global, AbstractTemplate, infer,
                                     signature, AttributeTemplate, infer_getattr, bound_function)
-import numba.typing.typeof
-from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
-                             make_attribute_wrapper, lower_builtin, box, unbox,
-                             lower_getattr, intrinsic, overload_method, overload, overload_attribute)
-from numba import cgutils
-from sdc.str_ext import string_type
-from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
-                                    iternext_impl, RefType)
-from numba.targets.hashing import _Py_hash_t
-import llvmlite.llvmpy.core as lc
-from glob import glob
 from numba.special import prange
 
-char_typ = types.uint8
-offset_typ = types.uint32
-
-data_ctypes_type = types.ArrayCTypes(types.Array(char_typ, 1, 'C'))
-offset_ctypes_type = types.ArrayCTypes(types.Array(offset_typ, 1, 'C'))
-
-
-class StringArray(object):
-    def __init__(self, str_list):
-        # dummy constructor
-        self.num_strings = len(str_list)
-        self.offsets = str_list
-        self.data = str_list
-
-    def __repr__(self):
-        return 'StringArray({})'.format(self.data)
+from sdc.str_ext import string_type
+from sdc.str_arr_type import (StringArray, string_array_type, StringArrayType,
+                              StringArrayPayloadType, str_arr_payload_type, StringArrayIterator,
+                              is_str_arr_typ, offset_typ, data_ctypes_type, offset_ctypes_type)
+from sdc.utilities.sdc_typing_utils import check_is_array_of_dtype
 
 
-class StringArrayType(types.IterableType):
-    def __init__(self):
-        super(StringArrayType, self).__init__(
-            name='StringArrayType()')
-
-    @property
-    def dtype(self):
-        return string_type
-
-    @property
-    def iterator_type(self):
-        return StringArrayIterator()
-
-    def copy(self):
-        return StringArrayType()
-
-
-string_array_type = StringArrayType()
+# char_typ = types.uint8
+# offset_typ = types.uint32
+# 
+# data_ctypes_type = types.ArrayCTypes(types.Array(char_typ, 1, 'C'))
+# offset_ctypes_type = types.ArrayCTypes(types.Array(offset_typ, 1, 'C'))
+# 
+# 
+# class StringArray(object):
+#     def __init__(self, str_list):
+#         # dummy constructor
+#         self.num_strings = len(str_list)
+#         self.offsets = str_list
+#         self.data = str_list
+# 
+#     def __repr__(self):
+#         return 'StringArray({})'.format(self.data)
+# 
+# 
+# class StringArrayType(types.IterableType):
+#     def __init__(self):
+#         super(StringArrayType, self).__init__(
+#             name='StringArrayType()')
+# 
+#     @property
+#     def dtype(self):
+#         return string_type
+# 
+#     @property
+#     def iterator_type(self):
+#         return StringArrayIterator()
+# 
+#     def copy(self):
+#         return StringArrayType()
+# 
+# 
+# string_array_type = StringArrayType()
 
 
 @typeof_impl.register(StringArray)
@@ -105,52 +109,52 @@ def type_string_array_call2(context):
     return typer
 
 
-class StringArrayPayloadType(types.Type):
-    def __init__(self):
-        super(StringArrayPayloadType, self).__init__(
-            name='StringArrayPayloadType()')
-
-
-str_arr_payload_type = StringArrayPayloadType()
-
-# XXX: C equivalent in _str_ext.cpp
-@register_model(StringArrayPayloadType)
-class StringArrayPayloadModel(models.StructModel):
-    def __init__(self, dmm, fe_type):
-        members = [
-            ('offsets', types.CPointer(offset_typ)),
-            ('data', types.CPointer(char_typ)),
-            ('null_bitmap', types.CPointer(char_typ)),
-        ]
-        models.StructModel.__init__(self, dmm, fe_type, members)
-
-
-str_arr_model_members = [
-    ('num_items', types.uint64),
-    ('num_total_chars', types.uint64),
-    ('offsets', types.CPointer(offset_typ)),
-    ('data', types.CPointer(char_typ)),
-    ('null_bitmap', types.CPointer(char_typ)),
-    ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
-]
-
-make_attribute_wrapper(StringArrayType, 'null_bitmap', 'null_bitmap')
-@register_model(StringArrayType)
-class StringArrayModel(models.StructModel):
-    def __init__(self, dmm, fe_type):
-
-        models.StructModel.__init__(self, dmm, fe_type, str_arr_model_members)
-
-
-class StringArrayIterator(types.SimpleIteratorType):
-    """
-    Type class for iterators of string arrays.
-    """
-
-    def __init__(self):
-        name = "iter(String)"
-        yield_type = string_type
-        super(StringArrayIterator, self).__init__(name, yield_type)
+# class StringArrayPayloadType(types.Type):
+#     def __init__(self):
+#         super(StringArrayPayloadType, self).__init__(
+#             name='StringArrayPayloadType()')
+# 
+# 
+# str_arr_payload_type = StringArrayPayloadType()
+# 
+# # XXX: C equivalent in _str_ext.cpp
+# @register_model(StringArrayPayloadType)
+# class StringArrayPayloadModel(models.StructModel):
+#     def __init__(self, dmm, fe_type):
+#         members = [
+#             ('offsets', types.CPointer(offset_typ)),
+#             ('data', types.CPointer(char_typ)),
+#             ('null_bitmap', types.CPointer(char_typ)),
+#         ]
+#         models.StructModel.__init__(self, dmm, fe_type, members)
+# 
+# 
+# str_arr_model_members = [
+#     ('num_items', types.uint64),
+#     ('num_total_chars', types.uint64),
+#     ('offsets', types.CPointer(offset_typ)),
+#     ('data', types.CPointer(char_typ)),
+#     ('null_bitmap', types.CPointer(char_typ)),
+#     ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
+# ]
+# 
+# make_attribute_wrapper(StringArrayType, 'null_bitmap', 'null_bitmap')
+# @register_model(StringArrayType)
+# class StringArrayModel(models.StructModel):
+#     def __init__(self, dmm, fe_type):
+# 
+#         models.StructModel.__init__(self, dmm, fe_type, str_arr_model_members)
+# 
+# 
+# class StringArrayIterator(types.SimpleIteratorType):
+#     """
+#     Type class for iterators of string arrays.
+#     """
+# 
+#     def __init__(self):
+#         name = "iter(String)"
+#         yield_type = string_type
+#         super(StringArrayIterator, self).__init__(name, yield_type)
 
 
 def iternext_str_array(context, builder, sig, args, result):
@@ -576,9 +580,9 @@ if sdc.config.config_pipeline_hpat_default:
         key = '<'
 
 
-def is_str_arr_typ(typ):
-    from sdc.hiframes.pd_series_ext import is_str_series_typ
-    return typ == string_array_type or is_str_series_typ(typ)
+# def is_str_arr_typ(typ):
+#     from sdc.hiframes.pd_series_ext import is_str_series_typ
+#     return typ == string_array_type or is_str_series_typ(typ)
 
 # @infer_global(len)
 # class LenStringArray(AbstractTemplate):
@@ -1478,7 +1482,7 @@ def create_str_arr_from_list(str_list):
     n = len(str_list)
     data_total_chars = 0
     for i in numba.prange(n):
-        data_total_chars += len(str_list[i])
+        data_total_chars += get_utf8_size(str_list[i])
     str_arr = pre_alloc_string_array(n, data_total_chars)
     cp_str_list_to_array(str_arr, str_list)
 
@@ -1489,8 +1493,130 @@ def create_str_arr_from_list(str_list):
 def str_arr_set_na_by_mask(str_arr, nan_mask):
     # precondition: (1) str_arr and nan_mask have the same size
     #               (2) elements for which na bits are set all have zero lenght
-    idxs = np.arange(len(str_arr))
-    for i in idxs[nan_mask]:
-        str_arr_set_na(str_arr, i)
+    for i in numba.prange(len(str_arr)):
+        if nan_mask[i]:
+            str_arr_set_na(str_arr, i)
 
     return str_arr
+
+
+@overload(operator.add)
+def sdc_str_arr_operator_add(self, other):
+
+    self_is_str_arr = self == string_array_type
+    other_is_str_arr = other == string_array_type
+    operands_are_str_arr = self_is_str_arr and other_is_str_arr
+
+    if not (operands_are_str_arr
+            or (self_is_str_arr and isinstance(other, types.UnicodeType))
+            or (isinstance(self, types.UnicodeType) and other_is_str_arr)):
+        return None
+
+    if operands_are_str_arr:
+        def _sdc_str_arr_operator_add_impl(self, other):
+            size_self, size_other = len(self), len(other)
+            if size_self != size_other:
+                raise ValueError("Mismatch of String Arrays sizes in operator.add")
+
+            res_total_chars = 0
+            for i in numba.prange(size_self):
+                if not str_arr_is_na(self, i) and not str_arr_is_na(other, i):
+                    res_total_chars += (get_utf8_size(self[i]) + get_utf8_size(other[i]))
+            res_arr = pre_alloc_string_array(size_self, res_total_chars)
+
+            for i in numba.prange(size_self):
+                if not (str_arr_is_na(self, i) or str_arr_is_na(other, i)):
+                    res_arr[i] = self[i] + other[i]
+                else:
+                    res_arr[i] = ''
+                    str_arr_set_na(res_arr, i)
+
+            return res_arr
+
+    elif self_is_str_arr:
+        def _sdc_str_arr_operator_add_impl(self, other):
+            res_size = len(self)
+            res_total_chars = 0
+            for i in numba.prange(res_size):
+                if not str_arr_is_na(self, i):
+                    res_total_chars += get_utf8_size(self[i]) + get_utf8_size(other)
+            res_arr = pre_alloc_string_array(res_size, res_total_chars)
+
+            for i in numba.prange(res_size):
+                if not str_arr_is_na(self, i):
+                    res_arr[i] = self[i] + other
+                else:
+                    res_arr[i] = ''
+                    str_arr_set_na(res_arr, i)
+
+            return res_arr
+
+    elif other_is_str_arr:
+        def _sdc_str_arr_operator_add_impl(self, other):
+            res_size = len(other)
+            res_total_chars = 0
+            for i in numba.prange(res_size):
+                if not str_arr_is_na(other, i):
+                    res_total_chars += get_utf8_size(other[i]) + get_utf8_size(self)
+            res_arr = pre_alloc_string_array(res_size, res_total_chars)
+
+            for i in numba.prange(res_size):
+                if not str_arr_is_na(other, i):
+                    res_arr[i] = self + other[i]
+                else:
+                    res_arr[i] = ''
+                    str_arr_set_na(res_arr, i)
+
+            return res_arr
+
+    else:
+        return None
+
+    return _sdc_str_arr_operator_add_impl
+
+
+@overload(operator.mul)
+def sdc_str_arr_operator_mul(self, other):
+
+    self_is_str_arr = self == string_array_type
+    other_is_str_arr = other == string_array_type
+    if not ((self_is_str_arr and check_is_array_of_dtype(other, types.Integer)
+             or self_is_str_arr and isinstance(other, types.Integer)
+             or other_is_str_arr and check_is_array_of_dtype(self, types.Integer)
+             or other_is_str_arr and isinstance(self, types.Integer))):
+        return None
+
+    one_operand_is_scalar = isinstance(self, types.Integer) or isinstance(other, types.Integer)
+
+    def _sdc_str_arr_operator_mul_impl(self, other):
+
+        _self, _other = (self, other) if self_is_str_arr == True else (other, self)  # noqa
+        res_size = len(_self)
+        if one_operand_is_scalar != True:
+            if res_size != len(_other):
+                raise ValueError("Mismatch of String Array and Integer array sizes in operator.mul")
+
+        res_total_chars = 0
+        for i in numba.prange(res_size):
+            if not str_arr_is_na(_self, i):
+                if one_operand_is_scalar == True:  # noqa
+                    res_total_chars += get_utf8_size(_self[i]) * max(0, _other)
+                else:
+                    res_total_chars += get_utf8_size(_self[i]) * max(0, _other[i])
+        res_arr = pre_alloc_string_array(res_size, res_total_chars)
+
+        for i in numba.prange(res_size):
+            if not str_arr_is_na(_self, i):
+                if one_operand_is_scalar == True:  # noqa
+                    set_value = _self[i] * _other
+                    res_arr[i] = _self[i] * _other
+                else:
+                    set_value = _self[i] * _other[i]
+                    res_arr[i] = _self[i] * _other[i]
+            else:
+                res_arr[i] = ''
+                str_arr_set_na(res_arr, i)
+
+        return res_arr
+
+    return _sdc_str_arr_operator_mul_impl

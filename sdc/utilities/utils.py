@@ -25,7 +25,7 @@
 # *****************************************************************************
 
 
-from . import hstr_ext
+from sdc import hstr_ext
 import llvmlite.binding as ll
 from llvmlite import ir as lir
 from collections import namedtuple
