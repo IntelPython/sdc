@@ -112,11 +112,11 @@ def sdc_pandas_series_operator_binop(self, other):
         def _series_operator_binop_scalar_impl(self, other):
             if self_is_series == True:  # noqa
                 result_data = numpy.empty(len(self._data), dtype=numpy.float64)
-                result_data[:] = self._data + other
+                result_data[:] = self._data + numpy.float64(other)
                 return pandas.Series(result_data, index=self._index, name=self._name)
             else:
                 result_data = numpy.empty(len(other._data), dtype=numpy.float64)
-                result_data[:] = self + other._data
+                result_data[:] = numpy.float64(self) + other._data
                 return pandas.Series(result_data, index=other._index, name=other._name)
 
         return _series_operator_binop_scalar_impl
@@ -128,8 +128,8 @@ def sdc_pandas_series_operator_binop(self, other):
             def _series_operator_binop_none_indexes_impl(self, other):
 
                 if (len(self._data) == len(other._data)):
-                    result_data = numpy.empty(len(self._data), dtype=numpy.float64)
-                    result_data[:] = self._data + other._data
+                    result_data = self._data.astype(numpy.float64)
+                    result_data = result_data + other._data
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)

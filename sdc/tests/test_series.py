@@ -54,7 +54,6 @@ from sdc.tests.test_utils import (count_array_OneDs,
 from sdc.tests.gen_test_data import ParquetGenerator
 
 from sdc.tests.test_utils import test_global_input_data_unicode_kind1
-from sdc.str_arr_ext import num_total_chars
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
