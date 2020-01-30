@@ -30,6 +30,7 @@
 '''
 
 
+import operator
 import pandas
 import numpy
 import sdc
@@ -45,7 +46,7 @@ from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_ro
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
-from sdc.utilities.utils import sdc_overload_method, sdc_overload_attribute
+from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
 
 
 @sdc_overload_attribute(DataFrameType, 'index')
@@ -925,6 +926,121 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
         return _drop_impl
 
     return sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns)
+
+
+def df_getitem_str_literal_idx_main_codelines(self, idx):
+    """Generate main code lines for df.getitem"""
+    try:
+        col_idx = self.columns.index(idx)
+    except ValueError:
+        func_lines = ['  raise KeyError']
+    else:
+        col_data = f'data_{col_idx}'
+        func_lines = [
+            f'  {col_data} = get_dataframe_data(self, {col_idx})',
+            f'  return pandas.Series({col_data}, index=self._index, name=idx)'
+        ]
+
+    return func_lines
+
+
+def df_getitem_str_literal_idx_codegen(self, idx):
+    """
+        def _df_getitem_str_literal_idx_impl(self, idx):
+          data_0 = get_dataframe_data(self, 0)
+          return pandas.Series(data_0, index=self._index, name=idx)
+    """
+    func_lines = ['def _df_getitem_str_literal_idx_impl(self, idx):']
+    if self.columns:
+        func_lines += df_getitem_str_literal_idx_main_codelines(self, idx)
+    else:
+        # raise KeyError if input DF is empty
+        func_lines += ['  raise KeyError']
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def gen_df_getitem_str_literal_idx_impl(self, idx):
+    func_text, global_vars = df_getitem_str_literal_idx_codegen(self, idx)
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _impl = loc_vars['_df_getitem_str_literal_idx_impl']
+
+    return _impl
+
+
+def df_getitem_unicode_idx_main_codelines(self):
+    """Generate main code lines for df.getitem"""
+    func_lines = []
+    df_data = []
+    for i, col in enumerate(self.columns):
+        col_data = f'data_{i}'
+        func_lines += [f'  {col_data} = get_dataframe_data(self, {i})']
+        df_data.append((col, col_data))
+
+    data = ', '.join(f'"{col}": {d}' for col, d in df_data)
+    func_lines += [
+        f'  data = {{{data}}}',
+        f'  return pandas.Series(data[idx], index=self._index, name=idx)'
+    ]
+
+    return func_lines
+
+
+def df_getitem_unicode_idx_codegen(self):
+    """
+    def _df_getitem_unicode_idx_impl(self, idx):
+      if idx not in self._columns:
+        raise KeyError
+      data_0 = get_dataframe_data(self, 0)
+      data_1 = get_dataframe_data(self, 1)
+      data = {"A": data_0, "B": data_1}
+      return pandas.Series(data[idx], index=self._index, name=idx)
+    """
+    func_lines = [
+        'def _df_getitem_unicode_idx_impl(self, idx):',
+        '  if idx not in self._columns:',
+        '    raise KeyError'
+    ]
+    if self.columns:
+        func_lines += df_getitem_unicode_idx_main_codelines(self)
+    else:
+        # raise KeyError if input DF is empty
+        func_lines += ['  raise KeyError']
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def gen_df_getitem_unicode_idx_impl(self):
+    func_text, global_vars = df_getitem_unicode_idx_codegen(self)
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _impl = loc_vars['_df_getitem_unicode_idx_impl']
+
+    return _impl
+
+
+@sdc_overload(operator.getitem)
+def sdc_pandas_dataframe_getitem(self, idx):
+
+    if not isinstance(self, DataFrameType):
+        return None
+
+    if isinstance(idx, types.StringLiteral):
+        return gen_df_getitem_str_literal_idx_impl(self, idx.literal_value)
+    if isinstance(idx, types.UnicodeType):
+        return gen_df_getitem_unicode_idx_impl(self)
+
+    ty_checker = TypeChecker('Operator getitem().')
+    ty_checker.raise_exc(idx, 'str', 'idx')
 
 
 @sdc_overload_method(DataFrameType, 'pct_change')
