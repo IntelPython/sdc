@@ -93,9 +93,9 @@ if not is_win:
     io_libs += boost_libs
 
 ext_io = Extension(name="sdc.hio",
-                   sources=["sdc/io/_io.cpp", "sdc/io/_csv.cpp"],
+                   sources=[],
                    depends=["sdc/_hpat_common.h", "sdc/_distributed.h",
-                            "sdc/_import_py.h", "sdc/io/_csv.h",
+                            "sdc/_import_py.h",
                             "sdc/_datetime_ext.h"],
                    libraries=boost_libs,
                    include_dirs=ind + np_compile_args['include_dirs'],
