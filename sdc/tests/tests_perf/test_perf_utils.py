@@ -286,11 +286,13 @@ class TestResults:
         if self.test_results_data.empty:
             return None
 
-        median_col = self.test_results_data.groupby(self.index)['Time(s)'].median()
-        min_col = self.test_results_data.groupby(self.index)['Time(s)'].min()
-        max_col = self.test_results_data.groupby(self.index)['Time(s)'].max()
-        compilation_col = self.test_results_data.groupby(self.index)['Compile(s)'].median(skipna=False)
-        boxing_col = self.test_results_data.groupby(self.index)['Boxing(s)'].median(skipna=False)
+        groupby_index = self.test_results_data.groupby(self.index)
+
+        median_col = groupby_index['Time(s)'].median()
+        min_col = groupby_index['Time(s)'].min()
+        max_col = groupby_index['Time(s)'].max()
+        compilation_col = groupby_index['Compile(s)'].median(skipna=False)
+        boxing_col = groupby_index['Boxing(s)'].median(skipna=False)
 
         test_results_data = self.test_results_data.set_index(self.index)
         test_results_data['median'] = median_col
