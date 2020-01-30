@@ -390,6 +390,15 @@ def sdc_pandas_dataframe_rolling_skew(self):
     return gen_df_rolling_method_impl('skew', self)
 
 
+@sdc_overload_method(DataFrameRollingType, 'sum')
+def sdc_pandas_dataframe_rolling_sum(self):
+
+    ty_checker = TypeChecker('Method rolling.sum().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    return gen_df_rolling_method_impl('sum', self)
+
+
 sdc_pandas_dataframe_rolling_apply.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
     'method_name': 'apply',
     'example_caption': 'Calculate the rolling apply.',
@@ -501,5 +510,17 @@ sdc_pandas_dataframe_rolling_skew.__doc__ = sdc_pandas_dataframe_rolling_docstri
     'method_name': 'skew',
     'example_caption': 'Unbiased rolling skewness.',
     'limitations_block': '',
+    'extra_params': ''
+})
+
+sdc_pandas_dataframe_rolling_sum.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'sum',
+    'example_caption': 'Calculate rolling sum of given Series.',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """,
     'extra_params': ''
 })

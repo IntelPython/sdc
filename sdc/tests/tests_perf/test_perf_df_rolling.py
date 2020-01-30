@@ -95,6 +95,7 @@ class TestDFRollingMethods(TestBase):
             'median': [2 * 10 ** 5],
             'min': [2 * 10 ** 5],
             'skew': [2 * 10 ** 5],
+            'sum': [2 * 10 ** 5],
         }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
@@ -107,7 +108,9 @@ class TestDFRollingMethods(TestBase):
         cfunc(*args, **kwargs)
 
         # execution and boxing time
-        record['test_results'], record['boxing_results'] = get_times(cfunc, *args, **kwargs)
+        record['test_results'], record['boxing_results'] = get_times(cfunc,
+                                                                     *args,
+                                                                     **kwargs)
 
     def _test_python(self, pyfunc, record, *args, **kwargs):
         record['test_results'], _ = get_times(pyfunc, *args, **kwargs)
@@ -198,3 +201,6 @@ class TestDFRollingMethods(TestBase):
 
     def test_df_rolling_skew(self):
         self._test_df_rolling_method('skew')
+
+    def test_df_rolling_sum(self):
+        self._test_df_rolling_method('sum')
