@@ -6122,7 +6122,7 @@ def sdc_pandas_str_series_operator_add(self, other):
 
                     if none_or_numeric_indexes == True:  # noqa
                         result_index = left_index.astype(numba_index_common_dtype)
-                    else: # case of string indices
+                    else:  # case of string indices
                         result_index = self._index
 
                     return pandas.Series(result_data, index=result_index)
@@ -6135,9 +6135,9 @@ def sdc_pandas_str_series_operator_add(self, other):
                 result_data_as_list = []
                 for i in numpy.arange(result_size):
                     if (left_indexer[i] == -1
-                        or right_indexer[i] == -1
-                        or str_arr_is_na(self._data, left_indexer[i])
-                        or str_arr_is_na(other._data, right_indexer[i])):
+                            or right_indexer[i] == -1
+                            or str_arr_is_na(self._data, left_indexer[i])
+                            or str_arr_is_na(other._data, right_indexer[i])):
                         result_nan_mask[i] = True
                         result_data_as_list.append('')
                     else:
@@ -6254,7 +6254,7 @@ def sdc_pandas_str_series_operator_mul(self, other):
 
                     if none_or_numeric_indexes == True:  # noqa
                         result_index = left_index.astype(numba_index_common_dtype)
-                    else: # case of string indices
+                    else:  # case of string indices
                         result_index = self._index
 
                     return pandas.Series(result_data, index=result_index)
@@ -6269,8 +6269,8 @@ def sdc_pandas_str_series_operator_mul(self, other):
                 result_data_as_list = []
                 for i in numpy.arange(result_size):
                     if (left_indexer[i] == -1
-                        or right_indexer[i] == -1
-                        or str_arr_is_na(str_series_operand._data, str_series_indexer[i])):
+                            or right_indexer[i] == -1
+                            or str_arr_is_na(str_series_operand._data, str_series_indexer[i])):
                         result_nan_mask[i] = True
                         result_data_as_list.append('')
                     else:

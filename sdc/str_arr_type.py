@@ -88,6 +88,7 @@ class StringArrayPayloadModel(models.StructModel):
         ]
         models.StructModel.__init__(self, dmm, fe_type, members)
 
+
 str_arr_model_members = [
     ('num_items', types.uint64),
     ('num_total_chars', types.uint64),

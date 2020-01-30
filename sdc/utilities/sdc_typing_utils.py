@@ -172,3 +172,4 @@ def find_common_dtype_from_numpy_dtypes(array_types, scalar_types):
 
     return numba_common_dtype
 
+

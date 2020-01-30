@@ -366,7 +366,8 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                     # TODO: insert new blocks in current spot of work_list
                     # instead of append?
                     # TODO: rename variables, fix scope/loc
-                    sdc.utilities.utils.inline_new_blocks(self.state.func_ir, block, len(new_body), out_nodes, work_list)
+                    sdc.utilities.utils.inline_new_blocks(
+                        self.state.func_ir, block, len(new_body), out_nodes, work_list)
                     replaced = True
                     break
             if not replaced:

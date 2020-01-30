@@ -53,44 +53,6 @@ from sdc.str_arr_type import (StringArray, string_array_type, StringArrayType,
 from sdc.utilities.sdc_typing_utils import check_is_array_of_dtype
 
 
-# char_typ = types.uint8
-# offset_typ = types.uint32
-# 
-# data_ctypes_type = types.ArrayCTypes(types.Array(char_typ, 1, 'C'))
-# offset_ctypes_type = types.ArrayCTypes(types.Array(offset_typ, 1, 'C'))
-# 
-# 
-# class StringArray(object):
-#     def __init__(self, str_list):
-#         # dummy constructor
-#         self.num_strings = len(str_list)
-#         self.offsets = str_list
-#         self.data = str_list
-# 
-#     def __repr__(self):
-#         return 'StringArray({})'.format(self.data)
-# 
-# 
-# class StringArrayType(types.IterableType):
-#     def __init__(self):
-#         super(StringArrayType, self).__init__(
-#             name='StringArrayType()')
-# 
-#     @property
-#     def dtype(self):
-#         return string_type
-# 
-#     @property
-#     def iterator_type(self):
-#         return StringArrayIterator()
-# 
-#     def copy(self):
-#         return StringArrayType()
-# 
-# 
-# string_array_type = StringArrayType()
-
-
 @typeof_impl.register(StringArray)
 def typeof_string_array(val, c):
     return string_array_type
@@ -107,54 +69,6 @@ def type_string_array_call2(context):
     def typer(string_list=None):
         return string_array_type
     return typer
-
-
-# class StringArrayPayloadType(types.Type):
-#     def __init__(self):
-#         super(StringArrayPayloadType, self).__init__(
-#             name='StringArrayPayloadType()')
-# 
-# 
-# str_arr_payload_type = StringArrayPayloadType()
-# 
-# # XXX: C equivalent in _str_ext.cpp
-# @register_model(StringArrayPayloadType)
-# class StringArrayPayloadModel(models.StructModel):
-#     def __init__(self, dmm, fe_type):
-#         members = [
-#             ('offsets', types.CPointer(offset_typ)),
-#             ('data', types.CPointer(char_typ)),
-#             ('null_bitmap', types.CPointer(char_typ)),
-#         ]
-#         models.StructModel.__init__(self, dmm, fe_type, members)
-# 
-# 
-# str_arr_model_members = [
-#     ('num_items', types.uint64),
-#     ('num_total_chars', types.uint64),
-#     ('offsets', types.CPointer(offset_typ)),
-#     ('data', types.CPointer(char_typ)),
-#     ('null_bitmap', types.CPointer(char_typ)),
-#     ('meminfo', types.MemInfoPointer(str_arr_payload_type)),
-# ]
-# 
-# make_attribute_wrapper(StringArrayType, 'null_bitmap', 'null_bitmap')
-# @register_model(StringArrayType)
-# class StringArrayModel(models.StructModel):
-#     def __init__(self, dmm, fe_type):
-# 
-#         models.StructModel.__init__(self, dmm, fe_type, str_arr_model_members)
-# 
-# 
-# class StringArrayIterator(types.SimpleIteratorType):
-#     """
-#     Type class for iterators of string arrays.
-#     """
-# 
-#     def __init__(self):
-#         name = "iter(String)"
-#         yield_type = string_type
-#         super(StringArrayIterator, self).__init__(name, yield_type)
 
 
 def iternext_str_array(context, builder, sig, args, result):
@@ -1592,7 +1506,7 @@ def sdc_str_arr_operator_mul(self, other):
 
         _self, _other = (self, other) if self_is_str_arr == True else (other, self)  # noqa
         res_size = len(_self)
-        if one_operand_is_scalar != True:
+        if one_operand_is_scalar != True:  # noqa
             if res_size != len(_other):
                 raise ValueError("Mismatch of String Array and Integer array sizes in operator.mul")
 
