@@ -1070,12 +1070,10 @@ stringmethods_funcs = {
 }
 
 
-@sdc_overload_method(StringMethodsType, 'capitalize')
-def hpat_pandas_stringmethods_capitalize(self):
-    """
+sdc_pandas_series_str_docstring_template_ = """
         Intel Scalable Dataframe Compiler User Guide
         ********************************************
-        Pandas API: pandas.Series.str.capitalize
+        Pandas API: pandas.Series.str.{method_name}
 
         Limitations
         -----------
@@ -1083,13 +1081,13 @@ def hpat_pandas_stringmethods_capitalize(self):
 
         Examples
         --------
-        .. literalinclude:: ../../../examples/series/str/series_str_capitalize.py
+        .. literalinclude:: ../../../examples/series/str/series_str_{method_name}.py
            :language: python
            :lines: 27-
-           :caption: Convert strings in the Series/Index to be capitalized.
-           :name: ex_series_str_capitalize
+           :caption: {caption}
+           :name: ex_series_str_{method_name}
 
-        .. command-output:: python ./series/str/series_str_capitalize.py
+        .. command-output:: python ./series/str/series_str_{method_name}.py
            :cwd: ../../../examples
 
         .. seealso::
@@ -1109,13 +1107,13 @@ def hpat_pandas_stringmethods_capitalize(self):
         Intel Scalable Dataframe Compiler Developer Guide
         *************************************************
 
-        Pandas Series method :meth:`pandas.core.strings.StringMethods.capitalize()` implementation.
+        Pandas Series method :meth:`pandas.core.strings.StringMethods.{method_name}()` implementation.
 
         Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
 
         .. only:: developer
 
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_capitalize_str
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_{method_name}_str
 
         Parameters
         ----------
@@ -1127,13 +1125,17 @@ def hpat_pandas_stringmethods_capitalize(self):
         :obj:`pandas.Series`
              returns :obj:`pandas.Series` object
     """
+
+
+@sdc_overload_method(StringMethodsType, 'capitalize')
+def hpat_pandas_stringmethods_capitalize(self):
     ty_checker = TypeChecker('Method capitalize().')
     ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_capitalize_impl(self):
         item_count = len(self._data)
         result = [''] * item_count
-        for idx, item in enumerate(self._data._data):
+        for idx, item in numba.prange(self._data._data):
             result[idx] = item.capitalize()
 
         return pandas.Series(result, self._data._index, name=self._data._name)
@@ -1143,68 +1145,13 @@ def hpat_pandas_stringmethods_capitalize(self):
 
 @sdc_overload_method(StringMethodsType, 'title')
 def hpat_pandas_stringmethods_title(self):
-    """
-        Intel Scalable Dataframe Compiler User Guide
-        ********************************************
-        Pandas API: pandas.Series.str.title
-
-        Limitations
-        -----------
-        Series elements are expected to be Unicode strings. Elements cannot be NaN.
-
-        Examples
-        --------
-        .. literalinclude:: ../../../examples/series/str/series_str_title.py
-           :language: python
-           :lines: 27-
-           :caption: Convert strings in the Series/Index to titlecase.
-           :name: ex_series_str_title
-
-        .. command-output:: python ./series/str/series_str_title.py
-           :cwd: ../../../examples
-
-        .. seealso::
-            :ref:`Series.str.lower <pandas.Series.str.lower>`
-                Converts all characters to lowercase.
-            :ref:`Series.str.upper <pandas.Series.str.upper>`
-                Converts all characters to uppercase.
-            :ref:`Series.str.title <pandas.Series.str.title>`
-                Converts first character of each word to uppercase and remaining to lowercase.
-            :ref:`Series.str.capitalize <pandas.Series.str.capitalize>`
-                Converts first character to uppercase and remaining to lowercase.
-            :ref:`Series.str.swapcase <pandas.Series.str.swapcase>`
-                Converts uppercase to lowercase and lowercase to uppercase.
-            :ref:`Series.str.casefold <pandas.Series.str.casefold>`
-                Removes all case distinctions in the string.
-
-        Intel Scalable Dataframe Compiler Developer Guide
-        *************************************************
-
-        Pandas Series method :meth:`pandas.core.strings.StringMethods.title()` implementation.
-
-        Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
-        .. only:: developer
-
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_title_str
-
-        Parameters
-        ----------
-        self: :class:`pandas.core.strings.StringMethods`
-            input arg
-
-        Returns
-        -------
-        :obj:`pandas.Series`
-             returns :obj:`pandas.Series` object
-    """
     ty_checker = TypeChecker('Method title().')
     ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_title_impl(self):
         item_count = len(self._data)
         result = [''] * item_count
-        for idx, item in enumerate(self._data._data):
+        for idx, item in numba.prange(self._data._data):
             result[idx] = item.title()
 
         return pandas.Series(result, self._data._index, name=self._data._name)
@@ -1214,68 +1161,13 @@ def hpat_pandas_stringmethods_title(self):
 
 @sdc_overload_method(StringMethodsType, 'swapcase')
 def hpat_pandas_stringmethods_swapcase(self):
-    """
-        Intel Scalable Dataframe Compiler User Guide
-        ********************************************
-        Pandas API: pandas.Series.str.swapcase
-
-        Limitations
-        -----------
-        Series elements are expected to be Unicode strings. Elements cannot be NaN.
-
-        Examples
-        --------
-        .. literalinclude:: ../../../examples/series/str/series_str_swapcase.py
-           :language: python
-           :lines: 27-
-           :caption: Convert strings in the Series/Index to be swapcased.
-           :name: ex_series_str_swapcase
-
-        .. command-output:: python ./series/str/series_str_swapcase.py
-           :cwd: ../../../examples
-
-        .. seealso::
-            :ref:`Series.str.lower <pandas.Series.str.lower>`
-                Converts all characters to lowercase.
-            :ref:`Series.str.upper <pandas.Series.str.upper>`
-                Converts all characters to uppercase.
-            :ref:`Series.str.title <pandas.Series.str.title>`
-                Converts first character of each word to uppercase and remaining to lowercase.
-            :ref:`Series.str.capitalize <pandas.Series.str.capitalize>`
-                Converts first character to uppercase and remaining to lowercase.
-            :ref:`Series.str.swapcase <pandas.Series.str.swapcase>`
-                Converts uppercase to lowercase and lowercase to uppercase.
-            :ref:`Series.str.casefold <pandas.Series.str.casefold>`
-                Removes all case distinctions in the string.
-
-        Intel Scalable Dataframe Compiler Developer Guide
-        *************************************************
-
-        Pandas Series method :meth:`pandas.core.strings.StringMethods.swapcase()` implementation.
-
-        Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
-        .. only:: developer
-
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_swapcase_str
-
-        Parameters
-        ----------
-        self: :class:`pandas.core.strings.StringMethods`
-            input arg
-
-        Returns
-        -------
-        :obj:`pandas.Series`
-             returns :obj:`pandas.Series` object
-    """
     ty_checker = TypeChecker('Method swapcase().')
     ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_swapcase_impl(self):
         item_count = len(self._data)
         result = [''] * item_count
-        for idx, item in enumerate(self._data._data):
+        for idx, item in numba.prange(self._data._data):
             result[idx] = item.swapcase()
 
         return pandas.Series(result, self._data._index, name=self._data._name)
@@ -1285,68 +1177,13 @@ def hpat_pandas_stringmethods_swapcase(self):
 
 @sdc_overload_method(StringMethodsType, 'casefold')
 def hpat_pandas_stringmethods_casefold(self):
-    """
-        Intel Scalable Dataframe Compiler User Guide
-        ********************************************
-        Pandas API: pandas.Series.str.casefold
-
-        Limitations
-        -----------
-        Series elements are expected to be Unicode strings. Elements cannot be NaN.
-
-        Examples
-        --------
-        .. literalinclude:: ../../../examples/series/str/series_str_casefold.py
-           :language: python
-           :lines: 27-
-           :caption: Convert strings in the Series/Index to be casefolded.
-           :name: ex_series_str_casefold
-
-        .. command-output:: python ./series/str/series_str_casefold.py
-           :cwd: ../../../examples
-
-        .. seealso::
-            :ref:`Series.str.lower <pandas.Series.str.lower>`
-                Converts all characters to lowercase.
-            :ref:`Series.str.upper <pandas.Series.str.upper>`
-                Converts all characters to uppercase.
-            :ref:`Series.str.title <pandas.Series.str.title>`
-                Converts first character of each word to uppercase and remaining to lowercase.
-            :ref:`Series.str.capitalize <pandas.Series.str.capitalize>`
-                Converts first character to uppercase and remaining to lowercase.
-            :ref:`Series.str.swapcase <pandas.Series.str.swapcase>`
-                Converts uppercase to lowercase and lowercase to uppercase.
-            :ref:`Series.str.casefold <pandas.Series.str.casefold>`
-                Removes all case distinctions in the string.
-
-        Intel Scalable Dataframe Compiler Developer Guide
-        *************************************************
-
-        Pandas Series method :meth:`pandas.core.strings.StringMethods.casefold()` implementation.
-
-        Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
-        .. only:: developer
-
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_casefold_str
-
-        Parameters
-        ----------
-        self: :class:`pandas.core.strings.StringMethods`
-            input arg
-
-        Returns
-        -------
-        :obj:`pandas.Series`
-             returns :obj:`pandas.Series` object
-    """
     ty_checker = TypeChecker('Method casefold().')
     ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_casefold_impl(self):
         item_count = len(self._data)
         result = [''] * item_count
-        for idx, item in enumerate(self._data._data):
+        for idx, item in numba.prange(self._data._data):
             result[idx] = item.casefold()
 
         return pandas.Series(result, self._data._index, name=self._data._name)
@@ -1354,8 +1191,24 @@ def hpat_pandas_stringmethods_casefold(self):
     return hpat_pandas_stringmethods_casefold_impl
 
 
+stringmethods_funcs_ = {
+    'capitalize': {'method': hpat_pandas_stringmethods_capitalize,
+                   'caption': 'Convert strings in the Series/Index to be capitalized.'},
+    'title': {'method': hpat_pandas_stringmethods_title,
+              'caption': 'Convert strings in the Series/Index to titlecase.'},
+    'swapcase': {'method': hpat_pandas_stringmethods_swapcase,
+                 'caption': 'Convert strings in the Series/Index to be swapcased.'},
+    'casefold': {'method': hpat_pandas_stringmethods_casefold,
+                 'caption': 'Convert strings in the Series/Index to be casefolded.'},
+}
+
+
 for name, data in stringmethods_funcs.items():
     data['method'].__doc__ = sdc_pandas_series_str_docstring_template.format(**{'method_name': name,
+                                                                                'caption': data['caption']})
+
+for name, data in stringmethods_funcs_.items():
+    data['method'].__doc__ = sdc_pandas_series_str_docstring_template_.format(**{'method_name': name,
                                                                                 'caption': data['caption']})
 
 
