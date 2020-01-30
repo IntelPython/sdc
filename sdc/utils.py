@@ -566,10 +566,24 @@ def update_globals(func, glbls):
         func.__globals__.update(glbls)
 
 
-def sdc_overload(func, jit_options={}, strict=True, inline=None):
+def update_jit_options(jit_options, parallel, config_flag):
+    jit_options = jit_options.copy()
+
+    if parallel is not None:
+        if 'parallel' not in jit_options:
+            jit_options.update({'parallel': parallel})
+        else:
+            raise ValueError('Either jit_options "parallel" or parallel parameter could be specified at the same time')
+
     if 'parallel' not in jit_options:
         jit_options = jit_options.copy()
         jit_options.update({'parallel': config_use_parallel_overloads})
+
+    return jit_options
+
+
+def sdc_overload(func, jit_options={}, parallel=None, strict=True, inline=None):
+    jit_options = update_jit_options(jit_options, parallel, config_use_parallel_overloads)
 
     if inline is None:
         inline = 'always' if config_inline_overloads else 'never'
@@ -577,10 +591,8 @@ def sdc_overload(func, jit_options={}, strict=True, inline=None):
     return overload(func, jit_options=jit_options, strict=strict, inline=inline)
 
 
-def sdc_overload_method(typ, name, jit_options={}, strict=True, inline=None):
-    if 'parallel' not in jit_options:
-        jit_options = jit_options.copy()
-        jit_options.update({'parallel': config_use_parallel_overloads})
+def sdc_overload_method(typ, name, jit_options={}, parallel=None, strict=True, inline=None):
+    jit_options = update_jit_options(jit_options, parallel, config_use_parallel_overloads)
 
     if inline is None:
         inline = 'always' if config_inline_overloads else 'never'
@@ -588,10 +600,8 @@ def sdc_overload_method(typ, name, jit_options={}, strict=True, inline=None):
     return overload_method(typ, name, jit_options=jit_options, strict=strict, inline=inline)
 
 
-def sdc_overload_attribute(typ, name, jit_options={}, strict=True, inline=None):
-    if 'parallel' not in jit_options:
-        jit_options = jit_options.copy()
-        jit_options.update({'parallel': config_use_parallel_overloads})
+def sdc_overload_attribute(typ, name, jit_options={}, parallel=None, strict=True, inline=None):
+    jit_options = update_jit_options(jit_options, parallel, config_use_parallel_overloads)
 
     if inline is None:
         inline = 'always' if config_inline_overloads else 'never'
