@@ -3168,7 +3168,7 @@ class TestSeries(
                 pd.testing.assert_series_equal(hpat_func(S), test_impl(S),
                                                check_names=check_names)
 
-    def test_series_str_capitalize(self):
+    def test_series_capitalize_str(self):
         def test_impl(S):
             return S.str.capitalize()
 
@@ -3176,7 +3176,7 @@ class TestSeries(
         s = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
         pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
-    def test_series_str_title(self):
+    def test_series_title_str(self):
         def test_impl(S):
             return S.str.title()
 
@@ -3184,7 +3184,7 @@ class TestSeries(
         s = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
         pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
-    def test_series_str_swapcase(self):
+    def test_series_swapcase_str(self):
         def test_impl(S):
             return S.str.swapcase()
 
@@ -3192,7 +3192,7 @@ class TestSeries(
         s = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
         pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
-    def test_series_str_casefold(self):
+    def test_series_casefold_str(self):
         def test_impl(S):
             return S.str.casefold()
 
