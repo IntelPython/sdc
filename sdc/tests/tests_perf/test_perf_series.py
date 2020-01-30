@@ -134,7 +134,7 @@ cases = [
     TC(name='lt', size=[10 ** 7], params='other', data_num=2),
     TC(name='map', size=[10 ** 7], params='lambda x: x * 2'),
     TC(name='map', size=[10 ** 7], params='{2.: 42., 4.: 3.14}'),
-    TC(name='max', size=[10 ** 8]),
+    TC(name='max', size=[10 ** 8], params='skipna=True'),
     TC(name='max', size=[10 ** 8], params='skipna=False'),
     TC(name='mean', size=[10 ** 8]),
     TC(name='median', size=[10 ** 8]),
