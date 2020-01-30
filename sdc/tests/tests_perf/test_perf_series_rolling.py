@@ -29,12 +29,14 @@ import time
 
 import numba
 import pandas
+import numpy as np
 
 from sdc.tests.test_utils import test_global_input_data_float64
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import (calc_compilation, get_times,
                                                   perf_data_gen_fixed_len)
-from .generator import test_perf_generator
+from .generator import generate_test_cases
+from .generator import TestCase as TC
 
 
 def get_rolling_params(window=100, min_periods=None):
@@ -70,9 +72,12 @@ class TestSeriesRollingMethods(TestBase):
     def _test_python(self, pyfunc, record, *args, **kwargs):
         record['test_results'], _ = get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, name, total_data_length, test_name=None,
+    def _test_case(self, pyfunc, name, total_data_length, data_num=1,
                    input_data=test_global_input_data_float64):
         test_name = 'Series.rolling.{}'.format(name)
+
+        if input_data is None:
+            input_data = test_global_input_data_float64
 
         full_input_data_length = sum(len(i) for i in input_data)
         for data_length in total_data_length:
@@ -82,6 +87,12 @@ class TestSeriesRollingMethods(TestBase):
             }
             data = perf_data_gen_fixed_len(input_data, full_input_data_length, data_length)
             test_data = pandas.Series(data)
+
+            args = [test_data]
+            for i in range(data_num - 1):
+                np.random.seed(i)
+                extra_data = np.random.ranf(data_length)
+                args.append(pandas.Series(extra_data))
 
             record = base.copy()
             record['test_type'] = 'SDC'
@@ -95,17 +106,21 @@ class TestSeriesRollingMethods(TestBase):
 
 
 cases = [
-    ('apply', 'func=lambda x: numpy.nan if len(x) == 0 else x.mean()', [10 ** 7]),
-    ('count', '', [10 ** 7]),
-    ('kurt', '', [10 ** 7]),
-    ('max', '', [10 ** 7]),
-    ('mean', '', [10 ** 7]),
-    ('median', '', [10 ** 7]),
-    ('min', '', [10 ** 7]),
-    ('skew', '', [10 ** 7]),
-    ('std', '', [10 ** 7]),
-    ('sum', '', [10 ** 7]),
-    ('var', '', [10 ** 7]),
+    TC(name='apply', size=[10 ** 7], params='func=lambda x: numpy.nan if len(x) == 0 else x.mean()'),
+    TC(name='corr', size=[10 ** 7]),
+    TC(name='count', size=[10 ** 7]),
+    TC(name='cov', size=[10 ** 7]),
+    TC(name='kurt', size=[10 ** 7]),
+    TC(name='max', size=[10 ** 7]),
+    TC(name='mean', size=[10 ** 7]),
+    TC(name='median', size=[10 ** 7]),
+    TC(name='min', size=[10 ** 7]),
+    TC(name='quantile', size=[10 ** 7], params='0.2'),
+    TC(name='skew', size=[10 ** 7]),
+    TC(name='std', size=[10 ** 7]),
+    TC(name='sum', size=[10 ** 7]),
+    TC(name='var', size=[10 ** 7]),
 ]
 
-test_perf_generator(cases, TestSeriesRollingMethods, 'series', 'rolling({}).'.format(get_rolling_params()))
+
+generate_test_cases(cases, TestSeriesRollingMethods, 'series', 'rolling({})'.format(get_rolling_params()))
