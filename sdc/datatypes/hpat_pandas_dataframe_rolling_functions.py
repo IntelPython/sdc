@@ -26,7 +26,8 @@
 import numpy
 import pandas
 
-from numba.types import float64, Boolean, Omitted, NoneType
+from numba.types import (float64, Boolean, Number, Omitted,
+                         NoneType, StringLiteral, UnicodeType)
 from sdc.datatypes.common_functions import TypeChecker, params2list
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import DataFrameRollingType
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
@@ -352,6 +353,23 @@ def sdc_pandas_dataframe_rolling_min(self):
     return gen_df_rolling_method_impl('min', self)
 
 
+@sdc_overload_method(DataFrameRollingType, 'quantile')
+def sdc_pandas_dataframe_rolling_quantile(self, quantile, interpolation='linear'):
+
+    ty_checker = TypeChecker('Method rolling.quantile().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    if not isinstance(quantile, Number):
+        ty_checker.raise_exc(quantile, 'float', 'quantile')
+
+    str_types = (Omitted, StringLiteral, UnicodeType)
+    if not isinstance(interpolation, str_types) and interpolation != 'linear':
+        ty_checker.raise_exc(interpolation, 'str', 'interpolation')
+
+    return gen_df_rolling_method_impl('quantile', self, args=['quantile'],
+                                      kws={'interpolation': '"linear"'})
+
+
 @sdc_overload_method(DataFrameRollingType, 'skew')
 def sdc_pandas_dataframe_rolling_skew(self):
 
@@ -453,6 +471,25 @@ sdc_pandas_dataframe_rolling_min.__doc__ = sdc_pandas_dataframe_rolling_docstrin
     'example_caption': 'Calculate the rolling minimum.',
     'limitations_block': '',
     'extra_params': ''
+})
+
+sdc_pandas_dataframe_rolling_quantile.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'quantile',
+    'example_caption': 'Calculate the rolling quantile.',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    Supported ``interpolation`` only can be `'linear'`.
+    DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """,
+    'extra_params':
+    """
+    quantile: :obj:`float`
+        Quantile to compute. 0 <= quantile <= 1.
+    interpolation: :obj:`str`
+        This optional parameter specifies the interpolation method to use.
+    """
 })
 
 sdc_pandas_dataframe_rolling_skew.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
