@@ -46,6 +46,7 @@ from sdc.datatypes.common_functions import (check_index_is_numeric, find_common_
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_arr_ext import (string_array_type, num_total_chars, str_arr_is_na)
 from sdc.utils import sdc_overload
+from sdc.functions.numpy_like import astype
 
 
 @sdc_overload(operator.add)
@@ -101,7 +102,7 @@ def sdc_pandas_series_operator_add(self, other):
     # specializations for numeric series - TODO: support arithmetic operation on StringArrays
     if (isinstance(other, types.Number)):
         def _series_operator_add_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) + numpy.float64(other)
+            result_data = astype(self._data, numpy.float64) + numpy.float64(other)
             return pandas.Series(result_data, index=self._index, name=self._name)
 
         return _series_operator_add_scalar_impl
@@ -113,8 +114,8 @@ def sdc_pandas_series_operator_add(self, other):
             def _series_operator_add_none_indexes_impl(self, other):
 
                 if (len(self._data) == len(other._data)):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data + other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data + astype(other._data, numpy.float64)
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -124,11 +125,11 @@ def sdc_pandas_series_operator_add(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data + other._data.astype(numpy.float64)
+                        result_data = result_data + astype(other._data, numpy.float64)
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) + result_data
+                        result_data = astype(self._data, numpy.float64) + result_data
 
                     return pandas.Series(result_data, self._index)
 
@@ -146,11 +147,11 @@ def sdc_pandas_series_operator_add(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data + other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data + astype(other._data, numpy.float64)
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_index_common_dtype)
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -233,7 +234,7 @@ def sdc_pandas_series_operator_sub(self, other):
     # specializations for numeric series - TODO: support arithmetic operation on StringArrays
     if (isinstance(other, types.Number)):
         def _series_operator_sub_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) - numpy.float64(other)
+            result_data = astype(self._data, numpy.float64) - numpy.float64(other)
             return pandas.Series(result_data, index=self._index, name=self._name)
 
         return _series_operator_sub_scalar_impl
@@ -245,8 +246,8 @@ def sdc_pandas_series_operator_sub(self, other):
             def _series_operator_sub_none_indexes_impl(self, other):
 
                 if (len(self._data) == len(other._data)):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data - other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data - astype(other._data, numpy.float64)
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -256,11 +257,11 @@ def sdc_pandas_series_operator_sub(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data - other._data.astype(numpy.float64)
+                        result_data = result_data - astype(other._data, numpy.float64)
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) - result_data
+                        result_data = astype(self._data, numpy.float64) - result_data
 
                     return pandas.Series(result_data, self._index)
 
@@ -278,11 +279,11 @@ def sdc_pandas_series_operator_sub(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data - other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data - astype(other._data, numpy.float64)
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_index_common_dtype)
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -365,7 +366,7 @@ def sdc_pandas_series_operator_mul(self, other):
     # specializations for numeric series - TODO: support arithmetic operation on StringArrays
     if (isinstance(other, types.Number)):
         def _series_operator_mul_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) * numpy.float64(other)
+            result_data = astype(self._data, numpy.float64) * numpy.float64(other)
             return pandas.Series(result_data, index=self._index, name=self._name)
 
         return _series_operator_mul_scalar_impl
@@ -377,8 +378,8 @@ def sdc_pandas_series_operator_mul(self, other):
             def _series_operator_mul_none_indexes_impl(self, other):
 
                 if (len(self._data) == len(other._data)):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data * other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data * astype(other._data, numpy.float64)
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -388,11 +389,11 @@ def sdc_pandas_series_operator_mul(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data * other._data.astype(numpy.float64)
+                        result_data = result_data * astype(other._data, numpy.float64)
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) * result_data
+                        result_data = astype(self._data, numpy.float64) * result_data
 
                     return pandas.Series(result_data, self._index)
 
@@ -410,11 +411,11 @@ def sdc_pandas_series_operator_mul(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data * other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data * astype(other._data, numpy.float64)
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_index_common_dtype)
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -497,7 +498,7 @@ def sdc_pandas_series_operator_truediv(self, other):
     # specializations for numeric series - TODO: support arithmetic operation on StringArrays
     if (isinstance(other, types.Number)):
         def _series_operator_truediv_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) / numpy.float64(other)
+            result_data = astype(self._data, numpy.float64) / numpy.float64(other)
             return pandas.Series(result_data, index=self._index, name=self._name)
 
         return _series_operator_truediv_scalar_impl
@@ -509,8 +510,8 @@ def sdc_pandas_series_operator_truediv(self, other):
             def _series_operator_truediv_none_indexes_impl(self, other):
 
                 if (len(self._data) == len(other._data)):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data / other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data / astype(other._data, numpy.float64)
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -520,11 +521,11 @@ def sdc_pandas_series_operator_truediv(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data / other._data.astype(numpy.float64)
+                        result_data = result_data / astype(other._data, numpy.float64)
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) / result_data
+                        result_data = astype(self._data, numpy.float64) / result_data
 
                     return pandas.Series(result_data, self._index)
 
@@ -542,11 +543,11 @@ def sdc_pandas_series_operator_truediv(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data / other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data / astype(other._data, numpy.float64)
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_index_common_dtype)
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -629,7 +630,7 @@ def sdc_pandas_series_operator_floordiv(self, other):
     # specializations for numeric series - TODO: support arithmetic operation on StringArrays
     if (isinstance(other, types.Number)):
         def _series_operator_floordiv_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) // numpy.float64(other)
+            result_data = astype(self._data, numpy.float64) // numpy.float64(other)
             return pandas.Series(result_data, index=self._index, name=self._name)
 
         return _series_operator_floordiv_scalar_impl
@@ -641,8 +642,8 @@ def sdc_pandas_series_operator_floordiv(self, other):
             def _series_operator_floordiv_none_indexes_impl(self, other):
 
                 if (len(self._data) == len(other._data)):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data // other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data // astype(other._data, numpy.float64)
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -652,11 +653,11 @@ def sdc_pandas_series_operator_floordiv(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data // other._data.astype(numpy.float64)
+                        result_data = result_data // astype(other._data, numpy.float64)
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) // result_data
+                        result_data = astype(self._data, numpy.float64) // result_data
 
                     return pandas.Series(result_data, self._index)
 
@@ -674,11 +675,11 @@ def sdc_pandas_series_operator_floordiv(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data // other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data // astype(other._data, numpy.float64)
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_index_common_dtype)
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -761,7 +762,7 @@ def sdc_pandas_series_operator_mod(self, other):
     # specializations for numeric series - TODO: support arithmetic operation on StringArrays
     if (isinstance(other, types.Number)):
         def _series_operator_mod_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) % numpy.float64(other)
+            result_data = astype(self._data, numpy.float64) % numpy.float64(other)
             return pandas.Series(result_data, index=self._index, name=self._name)
 
         return _series_operator_mod_scalar_impl
@@ -773,8 +774,8 @@ def sdc_pandas_series_operator_mod(self, other):
             def _series_operator_mod_none_indexes_impl(self, other):
 
                 if (len(self._data) == len(other._data)):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data % other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data % astype(other._data, numpy.float64)
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -784,11 +785,11 @@ def sdc_pandas_series_operator_mod(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data % other._data.astype(numpy.float64)
+                        result_data = result_data % astype(other._data, numpy.float64)
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) % result_data
+                        result_data = astype(self._data, numpy.float64) % result_data
 
                     return pandas.Series(result_data, self._index)
 
@@ -806,11 +807,11 @@ def sdc_pandas_series_operator_mod(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data % other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data % astype(other._data, numpy.float64)
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_index_common_dtype)
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -893,7 +894,7 @@ def sdc_pandas_series_operator_pow(self, other):
     # specializations for numeric series - TODO: support arithmetic operation on StringArrays
     if (isinstance(other, types.Number)):
         def _series_operator_pow_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) ** numpy.float64(other)
+            result_data = astype(self._data, numpy.float64) ** numpy.float64(other)
             return pandas.Series(result_data, index=self._index, name=self._name)
 
         return _series_operator_pow_scalar_impl
@@ -905,8 +906,8 @@ def sdc_pandas_series_operator_pow(self, other):
             def _series_operator_pow_none_indexes_impl(self, other):
 
                 if (len(self._data) == len(other._data)):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data ** other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data ** astype(other._data, numpy.float64)
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -916,11 +917,11 @@ def sdc_pandas_series_operator_pow(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data ** other._data.astype(numpy.float64)
+                        result_data = result_data ** astype(other._data, numpy.float64)
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) ** result_data
+                        result_data = astype(self._data, numpy.float64) ** result_data
 
                     return pandas.Series(result_data, self._index)
 
@@ -938,11 +939,11 @@ def sdc_pandas_series_operator_pow(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data ** other._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
+                    result_data = result_data ** astype(other._data, numpy.float64)
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_index_common_dtype)
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -1050,7 +1051,7 @@ def sdc_pandas_series_operator_lt(self, other):
 
                 if sdc_check_indexes_equal(left_index, right_index):
                     if none_or_numeric_indexes == True:  # noqa
-                        new_index = left_index.astype(numba_index_common_dtype)
+                        new_index = astype(left_index, numba_index_common_dtype)
                     else:
                         new_index = self._index
                     return pandas.Series(self._data < other._data,
@@ -1141,7 +1142,7 @@ def sdc_pandas_series_operator_gt(self, other):
 
                 if sdc_check_indexes_equal(left_index, right_index):
                     if none_or_numeric_indexes == True:  # noqa
-                        new_index = left_index.astype(numba_index_common_dtype)
+                        new_index = astype(left_index, numba_index_common_dtype)
                     else:
                         new_index = self._index
                     return pandas.Series(self._data > other._data,
@@ -1232,7 +1233,7 @@ def sdc_pandas_series_operator_le(self, other):
 
                 if sdc_check_indexes_equal(left_index, right_index):
                     if none_or_numeric_indexes == True:  # noqa
-                        new_index = left_index.astype(numba_index_common_dtype)
+                        new_index = astype(left_index, numba_index_common_dtype)
                     else:
                         new_index = self._index
                     return pandas.Series(self._data <= other._data,
@@ -1323,7 +1324,7 @@ def sdc_pandas_series_operator_ge(self, other):
 
                 if sdc_check_indexes_equal(left_index, right_index):
                     if none_or_numeric_indexes == True:  # noqa
-                        new_index = left_index.astype(numba_index_common_dtype)
+                        new_index = astype(left_index, numba_index_common_dtype)
                     else:
                         new_index = self._index
                     return pandas.Series(self._data >= other._data,
@@ -1414,7 +1415,7 @@ def sdc_pandas_series_operator_ne(self, other):
 
                 if sdc_check_indexes_equal(left_index, right_index):
                     if none_or_numeric_indexes == True:  # noqa
-                        new_index = left_index.astype(numba_index_common_dtype)
+                        new_index = astype(left_index, numba_index_common_dtype)
                     else:
                         new_index = self._index
                     return pandas.Series(self._data != other._data,
@@ -1505,7 +1506,7 @@ def sdc_pandas_series_operator_eq(self, other):
 
                 if sdc_check_indexes_equal(left_index, right_index):
                     if none_or_numeric_indexes == True:  # noqa
-                        new_index = left_index.astype(numba_index_common_dtype)
+                        new_index = astype(left_index, numba_index_common_dtype)
                     else:
                         new_index = self._index
                     return pandas.Series(self._data == other._data,
