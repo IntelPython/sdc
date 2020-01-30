@@ -3173,7 +3173,7 @@ class TestSeries(
             return S.str.capitalize()
 
         sdc_func = self.jit(test_impl)
-        s = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
+        s = pd.Series(test_global_input_data_unicode_kind4)
         pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     def test_series_title_str(self):
@@ -3181,7 +3181,7 @@ class TestSeries(
             return S.str.title()
 
         sdc_func = self.jit(test_impl)
-        s = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
+        s = pd.Series(test_global_input_data_unicode_kind4)
         pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     def test_series_swapcase_str(self):
@@ -3189,7 +3189,7 @@ class TestSeries(
             return S.str.swapcase()
 
         sdc_func = self.jit(test_impl)
-        s = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
+        s = pd.Series(test_global_input_data_unicode_kind4)
         pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     def test_series_casefold_str(self):
@@ -3197,7 +3197,7 @@ class TestSeries(
             return S.str.casefold()
 
         sdc_func = self.jit(test_impl)
-        s = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
+        s = pd.Series(test_global_input_data_unicode_kind4)
         pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     @skip_sdc_jit('Series.str.<method>() unsupported')
