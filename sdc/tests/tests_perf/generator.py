@@ -31,12 +31,12 @@ def to_varname_without_excess_underscores(string):
     return '_'.join(i for i in to_varname(string).split('_') if i)
 
 
-def generate_test_cases(cases, class_add, typ, prefix=''):
+def generate_test_cases(cases, class_add, typ, prefix='', dop=''):
     for test_case in cases:
-        test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case)]
+        test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case), dop]
         test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
 
-        setattr(class_add, test_name, gen_test(test_case, prefix))
+        setattr(class_add, test_name, gen_test(test_case, prefix, dop))
 
 
 def gen_params_wo_data(test_case):
@@ -64,7 +64,7 @@ def gen_call_expr(test_case, prefix):
     return '.'.join(call_expr_parts)
 
 
-def gen_test(test_case, prefix):
+def gen_test(test_case, prefix, dop):
     func_name = 'func'
 
     usecase = gen_usecase(test_case, prefix)
@@ -73,8 +73,8 @@ def gen_test(test_case, prefix):
 
     func_text = f"""
 {skip}def {func_name}(self):
-  self._test_case(usecase, name='{test_case.name}', total_data_length={test_case.size},
-                  data_num={test_case.data_num}, input_data={test_case.input_data})
+  self._test_case(usecase, name='{test_case.name + '_' + dop}', total_data_length={test_case.size},
+                  data_num={test_case.data_num}, input_data={test_case.input_data}, typ='{dop}')
 """
 
     loc_vars = {}
