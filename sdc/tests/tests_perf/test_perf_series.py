@@ -154,7 +154,7 @@ cases = [
     TC(name='pow', size=[10 ** 7], params='other', data_num=2),
     TC(name='quantile', size=[10 ** 8]),
     TC(name='rename', size=[10 ** 7], call_expr='data.rename("new_series")', usecase_params='data'),
-    TC(name='setitem', size=[10 ** 7], call_expr='S = data[100000]', usecase_params='data'),
+    TC(name='setitem', size=[10 ** 7], call_expr='data[100000] = 0', usecase_params='data'),
     TC(name='shape', size=[10 ** 7], call_expr='data.shape', usecase_params='data'),
     TC(name='shift', size=[10 ** 8]),
     TC(name='size', size=[10 ** 7], call_expr='data.size', usecase_params='data'),
