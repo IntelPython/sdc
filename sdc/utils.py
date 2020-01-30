@@ -592,13 +592,32 @@ def sdc_overload(func, jit_options={}, parallel=None, strict=True, inline=None):
     return overload(func, jit_options=jit_options, strict=strict, inline=inline)
 
 
+def patched_register_jitable(*args, **kwargs):
+    """
+    register_jitable patched according this:
+    https://github.com/numba/numba/issues/5142#issuecomment-579704346
+    """
+    def wrap(fn):
+        # It is just a wrapper for @overload
+        inline = kwargs.pop('inline', 'never')
+        @overload(fn, jit_options=kwargs, inline=inline, strict=False)
+        def ov_wrap(*args, **kwargs):
+            return fn
+        return fn
+
+    if kwargs:
+        return wrap
+    else:
+        return wrap(*args)
+
+
 def sdc_register_jitable(*args, **kwargs):
     updated_kwargs = kwargs.copy()
     updated_kwargs['parallel'] = updated_kwargs.get('parallel', config_use_parallel_overloads)
     updated_kwargs['inline'] = updated_kwargs.get('inline', 'always' if config_inline_overloads else 'never')
 
     def wrap(fn):
-        return register_jitable(**updated_kwargs)(fn)
+        return patched_register_jitable(**updated_kwargs)(fn)
 
     if kwargs:
         return wrap
