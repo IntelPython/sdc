@@ -45,7 +45,7 @@ from sdc.str_arr_type import string_array_type
 from sdc.str_arr_ext import (num_total_chars, append_string_array_to,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na,
                              cp_str_list_to_array)
-from sdc.utilities.utils import sdc_overload
+from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 from sdc.utilities.sdc_typing_utils import find_common_dtype_from_numpy_dtypes
 
 
@@ -116,7 +116,7 @@ def hpat_arrays_append_overload(A, B):
             return _append_list_string_array_impl
 
 
-@register_jitable
+@sdc_register_jitable
 def fill_array(data, size, fill_value=numpy.nan, push_back=True):
     """
     Fill array with given values to reach the size
@@ -128,7 +128,7 @@ def fill_array(data, size, fill_value=numpy.nan, push_back=True):
     return numpy.append(numpy.repeat(fill_value, size - data.size), data)
 
 
-@register_jitable
+@sdc_register_jitable
 def fill_str_array(data, size, push_back=True):
     """
     Fill StringArrayType array with given values to reach the size
