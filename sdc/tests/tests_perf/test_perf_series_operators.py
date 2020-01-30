@@ -40,7 +40,12 @@ from .generator import generate_test_cases
 from .generator import TestCase as TC
 
 
-# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series_operators.TestSeriesOperatorMethods.test_series_{method_name}
+"""
+python -m sdc.runtests
+sdc.tests.tests_perf.test_perf_series_operators.TestSeriesOperatorMethods.test_series_operator_{name}
+"""
+
+
 class TestSeriesOperatorMethods(TestBase):
     @classmethod
     def setUpClass(cls):
