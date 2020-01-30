@@ -46,12 +46,12 @@ from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array)
 from sdc.utils import sdc_overload
 
 
-def astype(self, dtype, order='K', casting='unsafe', subok=True, copy=True):
+def astype(self, dtype):
     pass
 
 
 @sdc_overload(astype)
-def sdc_astype_overload(self, dtype, order='K', casting='unsafe', subok=True, copy=True):
+def sdc_astype_overload(self, dtype):
     """
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -71,7 +71,7 @@ def sdc_astype_overload(self, dtype, order='K', casting='unsafe', subok=True, co
 
     if ((isinstance(dtype, types.Function) and dtype.typing_key == str) or
         (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
-        def sdc_astype_number_to_string_impl(self, dtype, order='K', casting='unsafe', subok=True, copy=True):
+        def sdc_astype_number_to_string_impl(self, dtype):
             num_chars = 0
             arr_len = len(self)
 
@@ -99,7 +99,7 @@ def sdc_astype_overload(self, dtype, order='K', casting='unsafe', subok=True, co
         other_numba_dtype = numpy_support.from_dtype(other_numpy_dtype)
         numba_self = self.dtype
 
-    def sdc_astype_number_impl(self, dtype, order='K', casting='unsafe', subok=True, copy=True):
+    def sdc_astype_number_impl(self, dtype):
         if other_numba_dtype == numba_self:
             return self
 
