@@ -39,7 +39,7 @@ from numba.errors import TypingError
 
 import sdc
 from sdc.datatypes.common_functions import TypeChecker
-from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array)
+from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size)
 from sdc.utils import sdc_overload
 
 
@@ -55,7 +55,6 @@ def sdc_astype_overload(self, dtype):
     Parallel replacement of numpy.astype.
 
     .. only:: developer
-
        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k astype
 
     """
@@ -69,15 +68,15 @@ def sdc_astype_overload(self, dtype):
     if ((isinstance(dtype, types.Function) and dtype.typing_key == str) or
         (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
         def sdc_astype_number_to_string_impl(self, dtype):
-            num_chars = 0
+            num_bytes = 0
             arr_len = len(self)
 
-            # Get total chars for new array
+            # Get total bytes for new array
             for i in prange(arr_len):
                 item = self[i]
-                num_chars += len(str(item))  # TODO: check NA
+                num_bytes += get_utf8_size(str(item))
 
-            data = pre_alloc_string_array(arr_len, num_chars)
+            data = pre_alloc_string_array(arr_len, num_bytes)
 
             for i in range(arr_len):
                 item = self[i]
