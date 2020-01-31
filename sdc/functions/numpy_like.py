@@ -34,11 +34,8 @@
 import numba
 import numpy
 
+from numba import types, jit, prange, numpy_support
 from numba.errors import TypingError
-from numba import types
-from numba import jit
-from numba import prange
-from numba import numpy_support
 
 import sdc
 from sdc.datatypes.common_functions import TypeChecker
@@ -55,7 +52,7 @@ def sdc_astype_overload(self, dtype):
     """
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
-    Parallel analogue of numpy 'astype' implementation.
+    Parallel replacement of numpy.astype.
 
     .. only:: developer
 
@@ -90,23 +87,12 @@ def sdc_astype_overload(self, dtype):
 
         return sdc_astype_number_to_string_impl
 
-    if (isinstance(self, types.Array) and isinstance(dtype, types.functions.NumberClass)):
-        other_numba_dtype = dtype.instance_type
-        numba_self = self.dtype
+    if (isinstance(self, types.Array) and isinstance(dtype, (types.StringLiteral, types.functions.NumberClass))):
+        def sdc_astype_number_impl(self, dtype):
+            arr = numpy.empty(len(self), dtype=numpy.dtype(dtype))
+            for i in numba.prange(len(self)):
+                arr[i] = self[i]
 
-    if (isinstance(self, types.Array) and isinstance(dtype, (types.StringLiteral, types.UnicodeType))):
-        other_numpy_dtype = numpy.dtype(dtype.literal_value)
-        other_numba_dtype = numpy_support.from_dtype(other_numpy_dtype)
-        numba_self = self.dtype
+            return arr
 
-    def sdc_astype_number_impl(self, dtype):
-        if other_numba_dtype == numba_self:
-            return self
-
-        arr = numpy.empty(len(self), dtype=numpy.dtype(dtype))
-        for i in numba.prange(len(self)):
-            arr[i] = self[i]
-
-        return arr
-
-    return sdc_astype_number_impl
+        return sdc_astype_number_impl

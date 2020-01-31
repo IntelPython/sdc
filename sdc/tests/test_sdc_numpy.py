@@ -57,7 +57,7 @@ class TestArrays(TestCase):
                 with self.subTest(data=case, type=type_):
                     np.testing.assert_array_equal(sdc_func(a, type_), ref_impl(a, type_))
 
-    @unittest.skip("Numba can't unbox literal value as type")
+    @unittest.skip("Need implement support for non-literal dtype parameter")
     def test_astype_to_num_unbox(self):
         def ref_impl(a, t):
             return a.astype(t)
@@ -68,7 +68,7 @@ class TestArrays(TestCase):
         sdc_func = self.jit(sdc_impl)
 
         cases = [[5, 2, 0, 333, -4], [3.3, 5.4, 3.4]]
-        cases_type = ['float64', 'int64']
+        cases_type = ['float64', 'int64', 'str']
         for case in cases:
             a = np.array(case)
             for type_ in cases_type:
