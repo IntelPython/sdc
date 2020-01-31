@@ -1179,7 +1179,7 @@ stringmethods_funcs = {
 for name, data in stringmethods_funcs.items():
     data['method'].__doc__ = sdc_pandas_series_str_docstring_template.format(**{'method_name': name,
                                                                                 'caption': data['caption'],
-                                                                                'seealso':data['seealso']})
+                                                                                'seealso': data['seealso']})
 
 
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))
