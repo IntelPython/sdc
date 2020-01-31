@@ -2077,6 +2077,35 @@ def hpat_pandas_series_isin(self, values):
 @sdc_overload_method(SeriesType, 'append')
 def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integrity=False):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.append
+
+    Limitations
+    -----------
+    - Parameter verify_integrity is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ignore_index supported as literal value only
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_append.py
+       :language: python
+       :lines: 27-
+       :caption: Concatenate two or more Series.
+       :name: ex_series_append
+
+    .. command-output:: python ./series/series_append.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        `pandas.absolute
+        <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.concat.html#pandas.concat>`_
+            General function to concatenate DataFrame or Series objects.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.append` implementation.
 
     .. only:: developer
@@ -2106,27 +2135,22 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
 
     _func_name = 'Method append().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError(
-            '{} The object must be a pandas.series. Given self: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if not (isinstance(to_append, SeriesType)
             or (isinstance(to_append, (types.UniTuple, types.List)) and isinstance(to_append.dtype, SeriesType))):
-        raise TypingError(
-            '{} The argument must be a pandas.series or list/tuple of pandas.series. \
-            Given to_append: {}'.format(_func_name, to_append))
+        ty_checker.raise_exc(to_append, 'series or list/tuple of series', 'to_append')
 
     # currently we will always raise this in the end, i.e. if no impl was found
     # TODO: find a way to stop compilation early and not proceed with unliteral step
     if not (isinstance(ignore_index, types.Literal) and isinstance(ignore_index, types.Boolean)
             or isinstance(ignore_index, types.Omitted)
             or ignore_index is False):
-        raise TypingError(
-            '{} The ignore_index must be a literal Boolean constant. Given: {}'.format(_func_name, ignore_index))
+        ty_checker.raise_exc(ignore_index, 'literal Boolean constant', 'ignore_index')
 
     if not (verify_integrity is False or isinstance(verify_integrity, types.Omitted)):
-        raise TypingError(
-            '{} Unsupported parameters. Given verify_integrity: {}'.format(_func_name, verify_integrity))
+        ty_checker.raise_exc(verify_integrity, 'bool', 'verify_integrity')
 
     # ignore_index value has to be known at compile time to select between implementations with different signatures
     ignore_index_is_false = (common_functions.has_literal_value(ignore_index, False)
@@ -2254,7 +2278,7 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
        :language: python
        :lines: 27-
        :caption: Compute correlation with other Series, excluding missing values.
-       :name: ex_series_copy
+       :name: ex_series_corr
 
     .. command-output:: python ./series/series_corr.py
        :cwd: ../../../examples
@@ -2417,9 +2441,43 @@ def hpat_pandas_series_groupby(
         squeeze=False,
         observed=False):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.groupby
+
+    Limitations
+    -----------
+    - Parameters level, as_index, sort, group_keys, squeeze, observed
+    are currently unsupported by Intel Scalable Dataframe Compiler
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_groupby.py
+       :language: python
+       :lines: 27-
+       :caption: Return the mean of the values for the requested axis.
+       :name: ex_series_groupby
+
+    .. command-output:: python ./series/series_groupby.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`Series.resample <pandas.Series.resample>`
+            Resample time-series data.
+
+    .. note::
+
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas Series method :meth:`pandas.Series.groupby` implementation.
+
     .. only:: developer
        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_groupby_count
+
     Parameters
     -----------
     self: :class:`pandas.Series`
@@ -2443,19 +2501,19 @@ def hpat_pandas_series_groupby(
     Returns
     -------
     :obj:`pandas.SeriesGroupBy`
-         returns :obj:`pandas.SeriesGroupBy` object
+        returns :obj:`pandas.SeriesGroupBy` object
     """
 
     _func_name = 'Method Series.groupby().'
 
-    if not isinstance(self, SeriesType):
-        raise TypingError('{} The object must be a pandas.series. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
 
     if by is None and axis is None:
-        raise TypingError("{} You have to supply one of 'by' or 'axis' parameters".format(_func_name))
+        ty_checker.raise_exc(by, "supply one of 'by' or 'axis'", 'by')
 
     if level is not None and not isinstance(level, (types.Integer, types.NoneType, types.Omitted)):
-        raise TypingError("{} 'level' must be an Integer. Given: {}".format(_func_name, level))
+        ty_checker.raise_exc(level, 'int', 'level')
 
     def hpat_pandas_series_groupby_impl(
             self,
@@ -5746,9 +5804,29 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
 @sdc_overload_method(SeriesType, 'cov')
 def hpat_pandas_series_cov(self, other, min_periods=None):
     """
-    Pandas Series method :meth:`pandas.Series.cov` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-    Note: Unsupported mixed numeric and string data
+    Pandas API: pandas.Series.cov
+
+    Limitations
+    -----------
+    - Unsupported mixed numeric and string data
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_cov.py
+       :language: python
+       :lines: 27-
+       :caption: Compute covariance with Series, excluding missing values.
+       :name: ex_series_cov
+
+    .. command-output:: python ./series/series_cov.py
+       :cwd: ../../../examples
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas Series method :meth:`pandas.Series.cov` implementation.
 
     .. only:: developer
 
@@ -5765,7 +5843,7 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
     Returns
     -------
     :obj:`float`
-         returns :obj:`float` object
+        returns :obj:`float` object
     """
 
     ty_checker = TypeChecker('Method cov().')
@@ -5816,9 +5894,43 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
 @sdc_overload_method(SeriesType, 'pct_change', parallel=False)
 def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None, freq=None):
     """
-    Pandas Series method :meth:`pandas.Series.pct_change` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-    Note: Unsupported mixed numeric and string data
+    Pandas API: pandas.Series.pct_change
+
+    Limitations
+    -----------
+    - Unsupported mixed numeric and string data
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_pct_change.py
+       :language: python
+       :lines: 27-
+       :caption: Percentage change between the current and a prior element.
+       :name: ex_series_pct_change
+
+    .. command-output:: python ./series/series_pct_change.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`Series.diff <pandas.Series.diff>`
+            Compute the difference of two elements in a Series.
+
+        :ref:`DataFrame.diff <pandas.DataFrame.diff>`
+            Compute the difference of two elements in a DataFrame.
+
+        :ref:`Series.shift <pandas.Series.shift>`
+            Shift the index by some number of periods.
+
+        :ref:`DataFrame.shift <pandas.DataFrame.shift>`
+            Shift the index by some number of periods.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas Series method :meth:`pandas.Series.pct_change` implementation.
 
     .. only:: developer
 
@@ -5918,10 +6030,50 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
 @sdc_overload_method(SeriesType, 'describe')
 def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=None):
     """
-    Pandas Series method :meth:`pandas.Series.describe` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-    Note: Differs from Pandas in returning statistics as Series of strings when applied to
-        Series of strings or date-time values
+    Pandas API: pandas.Series.describe
+
+    Limitations
+    -----------
+    - Differs from Pandas in returning statistics as Series of strings when applied to
+    Series of strings or date-time values
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_describe.py
+       :language: python
+       :lines: 27-
+       :caption: Generate descriptive statistics.
+       :name: ex_series_describe
+
+    .. command-output:: python ./series/series_describe.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.count <pandas.DataFrame.count>`
+            Count number of non-NA/null observations.
+
+        :ref:`DataFrame.max <pandas.DataFrame.max>`
+            Maximum of the values in the object.
+
+        :ref:`DataFrame.min <pandas.DataFrame.min>`
+            Minimum of the values in the object.
+
+        :ref:`DataFrame.mean <pandas.DataFrame.mean>`
+            Mean of the values.
+
+        :ref:`DataFrame.std <pandas.DataFrame.std>`
+            Standard deviation of the observations.
+
+        :ref:`DataFrame.select_dtypes <pandas.DataFrame.select_dtypes>`
+            Subset of a DataFrame including/excluding columns based on their dtype.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas Series method :meth:`pandas.Series.describe` implementation.
 
     .. only:: developer
 
