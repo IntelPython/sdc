@@ -168,5 +168,3 @@ def find_common_dtype_from_numpy_dtypes(array_types, scalar_types):
     numba_common_dtype = numpy_support.from_dtype(np_common_dtype)
 
     return numba_common_dtype
-
-
