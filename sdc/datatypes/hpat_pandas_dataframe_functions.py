@@ -157,6 +157,10 @@ def hpat_pandas_dataframe_values(df):
     ********************************************
     Pandas API: pandas.DataFrame.values
 
+    Limitations
+    -----------
+    Only numeric values supported as an output
+
     Examples
     --------
     .. literalinclude:: ../../../examples/dataframe/dataframe_values.py
