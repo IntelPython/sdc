@@ -6065,6 +6065,7 @@ class TestSeries(
                             test_impl(S2, idx, value)
                             pd.testing.assert_series_equal(S1, S2)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     @skip_numba_jit('Requires StringArray support of operator.eq')
     def test_series_setitem_idx_str_scalar(self):
         """ Verifies Series.setitem for scalar string idx operand and integer Series with index of matching dtype"""
@@ -6078,6 +6079,7 @@ class TestSeries(
 
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_int_scalar1(self):
         """ Verifies Series.setitem for scalar integer idx operand and integer Series with index of matching dtype"""
 
@@ -6090,6 +6092,7 @@ class TestSeries(
 
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_int_scalar2(self):
         """ Verifies Series.setitem for scalar integer idx operand and integer Series with
             index of non matching dtype (i.e. set along positions, not index)"""
@@ -6105,6 +6108,7 @@ class TestSeries(
         value = -100
         self._test_series_setitem([series_data], series_indexes, [idx], [value])
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     @skip_numba_jit('TODO: support replacing data in Series with new array')
     def test_series_setitem_idx_int_scalar_non_existing(self):
         """ Verifies adding new element to an integer Series by using Series.setitem with
@@ -6120,6 +6124,7 @@ class TestSeries(
         test_impl(S2, idx, value)
         pd.testing.assert_series_equal(S1, S2)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_str_series(self):
         """ Verifies Series.setitem for idx operand of type pandas.Series and string dtype called on
             integer Series with index of matching dtype and scalar and non scalar assigned values """
@@ -6141,6 +6146,7 @@ class TestSeries(
                           pd.Series(assigned_values)]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, np.intp)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_float_series(self):
         """ Verifies Series.setitem for idx operand of type pandas.Series and float dtype called on
             integer Series with index of matching dtype and scalar and non scalar assigned values """
@@ -6164,6 +6170,7 @@ class TestSeries(
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_int_series1(self):
         """ Verifies Series.setitem for idx operand of type pandas.Series and integer dtype called on
             integer Series with index of matching dtype and scalar and non scalar assigned values """
@@ -6188,6 +6195,7 @@ class TestSeries(
                           pd.Series(assigned_values)]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_int_series2(self):
         """ Verifies Series.setitem for idx operand of type pandas.Series and integer dtype called on
             integer Series with index of non-matching dtype and scalar and non scalar assigned values """
@@ -6207,6 +6215,7 @@ class TestSeries(
                           pd.Series(assigned_values)]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_int_series3(self):
         """ Verifies negative case of using Series.setitem with idx operand of type pandas.Series
             and integer dtype called on integer Series with index that has duplicate values """
@@ -6225,6 +6234,7 @@ class TestSeries(
         msg = 'Reindexing only valid with uniquely valued Index objects'
         self.assertIn(msg, str(raises.exception))
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_int_series4(self):
         """ Verifies negative case of using Series.setitem with idx operand of type pandas.Series
             and integer dtype called on integer Series with index not containg some values in idx """
@@ -6243,6 +6253,7 @@ class TestSeries(
 
         self.assertRaises(type(pandas_exception), hpat_func, S1, idx, value)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_int_array1(self):
         """ Verifies Series.setitem for idx operand of type numpy.ndarray and integer dtype called on
             integer Series with integer index and scalar and non scalar assigned values """
@@ -6266,6 +6277,7 @@ class TestSeries(
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_int_array2(self):
         """ Verifies Series.setitem for idx operand of type numpy.ndarray and integer dtype called on
             integer Series with string index and scalar and non scalar assigned values """
@@ -6287,6 +6299,7 @@ class TestSeries(
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_int_slice1(self):
         """ Verifies that Series.setitem for int slice as idx operand called on integer Series
             with index of matching dtype assigns vector value along positions (but not along index) """
@@ -6309,6 +6322,7 @@ class TestSeries(
                 test_impl(S2, idx, value)
                 pd.testing.assert_series_equal(S1, S2)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_int_slice2(self):
         """ Verifies that Series.setitem for int slice as idx operand called on integer Series
             with index of matching dtype assigns scalar value along positions (but not along index) """
@@ -6370,6 +6384,7 @@ class TestSeries(
                     test_impl(S2, idx, value)
                     pd.testing.assert_series_equal(S1, S2)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_int_scalar_no_dtype_change(self):
         """ Verifies that setting float value to an element of integer Series via scalar integer index
             converts the value and keeps origin Series dtype unchanged """
@@ -6384,6 +6399,7 @@ class TestSeries(
         test_impl(S2, idx, value)
         pd.testing.assert_series_equal(S1, S2)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     @skip_numba_jit('TODO: support changing Series.dtype')
     def test_series_setitem_idx_int_slice_dtype_change(self):
         """ Verifies that setting float value to an element of integer Series with default index via integer slice
@@ -6399,6 +6415,7 @@ class TestSeries(
         test_impl(S2, idx, value)
         pd.testing.assert_series_equal(S1, S2)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_bool_series1(self):
         """ Verifies Series.setitem assigning scalar and non scalar values
             via mask indicated by a Boolean pandas.Series with integer index """
@@ -6426,6 +6443,7 @@ class TestSeries(
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_bool_series2(self):
         """ Verifies Series.setitem assigning scalar and non scalar values
             via mask indicated by a Boolean pandas.Series with string index """
@@ -6452,6 +6470,7 @@ class TestSeries(
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_bool_array1(self):
         """ Verifies Series.setitem for idx operand of type numpy.ndarray and Boolean dtype called on
             integer Series with default index and scalar and non scalar assigned values. Due to no duplicates
@@ -6480,6 +6499,7 @@ class TestSeries(
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_bool_array2(self):
         """ Verifies Series.setitem for idx operand of type numpy.ndarray and Boolean dtype called on
             integer Series with default index and scalar and non scalar assigned values. Due to duplicates
@@ -6497,6 +6517,7 @@ class TestSeries(
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_setitem_idx_bool_array3(self):
         """ Verifies Series.setitem for idx operand of type numpy.ndarray and Boolean dtype called on
             integer Series with string index and scalar and non scalar assigned values. Due to no duplicates
