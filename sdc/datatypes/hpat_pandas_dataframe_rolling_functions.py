@@ -28,12 +28,12 @@ import pandas
 
 from numba.types import (float64, Boolean, Number, Omitted,
                          NoneType, StringLiteral, UnicodeType)
-from sdc.datatypes.common_functions import TypeChecker, params2list
+from sdc.utilities.sdc_typing_utils import TypeChecker, params2list
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import DataFrameRollingType
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.hiframes.pd_series_type import SeriesType
-from sdc.utils import sdc_overload_method
+from sdc.utilities.utils import sdc_overload_method
 
 
 sdc_pandas_dataframe_rolling_docstring_tmpl = """
