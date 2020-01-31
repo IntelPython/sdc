@@ -94,6 +94,7 @@ class TestDFRollingMethods(TestBase):
             'mean': [2 * 10 ** 5],
             'median': [2 * 10 ** 5],
             'min': [2 * 10 ** 5],
+            'quantile': [2 * 10 ** 5],
             'skew': [2 * 10 ** 5],
             'sum': [2 * 10 ** 5],
         }
@@ -198,6 +199,9 @@ class TestDFRollingMethods(TestBase):
 
     def test_df_rolling_min(self):
         self._test_df_rolling_method('min')
+
+    def test_df_rolling_quantile(self):
+        self._test_df_rolling_method('quantile', method_params='0.25')
 
     def test_df_rolling_skew(self):
         self._test_df_rolling_method('skew')
