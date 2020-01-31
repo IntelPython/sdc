@@ -121,7 +121,7 @@ def has_python_value(var, value):
 
 def check_is_numeric_array(type_var):
     """Used during typing to check that type_var is a numeric numpy arrays"""
-    return isinstance(type_var, types.Array) and isinstance(type_var.dtype, types.Number)
+    return check_is_array_of_dtype(type_var, types.Number)
 
 
 def check_index_is_numeric(ty_series):
@@ -156,10 +156,7 @@ def check_arrays_comparable(ty_left, ty_right):
 
 
 def check_is_array_of_dtype(type_var, dtype):
-    """Used during typing to check that type_var is an internal type used to represent 1D array of type dtype"""
-    if dtype is types.UnicodeType:
-        return type_var == string_array_type
-
+    """Used during typing to check that type_var is a numeric numpy array of specific dtype"""
     return isinstance(type_var, types.Array) and isinstance(type_var.dtype, dtype)
 
 
