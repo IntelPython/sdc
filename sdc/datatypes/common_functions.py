@@ -676,8 +676,8 @@ def _sdc_pandas_series_align_overload(series, other, size='max', finiteness=Fals
         min_length = min(arr_len, other_arr_len)
         length = max(arr_len, other_arr_len) if size == 'max' else min_length
 
-        aligned_arr = numpy.array([numpy.nan] * length)
-        aligned_other_arr = numpy.array([numpy.nan] * length)
+        aligned_arr = numpy.repeat([numpy.nan], length)
+        aligned_other_arr = numpy.repeat([numpy.nan], length)
 
         for i in numba.prange(min_length):
             if not finiteness or (numpy.isfinite(arr[i]) and numpy.isfinite(other_arr[i])):
