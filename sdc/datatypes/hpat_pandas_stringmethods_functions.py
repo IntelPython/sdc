@@ -1135,8 +1135,8 @@ def hpat_pandas_stringmethods_capitalize(self):
     def hpat_pandas_stringmethods_capitalize_impl(self):
         item_count = len(self._data)
         result = [''] * item_count
-        for idx, item in numba.prange(self._data._data):
-            result[idx] = item.capitalize()
+        for idx in numba.prange(item_count):
+            result[idx] = self._data._data[idx].capitalize()
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
@@ -1151,8 +1151,8 @@ def hpat_pandas_stringmethods_title(self):
     def hpat_pandas_stringmethods_title_impl(self):
         item_count = len(self._data)
         result = [''] * item_count
-        for idx, item in numba.prange(self._data._data):
-            result[idx] = item.title()
+        for idx in numba.prange(item_count):
+            result[idx] = self._data._data[idx].title()
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
@@ -1167,8 +1167,8 @@ def hpat_pandas_stringmethods_swapcase(self):
     def hpat_pandas_stringmethods_swapcase_impl(self):
         item_count = len(self._data)
         result = [''] * item_count
-        for idx, item in numba.prange(self._data._data):
-            result[idx] = item.swapcase()
+        for idx in numba.prange(item_count):
+            result[idx] = self._data._data[idx].swapcase()
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
@@ -1183,8 +1183,8 @@ def hpat_pandas_stringmethods_casefold(self):
     def hpat_pandas_stringmethods_casefold_impl(self):
         item_count = len(self._data)
         result = [''] * item_count
-        for idx, item in numba.prange(self._data._data):
-            result[idx] = item.casefold()
+        for idx in numba.prange(item_count):
+            result[idx] = self._data._data[idx].casefold()
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
