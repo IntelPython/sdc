@@ -65,8 +65,10 @@ def sdc_astype_overload(self, dtype):
     if not isinstance(dtype, (types.StringLiteral, types.UnicodeType, types.Function, types.functions.NumberClass)):
         ty_checker.raise_exc(dtype, 'string or type', 'dtype')
 
-    if ((isinstance(dtype, types.Function) and dtype.typing_key == str) or
-        (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
+    if (
+        (isinstance(dtype, types.Function) and dtype.typing_key == str) or
+        (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')
+    ):
         def sdc_astype_number_to_string_impl(self, dtype):
             num_bytes = 0
             arr_len = len(self)

@@ -94,7 +94,8 @@ class TestFunctions(TestBase):
 
 cases = [
     TC(name='astype_numpy', size=[10 ** 7], call_expr='data.astype(np.int64)', usecase_params='data'),
-    TC(name='astype_sdc', size=[10 ** 7], call_expr='sdc.functions.numpy_like.astype(data, np.int64)', usecase_params='data')
+    TC(name='astype_sdc', size=[10 ** 7], call_expr='sdc.functions.numpy_like.astype(data, np.int64)',
+       usecase_params='data'),
 ]
 
 generate_test_cases(cases, TestFunctions, 'function')
