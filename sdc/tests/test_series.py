@@ -124,6 +124,7 @@ def gen_frand_array(size, min=-100, max=100):
     np.random.seed(100)
     return (max - min) * np.random.sample(size) + min
 
+
 def gen_strlist(size, nchars=8, accepted_chars=None):
     """Generate list of strings of specified size based on accepted_chars"""
     if not accepted_chars:
@@ -5336,18 +5337,18 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         dtype_to_data = {
-            'int' :    [[0, 1, 2, 3, 4]],
-            'float' :  [[0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf],
-                        [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
-                        [1, 2, 3, 4, np.nan, np.inf, 0, 0, np.nan, np.nan]],
-            'string' :  [['a', '', 'a', '', 'b', None, 'a', '', None, 'b'],
-                        ['dog', None, 'NaN', '', 'cat', None, 'cat', None, 'dog', ''],
-                        ['dog', 'NaN', '', 'cat', 'cat', 'dog', '']]
+            'int':    [[0, 1, 2, 3, 4]],
+            'float':  [[0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf],
+                       [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                       [1, 2, 3, 4, np.nan, np.inf, 0, 0, np.nan, np.nan]],
+            'string': [['a', '', 'a', '', 'b', None, 'a', '', None, 'b'],
+                       ['dog', None, 'NaN', '', 'cat', None, 'cat', None, 'dog', ''],
+                       ['dog', 'NaN', '', 'cat', 'cat', 'dog', '']]
         }
         dtype_to_values = {
-            'int' :    50,
-            'float' :  np.nan,
-            'string' : 'bird'
+            'int':    50,
+            'float':  np.nan,
+            'string': 'bird'
         }
 
         idx = slice(2, None)
@@ -5371,18 +5372,18 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         dtype_to_data = {
-            'int' :    [[0, 1, 2, 3, 4]],
-            'float' :  [[0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf],
-                        [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
-                        [1, 2, 3, 4, np.nan, np.inf, 0, 0, np.nan, np.nan]],
-            'string' :  [['a', '', 'a', '', 'b', None, 'a', '', None, 'b'],
-                        ['dog', None, 'NaN', '', 'cat', None, 'cat', None, 'dog', ''],
-                        ['dog', 'NaN', '', 'cat', 'cat', 'dog', '']]
+            'int':    [[0, 1, 2, 3, 4]],
+            'float':  [[0, 0, 0, np.nan, np.nan, 0, 0, np.nan, np.inf, 0, 0, np.inf, np.inf],
+                       [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                       [1, 2, 3, 4, np.nan, np.inf, 0, 0, np.nan, np.nan]],
+            'string': [['a', '', 'a', '', 'b', None, 'a', '', None, 'b'],
+                       ['dog', None, 'NaN', '', 'cat', None, 'cat', None, 'dog', ''],
+                       ['dog', 'NaN', '', 'cat', 'cat', 'dog', '']]
         }
         dtype_to_values = {
-            'int' :    50,
-            'float' :  np.nan,
-            'string' : 'bird'
+            'int':    50,
+            'float':  np.nan,
+            'string': 'bird'
         }
 
         idx = pd.Series([0, 2, 4])
@@ -5416,8 +5417,8 @@ class TestSeries(
         self.assertIn(msg, str(raises.exception))
 
         idx, value = '3', 101
-        msg_tmpl = 'Operator setitem(). The idx is not comparable to Series index, not a Boolean or integer indexer ' + \
-                   'or a Slice. Given: self.index={}, idx={}'
+        msg_tmpl = 'Operator setitem(). The idx is not comparable to Series index, not a Boolean or integer indexer' \
+                   + ' or a Slice. Given: self.index={}, idx={}'
         with self.assertRaises(TypingError) as raises:
             hpat_func(S, idx, value)
         msg = msg_tmpl.format('none', 'unicode_type')
@@ -6156,10 +6157,11 @@ class TestSeries(
         idx = pd.Series(index_values[:k])
 
         assigned_values = -10 + np.arange(k) * (-1)
-        values_to_test = [-100,
-                          np.array(assigned_values),
-                          pd.Series(assigned_values)
-                        ]
+        values_to_test = [
+                            -100,
+                            np.array(assigned_values),
+                            pd.Series(assigned_values)
+        ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
     def test_series_setitem_idx_int_series1(self):
@@ -6279,10 +6281,10 @@ class TestSeries(
 
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
-                          -100,
-                        np.array(assigned_values),
-                        pd.Series(assigned_values)
-                          ]
+                            -100,
+                            np.array(assigned_values),
+                            pd.Series(assigned_values)
+        ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
     def test_series_setitem_idx_int_slice1(self):
@@ -6316,12 +6318,12 @@ class TestSeries(
 
         n = 11
         dtype_to_data = {
-            'int' : np.arange(n),
-            'float' : np.arange(n, dtype=np.float_)
+            'int':   np.arange(n),
+            'float': np.arange(n, dtype=np.float_)
         }
         dtype_to_values = {
-            'int' : [100, -100],
-            'float' : [np.nan, np.inf, 1.25, np.PZERO, -2]
+            'int':   [100, -100],
+            'float': [np.nan, np.inf, 1.25, np.PZERO, -2]
         }
         series_indexes = [
              None,

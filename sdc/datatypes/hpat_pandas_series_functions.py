@@ -523,7 +523,6 @@ def sdc_pandas_series_setitem(self, idx, value):
               'Given: self.index={}, idx={}'
         raise TypingError(msg.format(_func_name, self.index, idx))
 
-
     value_is_series = isinstance(value, SeriesType)
     value_is_array = isinstance(value, types.Array)
 
@@ -536,8 +535,8 @@ def sdc_pandas_series_setitem(self, idx, value):
     assign_along_positions = ((self_index_is_none
                                or isinstance(idx, types.SliceType)
                                or not idx_and_self_index_comparable)
-                               and not idx_is_boolean_series
-                               and not idx_is_boolean_array)
+                              and not idx_is_boolean_series
+                              and not idx_is_boolean_array)
 
     idx_is_scalar = isinstance(idx, (types.Number, types.UnicodeType))
     if assign_along_positions or idx_is_scalar:
@@ -588,8 +587,9 @@ def sdc_pandas_series_setitem(self, idx, value):
                 # pandas behaves differently if value.index has duplicates and if it has no
                 # in case of duplicates in value.index assignment is made via positions
                 # in case there are no duplicates, value.index is used as reindexer
-                if (len(unique_value_indices) != len(value_index)
-                    or len(unique_self_indices) != len(self_index)):
+                self_index_has_duplicates = len(unique_self_indices) != len(self_index)
+                value_index_has_duplicates = len(unique_value_indices) != len(value_index)
+                if (self_index_has_duplicates or value_index_has_duplicates):
                     self._data[idx] = value._data
                 else:
                     map_index_to_position = Dict.empty(
