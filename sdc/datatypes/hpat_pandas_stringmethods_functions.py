@@ -1095,7 +1095,7 @@ def hpat_pandas_stringmethods_casefold(self):
     return hpat_pandas_stringmethods_casefold_impl
 
 
-seealso_for_ismethods = '''
+seealso_check_methods = """
                         :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
                             Check whether all characters are alphabetic.
                         :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
@@ -1114,10 +1114,10 @@ seealso_for_ismethods = '''
                             Check whether all characters are uppercase.
                         :ref:`Series.str.istitle <pandas.Series.str.istitle>`
                             Check whether all characters are titlecase.
-                        '''
+                        """
 
 
-seealso_for_conv_methods = '''
+seealso_transform_methods = """
                             :ref:`Series.str.lower <pandas.Series.str.lower>`
                                 Converts all characters to lowercase.
                             :ref:`Series.str.upper <pandas.Series.str.upper>`
@@ -1130,7 +1130,7 @@ seealso_for_conv_methods = '''
                                 Converts uppercase to lowercase and lowercase to uppercase.
                             :ref:`Series.str.casefold <pandas.Series.str.casefold>`
                                 Removes all case distinctions in the string.
-                            '''
+                           """
 
 
 stringmethods_funcs = {

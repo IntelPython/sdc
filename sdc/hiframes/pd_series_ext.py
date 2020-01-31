@@ -494,7 +494,7 @@ class SeriesAttribute(AttributeTemplate):
 
 #     return typer
 
-str2str_methods = ['capitalize', 'swapcase', 'title']
+# str2str_methods = ['capitalize', 'swapcase', 'title']
 """
     Functions which are still overloaded by HPAT compiler pipeline
 """
