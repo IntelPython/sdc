@@ -1,5 +1,5 @@
 {% set NUMBA_VERSION = "==0.46" %}
-{% set PANDAS_VERSION = "==0.25" %}
+{% set PANDAS_VERSION = "==0.25.3" %}
 {% set PYARROW_VERSION = "==0.15.1" %}
 {% set ARROW_CPP_VERSION = "==0.15.1" %}
 
