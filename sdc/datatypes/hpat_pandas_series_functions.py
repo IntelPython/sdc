@@ -316,22 +316,10 @@ def hpat_pandas_series_getitem(self, idx):
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
-
     Pandas Series operator :attr:`pandas.Series.__getitem__` implementation
 
-    Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_getitem_series*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input Series
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`, :obj:`slice`, :obj:`list`
-        input arg
-
-    Returns
-    -------
-    :class:`pandas.Series` or a value of :obj:`pandas.Series.dtype`
-        returns :obj:`pandas.Series` object
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_getitem_series*
     """
 
     _func_name = 'Operator getitem().'
@@ -474,23 +462,10 @@ def hpat_pandas_series_setitem(self, idx, value):
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
-     Pandas Series operator :attr:`pandas.Series.set` implementation
+    Pandas Series operator :attr:`pandas.Series.set` implementation
 
-    Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_setitem*
-
-    Parameters
-    ----------
-    series: :obj:`pandas.Series`
-        input series
-    idx: :obj:`int`, :obj:`slice` or :obj:`pandas.Series`
-        input index
-    value: :object
-        input value
-
-    Returns
-    -------
-    :class:`pandas.Series` or an element of the underneath type
-            object of :class:`pandas.Series`
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_setitem*
     """
 
     ty_checker = TypeChecker('Operator setitem.')
@@ -505,10 +480,6 @@ def hpat_pandas_series_setitem(self, idx, value):
 
     if isinstance(idx, types.Integer) or isinstance(idx, types.SliceType):
         def hpat_pandas_series_setitem_idx_integer_impl(self, idx, value):
-            """
-            Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_value
-            Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_slice
-            """
             self._data[idx] = value
             return self
 
@@ -516,9 +487,6 @@ def hpat_pandas_series_setitem(self, idx, value):
 
     if isinstance(idx, SeriesType):
         def hpat_pandas_series_setitem_idx_series_impl(self, idx, value):
-            """
-            Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_setitem_for_series
-            """
             super_index = idx._data
             self._data[super_index] = value
             return self
@@ -570,17 +538,7 @@ def hpat_pandas_series_iloc(self):
     Pandas Series method :meth:`pandas.Series.iloc` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_iloc*
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-
-    Returns
-    -------
-    :obj:`series`
-        returns an object of :obj:`series`
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_iloc*
     """
 
     _func_name = 'Attribute iloc().'
@@ -657,17 +615,7 @@ def hpat_pandas_series_loc(self):
     Pandas Series method :meth:`pandas.Series.loc` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_loc*
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-
-    Returns
-    -------
-    :obj:`series`
-        returns an object of :obj:`series`
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_loc*
     """
 
     _func_name = 'Attribute loc().'
@@ -716,17 +664,7 @@ def hpat_pandas_series_iat(self):
     Pandas Series method :meth:`pandas.Series.iat` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_iat*
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-
-    Returns
-    -------
-    :obj:`series`
-        returns an object of :obj:`series`
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_iat*
     """
 
     _func_name = 'Attribute iat().'
@@ -784,17 +722,7 @@ def hpat_pandas_series_at(self):
     Pandas Series method :meth:`pandas.Series.at` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_at*
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-
-    Returns
-    -------
-    :obj:`series`
-        returns an object of :obj:`series`
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_at*
     """
 
     _func_name = 'Attribute at().'
@@ -847,25 +775,7 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
     Pandas Series method :meth:`pandas.Series.nsmallest` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_nsmallest*
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-    n: :obj:`int`, default 5
-        Return this many ascending sorted values.
-    keep: :obj:`str`, default 'first'
-        When there are duplicate values that cannot all fit in a Series of n elements:
-        first : return the first n occurrences in order of appearance.
-        last : return the last n occurrences in reverse order of appearance.
-        all : keep all occurrences. This can result in a Series of size larger than n.
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`series`
-        returns :obj:`series`
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_nsmallest*
     """
 
     _func_name = 'Method nsmallest().'
@@ -930,25 +840,7 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
     Pandas Series method :meth:`pandas.Series.nlargest` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_nlargest*
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-    n: :obj:`int`, default 5
-        Return this many ascending sorted values.
-    keep: :obj:`str`, default 'first'
-        When there are duplicate values that cannot all fit in a Series of n elements:
-        first : return the first n occurrences in order of appearance.
-        last : return the last n occurrences in reverse order of appearance.
-        all : keep all occurrences. This can result in a Series of size larger than n.
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`series`
-        returns :obj:`series`
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_nlargest*
     """
 
     _func_name = 'Method nlargest().'
@@ -1001,16 +893,6 @@ def hpat_pandas_series_shape(self):
 
     .. only:: developer
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_shape1
-
-    Parameters
-    ----------
-    series: :obj:`pandas.Series`
-        input series
-
-    Returns
-    -------
-    :obj:`tuple`
-        a tuple of the shape of the underlying data
     """
 
     _func_name = 'Attribute shape.'
@@ -1056,40 +938,10 @@ def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, num
     Pandas Series method :meth:`pandas.Series.std` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_unboxing
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_str
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_unsupported_params
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-    axis: :obj:`int`, :obj:`str`
-        Axis along which the operation acts
-        0/None/'index' - row-wise operation
-        1/'columns'    - column-wise operation
-        *unsupported*
-    skipna: :obj:`bool`
-        exclude NA/null values
-    level: :obj:`int`, :obj:`str`
-        If the axis is a MultiIndex (hierarchical),
-        count along a particular level, collapsing into a scalar
-        *unsupported*
-    ddof: :obj:`int`
-        Delta Degrees of Freedom.
-        The divisor used in calculations is N - ddof,
-        where N represents the number of elements.
-    numeric_only: :obj:`bool`
-        Include only float, int, boolean columns.
-        If None, will attempt to use everything, then use only numeric data.
-        Not implemented for Series.
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`scalar`
-        returns :obj:`scalar`
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_unboxing
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_str
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_unsupported_params
     """
 
     _func_name = 'Method std().'
@@ -1155,16 +1007,6 @@ def hpat_pandas_series_values(self):
 
     .. only:: developer
         Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_values
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-
-    Returns
-    -------
-    :obj:`ndarray`
-        returns :obj:`ndarray` or ndarray-like
     """
 
     _func_name = 'Attribute values.'
@@ -1197,43 +1039,21 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
     .. command-output:: python ./series/series_value_counts.py
        :cwd: ../../../examples
 
-     .. note::
-
-        Parameter bins and dropna for Strings are currently unsupported by Intel Scalable Dataframe Compiler
+    Limitations
+    -----------
+    - Parameter bins and dropna for Strings are currently unsupported by Intel Scalable Dataframe Compiler
+    - Elements with the same count might appear in result in a different order than in Pandas
 
     .. seealso::
 
         :ref:`Series.count <pandas.Series.count>`
 
-
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.value_counts` implementation.
 
-    Note: Elements with the same count might appear in result in a different order than in Pandas
-
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_value_counts*
-
-    Parameters
-    -----------
-    self: :obj:`pandas.Series`
-        input series
-    normalize: :obj:`boolean`, default False
-        If True then the object returned will contain the relative frequencies of the unique values
-    sort: :obj: `boolean`, default True
-        Sort by frequencies
-    ascending: :obj:`boolean`, default False
-        Sort in ascending order
-    bins: :obj:`integer`, default None
-        *unsupported*
-    dropna: :obj:`boolean`, default True
-        Skip counts of NaN
-
-    Returns
-    -------
-    :returns :obj:`pandas.Series`
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_value_counts*
     """
 
     _func_name = 'Method value_counts().'
@@ -1399,40 +1219,10 @@ def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
     Pandas Series method :meth:`pandas.Series.var` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_unboxing
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_str
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_unsupported_params
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-    axis: :obj:`int`, :obj:`str`
-        Axis along which the operation acts
-        0/None/'index' - row-wise operation
-        1/'columns'    - column-wise operation
-        *unsupported*
-    skipna: :obj:`bool`
-        exclude NA/null values
-    level: :obj:`int`, :obj:`str`
-        If the axis is a MultiIndex (hierarchical),
-        count along a particular level, collapsing into a scalar
-        *unsupported*
-    ddof: :obj:`int`
-        Delta Degrees of Freedom.
-        The divisor used in calculations is N - ddof,
-        where N represents the number of elements.
-    numeric_only: :obj:`bool`
-        Include only float, int, boolean columns.
-        If None, will attempt to use everything, then use only numeric data.
-        Not implemented for Series.
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`scalar`
-        returns :obj:`scalar`
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_unboxing
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_str
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_unsupported_params
     """
 
     _func_name = 'Method var().'
@@ -1503,16 +1293,6 @@ def hpat_pandas_series_index(self):
     .. only:: developer
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_index1
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_index2
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-
-    Returns
-    -------
-    :obj:`ndarray`
-        the index of the Series
     """
 
     _func_name = 'Attribute index.'
@@ -1563,16 +1343,6 @@ def hpat_pandas_series_size(self):
 
     .. only:: developer
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_size
-
-    Parameters
-    ----------
-    series: :obj:`pandas.Series`
-        input series
-
-    Returns
-    -------
-    :obj:`int`
-        Return the number of elements in the underlying data.
     """
 
     _func_name = 'Attribute size.'
@@ -1592,18 +1362,7 @@ def hpat_pandas_series_str(self):
     Pandas Series attribute :attr:`pandas.Series.str` implementation
 
     .. only:: developer
-
         Test: python -m sdc.runtests sdc.tests.test_hiframes.TestHiFrames.test_str_get
-
-    Parameters
-    ----------
-    series: :obj:`pandas.Series`
-        input series
-
-    Returns
-    -------
-    :class:`pandas.core.strings.StringMethods`
-        Output class to manipulate with input data.
     """
 
     _func_name = 'Attribute str.'
@@ -1645,17 +1404,7 @@ def hpat_pandas_series_ndim(self):
     Pandas Series attribute :attr:`pandas.Series.ndim` implementation
 
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_getattr_ndim
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-
-    Returns
-    -------
-    :obj:`int`
-        Number of dimensions of the underlying data, by definition 1
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_getattr_ndim
     """
 
     _func_name = 'Attribute ndim.'
@@ -1693,17 +1442,7 @@ def hpat_pandas_series_T(self):
     Pandas Series attribute :attr:`pandas.Series.T` implementation
 
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_getattr_T
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-
-    Returns
-    -------
-    :obj:`numpy.ndarray`
-        An array representing the underlying data
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_getattr_T
     """
 
     _func_name = 'Attribute T.'
@@ -1723,17 +1462,7 @@ def hpat_pandas_series_len(self):
     Pandas Series operator :func:`len` implementation
 
     .. only:: developer
-
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_len
-
-    Parameters
-    ----------
-    series: :class:`pandas.Series`
-
-    Returns
-    -------
-    :obj:`int`
-        number of items in the object
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_len
     """
 
     _func_name = 'Operator len().'
@@ -1754,6 +1483,10 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
     ********************************************
 
     Pandas API: pandas.Series.astype
+
+    Limitations
+    -----------
+    - Currently copy=False is not supported
 
     Examples
     --------
@@ -1790,25 +1523,6 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
 
     .. only:: developer
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_astype*
-
-    Parameters
-    -----------
-    dtype : :obj:`numpy.dtype` or :obj:`dict`
-        Use a numpy.dtype or Python type to cast entire pandas object to the same type.
-        Alternatively, use {col: dtype, …}, where col is a column label and dtype is a numpy.dtype
-        or Python type to cast one or more of the DataFrame’s columns to column-specific types.
-
-    copy : :obj:`bool`, default :obj:`True`
-        Return a copy when True
-        Currently copy=False is not supported
-    errors : :obj:`str`, default :obj:`'raise'`
-        Control raising of exceptions on invalid data for provided dtype.
-            * raise : allow exceptions to be raised
-            * ignore : suppress exceptions. On error return original object
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` Cast a :obj:`pandas.Series` to a specified dtype dtype
     """
 
     _func_name = 'Method astype().'
@@ -1929,29 +1643,7 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
     Pandas Series method :meth:`pandas.Series.shift` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_shift*
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-    periods: :obj:`int`
-        Number of periods to shift. Can be positive or negative.
-    freq: :obj:`DateOffset`, :obj:`tseries.offsets`, :obj:`timedelta`, :obj:`str`
-        Offset to use from the tseries module or time rule (e.g. ‘EOM’).
-        *unsupported*
-    axis: :obj:`int`, :obj:`str`
-        Axis along which the operation acts
-        0/None/'index' - row-wise operation
-        1/'columns'    - column-wise operation
-        *unsupported*
-    fill_value : :obj:`int`, :obj:`float`
-        The scalar value to use for newly introduced missing values.
-
-    Returns
-    -------
-    :obj:`scalar`
-        returns :obj:`series` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_shift*
     """
 
     _func_name = 'Method shift().'
@@ -2045,17 +1737,7 @@ def hpat_pandas_series_isin(self, values):
     Pandas Series method :meth:`pandas.Series.isin` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isin_list1
-
-    Parameters
-    -----------
-    values : :obj:`list` or :obj:`set` object
-        specifies values to look for in the series
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object indicating if each element of self is in values
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isin_list1
     """
 
     _func_name = 'Method isin().'
@@ -2109,28 +1791,7 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
     Pandas Series method :meth:`pandas.Series.append` implementation.
 
     .. only:: developer
-
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_append*
-
-    Parameters
-    -----------
-    self: :obj:`pandas.Series`
-        input series
-    to_append : :obj:`pandas.Series` object or :obj:`list` or :obj:`set`
-        Series (or list or tuple of Series) to append with self
-    ignore_index: :obj:`bool`, default False
-        If True, do not use the index labels.
-        Supported as literal value only
-    verify_integrity: :obj:`bool`, default False
-        If True, raise Exception on creating index with duplicates.
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
-        Concatenated Series
-
     """
 
     _func_name = 'Method append().'
@@ -2215,25 +1876,9 @@ def hpat_pandas_series_copy(self, deep=True):
     Pandas Series method :meth:`pandas.Series.copy` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_str1
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_int1
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_deep
-
-    Parameters
-    -----------
-    self: :class:`pandas.Series`
-        input arg
-    deep: :obj:`bool`, default :obj:`True`
-        Make a deep copy, including a copy of the data and the indices.
-        With deep=False neither the indices nor the data are copied.
-        [SDC limitations]:
-            - deep=False: shallow copy of index is not supported
-
-    Returns
-    -------
-    :obj:`pandas.Series` or :obj:`pandas.DataFrame`
-        Object type matches caller.
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_str1
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_int1
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_deep
     """
 
     ty_checker = TypeChecker('Method Series.copy().')
@@ -2288,30 +1933,9 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
     Pandas Series method :meth:`pandas.Series.corr` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_corr
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_corr_unsupported_dtype
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_corr_unsupported_period
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-    other: :obj:`pandas.Series`
-        input series
-    method: {'pearson', 'kendall', 'spearman'} or callable
-        pearson : standard correlation coefficient
-        kendall : Kendall Tau correlation coefficient
-        spearman : Spearman rank correlation
-        callable: callable with input two 1d ndarrays
-        and returning a float.
-        *unsupported
-    min_periods: :obj:`int`, default None
-
-    Returns
-    -------
-    :obj:`float`
-        returns :obj:`float` object
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_corr
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_corr_unsupported_dtype
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_corr_unsupported_period
     """
 
     _func_name = 'Method corr().'
@@ -2397,16 +2021,7 @@ def hpat_pandas_series_head(self, n=5):
     Pandas Series method :meth:`pandas.Series.head` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_head*
-
-    Parameters
-    -----------
-    n: :obj:`int`, default 5
-        input argument, default 5
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns: The first n rows of the caller object.
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_head*
     """
 
     _func_name = 'Method head().'
@@ -2476,32 +2091,7 @@ def hpat_pandas_series_groupby(
     Pandas Series method :meth:`pandas.Series.groupby` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_groupby_count
-
-    Parameters
-    -----------
-    self: :class:`pandas.Series`
-        input arg
-    by: :obj:`pandas.Series` object
-        Used to determine the groups for the groupby
-    axis:
-        *unsupported*
-    level:
-        *unsupported*
-    as_index:
-        *unsupported*
-    sort:
-        *unsupported*
-    group_keys:
-        *unsupported*
-    squeeze:
-        *unsupported*
-    observed:
-        *unsupported*
-    Returns
-    -------
-    :obj:`pandas.SeriesGroupBy`
-        returns :obj:`pandas.SeriesGroupBy` object
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_groupby_count
     """
 
     _func_name = 'Method Series.groupby().'
@@ -2558,18 +2148,7 @@ def hpat_pandas_series_isnull(self):
     Pandas Series method :meth:`pandas.Series.isnull` implementation.
 
     .. only:: developer
-
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_isnull*
-
-    Parameters
-    -----------
-    self : :obj:`pandas.Series` object
-        input argument
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method isnull().'
@@ -2637,18 +2216,7 @@ def hpat_pandas_series_isna(self):
     Pandas Series method :meth:`pandas.Series.isna` implementation.
 
     .. only:: developer
-
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_isna*
-
-    Parameters
-    -----------
-    self : :obj:`pandas.Series` object
-        input argument
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method isna().'
@@ -2716,18 +2284,7 @@ def hpat_pandas_series_notna(self):
     Pandas Series method :meth:`pandas.Series.notna` implementation.
 
     .. only:: developer
-
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_notna*
-
-    Parameters
-    -----------
-    self : :obj:`pandas.Series` object
-        input series
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method notna().'
@@ -2757,6 +2314,10 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
 
     Pandas API: pandas.Series.ne
 
+    Limitations
+    -----------
+    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_ne.py
@@ -2770,31 +2331,14 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
 
     .. note::
 
-        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.ne` implementation.
+
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-        *unsupported*
-    fill_value: :obj:`float` or None, default None
-        *unsupported*
-    axis: default 0
-        *unsupported*
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
     """
 
     _func_name = 'Method ne().'
@@ -2834,6 +2378,9 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     Pandas API: pandas.Series.add
 
+    Limitations
+    -----------
+    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -2848,7 +2395,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     .. note::
 
-        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -2857,26 +2404,9 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.add` implementation.
+
     .. only:: developer
-
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-         *unsupported*
-    fill_value: :obj:`float` or None, default None
-              *unsupported*
-    axis: :obj:`int` default 0
-         *unsupported*
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
     """
 
     _func_name = 'Method add().'
@@ -2891,21 +2421,12 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     if isinstance(other, SeriesType):
         def hpat_pandas_series_add_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
-            """
-
             return pandas.Series(self._data + other._data)
 
         return hpat_pandas_series_add_impl
 
     if isinstance(other, types.Integer) or isinstance(other, types.Float):
         def hpat_pandas_series_add_number_impl(self, other, level=None, fill_value=None, axis=0):
-            """
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_integer_scalar
-            Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5_float_scalar
-            """
-
             if axis != 0:
                 raise ValueError('Method add(). The object axis\n expected: 0')
 
@@ -2953,23 +2474,6 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
 
     .. only:: developer
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-        *unsupported*
-    fill_value: :obj:`float` or None, default None
-        *unsupported*
-    axis: default 0
-        *unsupported*
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method sub().'
@@ -3058,26 +2562,6 @@ def hpat_pandas_series_sum(
 
     .. only:: developer
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_sum*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input series
-    axis:
-        *unsupported*
-    skipna: :obj:`bool`, default :obj:`True`
-        Exclude NA/null values when computing the result.
-    level:
-        *unsupported*
-    numeric_only:
-        *unsupported*
-    min_count:
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`float`
-        scalar or Series (if level specified)
     """
 
     _func_name = 'Method sum().'
@@ -3165,26 +2649,7 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
     Pandas Series method :meth:`pandas.Series.take` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_take_index_*
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-    indices: :obj:`array-like`
-        An array of ints indicating which positions to take
-    axis: {0 or `index`, 1 or `columns`, None}, default 0
-        The axis on which to select elements. 0 means that we are selecting rows,
-        1 means that we are selecting columns.
-        *unsupported*
-    is_copy: :obj:`bool`, default True
-        Whether to return a copy of the original object or not.
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object containing the elements taken from the object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_take_index_*
     """
 
     _func_name = 'Method take().'
@@ -3256,23 +2721,9 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=True):
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.idxmax` implementation.
+
     .. only:: developer
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_idxmax*
-
-    Parameters
-    -----------
-    axis :  :obj:`int`, :obj:`str`, default: None
-        Axis along which the operation acts
-        0/None - row-wise operation
-        1      - column-wise operation
-        *unsupported*
-    skipna:  :obj:`bool`, default: True
-        exclude NA/null values
-
-    Returns
-    -------
-    :obj:`pandas.Series.index` or nan
-        returns: Label of the minimum value.
     """
 
     _func_name = 'Method idxmax().'
@@ -3312,6 +2763,10 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     Pandas API: pandas.Series.mul
 
+    Limitations
+    -----------
+    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_mul.py
@@ -3325,7 +2780,7 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
      .. note::
 
-        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3337,24 +2792,6 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     .. only:: developer
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-        *unsupported*
-    fill_value: :obj:`float` or None, default None
-        *unsupported*
-    axis: default 0
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
     """
 
     _func_name = 'Method mul().'
@@ -3401,6 +2838,10 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
 
     Pandas API: pandas.Series.div
 
+    Limitations
+    -----------
+    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_div.py
@@ -3414,7 +2855,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
 
     .. note::
 
-        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3425,25 +2866,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
     Pandas Series method :meth:`pandas.Series.div` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-        *unsupported*
-    fill_value: :obj:`float` or None, default None
-        *unsupported*
-    axis: default 0
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
     """
 
     _func_name = 'Method div().'
@@ -3490,6 +2913,10 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     Pandas API: pandas.Series.truediv
 
+    Limitations
+    -----------
+    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_truediv.py
@@ -3503,7 +2930,7 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     .. note::
 
-        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3512,27 +2939,9 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series :meth:`pandas.Series.truediv` implementation.
+
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-        *unsupported*
-    fill_value: :obj:`float` or None, default None
-        *unsupported*
-    axis: default 0
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
     """
 
     _func_name = 'Method truediv().'
@@ -3608,25 +3017,7 @@ def hpat_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0
     Pandas Series method :meth:`pandas.Series.floordiv` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-        *unsupported*
-    fill_value: :obj:`float` or None, default None
-        *unsupported*
-    axis: default 0
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
     """
 
     _func_name = 'Method floordiv().'
@@ -3666,6 +3057,10 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
 
     Pandas API: pandas.Series.pow
 
+    Limitations
+    -----------
+    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_pow.py
@@ -3679,7 +3074,7 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
 
     .. note::
 
-        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3688,26 +3083,9 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.pow` implementation.
+
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-        *unsupported*
-    fill_value: :obj:`float` or None, default None
-        *unsupported*
-    axis: default 0
-        *unsupported*
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
     """
 
     _func_name = 'Method pow().'
@@ -3771,35 +3149,7 @@ def hpat_pandas_series_prod(self, axis=None, skipna=None, level=None, numeric_on
     Pandas Series method :meth:`pandas.Series.prod` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_prod*
-
-    Parameters
-    -----------
-    self: :obj:`pandas.Series`
-        input series
-    axis: {index (0)}
-        Axis for the function to be applied on.
-        *unsupported*
-    skipna: :obj:`bool`, default :obj:`True`
-        Exclude nan values when computing the result
-    level: :obj:`int`, :obj:`str`, default :obj:`None`
-        If the axis is a MultiIndex (hierarchical), count along a particular level, collapsing into a scalar.
-        *unsupported*
-    numeric_only: :obj:`bool`, default :obj:`None`
-        Include only float, int, boolean columns.
-        If None, will attempt to use everything, then use only numeric data.
-        Not implemented for Series.
-        *unsupported*
-    min_count: :obj:`int`, default 0
-        The required number of valid values to perform the operation.
-        If fewer than min_count non-NA values are present the result will be NA.
-        *unsupported*
-
-    Returns
-    -------
-    :obj:
-        Returns scalar or Series (if level specified)
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_prod*
     """
 
     _func_name = 'Method prod().'
@@ -3870,18 +3220,9 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.quantile` implementation.
+
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_quantile
-             python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_quantile_q_vector
-    Parameters
-    -----------
-    q : :obj: float or array-like object, default 0.5
-        the quantile(s) to compute
-    interpolation: 'linear', 'lower', 'higher', 'midpoint', 'nearest', default `linear`
-        *unsupported* by Numba
-    Returns
-    -------
-    :obj:`pandas.Series` or float
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_quantile*
     """
 
     _func_name = 'Method quantile().'
@@ -3929,26 +3270,7 @@ def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=
     Pandas Series method :meth:`pandas.Series.rename` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_rename
-
-    Parameters
-    -----------
-    index : :obj:`scalar` or `hashable sequence` or `dict` or `function`
-        Dict-like or functions are transformations to apply to the index.
-        Scalar or hashable sequence-like will alter the Series.name attribute.
-        Only scalar value is supported.
-    copy : :obj:`bool`, default :obj:`True`
-        Whether to copy underlying data.
-    inplace : :obj:`bool`, default :obj:`False`
-        Whether to return a new Series. If True then value of copy is ignored.
-    level : :obj:`int` or `str`
-        In case of a MultiIndex, only rename labels in the specified level.
-        *Not supported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` with index labels or name altered.
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_rename
     """
 
     ty_checker = TypeChecker('Method rename().')
@@ -4003,6 +3325,10 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
 
     Pandas API: pandas.Series.min
 
+    Limitations
+    -----------
+    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_min.py
@@ -4016,7 +3342,7 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
 
     .. note::
 
-        Parameters axis, level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -4040,23 +3366,7 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
     Pandas Series method :meth:`pandas.Series.min` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_min*
-
-    Parameters
-    -----------
-    axis:
-        *unsupported*
-    skipna: :obj:`bool` object
-        Exclude nan values when computing the result
-    level:
-        *unsupported*
-    numeric_only:
-        *unsupported*
-    Returns
-    -------
-    :obj:
-         returns :obj: scalar
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_min*
     """
 
     _func_name = 'Method min().'
@@ -4101,6 +3411,10 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
 
     Pandas API: pandas.Series.max
 
+    Limitations
+    -----------
+    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_max.py
@@ -4114,7 +3428,7 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
 
     .. note::
 
-        Parameters axis, level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -4132,22 +3446,9 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.max` implementation.
+
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_max*
-    Parameters
-    -----------
-    axis:
-        *unsupported*
-    skipna: :obj:`bool` object
-        Exclude nan values when computing the result
-    level:
-        *unsupported*
-    numeric_only:
-        *unsupported*
-    Returns
-    -------
-    :obj:
-         returns :obj: scalar
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_max*
     """
 
     _func_name = 'Method max().'
@@ -4215,28 +3516,7 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
     Pandas Series method :meth:`pandas.Series.mean` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_mean*
-
-    Parameters
-    -----------
-    axis: {index (0)}
-        Axis for the function to be applied on.
-        *unsupported*
-    skipna: :obj:`bool`, default True
-        Exclude NA/null values when computing the result.
-    level: :obj:`int` or level name, default None
-        If the axis is a MultiIndex (hierarchical), count along a particular level, collapsing into a scalar.
-        *unsupported*
-    numeric_only: :obj:`bool`, default None
-        Include only float, int, boolean columns.
-        If None, will attempt to use everything, then use only numeric data. Not implemented for Series.
-        *unsupported*
-
-    Returns
-    -------
-    :obj:
-        Return the mean of the values for the requested axis.
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_mean*
     """
 
     _func_name = 'Method mean().'
@@ -4305,24 +3585,7 @@ def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
     Pandas Series method :meth:`pandas.Series.mod` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-        *unsupported*
-    fill_value: :obj:`float` or None, default None
-        *unsupported*
-    axis: default 0
-        *unsupported*
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
     """
 
     _func_name = 'Method mod().'
@@ -4362,6 +3625,10 @@ def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
 
     Pandas API: pandas.Series.eq
 
+    Limitations
+    -----------
+    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_eq.py
@@ -4375,32 +3642,14 @@ def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
 
     .. note::
 
-        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.eq` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-        *unsupported*
-    fill_value: :obj:`float` or None, default None
-        *unsupported*
-    axis: default 0
-        *unsupported*
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
     """
 
     _func_name = 'Method eq().'
@@ -4440,6 +3689,10 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
 
     Pandas API: pandas.Series.ge
 
+    Limitations
+    -----------
+    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_ge.py
@@ -4453,32 +3706,14 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
 
     .. note::
 
-        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.ge` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-        *unsupported*
-    fill_value: :obj:`float` or None, default None
-        *unsupported*
-    axis: default 0
-        *unsupported*
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
     """
 
     _func_name = 'Method ge().'
@@ -4549,22 +3784,7 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True):
     Pandas Series method :meth:`pandas.Series.idxmin` implementation.
 
     .. only:: developer
-
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_idxmin*
-
-    Parameters
-    -----------
-    axis :  :obj:`int`, :obj:`str`, default: None
-        Axis along which the operation acts
-        0/None - row-wise operation
-        1      - column-wise operation
-        *unsupported*
-    skipna:  :obj:`bool`, default: True
-        exclude NA/null values
-    Returns
-    -------
-    :obj:`pandas.Series.index` or nan
-        returns: Label of the minimum value.
     """
 
     _func_name = 'Method idxmin().'
@@ -4604,6 +3824,10 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
 
     Pandas API: pandas.Series.lt
 
+    Limitations
+    -----------
+    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_lt.py
@@ -4617,32 +3841,14 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
 
     .. note::
 
-        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.lt` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-        *unsupported*
-    fill_value: :obj:`float` or None, default None
-        *unsupported*
-    axis: default 0
-        *unsupported*
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
     """
 
     _func_name = 'Method lt().'
@@ -4682,6 +3888,10 @@ def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
 
     Pandas API: pandas.Series.gt
 
+    Limitations
+    -----------
+    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_gt.py
@@ -4695,32 +3905,14 @@ def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
 
     .. note::
 
-        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.gt` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-         *unsupported*
-    fill_value: :obj:`float` or None, default None
-              *unsupported*
-    axis: default 0
-         *unsupported*
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
     """
 
     _func_name = 'Method gt().'
@@ -4760,6 +3952,10 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
 
     Pandas API: pandas.Series.le
 
+    Limitations
+    -----------
+    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_le.py
@@ -4773,32 +3969,14 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
 
     .. note::
 
-        Parameters level, fill_value, axis are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.le` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
-
-    Parameters
-    ----------
-    self: :class:`pandas.Series`
-        input arg
-    other: :obj:`pandas.Series`, :obj:`int` or :obj:`float`
-        input arg
-    level: :obj:`int` or name
-         *unsupported*
-    fill_value: :obj:`float` or None, default None
-              *unsupported*
-    axis: default 0
-         *unsupported*
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
     """
 
     _func_name = 'Method le().'
@@ -4838,7 +4016,6 @@ def hpat_pandas_series_abs(self):
 
     Pandas API: pandas.Series.abs
 
-
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_abs.py
@@ -4857,18 +4034,10 @@ def hpat_pandas_series_abs(self):
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
-
     Pandas Series method :meth:`pandas.Series.abs` implementation.
+
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_abs1
-    Parameters
-    -----------
-    self: :obj:`pandas.Series`
-          input series
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` containing the absolute value of elements
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_abs1
     """
 
     _func_name = 'Method abs().'
@@ -4895,6 +4064,10 @@ def hpat_pandas_series_unique(self):
 
     Pandas API: pandas.Series.unique
 
+    Limitations
+    -----------
+    - Return values order is unspecified
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_unique.py
@@ -4909,17 +4082,9 @@ def hpat_pandas_series_unique(self):
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.unique` implementation.
-    Note: Return values order is unspecified
+
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_unique_sorted
-    Parameters
-    -----------
-    self: :class:`pandas.Series`
-        input arg
-    Returns
-    -------
-    :obj:`numpy.array`
-         returns :obj:`numpy.array` ndarray
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_unique_sorted
     """
 
     ty_checker = TypeChecker('Method unique().')
@@ -4999,25 +4164,6 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True):
 
     .. only:: developer
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_cumsum*
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-    axis: :obj:`int`, :obj:`str`
-        Axis along which the operation acts
-        0/None/'index' - row-wise operation
-        1/'columns'    - column-wise operation
-        *unsupported*
-    skipna: :obj:`bool`
-        exclude NA/null values
-    *args:
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`scalar`, :obj:`pandas.Series`
-        returns :obj:`scalar` or :obj:`pandas.Series` object
     """
 
     _func_name = 'Method cumsum().'
@@ -5075,18 +4221,7 @@ def hpat_pandas_series_nunique(self, dropna=True):
     Pandas Series method :meth:`pandas.Series.nunique` implementation.
 
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_nunique
-
-    Parameters
-    -----------
-    self: :obj:`pandas.Series`
-        input series
-    dropna: :obj:`bool`, default True
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_nunique
     """
 
     _func_name = 'Method nunique().'
@@ -5133,6 +4268,10 @@ def hpat_pandas_series_count(self, level=None):
 
     Pandas API: pandas.Series.count
 
+    Limitations
+    -----------
+    - Parameter level is currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_count.py
@@ -5144,10 +4283,6 @@ def hpat_pandas_series_count(self, level=None):
     .. command-output:: python ./series/series_count.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter level is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
         :ref:`Series.value_counts <pandas.Series.value_counts>`
@@ -5157,19 +4292,9 @@ def hpat_pandas_series_count(self, level=None):
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.count` implementation.
-    .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_count
-    Parameters
 
-    -----------
-    self: :obj:`pandas.Series`
-          input series
-    level:  :obj:`int` or name
-           *unsupported*
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
+    .. only:: developer
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_count
     """
 
     _func_name = 'Method count().'
@@ -5231,28 +4356,7 @@ def hpat_pandas_series_median(self, axis=None, skipna=None, level=None, numeric_
     Pandas Series method :meth:`pandas.Series.median` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_median1*
-
-    Parameters
-    -----------
-    self: :obj:`pandas.Series`
-        input series
-    axis: :obj:`int` or :obj:`string` {0 or `index`, None}, default None
-        The axis for the function to be applied on.
-        *unsupported*
-    skipna: :obj:`bool`, default True
-        exclude NA/null values when computing the result
-    level: :obj:`int` or :obj:`string`, default None
-        *unsupported*
-    numeric_only: :obj:`bool` or None, default None
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`float` or :obj:`pandas.Series` (if level is specified)
-        median of values in the series
-
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_median1*
     """
 
     _func_name = 'Method median().'
@@ -5300,6 +4404,10 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     Pandas API: pandas.Series.argsort
 
+    Limitations
+    -----------
+    - Parameters kind, order are currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_argsort.py
@@ -5313,7 +4421,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     .. note::
 
-        Parameters axis, kind, order are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -5326,28 +4434,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     Pandas Series method :meth:`pandas.Series.argsort` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_argsort*
-
-    Parameters
-    -----------
-    self: :class:`pandas.Series`
-        input series
-    axis: :obj:`int`
-        Has no effect but is accepted for compatibility with numpy.
-        *unsupported*
-    kind: :obj:'str', {'mergesort', 'quicksort', 'heapsort'}, default: 'quicksort'
-        Choice of sorting algorithm. See np.sort for more information. 'mergesort' is the only stable algorithm
-        *uses python func - sorted() for str and numpy func - sort() for num*
-        *'heapsort' unsupported*
-    order: :obj:`str` or  :obj:`list of str`, default: None
-        Has no effect but is accepted for compatibility with numpy.
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns: Positions of values within the sort order with -1 indicating nan values.
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_argsort*
     """
 
     _func_name = 'Method argsort().'
@@ -5433,6 +4520,11 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
     Pandas API: pandas.Series.sort_values
 
+    Limitations
+    -----------
+    - Parameter inplace is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter kind currently only 'mergesort' and 'quicksort' are supported as literal values.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_sort_values.py
@@ -5446,7 +4538,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
     .. note::
 
-        Parameters axis, kind, na_position are currently unsupported by Intel Scalable Dataframe Compiler
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -5464,29 +4556,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     Pandas Series method :meth:`pandas.Series.sort_values` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_sort_values*
-
-    Parameters
-    -----------
-    self: :class:'pandas.Series'
-        input series
-    axis: :obj:`int` or :obj:`string` {0 or `index`}, default 0
-        Axis to direct sorting. For Series only one axis ('index' or 0) exists.
-    ascending: :obj:'bool', default: True
-        If True, sort values in ascending order, otherwise descending.
-    inplace: :obj:`bool`, default False
-        If True, do operation inplace and return None.
-        *unsupported*
-    kind: :obj:'str' or None, {'mergesort', 'quicksort', 'heapsort'}, default: 'quicksort'
-        Choice of sorting algorithm.
-        Currently only 'mergesort' and 'quicksort' are supported as literal values.
-    na_position: {'first' or 'last'}, default 'last'
-        Argument 'first' puts NaNs at the beginning, 'last' puts NaNs at the end.
-
-    Returns
-    -------
-    :obj:`pandas.Series`
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_sort_values*
     """
 
     _func_name = 'Method sort_values().'
@@ -5601,21 +4671,6 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
 
     .. only:: developer
        Tests: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_dropna*
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-    axis: :obj:`int` or :obj:`string` {0 or `index`}, default 0
-        There is only one axis to drop values from.
-    inplace: :obj:`bool`, default False
-        If True, do operation inplace and return None.
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object with NA entries dropped from it.
     """
 
     _func_name = 'Method dropna().'
@@ -5650,6 +4705,7 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
     Limitations
     -----------
     - Parameters method, limit, downcast are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter inplace supported as literal value only
 
     Examples
     --------
@@ -5682,33 +4738,6 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
 
     .. only:: developer
        Tests: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_fillna*
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-    value: scalar of the same dtype as input Series (other types currently unsupported), default None
-        Value to use to fill the NA elements
-    method: :obj:`string` {`backfill`, `bfill`, `pad`, `ffill`, None}, default None
-        Method to use for filling holes in reindexed Series.
-        *unsupported*
-    axis: :obj:`int` or :obj:`string` {0 or `index`}, default None
-        There is only one axis to drop values from.
-    inplace: :obj:`bool`, default False
-        If True, do operation inplace and return None.
-        Supported as literal value only
-    limit: :obj:`int`, default None
-        If method is specified, this is the maximum number of consecutive NaN
-        values to forward/backward fill.
-        *unsupported*
-    downcast: :obj:`dict` or :obj:`string` {`infer`}, default None
-        Controls logic of downcasting elements to particular dtype
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` with missed values filled.
     """
 
     _func_name = 'Method fillna().'
@@ -5829,21 +4858,7 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
     Pandas Series method :meth:`pandas.Series.cov` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_cov
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        input series
-    other: :obj:`pandas.Series`
-        input series
-    min_periods: :obj:`int`, default None
-
-    Returns
-    -------
-    :obj:`float`
-        returns :obj:`float` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_cov
     """
 
     ty_checker = TypeChecker('Method cov().')
@@ -5902,6 +4917,7 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
     Limitations
     -----------
     - Unsupported mixed numeric and string data
+    - Parameters limit, freq are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -5933,27 +4949,7 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
     Pandas Series method :meth:`pandas.Series.pct_change` implementation.
 
     .. only:: developer
-
-       Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_pct_change
-
-    Parameters
-    -----------
-    self: :obj:`pandas.Series`
-        input series
-    periods: :obj:`int`, default 1
-        Periods to shift for forming percent change.
-    fill_method: :obj:`str`, default 'pad'
-        How to handle NAs before computing percent changes.
-    limit: :obj:`int`, default Nogne
-        The number of consecutive NAs to fill before stopping.
-        *unsupported*
-    freq: :obj: DateOffset, timedelta, or offset alias string, optional
-        Increment to use from time series API (e.g. 'M' or BDay()).
-        *unsupported*
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_pct_change
     """
 
     ty_checker = TypeChecker('Method pct_change().')
@@ -6078,23 +5074,6 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
     .. only:: developer
 
        Tests: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_describe*
-
-    Parameters
-    ----------
-    self: :obj:`pandas.Series`
-        Input series
-    percentiles: :obj:`list-like`
-        The percentiles to include in the output. The default is [.25, .5, .75]
-        All should fall between 0 and 1 and no duplicates are allowed.
-    include: 'all', :obj:`list-like` of dtypes or None, default None
-        A white list of data types to include in the result. Ignored for Series.
-    exclude: :obj:`list-like` of dtypes or None, default None
-        A black list of data types to omit from the result. Ignored for Series.
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        returns :obj:`pandas.Series` object containing summary statistics of the Series
     """
 
     ty_checker = TypeChecker('Method describe().')
