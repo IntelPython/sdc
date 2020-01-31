@@ -23,6 +23,7 @@ class TestCase(NamedTuple):
     usecase_params: str = None
     data_num: int = 1
     input_data: list = None
+    type_data: str = 'float'
     skip: bool = False
 
 
@@ -33,7 +34,7 @@ def to_varname_without_excess_underscores(string):
 
 def generate_test_cases(cases, class_add, typ, prefix='', dop=''):
     for test_case in cases:
-        test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case), dop]
+        test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case), test_case.type_data]
         test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
 
         setattr(class_add, test_name, gen_test(test_case, test_name, prefix, dop))
@@ -64,7 +65,7 @@ def gen_call_expr(test_case, prefix):
     return '.'.join(call_expr_parts)
 
 
-def gen_test(test_case, test_name, prefix, dop):
+def gen_test(test_case, test_name, prefix):
     func_name = 'func'
 
     usecase = gen_usecase(test_case, prefix)

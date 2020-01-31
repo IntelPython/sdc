@@ -68,7 +68,8 @@ class TestSeriesMethods(TestBase):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64, typ='float'):
+    def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64,
+                   typ='float'):
         test_name = 'Series.{}'.format(name)
 
         if input_data is None:
@@ -90,7 +91,7 @@ class TestSeriesMethods(TestBase):
                 if typ == 'float':
                     extra_data = np.random.ranf(data_length)
                 elif typ == 'int':
-                    extra_data = np.random.randint(data_length)
+                    extra_data = np.random.randint(10 ** 4, size=data_length)
                 args.append(pandas.Series(extra_data))
 
             record = base.copy()
