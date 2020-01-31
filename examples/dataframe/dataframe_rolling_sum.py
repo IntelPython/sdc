@@ -24,16 +24,18 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import numpy as np
 import pandas as pd
-
 from numba import njit
 
 
 @njit
-def series_nlargest():
-    series = pd.Series(np.arange(10))
-    return series.nlargest(4)
+def df_rolling_sum():
+    df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
+    out_df = df.rolling(3).sum()
+
+    # Expect DataFrame of
+    # {'A': [NaN, NaN, 12.0, 10.0, 13.0], 'B': [NaN, NaN, -12.0, -10.0, -13.0]}
+    return out_df
 
 
-print(series_nlargest())
+print(df_rolling_sum())
