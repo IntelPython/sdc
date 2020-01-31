@@ -23,7 +23,7 @@ class TestCase(NamedTuple):
     usecase_params: str = None
     data_num: int = 1
     input_data: list = None
-    type_data: str = 'float'
+    type_data: str = None
     skip: bool = False
 
 
@@ -72,10 +72,14 @@ def gen_test(test_case, test_name, prefix):
 
     skip = '@skip_numba_jit\n' if test_case.skip else ''
 
+    test_name = test_case.name
+    if test_case.params:
+        test_name = f'{test_name}({test_case.params})'
+
     func_text = f"""
 {skip}def {func_name}(self):
-  self._test_case(usecase, name='{test_name + '_' + dop}', total_data_length={test_case.size},
-                  data_num={test_case.data_num}, input_data={test_case.input_data}, typ='{dop}')
+  self._test_case(usecase, name='{test_name + '_' + test_case.type_data}', total_data_length={test_case.size},
+                  data_num={test_case.data_num}, input_data={test_case.input_data}, typ='{test_case.type_data}')
 """
 
     loc_vars = {}
