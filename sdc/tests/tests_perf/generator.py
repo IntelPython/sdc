@@ -32,12 +32,13 @@ def to_varname_without_excess_underscores(string):
     return '_'.join(i for i in to_varname(string).split('_') if i)
 
 
-def generate_test_cases(cases, class_add, typ, prefix='', dop=''):
+def generate_test_cases(cases, class_add, typ, prefix=''):
     for test_case in cases:
-        test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case), test_case.type_data]
+        typ_input_data = '' if test_case.type_data is None else test_case.type_data
+        test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case), typ_input_data]
         test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
 
-        setattr(class_add, test_name, gen_test(test_case, test_name, prefix, dop))
+        setattr(class_add, test_name, gen_test(test_case, test_name, prefix))
 
 
 def gen_params_wo_data(test_case):

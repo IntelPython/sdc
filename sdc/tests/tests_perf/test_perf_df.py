@@ -61,11 +61,13 @@ class TestDataFrameMethods(TestBase):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, name, total_data_length, data_num=1,
-                   input_data=test_global_input_data_float64):
+    def _test_case(self, pyfunc, name, total_data_length, input_data, typ, data_num=1):
 
         if input_data is None:
             input_data = test_global_input_data_float64
+
+        if input_data is None:
+            typ = 'float'
 
         test_name = 'DataFrame.{}'.format(name)
 
