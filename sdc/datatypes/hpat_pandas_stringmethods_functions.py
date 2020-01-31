@@ -873,7 +873,7 @@ sdc_pandas_series_str_docstring_template = """
            :cwd: ../../../examples
 
         .. seealso::
-            {see_also}
+            {seealso}
 
         Intel Scalable Dataframe Compiler Developer Guide
         *************************************************
@@ -1095,7 +1095,7 @@ def hpat_pandas_stringmethods_casefold(self):
     return hpat_pandas_stringmethods_casefold_impl
 
 
-see_also_for_ismethods = '''
+seealso_for_ismethods = '''
                         :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
                             Check whether all characters are alphabetic.
                         :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
@@ -1117,7 +1117,7 @@ see_also_for_ismethods = '''
                         '''
 
 
-see_also_for_conv_methods = '''
+seealso_for_conv_methods = '''
                             :ref:`Series.str.lower <pandas.Series.str.lower>`
                                 Converts all characters to lowercase.
                             :ref:`Series.str.upper <pandas.Series.str.upper>`
@@ -1136,50 +1136,50 @@ see_also_for_conv_methods = '''
 stringmethods_funcs = {
     'istitle': {'method': hpat_pandas_stringmethods_istitle,
                 'caption': 'Check if each word start with an upper case letter',
-                'see_also': see_also_for_ismethods},
+                'seealso': seealso_for_ismethods},
     'isspace': {'method': hpat_pandas_stringmethods_isspace,
                 'caption': 'Check if all the characters in the text are whitespaces',
-                'see_also': see_also_for_ismethods},
+                'seealso': seealso_for_ismethods},
     'isalpha': {'method': hpat_pandas_stringmethods_isalpha,
                 'caption': 'Check whether all characters in each string are alphabetic',
-                'see_also': see_also_for_ismethods},
+                'seealso': seealso_for_ismethods},
     'islower': {'method': hpat_pandas_stringmethods_islower,
                 'caption': 'Check if all the characters in the text are alphanumeric',
-                'see_also': see_also_for_ismethods},
+                'seealso': seealso_for_ismethods},
     'isalnum': {'method': hpat_pandas_stringmethods_isalnum,
                 'caption': 'Check if all the characters in the text are alphanumeric',
-                'see_also': see_also_for_ismethods},
+                'seealso': seealso_for_ismethods},
     'isnumeric': {'method': hpat_pandas_stringmethods_isnumeric,
                   'caption': 'Check whether all characters in each string are numeric.',
-                  'see_also': see_also_for_ismethods},
+                  'seealso': seealso_for_ismethods},
     'isdigit': {'method': hpat_pandas_stringmethods_isdigit,
                 'caption': 'Check whether all characters in each string in the Series/Index are digits.',
-                'see_also': see_also_for_ismethods},
+                'seealso': seealso_for_ismethods},
     'isdecimal': {'method': hpat_pandas_stringmethods_isdecimal,
                   'caption': 'Check whether all characters in each string are decimal.',
-                  'see_also': see_also_for_ismethods},
+                  'seealso': seealso_for_ismethods},
     'isupper': {'method': hpat_pandas_stringmethods_isupper,
                 'caption': 'Check whether all characters in each string are uppercase.',
-                'see_also': see_also_for_ismethods},
+                'seealso': seealso_for_ismethods},
     'capitalize': {'method': hpat_pandas_stringmethods_capitalize,
                    'caption': 'Convert strings in the Series/Index to be capitalized.',
-                   'see_also': see_also_for_conv_methods},
+                   'seealso': seealso_for_conv_methods},
     'title': {'method': hpat_pandas_stringmethods_title,
               'caption': 'Convert strings in the Series/Index to titlecase.',
-              'see_also': see_also_for_conv_methods},
+              'seealso': seealso_for_conv_methods},
     'swapcase': {'method': hpat_pandas_stringmethods_swapcase,
                  'caption': 'Convert strings in the Series/Index to be swapcased.',
-                 'see_also': see_also_for_conv_methods},
+                 'seealso': seealso_for_conv_methods},
     'casefold': {'method': hpat_pandas_stringmethods_casefold,
                  'caption': 'Convert strings in the Series/Index to be casefolded.',
-                 'see_also': see_also_for_conv_methods},
+                 'seealso': seealso_for_conv_methods},
 }
 
 
 for name, data in stringmethods_funcs.items():
     data['method'].__doc__ = sdc_pandas_series_str_docstring_template.format(**{'method_name': name,
                                                                                 'caption': data['caption'],
-                                                                                'see_also':data['see_also']})
+                                                                                'seealso':data['seealso']})
 
 
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))
