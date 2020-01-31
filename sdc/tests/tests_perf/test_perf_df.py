@@ -66,7 +66,7 @@ class TestDataFrameMethods(TestBase):
         if input_data is None:
             input_data = test_global_input_data_float64
 
-        if input_data is None:
+        if typ == '':
             typ = 'float'
 
         test_name = 'DataFrame.{}'.format(name)
@@ -82,9 +82,12 @@ class TestDataFrameMethods(TestBase):
             test_data = pandas.DataFrame({f"f{i}": data for i in range(3)})
 
             args = [test_data]
-            for i in range(data_num-1):
+            for i in range(data_num - 1):
                 np.random.seed(i)
-                extra_data = np.random.ranf(data_length)
+                if typ == 'float':
+                    extra_data = np.random.ranf(data_length)
+                elif typ == 'int':
+                    extra_data = np.random.randint(10 ** 4, size=data_length)
                 args.append(pandas.DataFrame({f"f{i}": extra_data for i in range(3)}))
 
             record = base.copy()

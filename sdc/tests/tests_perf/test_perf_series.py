@@ -74,7 +74,7 @@ class TestSeriesMethods(TestBase):
         if input_data is None:
             input_data = test_global_input_data_float64
 
-        if typ is None:
+        if typ == '':
             typ = 'float'
 
         full_input_data_length = sum(len(i) for i in input_data)
