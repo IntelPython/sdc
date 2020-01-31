@@ -5422,12 +5422,12 @@ class TestSeries(TestSeries_apply, TestCase):
         }
 
         idx = slice(2, None)
-        for dtype in dtype_to_data:
+        for dtype, all_data in dtype_to_data.items():
             # FIXME: setitem for StringArray type has no overload for slice idx
             if dtype == 'string':
                 continue
-            for series_data in dtype_to_data[dtype]:
-                value = dtype_to_values[dtype]
+            value = dtype_to_values[dtype]
+            for series_data in all_data:
                 S1 = pd.Series(series_data)
                 S2 = S1.copy(deep=True)
                 with self.subTest(series=S1, value=value):
@@ -5457,12 +5457,12 @@ class TestSeries(TestSeries_apply, TestCase):
         }
 
         idx = pd.Series([0, 2, 4])
-        for dtype in dtype_to_data:
+        for dtype, all_data in dtype_to_data.items():
             # FIXME: setitem for StringArray type has no overload for slice idx
             if dtype == 'string':
                 continue
-            for series_data in dtype_to_data[dtype]:
-                value = dtype_to_values[dtype]
+            value = dtype_to_values[dtype]
+            for series_data in all_data:
                 S1 = pd.Series(series_data)
                 S2 = S1.copy(deep=True)
                 with self.subTest(series=S1, value=value):
@@ -6149,71 +6149,63 @@ class TestSeries(TestSeries_apply, TestCase):
         result = hpat_func(S, idx, value)
         pd.testing.assert_series_equal(result, S)
 
+    def _test_series_setitem(self, all_data, indexes, idxs, values, dtype=None):
+        """ Common function used by setitem tests to compile and run setitem on provided data"""
+        def test_impl(A, i, value):
+            A[i] = value
+        hpat_func = self.jit(test_impl)
+
+        for series_data in all_data:
+            for series_index in indexes:
+                S = pd.Series(series_data, series_index, dtype=dtype)
+                for idx in idxs:
+                    for value in values:
+                        with self.subTest(series=S, idx=idx, value=value):
+                            S1 = S.copy(deep=True)
+                            S2 = S.copy(deep=True)
+                            hpat_func(S1, idx, value)
+                            test_impl(S2, idx, value)
+                            pd.testing.assert_series_equal(S1, S2)
+
     @skip_numba_jit('Requires StringArray support of operator.eq')
     def test_series_setitem_idx_str_scalar(self):
         """ Verifies Series.setitem for scalar string idx operand and integer Series with index of matching dtype"""
-        def test_impl(A, i, value):
-            A[i] = value
-        hpat_func = self.jit(test_impl)
 
+        series_data = np.arange(5)
+        series_index = ['a', 'a', 'c', 'd', 'a']
         idx = 'a'
-        S = pd.Series(np.arange(5), index=['a', 'a', 'c', 'd', 'a'])
         values_to_test = [-100,
                           np.array([5, 55, 555]),
                           pd.Series([5, 55, 555])]
 
-        for value in values_to_test:
-            with self.subTest(value=value):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
+        self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
     def test_series_setitem_idx_int_scalar1(self):
         """ Verifies Series.setitem for scalar integer idx operand and integer Series with index of matching dtype"""
-        def test_impl(A, i, value):
-            A[i] = value
-        hpat_func = self.jit(test_impl)
 
+        series_data = np.arange(5)
+        series_index = [8, 8, 9, 8, 5]
         idx = 8
-        S = pd.Series(np.arange(5), index=[8, 8, 9, 8, 5])
         values_to_test = [-100,
                           np.array([5, 55, 555]),
                           pd.Series([5, 55, 555])]
 
-        for value in values_to_test:
-            with self.subTest(value=value):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
+        self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
     def test_series_setitem_idx_int_scalar2(self):
         """ Verifies Series.setitem for scalar integer idx operand and integer Series with
             index of non matching dtype (i.e. set along positions, not index)"""
-        def test_impl(A, i, value):
-            A[i] = value
-        hpat_func = self.jit(test_impl)
 
         n = 11
-        np.random.seed(0)
-        indexes_to_test = [
+        series_data = np.arange(n)
+        series_indexes = [
                             None,
                             np.arange(n, dtype=np.float),
                             gen_strlist(n, 2, 'abcd123 ')
-                            ]
+        ]
         idx = 8
         value = -100
-        for series_index in indexes_to_test:
-            S = pd.Series(np.arange(n), index=series_index)
-            with self.subTest(index=series_index):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
+        self._test_series_setitem([series_data], series_indexes, [idx], [value])
 
     @skip_numba_jit('TODO: support replacing data in Series with new array')
     def test_series_setitem_idx_int_scalar_non_existing(self):
@@ -6233,61 +6225,45 @@ class TestSeries(TestSeries_apply, TestCase):
     def test_series_setitem_idx_str_series(self):
         """ Verifies Series.setitem for idx operand of type pandas.Series and string dtype called on
             integer Series with index of matching dtype and scalar and non scalar assigned values """
-        def test_impl(A, i, value):
-            A[i] = value
-        hpat_func = self.jit(test_impl)
 
         n, k = 11, 4
         np.random.seed(0)
-        assigned_values = -10 + np.arange(k) * (-1)
         valid_indices = gen_strlist(n, 2, 'abcd123 ')
-        S = pd.Series(np.arange(n), index=valid_indices[:n], dtype=np.intp)
+        series_data = np.arange(n)
+        series_index = valid_indices[:n]
 
         # create a Series from exactly k random S.index values
         selected_indexes = np.arange(n)
         np.random.shuffle(selected_indexes)
-        idx = pd.Series(np.take(S.index, selected_indexes[:k]))
+        idx = pd.Series(np.take(series_index, selected_indexes[:k]))
 
+        assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
                           pd.Series(assigned_values)]
-        for value in values_to_test:
-            with self.subTest(value=value):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
+        self._test_series_setitem([series_data], [series_index], [idx], values_to_test, np.intp)
 
     def test_series_setitem_idx_float_series(self):
         """ Verifies Series.setitem for idx operand of type pandas.Series and float dtype called on
             integer Series with index of matching dtype and scalar and non scalar assigned values """
-        def test_impl(A, i, value):
-            A[i] = value
-        hpat_func = self.jit(test_impl)
 
         n, k = 11, 4
         np.random.seed(0)
-        assigned_values = -10 + np.arange(k) * (-1)
         index_values = np.arange(n, dtype=np.float)
         np.random.shuffle(index_values)
-        S = pd.Series(np.arange(n), index=index_values)
+        series_data = np.arange(n)
+        series_index = np.copy(index_values)
 
         # create a Series from exactly k random S.index values
         np.random.shuffle(index_values)
         idx = pd.Series(index_values[:k])
 
+        assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
                           pd.Series(assigned_values)
                         ]
-        for value in values_to_test:
-            with self.subTest(value=value):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
+        self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
     def test_series_setitem_idx_int_series1(self):
         """ Verifies Series.setitem for idx operand of type pandas.Series and integer dtype called on
@@ -6298,53 +6274,39 @@ class TestSeries(TestSeries_apply, TestCase):
 
         n, k = 11, 4
         np.random.seed(0)
-        assigned_values = -10 + np.arange(k) * (-1)
         index_values = np.arange(n)
         np.random.shuffle(index_values)
-        S = pd.Series(np.arange(n), index=index_values)
+        series_data = np.arange(n)
+        series_index = np.copy(index_values)
 
         # create a Series from exactly k random S.index values
         np.random.shuffle(index_values)
         idx = pd.Series(index_values[:k])
 
+        assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
                           pd.Series(assigned_values)]
-        for value in values_to_test:
-            with self.subTest(value=value):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
+        self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
     def test_series_setitem_idx_int_series2(self):
         """ Verifies Series.setitem for idx operand of type pandas.Series and integer dtype called on
             integer Series with index of non-matching dtype and scalar and non scalar assigned values """
-        def test_impl(A, i, value):
-            A[i] = value
-        hpat_func = self.jit(test_impl)
 
         n, k = 11, 4
         np.random.seed(0)
-        assigned_values = -10 + np.arange(k) * (-1)
+        series_data = np.arange(n)
         series_index = gen_strlist(n, 2, 'abcd123 ')
-        S = pd.Series(np.arange(n), index=series_index)
 
         set_positions = np.arange(n)
         np.random.shuffle(set_positions)
         idx = pd.Series(set_positions[:k])
 
+        assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
                           pd.Series(assigned_values)]
-        for value in values_to_test:
-            with self.subTest(value=value):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
+        self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
     def test_series_setitem_idx_int_series3(self):
         """ Verifies negative case of using Series.setitem with idx operand of type pandas.Series
@@ -6385,63 +6347,46 @@ class TestSeries(TestSeries_apply, TestCase):
     def test_series_setitem_idx_int_array1(self):
         """ Verifies Series.setitem for idx operand of type numpy.ndarray and integer dtype called on
             integer Series with integer index and scalar and non scalar assigned values """
-        def test_impl(A, i, value):
-            A[i] = value
-        hpat_func = self.jit(test_impl)
 
         n, k = 11, 4
         np.random.seed(0)
-        assigned_values = -10 + np.arange(k) * (-1)
         index_values = np.arange(n)
         np.random.shuffle(index_values)
-        S = pd.Series(np.arange(n), index=index_values)
+        series_data = np.arange(n)
+        series_index = np.copy(index_values)
 
         # create a Series from exactly k random S.index values
         np.random.shuffle(index_values)
         idx = np.array(index_values[:k])
 
+        assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
-                        -100,
-                        np.array(assigned_values),
-                        pd.Series(assigned_values)
-                          ]
-        for value in values_to_test:
-            with self.subTest(value=value):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
+                            -100,
+                            np.array(assigned_values),
+                            pd.Series(assigned_values)
+        ]
+        self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
     def test_series_setitem_idx_int_array2(self):
         """ Verifies Series.setitem for idx operand of type numpy.ndarray and integer dtype called on
             integer Series with string index and scalar and non scalar assigned values """
-        def test_impl(A, i, value):
-            A[i] = value
-        hpat_func = self.jit(test_impl)
 
         n, k = 11, 4
         np.random.seed(0)
-        assigned_values = -10 + np.arange(k) * (-1)
+        series_data = np.arange(n)
         series_index = gen_strlist(n, 2, 'abcd123 ')
-        S = pd.Series(np.arange(n), index=series_index)
 
         set_positions = np.arange(n)
         np.random.shuffle(set_positions)
         idx = np.array(set_positions[:k])
 
+        assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                           -100,
                         np.array(assigned_values),
                         pd.Series(assigned_values)
                           ]
-        for value in values_to_test:
-            with self.subTest(value=value):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
+        self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
     def test_series_setitem_idx_int_slice1(self):
         """ Verifies that Series.setitem for int slice as idx operand called on integer Series
@@ -6450,7 +6395,6 @@ class TestSeries(TestSeries_apply, TestCase):
             A[i] = value
         hpat_func = self.jit(test_impl)
 
-        np.random.seed(0)
         S = pd.Series(np.arange(7), index=[2, 5, 1, 3, 6, 0, 4])
         slices_to_test = [(4, ), (None, 4), (1, 4), (2, 7, 3), (None, -4), (-4, ), (None, ), (None, None, 2)]
 
@@ -6474,7 +6418,6 @@ class TestSeries(TestSeries_apply, TestCase):
         hpat_func = self.jit(test_impl)
 
         n = 11
-        np.random.seed(0)
         dtype_to_data = {
             'int' : np.arange(n),
             'float' : np.arange(n, dtype=np.float_)
@@ -6560,16 +6503,13 @@ class TestSeries(TestSeries_apply, TestCase):
     def test_series_setitem_idx_bool_series1(self):
         """ Verifies Series.setitem assigning scalar and non scalar values
             via mask indicated by a Boolean pandas.Series with integer index """
-        def test_impl(A, i, value):
-            A[i] = value
-        hpat_func = self.jit(test_impl)
 
         n, k = 11, 4
         np.random.seed(0)
-        assigned_values = -10 + np.arange(k) * (-1)
         index_values = np.arange(n)
         np.random.shuffle(index_values)
-        S = pd.Series(np.arange(n), index=index_values, dtype=np.float)
+        series_data = np.arange(n)
+        series_index = np.copy(index_values)
 
         # create a bool Series with the same len as S and True values at exactly k random positions
         idx = pd.Series(np.zeros(n, dtype=np.bool))
@@ -6577,6 +6517,7 @@ class TestSeries(TestSeries_apply, TestCase):
         idx[index_values[:k]] = True
         np.random.shuffle(index_values)
 
+        assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
                             np.array(assigned_values),
@@ -6584,63 +6525,45 @@ class TestSeries(TestSeries_apply, TestCase):
                             pd.Series(assigned_values, index=index_values[:k]),
                             pd.Series(assigned_values, index=index_values[:k].astype('float'))
         ]
-        for value in values_to_test:
-            with self.subTest(value=value):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
+        self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 
     def test_series_setitem_idx_bool_series2(self):
         """ Verifies Series.setitem assigning scalar and non scalar values
             via mask indicated by a Boolean pandas.Series with string index """
-        def test_impl(A, i, value):
-            A[i] = value
-        hpat_func = self.jit(test_impl)
 
         n, k = 11, 4
         np.random.seed(0)
-        assigned_values = -10 + np.arange(k) * (-1)
-        index_values = gen_strlist(n, 2, 'abcd123 ')
-        S = pd.Series(np.arange(n), index=index_values, dtype=np.float)
+        series_data = np.arange(n)
+        series_index = gen_strlist(n, 2, 'abcd123 ')
 
         # create a bool Series with the same len as S and True values at exactly k random positions
         shuffled_data = np.arange(n)
         np.random.shuffle(shuffled_data)
-        k_series_indexes = list(np.take(index_values, shuffled_data))
+        k_series_indexes = list(np.take(series_index, shuffled_data))
         idx = pd.Series(np.zeros(n, dtype=np.bool), index=k_series_indexes)
         idx[shuffled_data[:k]] = True
 
         np.random.shuffle(shuffled_data)
-        k_series_indexes = list(np.take(index_values, shuffled_data[:k]))
+        k_series_indexes = list(np.take(series_index, shuffled_data[:k]))
+        assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
                             np.array(assigned_values),
                             pd.Series(assigned_values, index=k_series_indexes),
         ]
-        for value in values_to_test:
-            with self.subTest(value=value):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
+        self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 
     def test_series_setitem_idx_bool_array1(self):
         """ Verifies Series.setitem for idx operand of type numpy.ndarray and Boolean dtype called on
             integer Series with default index and scalar and non scalar assigned values. Due to no duplicates
             in idx.index or S.index the assignment is made along provided indexes. """
-        def test_impl(A, i, value):
-            A[i] = value
-        hpat_func = self.jit(test_impl)
 
         n, k = 11, 4
         np.random.seed(0)
-        assigned_values = -10 + np.arange(k) * (-1)
         index_values = np.arange(n)
         np.random.shuffle(index_values)
-        S = pd.Series(np.arange(n), index=index_values, dtype=np.float)
+        series_data = np.arange(n)
+        series_index = np.copy(index_values)
 
         # create a bool array with the same len as S and True values at exactly k random positions
         np.random.shuffle(index_values)
@@ -6648,6 +6571,7 @@ class TestSeries(TestSeries_apply, TestCase):
         idx[index_values[:k]] = True
         np.random.shuffle(index_values)
 
+        assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
                             np.array(assigned_values),
@@ -6655,53 +6579,34 @@ class TestSeries(TestSeries_apply, TestCase):
                             pd.Series(assigned_values, index=index_values[:k]),
                             pd.Series(assigned_values, index=index_values[:k].astype('float'))
         ]
-        for value in values_to_test:
-            with self.subTest(value=value):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
+        self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 
     def test_series_setitem_idx_bool_array2(self):
         """ Verifies Series.setitem for idx operand of type numpy.ndarray and Boolean dtype called on
             integer Series with default index and scalar and non scalar assigned values. Due to duplicates
             in idx.index and S.index the assignment is made along Series positions (but not index). """
-        def test_impl(A, i, value):
-            A[i] = value
-        hpat_func = self.jit(test_impl)
 
         n, k = 7, 4
-        assigned_values = -10 + np.arange(k) * (-1)
-        index_values = [6, 2, 3, 2, 7, 5, 1]
-        S = pd.Series(np.arange(n), index=index_values, dtype=np.float)
+        series_data = np.arange(n)
+        series_index = [6, 2, 3, 2, 7, 5, 1]
 
         idx = np.asarray([False, True, True, False, False, True, True])
+        assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             pd.Series(assigned_values),
                             pd.Series(assigned_values, index=[1, 6, 3, 5])
         ]
-        for value in values_to_test:
-            with self.subTest(value=value):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
+        self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 
     def test_series_setitem_idx_bool_array3(self):
         """ Verifies Series.setitem for idx operand of type numpy.ndarray and Boolean dtype called on
             integer Series with string index and scalar and non scalar assigned values. Due to no duplicates
             in idx.index or S.index the assignment is made along provided indexes. """
-        def test_impl(A, i, value):
-            A[i] = value
-        hpat_func = self.jit(test_impl)
 
         n, k = 11, 4
         np.random.seed(0)
-        assigned_values = -10 + np.arange(k) * (-1)
-        index_values = gen_strlist(n, 2, 'abcd123 ')
-        S = pd.Series(np.arange(n), index=index_values, dtype=np.float)
+        series_data = np.arange(n)
+        series_index = gen_strlist(n, 2, 'abcd123 ')
 
         # create a bool array with the same len as S and True values at exactly k random positions
         shuffled_data = np.arange(n)
@@ -6710,19 +6615,13 @@ class TestSeries(TestSeries_apply, TestCase):
         idx[shuffled_data[:k]] = True
         np.random.shuffle(shuffled_data)
 
+        assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
                             np.array(assigned_values),
-                            pd.Series(assigned_values, index=list(np.take(index_values, shuffled_data[:k])))
+                            pd.Series(assigned_values, index=list(np.take(series_index, shuffled_data[:k])))
         ]
-        for value in values_to_test:
-            with self.subTest(value=value):
-                S1 = S.copy(deep=True)
-                S2 = S.copy(deep=True)
-                hpat_func(S1, idx, value)
-                test_impl(S2, idx, value)
-                pd.testing.assert_series_equal(S1, S2)
-
+        self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 
 if __name__ == "__main__":
     unittest.main()

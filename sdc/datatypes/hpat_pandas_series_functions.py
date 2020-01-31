@@ -511,15 +511,12 @@ def sdc_pandas_series_setitem(self, idx, value):
 
             if assign_via_idx_mask == True:  # noqa
                 _idx = self._index == idx
-            elif assign_via_idx_data == True:
+            elif assign_via_idx_data == True:  # noqa
                 _idx = idx._data
             else:
                 _idx = idx
 
-            if value_is_series == True:  # noqa
-                _value = value._data
-            else:
-                _value = value
+            _value = value._data if value_is_series == True else value  # noqa
 
             self._data[_idx] = _value
             return self
@@ -650,15 +647,8 @@ def sdc_pandas_series_setitem(self, idx, value):
             value_is_scalar = not (value_is_series or value_is_array)
             def sdc_pandas_series_setitem_idx_int_series_align_impl(self, idx, value):
 
-                if idx_is_series == True:  # noqa
-                    _idx = idx._data
-                else:
-                    _idx = idx
-
-                if value_is_series == True:  # noqa
-                    _value = value._data
-                else:
-                    _value = value
+                _idx = idx._data if idx_is_series == True else idx  # noqa
+                _value = value._data if value_is_series == True else value  # noqa
 
                 self_index_size = len(self._index)
                 idx_size = len(_idx)
