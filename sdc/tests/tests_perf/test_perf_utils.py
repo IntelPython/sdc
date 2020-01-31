@@ -284,7 +284,7 @@ class TestResults:
                                      729   1024   0.000500  0.000000  0.000502                  NaN        0.000000
         """
         if self.test_results_data.empty:
-            return None
+            return pandas.DataFrame()
 
         median_col = self.test_results_data.groupby(self.index)['Time(s)'].median()
         min_col = self.test_results_data.groupby(self.index)['Time(s)'].min()
@@ -331,6 +331,7 @@ class TestResults:
         """
         Print performance testing results from global data storage
         """
+        print("Performance testing results:")
         print(self.grouped_data.to_string())
 
     def dump(self):
