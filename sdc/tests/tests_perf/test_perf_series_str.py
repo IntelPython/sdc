@@ -36,80 +36,18 @@ import pandas as pd
 from sdc.tests.test_utils import *
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import *
+from .generator import generate_test_cases
+from .generator import TestCase as TC
 
 
-def usecase_series_len(input_data):
-    start_time = time.time()
-    res = input_data.str.len()
-    finish_time = time.time()
-
-    return finish_time - start_time, res
-
-
-def usecase_series_capitalize(input_data):
-    start_time = time.time()
-    res = input_data.str.capitalize()
-    finish_time = time.time()
-
-    return finish_time - start_time, res
+test_global_input_data_unicode_kind1 = [
+    'ascii',
+    '12345',
+    '1234567890',
+]
 
 
-def usecase_series_lower(input_data):
-    start_time = time.time()
-    res = input_data.str.lower()
-    finish_time = time.time()
-
-    return finish_time - start_time, res
-
-
-def usecase_series_swapcase(input_data):
-    start_time = time.time()
-    res = input_data.str.swapcase()
-    finish_time = time.time()
-
-    return finish_time - start_time, res
-
-
-def usecase_series_title(input_data):
-    start_time = time.time()
-    res = input_data.str.title()
-    finish_time = time.time()
-
-    return finish_time - start_time, res
-
-
-def usecase_series_upper(input_data):
-    start_time = time.time()
-    res = input_data.str.upper()
-    finish_time = time.time()
-
-    return finish_time - start_time, res
-
-
-def usecase_series_lstrip(input_data):
-    start_time = time.time()
-    res = input_data.str.lstrip()
-    finish_time = time.time()
-
-    return finish_time - start_time, res
-
-
-def usecase_series_rstrip(input_data):
-    start_time = time.time()
-    res = input_data.str.rstrip()
-    finish_time = time.time()
-
-    return finish_time - start_time, res
-
-
-def usecase_series_strip(input_data):
-    start_time = time.time()
-    res = input_data.str.strip()
-    finish_time = time.time()
-
-    return finish_time - start_time, res
-
-
+# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series_str.TestSeriesStringMethods.test_series_str_{method_name}
 class TestSeriesStringMethods(TestBase):
     iter_number = 5
     results_class = TestResultsStr
@@ -117,16 +55,13 @@ class TestSeriesStringMethods(TestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-
-        cls.total_data_length = [10**4, 10**5]
         cls.width = [16, 64, 512, 1024]
-        cls.num_threads = int(os.environ.get('NUMBA_NUM_THREADS', config.NUMBA_NUM_THREADS))
-        cls.threading_layer = os.environ.get('NUMBA_THREADING_LAYER', config.THREADING_LAYER)
 
-    def _test_series_str(self, pyfunc, name, input_data=None):
+    def _test_case(self, pyfunc, name, total_data_length, input_data=None, *args, **kwargs):
+        test_name = 'series_str_{}'.format(name)
         input_data = input_data or test_global_input_data_unicode_kind4
         hpat_func = sdc.jit(pyfunc)
-        for data_length, data_width in itertools.product(self.total_data_length, self.width):
+        for data_length, data_width in itertools.product(total_data_length, self.width):
             data = perf_data_gen_fixed_len(input_data, data_width, data_length)
             test_data = pd.Series(data)
 
@@ -135,42 +70,34 @@ class TestSeriesStringMethods(TestBase):
             hpat_func(test_data)
 
             exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)
-            self.test_results.add(name, 'JIT', test_data.size, exec_times, data_width,
+
+            self.test_results.add(test_name, 'SDC', test_data.size, exec_times, data_width,
                                   boxing_times, compile_results=compile_results, num_threads=self.num_threads)
             exec_times, _ = get_times(pyfunc, test_data, iter_number=self.iter_number)
-            self.test_results.add(name, 'Reference', test_data.size, exec_times, data_width,
+            self.test_results.add(test_name, 'Python', test_data.size, exec_times, data_width,
                                   num_threads=self.num_threads)
 
-    def test_series_str_len(self):
-        self._test_series_str(usecase_series_len, 'series_str_len')
 
-    def test_series_str_capitalize(self):
-        self._test_series_str(usecase_series_capitalize, 'series_str_capitalize')
+cases = [
+    TC(name='capitalize', size=[10 ** 4, 10 ** 5], skip=True),
+    TC(name='center', params='1', size=[10 ** 4, 10 ** 5],  input_data=test_global_input_data_unicode_kind1),
+    TC(name='endswith', params='"e"', size=[10 ** 4, 10 ** 5]),
+    TC(name='find', params='"e"', size=[10 ** 4, 10 ** 5]),
+    TC(name='len', size=[10 ** 4, 10 ** 5]),
+    TC(name='ljust', params='1', size=[10 ** 4, 10 ** 5], input_data=test_global_input_data_unicode_kind1),
+    TC(name='lower', size=[10 ** 4, 10 ** 5]),
+    TC(name='lstrip', size=[10 ** 4, 10 ** 5],
+       input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    TC(name='rjust', params='1', size=[10 ** 4, 10 ** 5], input_data=test_global_input_data_unicode_kind1),
+    TC(name='rstrip', size=[10 ** 4, 10 ** 5],
+       input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    TC(name='startswith', params='"e"', size=[10 ** 4, 10 ** 5]),
+    TC(name='strip', size=[10 ** 4, 10 ** 5],
+       input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
+    TC(name='swapcase', size=[10 ** 4, 10 ** 5], skip=True),
+    TC(name='title', size=[10 ** 4, 10 ** 5], skip=True),
+    TC(name='upper', size=[10 ** 4, 10 ** 5]),
+    TC(name='zfill', params='1', size=[10 ** 4, 10 ** 5], input_data=test_global_input_data_unicode_kind1),
+]
 
-    def test_series_str_lower(self):
-        self._test_series_str(usecase_series_lower, 'series_str_lower')
-
-    def test_series_str_swapcase(self):
-        self._test_series_str(usecase_series_swapcase, 'series_str_swapcase')
-
-    def test_series_str_title(self):
-        self._test_series_str(usecase_series_title, 'series_str_title')
-
-    def test_series_str_upper(self):
-        self._test_series_str(usecase_series_upper, 'series_str_upper')
-
-    def test_series_str_lstrip(self):
-        input_data = ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]
-        self._test_series_str(usecase_series_lstrip, 'series_str_lstrip', input_data=input_data)
-
-    def test_series_str_rstrip(self):
-        input_data = ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]
-        self._test_series_str(usecase_series_rstrip, 'series_str_rstrip', input_data=input_data)
-
-    def test_series_str_strip(self):
-        input_data = ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]
-        self._test_series_str(usecase_series_strip, 'series_str_strip', input_data=input_data)
-
-
-if __name__ == "__main__":
-    unittest.main()
+generate_test_cases(cases, TestSeriesStringMethods, 'series', 'str')

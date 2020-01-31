@@ -26,6 +26,8 @@
 
 import numpy
 import pandas
+from numba import prange, types
+from numba.targets.registry import cpu_target
 
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.utils import sdc_overload_method
@@ -48,31 +50,31 @@ def hpat_pandas_series_apply(self, func, convert_dtype=True, args=()):
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_apply.py
-       :language: python
-       :lines: 33-
-       :caption: Square the values by defining a function and passing it as an argument to `apply()`.
-       :name: ex_series_apply
+        :language: python
+        :lines: 33-
+        :caption: Square the values by defining a function and passing it as an argument to `apply()`.
+        :name: ex_series_apply
 
     .. command-output:: python ./series/series_apply.py
-       :cwd: ../../../examples
+        :cwd: ../../../examples
 
     .. literalinclude:: ../../../examples/series/series_apply_lambda.py
-       :language: python
-       :lines: 33-
-       :caption: Square the values by passing an anonymous function as an argument to `apply()`.
-       :name: ex_series_apply_lambda
+        :language: python
+        :lines: 33-
+        :caption: Square the values by passing an anonymous function as an argument to `apply()`.
+        :name: ex_series_apply_lambda
 
     .. command-output:: python ./series/series_apply_lambda.py
-       :cwd: ../../../examples
+        :cwd: ../../../examples
 
     .. literalinclude:: ../../../examples/series/series_apply_log.py
-       :language: python
-       :lines: 33-
-       :caption: Use a function from the Numpy library.
-       :name: ex_series_apply_log
+        :language: python
+        :lines: 33-
+        :caption: Use a function from the Numpy library.
+        :name: ex_series_apply_log
 
     .. command-output:: python ./series/series_apply_log.py
-       :cwd: ../../../examples
+        :cwd: ../../../examples
 
     .. seealso::
 
@@ -87,13 +89,31 @@ def hpat_pandas_series_apply(self, func, convert_dtype=True, args=()):
     *************************************************
 
     .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_series_apply
+        Test: python -m sdc.runtests sdc.tests.test_series_apply
     """
 
     ty_checker = TypeChecker("Method apply().")
     ty_checker.check(self, SeriesType)
+    ty_checker.check(func, types.Callable)
+
+    func_args = [self.dtype]
+    if not isinstance(args, types.Omitted):
+        func_args.extend(args)
+
+    sig = func.get_call_type(cpu_target.typing_context, func_args, {})
+    output_type = sig.return_type
 
     def impl(self, func, convert_dtype=True, args=()):
-        return pandas.Series(list(map(func, self._data)), index=self._index, name=self._name)
+        input_arr = self._data
+        length = len(input_arr)
+
+        output_arr = numpy.empty(length, dtype=output_type)
+
+        for i in prange(length):
+            # Numba issue https://github.com/numba/numba/issues/5065
+            # output_arr[i] = func(input_arr[i], *args)
+            output_arr[i] = func(input_arr[i])
+
+        return pandas.Series(output_arr, index=self._index, name=self._name)
 
     return impl
