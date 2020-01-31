@@ -25,77 +25,22 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import pandas as pd
+import pandas
 import numpy as np
 
 import time
 import random
 
-import pandas
 import sdc
 
 from .test_perf_base import TestBase
 from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
-from sdc.io.csv_ext import to_varname
+from .generator import generate_test_cases
+from .generator import TestCase as TC
 
 
-def usecase_gen(call_expression):
-    func_name = 'usecase_func'
-
-    func_text = f"""\
-def {func_name}(input_data):
-  start_time = time.time()
-  res = input_data.{call_expression}
-  finish_time = time.time()
-  return finish_time - start_time, res
-"""
-
-    loc_vars = {}
-    exec(func_text, globals(), loc_vars)
-    _gen_impl = loc_vars[func_name]
-
-    return _gen_impl
-
-
-def usecase_gen_two_par(name, par):
-    func_name = 'usecase_func'
-
-    func_text = f"""\
-def {func_name}(A, B):
-  start_time = time.time()
-  res = A.{name}(B, {par})
-  finish_time = time.time()
-  return finish_time - start_time, res
-"""
-
-    loc_vars = {}
-    exec(func_text, globals(), loc_vars)
-    _gen_impl = loc_vars[func_name]
-
-    return _gen_impl
-
-
-def usecase_series_astype_int(input_data):
-    # astype to int8
-    start_time = time.time()
-    input_data.astype(np.int8)
-    finish_time = time.time()
-    res_time = finish_time - start_time
-
-    return res_time, input_data
-
-
-def usecase_series_chain_add_and_sum(A, B):
-    start_time = time.time()
-    res = (A + B).sum()
-    finish_time = time.time()
-    res_time = finish_time - start_time
-
-    return res_time, res
-
-
-# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods
+# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods.test_series_{method_name}
 class TestSeriesMethods(TestBase):
     @classmethod
     def setUpClass(cls):
@@ -118,182 +63,109 @@ class TestSeriesMethods(TestBase):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, name, total_data_length, input_data=test_global_input_data_float64):
+    def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
+        test_name = 'Series.{}'.format(name)
+
+        if input_data is None:
+            input_data = test_global_input_data_float64
+
         full_input_data_length = sum(len(i) for i in input_data)
         for data_length in total_data_length:
             base = {
-                "test_name": name,
+                "test_name": test_name,
                 "data_size": data_length,
             }
             data = perf_data_gen_fixed_len(input_data, full_input_data_length,
                                            data_length)
             test_data = pandas.Series(data)
 
+            args = [test_data]
+            for i in range(data_num - 1):
+                np.random.seed(i)
+                extra_data = np.random.ranf(data_length)
+                args.append(pandas.Series(extra_data))
+
             record = base.copy()
             record["test_type"] = 'SDC'
-            self._test_jitted(pyfunc, record, test_data)
+            self._test_jitted(pyfunc, record, *args)
             self.test_results.add(**record)
 
             record = base.copy()
             record["test_type"] = 'Python'
-            self._test_python(pyfunc, record, test_data)
+            self._test_python(pyfunc, record, *args)
             self.test_results.add(**record)
-
-    def _test_series_binary_operations(self, pyfunc, name, total_data_length, input_data=None):
-        np.random.seed(0)
-        hpat_func = sdc.jit(pyfunc)
-        for data_length in total_data_length:
-
-            # TODO: replace with generic function to generate random sequence of floats
-            data1 = np.random.ranf(data_length)
-            data2 = np.random.ranf(data_length)
-            A = pd.Series(data1)
-            B = pd.Series(data2)
-
-            compile_results = calc_compilation(pyfunc, A, B, iter_number=self.iter_number)
-
-            # Warming up
-            hpat_func(A, B)
-
-            exec_times, boxing_times = get_times(hpat_func, A, B, iter_number=self.iter_number)
-            self.test_results.add(name, 'SDC', A.size, exec_times, boxing_times,
-                                  compile_results=compile_results, num_threads=self.num_threads)
-            exec_times, _ = get_times(pyfunc, A, B, iter_number=self.iter_number)
-            self.test_results.add(name, 'Python', A.size, exec_times, num_threads=self.num_threads)
-
-    def test_series_float_astype_int(self):
-        self._test_case(usecase_gen('astype(np.int8)'), 'series_astype_int', [10 ** 5],
-                        input_data=[test_global_input_data_float64[0]])
-
-    def test_series_chain_add_and_sum(self):
-        self._test_series_binary_operations(usecase_series_chain_add_and_sum,
-                                            'series_chain_add_and_sum',
-                                            [20 * 10 ** 7, 25 * 10 ** 7, 30 * 10 ** 7])
-
-
-def test_gen(name, params, data_length, call_expression):
-    func_name = 'func'
-    if call_expression is None:
-        call_expression = '{}({})'.format(name, params)
-
-    func_text = f"""\
-def {func_name}(self):
-  self._test_case(usecase_gen('{call_expression}'), 'series_{name}', {data_length})
-"""
-
-    global_vars = {'usecase_gen': usecase_gen}
-
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _gen_impl = loc_vars[func_name]
-
-    return _gen_impl
-
-
-def test_gen_two_par(name, params, data_length):
-    func_name = 'func'
-
-    func_text = f"""\
-def {func_name}(self):
-  self._test_series_binary_operations(usecase_gen_two_par('{name}', '{params}'), 'series_{name}', {data_length})
-"""
-
-    global_vars = {'usecase_gen_two_par': usecase_gen_two_par}
-
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _gen_impl = loc_vars[func_name]
-
-    return _gen_impl
 
 
 cases = [
-    ('abs', '', [10 ** 8]),
-    ('apply', 'lambda x: x', [10 ** 7]),
-    ('argsort', '', [10 ** 4]),
-    ('at', '', [10 ** 7], 'at[3]'),
-    ('copy', '', [10 ** 8]),
-    ('count', '', [10 ** 7]),
-    ('cumsum', '', [10 ** 8]),
-    ('describe', '', [10 ** 7]),
-    ('dropna', '', [10 ** 7]),
-    ('fillna', '-1', [10 ** 7]),
-    ('head', '', [10 ** 8]),
-    ('iat', '', [10 ** 7], 'iat[100000]'),
-    ('idxmax', '', [10 ** 8]),
-    ('idxmin', '', [10 ** 8]),
-    ('iloc', '', [10 ** 7], 'iloc[100000]'),
-    ('index', '', [10 ** 7], 'index'),
-    ('isin', '', [10 ** 7], 'isin([0])'),
-    ('isna', '', [10 ** 7]),
-    ('loc', '', [10 ** 7], 'loc[0]'),
-    ('isnull', '', [10 ** 7]),
-    ('map', 'lambda x: x * 2', [10 ** 7]),
-    ('map', '{2.: 42., 4.: 3.14}', [10 ** 7]),
-    ('max', '', [10 ** 8]),
-    ('max', 'skipna=False', [10 ** 8]),
-    ('mean', '', [10 ** 8]),
-    ('median', '', [10 ** 8]),
-    ('min', '', [10 ** 8]),
-    ('min', 'skipna=False', [10 ** 7]),
-    ('ndim', '', [10 ** 7], 'ndim'),
-    ('nlargest', '', [10 ** 6]),
-    ('notna', '', [10 ** 7]),
-    ('nsmallest', '', [10 ** 6]),
-    ('nunique', '', [10 ** 7]),
-    ('prod', '', [10 ** 8]),
-    ('pct_change', 'periods=1, limit=None, freq=None', [10 ** 7]),
-    ('quantile', '', [10 ** 8]),
-    ('rename', '', [10 ** 7], 'rename("new_series")'),
-    ('shape', '', [10 ** 7], 'shape'),
-    ('shift', '', [10 ** 8]),
-    ('size', '', [10 ** 7], 'size'),
-    ('sort_values', '', [10 ** 5]),
-    ('std', '', [10 ** 7]),
-    ('sum', '', [10 ** 8]),
-    ('take', '', [10 ** 7], 'take([0])'),
-    ('values', '', [10 ** 7], 'values'),
-    ('value_counts', '', [10 ** 6]),
-    ('var', '', [10 ** 8]),
-    ('unique', '', [10 ** 5]),
+    TC(name='abs', size=[10 ** 8]),
+    TC(name='add', size=[10 ** 7], params='other',  data_num=2),
+    TC(name='append', size=[10 ** 7], params='other', data_num=2),
+    TC(name='apply', size=[10 ** 7], params='lambda x: x'),
+    TC(name='argsort', size=[10 ** 4]),
+    TC(name='astype', size=[10 ** 5], call_expr='data.astype(np.int8)', usecase_params='data',
+       input_data=[test_global_input_data_float64[0]]),
+    TC(name='at', size=[10 ** 7], call_expr='data.at[3]', usecase_params='data'),
+    TC(name='chain_add_and_sum', size=[20 * 10 ** 6, 25 * 10 ** 6, 30 * 10 ** 6], call_expr='(A + B).sum()',
+       usecase_params='A, B', data_num=2),
+    TC(name='copy', size=[10 ** 8]),
+    TC(name='corr',  size=[10 ** 7],params='other', data_num=2),
+    TC(name='count', size=[10 ** 7]),
+    TC(name='cov', size=[10 ** 8], params='other', data_num=2),
+    TC(name='cumsum', size=[10 ** 8]),
+    TC(name='describe', size=[10 ** 7]),
+    TC(name='div', size=[10 ** 7], params='other', data_num=2),
+    TC(name='dropna', size=[10 ** 7]),
+    TC(name='eq', size=[10 ** 7], params='other', data_num=2),
+    TC(name='fillna', size=[10 ** 7], params='-1'),
+    TC(name='floordiv', size=[10 ** 7], params='other', data_num=2),
+    TC(name='ge', size=[10 ** 7], params='other', data_num=2),
+    TC(name='gt',  size=[10 ** 7],params='other', data_num=2),
+    TC(name='head', size=[10 ** 8]),
+    TC(name='iat', size=[10 ** 7], call_expr='data.iat[100000]', usecase_params='data'),
+    TC(name='idxmax', size=[10 ** 8]),
+    TC(name='idxmin', size=[10 ** 8]),
+    TC(name='iloc', size=[10 ** 7], call_expr='data.iloc[100000]', usecase_params='data'),
+    TC(name='index', size=[10 ** 7], call_expr='data.index', usecase_params='data'),
+    TC(name='isin', size=[10 ** 7], call_expr='data.isin([0])', usecase_params='data'),
+    TC(name='isna', size=[10 ** 7]),
+    TC(name='isnull', size=[10 ** 7]),
+    TC(name='le', size=[10 ** 7], params='other', data_num=2),
+    TC(name='loc', size=[10 ** 7], call_expr='data.loc[0]', usecase_params='data'),
+    TC(name='lt', size=[10 ** 7], params='other', data_num=2),
+    TC(name='map', size=[10 ** 7], params='lambda x: x * 2'),
+    TC(name='map', size=[10 ** 7], params='{2.: 42., 4.: 3.14}'),
+    TC(name='max', size=[10 ** 8], params='skipna=True'),
+    TC(name='max', size=[10 ** 8], params='skipna=False'),
+    TC(name='mean', size=[10 ** 8]),
+    TC(name='median', size=[10 ** 8]),
+    TC(name='min', size=[10 ** 8]),
+    TC(name='min', size=[10 ** 7], params='skipna=False'),
+    TC(name='mod', size=[10 ** 7], params='other', data_num=2),
+    TC(name='mul', size=[10 ** 7], params='other', data_num=2),
+    TC(name='ndim', size=[10 ** 7], call_expr='data.ndim', usecase_params='data'),
+    TC(name='ne', size=[10 ** 8], params='other', data_num=2),
+    TC(name='nlargest', size=[10 ** 6]),
+    TC(name='notna', size=[10 ** 7]),
+    TC(name='nsmallest', size=[10 ** 6]),
+    TC(name='nunique', size=[10 ** 7]),
+    TC(name='prod', size=[10 ** 8]),
+    TC(name='pct_change', size=[10 ** 7], params='periods=1, limit=None, freq=None'),
+    TC(name='pow', size=[10 ** 7], params='other', data_num=2),
+    TC(name='quantile', size=[10 ** 8]),
+    TC(name='rename', size=[10 ** 7], call_expr='data.rename("new_series")', usecase_params='data'),
+    TC(name='shape', size=[10 ** 7], call_expr='data.shape', usecase_params='data'),
+    TC(name='shift', size=[10 ** 8]),
+    TC(name='size', size=[10 ** 7], call_expr='data.size', usecase_params='data'),
+    TC(name='sort_values', size=[10 ** 5]),
+    TC(name='std', size=[10 ** 7]),
+    TC(name='sub', size=[10 ** 7], params='other', data_num=2),
+    TC(name='sum', size=[10 ** 8]),
+    TC(name='take', size=[10 ** 7], call_expr='data.take([0])', usecase_params='data'),
+    TC(name='truediv', size=[10 ** 7], params='other', data_num=2),
+    TC(name='values', size=[10 ** 7], call_expr='data.values', usecase_params='data'),
+    TC(name='value_counts', size=[10 ** 6]),
+    TC(name='var', size=[10 ** 8]),
+    TC(name='unique', size=[10 ** 5]),
 ]
 
-cases_two_par = [
-    ('add', '', [10 ** 7]),
-    ('append', '', [10 ** 7]),
-    ('corr', '', [10 ** 7]),
-    ('cov', '', [10 ** 8]),
-    ('div', '', [10 ** 7]),
-    ('eq', '', [10 ** 7]),
-    ('floordiv', '', [10 ** 7]),
-    ('ge', '', [10 ** 7]),
-    ('gt', '', [10 ** 7]),
-    ('le', '', [10 ** 7]),
-    ('lt', '', [10 ** 7]),
-    ('mod', '', [10 ** 7]),
-    ('mul', '', [10 ** 7]),
-    ('ne', '', [10 ** 8]),
-    ('pow', '', [10 ** 7]),
-    ('sub', '', [10 ** 7]),
-    ('truediv', '', [10 ** 7]),
-]
-
-for params in cases:
-    if len(params) == 4:
-        func, param, length, call_expression = params
-    else:
-        func, param, length = params
-        call_expression = None
-    name = func
-    if param:
-        name += "_" + to_varname(param).replace('__', '_')
-    func_name = 'test_series_float_{}'.format(name)
-    setattr(TestSeriesMethods, func_name, test_gen(func, param, length, call_expression))
-
-for params in cases_two_par:
-    func, param, length = params
-    name = func
-    if param:
-        name += to_varname(param)
-    func_name = 'test_series_float_{}'.format(name)
-    setattr(TestSeriesMethods, func_name, test_gen_two_par(func, param, length))
+generate_test_cases(cases, TestSeriesMethods, 'series')
