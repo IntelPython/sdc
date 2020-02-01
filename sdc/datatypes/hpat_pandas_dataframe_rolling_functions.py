@@ -379,6 +379,18 @@ def sdc_pandas_dataframe_rolling_skew(self):
     return gen_df_rolling_method_impl('skew', self)
 
 
+@sdc_overload_method(DataFrameRollingType, 'std')
+def sdc_pandas_dataframe_rolling_std(self, ddof=1):
+
+    ty_checker = TypeChecker('Method rolling.std().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    if not isinstance(ddof, (int, Integer, Omitted)):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
+
+    return gen_df_rolling_method_impl('std', self, kws={'ddof': '1'})
+
+
 @sdc_overload_method(DataFrameRollingType, 'sum')
 def sdc_pandas_dataframe_rolling_sum(self):
 
@@ -509,6 +521,22 @@ sdc_pandas_dataframe_rolling_skew.__doc__ = sdc_pandas_dataframe_rolling_docstri
     'example_caption': 'Unbiased rolling skewness.',
     'limitations_block': '',
     'extra_params': ''
+})
+
+sdc_pandas_dataframe_rolling_std.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'std',
+    'example_caption': 'Calculate rolling standard deviation.',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """,
+    'extra_params':
+    """
+    ddof: :obj:`int`
+        Delta Degrees of Freedom.
+    """
 })
 
 sdc_pandas_dataframe_rolling_sum.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
