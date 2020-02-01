@@ -801,8 +801,9 @@ class TestRolling(TestCase):
         test_impl = rolling_var_usecase
         hpat_func = self.jit(test_impl)
 
+        window, min_periods, invalid_ddof = 3, 2, '1'
         with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, 3, 2, '1')
+            hpat_func(obj, window, min_periods, invalid_ddof)
         msg = 'Method rolling.var(). The object ddof\n given: unicode_type\n expected: int'
         self.assertIn(msg, str(raises.exception))
 
