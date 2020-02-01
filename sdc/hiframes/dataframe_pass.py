@@ -43,8 +43,8 @@ from numba.inline_closurecall import inline_closure_call
 from numba.compiler_machinery import FunctionPass, register_pass
 import sdc
 from sdc import hiframes
-from sdc.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
-                        is_whole_slice, is_array, is_assign, sanitize_varname, update_globals)
+from sdc.utilities.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
+                                 is_whole_slice, is_array, is_assign, sanitize_varname, update_globals)
 from sdc.str_arr_ext import (string_array_type, StringArrayType,
                               is_str_arr_typ, pre_alloc_string_array)
 from sdc.hiframes.pd_dataframe_ext import (DataFrameType, DataFrameLocType,

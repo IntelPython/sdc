@@ -34,10 +34,11 @@ from numba.extending import register_jitable
 from numba.types import (float64, Boolean, Integer, NoneType, Number,
                          Omitted, StringLiteral, UnicodeType)
 
-from sdc.datatypes.common_functions import TypeChecker, _sdc_pandas_series_align
+from sdc.datatypes.common_functions import _sdc_pandas_series_align
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.hiframes.pd_series_type import SeriesType
-from sdc.utils import sdc_overload_method, sdc_register_jitable
+from sdc.utilities.sdc_typing_utils import TypeChecker
+from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
 
 
 # disabling parallel execution for rolling due to numba issue https://github.com/numba/numba/issues/5098
