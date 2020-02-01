@@ -98,6 +98,7 @@ class TestDFRollingMethods(TestBase):
             'skew': [2 * 10 ** 5],
             'std': [2 * 10 ** 5],
             'sum': [2 * 10 ** 5],
+            'var': [2 * 10 ** 5],
         }
 
     def _test_jitted(self, pyfunc, record, *args, **kwargs):
@@ -209,3 +210,6 @@ class TestDFRollingMethods(TestBase):
 
     def test_df_rolling_sum(self):
         self._test_df_rolling_method('sum')
+
+    def test_df_rolling_var(self):
+        self._test_df_rolling_method('var')
