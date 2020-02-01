@@ -41,7 +41,7 @@ from numba import cgutils
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 from . import hdict_ext
-from sdc.utils import unliteral_all
+from sdc.utilities.utils import unliteral_all
 
 ll_voidp = lir.IntType(8).as_pointer()
 
