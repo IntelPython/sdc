@@ -48,8 +48,8 @@ from numba.compiler_machinery import FunctionPass, register_pass
 
 import sdc
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
-from sdc.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
-                        is_whole_slice, is_array, update_globals)
+from sdc.utilities.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
+                                 is_whole_slice, is_array, update_globals)
 from sdc.str_ext import (string_type, unicode_to_std_str, std_str_to_unicode,
                           list_string_array_type)
 from sdc.str_arr_ext import (string_array_type, StringArrayType,
