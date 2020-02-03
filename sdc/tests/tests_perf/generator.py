@@ -34,7 +34,7 @@ def to_varname_without_excess_underscores(string):
 
 def generate_test_cases(cases, class_add, typ, prefix=''):
     for test_case in cases:
-        typ_input_data = '' if test_case.type_data=='' else test_case.type_data
+        typ_input_data = '' if test_case.type_data == '' else test_case.type_data
         test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case), typ_input_data]
         test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
 
