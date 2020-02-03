@@ -36,6 +36,7 @@ import numpy
 import sdc
 
 from numba import types
+from numba.special import literally
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.str_arr_ext import StringArrayType
@@ -973,33 +974,15 @@ def gen_df_getitem_str_literal_idx_impl(self, idx):
     return _impl
 
 
-def df_getitem_unicode_idx_main_codelines(self):
-    """Generate main code lines for df.getitem"""
-    func_lines = []
-    df_data = []
-    for i, col in enumerate(self.columns):
-        col_data = f'data_{i}'
-        func_lines += [f'  {col_data} = get_dataframe_data(self, {i})']
-        df_data.append((col, col_data))
-
-    data = ', '.join(f'"{col}": {d}' for col, d in df_data)
-    func_lines += [
-        f'  data = {{{data}}}',
-        f'  return pandas.Series(data[idx], index=self._index, name=idx)'
-    ]
-
-    return func_lines
-
-
 def df_getitem_unicode_idx_codegen(self):
     """
     def _df_getitem_unicode_idx_impl(self, idx):
       if idx not in self._columns:
         raise KeyError
-      data_0 = get_dataframe_data(self, 0)
-      data_1 = get_dataframe_data(self, 1)
-      data = {"A": data_0, "B": data_1}
-      return pandas.Series(data[idx], index=self._index, name=idx)
+      literal_idx = literally(idx)
+      col_idx = self._columns.index(literal_idx)
+      res_data = get_dataframe_data(self, col_idx)
+      return pandas.Series(res_data, index=self._index, name=idx)
     """
     func_lines = [
         'def _df_getitem_unicode_idx_impl(self, idx):',
@@ -1007,13 +990,19 @@ def df_getitem_unicode_idx_codegen(self):
         '    raise KeyError'
     ]
     if self.columns:
-        func_lines += df_getitem_unicode_idx_main_codelines(self)
+        func_lines += [
+            '  literal_idx = literally(idx)',
+            '  col_idx = self._columns.index(literal_idx)',
+            '  res_data = get_dataframe_data(self, col_idx)',
+            '  return pandas.Series(res_data, index=self._index, name=idx)'
+        ]
     else:
         # raise KeyError if input DF is empty
         func_lines += ['  raise KeyError']
 
     func_text = '\n'.join(func_lines)
-    global_vars = {'pandas': pandas, 'get_dataframe_data': get_dataframe_data}
+    global_vars = {'pandas': pandas, 'literally': literally,
+                   'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
 

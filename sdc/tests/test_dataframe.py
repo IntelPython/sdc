@@ -1253,18 +1253,14 @@ class TestDataFrame(TestCase):
 
     @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_unicode_idx(self):
-        dfs = [gen_df(test_global_input_data_float64), pd.DataFrame({'A': []})]
+        dfs = [gen_df(test_global_input_data_float64),
+               gen_df(test_global_input_data_float64, with_index=True),
+               pd.DataFrame({'A': []})]
         for df in dfs:
             with self.subTest(df=df):
                 self._test_df_getitem_unicode_idx(df, 'A')
 
-    @unittest.skip('Python crashes when DF with index')
-    def test_df_getitem_unicode_idx_with_index(self):
-        df = gen_df(test_global_input_data_float64, with_index=True)
-        self._test_df_getitem_unicode_idx(df, 'A')
-
     @skip_sdc_jit('DF.getitem unsupported Series name')
-    @unittest.expectedFailure  # multitype DF issue
     def test_df_getitem_unicode_idx_multiple_types(self):
         int_data = [-1, 1, 0]
         float_data = [0.1, 0., -0.1]
