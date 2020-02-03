@@ -10,10 +10,6 @@ Intel® Scalable Dataframe Compiler
     :target: https://dev.azure.com/IntelPython/HPAT/_build/latest?definitionId=2&branchName=master
     :alt: Azure Pipelines
 
-.. image:: https://coveralls.io/repos/github/IntelPython/sdc/badge.svg?branch=master
-    :target: https://coveralls.io/github/IntelPython/sdc?branch=master
-    :alt: Coveralls
-
 Numba* Extension For Pandas* Operations Compilation
 ###################################################
 
