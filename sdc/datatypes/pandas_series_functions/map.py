@@ -30,9 +30,9 @@ from numba import prange, types
 from numba.targets.registry import cpu_target
 
 from sdc.hiframes.pd_series_ext import SeriesType
-from sdc.utils import sdc_overload_method
+from sdc.utilities.utils import sdc_overload_method
 
-from ..common_functions import TypeChecker
+from sdc.utilities.sdc_typing_utils import TypeChecker
 
 
 @sdc_overload_method(SeriesType, 'map')
