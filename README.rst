@@ -43,6 +43,9 @@ If you do not have conda, we recommend using Miniconda3::
     ./miniconda.sh -b
     export PATH=$HOME/miniconda3/bin:$PATH
 
+Intel SDC uses Numba ``ef119bcd1733ff49d71bdf2da8a66e91bb704f83`` commit from master branch as Numba package for build and run.
+That is why it is required to build specified Numba first. Build steps are described below.
+
 It is possible to build Intel SDC via conda-build or setuptools. Follow one of the
 cases below to install Intel SDC and its dependencies on Linux.
 
@@ -51,23 +54,33 @@ Building on Linux with conda-build
 ::
 
     PYVER=<3.6 or 3.7>
+    NUMPYVER=<1.16 or 1.17>
     conda create -n CBLD python=$PYVER conda-build
     source activate CBLD
-    git clone https://github.com/IntelPython/sdc
+    git clone https://github.com/IntelPython/sdc.git
     cd sdc
-    # build Intel SDC
-    conda build --python $PYVER --override-channels -c numba -c conda-forge -c defaults buildscripts/sdc-conda-recipe
+    # Build Numba
+    conda build --python $PYVER --numpy $NUMPYVER --output-folder <path_to_sdc>/numba_build -c numba -c defaults -c intel --override-channels buildscripts/numba-conda-recipe/recipe
+    # Build Intel SDC
+    conda build --python $PYVER --numpy $NUMPYVER -c file://<path_to_sdc>/numba_build -c numba -c defaults -c conda-forge --override-channels buildscripts/sdc-conda-recipe
 
 Building on Linux with setuptools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ::
 
     PYVER=<3.6 or 3.7>
-    conda create -n SDC -q -y -c numba -c defaults -c conda-forge python=$PYVER numba pandas scipy mpich pyarrow=0.15.1 gcc_linux-64 gxx_linux-64
+    NUMPYVER=<1.16 or 1.17>
+    conda create -n SDC -q -y -c numba -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER pandas=0.25.3 scipy pyarrow=0.15.1 gcc_linux-64 gxx_linux-64 tbb-devel llvmlite=0.31.0rc1=py*_0
     source activate SDC
     git clone https://github.com/IntelPython/sdc
     cd sdc
+    # Build Numba
+    git clone https://github.com/numpy/numpy.git
+    cd numba
+    git checkout ef119bcd1733ff49d71bdf2da8a66e91bb704f83
+    python setup.py install
     # build SDC
+    cd ../
     python setup.py install
 
 In case of issues, reinstalling in a new conda environment is recommended.
@@ -89,23 +102,35 @@ Building on Windows with conda-build
 ::
 
     set PYVER=<3.6 or 3.7>
+    set NUMPYVER=<1.16 or 1.17>
     conda create -n CBLD -q -y python=%PYVER% conda-build conda-verify vc vs2015_runtime vs2015_win-64
     conda activate CBLD
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
-    conda build --python %PYVER% --override-channels -c numba -c defaults -c intel buildscripts\sdc-conda-recipe
+    # Build Numba
+    conda build --python %PYVER% --numpy %NUMPYVER% --output-folder <path_to_sdc>\numba_build -c numba -c defaults -c intel --override-channels buildscripts\numba-conda-recipe\recipe
+    # Build Intel SDC
+    conda build --python %PYVER% --numpy %NUMPYVER% -c <path_to_sdc>\numba_build -c numba -c defaults -c conda-forge --override-channels buildscripts\sdc-conda-recipe
 
 Building on Windows with setuptools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ::
 
-    conda create -n SDC -c numba -c defaults -c intel -c conda-forge python=<3.6 or 3.7> numba impi-devel pyarrow=0.15.0 arrow-cpp=0.15.0 scipy pandas boost
+    set PYVER=<3.6 or 3.7>
+    set NUMPYVER=<1.16 or 1.17>
+    conda create -n SDC -c numba -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% pandas=0.25.3 scipy pyarrow=0.15.1 tbb-devel llvmlite=0.31.0rc1=py*_0
     conda activate SDC
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
     set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
     set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
-    %CONDA_PREFIX%\Library\bin\mpivars.bat quiet
+    # Build Numba
+    git clone https://github.com/numpy/numpy.git
+    cd numba
+    git checkout ef119bcd1733ff49d71bdf2da8a66e91bb704f83
+    python setup.py install
+    # Build Intel SDC
+    cd ..\
     python setup.py install
 
 .. "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64
