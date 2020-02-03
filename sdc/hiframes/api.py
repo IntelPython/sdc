@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -53,7 +53,7 @@ from numba.targets.imputils import (
 from numba.targets.arrayobj import make_array
 
 import sdc
-from sdc.utils import _numba_to_c_type_map, unliteral_all
+from sdc.utilities.utils import (_numba_to_c_type_map, unliteral_all)
 from sdc.str_ext import string_type, list_string_array_type
 from sdc.set_ext import build_set
 from sdc.str_arr_ext import (
@@ -87,10 +87,7 @@ enable_hiframes_remove_dead = True
 
 # quantile imports?
 
-if sdc.config.config_transport_mpi:
-    from .. import transport_mpi as transport
-else:
-    from .. import transport_seq as transport
+from .. import transport_seq as transport
 
 ll.add_symbol('quantile_parallel', transport.quantile_parallel)
 ll.add_symbol('nth_sequential', transport.nth_sequential)
@@ -200,8 +197,7 @@ def median(arr, parallel=False):
     # similar to numpy/lib/function_base.py:_median
     # TODO: check return types, e.g. float32 -> float32
 
-    if not sdc.config.config_transport_mpi:
-        parallel = False
+    parallel = False
 
     n = len(arr)
     if parallel:
@@ -362,7 +358,7 @@ def lower_unique(context, builder, sig, args):
 def unique_overload(arr_typ):
     # TODO: extend to other types like datetime?
     def unique_seq(A):
-        return sdc.utils.to_array(build_set(A))
+        return sdc.utilities.utils.to_array(build_set(A))
     return unique_seq
 
 
@@ -378,7 +374,7 @@ def lower_unique_parallel(context, builder, sig, args):
 def unique_overload_parallel(arr_typ):
 
     def unique_par(A):
-        uniq_A = sdc.utils.to_array(build_set(A))
+        uniq_A = sdc.utilities.utils.to_array(build_set(A))
         key_arrs = (uniq_A,)
 
         n_pes = sdc.distributed_api.get_size()
@@ -403,7 +399,7 @@ def unique_overload_parallel(arr_typ):
         # shuffle
         out_arr, = alltoallv_tup(key_arrs, shuffle_meta)
 
-        return sdc.utils.to_array(build_set(out_arr))
+        return sdc.utilities.utils.to_array(build_set(out_arr))
 
     return unique_par
 

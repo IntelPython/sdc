@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -32,7 +32,7 @@ from numba import types
 from numba.extending import overload
 
 import sdc
-from sdc.utils import get_ctypes_ptr, _numba_to_c_type_map
+from sdc.utilities.utils import get_ctypes_ptr, _numba_to_c_type_map
 from sdc.timsort import getitem_arr_tup
 from sdc.str_ext import string_type
 from sdc.str_arr_ext import (string_array_type, to_string_list,

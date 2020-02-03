@@ -11,12 +11,11 @@ This is Intel® Scalable Dataframe Compiler (Intel® SDC), which is an extension
 `Pandas*`_ operations. It automatically vectorizes and parallelizes the code by leveraging modern hardware instructions
 and by utilizing all available cores.
 
-.. seealso::
-    Intel SDC is just one of technologies that enable native speeds for Python. Learn about other technologies
-    here.
+.. image:: ./_images/scalability.png
+    :width: 800px
+    :align: center
+    :alt: Intel® Scalable Dataframe Compiler scalability
 
-.. todo::
-    Insert performance chart illustrating speedups vs. stock `Pandas*`_
 
 User Manual
 ===========

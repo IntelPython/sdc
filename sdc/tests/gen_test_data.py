@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,10 +24,9 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
 import numpy as np
-import pyarrow.parquet as pq
 import pyarrow as pa
+import pyarrow.parquet as pq
 import pandas as pd
 
 
@@ -99,10 +98,10 @@ def generate_other_data():
     df.to_parquet("pivot2.pq")
 
     # CSV reader test
-    data = ("0,2.3,4.6,47736\n"
-            "1,2.3,4.6,47736\n"
-            "2,2.3,4.6,47736\n"
-            "4,2.3,4.6,47736\n")
+    data = ("0,2.3,4.6,A\n"
+            "1,2.3,4.6,B\n"
+            "2,2.3,4.6,\n"
+            "4,2.3,4.6,D\n")
 
     with open("csv_data1.csv", "w") as f:
         f.write(data)

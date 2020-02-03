@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -40,9 +40,10 @@ from numba.extending import overload_method
 from numba.errors import TypingError
 
 from sdc.datatypes.hpat_pandas_seriesgroupby_types import SeriesGroupByType
+from sdc.utilities.utils import sdc_overload_method
 
 
-@overload_method(SeriesGroupByType, 'count')
+@sdc_overload_method(SeriesGroupByType, 'count')
 def hpat_pandas_seriesgroupby_count(self):
     """
     Pandas Series method :meth:`pandas.core.groupby.GroupBy.count` implementation.

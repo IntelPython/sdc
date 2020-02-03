@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -42,8 +42,8 @@ from numba.typing.templates import (signature, AbstractTemplate, infer, infer_ge
                                     ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
 
 import sdc
-from . import hstr_ext
-# from sdc.utils import unliteral_all
+from sdc import hstr_ext
+# from sdc.utilities.utils import unliteral_all
 # TODO: resolve import conflict
 
 

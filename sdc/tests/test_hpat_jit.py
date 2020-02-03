@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,16 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import unittest
-import platform
-import sdc
 import numba
 import numpy as np
 import pandas as pd
-from sdc import *
-from numba.typed import Dict
+import platform
+import unittest
 from collections import defaultdict
+from numba.typed import Dict
+
+import sdc
+from sdc import *
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
 
@@ -354,7 +354,7 @@ class TestHpatJitIssues(TestCase):
         def test_impl():
             return pd.read_csv("csv_data1.csv",
                                names=['A', 'B', 'C', 'D'],
-                               dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},
+                               dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str},
                                )
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
@@ -367,7 +367,7 @@ class TestHpatJitIssues(TestCase):
                      '[right]: int32')
     def test_csv_keys1_issue(self):
         def test_impl():
-            dtype = {'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int}
+            dtype = {'A': np.int, 'B': np.float, 'C': np.float, 'D': str}
             return pd.read_csv("csv_data1.csv",
                                names=dtype.keys(),
                                dtype=dtype,
@@ -383,7 +383,7 @@ class TestHpatJitIssues(TestCase):
                      '[right]: int32')
     def test_csv_const_dtype1_issue(self):
         def test_impl():
-            dtype = {'A': 'int', 'B': 'float64', 'C': 'float', 'D': 'int64'}
+            dtype = {'A': 'int', 'B': 'float64', 'C': 'float', 'D': 'str'}
             return pd.read_csv("csv_data1.csv",
                                names=dtype.keys(),
                                dtype=dtype,
@@ -401,7 +401,7 @@ class TestHpatJitIssues(TestCase):
         def test_impl():
             return pd.read_csv("csv_data1.csv",
                                names=['A', 'B', 'C', 'D'],
-                               dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': np.int},
+                               dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str},
                                skiprows=2,
                                )
         hpat_func = self.jit(test_impl)

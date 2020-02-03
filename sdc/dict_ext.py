@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -41,7 +41,7 @@ from numba import cgutils
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 from . import hdict_ext
-from sdc.utils import unliteral_all
+from sdc.utilities.utils import unliteral_all
 
 ll_voidp = lir.IntType(8).as_pointer()
 

@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -49,12 +49,13 @@ from numba.analysis import compute_cfg_from_blocks
 from numba.compiler_machinery import FunctionPass, register_pass
 
 import sdc
-from sdc import utils, config
+from sdc import config
+# from sdc.utilities import utils
 import sdc.io
 from sdc.io import parquet_pio
 from sdc.hiframes import filter, join, aggregate, sort
-from sdc.utils import (get_constant, NOT_CONSTANT, debug_prints,
-                        inline_new_blocks, ReplaceFunc, is_call, is_assign, update_globals)
+from sdc.utilities.utils import (get_constant, NOT_CONSTANT, debug_prints,
+                                 inline_new_blocks, ReplaceFunc, is_call, is_assign, update_globals)
 import sdc.hiframes.api
 from sdc.str_ext import string_type
 from sdc.str_arr_ext import string_array_type
@@ -743,6 +744,35 @@ class HiFramesPassImpl(object):
         # # remove DataFrame call
         # return nodes
 
+    @staticmethod
+    def get_dtypes(df):
+        dtypes = []
+        for d in df.dtypes.values:
+            try:
+                numba_type = numba.typeof(d).dtype
+                array_type = types.Array(numba_type, 1, 'C')
+            except:
+                array_type = string_array_type
+            dtypes.append(array_type)
+        return dtypes
+
+    @staticmethod
+    def infer_column_names_and_types_from_constant_filename(fname_const, skiprows, col_names):
+        rows_to_read = 100  # TODO: tune this
+        df = pd.read_csv(fname_const, nrows=rows_to_read, skiprows=skiprows)
+        # TODO: string_array, categorical, etc.
+        dtypes = HiFramesPassImpl.get_dtypes(df)
+        cols = df.columns.to_list()
+        # overwrite column names like Pandas if explicitly provided
+        if col_names != 0:
+            cols[-len(col_names):] = col_names
+        else:
+            # a row is used for names if not provided
+            skiprows += 1
+        col_names = cols
+        dtype_map = {c: d for c, d in zip(col_names, dtypes)}
+        return skiprows, col_names, dtype_map
+
     def _handle_pd_read_csv(self, assign, lhs, rhs, label):
         """transform pd.read_csv(names=[A], dtype={'A': np.int32}) call
         """
@@ -778,20 +808,9 @@ class HiFramesPassImpl(object):
             if fname_const is None:
                 raise ValueError("pd.read_csv() requires explicit type"
                                  "annotation using 'dtype' if filename is not constant")
-            rows_to_read = 100  # TODO: tune this
-            df = pd.read_csv(fname_const, nrows=rows_to_read, skiprows=skiprows)
-            # TODO: string_array, categorical, etc.
-            dtypes = [types.Array(numba.typeof(d).dtype, 1, 'C')
-                      for d in df.dtypes.values]
-            cols = df.columns.to_list()
-            # overwrite column names like Pandas if explicitly provided
-            if col_names != 0:
-                cols[-len(col_names):] = col_names
-            else:
-                # a row is used for names if not provided
-                skiprows += 1
-            col_names = cols
-            dtype_map = {c: d for c, d in zip(col_names, dtypes)}
+            skiprows, col_names, dtype_map = \
+                self.infer_column_names_and_types_from_constant_filename(
+                    fname_const, skiprows, col_names)
         else:
             dtype_map = guard(get_definition, self.state.func_ir, dtype_var)
             if (not isinstance(dtype_map, ir.Expr)
@@ -851,15 +870,13 @@ class HiFramesPassImpl(object):
         nodes[-1].target = lhs
         return nodes
 
-    def _get_csv_col_info(self, dtype_map, date_cols, col_names, lhs):
+    @staticmethod
+    def _get_csv_col_info_core(dtype_map, date_cols, col_names):
         if isinstance(dtype_map, types.Type):
             typ = dtype_map
-            data_arrs = [ir.Var(lhs.scope, mk_unique_var(cname), lhs.loc)
-                         for cname in col_names]
-            return col_names, data_arrs, [typ] * len(col_names)
+            return col_names, [typ] * len(col_names)
 
         columns = []
-        data_arrs = []
         out_types = []
         for i, (col_name, typ) in enumerate(dtype_map.items()):
             columns.append(col_name)
@@ -867,11 +884,23 @@ class HiFramesPassImpl(object):
             if i in date_cols:
                 typ = types.Array(types.NPDatetime('ns'), 1, 'C')
             out_types.append(typ)
+        return columns, out_types
+
+    @staticmethod
+    def _get_csv_col_info(dtype_map, date_cols, col_names, lhs):
+        col_names, out_types = HiFramesPassImpl._get_csv_col_info_core(dtype_map, date_cols, col_names)
+
+        if isinstance(dtype_map, types.Type):
+            data_arrs = [ir.Var(lhs.scope, mk_unique_var(cname), lhs.loc)
+                         for cname in col_names]
+            return col_names, data_arrs, out_types
+
+        data_arrs = []
+        for i, (col_name, typ) in enumerate(dtype_map.items()):
             # output array variable
             data_arrs.append(
                 ir.Var(lhs.scope, mk_unique_var(col_name), lhs.loc))
-
-        return columns, data_arrs, out_types
+        return col_names, data_arrs, out_types
 
     def _get_const_dtype(self, dtype_var):
         dtype_def = guard(get_definition, self.state.func_ir, dtype_var)

@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -64,10 +64,7 @@ def _handle_np_fromfile(assign, lhs, rhs):
 
     # FIXME: import here since hio has hdf5 which might not be available
     from .. import hio
-    if sdc.config.config_transport_mpi:
-        from .. import transport_mpi as transport
-    else:
-        from .. import transport_seq as transport
+    from .. import transport_seq as transport
 
     import llvmlite.binding as ll
     ll.add_symbol('get_file_size', transport.get_file_size)
@@ -105,19 +102,16 @@ def get_dtype_size(typingctx, dtype=None):
 
 
 @overload_method(types.Array, 'tofile')
-def tofile_overload(arr_ty, fname_ty):
+def tofile_overload(arr, fname):
     # FIXME: import here since hio has hdf5 which might not be available
     from .. import hio
-    if sdc.config.config_transport_mpi:
-        from .. import transport_mpi as transport
-    else:
-        from .. import transport_seq as transport
+    from .. import transport_seq as transport
 
     import llvmlite.binding as ll
     ll.add_symbol('file_write', hio.file_write)
     ll.add_symbol('file_write_parallel', transport.file_write_parallel)
     # TODO: fix Numba to convert literal
-    if fname_ty == string_type or isinstance(fname_ty, types.StringLiteral):
+    if fname == string_type or isinstance(fname, types.StringLiteral):
         def tofile_impl(arr, fname):
             A = np.ascontiguousarray(arr)
             dtype_size = get_dtype_size(A.dtype)

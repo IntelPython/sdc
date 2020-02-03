@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -73,7 +73,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
                     new_body.extend(out_nodes)
                     self._update_definitions(out_nodes)
 
-                if isinstance(out_nodes, sdc.utils.ReplaceFunc):
+                if isinstance(out_nodes, sdc.utilities.utils.ReplaceFunc):
                     rp_func = out_nodes
                     if rp_func.pre_nodes is not None:
                         new_body.extend(rp_func.pre_nodes)
@@ -81,7 +81,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
 
                     inst.value = ir.Expr.call(ir.Var(block.scope, "dummy", inst.loc), rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
-                    sdc.utils.update_globals(rp_func.func, rp_func.glbls)
+                    sdc.utilities.utils.update_globals(rp_func.func, rp_func.glbls)
                     numba.inline_closurecall.inline_closure_call(self.state.func_ir,
                                                                  rp_func.glbls,
                                                                  block,
@@ -96,7 +96,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
                     break
                 if isinstance(out_nodes, dict):
                     block.body = new_body + block.body[i:]
-                    sdc.utils.inline_new_blocks(self.state.func_ir, block, i, out_nodes, work_list)
+                    sdc.utilities.utils.inline_new_blocks(self.state.func_ir, block, i, out_nodes, work_list)
                     replaced = True
                     break
 
@@ -276,7 +276,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
                     new_args.append(arg_typs[i])
             arg_typs = tuple(new_args)
 
-        return sdc.utils.ReplaceFunc(func, arg_typs, args, glbls, pre_nodes)
+        return sdc.utilities.utils.ReplaceFunc(func, arg_typs, args, glbls, pre_nodes)
 
     def _update_definitions(self, node_list):
         loc = ir.Loc("", 0)
@@ -344,7 +344,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                     # TODO: fix scope/loc
                     new_body.extend(out_nodes)
                     self._update_definitions(out_nodes)
-                if isinstance(out_nodes, sdc.utils.ReplaceFunc):
+                if isinstance(out_nodes, sdc.utilities.utils.ReplaceFunc):
                     rp_func = out_nodes
                     if rp_func.pre_nodes is not None:
                         new_body.extend(rp_func.pre_nodes)
@@ -356,7 +356,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                         ir.Var(block.scope, "dummy", inst.loc),
                         rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
-                    sdc.utils.update_globals(rp_func.func, rp_func.glbls)
+                    sdc.utilities.utils.update_globals(rp_func.func, rp_func.glbls)
                     numba.inline_closurecall.inline_closure_call(self.state.func_ir, rp_func.glbls,
                                         block, len(new_body), rp_func.func, work_list=work_list)
                     replaced = True
@@ -366,7 +366,8 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                     # TODO: insert new blocks in current spot of work_list
                     # instead of append?
                     # TODO: rename variables, fix scope/loc
-                    sdc.utils.inline_new_blocks(self.state.func_ir, block, len(new_body), out_nodes, work_list)
+                    sdc.utilities.utils.inline_new_blocks(
+                        self.state.func_ir, block, len(new_body), out_nodes, work_list)
                     replaced = True
                     break
             if not replaced:
@@ -386,13 +387,13 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
     def _replace_vars(self, inst):
         # variable replacement can affect definitions so handling assignment
         # values specifically
-        if sdc.utils.is_assign(inst):
+        if sdc.utilities.utils.is_assign(inst):
             lhs = inst.target.name
             self.state.func_ir._definitions[lhs].remove(inst.value)
 
         numba.ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
 
-        if sdc.utils.is_assign(inst):
+        if sdc.utilities.utils.is_assign(inst):
             self.state.func_ir._definitions[lhs].append(inst.value)
             # if lhs changed, TODO: test
             if inst.target.name != lhs:
@@ -729,17 +730,17 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         kws = dict(rhs.kws)
         if 'data' in kws:
             data = kws['data']
-            if len(rhs.args) != 0:  
+            if len(rhs.args) != 0:
                 raise ValueError(
                     "only data argument suppoted in pd.DataFrame()")
         else:
-            if len(rhs.args) != 1:  
+            if len(rhs.args) != 1:
                 raise ValueError(
                     "data argument in pd.DataFrame() expected")
             data = rhs.args[0]
 
         arg_def = guard(numba.ir_utils.get_definition, self.state.func_ir, data)
-        if (not isinstance(arg_def, ir.Expr) or arg_def.op != 'build_map'):  
+        if (not isinstance(arg_def, ir.Expr) or arg_def.op != 'build_map'):
             raise ValueError("Invalid DataFrame() arguments (constant dict of columns expected)")
 
         nodes, items = self._fix_df_arrays(arg_def.items)
@@ -904,7 +905,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
 
     def _handle_concat_series(self, lhs, rhs):
         # defer to typed pass since the type might be non-numerical
-        def f(arr_list):  
+        def f(arr_list):
             return sdc.hiframes.api.init_series(sdc.hiframes.api.concat(arr_list))
         return self._replace_func(f, rhs.args)
 
@@ -918,7 +919,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             # FIXME: does this break for list(other things)?
             col_arr = self._fix_df_list_of_array(col_arr)
 
-            def f(arr):  
+            def f(arr):
                 df_arr = sdc.hiframes.api.fix_df_array(arr)
             f_block = numba.ir_utils.compile_to_numba_ir(
                 f, {'sdc': sdc}).blocks.popitem()[1]
@@ -943,12 +944,12 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                 col_name = col_var
             else:
                 col_name = get_constant(self.state.func_ir, col_var)
-                if col_name is NOT_CONSTANT:  
+                if col_name is NOT_CONSTANT:
                     raise ValueError(
                         "data frame column names should be constant")
             # cast to series type
 
-            def f(arr):  
+            def f(arr):
                 df_arr = sdc.hiframes.api.init_series(arr)
             f_block = numba.ir_utils.compile_to_numba_ir(
                 f, {'sdc': sdc}).blocks.popitem()[1]
@@ -1090,7 +1091,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             by_arg = groubpy_call.args[0]
         elif 'by' in kws:
             by_arg = kws['by']
-        else:  
+        else:
             raise ValueError("by argument for groupby() required")
 
         err_msg = ("groupby() by argument should be list of column names or a column name")
@@ -1262,18 +1263,18 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             other = args[0]
             if on_arr is not None:
                 if func_name == 'cov':
-                    def f(arr, other, on_arr, w, center):  
+                    def f(arr, other, on_arr, w, center):
                         df_arr = sdc.hiframes.api.init_series(sdc.hiframes.rolling.rolling_cov(arr, other, on_arr, w, center))
                 if func_name == 'corr':
-                    def f(arr, other, on_arr, w, center):  
+                    def f(arr, other, on_arr, w, center):
                         df_arr = sdc.hiframes.api.init_series(sdc.hiframes.rolling.rolling_corr(arr, other, on_arr, w, center))
                 args = [in_col_var, other, on_arr, window, center]
             else:
                 if func_name == 'cov':
-                    def f(arr, other, w, center):  
+                    def f(arr, other, w, center):
                         df_arr = sdc.hiframes.api.init_series(sdc.hiframes.rolling.rolling_cov(arr, other, w, center))
                 if func_name == 'corr':
-                    def f(arr, other, w, center):  
+                    def f(arr, other, w, center):
                         df_arr = sdc.hiframes.api.init_series(sdc.hiframes.rolling.rolling_corr(arr, other, w, center))
                 args = [in_col_var, other, window, center]
         # variable window case
@@ -1283,17 +1284,17 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                     df_arr = sdc.hiframes.api.init_series(sdc.hiframes.rolling.rolling_variable(arr, on_arr, w, center, False, func))
                 args = [in_col_var, on_arr, window, center, args[0]]
             else:
-                def f(arr, on_arr, w, center):  
+                def f(arr, on_arr, w, center):
                     df_arr = sdc.hiframes.api.init_series(sdc.hiframes.rolling.rolling_variable(arr, on_arr, w, center, False, _func_name))
                 args = [in_col_var, on_arr, window, center]
         else:  # fixed window
             # apply case takes the passed function instead of just name
             if func_name == 'apply':
-                def f(arr, w, center, func):  
+                def f(arr, w, center, func):
                     df_arr = sdc.hiframes.api.init_series(sdc.hiframes.rolling.rolling_fixed(arr, w, center, False, func))
                 args = [in_col_var, window, center, args[0]]
             else:
-                def f(arr, w, center):  
+                def f(arr, w, center):
                     df_arr = sdc.hiframes.api.init_series(sdc.hiframes.rolling.rolling_fixed(arr, w, center, False, _func_name))
                 args = [in_col_var, window, center]
 
@@ -1337,7 +1338,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         if extra_globals is not None:
             glbls.update(extra_globals)
 
-        return sdc.utils.ReplaceFunc(func, None, args, glbls, pre_nodes)
+        return sdc.utilities.utils.ReplaceFunc(func, None, args, glbls, pre_nodes)
 
     def _create_df(self, df_varname, df_col_map, label):
         # order is important for proper handling of itertuples, apply, etc.

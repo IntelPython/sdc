@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,24 +24,30 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import unittest
-import pandas as pd
-import numpy as np
-from math import sqrt
 import numba
+import numpy as np
+import pandas as pd
+import unittest
+from math import sqrt
+
 import sdc
 from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                   count_parfor_OneDs, count_array_OneDs,
-                                   count_parfor_OneD_Vars, count_array_OneD_Vars,
-                                   dist_IR_contains, check_numba_version,
-                                   skip_numba_jit)
+from sdc.tests.test_utils import (check_numba_version,
+                                  count_array_OneD_Vars,
+                                  count_array_OneDs,
+                                  count_array_REPs,
+                                  count_parfor_OneD_Vars,
+                                  count_parfor_OneDs,
+                                  count_parfor_REPs,
+                                  dist_IR_contains,
+                                  skip_numba_jit,
+                                  skip_sdc_jit)
 
 
 class TestML(TestCase):
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_logistic_regression(self):
         def test_impl(n, d):
             iterations = 3
@@ -61,6 +67,7 @@ class TestML(TestCase):
         self.assertEqual(count_parfor_OneDs(), 3)
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_logistic_regression_acc(self):
         def test_impl(N, D):
             iterations = 3
@@ -83,6 +90,7 @@ class TestML(TestCase):
         self.assertEqual(count_parfor_OneDs(), 4)
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_linear_regression(self):
         def test_impl(N, D):
             p = 2
@@ -123,8 +131,7 @@ class TestML(TestCase):
         self.assertEqual(count_array_OneDs(), 1)
         self.assertEqual(count_parfor_OneDs(), 2)
 
-    @unittest.skipIf(check_numba_version('0.46.0'),
-                     "Broken in numba 0.46.0. https://github.com/numba/numba/issues/4690")
+    @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
     def test_kmeans(self):
         def test_impl(numCenter, numIter, N, D):
             A = np.ones((N, D))

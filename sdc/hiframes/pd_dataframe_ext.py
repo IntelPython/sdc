@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -33,7 +33,7 @@ import numpy as np
 import numba
 from numba import types, cgutils
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
-                             type_callable, infer, overload, make_attribute_wrapper, intrinsic,
+                             type_callable, infer, overload, intrinsic,
                              lower_builtin, overload_method)
 from numba.typing.templates import (infer_global, AbstractTemplate, signature,
                                     AttributeTemplate, bound_function)
@@ -41,80 +41,9 @@ from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
 
 import sdc
 from sdc.hiframes.pd_series_ext import SeriesType
+from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.str_ext import string_type
 from sdc.str_arr_ext import string_array_type
-
-
-class DataFrameType(types.Type):  # TODO: IterableType over column names
-    """Temporary type class for DataFrame objects.
-    """
-
-    def __init__(self, data=None, index=None, columns=None, has_parent=False):
-        self.data = data
-        if index is None:
-            index = types.none
-        self.index = index
-        self.columns = columns
-        # keeping whether it is unboxed from Python to enable reflection of new
-        # columns
-        self.has_parent = has_parent
-        super(DataFrameType, self).__init__(
-            name="dataframe({}, {}, {}, {})".format(data, index, columns, has_parent))
-
-    def copy(self, index=None, has_parent=None):
-        # XXX is copy necessary?
-        if index is None:
-            index = types.none if self.index == types.none else self.index.copy()
-        data = tuple(a.copy() for a in self.data)
-        if has_parent is None:
-            has_parent = self.has_parent
-        return DataFrameType(data, index, self.columns, has_parent)
-
-    @property
-    def key(self):
-        # needed?
-        return self.data, self.index, self.columns, self.has_parent
-
-    def unify(self, typingctx, other):
-        if (isinstance(other, DataFrameType)
-                and len(other.data) == len(self.data)
-                and other.columns == self.columns
-                and other.has_parent == self.has_parent):
-            new_index = types.none
-            if self.index != types.none and other.index != types.none:
-                new_index = self.index.unify(typingctx, other.index)
-            elif other.index != types.none:
-                new_index = other.index
-            elif self.index != types.none:
-                new_index = self.index
-
-            data = tuple(a.unify(typingctx, b) for a, b in zip(self.data, other.data))
-            return DataFrameType(data, new_index, self.columns, self.has_parent)
-
-    def is_precise(self):
-        return all(a.is_precise() for a in self.data) and self.index.is_precise()
-
-@register_model(DataFrameType)
-class DataFrameModel(models.StructModel):
-    def __init__(self, dmm, fe_type):
-        n_cols = len(fe_type.columns)
-        members = [
-            ('data', types.Tuple(fe_type.data)),
-            ('index', fe_type.index),
-            ('columns', types.UniTuple(string_type, n_cols)),
-            # for lazy unboxing of df coming from Python (usually argument)
-            # list of flags noting which columns and index are unboxed
-            # index flag is last
-            ('unboxed', types.UniTuple(types.int8, n_cols + 1)),
-            ('parent', types.pyobject),
-        ]
-        super(DataFrameModel, self).__init__(dmm, fe_type, members)
-
-make_attribute_wrapper(DataFrameType, 'data', '_data')
-make_attribute_wrapper(DataFrameType, 'index', '_index')
-make_attribute_wrapper(DataFrameType, 'columns', '_columns')
-make_attribute_wrapper(DataFrameType, 'unboxed', '_unboxed')
-make_attribute_wrapper(DataFrameType, 'parent', '_parent')
 
 @infer_getattr
 class DataFrameAttribute(AttributeTemplate):
@@ -142,10 +71,6 @@ class DataFrameAttribute(AttributeTemplate):
     def resolve_apply(self, df, args, kws):
         kws = dict(kws)
         func = args[0] if len(args) > 0 else kws.get('func', None)
-        # check lambda
-        if not isinstance(func, types.MakeFunctionLiteral):
-            raise ValueError("df.apply(): lambda not found")
-
         # check axis
         axis = args[1] if len(args) > 1 else kws.get('axis', None)
         if (axis is None or not isinstance(axis, types.IntegerLiteral)
@@ -165,12 +90,8 @@ class DataFrameAttribute(AttributeTemplate):
             dtypes.append(el_typ)
 
         row_typ = types.NamedTuple(dtypes, Row)
-        code = func.literal_value.code
-        f_ir = numba.ir_utils.get_ir_of_code({'np': np}, code)
-        _, f_return_type, _ = numba.typed_passes.type_inference_stage(
-            self.context, f_ir, (row_typ,), None)
-
-        return signature(SeriesType(f_return_type), *args)
+        t = func.get_call_type(self.context, (row_typ,), {})
+        return signature(SeriesType(t.return_type), *args)
 
     @bound_function("df.describe")
     def resolve_describe(self, df, args, kws):
@@ -829,7 +750,7 @@ class SortDummyTyper(AbstractTemplate):
         df, by, ascending, inplace = args
 
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
@@ -963,7 +884,7 @@ class FillnaDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
         df, value, inplace = args
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
@@ -1007,7 +928,7 @@ class ResetIndexDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
         df, inplace = args
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
@@ -1049,7 +970,7 @@ class DropnaDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
         df, inplace = args
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
@@ -1071,18 +992,19 @@ def lower_dropna_dummy(context, builder, sig, args):
     return out_obj._getvalue()
 
 
-@overload_method(DataFrameType, 'drop')
-def drop_overload(df, labels=None, axis=0, index=None, columns=None,
+if sdc.config.config_pipeline_hpat_default:
+    @overload_method(DataFrameType, 'drop')
+    def drop_overload(df, labels=None, axis=0, index=None, columns=None,
+                      level=None, inplace=False, errors='raise'):
+
+        # TODO: avoid dummy and generate func here when inlining is possible
+        # TODO: inplace of df with parent (reflection)
+        def _impl(df, labels=None, axis=0, index=None, columns=None,
                   level=None, inplace=False, errors='raise'):
+            return sdc.hiframes.pd_dataframe_ext.drop_dummy(
+                df, labels, axis, columns, inplace)
 
-    # TODO: avoid dummy and generate func here when inlining is possible
-    # TODO: inplace of df with parent (reflection)
-    def _impl(df, labels=None, axis=0, index=None, columns=None,
-              level=None, inplace=False, errors='raise'):
-        return sdc.hiframes.pd_dataframe_ext.drop_dummy(
-            df, labels, axis, columns, inplace)
-
-    return _impl
+        return _impl
 
 
 def drop_dummy(df, labels, axis, columns, inplace):
@@ -1119,7 +1041,7 @@ class DropDummyTyper(AbstractTemplate):
         new_data = tuple(df.data[df.columns.index(c)] for c in new_cols)
 
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
@@ -1240,21 +1162,22 @@ def lower_isin_dummy(context, builder, sig, args):
     return out_obj._getvalue()
 
 
-@overload_method(DataFrameType, 'append')
-def append_overload(df, other, ignore_index=False, verify_integrity=False,
-                    sort=None):
-    if isinstance(other, DataFrameType):
-        return (lambda df, other, ignore_index=False, verify_integrity=False,
-                sort=None: pd.concat((df, other)))
+if sdc.config.config_pipeline_hpat_default:
+    @overload_method(DataFrameType, 'append')
+    def append_overload(df, other, ignore_index=False, verify_integrity=False,
+                        sort=None):
+        if isinstance(other, DataFrameType):
+            return (lambda df, other, ignore_index=False, verify_integrity=False,
+                    sort=None: pd.concat((df, other)))
 
-    # TODO: tuple case
-    # TODO: non-homogenous build_list case
-    if isinstance(other, types.List) and isinstance(other.dtype, DataFrameType):
-        return (lambda df, other, ignore_index=False, verify_integrity=False,
-                sort=None: pd.concat([df] + other))
+        # TODO: tuple case
+        # TODO: non-homogenous build_list case
+        if isinstance(other, types.List) and isinstance(other.dtype, DataFrameType):
+            return (lambda df, other, ignore_index=False, verify_integrity=False,
+                    sort=None: pd.concat([df] + other))
 
-    raise ValueError("invalid df.append() input. Only dataframe and list"
-                     " of dataframes supported")
+        raise ValueError("invalid df.append() input. Only dataframe and list"
+                         " of dataframes supported")
 
 
 @overload_method(DataFrameType, 'pct_change')
@@ -1569,13 +1492,14 @@ def lower_prod_dummy(context, builder, sig, args):
     return out_obj._getvalue()
 
 
-@overload_method(DataFrameType, 'count')
-def count_overload(df, axis=0, level=None, numeric_only=False):
-    # TODO: avoid dummy and generate func here when inlining is possible
-    def _impl(df, axis=0, level=None, numeric_only=False):
-        return sdc.hiframes.pd_dataframe_ext.count_dummy(df)
+if sdc.config.config_pipeline_hpat_default:
+    @overload_method(DataFrameType, 'count')
+    def count_overload(df, axis=0, level=None, numeric_only=False):
+        # TODO: avoid dummy and generate func here when inlining is possible
+        def _impl(df, axis=0, level=None, numeric_only=False):
+            return sdc.hiframes.pd_dataframe_ext.count_dummy(df)
 
-    return _impl
+        return _impl
 
 
 def count_dummy(df, n):

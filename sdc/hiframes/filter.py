@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -34,7 +34,7 @@ from numba.typing import signature
 import sdc
 from sdc import distributed, distributed_analysis
 from sdc.distributed_analysis import Distribution
-from sdc.utils import debug_prints
+from sdc.utilities.utils import debug_prints
 from sdc.str_arr_ext import string_array_type
 from sdc.hiframes.split_impl import string_array_split_view_type
 
@@ -100,7 +100,7 @@ def filter_array_analysis(filter_node, equiv_set, typemap, array_analysis):
         equiv_set.insert_equiv(col_var, shape)
         post.extend(c_post)
         all_shapes.append(shape[0])
-        equiv_set.define(col_var)
+        equiv_set.define(col_var, {})
 
     if len(all_shapes) > 1:
         equiv_set.insert_equiv(*all_shapes)

@@ -1,4 +1,5 @@
 ﻿.. _performance:
+.. include:: ./ext_links.txt
 
 Getting Performance With Intel® SDC
 ===================================

@@ -1,5 +1,6 @@
+﻿# -*- coding: utf-8 -*-
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -27,48 +28,23 @@
 from setuptools import setup, Extension, find_packages, Command
 import platform
 import os
-from distutils.command import build
-from distutils.spawn import spawn
+from docs.source.buildscripts.sdc_build_doc import SDCBuildDoc
 
 
 # Note we don't import Numpy at the toplevel, since setup.py
 # should be able to run without Numpy for pip to discover the
 # build dependencies
 import numpy.distutils.misc_util as np_misc
-#import copy
 import versioneer
+
+# String constants for Intel SDC project configuration
+SDC_NAME_STR = 'Intel® Scalable Dataframe Compiler'
 
 # Inject required options for extensions compiled against the Numpy
 # C API (include dirs, library dirs etc.)
 np_compile_args = np_misc.get_info('npymath')
 
 is_win = platform.system() == 'Windows'
-
-# Sphinx User's Documentation Build
-
-
-class build_doc(build.build):
-    description = "Build user's documentation"
-
-    def run(self):
-        spawn(['rm', '-rf', 'docs/_build', 'API_doc', 'docs/usersource/api/'])
-        spawn(['python', 'docs/rename_function.py'])
-        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_build/docstrees',
-               '-j1', 'docs/usersource', '-t', 'user', 'docs/_build/html'])
-        spawn(['python', 'docs/CleanRSTfiles.py'])
-        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_build/docstrees',
-               '-j1', 'docs/usersource', '-t', 'user', 'docs/_build/html'])
-
-# Sphinx Developer's Documentation Build
-
-
-class build_devdoc(build.build):
-    description = "Build developer's documentation"
-
-    def run(self):
-        spawn(['rm', '-rf', 'docs/_builddev'])
-        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_builddev/docstrees',
-               '-j1', 'docs/devsource', '-t', 'developer', 'docs/_builddev/html'])
 
 
 def readme():
@@ -109,22 +85,7 @@ lid = [PREFIX_DIR + '/lib', ]
 eca = ['-std=c++11', ]  # '-g', '-O0']
 ela = ['-std=c++11', ]
 
-MPI_LIBS = ['mpi']
-
-use_impi = False
-if use_impi:
-    MPI_ROOT = os.environ['I_MPI_ROOT']
-    MPI_INC = MPI_ROOT + '/include64/'
-    MPI_LIBDIR = MPI_ROOT + '/lib64/'
-    MPI_LIBS = ['mpifort', 'mpi', 'mpigi']
-    ind = [PREFIX_DIR + '/include', MPI_INC]
-    lid = [PREFIX_DIR + '/lib', MPI_LIBDIR]
-
-if is_win:
-    # use Intel MPI on Windows
-    MPI_LIBS = ['impi']
-
-io_libs = MPI_LIBS
+io_libs = []
 boost_libs = []
 
 if not is_win:
@@ -143,17 +104,6 @@ ext_io = Extension(name="sdc.hio",
                    extra_link_args=ela,
                    language="c++"
                    )
-
-ext_transport_mpi = Extension(name="sdc.transport_mpi",
-                              sources=["sdc/transport/hpat_transport_mpi.cpp"],
-                              depends=["sdc/_distributed.h"],
-                              libraries=io_libs,
-                              include_dirs=ind,
-                              library_dirs=lid,
-                              extra_compile_args=eca,
-                              extra_link_args=ela,
-                              language="c++"
-                              )
 
 ext_transport_seq = Extension(name="sdc.transport_seq",
                               sources=["sdc/transport/hpat_transport_single_process.cpp"],
@@ -201,9 +151,6 @@ ext_set = Extension(name="sdc.hset_ext",
                     )
 
 str_libs = np_compile_args['libraries']
-
-if not is_win:
-    str_libs += ['boost_regex']
 
 ext_str = Extension(name="sdc.hstr_ext",
                     sources=["sdc/_str_ext.cpp"],
@@ -259,25 +206,16 @@ ext_cv_wrapper = Extension(name="sdc.cv_wrapper",
                            include_dirs=[OPENCV_DIR + '/include'] + ind,
                            library_dirs=[os.path.join(OPENCV_DIR, 'lib')] + lid,
                            libraries=cv_libs,
-                           #extra_link_args = cv_link_args,
                            language="c++",
                            )
 
-_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_dt, ext_io, ext_transport_mpi, ext_transport_seq]
+_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq]
 
 if _has_pyarrow:
     _ext_mods.append(ext_parquet)
 
 if _has_opencv:
     _ext_mods.append(ext_cv_wrapper)
-
-# Custom build commands
-#
-# These commands extends standart setuptools build procedure
-#
-sdc_build_commands = versioneer.get_cmdclass()
-sdc_build_commands['build_doc'] = build_doc
-sdc_build_commands['build_devdoc'] = build_devdoc
 
 
 class style(Command):
@@ -397,11 +335,19 @@ class style(Command):
             print("%s Style check passed" % self._result_marker)
 
 
+# Custom build commands
+#
+# These commands extend standard setuptools build procedure
+#
+sdc_build_commands = versioneer.get_cmdclass()
+sdc_build_commands['build_doc'] = SDCBuildDoc
 sdc_build_commands.update({'style': style})
+sdc_version = versioneer.get_version()
+sdc_release = 'Alpha ({})'.format(versioneer.get_version())
 
-setup(name='sdc',
-      version=versioneer.get_version(),
-      description='compiling Python code for clusters',
+setup(name=SDC_NAME_STR,
+      version=sdc_version,
+      description='Numba* extension for compiling Pandas* operations',
       long_description=readme(),
       classifiers=[
           "Development Status :: 2 - Pre-Alpha",
@@ -412,9 +358,9 @@ setup(name='sdc',
           "Topic :: Software Development :: Compilers",
           "Topic :: System :: Distributed Computing",
       ],
-      keywords='data analytics cluster',
+      keywords='data analytics distributed Pandas Numba',
       url='https://github.com/IntelPython/sdc',
-      author='Intel',
+      author='Intel Corporation',
       packages=find_packages(),
       package_data={'sdc.tests': ['*.bz2'], },
       install_requires=['numba'],
@@ -424,6 +370,5 @@ setup(name='sdc',
       entry_points={
           "numba_extensions": [
               "init = sdc:_init_extension",
-          ],
-      },
-)
+          ]},
+      )

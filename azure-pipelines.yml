@@ -14,7 +14,7 @@ jobs:
       py3.7_numpy1.17:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.17'
-        USE_NUMBA_MASTER: 'False'
+        USE_NUMBA_MASTER: 'True'
         SDC_CONFIG_PIPELINE_SDC: 'False'
 
 - template: buildscripts/azure/template-linux-macos.yml
@@ -26,7 +26,7 @@ jobs:
       py3.7_numpy1.17:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.17'
-        USE_NUMBA_MASTER: 'False'
+        USE_NUMBA_MASTER: 'True'
         SDC_CONFIG_PIPELINE_SDC: 'False'
 
 - template: buildscripts/azure/template-linux-macos.yml
@@ -38,5 +38,5 @@ jobs:
       py3.7_numpy1.17:
         PYTHON_VER: '3.7'
         NUMPY_VER: '1.17'
-        USE_NUMBA_MASTER: 'False'
+        USE_NUMBA_MASTER: 'True'
         SDC_CONFIG_PIPELINE_SDC: 'False'

@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -76,13 +76,13 @@ from numba.parfor import (
 from numba.compiler_machinery import FunctionPass, register_pass
 
 import sdc
-import sdc.utils
+import sdc.utilities.utils
 from sdc import distributed_api, distributed_lower
 from sdc.str_ext import string_type
-from sdc.str_arr_ext import string_array_type
+from sdc.str_arr_type import string_array_type
 from sdc.distributed_api import Reduce_Type
 from sdc.distributed_analysis import Distribution, DistributedAnalysis
-from sdc.utils import (
+from sdc.utilities.utils import (
     is_alloc_callname,
     is_whole_slice,
     is_array_container,
@@ -792,7 +792,7 @@ class DistributedPassImpl(object):
         # allocs are handled separately
         is_1D_bool = (self._is_1D_Var_arr(lhs) or self._is_1D_arr(lhs))
         err_str = "allocation calls handled separately 'empty', 'zeros', 'ones', 'full' etc."
-        assert not (is_1D_bool and func_name in sdc.utils.np_alloc_callnames), err_str
+        assert not (is_1D_bool and func_name in sdc.utilities.utils.np_alloc_callnames), err_str
 
         out = [assign]
         scope = assign.target.scope
@@ -1768,9 +1768,9 @@ class DistributedPassImpl(object):
         pre = []
         out = []
         _, reductions = get_parfor_reductions(
-            parfor, parfor.params, self.state.calltypes)
+            self.state.func_ir, parfor, parfor.params, self.state.calltypes)
 
-        for reduce_varname, (init_val, reduce_nodes) in reductions.items():
+        for reduce_varname, (init_val, reduce_nodes, _) in reductions.items():
             reduce_op = guard(self._get_reduce_op, reduce_nodes)
             # TODO: initialize reduction vars (arrays)
             reduce_var = namevar_table[reduce_varname]

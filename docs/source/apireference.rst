@@ -1,11 +1,11 @@
 .. _apireference:
 
 API Reference
-~~~~~~~~~~~~~
+*************
 
-This page gives an overview of all Pandas APIs supported currently by Intel® Scalable Dataframe Compiler
+.. toctree::
+   :maxdepth: 2
 
-.. autosummary::
-    :toctree: _autosummary
-
-    pandas.Series
+   Series: Columnar Data Structure <./_api_ref/api_ref.pandas.series.rst>
+   Dataframe: Tabular Data Structure <./_api_ref/api_ref.pandas.dataframe.rst>
+   Window <./_api_ref/api_ref.pandas.window.rst>

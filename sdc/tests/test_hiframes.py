@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,27 +24,29 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
 import itertools
+import numba
 import numpy as np
 import os
 import pandas as pd
 import pyarrow.parquet as pq
 import random
-import sdc
 import string
 import unittest
-
-import numba
 from numba import types
 
+import sdc
 from sdc import hiframes
 from sdc.str_arr_ext import StringArray
 from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                   count_parfor_OneDs, count_array_OneDs, dist_IR_contains,
-                                   get_start_end,
-                                   skip_sdc_jit, skip_numba_jit)
+from sdc.tests.test_utils import (count_array_OneDs,
+                                  count_array_REPs,
+                                  count_parfor_OneDs,
+                                  count_parfor_REPs,
+                                  dist_IR_contains,
+                                  get_start_end,
+                                  skip_numba_jit,
+                                  skip_sdc_jit)
 
 
 class TestHiFrames(TestCase):
@@ -87,6 +89,7 @@ class TestHiFrames(TestCase):
         df = pd.DataFrame({'A': [1, 2, 3], 'B': [True, False, True]})
         np.testing.assert_array_equal(test_impl(df), hpat_func(df))
 
+    @skip_numba_jit
     def test_fillna(self):
         def test_impl():
             A = np.array([1., 2., 3.])
@@ -98,6 +101,7 @@ class TestHiFrames(TestCase):
         hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    @skip_numba_jit
     def test_fillna_inplace(self):
         def test_impl():
             A = np.array([1., 2., 3.])
@@ -109,6 +113,7 @@ class TestHiFrames(TestCase):
         hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    @skip_numba_jit
     def test_column_mean(self):
         def test_impl():
             A = np.array([1., 2., 3.])
@@ -119,6 +124,7 @@ class TestHiFrames(TestCase):
         hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
+    @skip_numba_jit
     def test_column_var(self):
         def test_impl():
             A = np.array([1., 2., 3.])
@@ -129,6 +135,7 @@ class TestHiFrames(TestCase):
         hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
+    @skip_numba_jit
     def test_column_std(self):
         def test_impl():
             A = np.array([1., 2., 3.])
@@ -166,6 +173,7 @@ class TestHiFrames(TestCase):
         np.testing.assert_equal(df1.B.values, df2.B.values)
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_cumsum(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
@@ -182,6 +190,7 @@ class TestHiFrames(TestCase):
         self.assertTrue(dist_IR_contains('dist_cumsum'))
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_column_distribution(self):
         # make sure all column calls are distributed
         def test_impl(n):
@@ -202,6 +211,8 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertTrue(dist_IR_contains('dist_cumsum'))
 
+    @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_quantile_parallel(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float64)})
@@ -282,6 +293,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(hpat_func(), test_impl())
         self.assertEqual(count_array_REPs(), 0)
 
+    @skip_numba_jit
     def test_nunique_str(self):
         def test_impl(n):
             df = pd.DataFrame({'A': ['aa', 'bb', 'aa', 'cc', 'cc']})
@@ -334,6 +346,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 0)
 
     @skip_numba_jit
+    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_describe(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float64)})
@@ -424,7 +437,6 @@ class TestHiFrames(TestCase):
         pd.testing.assert_series_equal(
             hpat_func(df), test_impl(df), check_names=False)
 
-    @skip_sdc_jit("Could not get length of Series(StringArraySplitView)")
     @skip_numba_jit
     def test_str_split_filter(self):
         def test_impl(df):
@@ -457,7 +469,7 @@ class TestHiFrames(TestCase):
         hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(df2), test_impl(df2))
 
-    @skip_numba_jit
+    @unittest.skip('Getitem Series with list values not implement')
     def test_str_split_bool_index(self):
         def test_impl(df):
             C = df.A.str.split(',')
@@ -665,6 +677,7 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @skip_numba_jit
     def test_df_input(self):
         def test_impl(df):
             return df.B.sum()

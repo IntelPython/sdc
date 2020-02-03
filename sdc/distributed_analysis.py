@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -43,10 +43,10 @@ import sdc
 import sdc.io
 import sdc.io.np_io
 from sdc.hiframes.pd_series_ext import SeriesType
-from sdc.utils import (get_constant, is_alloc_callname,
-                        is_whole_slice, is_array, is_array_container,
-                        is_np_array, find_build_tuple, debug_prints,
-                        is_const_slice)
+from sdc.utilities.utils import (get_constant, is_alloc_callname,
+                                 is_whole_slice, is_array, is_array_container,
+                                 is_np_array, find_build_tuple, debug_prints,
+                                 is_const_slice)
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from enum import Enum
 

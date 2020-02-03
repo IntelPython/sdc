@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -41,7 +41,7 @@ from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             mk_unique_var)
 import sdc
 from sdc import distributed, distributed_analysis
-from sdc.utils import alloc_arr_tup, debug_prints
+from sdc.utilities.utils import alloc_arr_tup, debug_prints
 from sdc.distributed_analysis import Distribution
 
 from sdc.str_arr_ext import (string_array_type, to_string_list,
@@ -131,7 +131,7 @@ def join_array_analysis(join_node, equiv_set, typemap, array_analysis):
         equiv_set.insert_equiv(col_var, shape)
         post.extend(c_post)
         all_shapes.append(shape[0])
-        equiv_set.define(col_var)
+        equiv_set.define(col_var, {})
 
     if len(all_shapes) > 1:
         equiv_set.insert_equiv(*all_shapes)
@@ -690,10 +690,7 @@ def write_data_send_buff_overload(meta_tup, node_id, ind, data, key_meta):
     return write_impl
 
 
-if hpat_config.config_transport_mpi:
-    from .. import transport_mpi as transport
-else:
-    from .. import transport_seq as transport
+from .. import transport_seq as transport
 
 ll.add_symbol('get_join_sendrecv_counts', transport.get_join_sendrecv_counts)
 ll.add_symbol('c_alltoallv', transport.c_alltoallv)

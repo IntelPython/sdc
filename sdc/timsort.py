@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 import numba
 from numba.extending import overload
-from sdc.utils import empty_like_type, alloc_arr_tup
+from sdc.utilities.utils import empty_like_type, alloc_arr_tup
 
 # ported from Spark to Numba-compilable Python
 # A port of the Android TimSort class, which utilizes a "stable, adaptive, iterative mergesort."

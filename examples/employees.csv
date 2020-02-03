@@ -1,0 +1,11 @@
+,Gender,First Name,Start Date,Last Login Time,Salary,Bonus %,Senior Management,Team
+0,Female,EMILY,2015-12-04,0 days 21:41:41.000000000,39582,1.306,,Business Development
+1,Male,NOAH,2011-02-02,0 days 00:04:19.000000000,124742,5.881,False,Client Services
+2,Male,ISAAC,1994-10-25,0 days 04:35:46.000000000,138462,14.995,True,Sales
+3,Male,,1998-12-24,0 days 18:35:33.000000000,60661,3.477,False,Business Development
+4,,CHRISTOPHER,2002-03-05,0 days 12:26:32.000000000,97764,15.65,False,
+5,Female,MIA,2005-01-20,0 days 17:47:44.000000000,42104,12.595,False,Product
+6,Female,OLIVIA,1994-07-13,0 days 00:43:25.000000000,46646,1.284,False,Client Services
+7,Male,ALEXANDER,2019-09-03,0 days 04:15:00.000000000,123807,17.849,True,Legal
+8,Male,JOSEPH,2008-09-15,0 days 01:16:05.000000000,139681,19.904,False,Engineering
+9,Male,JOSEPH,2009-06-11,0 days 20:27:06.000000000,71359,19.103,False,Client Services

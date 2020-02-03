@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -45,11 +45,10 @@ from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.extending import overload, lower_builtin
 import sdc
-from sdc.utils import (is_call_assign, is_var_assign, is_assign, debug_prints,
-                        alloc_arr_tup, empty_like_type)
+from sdc.utilities.utils import (is_call_assign, is_var_assign, is_assign, debug_prints,
+                                 alloc_arr_tup, empty_like_type, unliteral_all)
 from sdc import distributed, distributed_analysis
 from sdc.distributed_analysis import Distribution
-from sdc.utils import unliteral_all
 from sdc.str_ext import string_type
 from sdc.set_ext import num_total_chars_set_string, build_set
 from sdc.str_arr_ext import (string_array_type, pre_alloc_string_array,
@@ -438,7 +437,7 @@ def aggregate_array_analysis(aggregate_node, equiv_set, typemap,
         equiv_set.insert_equiv(col_var, shape)
         post.extend(c_post)
         all_shapes.append(shape[0])
-        equiv_set.define(col_var)
+        equiv_set.define(col_var, {})
 
     if len(all_shapes) > 1:
         equiv_set.insert_equiv(*all_shapes)
