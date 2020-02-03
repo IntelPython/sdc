@@ -974,47 +974,23 @@ def gen_df_getitem_str_literal_idx_impl(self, idx):
     return _impl
 
 
-def df_getitem_unicode_idx_codegen(self):
-    """
-    def _df_getitem_unicode_idx_impl(self, idx):
-      if idx not in self._columns:
-        raise KeyError
-      literal_idx = literally(idx)
-      col_idx = self._columns.index(literal_idx)
-      res_data = get_dataframe_data(self, col_idx)
-      return pandas.Series(res_data, index=self._index, name=idx)
-    """
-    func_lines = [
-        'def _df_getitem_unicode_idx_impl(self, idx):',
-        '  if idx not in self._columns:',
-        '    raise KeyError'
-    ]
-    if self.columns:
-        func_lines += [
-            '  literal_idx = literally(idx)',
-            '  col_idx = self._columns.index(literal_idx)',
-            '  res_data = get_dataframe_data(self, col_idx)',
-            '  return pandas.Series(res_data, index=self._index, name=idx)'
-        ]
-    else:
-        # raise KeyError if input DF is empty
-        func_lines += ['  raise KeyError']
-
-    func_text = '\n'.join(func_lines)
-    global_vars = {'pandas': pandas, 'literally': literally,
-                   'get_dataframe_data': get_dataframe_data}
-
-    return func_text, global_vars
-
-
 def gen_df_getitem_unicode_idx_impl(self):
-    func_text, global_vars = df_getitem_unicode_idx_codegen(self)
+    df_is_empty = False if self.columns else True
 
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _impl = loc_vars['_df_getitem_unicode_idx_impl']
+    def _df_getitem_unicode_idx_impl(self, idx):
+        if df_is_empty == False:  # noqa
+            if idx not in self._columns:
+                raise KeyError
 
-    return _impl
+            literal_idx = literally(idx)
+            col_idx = self._columns.index(literal_idx)
+            res_data = get_dataframe_data(self, col_idx)
+
+            return pandas.Series(res_data, index=self._index, name=idx)
+        else:
+            raise KeyError
+
+    return _df_getitem_unicode_idx_impl
 
 
 @sdc_overload(operator.getitem)
@@ -1025,6 +1001,7 @@ def sdc_pandas_dataframe_getitem(self, idx):
 
     if isinstance(idx, types.StringLiteral):
         return gen_df_getitem_str_literal_idx_impl(self, idx.literal_value)
+
     if isinstance(idx, types.UnicodeType):
         return gen_df_getitem_unicode_idx_impl(self)
 
