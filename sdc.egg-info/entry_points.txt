@@ -1,0 +1,3 @@
+[numba_extensions]
+init = sdc:_init_extension
+

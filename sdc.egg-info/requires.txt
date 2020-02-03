@@ -1,0 +1,4 @@
+numba
+
+[Parquet]
+pyarrow
