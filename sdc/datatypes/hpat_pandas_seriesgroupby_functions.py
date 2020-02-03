@@ -40,7 +40,7 @@ from numba.extending import overload_method
 from numba.errors import TypingError
 
 from sdc.datatypes.hpat_pandas_seriesgroupby_types import SeriesGroupByType
-from sdc.utils import sdc_overload_method
+from sdc.utilities.utils import sdc_overload_method
 
 
 @sdc_overload_method(SeriesGroupByType, 'count')

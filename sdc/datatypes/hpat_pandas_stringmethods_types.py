@@ -37,7 +37,7 @@ from numba.extending import (models, overload, register_model, make_attribute_wr
 from numba.datamodel import (register_default, StructModel)
 from numba.typing.templates import signature
 from sdc.hiframes.split_impl import SplitViewStringMethodsType, StringArraySplitViewType
-from sdc.utils import sdc_overload
+from sdc.utilities.utils import sdc_overload
 
 
 class StringMethodsType(types.IterableType):
