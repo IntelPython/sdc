@@ -42,8 +42,8 @@ from numba.typing.templates import (signature, AbstractTemplate, infer, infer_ge
                                     ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
 
 import sdc
-from . import hstr_ext
-# from sdc.utils import unliteral_all
+from sdc import hstr_ext
+# from sdc.utilities.utils import unliteral_all
 # TODO: resolve import conflict
 
 

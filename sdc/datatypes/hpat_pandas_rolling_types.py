@@ -28,7 +28,7 @@ from numba import cgutils, types
 from numba.datamodel import StructModel
 from numba.extending import make_attribute_wrapper, models
 from numba.typing.templates import signature
-from sdc.datatypes.common_functions import TypeChecker
+from sdc.utilities.sdc_typing_utils import TypeChecker
 
 
 class RollingType(types.Type):

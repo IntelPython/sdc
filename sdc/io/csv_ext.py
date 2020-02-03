@@ -40,7 +40,8 @@ from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
 import sdc
 from sdc import distributed, distributed_analysis
-from sdc.utils import debug_prints, alloc_arr_tup, empty_like_type
+from sdc.utilities.utils import (debug_prints, alloc_arr_tup, empty_like_type,
+                                 _numba_to_c_type_map)
 from sdc.distributed_analysis import Distribution
 from sdc.str_ext import string_type
 from sdc.str_arr_ext import (string_array_type, to_string_list,
@@ -49,7 +50,6 @@ from sdc.str_arr_ext import (string_array_type, to_string_list,
                               pre_alloc_string_array, num_total_chars,
                               getitem_str_offset, copy_str_arr_slice)
 from sdc.timsort import copyElement_tup, getitem_arr_tup
-from sdc.utils import _numba_to_c_type_map
 from sdc import objmode
 import pandas as pd
 import numpy as np
