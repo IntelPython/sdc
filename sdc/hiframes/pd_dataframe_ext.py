@@ -750,7 +750,7 @@ class SortDummyTyper(AbstractTemplate):
         df, by, ascending, inplace = args
 
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
@@ -884,7 +884,7 @@ class FillnaDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
         df, value, inplace = args
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
@@ -928,7 +928,7 @@ class ResetIndexDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
         df, inplace = args
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
@@ -970,7 +970,7 @@ class DropnaDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
         df, inplace = args
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
@@ -1041,7 +1041,7 @@ class DropDummyTyper(AbstractTemplate):
         new_data = tuple(df.data[df.columns.index(c)] for c in new_cols)
 
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
