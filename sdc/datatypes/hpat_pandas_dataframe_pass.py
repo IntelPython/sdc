@@ -73,7 +73,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
                     new_body.extend(out_nodes)
                     self._update_definitions(out_nodes)
 
-                if isinstance(out_nodes, sdc.utils.ReplaceFunc):
+                if isinstance(out_nodes, sdc.utilities.utils.ReplaceFunc):
                     rp_func = out_nodes
                     if rp_func.pre_nodes is not None:
                         new_body.extend(rp_func.pre_nodes)
@@ -81,7 +81,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
 
                     inst.value = ir.Expr.call(ir.Var(block.scope, "dummy", inst.loc), rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
-                    sdc.utils.update_globals(rp_func.func, rp_func.glbls)
+                    sdc.utilities.utils.update_globals(rp_func.func, rp_func.glbls)
                     numba.inline_closurecall.inline_closure_call(self.state.func_ir,
                                                                  rp_func.glbls,
                                                                  block,
@@ -96,7 +96,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
                     break
                 if isinstance(out_nodes, dict):
                     block.body = new_body + block.body[i:]
-                    sdc.utils.inline_new_blocks(self.state.func_ir, block, i, out_nodes, work_list)
+                    sdc.utilities.utils.inline_new_blocks(self.state.func_ir, block, i, out_nodes, work_list)
                     replaced = True
                     break
 
@@ -276,7 +276,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
                     new_args.append(arg_typs[i])
             arg_typs = tuple(new_args)
 
-        return sdc.utils.ReplaceFunc(func, arg_typs, args, glbls, pre_nodes)
+        return sdc.utilities.utils.ReplaceFunc(func, arg_typs, args, glbls, pre_nodes)
 
     def _update_definitions(self, node_list):
         loc = ir.Loc("", 0)
@@ -344,7 +344,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                     # TODO: fix scope/loc
                     new_body.extend(out_nodes)
                     self._update_definitions(out_nodes)
-                if isinstance(out_nodes, sdc.utils.ReplaceFunc):
+                if isinstance(out_nodes, sdc.utilities.utils.ReplaceFunc):
                     rp_func = out_nodes
                     if rp_func.pre_nodes is not None:
                         new_body.extend(rp_func.pre_nodes)
@@ -356,7 +356,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                         ir.Var(block.scope, "dummy", inst.loc),
                         rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
-                    sdc.utils.update_globals(rp_func.func, rp_func.glbls)
+                    sdc.utilities.utils.update_globals(rp_func.func, rp_func.glbls)
                     numba.inline_closurecall.inline_closure_call(self.state.func_ir, rp_func.glbls,
                                         block, len(new_body), rp_func.func, work_list=work_list)
                     replaced = True
@@ -366,7 +366,8 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                     # TODO: insert new blocks in current spot of work_list
                     # instead of append?
                     # TODO: rename variables, fix scope/loc
-                    sdc.utils.inline_new_blocks(self.state.func_ir, block, len(new_body), out_nodes, work_list)
+                    sdc.utilities.utils.inline_new_blocks(
+                        self.state.func_ir, block, len(new_body), out_nodes, work_list)
                     replaced = True
                     break
             if not replaced:
@@ -386,13 +387,13 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
     def _replace_vars(self, inst):
         # variable replacement can affect definitions so handling assignment
         # values specifically
-        if sdc.utils.is_assign(inst):
+        if sdc.utilities.utils.is_assign(inst):
             lhs = inst.target.name
             self.state.func_ir._definitions[lhs].remove(inst.value)
 
         numba.ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
 
-        if sdc.utils.is_assign(inst):
+        if sdc.utilities.utils.is_assign(inst):
             self.state.func_ir._definitions[lhs].append(inst.value)
             # if lhs changed, TODO: test
             if inst.target.name != lhs:
@@ -1337,7 +1338,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         if extra_globals is not None:
             glbls.update(extra_globals)
 
-        return sdc.utils.ReplaceFunc(func, None, args, glbls, pre_nodes)
+        return sdc.utilities.utils.ReplaceFunc(func, None, args, glbls, pre_nodes)
 
     def _create_df(self, df_varname, df_col_map, label):
         # order is important for proper handling of itertuples, apply, etc.

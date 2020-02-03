@@ -37,7 +37,7 @@ from numba.typing.templates import infer_global, AbstractTemplate
 from numba.ir_utils import guard, find_const
 
 from sdc.distributed_api import Reduce_Type
-from sdc.utils import unliteral_all
+from sdc.utilities.utils import unliteral_all
 
 
 supported_rolling_funcs = ('sum', 'mean', 'var', 'std', 'count', 'median',

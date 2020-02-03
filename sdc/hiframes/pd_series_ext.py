@@ -59,14 +59,8 @@ from sdc.hiframes.rolling import supported_rolling_funcs
 from sdc.hiframes.split_impl import (SplitViewStringMethodsType,
                                      string_array_split_view_type,
                                      GetItemStringArraySplitView)
-from sdc.str_arr_ext import (
-    string_array_type,
-    iternext_str_array,
-    offset_typ,
-    char_typ,
-    str_arr_payload_type,
-    StringArrayType,
-    GetItemStringArray)
+
+from sdc.str_arr_ext import (string_array_type, GetItemStringArray)
 from sdc.str_ext import string_type, list_string_array_type
 
 from sdc.hiframes.pd_series_type import (SeriesType, _get_series_array_type)
@@ -667,55 +661,51 @@ if sdc.config.config_pipeline_hpat_default:
                 return GetItemSeries.generic(self, (args[0].stype, args[1]), kws)
 
 
-@infer
-@infer_global(operator.eq)
-@infer_global(operator.ne)
-@infer_global(operator.ge)
-@infer_global(operator.gt)
-@infer_global(operator.le)
-@infer_global(operator.lt)
-class SeriesCompEqual(AbstractTemplate):
-    key = '=='
+if sdc.config.config_pipeline_hpat_default:
+    @infer
+    @infer_global(operator.eq)
+    @infer_global(operator.ne)
+    @infer_global(operator.ge)
+    @infer_global(operator.gt)
+    @infer_global(operator.le)
+    @infer_global(operator.lt)
+    class SeriesCompEqual(AbstractTemplate):
+        key = '=='
 
-    def generic(self, args, kws):
-        from sdc.str_arr_ext import is_str_arr_typ
-        assert not kws
-        [va, vb] = args
-        # if one of the inputs is string array
-        if is_str_series_typ(va) or is_str_series_typ(vb):
-            # inputs should be either string array or string
-            assert is_str_arr_typ(va) or va == string_type
-            assert is_str_arr_typ(vb) or vb == string_type
-            return signature(SeriesType(types.boolean), va, vb)
+        def generic(self, args, kws):
+            from sdc.str_arr_ext import is_str_arr_typ
+            assert not kws
+            [va, vb] = args
+            # if one of the inputs is string array
+            if is_str_series_typ(va) or is_str_series_typ(vb):
+                # inputs should be either string array or string
+                assert is_str_arr_typ(va) or va == string_type
+                assert is_str_arr_typ(vb) or vb == string_type
+                return signature(SeriesType(types.boolean), va, vb)
 
-        if ((is_dt64_series_typ(va) and vb == string_type)
-                or (is_dt64_series_typ(vb) and va == string_type)):
-            return signature(SeriesType(types.boolean), va, vb)
+            if ((is_dt64_series_typ(va) and vb == string_type)
+                    or (is_dt64_series_typ(vb) and va == string_type)):
+                return signature(SeriesType(types.boolean), va, vb)
 
+    @infer
+    class CmpOpNEqSeries(SeriesCompEqual):
+        key = '!='
 
-@infer
-class CmpOpNEqSeries(SeriesCompEqual):
-    key = '!='
+    @infer
+    class CmpOpGESeries(SeriesCompEqual):
+        key = '>='
 
+    @infer
+    class CmpOpGTSeries(SeriesCompEqual):
+        key = '>'
 
-@infer
-class CmpOpGESeries(SeriesCompEqual):
-    key = '>='
+    @infer
+    class CmpOpLESeries(SeriesCompEqual):
+        key = '<='
 
-
-@infer
-class CmpOpGTSeries(SeriesCompEqual):
-    key = '>'
-
-
-@infer
-class CmpOpLESeries(SeriesCompEqual):
-    key = '<='
-
-
-@infer
-class CmpOpLTSeries(SeriesCompEqual):
-    key = '<'
+    @infer
+    class CmpOpLTSeries(SeriesCompEqual):
+        key = '<'
 
 
 if sdc.config.config_pipeline_hpat_default:

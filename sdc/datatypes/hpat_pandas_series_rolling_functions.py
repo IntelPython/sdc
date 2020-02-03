@@ -34,9 +34,9 @@ from numba.extending import register_jitable
 from numba.types import (float64, Boolean, Integer, NoneType, Number,
                          Omitted, StringLiteral, UnicodeType)
 
-from sdc.datatypes.common_functions import TypeChecker
+from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
-from sdc.utils import sdc_overload_method
+from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
 
 
 # disabling parallel execution for rolling due to numba issue https://github.com/numba/numba/issues/5098
@@ -90,13 +90,13 @@ hpat_pandas_series_rolling_docstring_tmpl = """
 """
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_apply(arr, func):
     """Apply function for values"""
     return func(arr)
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_corr(x, y):
     """Calculate correlation of values"""
     if len(x) == 0:
@@ -105,13 +105,13 @@ def arr_corr(x, y):
     return numpy.corrcoef(x, y)[0, 1]
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_nonnan_count(arr):
     """Count non-NaN values"""
     return len(arr) - numpy.isnan(arr).sum()
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_cov(x, y, ddof):
     """Calculate covariance of values 1D arrays x and y of the same size"""
     if len(x) == 0:
@@ -120,7 +120,7 @@ def arr_cov(x, y, ddof):
     return numpy.cov(x, y, ddof=ddof)[0, 1]
 
 
-@register_jitable
+@sdc_register_jitable
 def _moment(arr, moment):
     mn = numpy.mean(arr)
     s = numpy.power((arr - mn), moment)
@@ -128,7 +128,7 @@ def _moment(arr, moment):
     return numpy.mean(s)
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_kurt(arr):
     """Calculate unbiased kurtosis of values"""
     n = len(arr)
@@ -145,7 +145,7 @@ def arr_kurt(arr):
     return val
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_max(arr):
     """Calculate maximum of values"""
     if len(arr) == 0:
@@ -154,7 +154,7 @@ def arr_max(arr):
     return arr.max()
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_mean(arr):
     """Calculate mean of values"""
     if len(arr) == 0:
@@ -163,7 +163,7 @@ def arr_mean(arr):
     return arr.mean()
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_median(arr):
     """Calculate median of values"""
     if len(arr) == 0:
@@ -172,7 +172,7 @@ def arr_median(arr):
     return numpy.median(arr)
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_min(arr):
     """Calculate minimum of values"""
     if len(arr) == 0:
@@ -181,7 +181,7 @@ def arr_min(arr):
     return arr.min()
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_quantile(arr, q):
     """Calculate quantile of values"""
     if len(arr) == 0:
@@ -190,7 +190,7 @@ def arr_quantile(arr, q):
     return numpy.quantile(arr, q)
 
 
-@register_jitable
+@sdc_register_jitable
 def _moment(arr, moment):
     mn = numpy.mean(arr)
     s = numpy.power((arr - mn), moment)
@@ -198,7 +198,7 @@ def _moment(arr, moment):
     return numpy.mean(s)
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_skew(arr):
     """Calculate unbiased skewness of values"""
     n = len(arr)
@@ -215,19 +215,19 @@ def arr_skew(arr):
     return val
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_std(arr, ddof):
     """Calculate standard deviation of values"""
     return arr_var(arr, ddof) ** 0.5
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_sum(arr):
     """Calculate sum of values"""
     return arr.sum()
 
 
-@register_jitable
+@sdc_register_jitable
 def arr_var(arr, ddof):
     """Calculate unbiased variance of values"""
     length = len(arr)
