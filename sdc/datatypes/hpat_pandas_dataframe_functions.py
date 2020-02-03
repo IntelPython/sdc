@@ -36,7 +36,7 @@ import sdc
 
 from numba import types
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
-from sdc.datatypes.common_functions import TypeChecker
+from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.str_arr_ext import StringArrayType
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
@@ -45,9 +45,8 @@ from sdc.hiframes.pd_series_type import SeriesType
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
-from sdc.datatypes.common_functions import TypeChecker
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
-from sdc.utils import sdc_overload_method, sdc_overload_attribute
+from sdc.utilities.utils import sdc_overload_method, sdc_overload_attribute
 
 
 @sdc_overload_attribute(DataFrameType, 'index')

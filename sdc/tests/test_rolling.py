@@ -52,15 +52,25 @@ if LONG_TEST:
     test_funcs = supported_rolling_funcs[:-3]
 
 
-def series_rolling_std_usecase(series, window, min_periods, ddof):
-    return series.rolling(window, min_periods).std(ddof)
+def rolling_std_usecase(obj, window, min_periods, ddof):
+    return obj.rolling(window, min_periods).std(ddof)
 
 
-def series_rolling_var_usecase(series, window, min_periods, ddof):
-    return series.rolling(window, min_periods).var(ddof)
+def rolling_var_usecase(obj, window, min_periods, ddof):
+    return obj.rolling(window, min_periods).var(ddof)
 
 
 class TestRolling(TestCase):
+
+    @skip_numba_jit
+    def test_series_rolling1(self):
+        def test_impl(S):
+            return S.rolling(3).sum()
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([1.0, 2., 3., 4., 5.])
+        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
     @skip_numba_jit
     def test_fixed1(self):
         # test sequentially with manually created dfs
@@ -696,6 +706,54 @@ class TestRolling(TestCase):
                     ref_result = test_impl(obj, window, min_periods)
                     assert_equal(jit_result, ref_result)
 
+    def _test_rolling_quantile(self, obj):
+        def test_impl(obj, window, min_periods, quantile):
+            return obj.rolling(window, min_periods).quantile(quantile)
+
+        hpat_func = self.jit(test_impl)
+        assert_equal = self._get_assert_equal(obj)
+        quantiles = [0, 0.25, 0.5, 0.75, 1]
+
+        for window in range(0, len(obj) + 3, 2):
+            for min_periods, q in product(range(0, window, 2), quantiles):
+                with self.subTest(obj=obj, window=window,
+                                  min_periods=min_periods, quantiles=q):
+                    jit_result = hpat_func(obj, window, min_periods, q)
+                    ref_result = test_impl(obj, window, min_periods, q)
+                    assert_equal(jit_result, ref_result)
+
+    def _test_rolling_quantile_exception_unsupported_types(self, obj):
+        def test_impl(obj, quantile, interpolation):
+            return obj.rolling(3, 2).quantile(quantile, interpolation)
+
+        hpat_func = self.jit(test_impl)
+
+        msg_tmpl = 'Method rolling.quantile(). The object {}\n given: {}\n expected: {}'
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, '0.5', 'linear')
+        msg = msg_tmpl.format('quantile', 'unicode_type', 'float')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, 0.5, None)
+        msg = msg_tmpl.format('interpolation', 'none', 'str')
+        self.assertIn(msg, str(raises.exception))
+
+    def _test_rolling_quantile_exception_unsupported_values(self, obj):
+        def test_impl(obj, quantile, interpolation):
+            return obj.rolling(3, 2).quantile(quantile, interpolation)
+
+        hpat_func = self.jit(test_impl)
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(obj, 2, 'linear')
+        self.assertIn('quantile value not in [0, 1]', str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(obj, 0.5, 'lower')
+        self.assertIn('interpolation value not "linear"', str(raises.exception))
+
     def _test_rolling_skew(self, obj):
         def test_impl(obj, window, min_periods):
             return obj.rolling(window, min_periods).skew()
@@ -710,6 +768,67 @@ class TestRolling(TestCase):
                     ref_result = test_impl(obj, window, min_periods)
                     jit_result = hpat_func(obj, window, min_periods)
                     assert_equal(jit_result, ref_result)
+
+    def _test_rolling_std(self, obj):
+        test_impl = rolling_std_usecase
+        hpat_func = self.jit(test_impl)
+        assert_equal = self._get_assert_equal(obj)
+
+        for window in range(0, len(obj) + 3, 2):
+            for min_periods, ddof in product(range(0, window, 2), [0, 1]):
+                with self.subTest(obj=obj, window=window,
+                                  min_periods=min_periods, ddof=ddof):
+                    jit_result = hpat_func(obj, window, min_periods, ddof)
+                    ref_result = test_impl(obj, window, min_periods, ddof)
+                    assert_equal(jit_result, ref_result)
+
+    def _test_rolling_std_exception_unsupported_ddof(self, obj):
+        test_impl = rolling_std_usecase
+        hpat_func = self.jit(test_impl)
+
+        window, min_periods, invalid_ddof = 3, 2, '1'
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, window, min_periods, invalid_ddof)
+        msg = 'Method rolling.std(). The object ddof\n given: unicode_type\n expected: int'
+        self.assertIn(msg, str(raises.exception))
+
+    def _test_rolling_sum(self, obj):
+        def test_impl(obj, window, min_periods):
+            return obj.rolling(window, min_periods).sum()
+
+        hpat_func = self.jit(test_impl)
+        assert_equal = self._get_assert_equal(obj)
+
+        for window in range(0, len(obj) + 3, 2):
+            for min_periods in range(0, window + 1, 2):
+                with self.subTest(obj=obj, window=window,
+                                  min_periods=min_periods):
+                    jit_result = hpat_func(obj, window, min_periods)
+                    ref_result = test_impl(obj, window, min_periods)
+                    assert_equal(jit_result, ref_result)
+
+    def _test_rolling_var(self, obj):
+        test_impl = rolling_var_usecase
+        hpat_func = self.jit(test_impl)
+        assert_equal = self._get_assert_equal(obj)
+
+        for window in range(0, len(obj) + 3, 2):
+            for min_periods, ddof in product(range(0, window, 2), [0, 1]):
+                with self.subTest(obj=obj, window=window,
+                                  min_periods=min_periods, ddof=ddof):
+                    jit_result = hpat_func(obj, window, min_periods, ddof)
+                    ref_result = test_impl(obj, window, min_periods, ddof)
+                    assert_equal(jit_result, ref_result)
+
+    def _test_rolling_var_exception_unsupported_ddof(self, obj):
+        test_impl = rolling_var_usecase
+        hpat_func = self.jit(test_impl)
+
+        window, min_periods, invalid_ddof = 3, 2, '1'
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, window, min_periods, invalid_ddof)
+        msg = 'Method rolling.var(). The object ddof\n given: unicode_type\n expected: int'
+        self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('DataFrame.rolling.min() unsupported exceptions')
     def test_df_rolling_unsupported_values(self):
@@ -904,6 +1023,37 @@ class TestRolling(TestCase):
 
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    @skip_sdc_jit('DataFrame.rolling.quantile() unsupported')
+    def test_df_rolling_quantile(self):
+        all_data = [
+            list(range(10)), [1., -1., 0., 0.1, -0.1],
+            [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
+            [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
+        ]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_quantile(df)
+
+    @skip_sdc_jit('DataFrame.rolling.quantile() unsupported exceptions')
+    def test_df_rolling_quantile_exception_unsupported_types(self):
+        all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_quantile_exception_unsupported_types(df)
+
+    @skip_sdc_jit('DataFrame.rolling.quantile() unsupported exceptions')
+    def test_df_rolling_quantile_exception_unsupported_values(self):
+        all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_quantile_exception_unsupported_values(df)
+
     @skip_sdc_jit('DataFrame.rolling.skew() unsupported')
     def test_df_rolling_skew(self):
         all_data = test_global_input_data_float64
@@ -912,6 +1062,63 @@ class TestRolling(TestCase):
         df = pd.DataFrame(data)
 
         self._test_rolling_skew(df)
+
+    @skip_sdc_jit('DataFrame.rolling.std() unsupported')
+    def test_df_rolling_std(self):
+        all_data = [
+            list(range(10)), [1., -1., 0., 0.1, -0.1],
+            [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
+            [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
+        ]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_std(df)
+
+    @skip_sdc_jit('DataFrame.rolling.std() unsupported exceptions')
+    def test_df_rolling_std_exception_unsupported_ddof(self):
+        all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_std_exception_unsupported_ddof(df)
+
+    @skip_sdc_jit('DataFrame.rolling.sum() unsupported')
+    def test_df_rolling_sum(self):
+        all_data = [
+            list(range(10)), [1., -1., 0., 0.1, -0.1],
+            [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
+            [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
+        ]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_sum(df)
+
+    @skip_sdc_jit('DataFrame.rolling.var() unsupported')
+    def test_df_rolling_var(self):
+        all_data = [
+            list(range(10)), [1., -1., 0., 0.1, -0.1],
+            [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
+            [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
+        ]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_var(df)
+
+    @skip_sdc_jit('DataFrame.rolling.var() unsupported exceptions')
+    def test_df_rolling_var_exception_unsupported_ddof(self):
+        all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_var_exception_unsupported_ddof(df)
 
     @skip_sdc_jit('Series.rolling.min() unsupported exceptions')
     def test_series_rolling_unsupported_values(self):
@@ -1114,63 +1321,25 @@ class TestRolling(TestCase):
 
     @skip_sdc_jit('Series.rolling.quantile() unsupported Series index')
     def test_series_rolling_quantile(self):
-        def test_impl(series, window, min_periods, quantile):
-            return series.rolling(window, min_periods).quantile(quantile)
-
-        hpat_func = self.jit(test_impl)
-
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
             [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
             [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
         ]
         indices = [list(range(len(data)))[::-1] for data in all_data]
-        quantiles = [0, 0.25, 0.5, 0.75, 1]
         for data, index in zip(all_data, indices):
             series = pd.Series(data, index, name='A')
-            for window in range(0, len(series) + 3, 2):
-                for min_periods, q in product(range(0, window, 2), quantiles):
-                    with self.subTest(series=series, window=window,
-                                      min_periods=min_periods, quantiles=q):
-                        jit_result = hpat_func(series, window, min_periods, q)
-                        ref_result = test_impl(series, window, min_periods, q)
-                        pd.testing.assert_series_equal(jit_result, ref_result)
+            self._test_rolling_quantile(series)
 
     @skip_sdc_jit('Series.rolling.quantile() unsupported exceptions')
     def test_series_rolling_quantile_exception_unsupported_types(self):
-        def test_impl(quantile, interpolation):
-            series = pd.Series([1., -1., 0., 0.1, -0.1])
-            return series.rolling(3, 2).quantile(quantile, interpolation)
-
-        hpat_func = self.jit(test_impl)
-
-        msg_tmpl = 'Method rolling.quantile(). The object {}\n given: {}\n expected: {}'
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func('0.5', 'linear')
-        msg = msg_tmpl.format('quantile', 'unicode_type', 'float')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(0.5, None)
-        msg = msg_tmpl.format('interpolation', 'none', 'str')
-        self.assertIn(msg, str(raises.exception))
+        series = pd.Series([1., -1., 0., 0.1, -0.1])
+        self._test_rolling_quantile_exception_unsupported_types(series)
 
     @skip_sdc_jit('Series.rolling.quantile() unsupported exceptions')
     def test_series_rolling_quantile_exception_unsupported_values(self):
-        def test_impl(quantile, interpolation):
-            series = pd.Series([1., -1., 0., 0.1, -0.1])
-            return series.rolling(3, 2).quantile(quantile, interpolation)
-
-        hpat_func = self.jit(test_impl)
-
-        with self.assertRaises(ValueError) as raises:
-            hpat_func(2, 'linear')
-        self.assertIn('quantile value not in [0, 1]', str(raises.exception))
-
-        with self.assertRaises(ValueError) as raises:
-            hpat_func(0.5, 'lower')
-        self.assertIn('interpolation value not "linear"', str(raises.exception))
+        series = pd.Series([1., -1., 0., 0.1, -0.1])
+        self._test_rolling_quantile_exception_unsupported_values(series)
 
     @skip_sdc_jit('Series.rolling.skew() unsupported Series index')
     def test_series_rolling_skew(self):
@@ -1182,9 +1351,6 @@ class TestRolling(TestCase):
 
     @skip_sdc_jit('Series.rolling.std() unsupported Series index')
     def test_series_rolling_std(self):
-        test_impl = series_rolling_std_usecase
-        hpat_func = self.jit(test_impl)
-
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
             [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
@@ -1193,32 +1359,15 @@ class TestRolling(TestCase):
         indices = [list(range(len(data)))[::-1] for data in all_data]
         for data, index in zip(all_data, indices):
             series = pd.Series(data, index, name='A')
-            for window in range(0, len(series) + 3, 2):
-                for min_periods, ddof in product(range(0, window, 2), [0, 1]):
-                    with self.subTest(series=series, window=window,
-                                      min_periods=min_periods, ddof=ddof):
-                        jit_result = hpat_func(series, window, min_periods, ddof)
-                        ref_result = test_impl(series, window, min_periods, ddof)
-                        pd.testing.assert_series_equal(jit_result, ref_result)
+            self._test_rolling_std(series)
 
     @skip_sdc_jit('Series.rolling.std() unsupported exceptions')
     def test_series_rolling_std_exception_unsupported_ddof(self):
-        test_impl = series_rolling_std_usecase
-        hpat_func = self.jit(test_impl)
-
         series = pd.Series([1., -1., 0., 0.1, -0.1])
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, 3, 2, '1')
-        msg = 'Method rolling.std(). The object ddof\n given: unicode_type\n expected: int'
-        self.assertIn(msg, str(raises.exception))
+        self._test_rolling_std_exception_unsupported_ddof(series)
 
     @skip_sdc_jit('Series.rolling.sum() unsupported Series index')
     def test_series_rolling_sum(self):
-        def test_impl(series, window, min_periods):
-            return series.rolling(window, min_periods).sum()
-
-        hpat_func = self.jit(test_impl)
-
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
             [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
@@ -1227,19 +1376,10 @@ class TestRolling(TestCase):
         indices = [list(range(len(data)))[::-1] for data in all_data]
         for data, index in zip(all_data, indices):
             series = pd.Series(data, index, name='A')
-            for window in range(0, len(series) + 3, 2):
-                for min_periods in range(0, window + 1, 2):
-                    with self.subTest(series=series, window=window,
-                                      min_periods=min_periods):
-                        jit_result = hpat_func(series, window, min_periods)
-                        ref_result = test_impl(series, window, min_periods)
-                        pd.testing.assert_series_equal(jit_result, ref_result)
+            self._test_rolling_sum(series)
 
     @skip_sdc_jit('Series.rolling.var() unsupported Series index')
     def test_series_rolling_var(self):
-        test_impl = series_rolling_var_usecase
-        hpat_func = self.jit(test_impl)
-
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
             [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
@@ -1248,24 +1388,12 @@ class TestRolling(TestCase):
         indices = [list(range(len(data)))[::-1] for data in all_data]
         for data, index in zip(all_data, indices):
             series = pd.Series(data, index, name='A')
-            for window in range(0, len(series) + 3, 2):
-                for min_periods, ddof in product(range(0, window, 2), [0, 1]):
-                    with self.subTest(series=series, window=window,
-                                      min_periods=min_periods, ddof=ddof):
-                        jit_result = hpat_func(series, window, min_periods, ddof)
-                        ref_result = test_impl(series, window, min_periods, ddof)
-                        pd.testing.assert_series_equal(jit_result, ref_result)
+            self._test_rolling_var(series)
 
     @skip_sdc_jit('Series.rolling.var() unsupported exceptions')
     def test_series_rolling_var_exception_unsupported_ddof(self):
-        test_impl = series_rolling_var_usecase
-        hpat_func = self.jit(test_impl)
-
         series = pd.Series([1., -1., 0., 0.1, -0.1])
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, 3, 2, '1')
-        msg = 'Method rolling.var(). The object ddof\n given: unicode_type\n expected: int'
-        self.assertIn(msg, str(raises.exception))
+        self._test_rolling_var_exception_unsupported_ddof(series)
 
 
 if __name__ == "__main__":
