@@ -377,7 +377,7 @@ class StringAttribute(AttributeTemplate):
 def int_str_overload(in_str):
     if in_str == string_type:
         def _str_to_int_impl(in_str):
-            return _str_to_int64(in_str._data, in_str._length)
+            return _str_to_int64(in_str._data)
 
         return _str_to_int_impl
 
@@ -483,7 +483,7 @@ init_string_from_chars = types.ExternalFunction(
     "init_string_const", std_str_type(types.voidptr, types.intp))
 
 _str_to_int64 = types.ExternalFunction(
-    "str_to_int64", signature(types.intp, types.voidptr, types.intp))
+    "str_to_int64", signature(types.intp, types.voidptr))
 
 str_replace_regex = types.ExternalFunction(
     "str_replace_regex", std_str_type(std_str_type, regex_type, std_str_type))
