@@ -38,9 +38,9 @@ from numba import types, jit, prange, numpy_support
 from numba.errors import TypingError
 
 import sdc
-from sdc.datatypes.common_functions import TypeChecker
+from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size)
-from sdc.utils import sdc_overload
+from sdc.utilities.utils import sdc_overload
 
 
 def astype(self, dtype):
