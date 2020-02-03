@@ -81,7 +81,7 @@ extern "C"
     bool str_equal_cstr(std::string* s1, char* s2);
     void* str_split(std::string* str, std::string* sep, int64_t* size);
     void* str_substr_int(std::string* str, int64_t index);
-    int64_t str_to_int64(char* data);
+    int64_t str_to_int64(char* data, int64_t length);
     int64_t std_str_to_int64(std::string* str);
     double str_to_float64(std::string* str);
     int64_t get_str_len(std::string* str);
@@ -531,11 +531,10 @@ extern "C"
         uint32_t start = offsets[index];
         try
         {
-            *out = boost::lexical_cast<int64_t>(data + start, (std::size_t)size);
-            //*out = string(data + start, (std::size_t)size);
+            *out = stoll(std::string(data + start, (std::size_t)size));
             return 0;
         }
-        catch (const boost::bad_lexical_cast&)
+        catch (const std::exception&)
         {
             *out = 0;
             return -1;
@@ -549,10 +548,10 @@ extern "C"
         uint32_t start = offsets[index];
         try
         {
-            *out = boost::lexical_cast<double>(data + start, (std::size_t)size);
+            *out = stod(std::string(data + start, (std::size_t)size));
             return 0;
         }
-        catch (const boost::bad_lexical_cast&)
+        catch (const std::exception&)
         {
             *out = std::nan(""); // TODO: numpy NaN
             return -1;
@@ -560,16 +559,18 @@ extern "C"
         return -1;
     }
 
-    int64_t str_to_int64(char* data)
+    int64_t str_to_int64(char* data, int64_t length)
     {
-        errno = 0;
-        int64_t value = strtol(data, nullptr, 10);
-        if (errno != 0)
+        try
+        {
+            return stoll(std::string(data, (std::size_t)length));
+        }
+        catch (const std::exception&)
         {
             std::cerr << "invalid string to int conversion" << std::endl;
-            value = -1;
+            return -1;
         }
-        return value;
+        return -1;
     }
 
     void* compile_regex(std::string* pat)
