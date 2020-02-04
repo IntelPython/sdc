@@ -29,7 +29,7 @@ from sdc.str_arr_ext import (StringArray, StringArrayType, string_array_type,
                               pre_alloc_string_array, StringArrayPayloadType,
                               is_str_arr_typ)
 from sdc.str_ext import string_type, gen_get_unicode_chars
-from sdc.utils import to_array
+from sdc.utilities.utils import to_array
 import sdc
 import operator
 import numba
