@@ -32,6 +32,7 @@ import unittest
 from contextlib import contextmanager
 
 import pandas as pd
+import numpy as np
 
 from sdc.tests.test_utils import *
 from sdc.tests.tests_perf.test_perf_base import TestBase
@@ -57,24 +58,55 @@ class TestSeriesStringMethods(TestBase):
         super().setUpClass()
         cls.width = [16, 64, 512, 1024]
 
-    def _test_case(self, pyfunc, name, total_data_length, input_data, *args, **kwargs):
-        test_name = 'series_str_{}'.format(name)
-        hpat_func = sdc.jit(pyfunc)
+    def _test_jitted(self, pyfunc, record, *args, **kwargs):
+        # compilation time
+        record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
+
+        cfunc = numba.njit(pyfunc)
+
+        # Warming up
+        cfunc(*args, **kwargs)
+
+        # execution and boxing time
+        record["test_results"], record["boxing_results"] = \
+            get_times(cfunc, *args, **kwargs)
+
+    def _test_python(self, pyfunc, record, *args, **kwargs):
+        record["test_results"], _ = \
+            get_times(pyfunc, *args, **kwargs)
+
+    def _test_case(self, pyfunc, name, total_data_length, input_data, typ, data_num=1):
+        test_name = 'Series.{}'.format(name)
+
         for data_length, data_width in itertools.product(total_data_length, self.width):
-            data = perf_data_gen_fixed_len(input_data, data_width, data_length)
+            base = {
+                "test_name": test_name,
+                "data_size": data_length,
+                "data_width": data_width,
+            }
+            full_input_data_length = data_width
+            data = perf_data_gen_fixed_len(input_data, full_input_data_length,
+                                           data_length)
             test_data = pd.Series(data)
 
-            compile_results = calc_compilation(pyfunc, test_data, iter_number=self.iter_number)
-            # Warming up
-            hpat_func(test_data)
+            args = [test_data]
+            for i in range(data_num - 1):
+                np.random.seed(i)
+                if typ == 'float':
+                    extra_data = np.random.ranf(data_length)
+                elif typ == 'int':
+                    extra_data = np.random.randint(10 ** 4, size=data_length)
+                args.append(pd.Series(extra_data))
 
-            exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)
+            record = base.copy()
+            record["test_type"] = 'SDC'
+            self._test_jitted(pyfunc, record, *args)
+            self.test_results.add(**record)
 
-            self.test_results.add(test_name, 'SDC', test_data.size, exec_times, data_width,
-                                  boxing_times, compile_results=compile_results, num_threads=self.num_threads)
-            exec_times, _ = get_times(pyfunc, test_data, iter_number=self.iter_number)
-            self.test_results.add(test_name, 'Python', test_data.size, exec_times, data_width,
-                                  num_threads=self.num_threads)
+            record = base.copy()
+            record["test_type"] = 'Python'
+            self._test_python(pyfunc, record, *args)
+            self.test_results.add(**record)
 
 
 cases = [
