@@ -929,68 +929,61 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
     return sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns)
 
 
-def df_getitem_str_literal_idx_main_codelines(self, idx):
+def df_getitem_slice_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem"""
-    try:
-        col_idx = self.columns.index(idx)
-    except ValueError:
-        func_lines = ['  raise KeyError']
+    if isinstance(self.index, types.NoneType):
+        func_lines = ['  length = len(get_dataframe_data(self, 0))',
+                      '  index = numpy.arange(length)']
     else:
-        col_data = f'data_{col_idx}'
-        func_lines = [
-            f'  {col_data} = get_dataframe_data(self, {col_idx})',
-            f'  return pandas.Series({col_data}, index=self._index, name=idx)'
+        func_lines = ['  index = self._index']
+
+    results = []
+    for i, col in enumerate(self.columns):
+        res_data = f'result_data_{i}'
+        func_lines += [
+            f'  data_{i} = get_dataframe_data(self, {i})',
+            f'  {res_data} = pandas.Series(data_{i}[idx], index=index[idx], name="{col}")'
         ]
+        results.append((col, res_data))
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=index[idx])']
 
     return func_lines
 
 
-def df_getitem_str_literal_idx_codegen(self, idx):
+def df_getitem_str_slice_codegen(self, idx):
     """
-        def _df_getitem_str_literal_idx_impl(self, idx):
-          data_0 = get_dataframe_data(self, 0)
-          return pandas.Series(data_0, index=self._index, name=idx)
+    def _df_getitem_slice_idx_impl(self, idx):
+      index = self._index
+      data_0 = get_dataframe_data(self, 0)
+      result_data_0 = pandas.Series(data_0[idx], index=index[idx], name="A")
+      data_1 = get_dataframe_data(self, 1)
+      result_data_1 = pandas.Series(data_1[idx], index=index[idx], name="B")
+      return pandas.DataFrame({"A": result_data_0, "B": result_data_1}, index=index[idx])
     """
-    func_lines = ['def _df_getitem_str_literal_idx_impl(self, idx):']
+    func_lines = ['def _df_getitem_slice_idx_impl(self, idx):']
     if self.columns:
-        func_lines += df_getitem_str_literal_idx_main_codelines(self, idx)
+        func_lines += df_getitem_slice_idx_main_codelines(self, idx)
     else:
         # raise KeyError if input DF is empty
         func_lines += ['  raise KeyError']
 
     func_text = '\n'.join(func_lines)
-    global_vars = {'pandas': pandas, 'get_dataframe_data': get_dataframe_data}
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
 
 
-def gen_df_getitem_str_literal_idx_impl(self, idx):
-    func_text, global_vars = df_getitem_str_literal_idx_codegen(self, idx)
+def gen_df_getitem_slice_idx_impl(self, idx):
+    func_text, global_vars = df_getitem_str_slice_codegen(self, idx)
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _impl = loc_vars['_df_getitem_str_literal_idx_impl']
+    _impl = loc_vars['_df_getitem_slice_idx_impl']
 
     return _impl
-
-
-def gen_df_getitem_unicode_idx_impl(self):
-    df_is_empty = False if self.columns else True
-
-    def _df_getitem_unicode_idx_impl(self, idx):
-        if df_is_empty == False:  # noqa
-            if idx not in self._columns:
-                raise KeyError
-
-            literal_idx = literally(idx)
-            col_idx = self._columns.index(literal_idx)
-            res_data = get_dataframe_data(self, col_idx)
-
-            return pandas.Series(res_data, index=self._index, name=idx)
-        else:
-            raise KeyError
-
-    return _df_getitem_unicode_idx_impl
 
 
 @sdc_overload(operator.getitem)
@@ -1000,10 +993,31 @@ def sdc_pandas_dataframe_getitem(self, idx):
         return None
 
     if isinstance(idx, types.StringLiteral):
-        return gen_df_getitem_str_literal_idx_impl(self, idx.literal_value)
+        try:
+            col_idx = self.columns.index(idx.literal_value)
+            key_error = False
+        except ValueError:
+            key_error = True
+
+        def _df_getitem_str_literal_idx_impl(self, idx):
+            if key_error == False:  # noqa
+                data = get_dataframe_data(self, col_idx)
+                return pandas.Series(data, index=self._index, name=idx)
+            else:
+                raise KeyError
+
+        return _df_getitem_str_literal_idx_impl
 
     if isinstance(idx, types.UnicodeType):
-        return gen_df_getitem_unicode_idx_impl(self)
+        def _df_getitem_unicode_idx_impl(self, idx):
+            # http://numba.pydata.org/numba-doc/dev/developer/literal.html#specifying-for-literal-typing
+            # literally raises special exception to call getitem with literal idx value got from unicode
+            return literally(idx)
+
+        return _df_getitem_unicode_idx_impl
+
+    if isinstance(idx, types.SliceType):
+        return gen_df_getitem_slice_idx_impl(self, idx)
 
     ty_checker = TypeChecker('Operator getitem().')
     ty_checker.raise_exc(idx, 'str', 'idx')
