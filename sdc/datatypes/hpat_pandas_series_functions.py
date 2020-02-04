@@ -607,7 +607,6 @@ def sdc_pandas_series_setitem(self, idx, value):
                     for i in numba.prange(len(self_index)):
                         if idx[i]:
                             self_index_value = self_index[i]
-#                             self_index_value = indexes_common_dtype(self_index[i])
                             if self_index_value in map_index_to_position:
                                 self._data[i] = value._data[map_index_to_position[self_index_value]]
                             else:
@@ -6512,4 +6511,3 @@ def sdc_pandas_str_series_operator_mul(self, other):
                 return pandas.Series(result_data, joined_index)
 
             return _series_operator_mul_common_impl
-

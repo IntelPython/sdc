@@ -5723,20 +5723,6 @@ class TestSeries(
                 B = pd.Series(np.array(np.arange(n)**2, dtype=dtype_right))
                 pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
 
-    @skip_numba_jit("BUG: new-style impl of arithmetic operators for series do not consider scalar as left argument")
-    def test_series_operator_add_scalar_left(self):
-        """Verifies using all various Series arithmetic binary operators on two integer Series with default indexes"""
-        def test_impl(S, value):
-            return value + S
-        hpat_func = self.jit(test_impl)
-
-        n = 11
-        A = pd.Series(np.arange(-5, -5 + n))
-        scalar = 24
-
-        # check_dtype=False because SDC implementation always returns float64 Series
-        pd.testing.assert_series_equal(hpat_func(A, scalar), test_impl(A, scalar), check_dtype=False)
-
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support Series indexes')
     def test_series_operator_lt_index_mismatch1(self):
         """Verifies correct exception is raised when comparing Series with non equal integer indexes"""
@@ -5855,7 +5841,6 @@ class TestSeries(
         self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit
-    @skip_numba_jit("TODO: support arithemetic operations on StringArrays and extend Series.operator.lt overload")
     def test_series_operator_lt_str(self):
         """Verifies implementation of Series.operator.lt between two string Series with default indexes"""
         def test_impl(A, B):
@@ -6050,7 +6035,6 @@ class TestSeries(
 
             self.assertRaises(type(pandas_exception), hpat_func, S, percentiles)
 
-
     @skip_sdc_jit('Arithmetic operations on string series not implemented in old-pipeline')
     def test_series_operator_add_str_scalar(self):
         def test_impl(A, B):
@@ -6204,7 +6188,6 @@ class TestSeries(
                     hpat_func(S, operand)
                 expected_msg = 'Operator mul(). Not supported between operands of types:'
                 self.assertIn(expected_msg, str(raises.exception))
-
 
     @skip_sdc_jit("StringArray reflection was not implemented in old-pipeline")
     @skip_numba_jit("TODO: support StringArray reflection")
