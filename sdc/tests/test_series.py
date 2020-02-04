@@ -5632,7 +5632,7 @@ class TestSeries(
             return A + B
         hpat_func = self.jit(test_impl)
 
-        n = 20000
+        n = 2000
         np.random.seed(0)
         valid_ids = ['', 'aaa', 'a', 'b', 'ccc', 'ef', 'ff', 'fff', 'fa', 'dddd']
         index1 = [valid_ids[i] for i in np.random.randint(0, len(valid_ids), n)]
