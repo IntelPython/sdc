@@ -100,6 +100,7 @@ def gen_test(test_case, prefix):
 
     return func
 
+
 def create_func(usecase_params, call_expr):
     func_name = 'func'
 
@@ -138,6 +139,5 @@ def gen_usecase(test_case, prefix):
 
         return results
 
-        
     func = create_func(usecase_params, call_expr)
     return func
