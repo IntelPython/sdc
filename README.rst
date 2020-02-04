@@ -68,7 +68,7 @@ Building on Linux with setuptools
     NUMPYVER=<1.16 or 1.17>
     conda create -n SDC -q -y -c numba -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER pandas=0.25.3 scipy pyarrow=0.15.1 gcc_linux-64 gxx_linux-64 tbb-devel llvmlite=0.31.0rc1=py*_0
     source activate SDC
-    git clone https://github.com/IntelPython/sdc
+    git clone https://github.com/IntelPython/sdc.git
     cd sdc
     # Build Numba
     git clone https://github.com/numpy/numpy.git
