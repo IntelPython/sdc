@@ -83,15 +83,8 @@ class TestSeriesStringMethods(TestBase):
                     extra_data = np.random.choice(input_data, data_length)
                 args.append(pd.Series(extra_data))
 
-            record = base.copy()
-            record["test_type"] = 'SDC'
-            self._test_jitted(pyfunc, record, *args)
-            self.test_results.add(**record)
-
-            record = base.copy()
-            record["test_type"] = 'Python'
-            self._test_python(pyfunc, record, *args)
-            self.test_results.add(**record)
+            self.test_jit(base, pyfunc, args)
+            self.test_py(base, pyfunc, args)
 
 
 cases = [
