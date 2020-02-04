@@ -35,7 +35,7 @@ from sdc.str_arr_ext import StringArray
 from sdc.str_ext import std_str_to_unicode, unicode_to_std_str
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
-from sdc.functions.numpy_like import astype, nansum
+from sdc.functions.numpy_like import astype, nansum, isnan
 
 
 class TestArrays(TestCase):
@@ -169,7 +169,22 @@ class TestArrays(TestCase):
 
         sdc_func = self.jit(sdc_impl)
 
-        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan]]
+        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+    def test_isnan(self):
+        def ref_impl(a):
+            return np.isnan(a)
+
+        def sdc_impl(a):
+            return isnan(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
         for case in cases:
             a = np.array(case)
             with self.subTest(data=case):

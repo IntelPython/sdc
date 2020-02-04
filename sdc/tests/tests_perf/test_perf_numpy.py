@@ -38,6 +38,7 @@ from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from .generator import generate_test_cases
 from .generator import TestCase as TC
+from .generator import CallExpression as CE
 from sdc.functions import numpy_like
 
 
@@ -64,7 +65,7 @@ class TestFunctions(TestBase):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
+    def _test_case(self, cases, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
         test_name = '{}'.format(name)
 
         if input_data is None:
@@ -86,52 +87,30 @@ class TestFunctions(TestBase):
                 extra_data = np.random.ranf(data_length)
                 args.append(np.array(extra_data))
 
-            record = base.copy()
-            record["test_type"] = 'python'
-            self._test_python(pyfunc, record, *args)
-            self.test_results.add(**record)
-
-    def _test_case_jit(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
-        test_name = '{}'.format(name)
-
-        if input_data is None:
-            input_data = test_global_input_data_float64
-
-        full_input_data_length = sum(len(i) for i in input_data)
-        for data_length in total_data_length:
-            base = {
-                "test_name": test_name,
-                "data_size": data_length,
-            }
-            data = perf_data_gen_fixed_len(input_data, full_input_data_length,
-                                           data_length)
-            test_data = np.array(data)
-
-            args = [test_data]
-            for i in range(data_num - 1):
-                np.random.seed(i)
-                extra_data = np.random.ranf(data_length)
-                args.append(np.array(extra_data))
-
-            record = base.copy()
-            record["test_type"] = 'jit'
-            self._test_jitted(pyfunc, record, *args)
-            self.test_results.add(**record)
-
+            for case in cases:
+                record = base.copy()
+                record["test_type"] = case['type_']
+                if case['jitted']:
+                    self._test_jitted(case['func'], record, *args)
+                else:
+                    self._test_python(case['func'], record, *args)
+                self.test_results.add(**record)
 
 cases = [
-    TC(name='astype_numpy', size=[10 ** 7], call_expr='data.astype(np.int64)', usecase_params='data'),
-    TC(name='nansum_numpy', size=[10 ** 7], call_expr='np.nansum(data)', usecase_params='data'),
-    TC(name='sum_numpy', size=[10 ** 7], call_expr='np.sum(data)', usecase_params='data'),
-]
-
-jit_cases = [
-    TC(name='astype_numpy_jit', size=[10 ** 7], call_expr='data.astype(np.int64)', usecase_params='data'),
-    TC(name='astype_sdc', size=[10 ** 7], call_expr='sdc.functions.numpy_like.astype(data, np.int64)',
-       usecase_params='data'),
-    TC(name='nansum_sdc', size=[10 ** 7], call_expr='sdc.functions.numpy_like.nansum(data)',
-       usecase_params='data'),
+    TC(name='astype', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='data.astype(np.int64)', jitted=False),
+        CE(type_='Numba', code='data.astype(np.int64)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.astype(data, np.int64)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='nansum', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.nansum(data)', jitted=False),
+        CE(type_='SDC', code='sdc.functions.numpy_like.nansum(data)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='isnan', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.isnan(data)', jitted=False),
+        CE(type_='Numba', code='np.isnan(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.isnan(data)', jitted=True),
+    ], usecase_params='data'),
 ]
 
 generate_test_cases(cases, TestFunctions, 'function')
-generate_test_cases(jit_cases, TestFunctions, 'function')

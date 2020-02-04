@@ -5,6 +5,17 @@ from sdc.io.csv_ext import to_varname
 from sdc.tests.test_utils import *
 
 
+class CallExpression(NamedTuple):
+    """
+    code: function or method call as a string
+    type_: type of function performed (Python, Numba, SDC)
+    jitted: option indicating whether to jit call
+    """
+    code: str
+    type_: str
+    jitted: bool
+
+
 class TestCase(NamedTuple):
     """
     name: name of the API item, e.g. method, operator
@@ -89,16 +100,8 @@ def gen_test(test_case, prefix):
 
     return func
 
-
-def gen_usecase(test_case, prefix):
+def create_func(usecase_params, call_expr):
     func_name = 'func'
-
-    usecase_params = test_case.usecase_params
-    call_expr = test_case.call_expr
-    if call_expr is None:
-        if usecase_params is None:
-            usecase_params = gen_usecase_params(test_case)
-        call_expr = gen_call_expr(test_case, prefix)
 
     func_text = f"""
 def {func_name}({usecase_params}):
@@ -112,4 +115,29 @@ def {func_name}({usecase_params}):
     exec(func_text, globals(), loc_vars)
     func = loc_vars[func_name]
 
+    return func
+
+
+def gen_usecase(test_case, prefix):
+
+    usecase_params = test_case.usecase_params
+    call_expr = test_case.call_expr
+    if call_expr is None:
+        if usecase_params is None:
+            usecase_params = gen_usecase_params(test_case)
+        call_expr = gen_call_expr(test_case, prefix)
+
+    if isinstance(call_expr, list):
+        results = []
+        for ce in call_expr:
+            results.append({
+                'func': create_func(usecase_params, ce.code),
+                'type_': ce.type_,
+                'jitted': ce.jitted
+            })
+
+        return results
+
+        
+    func = create_func(usecase_params, call_expr)
     return func
