@@ -97,25 +97,3 @@ def sdc_astype_overload(self, dtype):
             return arr
 
         return sdc_astype_number_impl
-
-
-@sdc_register_jitable
-def nansum(a):
-    length = len(a)
-    result = 0
-    for i in prange(length):
-        if not numpy.isnan(a[i]):
-            result += a[i]
-
-    return result
-
-
-@sdc_register_jitable
-def isnan(a):
-    length = len(a)
-    res = numpy.zeros(shape=length, dtype=numpy.bool_)
-    for i in prange(length):
-        if numpy.isnan(a[i]):
-            res[i] = True
-
-    return res
