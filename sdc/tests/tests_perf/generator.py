@@ -22,8 +22,7 @@ class TestCase(NamedTuple):
     call_expr: str = None
     usecase_params: str = None
     data_num: int = 1
-    input_data: list = None
-    type_data: str = ''
+    input_data: list = [('float', test_global_input_data_float64)]
     skip: bool = False
 
 
@@ -35,10 +34,15 @@ def to_varname_without_excess_underscores(string):
 def generate_test_cases(cases, class_add, typ, prefix=''):
     for test_case in cases:
         for params in test_case.params:
-            typ_input_data = '' if test_case.type_data == '' else test_case.type_data
-            test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case.data_num, params), typ_input_data]
-            test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
-            setattr(class_add, test_name, gen_test(test_case, test_name, prefix, params))
+            for tup in test_case.input_data:
+                typ_input_data = tup[0]
+                input_data = tup[1]
+                if typ_input_data == 'str':
+                    test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case.data_num, params)]
+                else:
+                    test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case.data_num, params), typ_input_data]
+                test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
+                setattr(class_add, test_name, gen_test(test_case, prefix, params, typ_input_data, input_data))
 
 
 def gen_params_wo_data(data_num, params):
@@ -66,7 +70,7 @@ def gen_call_expr(test_case, prefix, params):
     return '.'.join(call_expr_parts)
 
 
-def gen_test(test_case, test_name, prefix, params):
+def gen_test(test_case, prefix, params, typ_input_data, input_data):
     func_name = 'func'
 
     usecase = gen_usecase(test_case, prefix, params)
@@ -79,13 +83,14 @@ def gen_test(test_case, test_name, prefix, params):
 
     func_text = f"""
 {skip}def {func_name}(self):
-  self._test_case(usecase, name='{test_name + '_' + test_case.type_data}', total_data_length={test_case.size},
-                  data_num={test_case.data_num}, input_data={test_case.input_data}, typ='{test_case.type_data}')
+  self._test_case(usecase, name='{test_name + '_' + typ_input_data}', total_data_length={test_case.size},
+                  data_num={test_case.data_num}, input_data=input_data, typ='{typ_input_data}')
 """
-    print(func_text)
+
     loc_vars = {}
     global_vars = {'usecase': usecase,
-                   'skip_numba_jit': skip_numba_jit}
+                   'skip_numba_jit': skip_numba_jit,
+                   'input_data': input_data}
     exec(func_text, global_vars, loc_vars)
     func = loc_vars[func_name]
 

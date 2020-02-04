@@ -33,7 +33,6 @@ import sdc
 
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
-from sdc.tests.test_utils import test_global_input_data_float64
 from .generator import generate_test_cases
 from .generator import TestCase as TC
 
@@ -62,13 +61,6 @@ class TestDataFrameMethods(TestBase):
             get_times(pyfunc, *args, **kwargs)
 
     def _test_case(self, pyfunc, name, total_data_length, input_data, typ, data_num=1):
-
-        if input_data is None:
-            input_data = test_global_input_data_float64
-
-        if typ == '':
-            typ = 'float'
-
         test_name = 'DataFrame.{}'.format(name)
 
         full_input_data_length = sum(len(i) for i in input_data)
