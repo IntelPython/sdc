@@ -22,7 +22,7 @@ class TestCase(NamedTuple):
     call_expr: str = None
     usecase_params: str = None
     data_num: int = 1
-    input_data: list = [('float', test_global_input_data_float64)]
+    input_data: list = [test_global_input_data_float64]
     skip: bool = False
 
 
@@ -34,9 +34,8 @@ def to_varname_without_excess_underscores(string):
 def generate_test_cases(cases, class_add, typ, prefix=''):
     for test_case in cases:
         for params in test_case.params:
-            for tup in test_case.input_data:
-                typ_input_data = tup[0]
-                input_data = tup[1]
+            for input_data in test_case.input_data:
+                typ_input_data = qualifier_type(input_data)
                 if typ_input_data == 'str':
                     test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case.data_num, params)]
                 else:
@@ -68,6 +67,15 @@ def gen_call_expr(test_case, prefix, params):
     call_expr_parts = ['data'] + prefix_as_list + ['{}({})'.format(test_case.name, params)]
 
     return '.'.join(call_expr_parts)
+
+
+def qualifier_type(input_data):
+    if isinstance(input_data[0], list):
+        return qualifier_type(input_data[0])
+    else:
+        typ = str(type(input_data[0]))
+        res = typ[8:len(typ)-2]
+        return res
 
 
 def gen_test(test_case, prefix, params, typ_input_data, input_data):

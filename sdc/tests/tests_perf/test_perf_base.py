@@ -54,13 +54,13 @@ class TestBase(unittest.TestCase):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def test_jit(self, base, pyfunc, args):
+    def test_jit(self, pyfunc, base, args):
         record = base.copy()
         record["test_type"] = 'SDC'
         self._test_jitted(pyfunc, record, *args)
         self.test_results.add(**record)
 
-    def test_py(self, base, pyfunc, args):
+    def test_py(self, pyfunc, base, args):
         record = base.copy()
         record["test_type"] = 'Python'
         self._test_python(pyfunc, record, *args)

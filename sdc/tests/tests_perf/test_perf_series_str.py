@@ -83,27 +83,27 @@ class TestSeriesStringMethods(TestBase):
                     extra_data = np.random.choice(input_data, data_length)
                 args.append(pd.Series(extra_data))
 
-            self.test_jit(base, pyfunc, args)
-            self.test_py(base, pyfunc, args)
+            self.test_jit(pyfunc, base, args)
+            self.test_py(pyfunc, base, args)
 
 
 cases = [
-    TC(name='capitalize', size=[10 ** 4, 10 ** 5], input_data=[('str', test_global_input_data_unicode_kind4)], skip=True),
-    TC(name='center', params=['1'], size=[10 ** 4, 10 ** 5],  input_data=[('str', test_global_input_data_unicode_kind1)]),
-    TC(name='endswith', params=['"e"'], size=[10 ** 4, 10 ** 5], input_data=[('str', test_global_input_data_unicode_kind4)]),
-    TC(name='find', params=['"e"'], size=[10 ** 4, 10 ** 5], input_data=[('str', test_global_input_data_unicode_kind4)]),
-    TC(name='len', size=[10 ** 4, 10 ** 5], input_data=[('str', test_global_input_data_unicode_kind4)]),
-    TC(name='ljust', params=['1'], size=[10 ** 4, 10 ** 5], input_data=[('str', test_global_input_data_unicode_kind1)]),
-    TC(name='lower', size=[10 ** 4, 10 ** 5], input_data=[('str', test_global_input_data_unicode_kind4)]),
-    TC(name='lstrip', size=[10 ** 4, 10 ** 5], input_data=[('str', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4])]),
-    TC(name='rjust', params=['1'], size=[10 ** 4, 10 ** 5], input_data=[('str', test_global_input_data_unicode_kind1)]),
-    TC(name='rstrip', size=[10 ** 4, 10 ** 5], input_data=[('str', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4])]),
-    TC(name='startswith', params=['"e"'], size=[10 ** 4, 10 ** 5], input_data=[('str', test_global_input_data_unicode_kind4)]),
-    TC(name='strip', size=[10 ** 4, 10 ** 5], input_data=[('str', ['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4])]),
-    TC(name='swapcase', size=[10 ** 4, 10 ** 5], input_data=[('str', test_global_input_data_unicode_kind4)], skip=True),
-    TC(name='title', size=[10 ** 4, 10 ** 5], input_data=[('str', test_global_input_data_unicode_kind4)], skip=True),
-    TC(name='upper', size=[10 ** 4, 10 ** 5], input_data=[('str', test_global_input_data_unicode_kind4)]),
-    TC(name='zfill', params=['1'], size=[10 ** 4, 10 ** 5], input_data=[('str', test_global_input_data_unicode_kind1)]),
+    TC(name='capitalize', size=[10 ** 4, 10 ** 5], input_data=[test_global_input_data_unicode_kind4], skip=True),
+    TC(name='center', params=['1'], size=[10 ** 4, 10 ** 5],  input_data=[test_global_input_data_unicode_kind1]),
+    TC(name='endswith', params=['"e"'], size=[10 ** 4, 10 ** 5], input_data=[test_global_input_data_unicode_kind4]),
+    TC(name='find', params=['"e"'], size=[10 ** 4, 10 ** 5], input_data=[test_global_input_data_unicode_kind4]),
+    TC(name='len', size=[10 ** 4, 10 ** 5], input_data=[test_global_input_data_unicode_kind4]),
+    TC(name='ljust', params=['1'], size=[10 ** 4, 10 ** 5], input_data=[test_global_input_data_unicode_kind1]),
+    TC(name='lower', size=[10 ** 4, 10 ** 5], input_data=[test_global_input_data_unicode_kind4]),
+    TC(name='lstrip', size=[10 ** 4, 10 ** 5], input_data=[['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]]),
+    TC(name='rjust', params=['1'], size=[10 ** 4, 10 ** 5], input_data=[test_global_input_data_unicode_kind1]),
+    TC(name='rstrip', size=[10 ** 4, 10 ** 5], input_data=[['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]]),
+    TC(name='startswith', params=['"e"'], size=[10 ** 4, 10 ** 5], input_data=[test_global_input_data_unicode_kind4]),
+    TC(name='strip', size=[10 ** 4, 10 ** 5], input_data=[['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]]),
+    TC(name='swapcase', size=[10 ** 4, 10 ** 5], input_data=[test_global_input_data_unicode_kind4], skip=True),
+    TC(name='title', size=[10 ** 4, 10 ** 5], input_data=[test_global_input_data_unicode_kind4], skip=True),
+    TC(name='upper', size=[10 ** 4, 10 ** 5], input_data=[test_global_input_data_unicode_kind4]),
+    TC(name='zfill', params=['1'], size=[10 ** 4, 10 ** 5], input_data=[test_global_input_data_unicode_kind1]),
 ]
 
 generate_test_cases(cases, TestSeriesStringMethods, 'series', 'str')
