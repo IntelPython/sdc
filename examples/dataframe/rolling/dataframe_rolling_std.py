@@ -24,27 +24,19 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from numba import njit
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
+@njit
+def df_rolling_std():
+    df = pd.DataFrame({'A': [4, 3, 5, 2, 6], 'B': [-4, -3, -5, -2, -6]})
+    out_df = df.rolling(3).std()
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
+    # Expect DataFrame of
+    # {'A': [NaN, NaN, 1.000000, 1.527525, 2.081666],
+    #  'B': [NaN, NaN, 1.000000, 1.527525, 2.081666]}
+    return out_df
 
-from sdc.tests.test_ml import *
 
-from sdc.tests.test_io import *
-
-from sdc.tests.test_hpat_jit import *
-
-from sdc.tests.test_sdc_numpy import *
-
-# performance tests
-import sdc.tests.tests_perf
+print(df_rolling_std())

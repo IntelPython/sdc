@@ -27,7 +27,7 @@
 
 """
 
-| This file contains SDC Pandas Series methods auto-generated with autogen_sources.py
+| This file contains overloads for various extension types auto-generated with autogen_sources.py
 
 """
 
@@ -39,13 +39,12 @@ import pandas
 from numba.errors import TypingError
 from numba import types
 
-import sdc
-from sdc.datatypes.common_functions import TypeChecker
-from sdc.datatypes.common_functions import (check_index_is_numeric, find_common_dtype_from_numpy_dtypes,
-                                            sdc_join_series_indexes, sdc_check_indexes_equal, check_arrays_comparable)
+from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric, check_types_comparable,
+                                            find_common_dtype_from_numpy_dtypes)
+from sdc.datatypes.common_functions import (sdc_join_series_indexes, sdc_check_indexes_equal)
 from sdc.hiframes.pd_series_type import SeriesType
-from sdc.str_arr_ext import (string_array_type, num_total_chars, str_arr_is_na)
-from sdc.utils import sdc_overload
+from sdc.str_arr_ext import (string_array_type, str_arr_is_na)
+from sdc.utilities.utils import sdc_overload
 
 
 @sdc_overload(operator.add)
@@ -78,35 +77,51 @@ def sdc_pandas_series_operator_add(self, other):
     _func_name = 'Operator add().'
 
     ty_checker = TypeChecker('Operator add().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
+
+    # this overload is not for string series
+    self_is_string_series = self_is_series and isinstance(self.dtype, types.UnicodeType)
+    other_is_string_series = other_is_series and isinstance(other.dtype, types.UnicodeType)
+    if self_is_string_series or other_is_string_series:
+        return None
+
+    if not isinstance(self, (SeriesType, types.Number)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
 
     if not isinstance(other, (SeriesType, types.Number)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series - TODO: support arithmetic operation on StringArrays
-    if (isinstance(other, types.Number)):
+    # specializations for numeric series only
+    if not operands_are_series:
         def _series_operator_add_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) + numpy.float64(other)
-            return pandas.Series(result_data, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                result_data[:] = self._data + numpy.float64(other)
+                return pandas.Series(result_data, index=self._index, name=self._name)
+            else:
+                result_data = numpy.empty(len(other._data), dtype=numpy.float64)
+                result_data[:] = numpy.float64(self) + other._data
+                return pandas.Series(result_data, index=other._index, name=other._name)
 
         return _series_operator_add_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:   # both operands are numeric series
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -114,7 +129,7 @@ def sdc_pandas_series_operator_add(self, other):
 
                 if (len(self._data) == len(other._data)):
                     result_data = self._data.astype(numpy.float64)
-                    result_data = result_data + other._data.astype(numpy.float64)
+                    result_data = result_data + other._data
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -124,13 +139,13 @@ def sdc_pandas_series_operator_add(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data + other._data.astype(numpy.float64)
+                        result_data = result_data + other._data
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) + result_data
+                        result_data = self._data + result_data
 
-                    return pandas.Series(result_data, self._index)
+                    return pandas.Series(result_data)
 
             return _series_operator_add_none_indexes_impl
         else:
@@ -146,8 +161,8 @@ def sdc_pandas_series_operator_add(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data + other._data.astype(numpy.float64)
+                    result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                    result_data[:] = self._data + other._data
 
                     if none_or_numeric_indexes == True:  # noqa
                         result_index = left_index.astype(numba_index_common_dtype)
@@ -159,18 +174,13 @@ def sdc_pandas_series_operator_add(self, other):
                 # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
                 joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
 
-                joined_index_range = numpy.arange(len(joined_index))
-                left_values = numpy.asarray(
-                    [self._data[left_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                left_values[left_indexer == -1] = numpy.nan
-
-                right_values = numpy.asarray(
-                    [other._data[right_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                right_values[right_indexer == -1] = numpy.nan
+                result_size = len(joined_index)
+                left_values = numpy.empty(result_size, dtype=numpy.float64)
+                right_values = numpy.empty(result_size, dtype=numpy.float64)
+                for i in numba.prange(result_size):
+                    left_pos, right_pos = left_indexer[i], right_indexer[i]
+                    left_values[i] = self._data[left_pos] if left_pos != -1 else numpy.nan
+                    right_values[i] = other._data[right_pos] if right_pos != -1 else numpy.nan
 
                 result_data = left_values + right_values
                 return pandas.Series(result_data, joined_index)
@@ -210,35 +220,51 @@ def sdc_pandas_series_operator_sub(self, other):
     _func_name = 'Operator sub().'
 
     ty_checker = TypeChecker('Operator sub().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
+
+    # this overload is not for string series
+    self_is_string_series = self_is_series and isinstance(self.dtype, types.UnicodeType)
+    other_is_string_series = other_is_series and isinstance(other.dtype, types.UnicodeType)
+    if self_is_string_series or other_is_string_series:
+        return None
+
+    if not isinstance(self, (SeriesType, types.Number)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
 
     if not isinstance(other, (SeriesType, types.Number)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series - TODO: support arithmetic operation on StringArrays
-    if (isinstance(other, types.Number)):
+    # specializations for numeric series only
+    if not operands_are_series:
         def _series_operator_sub_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) - numpy.float64(other)
-            return pandas.Series(result_data, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                result_data[:] = self._data - numpy.float64(other)
+                return pandas.Series(result_data, index=self._index, name=self._name)
+            else:
+                result_data = numpy.empty(len(other._data), dtype=numpy.float64)
+                result_data[:] = numpy.float64(self) - other._data
+                return pandas.Series(result_data, index=other._index, name=other._name)
 
         return _series_operator_sub_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:   # both operands are numeric series
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -246,7 +272,7 @@ def sdc_pandas_series_operator_sub(self, other):
 
                 if (len(self._data) == len(other._data)):
                     result_data = self._data.astype(numpy.float64)
-                    result_data = result_data - other._data.astype(numpy.float64)
+                    result_data = result_data - other._data
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -256,13 +282,13 @@ def sdc_pandas_series_operator_sub(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data - other._data.astype(numpy.float64)
+                        result_data = result_data - other._data
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) - result_data
+                        result_data = self._data - result_data
 
-                    return pandas.Series(result_data, self._index)
+                    return pandas.Series(result_data)
 
             return _series_operator_sub_none_indexes_impl
         else:
@@ -278,8 +304,8 @@ def sdc_pandas_series_operator_sub(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data - other._data.astype(numpy.float64)
+                    result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                    result_data[:] = self._data - other._data
 
                     if none_or_numeric_indexes == True:  # noqa
                         result_index = left_index.astype(numba_index_common_dtype)
@@ -291,18 +317,13 @@ def sdc_pandas_series_operator_sub(self, other):
                 # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
                 joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
 
-                joined_index_range = numpy.arange(len(joined_index))
-                left_values = numpy.asarray(
-                    [self._data[left_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                left_values[left_indexer == -1] = numpy.nan
-
-                right_values = numpy.asarray(
-                    [other._data[right_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                right_values[right_indexer == -1] = numpy.nan
+                result_size = len(joined_index)
+                left_values = numpy.empty(result_size, dtype=numpy.float64)
+                right_values = numpy.empty(result_size, dtype=numpy.float64)
+                for i in numba.prange(result_size):
+                    left_pos, right_pos = left_indexer[i], right_indexer[i]
+                    left_values[i] = self._data[left_pos] if left_pos != -1 else numpy.nan
+                    right_values[i] = other._data[right_pos] if right_pos != -1 else numpy.nan
 
                 result_data = left_values - right_values
                 return pandas.Series(result_data, joined_index)
@@ -342,35 +363,51 @@ def sdc_pandas_series_operator_mul(self, other):
     _func_name = 'Operator mul().'
 
     ty_checker = TypeChecker('Operator mul().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
+
+    # this overload is not for string series
+    self_is_string_series = self_is_series and isinstance(self.dtype, types.UnicodeType)
+    other_is_string_series = other_is_series and isinstance(other.dtype, types.UnicodeType)
+    if self_is_string_series or other_is_string_series:
+        return None
+
+    if not isinstance(self, (SeriesType, types.Number)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
 
     if not isinstance(other, (SeriesType, types.Number)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series - TODO: support arithmetic operation on StringArrays
-    if (isinstance(other, types.Number)):
+    # specializations for numeric series only
+    if not operands_are_series:
         def _series_operator_mul_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) * numpy.float64(other)
-            return pandas.Series(result_data, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                result_data[:] = self._data * numpy.float64(other)
+                return pandas.Series(result_data, index=self._index, name=self._name)
+            else:
+                result_data = numpy.empty(len(other._data), dtype=numpy.float64)
+                result_data[:] = numpy.float64(self) * other._data
+                return pandas.Series(result_data, index=other._index, name=other._name)
 
         return _series_operator_mul_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:   # both operands are numeric series
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -378,7 +415,7 @@ def sdc_pandas_series_operator_mul(self, other):
 
                 if (len(self._data) == len(other._data)):
                     result_data = self._data.astype(numpy.float64)
-                    result_data = result_data * other._data.astype(numpy.float64)
+                    result_data = result_data * other._data
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -388,13 +425,13 @@ def sdc_pandas_series_operator_mul(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data * other._data.astype(numpy.float64)
+                        result_data = result_data * other._data
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) * result_data
+                        result_data = self._data * result_data
 
-                    return pandas.Series(result_data, self._index)
+                    return pandas.Series(result_data)
 
             return _series_operator_mul_none_indexes_impl
         else:
@@ -410,8 +447,8 @@ def sdc_pandas_series_operator_mul(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data * other._data.astype(numpy.float64)
+                    result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                    result_data[:] = self._data * other._data
 
                     if none_or_numeric_indexes == True:  # noqa
                         result_index = left_index.astype(numba_index_common_dtype)
@@ -423,18 +460,13 @@ def sdc_pandas_series_operator_mul(self, other):
                 # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
                 joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
 
-                joined_index_range = numpy.arange(len(joined_index))
-                left_values = numpy.asarray(
-                    [self._data[left_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                left_values[left_indexer == -1] = numpy.nan
-
-                right_values = numpy.asarray(
-                    [other._data[right_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                right_values[right_indexer == -1] = numpy.nan
+                result_size = len(joined_index)
+                left_values = numpy.empty(result_size, dtype=numpy.float64)
+                right_values = numpy.empty(result_size, dtype=numpy.float64)
+                for i in numba.prange(result_size):
+                    left_pos, right_pos = left_indexer[i], right_indexer[i]
+                    left_values[i] = self._data[left_pos] if left_pos != -1 else numpy.nan
+                    right_values[i] = other._data[right_pos] if right_pos != -1 else numpy.nan
 
                 result_data = left_values * right_values
                 return pandas.Series(result_data, joined_index)
@@ -474,35 +506,51 @@ def sdc_pandas_series_operator_truediv(self, other):
     _func_name = 'Operator truediv().'
 
     ty_checker = TypeChecker('Operator truediv().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
+
+    # this overload is not for string series
+    self_is_string_series = self_is_series and isinstance(self.dtype, types.UnicodeType)
+    other_is_string_series = other_is_series and isinstance(other.dtype, types.UnicodeType)
+    if self_is_string_series or other_is_string_series:
+        return None
+
+    if not isinstance(self, (SeriesType, types.Number)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
 
     if not isinstance(other, (SeriesType, types.Number)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series - TODO: support arithmetic operation on StringArrays
-    if (isinstance(other, types.Number)):
+    # specializations for numeric series only
+    if not operands_are_series:
         def _series_operator_truediv_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) / numpy.float64(other)
-            return pandas.Series(result_data, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                result_data[:] = self._data / numpy.float64(other)
+                return pandas.Series(result_data, index=self._index, name=self._name)
+            else:
+                result_data = numpy.empty(len(other._data), dtype=numpy.float64)
+                result_data[:] = numpy.float64(self) / other._data
+                return pandas.Series(result_data, index=other._index, name=other._name)
 
         return _series_operator_truediv_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:   # both operands are numeric series
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -510,7 +558,7 @@ def sdc_pandas_series_operator_truediv(self, other):
 
                 if (len(self._data) == len(other._data)):
                     result_data = self._data.astype(numpy.float64)
-                    result_data = result_data / other._data.astype(numpy.float64)
+                    result_data = result_data / other._data
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -520,13 +568,13 @@ def sdc_pandas_series_operator_truediv(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data / other._data.astype(numpy.float64)
+                        result_data = result_data / other._data
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) / result_data
+                        result_data = self._data / result_data
 
-                    return pandas.Series(result_data, self._index)
+                    return pandas.Series(result_data)
 
             return _series_operator_truediv_none_indexes_impl
         else:
@@ -542,8 +590,8 @@ def sdc_pandas_series_operator_truediv(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data / other._data.astype(numpy.float64)
+                    result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                    result_data[:] = self._data / other._data
 
                     if none_or_numeric_indexes == True:  # noqa
                         result_index = left_index.astype(numba_index_common_dtype)
@@ -555,18 +603,13 @@ def sdc_pandas_series_operator_truediv(self, other):
                 # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
                 joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
 
-                joined_index_range = numpy.arange(len(joined_index))
-                left_values = numpy.asarray(
-                    [self._data[left_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                left_values[left_indexer == -1] = numpy.nan
-
-                right_values = numpy.asarray(
-                    [other._data[right_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                right_values[right_indexer == -1] = numpy.nan
+                result_size = len(joined_index)
+                left_values = numpy.empty(result_size, dtype=numpy.float64)
+                right_values = numpy.empty(result_size, dtype=numpy.float64)
+                for i in numba.prange(result_size):
+                    left_pos, right_pos = left_indexer[i], right_indexer[i]
+                    left_values[i] = self._data[left_pos] if left_pos != -1 else numpy.nan
+                    right_values[i] = other._data[right_pos] if right_pos != -1 else numpy.nan
 
                 result_data = left_values / right_values
                 return pandas.Series(result_data, joined_index)
@@ -606,35 +649,51 @@ def sdc_pandas_series_operator_floordiv(self, other):
     _func_name = 'Operator floordiv().'
 
     ty_checker = TypeChecker('Operator floordiv().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
+
+    # this overload is not for string series
+    self_is_string_series = self_is_series and isinstance(self.dtype, types.UnicodeType)
+    other_is_string_series = other_is_series and isinstance(other.dtype, types.UnicodeType)
+    if self_is_string_series or other_is_string_series:
+        return None
+
+    if not isinstance(self, (SeriesType, types.Number)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
 
     if not isinstance(other, (SeriesType, types.Number)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series - TODO: support arithmetic operation on StringArrays
-    if (isinstance(other, types.Number)):
+    # specializations for numeric series only
+    if not operands_are_series:
         def _series_operator_floordiv_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) // numpy.float64(other)
-            return pandas.Series(result_data, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                result_data[:] = self._data // numpy.float64(other)
+                return pandas.Series(result_data, index=self._index, name=self._name)
+            else:
+                result_data = numpy.empty(len(other._data), dtype=numpy.float64)
+                result_data[:] = numpy.float64(self) // other._data
+                return pandas.Series(result_data, index=other._index, name=other._name)
 
         return _series_operator_floordiv_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:   # both operands are numeric series
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -642,7 +701,7 @@ def sdc_pandas_series_operator_floordiv(self, other):
 
                 if (len(self._data) == len(other._data)):
                     result_data = self._data.astype(numpy.float64)
-                    result_data = result_data // other._data.astype(numpy.float64)
+                    result_data = result_data // other._data
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -652,13 +711,13 @@ def sdc_pandas_series_operator_floordiv(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data // other._data.astype(numpy.float64)
+                        result_data = result_data // other._data
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) // result_data
+                        result_data = self._data // result_data
 
-                    return pandas.Series(result_data, self._index)
+                    return pandas.Series(result_data)
 
             return _series_operator_floordiv_none_indexes_impl
         else:
@@ -674,8 +733,8 @@ def sdc_pandas_series_operator_floordiv(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data // other._data.astype(numpy.float64)
+                    result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                    result_data[:] = self._data // other._data
 
                     if none_or_numeric_indexes == True:  # noqa
                         result_index = left_index.astype(numba_index_common_dtype)
@@ -687,18 +746,13 @@ def sdc_pandas_series_operator_floordiv(self, other):
                 # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
                 joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
 
-                joined_index_range = numpy.arange(len(joined_index))
-                left_values = numpy.asarray(
-                    [self._data[left_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                left_values[left_indexer == -1] = numpy.nan
-
-                right_values = numpy.asarray(
-                    [other._data[right_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                right_values[right_indexer == -1] = numpy.nan
+                result_size = len(joined_index)
+                left_values = numpy.empty(result_size, dtype=numpy.float64)
+                right_values = numpy.empty(result_size, dtype=numpy.float64)
+                for i in numba.prange(result_size):
+                    left_pos, right_pos = left_indexer[i], right_indexer[i]
+                    left_values[i] = self._data[left_pos] if left_pos != -1 else numpy.nan
+                    right_values[i] = other._data[right_pos] if right_pos != -1 else numpy.nan
 
                 result_data = left_values // right_values
                 return pandas.Series(result_data, joined_index)
@@ -738,35 +792,51 @@ def sdc_pandas_series_operator_mod(self, other):
     _func_name = 'Operator mod().'
 
     ty_checker = TypeChecker('Operator mod().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
+
+    # this overload is not for string series
+    self_is_string_series = self_is_series and isinstance(self.dtype, types.UnicodeType)
+    other_is_string_series = other_is_series and isinstance(other.dtype, types.UnicodeType)
+    if self_is_string_series or other_is_string_series:
+        return None
+
+    if not isinstance(self, (SeriesType, types.Number)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
 
     if not isinstance(other, (SeriesType, types.Number)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series - TODO: support arithmetic operation on StringArrays
-    if (isinstance(other, types.Number)):
+    # specializations for numeric series only
+    if not operands_are_series:
         def _series_operator_mod_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) % numpy.float64(other)
-            return pandas.Series(result_data, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                result_data[:] = self._data % numpy.float64(other)
+                return pandas.Series(result_data, index=self._index, name=self._name)
+            else:
+                result_data = numpy.empty(len(other._data), dtype=numpy.float64)
+                result_data[:] = numpy.float64(self) % other._data
+                return pandas.Series(result_data, index=other._index, name=other._name)
 
         return _series_operator_mod_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:   # both operands are numeric series
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -774,7 +844,7 @@ def sdc_pandas_series_operator_mod(self, other):
 
                 if (len(self._data) == len(other._data)):
                     result_data = self._data.astype(numpy.float64)
-                    result_data = result_data % other._data.astype(numpy.float64)
+                    result_data = result_data % other._data
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -784,13 +854,13 @@ def sdc_pandas_series_operator_mod(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data % other._data.astype(numpy.float64)
+                        result_data = result_data % other._data
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) % result_data
+                        result_data = self._data % result_data
 
-                    return pandas.Series(result_data, self._index)
+                    return pandas.Series(result_data)
 
             return _series_operator_mod_none_indexes_impl
         else:
@@ -806,8 +876,8 @@ def sdc_pandas_series_operator_mod(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data % other._data.astype(numpy.float64)
+                    result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                    result_data[:] = self._data % other._data
 
                     if none_or_numeric_indexes == True:  # noqa
                         result_index = left_index.astype(numba_index_common_dtype)
@@ -819,18 +889,13 @@ def sdc_pandas_series_operator_mod(self, other):
                 # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
                 joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
 
-                joined_index_range = numpy.arange(len(joined_index))
-                left_values = numpy.asarray(
-                    [self._data[left_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                left_values[left_indexer == -1] = numpy.nan
-
-                right_values = numpy.asarray(
-                    [other._data[right_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                right_values[right_indexer == -1] = numpy.nan
+                result_size = len(joined_index)
+                left_values = numpy.empty(result_size, dtype=numpy.float64)
+                right_values = numpy.empty(result_size, dtype=numpy.float64)
+                for i in numba.prange(result_size):
+                    left_pos, right_pos = left_indexer[i], right_indexer[i]
+                    left_values[i] = self._data[left_pos] if left_pos != -1 else numpy.nan
+                    right_values[i] = other._data[right_pos] if right_pos != -1 else numpy.nan
 
                 result_data = left_values % right_values
                 return pandas.Series(result_data, joined_index)
@@ -870,35 +935,51 @@ def sdc_pandas_series_operator_pow(self, other):
     _func_name = 'Operator pow().'
 
     ty_checker = TypeChecker('Operator pow().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
+
+    # this overload is not for string series
+    self_is_string_series = self_is_series and isinstance(self.dtype, types.UnicodeType)
+    other_is_string_series = other_is_series and isinstance(other.dtype, types.UnicodeType)
+    if self_is_string_series or other_is_string_series:
+        return None
+
+    if not isinstance(self, (SeriesType, types.Number)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
 
     if not isinstance(other, (SeriesType, types.Number)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series - TODO: support arithmetic operation on StringArrays
-    if (isinstance(other, types.Number)):
+    # specializations for numeric series only
+    if not operands_are_series:
         def _series_operator_pow_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) ** numpy.float64(other)
-            return pandas.Series(result_data, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                result_data[:] = self._data ** numpy.float64(other)
+                return pandas.Series(result_data, index=self._index, name=self._name)
+            else:
+                result_data = numpy.empty(len(other._data), dtype=numpy.float64)
+                result_data[:] = numpy.float64(self) ** other._data
+                return pandas.Series(result_data, index=other._index, name=other._name)
 
         return _series_operator_pow_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:   # both operands are numeric series
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -906,7 +987,7 @@ def sdc_pandas_series_operator_pow(self, other):
 
                 if (len(self._data) == len(other._data)):
                     result_data = self._data.astype(numpy.float64)
-                    result_data = result_data ** other._data.astype(numpy.float64)
+                    result_data = result_data ** other._data
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -916,13 +997,13 @@ def sdc_pandas_series_operator_pow(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data ** other._data.astype(numpy.float64)
+                        result_data = result_data ** other._data
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) ** result_data
+                        result_data = self._data ** result_data
 
-                    return pandas.Series(result_data, self._index)
+                    return pandas.Series(result_data)
 
             return _series_operator_pow_none_indexes_impl
         else:
@@ -938,8 +1019,8 @@ def sdc_pandas_series_operator_pow(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data ** other._data.astype(numpy.float64)
+                    result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                    result_data[:] = self._data ** other._data
 
                     if none_or_numeric_indexes == True:  # noqa
                         result_index = left_index.astype(numba_index_common_dtype)
@@ -951,18 +1032,13 @@ def sdc_pandas_series_operator_pow(self, other):
                 # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
                 joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
 
-                joined_index_range = numpy.arange(len(joined_index))
-                left_values = numpy.asarray(
-                    [self._data[left_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                left_values[left_indexer == -1] = numpy.nan
-
-                right_values = numpy.asarray(
-                    [other._data[right_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                right_values[right_indexer == -1] = numpy.nan
+                result_size = len(joined_index)
+                left_values = numpy.empty(result_size, dtype=numpy.float64)
+                right_values = numpy.empty(result_size, dtype=numpy.float64)
+                for i in numba.prange(result_size):
+                    left_pos, right_pos = left_indexer[i], right_indexer[i]
+                    left_values[i] = self._data[left_pos] if left_pos != -1 else numpy.nan
+                    right_values[i] = other._data[right_pos] if right_pos != -1 else numpy.nan
 
                 result_data = left_values ** right_values
                 return pandas.Series(result_data, joined_index)
@@ -998,34 +1074,40 @@ def sdc_pandas_series_operator_lt(self, other):
     _func_name = 'Operator lt().'
 
     ty_checker = TypeChecker('Operator lt().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
 
-    if not isinstance(other, (SeriesType, types.Number)):
+    if not isinstance(self, (SeriesType, types.Number, types.UnicodeType)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
+
+    if not isinstance(other, (SeriesType, types.Number, types.UnicodeType)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series
-    if (isinstance(other, types.Number)):
+    if not operands_are_series:
         def _series_operator_lt_scalar_impl(self, other):
-            return pandas.Series(self._data < other, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                return pandas.Series(self._data < other, index=self._index, name=self._name)
+            else:
+                return pandas.Series(self < other._data, index=other._index, name=other._name)
 
         return _series_operator_lt_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -1089,34 +1171,40 @@ def sdc_pandas_series_operator_gt(self, other):
     _func_name = 'Operator gt().'
 
     ty_checker = TypeChecker('Operator gt().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
 
-    if not isinstance(other, (SeriesType, types.Number)):
+    if not isinstance(self, (SeriesType, types.Number, types.UnicodeType)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
+
+    if not isinstance(other, (SeriesType, types.Number, types.UnicodeType)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series
-    if (isinstance(other, types.Number)):
+    if not operands_are_series:
         def _series_operator_gt_scalar_impl(self, other):
-            return pandas.Series(self._data > other, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                return pandas.Series(self._data > other, index=self._index, name=self._name)
+            else:
+                return pandas.Series(self > other._data, index=other._index, name=other._name)
 
         return _series_operator_gt_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -1180,34 +1268,40 @@ def sdc_pandas_series_operator_le(self, other):
     _func_name = 'Operator le().'
 
     ty_checker = TypeChecker('Operator le().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
 
-    if not isinstance(other, (SeriesType, types.Number)):
+    if not isinstance(self, (SeriesType, types.Number, types.UnicodeType)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
+
+    if not isinstance(other, (SeriesType, types.Number, types.UnicodeType)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series
-    if (isinstance(other, types.Number)):
+    if not operands_are_series:
         def _series_operator_le_scalar_impl(self, other):
-            return pandas.Series(self._data <= other, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                return pandas.Series(self._data <= other, index=self._index, name=self._name)
+            else:
+                return pandas.Series(self <= other._data, index=other._index, name=other._name)
 
         return _series_operator_le_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -1271,34 +1365,40 @@ def sdc_pandas_series_operator_ge(self, other):
     _func_name = 'Operator ge().'
 
     ty_checker = TypeChecker('Operator ge().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
 
-    if not isinstance(other, (SeriesType, types.Number)):
+    if not isinstance(self, (SeriesType, types.Number, types.UnicodeType)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
+
+    if not isinstance(other, (SeriesType, types.Number, types.UnicodeType)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series
-    if (isinstance(other, types.Number)):
+    if not operands_are_series:
         def _series_operator_ge_scalar_impl(self, other):
-            return pandas.Series(self._data >= other, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                return pandas.Series(self._data >= other, index=self._index, name=self._name)
+            else:
+                return pandas.Series(self >= other._data, index=other._index, name=other._name)
 
         return _series_operator_ge_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -1362,34 +1462,40 @@ def sdc_pandas_series_operator_ne(self, other):
     _func_name = 'Operator ne().'
 
     ty_checker = TypeChecker('Operator ne().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
 
-    if not isinstance(other, (SeriesType, types.Number)):
+    if not isinstance(self, (SeriesType, types.Number, types.UnicodeType)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
+
+    if not isinstance(other, (SeriesType, types.Number, types.UnicodeType)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series
-    if (isinstance(other, types.Number)):
+    if not operands_are_series:
         def _series_operator_ne_scalar_impl(self, other):
-            return pandas.Series(self._data != other, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                return pandas.Series(self._data != other, index=self._index, name=self._name)
+            else:
+                return pandas.Series(self != other._data, index=other._index, name=other._name)
 
         return _series_operator_ne_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -1453,34 +1559,40 @@ def sdc_pandas_series_operator_eq(self, other):
     _func_name = 'Operator eq().'
 
     ty_checker = TypeChecker('Operator eq().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
 
-    if not isinstance(other, (SeriesType, types.Number)):
+    if not isinstance(self, (SeriesType, types.Number, types.UnicodeType)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
+
+    if not isinstance(other, (SeriesType, types.Number, types.UnicodeType)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series
-    if (isinstance(other, types.Number)):
+    if not operands_are_series:
         def _series_operator_eq_scalar_impl(self, other):
-            return pandas.Series(self._data == other, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                return pandas.Series(self._data == other, index=self._index, name=self._name)
+            else:
+                return pandas.Series(self == other._data, index=other._index, name=other._name)
 
         return _series_operator_eq_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -1516,3 +1628,267 @@ def sdc_pandas_series_operator_eq(self, other):
             return _series_operator_eq_common_impl
 
     return None
+
+
+@sdc_overload(operator.lt)
+def sdc_str_arr_operator_lt(self, other):
+
+    self_is_str_arr = self == string_array_type
+    other_is_str_arr = other == string_array_type
+    operands_are_arrays = self_is_str_arr and other_is_str_arr
+
+    if not (operands_are_arrays
+            or (self_is_str_arr and isinstance(other, types.UnicodeType))
+            or (isinstance(self, types.UnicodeType) and other_is_str_arr)):
+        return None
+
+    if operands_are_arrays:
+        def _sdc_str_arr_operator_lt_impl(self, other):
+            if len(self) != len(other):
+                raise ValueError("Mismatch of String Arrays sizes in operator.lt")
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] < other[i]
+                               and not (str_arr_is_na(self, i) or str_arr_is_na(other, i)))
+            return out_list
+
+    elif self_is_str_arr:
+        def _sdc_str_arr_operator_lt_impl(self, other):
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] < other and not (str_arr_is_na(self, i)))
+            return out_list
+
+    elif other_is_str_arr:
+        def _sdc_str_arr_operator_lt_impl(self, other):
+            n = len(other)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self < other[i] and not (str_arr_is_na(other, i)))
+            return out_list
+    else:
+        return None
+
+    return _sdc_str_arr_operator_lt_impl
+
+
+@sdc_overload(operator.gt)
+def sdc_str_arr_operator_gt(self, other):
+
+    self_is_str_arr = self == string_array_type
+    other_is_str_arr = other == string_array_type
+    operands_are_arrays = self_is_str_arr and other_is_str_arr
+
+    if not (operands_are_arrays
+            or (self_is_str_arr and isinstance(other, types.UnicodeType))
+            or (isinstance(self, types.UnicodeType) and other_is_str_arr)):
+        return None
+
+    if operands_are_arrays:
+        def _sdc_str_arr_operator_gt_impl(self, other):
+            if len(self) != len(other):
+                raise ValueError("Mismatch of String Arrays sizes in operator.gt")
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] > other[i]
+                               and not (str_arr_is_na(self, i) or str_arr_is_na(other, i)))
+            return out_list
+
+    elif self_is_str_arr:
+        def _sdc_str_arr_operator_gt_impl(self, other):
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] > other and not (str_arr_is_na(self, i)))
+            return out_list
+
+    elif other_is_str_arr:
+        def _sdc_str_arr_operator_gt_impl(self, other):
+            n = len(other)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self > other[i] and not (str_arr_is_na(other, i)))
+            return out_list
+    else:
+        return None
+
+    return _sdc_str_arr_operator_gt_impl
+
+
+@sdc_overload(operator.le)
+def sdc_str_arr_operator_le(self, other):
+
+    self_is_str_arr = self == string_array_type
+    other_is_str_arr = other == string_array_type
+    operands_are_arrays = self_is_str_arr and other_is_str_arr
+
+    if not (operands_are_arrays
+            or (self_is_str_arr and isinstance(other, types.UnicodeType))
+            or (isinstance(self, types.UnicodeType) and other_is_str_arr)):
+        return None
+
+    if operands_are_arrays:
+        def _sdc_str_arr_operator_le_impl(self, other):
+            if len(self) != len(other):
+                raise ValueError("Mismatch of String Arrays sizes in operator.le")
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] <= other[i]
+                               and not (str_arr_is_na(self, i) or str_arr_is_na(other, i)))
+            return out_list
+
+    elif self_is_str_arr:
+        def _sdc_str_arr_operator_le_impl(self, other):
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] <= other and not (str_arr_is_na(self, i)))
+            return out_list
+
+    elif other_is_str_arr:
+        def _sdc_str_arr_operator_le_impl(self, other):
+            n = len(other)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self <= other[i] and not (str_arr_is_na(other, i)))
+            return out_list
+    else:
+        return None
+
+    return _sdc_str_arr_operator_le_impl
+
+
+@sdc_overload(operator.ge)
+def sdc_str_arr_operator_ge(self, other):
+
+    self_is_str_arr = self == string_array_type
+    other_is_str_arr = other == string_array_type
+    operands_are_arrays = self_is_str_arr and other_is_str_arr
+
+    if not (operands_are_arrays
+            or (self_is_str_arr and isinstance(other, types.UnicodeType))
+            or (isinstance(self, types.UnicodeType) and other_is_str_arr)):
+        return None
+
+    if operands_are_arrays:
+        def _sdc_str_arr_operator_ge_impl(self, other):
+            if len(self) != len(other):
+                raise ValueError("Mismatch of String Arrays sizes in operator.ge")
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] >= other[i]
+                               and not (str_arr_is_na(self, i) or str_arr_is_na(other, i)))
+            return out_list
+
+    elif self_is_str_arr:
+        def _sdc_str_arr_operator_ge_impl(self, other):
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] >= other and not (str_arr_is_na(self, i)))
+            return out_list
+
+    elif other_is_str_arr:
+        def _sdc_str_arr_operator_ge_impl(self, other):
+            n = len(other)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self >= other[i] and not (str_arr_is_na(other, i)))
+            return out_list
+    else:
+        return None
+
+    return _sdc_str_arr_operator_ge_impl
+
+
+@sdc_overload(operator.ne)
+def sdc_str_arr_operator_ne(self, other):
+
+    self_is_str_arr = self == string_array_type
+    other_is_str_arr = other == string_array_type
+    operands_are_arrays = self_is_str_arr and other_is_str_arr
+
+    if not (operands_are_arrays
+            or (self_is_str_arr and isinstance(other, types.UnicodeType))
+            or (isinstance(self, types.UnicodeType) and other_is_str_arr)):
+        return None
+
+    if operands_are_arrays:
+        def _sdc_str_arr_operator_ne_impl(self, other):
+            if len(self) != len(other):
+                raise ValueError("Mismatch of String Arrays sizes in operator.ne")
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] != other[i]
+                               or (str_arr_is_na(self, i) or str_arr_is_na(other, i)))
+            return out_list
+
+    elif self_is_str_arr:
+        def _sdc_str_arr_operator_ne_impl(self, other):
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] != other or (str_arr_is_na(self, i)))
+            return out_list
+
+    elif other_is_str_arr:
+        def _sdc_str_arr_operator_ne_impl(self, other):
+            n = len(other)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self != other[i] or (str_arr_is_na(other, i)))
+            return out_list
+    else:
+        return None
+
+    return _sdc_str_arr_operator_ne_impl
+
+
+@sdc_overload(operator.eq)
+def sdc_str_arr_operator_eq(self, other):
+
+    self_is_str_arr = self == string_array_type
+    other_is_str_arr = other == string_array_type
+    operands_are_arrays = self_is_str_arr and other_is_str_arr
+
+    if not (operands_are_arrays
+            or (self_is_str_arr and isinstance(other, types.UnicodeType))
+            or (isinstance(self, types.UnicodeType) and other_is_str_arr)):
+        return None
+
+    if operands_are_arrays:
+        def _sdc_str_arr_operator_eq_impl(self, other):
+            if len(self) != len(other):
+                raise ValueError("Mismatch of String Arrays sizes in operator.eq")
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] == other[i]
+                               and not (str_arr_is_na(self, i) or str_arr_is_na(other, i)))
+            return out_list
+
+    elif self_is_str_arr:
+        def _sdc_str_arr_operator_eq_impl(self, other):
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] == other and not (str_arr_is_na(self, i)))
+            return out_list
+
+    elif other_is_str_arr:
+        def _sdc_str_arr_operator_eq_impl(self, other):
+            n = len(other)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self == other[i] and not (str_arr_is_na(other, i)))
+            return out_list
+    else:
+        return None
+
+    return _sdc_str_arr_operator_eq_impl

@@ -84,9 +84,9 @@ import numba
 from numba.types import (Boolean, Integer, NoneType,
                          Omitted, StringLiteral, UnicodeType)
 
-from sdc.datatypes.common_functions import TypeChecker
+from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
-from sdc.utils import sdc_overload_method
+from sdc.utilities.utils import sdc_overload_method
 
 _hpat_pandas_stringmethods_autogen_global_dict = {
     'pandas': pandas,

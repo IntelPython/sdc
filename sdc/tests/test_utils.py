@@ -25,10 +25,12 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import string
+import unittest
+
 import numba
 import numpy as np
-import pandas as pd
-import unittest
+import pandas
 
 import sdc
 from sdc.config import config_inline_overloads, config_use_parallel_overloads
@@ -55,6 +57,22 @@ test_global_input_data_float64 = [
     [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
     [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO],
 ]
+
+
+def gen_df(input_data, with_index=False):
+    """Generate DataFrame based on list of data like a [[1, 2, 3], [4, 5, 6]]"""
+    length = min(len(d) for d in input_data)
+    data = {n: d[:length] for n, d in zip(string.ascii_uppercase, input_data)}
+
+    index = None
+    if with_index:
+        # generate integer index
+        arr = np.arange(length)
+        np.random.seed(0)
+        np.random.shuffle(arr)
+        index = arr
+
+    return pandas.DataFrame(data, index=index)
 
 
 def count_array_REPs():
@@ -201,4 +219,4 @@ def create_series_from_values(size, data_values, index_values=None, name=None, u
         else:
             series_index = None
 
-    return pd.Series(series_data, series_index, name)
+    return pandas.Series(series_data, series_index, name)

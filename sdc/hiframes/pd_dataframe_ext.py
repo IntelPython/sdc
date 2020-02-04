@@ -342,11 +342,12 @@ def df_len_overload(df):
     return lambda df: len(df._data[0])
 
 
-@overload(operator.getitem)  # TODO: avoid lowering?
-def df_getitem_overload(df, ind):
-    if isinstance(df, DataFrameType) and isinstance(ind, types.StringLiteral):
-        index = df.columns.index(ind.literal_value)
-        return lambda df, ind: sdc.hiframes.api.init_series(df._data[index])
+if sdc.config.config_pipeline_hpat_default:
+    @overload(operator.getitem)  # TODO: avoid lowering?
+    def df_getitem_overload(df, ind):
+        if isinstance(df, DataFrameType) and isinstance(ind, types.StringLiteral):
+            index = df.columns.index(ind.literal_value)
+            return lambda df, ind: sdc.hiframes.api.init_series(df._data[index])
 
 
 @infer_global(operator.getitem)
@@ -750,7 +751,7 @@ class SortDummyTyper(AbstractTemplate):
         df, by, ascending, inplace = args
 
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
@@ -884,7 +885,7 @@ class FillnaDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
         df, value, inplace = args
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
@@ -928,7 +929,7 @@ class ResetIndexDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
         df, inplace = args
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
@@ -970,7 +971,7 @@ class DropnaDummyTyper(AbstractTemplate):
     def generic(self, args, kws):
         df, inplace = args
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,
@@ -1041,7 +1042,7 @@ class DropDummyTyper(AbstractTemplate):
         new_data = tuple(df.data[df.columns.index(c)] for c in new_cols)
 
         # inplace value
-        if isinstance(inplace, sdc.utils.BooleanLiteral):
+        if isinstance(inplace, sdc.utilities.utils.BooleanLiteral):
             inplace = inplace.literal_value
         else:
             # XXX inplace type is just bool when value not passed. Therefore,

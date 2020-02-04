@@ -26,7 +26,7 @@
 
 """
 
-| This file contains function templates used by the auto-generation script during build
+| This file contains function templates used by the auto-generation script
 
 """
 
@@ -40,13 +40,12 @@ import pandas
 from numba.errors import TypingError
 from numba import types
 
-import sdc
-from sdc.datatypes.common_functions import TypeChecker
-from sdc.datatypes.common_functions import (check_index_is_numeric, find_common_dtype_from_numpy_dtypes,
-                                            sdc_join_series_indexes, sdc_check_indexes_equal, check_arrays_comparable)
+from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric, check_types_comparable,
+                                            find_common_dtype_from_numpy_dtypes)
+from sdc.datatypes.common_functions import (sdc_join_series_indexes, sdc_check_indexes_equal)
 from sdc.hiframes.pd_series_type import SeriesType
-from sdc.str_arr_ext import (string_array_type, num_total_chars, str_arr_is_na)
-from sdc.utils import sdc_overload
+from sdc.str_arr_ext import (string_array_type, str_arr_is_na)
+from sdc.utilities.utils import sdc_overload
 
 
 def sdc_pandas_series_operator_binop(self, other):
@@ -78,35 +77,51 @@ def sdc_pandas_series_operator_binop(self, other):
     _func_name = 'Operator binop().'
 
     ty_checker = TypeChecker('Operator binop().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
+
+    # this overload is not for string series
+    self_is_string_series = self_is_series and isinstance(self.dtype, types.UnicodeType)
+    other_is_string_series = other_is_series and isinstance(other.dtype, types.UnicodeType)
+    if self_is_string_series or other_is_string_series:
+        return None
+
+    if not isinstance(self, (SeriesType, types.Number)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
 
     if not isinstance(other, (SeriesType, types.Number)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series - TODO: support arithmetic operation on StringArrays
-    if (isinstance(other, types.Number)):
+    # specializations for numeric series only
+    if not operands_are_series:
         def _series_operator_binop_scalar_impl(self, other):
-            result_data = self._data.astype(numpy.float64) + numpy.float64(other)
-            return pandas.Series(result_data, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                result_data[:] = self._data + numpy.float64(other)
+                return pandas.Series(result_data, index=self._index, name=self._name)
+            else:
+                result_data = numpy.empty(len(other._data), dtype=numpy.float64)
+                result_data[:] = numpy.float64(self) + other._data
+                return pandas.Series(result_data, index=other._index, name=other._name)
 
         return _series_operator_binop_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:   # both operands are numeric series
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -114,7 +129,7 @@ def sdc_pandas_series_operator_binop(self, other):
 
                 if (len(self._data) == len(other._data)):
                     result_data = self._data.astype(numpy.float64)
-                    result_data = result_data + other._data.astype(numpy.float64)
+                    result_data = result_data + other._data
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -124,13 +139,13 @@ def sdc_pandas_series_operator_binop(self, other):
                     if (left_size == min_data_size):
                         result_data[:min_data_size] = self._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = result_data + other._data.astype(numpy.float64)
+                        result_data = result_data + other._data
                     else:
                         result_data[:min_data_size] = other._data
                         result_data[min_data_size:] = numpy.nan
-                        result_data = self._data.astype(numpy.float64) + result_data
+                        result_data = self._data + result_data
 
-                    return pandas.Series(result_data, self._index)
+                    return pandas.Series(result_data)
 
             return _series_operator_binop_none_indexes_impl
         else:
@@ -146,8 +161,8 @@ def sdc_pandas_series_operator_binop(self, other):
 
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = self._data.astype(numpy.float64)
-                    result_data = result_data + other._data.astype(numpy.float64)
+                    result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                    result_data[:] = self._data + other._data
 
                     if none_or_numeric_indexes == True:  # noqa
                         result_index = left_index.astype(numba_index_common_dtype)
@@ -159,18 +174,13 @@ def sdc_pandas_series_operator_binop(self, other):
                 # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
                 joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
 
-                joined_index_range = numpy.arange(len(joined_index))
-                left_values = numpy.asarray(
-                    [self._data[left_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                left_values[left_indexer == -1] = numpy.nan
-
-                right_values = numpy.asarray(
-                    [other._data[right_indexer[i]] for i in joined_index_range],
-                    numpy.float64
-                )
-                right_values[right_indexer == -1] = numpy.nan
+                result_size = len(joined_index)
+                left_values = numpy.empty(result_size, dtype=numpy.float64)
+                right_values = numpy.empty(result_size, dtype=numpy.float64)
+                for i in numba.prange(result_size):
+                    left_pos, right_pos = left_indexer[i], right_indexer[i]
+                    left_values[i] = self._data[left_pos] if left_pos != -1 else numpy.nan
+                    right_values[i] = other._data[right_pos] if right_pos != -1 else numpy.nan
 
                 result_data = left_values + right_values
                 return pandas.Series(result_data, joined_index)
@@ -205,34 +215,40 @@ def sdc_pandas_series_operator_comp_binop(self, other):
     _func_name = 'Operator comp_binop().'
 
     ty_checker = TypeChecker('Operator comp_binop().')
-    if not isinstance(self, SeriesType):
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
         return None
 
-    if not isinstance(other, (SeriesType, types.Number)):
+    if not isinstance(self, (SeriesType, types.Number, types.UnicodeType)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
+
+    if not isinstance(other, (SeriesType, types.Number, types.UnicodeType)):
         ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
 
-    if isinstance(other, SeriesType):
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
         none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
                                    and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_data_comparable = check_arrays_comparable(self.data, other.data)
-        series_indexes_comparable = check_arrays_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
 
-    if isinstance(other, SeriesType) and not series_data_comparable:
-        raise TypingError('{} Not supported for series with not-comparable data. \
-        Given: self.data={}, other.data={}'.format(_func_name, self.data, other.data))
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if isinstance(other, SeriesType) and not series_indexes_comparable:
-        raise TypingError('{} Not implemented for series with not-comparable indexes. \
-        Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    # specializations for numeric series
-    if (isinstance(other, types.Number)):
+    if not operands_are_series:
         def _series_operator_comp_binop_scalar_impl(self, other):
-            return pandas.Series(self._data < other, index=self._index, name=self._name)
+            if self_is_series == True:  # noqa
+                return pandas.Series(self._data < other, index=self._index, name=self._name)
+            else:
+                return pandas.Series(self < other._data, index=other._index, name=other._name)
 
         return _series_operator_comp_binop_scalar_impl
 
-    elif (isinstance(other, SeriesType)):
+    else:
 
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
@@ -268,3 +284,46 @@ def sdc_pandas_series_operator_comp_binop(self, other):
             return _series_operator_comp_binop_common_impl
 
     return None
+
+
+def sdc_str_arr_operator_comp_binop(self, other):
+
+    self_is_str_arr = self == string_array_type
+    other_is_str_arr = other == string_array_type
+    operands_are_arrays = self_is_str_arr and other_is_str_arr
+
+    if not (operands_are_arrays
+            or (self_is_str_arr and isinstance(other, types.UnicodeType))
+            or (isinstance(self, types.UnicodeType) and other_is_str_arr)):
+        return None
+
+    if operands_are_arrays:
+        def _sdc_str_arr_operator_comp_binop_impl(self, other):
+            if len(self) != len(other):
+                raise ValueError("Mismatch of String Arrays sizes in operator.comp_binop")
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] < other[i]
+                               and not (str_arr_is_na(self, i) or str_arr_is_na(other, i)))
+            return out_list
+
+    elif self_is_str_arr:
+        def _sdc_str_arr_operator_comp_binop_impl(self, other):
+            n = len(self)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self[i] < other and not (str_arr_is_na(self, i)))
+            return out_list
+
+    elif other_is_str_arr:
+        def _sdc_str_arr_operator_comp_binop_impl(self, other):
+            n = len(other)
+            out_list = [False] * n
+            for i in numba.prange(n):
+                out_list[i] = (self < other[i] and not (str_arr_is_na(other, i)))
+            return out_list
+    else:
+        return None
+
+    return _sdc_str_arr_operator_comp_binop_impl
