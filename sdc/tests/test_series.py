@@ -50,7 +50,9 @@ from sdc.tests.test_utils import (count_array_OneDs,
                                   skip_inline,
                                   skip_numba_jit,
                                   skip_parallel,
-                                  skip_sdc_jit)
+                                  skip_sdc_jit,
+                                  create_series_from_values,
+                                  take_k_elements)
 from sdc.tests.gen_test_data import ParquetGenerator
 
 from sdc.tests.test_utils import test_global_input_data_unicode_kind1
@@ -6131,15 +6133,10 @@ class TestSeries(
 
         n, k = 11, 4
         np.random.seed(0)
-        valid_indices = gen_strlist(n, 2, 'abcd123 ')
         series_data = np.arange(n)
-        series_index = valid_indices[:n]
+        series_index = gen_strlist(n, 2, 'abcd123 ')
 
-        # create a Series from exactly k random S.index values
-        selected_indexes = np.arange(n)
-        np.random.shuffle(selected_indexes)
-        idx = pd.Series(np.take(series_index, selected_indexes[:k]))
-
+        idx = create_series_from_values(k, series_index)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
@@ -6153,15 +6150,10 @@ class TestSeries(
 
         n, k = 11, 4
         np.random.seed(0)
-        index_values = np.arange(n, dtype=np.float)
-        np.random.shuffle(index_values)
         series_data = np.arange(n)
-        series_index = np.copy(index_values)
+        series_index = np.arange(n, dtype=np.float)
 
-        # create a Series from exactly k random S.index values
-        np.random.shuffle(index_values)
-        idx = pd.Series(index_values[:k])
-
+        idx = create_series_from_values(k, series_index)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
@@ -6180,15 +6172,10 @@ class TestSeries(
 
         n, k = 11, 4
         np.random.seed(0)
-        index_values = np.arange(n)
-        np.random.shuffle(index_values)
         series_data = np.arange(n)
-        series_index = np.copy(index_values)
+        series_index = np.arange(n)
 
-        # create a Series from exactly k random S.index values
-        np.random.shuffle(index_values)
-        idx = pd.Series(index_values[:k])
-
+        idx = create_series_from_values(k, series_index)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
@@ -6205,10 +6192,7 @@ class TestSeries(
         series_data = np.arange(n)
         series_index = gen_strlist(n, 2, 'abcd123 ')
 
-        set_positions = np.arange(n)
-        np.random.shuffle(set_positions)
-        idx = pd.Series(set_positions[:k])
-
+        idx = create_series_from_values(k, np.arange(n))
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
@@ -6260,15 +6244,11 @@ class TestSeries(
 
         n, k = 11, 4
         np.random.seed(0)
-        index_values = np.arange(n)
-        np.random.shuffle(index_values)
+
         series_data = np.arange(n)
-        series_index = np.copy(index_values)
+        series_index = np.arange(n)
 
-        # create a Series from exactly k random S.index values
-        np.random.shuffle(index_values)
-        idx = np.array(index_values[:k])
-
+        idx = take_k_elements(k, series_index)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
@@ -6287,10 +6267,7 @@ class TestSeries(
         series_data = np.arange(n)
         series_index = gen_strlist(n, 2, 'abcd123 ')
 
-        set_positions = np.arange(n)
-        np.random.shuffle(set_positions)
-        idx = np.array(set_positions[:k])
-
+        idx = take_k_elements(k, np.arange(n))
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
@@ -6422,24 +6399,21 @@ class TestSeries(
 
         n, k = 11, 4
         np.random.seed(0)
-        index_values = np.arange(n)
-        np.random.shuffle(index_values)
         series_data = np.arange(n)
-        series_index = np.copy(index_values)
+        series_index = np.arange(n)
 
-        # create a bool Series with the same len as S and True values at exactly k random positions
+        # create a bool Series with the same len as S and True values at exactly k positions
         idx = pd.Series(np.zeros(n, dtype=np.bool))
-        np.random.shuffle(index_values)
-        idx[index_values[:k]] = True
-        np.random.shuffle(index_values)
+        idx[take_k_elements(k, np.arange(n))] = True
+        values_index = take_k_elements(k, series_index)
 
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
                             np.array(assigned_values),
                             pd.Series(assigned_values),
-                            pd.Series(assigned_values, index=index_values[:k]),
-                            pd.Series(assigned_values, index=index_values[:k].astype('float'))
+                            pd.Series(assigned_values, index=values_index),
+                            pd.Series(assigned_values, index=values_index.astype('float'))
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 
@@ -6453,20 +6427,17 @@ class TestSeries(
         series_data = np.arange(n)
         series_index = gen_strlist(n, 2, 'abcd123 ')
 
-        # create a bool Series with the same len as S and True values at exactly k random positions
-        shuffled_data = np.arange(n)
-        np.random.shuffle(shuffled_data)
-        k_series_indexes = list(np.take(series_index, shuffled_data))
-        idx = pd.Series(np.zeros(n, dtype=np.bool), index=k_series_indexes)
-        idx[shuffled_data[:k]] = True
+        # create a bool Series with the same len as S, reordered values from original series index
+        # as index and True values at exactly k positions
+        idx = pd.Series(np.zeros(n, dtype=np.bool), index=take_k_elements(n, series_index))
+        idx[take_k_elements(k, np.arange(n))] = True
+        values_index = take_k_elements(k, series_index)
 
-        np.random.shuffle(shuffled_data)
-        k_series_indexes = list(np.take(series_index, shuffled_data[:k]))
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
                             np.array(assigned_values),
-                            pd.Series(assigned_values, index=k_series_indexes),
+                            pd.Series(assigned_values, index=values_index),
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 
@@ -6478,24 +6449,21 @@ class TestSeries(
 
         n, k = 11, 4
         np.random.seed(0)
-        index_values = np.arange(n)
-        np.random.shuffle(index_values)
         series_data = np.arange(n)
-        series_index = np.copy(index_values)
+        series_index = np.arange(n)
 
-        # create a bool array with the same len as S and True values at exactly k random positions
-        np.random.shuffle(index_values)
+        # create a bool array with the same len as S and True values at exactly k positions
         idx = np.zeros(n, dtype=np.bool)
-        idx[index_values[:k]] = True
-        np.random.shuffle(index_values)
+        idx[take_k_elements(k, np.arange(n))] = True
+        values_index = take_k_elements(k, series_index)
 
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
                             np.array(assigned_values),
                             pd.Series(assigned_values),
-                            pd.Series(assigned_values, index=index_values[:k]),
-                            pd.Series(assigned_values, index=index_values[:k].astype('float'))
+                            pd.Series(assigned_values, index=values_index),
+                            pd.Series(assigned_values, index=values_index.astype('float'))
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 
@@ -6528,18 +6496,16 @@ class TestSeries(
         series_data = np.arange(n)
         series_index = gen_strlist(n, 2, 'abcd123 ')
 
-        # create a bool array with the same len as S and True values at exactly k random positions
-        shuffled_data = np.arange(n)
-        np.random.shuffle(shuffled_data)
+        # create a bool array with the same len as S and True values at exactly k positions
         idx = np.zeros(n, dtype=np.bool)
-        idx[shuffled_data[:k]] = True
-        np.random.shuffle(shuffled_data)
+        idx[take_k_elements(k, np.arange(n))] = True
+        values_index = take_k_elements(k, series_index)
 
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
                             np.array(assigned_values),
-                            pd.Series(assigned_values, index=list(np.take(series_index, shuffled_data[:k])))
+                            pd.Series(assigned_values, index=values_index)
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 
