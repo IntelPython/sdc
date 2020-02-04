@@ -40,7 +40,7 @@ from numba.errors import TypingError
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size)
-from sdc.utilities.utils import sdc_overload
+from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 
 
 def astype(self, dtype):
@@ -97,3 +97,14 @@ def sdc_astype_overload(self, dtype):
             return arr
 
         return sdc_astype_number_impl
+
+
+@sdc_register_jitable
+def nansum(a):
+    length = len(a)
+    result = 0
+    for i in prange(length):
+        if not numpy.isnan(a[i]):
+            result += a[i]
+
+    return result
