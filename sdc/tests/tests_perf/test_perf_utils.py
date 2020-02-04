@@ -182,6 +182,10 @@ def calc_compilation(pyfunc, *args, iter_number=5):
 
 def get_times(f, *args, iter_number=5):
     """Get time of boxing+unboxing and internal execution"""
+
+    # Warming up
+    f(*args)
+
     exec_times = []
     boxing_times = []
     for _ in range(iter_number):
