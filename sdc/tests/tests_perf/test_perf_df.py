@@ -43,23 +43,6 @@ class TestDataFrameMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_jitted(self, pyfunc, record, *args, **kwargs):
-        # compilation time
-        record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
-
-        cfunc = numba.njit(pyfunc)
-
-        # Warming up
-        cfunc(*args, **kwargs)
-
-        # execution and boxing time
-        record["test_results"], record["boxing_results"] = \
-            get_times(cfunc, *args, **kwargs)
-
-    def _test_python(self, pyfunc, record, *args, **kwargs):
-        record["test_results"], _ = \
-            get_times(pyfunc, *args, **kwargs)
-
     def _test_case(self, pyfunc, name, total_data_length, input_data, typ, data_num=1):
         test_name = 'DataFrame.{}'.format(name)
 

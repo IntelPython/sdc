@@ -58,23 +58,6 @@ class TestSeriesStringMethods(TestBase):
         super().setUpClass()
         cls.width = [16, 64, 512, 1024]
 
-    def _test_jitted(self, pyfunc, record, *args, **kwargs):
-        # compilation time
-        record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
-
-        cfunc = numba.njit(pyfunc)
-
-        # Warming up
-        cfunc(*args, **kwargs)
-
-        # execution and boxing time
-        record["test_results"], record["boxing_results"] = \
-            get_times(cfunc, *args, **kwargs)
-
-    def _test_python(self, pyfunc, record, *args, **kwargs):
-        record["test_results"], _ = \
-            get_times(pyfunc, *args, **kwargs)
-
     def _test_case(self, pyfunc, name, total_data_length, input_data, typ, data_num=1):
         test_name = 'Series.{}'.format(name)
 
@@ -96,6 +79,8 @@ class TestSeriesStringMethods(TestBase):
                     extra_data = np.random.ranf(data_length)
                 elif typ == 'int':
                     extra_data = np.random.randint(10 ** 4, size=data_length)
+                elif typ == 'str':
+                    extra_data = np.random.choice(input_data, data_length)
                 args.append(pd.Series(extra_data))
 
             record = base.copy()
