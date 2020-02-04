@@ -342,11 +342,12 @@ def df_len_overload(df):
     return lambda df: len(df._data[0])
 
 
-@overload(operator.getitem)  # TODO: avoid lowering?
-def df_getitem_overload(df, ind):
-    if isinstance(df, DataFrameType) and isinstance(ind, types.StringLiteral):
-        index = df.columns.index(ind.literal_value)
-        return lambda df, ind: sdc.hiframes.api.init_series(df._data[index])
+if sdc.config.config_pipeline_hpat_default:
+    @overload(operator.getitem)  # TODO: avoid lowering?
+    def df_getitem_overload(df, ind):
+        if isinstance(df, DataFrameType) and isinstance(ind, types.StringLiteral):
+            index = df.columns.index(ind.literal_value)
+            return lambda df, ind: sdc.hiframes.api.init_series(df._data[index])
 
 
 @infer_global(operator.getitem)
