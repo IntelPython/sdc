@@ -3200,23 +3200,6 @@ class TestSeries(
         s = pd.Series(test_global_input_data_unicode_kind4)
         pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
-    # @skip_sdc_jit('Series.str.<method>() unsupported')
-    # def test_series_str2str_unsupported(self):
-    #     unsupported_methods = ['capitalize', 'swapcase', 'title']
-    #     for method in unsupported_methods:
-    #         func_lines = ['def test_impl(S):',
-    #                       '  return S.str.{}()'.format(method)]
-    #         func_text = '\n'.join(func_lines)
-    #         test_impl = _make_func_from_text(func_text)
-    #         hpat_func = self.jit(test_impl)
-    #
-    #         S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'])
-    #         # TypingError with expected message is raised internally by Numba
-    #         with self.assertRaises(TypingError) as raises:
-    #             hpat_func(S)
-    #         expected_msg = 'Series.str.{} is not supported yet'.format(method)
-    #         self.assertIn(expected_msg, str(raises.exception))
-
     @sdc_limitation
     def test_series_append_same_names(self):
         """SDC discards name"""
