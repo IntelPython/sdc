@@ -66,8 +66,6 @@ class TestSeriesStringMethods(TestBase):
             test_data = pd.Series(data)
 
             compile_results = calc_compilation(pyfunc, test_data, iter_number=self.iter_number)
-            # Warming up
-            hpat_func(test_data)
 
             exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)
 

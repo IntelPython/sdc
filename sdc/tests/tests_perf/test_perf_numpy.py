@@ -25,21 +25,24 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas
 import numpy as np
 
-import pandas
-import numba
+import time
+import random
+
 import sdc
 
-from sdc.tests.tests_perf.test_perf_base import TestBase
-from sdc.tests.tests_perf.test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
+from .test_perf_base import TestBase
 from sdc.tests.test_utils import test_global_input_data_float64
+from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from .generator import generate_test_cases
 from .generator import TestCase as TC
+from sdc.functions import numpy_like
 
 
-# python -m sdc.runtests sdc.tests.tests_perf.test_perf_df.TestDataFrameMethods.test_df_{method_name}
-class TestDataFrameMethods(TestBase):
+# python -m sdc.runtests sdc.tests.tests_perf.test_perf_numpy.TestFunctions.test_function_{name}
+class TestFunctions(TestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -48,23 +51,21 @@ class TestDataFrameMethods(TestBase):
         # compilation time
         record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
 
-        cfunc = numba.njit(pyfunc)
+        sdc_func = sdc.jit(pyfunc)
 
         # execution and boxing time
         record["test_results"], record["boxing_results"] = \
-            get_times(cfunc, *args, **kwargs)
+            get_times(sdc_func, *args, **kwargs)
 
     def _test_python(self, pyfunc, record, *args, **kwargs):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, name, total_data_length, data_num=1,
-                   input_data=test_global_input_data_float64):
+    def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
+        test_name = '{}'.format(name)
 
         if input_data is None:
             input_data = test_global_input_data_float64
-
-        test_name = 'DataFrame.{}'.format(name)
 
         full_input_data_length = sum(len(i) for i in input_data)
         for data_length in total_data_length:
@@ -74,38 +75,24 @@ class TestDataFrameMethods(TestBase):
             }
             data = perf_data_gen_fixed_len(input_data, full_input_data_length,
                                            data_length)
-            test_data = pandas.DataFrame({f"f{i}": data for i in range(3)})
+            test_data = np.array(data)
 
             args = [test_data]
-            for i in range(data_num-1):
+            for i in range(data_num - 1):
                 np.random.seed(i)
                 extra_data = np.random.ranf(data_length)
-                args.append(pandas.DataFrame({f"f{i}": extra_data for i in range(3)}))
+                args.append(np.array(extra_data))
 
             record = base.copy()
-            record["test_type"] = 'SDC'
+            record["test_type"] = 'jit'
             self._test_jitted(pyfunc, record, *args)
-            self.test_results.add(**record)
-
-            record = base.copy()
-            record["test_type"] = 'Python'
-            self._test_python(pyfunc, record, *args)
             self.test_results.add(**record)
 
 
 cases = [
-    TC(name='append', size=[10 ** 7], params='other', data_num=2),
-    TC(name='count', size=[10 ** 7]),
-    TC(name='drop', size=[10 ** 8], params='columns="f0"'),
-    TC(name='max', size=[10 ** 7]),
-    TC(name='mean', size=[10 ** 7]),
-    TC(name='median', size=[10 ** 7]),
-    TC(name='min', size=[10 ** 7]),
-    TC(name='pct_change', size=[10 ** 7]),
-    TC(name='prod', size=[10 ** 7]),
-    TC(name='std', size=[10 ** 7]),
-    TC(name='sum', size=[10 ** 7]),
-    TC(name='var', size=[10 ** 7]),
+    TC(name='astype_numpy', size=[10 ** 7], call_expr='data.astype(np.int64)', usecase_params='data'),
+    TC(name='astype_sdc', size=[10 ** 7], call_expr='sdc.functions.numpy_like.astype(data, np.int64)',
+       usecase_params='data'),
 ]
 
-generate_test_cases(cases, TestDataFrameMethods, 'df')
+generate_test_cases(cases, TestFunctions, 'function')
