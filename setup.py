@@ -93,7 +93,7 @@ if not is_win:
     io_libs += boost_libs
 
 ext_io = Extension(name="sdc.hio",
-                   sources=[],
+                   sources=["sdc/io/_io.cpp"],
                    depends=["sdc/_hpat_common.h", "sdc/_distributed.h",
                             "sdc/_import_py.h",
                             "sdc/_datetime_ext.h"],
@@ -132,7 +132,6 @@ ext_chiframes = Extension(name="sdc.chiframes",
                           include_dirs=ind,
                           library_dirs=lid,
                           )
-
 
 ext_dict = Extension(name="sdc.hdict_ext",
                      sources=["sdc/_dict_ext.cpp"],
