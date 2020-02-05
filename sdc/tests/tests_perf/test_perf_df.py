@@ -97,6 +97,7 @@ cases = [
     TC(name='append', size=[10 ** 7], params='other', data_num=2),
     TC(name='count', size=[10 ** 7]),
     TC(name='drop', size=[10 ** 8], params='columns="f0"'),
+    TC(name='isin', params='other', size=[10 ** 7], data_num=2),
     TC(name='max', size=[10 ** 7]),
     TC(name='mean', size=[10 ** 7]),
     TC(name='median', size=[10 ** 7]),
