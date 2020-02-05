@@ -38,31 +38,21 @@ from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from .generator import generate_test_cases
 from .generator import TestCase as TC
-from sdc.functions import numpy_like
 
 
-# python -m sdc.runtests sdc.tests.tests_perf.test_perf_numpy.TestFunctions.test_function_{name}
-class TestFunctions(TestBase):
+"""
+python -m sdc.runtests
+sdc.tests.tests_perf.test_perf_series_operators.TestSeriesOperatorMethods.test_series_operator_{name}
+"""
+
+
+class TestSeriesOperatorMethods(TestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_jitted(self, pyfunc, record, *args, **kwargs):
-        # compilation time
-        record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
-
-        sdc_func = sdc.jit(pyfunc)
-
-        # execution and boxing time
-        record["test_results"], record["boxing_results"] = \
-            get_times(sdc_func, *args, **kwargs)
-
-    def _test_python(self, pyfunc, record, *args, **kwargs):
-        record["test_results"], _ = \
-            get_times(pyfunc, *args, **kwargs)
-
     def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
-        test_name = '{}'.format(name)
+        test_name = 'Series.{}'.format(name)
 
         if input_data is None:
             input_data = test_global_input_data_float64
@@ -75,24 +65,32 @@ class TestFunctions(TestBase):
             }
             data = perf_data_gen_fixed_len(input_data, full_input_data_length,
                                            data_length)
-            test_data = np.array(data)
+            test_data = pandas.Series(data)
 
             args = [test_data]
             for i in range(data_num - 1):
                 np.random.seed(i)
                 extra_data = np.random.ranf(data_length)
-                args.append(np.array(extra_data))
+                args.append(pandas.Series(extra_data))
 
-            record = base.copy()
-            record["test_type"] = 'jit'
-            self._test_jitted(pyfunc, record, *args)
-            self.test_results.add(**record)
+            self.test_jit(pyfunc, base, *args)
+            self.test_py(pyfunc, base, *args)
 
 
 cases = [
-    TC(name='astype_numpy', size=[10 ** 7], call_expr='data.astype(np.int64)', usecase_params='data'),
-    TC(name='astype_sdc', size=[10 ** 7], call_expr='sdc.functions.numpy_like.astype(data, np.int64)',
-       usecase_params='data'),
+    TC(name='operator_add', size=[10 ** 7], call_expr='A + B', usecase_params='A, B', data_num=2),
+    TC(name='operator_eq', size=[10 ** 7], call_expr='A == B', usecase_params='A, B', data_num=2),
+    TC(name='operator_floordiv', size=[10 ** 7], call_expr='A // B', usecase_params='A, B', data_num=2),
+    TC(name='operator_ge', size=[10 ** 7], call_expr='A >= B', usecase_params='A, B', data_num=2),
+    TC(name='operator_gt', size=[10 ** 7], call_expr='A > B', usecase_params='A, B', data_num=2),
+    TC(name='operator_le', size=[10 ** 7], call_expr='A <= B', usecase_params='A, B', data_num=2),
+    TC(name='operator_lt', size=[10 ** 7], call_expr='A < B', usecase_params='A, B', data_num=2),
+    TC(name='operator_mod', size=[10 ** 7], call_expr='A % B', usecase_params='A, B', data_num=2),
+    TC(name='operator_mul', size=[10 ** 7], call_expr='A * B', usecase_params='A, B', data_num=2),
+    TC(name='operator_ne', size=[10 ** 7], call_expr='A != B', usecase_params='A, B', data_num=2),
+    TC(name='operator_pow', size=[10 ** 7], call_expr='A ** B', usecase_params='A, B', data_num=2),
+    TC(name='operator_sub', size=[10 ** 7], call_expr='A - B', usecase_params='A, B', data_num=2),
+    TC(name='operator_truediv', size=[10 ** 7], call_expr='A / B', usecase_params='A, B', data_num=2),
 ]
 
-generate_test_cases(cases, TestFunctions, 'function')
+generate_test_cases(cases, TestSeriesOperatorMethods, 'series')

@@ -184,6 +184,10 @@ def get_times(f, *args, iter_number=5):
     """Get time of boxing+unboxing and internal execution"""
     exec_times = []
     boxing_times = []
+
+    # Warming up
+    f(*args)
+
     for _ in range(iter_number):
         ext_start = time.time()
         int_result, _ = f(*args)
