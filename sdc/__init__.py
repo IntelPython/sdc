@@ -31,7 +31,6 @@ from numba import (typeof, prange, pndindex, gdb, gdb_breakpoint, gdb_init,
                    stencil, threading_layer, jitclass, objmode)
 
 import sdc.config
-import sdc.dict_ext
 import sdc.set_ext
 import sdc.io
 import sdc.io.np_io

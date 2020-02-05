@@ -133,14 +133,6 @@ ext_chiframes = Extension(name="sdc.chiframes",
                           library_dirs=lid,
                           )
 
-ext_dict = Extension(name="sdc.hdict_ext",
-                     sources=["sdc/_dict_ext.cpp"],
-                     extra_compile_args=eca,
-                     extra_link_args=ela,
-                     include_dirs=ind,
-                     library_dirs=lid,
-                     )
-
 ext_set = Extension(name="sdc.hset_ext",
                     sources=["sdc/_set_ext.cpp"],
                     extra_compile_args=eca,
@@ -208,7 +200,7 @@ ext_cv_wrapper = Extension(name="sdc.cv_wrapper",
                            language="c++",
                            )
 
-_ext_mods = [ext_hdist, ext_chiframes, ext_dict, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq]
+_ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq]
 
 if _has_pyarrow:
     _ext_mods.append(ext_parquet)
