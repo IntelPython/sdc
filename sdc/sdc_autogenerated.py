@@ -309,7 +309,7 @@ def sdc_pandas_series_operator_sub(self, other):
                     result_data[:] = self._data - other._data
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_n_dtypeleft_index, )
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -452,7 +452,7 @@ def sdc_pandas_series_operator_mul(self, other):
                     result_data[:] = self._data * other._data
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_n_dtypeleft_index, )
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -595,7 +595,7 @@ def sdc_pandas_series_operator_truediv(self, other):
                     result_data[:] = self._data / other._data
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_n_dtypeleft_index, )
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -738,7 +738,7 @@ def sdc_pandas_series_operator_floordiv(self, other):
                     result_data[:] = self._data // other._data
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_n_dtypeleft_index, )
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -881,7 +881,7 @@ def sdc_pandas_series_operator_mod(self, other):
                     result_data[:] = self._data % other._data
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_n_dtypeleft_index, )
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -1024,7 +1024,7 @@ def sdc_pandas_series_operator_pow(self, other):
                     result_data[:] = self._data ** other._data
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_n_dtypeleft_index, )
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -1133,7 +1133,7 @@ def sdc_pandas_series_operator_lt(self, other):
 
                 if sdc_check_indexes_equal(left_index, right_index):
                     if none_or_numeric_indexes == True:  # noqa
-                        new_index = left_index.astype(numba_n_dtypeleft_index, )
+                        new_index = astype(left_index, numba_index_common_dtype)
                     else:
                         new_index = self._index
                     return pandas.Series(self._data < other._data,
@@ -1230,7 +1230,7 @@ def sdc_pandas_series_operator_gt(self, other):
 
                 if sdc_check_indexes_equal(left_index, right_index):
                     if none_or_numeric_indexes == True:  # noqa
-                        new_index = left_index.astype(numba_n_dtypeleft_index, )
+                        new_index = astype(left_index, numba_index_common_dtype)
                     else:
                         new_index = self._index
                     return pandas.Series(self._data > other._data,
@@ -1327,7 +1327,7 @@ def sdc_pandas_series_operator_le(self, other):
 
                 if sdc_check_indexes_equal(left_index, right_index):
                     if none_or_numeric_indexes == True:  # noqa
-                        new_index = left_index.astype(numba_n_dtypeleft_index, )
+                        new_index = astype(left_index, numba_index_common_dtype)
                     else:
                         new_index = self._index
                     return pandas.Series(self._data <= other._data,
@@ -1424,7 +1424,7 @@ def sdc_pandas_series_operator_ge(self, other):
 
                 if sdc_check_indexes_equal(left_index, right_index):
                     if none_or_numeric_indexes == True:  # noqa
-                        new_index = left_index.astype(numba_n_dtypeleft_index, )
+                        new_index = astype(left_index, numba_index_common_dtype)
                     else:
                         new_index = self._index
                     return pandas.Series(self._data >= other._data,
@@ -1521,7 +1521,7 @@ def sdc_pandas_series_operator_ne(self, other):
 
                 if sdc_check_indexes_equal(left_index, right_index):
                     if none_or_numeric_indexes == True:  # noqa
-                        new_index = left_index.astype(numba_n_dtypeleft_index, )
+                        new_index = astype(left_index, numba_index_common_dtype)
                     else:
                         new_index = self._index
                     return pandas.Series(self._data != other._data,
@@ -1618,7 +1618,7 @@ def sdc_pandas_series_operator_eq(self, other):
 
                 if sdc_check_indexes_equal(left_index, right_index):
                     if none_or_numeric_indexes == True:  # noqa
-                        new_index = left_index.astype(numba_n_dtypeleft_index, )
+                        new_index = astype(left_index, numba_index_common_dtype)
                     else:
                         new_index = self._index
                     return pandas.Series(self._data == other._data,
