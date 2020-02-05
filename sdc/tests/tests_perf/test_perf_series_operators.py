@@ -40,39 +40,14 @@ from .generator import generate_test_cases
 from .generator import TestCase as TC
 
 
-"""
-python -m sdc.runtests
-sdc.tests.tests_perf.test_perf_series_operators.TestSeriesOperatorMethods.test_series_operator_{name}
-"""
-
-
+# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series_operators.TestSeriesOperatorMethods.test_series_operator_{name}
 class TestSeriesOperatorMethods(TestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_jitted(self, pyfunc, record, *args, **kwargs):
-        # compilation time
-        record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
-
-        sdc_func = sdc.jit(pyfunc)
-
-        # Warming up
-        sdc_func(*args, **kwargs)
-
-        # execution and boxing time
-        record["test_results"], record["boxing_results"] = \
-            get_times(sdc_func, *args, **kwargs)
-
-    def _test_python(self, pyfunc, record, *args, **kwargs):
-        record["test_results"], _ = \
-            get_times(pyfunc, *args, **kwargs)
-
-    def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
+    def _test_case(self, pyfunc, name, total_data_length, input_data, typ, data_num=1):
         test_name = 'Series.{}'.format(name)
-
-        if input_data is None:
-            input_data = test_global_input_data_float64
 
         full_input_data_length = sum(len(i) for i in input_data)
         for data_length in total_data_length:
@@ -87,18 +62,14 @@ class TestSeriesOperatorMethods(TestBase):
             args = [test_data]
             for i in range(data_num - 1):
                 np.random.seed(i)
-                extra_data = np.random.ranf(data_length)
+                if typ == 'float':
+                    extra_data = np.random.ranf(data_length)
+                elif typ == 'int':
+                    extra_data = np.random.randint(10 ** 4, size=data_length)
                 args.append(pandas.Series(extra_data))
 
-            record = base.copy()
-            record["test_type"] = 'SDC'
-            self._test_jitted(pyfunc, record, *args)
-            self.test_results.add(**record)
-
-            record = base.copy()
-            record["test_type"] = 'Python'
-            self._test_python(pyfunc, record, *args)
-            self.test_results.add(**record)
+            self.test_jit(pyfunc, base, args)
+            self.test_py(pyfunc, base, args)
 
 
 cases = [
