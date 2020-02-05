@@ -86,18 +86,12 @@ eca = ['-std=c++11', ]  # '-g', '-O0']
 ela = ['-std=c++11', ]
 
 io_libs = []
-boost_libs = []
-
-if not is_win:
-    boost_libs = ['boost_filesystem', 'boost_system']
-    io_libs += boost_libs
 
 ext_io = Extension(name="sdc.hio",
                    sources=["sdc/io/_io.cpp"],
                    depends=["sdc/_hpat_common.h", "sdc/_distributed.h",
                             "sdc/_import_py.h",
                             "sdc/_datetime_ext.h"],
-                   libraries=boost_libs,
                    include_dirs=ind + np_compile_args['include_dirs'],
                    library_dirs=lid,
                    extra_compile_args=eca,
@@ -146,7 +140,7 @@ str_libs = np_compile_args['libraries']
 ext_str = Extension(name="sdc.hstr_ext",
                     sources=["sdc/_str_ext.cpp"],
                     libraries=str_libs,
-                    define_macros=np_compile_args['define_macros'] + [('USE_BOOST_REGEX', None)],
+                    define_macros=np_compile_args['define_macros'],
                     extra_compile_args=eca,
                     extra_link_args=ela,
                     include_dirs=np_compile_args['include_dirs'] + ind,
@@ -165,11 +159,6 @@ ext_dt = Extension(name="sdc.hdatetime_ext",
                    )
 
 pq_libs = ['arrow', 'parquet']
-
-# Windows MSVC can't have boost library names on command line
-# auto-link magic of boost should be used
-if not is_win:
-    pq_libs += ['boost_filesystem']
 
 # if is_win:
 #     pq_libs += ['arrow', 'parquet']
