@@ -30,6 +30,7 @@
 #include <numpy/arrayobject.h>
 #include <string>
 #include <vector>
+#include <cmath>
 
 #include "_str_decode.cpp"
 
