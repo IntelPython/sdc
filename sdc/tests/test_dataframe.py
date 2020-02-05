@@ -1282,7 +1282,6 @@ class TestDataFrame(TestCase):
                 with self.assertRaises(KeyError):
                     sdc_func(df, 'ABC')
 
-    @skip_numba_jit
     def test_isin_df1(self):
         def test_impl(df, df2):
             return df.isin(df2)
