@@ -65,8 +65,8 @@ class TestDataFrameMethods(TestBase):
                     extra_data = np.random.randint(10 ** 4, size=data_length)
                 args.append(pandas.DataFrame({f"f{i}": extra_data for i in range(3)}))
 
-            self.test_jit(pyfunc, base, args)
-            self.test_py(pyfunc, base, args)
+            self.test_jit(pyfunc, base, *args)
+            self.test_py(pyfunc, base, *args)
 
 
 cases = [

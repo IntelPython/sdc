@@ -73,6 +73,7 @@ class TestSeriesStringMethods(TestBase):
             test_data = pd.Series(data)
 
             args = [test_data]
+
             for i in range(data_num - 1):
                 np.random.seed(i)
                 if typ == 'float':
@@ -83,8 +84,8 @@ class TestSeriesStringMethods(TestBase):
                     extra_data = np.random.choice(input_data, data_length)
                 args.append(pd.Series(extra_data))
 
-            self.test_jit(pyfunc, base, args)
-            self.test_py(pyfunc, base, args)
+            self.test_jit(pyfunc, base, *args)
+            self.test_py(pyfunc, base, *args)
 
 
 cases = [
