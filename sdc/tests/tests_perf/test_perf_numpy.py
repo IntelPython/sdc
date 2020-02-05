@@ -53,9 +53,6 @@ class TestFunctions(TestBase):
 
         sdc_func = sdc.jit(pyfunc)
 
-        # Warming up
-        sdc_func(*args, **kwargs)
-
         # execution and boxing time
         record["test_results"], record["boxing_results"] = \
             get_times(sdc_func, *args, **kwargs)
