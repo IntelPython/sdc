@@ -75,8 +75,8 @@ class TestSeriesStringMethods(TestBase):
 
             args = [test_data]
 
-            self.test_jit(pyfunc, base, args)
-            self.test_py(pyfunc, base, args)
+            self.test_jit(pyfunc, base, *args)
+            self.test_py(pyfunc, base, *args)
 
 
 cases = [

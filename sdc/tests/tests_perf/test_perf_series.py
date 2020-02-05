@@ -68,8 +68,8 @@ class TestSeriesMethods(TestBase):
                 extra_data = np.random.ranf(data_length)
                 args.append(pandas.Series(extra_data))
 
-            self.test_jit(pyfunc, base, args)
-            self.test_py(pyfunc, base, args)
+            self.test_jit(pyfunc, base, *args)
+            self.test_py(pyfunc, base, *args)
 
 
 cases = [
