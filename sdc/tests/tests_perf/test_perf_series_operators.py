@@ -51,12 +51,16 @@ class TestSeriesOperatorMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
 
-    def gen_extra_data(self, data_num, data_length, args):
+    def gen_data(self, data_num, data_length, input_data):
+        data = []
+        full_input_data_length = sum(len(i) for i in input_data)
+        data.append(perf_data_gen_fixed_len(input_data, full_input_data_length,
+                                            data_length))
         for i in range(data_num - 1):
             np.random.seed(i)
-            extra_data = np.random.ranf(data_length)
-            args.append(pandas.Series(extra_data))
-        return args
+            data.append(np.random.ranf(data_length))
+
+        return data
 
     def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
         test_name = 'Series.{}'.format(name)
@@ -64,18 +68,17 @@ class TestSeriesOperatorMethods(TestBase):
         if input_data is None:
             input_data = test_global_input_data_float64
 
-        full_input_data_length = sum(len(i) for i in input_data)
         for data_length in total_data_length:
             base = {
                 "test_name": test_name,
                 "data_size": data_length,
             }
-            data = perf_data_gen_fixed_len(input_data, full_input_data_length,
-                                           data_length)
-            test_data = pandas.Series(data)
 
-            args = [test_data]
-            args = self.gen_extra_data(data_num, data_length, args)
+            datas = self.gen_data(data_num, data_length, input_data)
+            args = []
+            for data in datas:
+                test_data = pandas.Series(data)
+                args.append(test_data)
 
             self.test_jit(pyfunc, base, *args)
             self.test_py(pyfunc, base, *args)

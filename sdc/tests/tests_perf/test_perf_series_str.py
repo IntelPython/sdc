@@ -32,6 +32,7 @@ import unittest
 from contextlib import contextmanager
 
 import pandas as pd
+import numpy as np
 
 from sdc.tests.test_utils import *
 from sdc.tests.tests_perf.test_perf_base import TestBase
@@ -57,6 +58,17 @@ class TestSeriesStringMethods(TestBase):
         super().setUpClass()
         cls.width = [16, 64, 512, 1024]
 
+    def gen_data(self, data_num, data_length, input_data, data_width):
+        data = []
+        full_input_data_length = data_width
+        data.append(perf_data_gen_fixed_len(input_data, full_input_data_length,
+                                            data_length))
+        for i in range(data_num - 1):
+            np.random.seed(i)
+            data.append(np.random.choice(input_data, data_length))
+
+        return data
+
     def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
         test_name = 'Series.{}'.format(name)
 
@@ -68,12 +80,11 @@ class TestSeriesStringMethods(TestBase):
                 "data_size": data_length,
                 "data_width": data_width,
             }
-            full_input_data_length = data_width
-            data = perf_data_gen_fixed_len(input_data, full_input_data_length,
-                                           data_length)
-            test_data = pd.Series(data)
-
-            args = [test_data]
+            datas = self.gen_data(data_num, data_length, input_data, data_width)
+            args = []
+            for data in datas:
+                test_data = pd.Series(data)
+                args.append(test_data)
 
             self.test_jit(pyfunc, base, *args)
             self.test_py(pyfunc, base, *args)
