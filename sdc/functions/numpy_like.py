@@ -33,9 +33,11 @@
 
 import numba
 import numpy
+import numpy as np
 
 from numba import types, jit, prange, numpy_support
 from numba.errors import TypingError
+from numba.targets.arraymath import get_isnan, _median_inner
 
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
@@ -97,3 +99,32 @@ def sdc_astype_overload(self, dtype):
             return arr
 
         return sdc_astype_number_impl
+
+
+def nanmedian(a):
+    pass
+
+
+@sdc_overload(nanmedian)
+def np_nanmedian(a):
+    if not isinstance(a, types.Array):
+        return
+    isnan = get_isnan(a.dtype)
+
+    def nanmedian_impl(a):
+        # Create a temporary workspace with only non-NaN values
+        temp_arry = np.empty(a.size, a.dtype)
+        n = 0
+        for i in prange(len(a)):
+            v = a[i]
+            if not isnan(v):
+                temp_arry[n] = v
+                n += 1
+
+        # all NaNs
+        if n == 0:
+            return np.nan
+
+        return _median_inner(temp_arry, n)
+
+    return nanmedian_impl
