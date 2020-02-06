@@ -26,19 +26,17 @@
 
 #include <Python.h>
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#include <boost/algorithm/string/replace.hpp>
 #include <iostream>
 #include <numpy/arrayobject.h>
 #include <string>
 #include <vector>
+#include <cmath>
 
 #include "_str_decode.cpp"
 
 #include <regex>
 using std::regex;
 using std::regex_search;
-
-#include <boost/lexical_cast.hpp>
 
 #ifndef _WIN32
 #include <glob.h>
@@ -118,7 +116,6 @@ extern "C"
     bool str_contains_regex(std::string* str, regex* e);
     bool str_contains_noregex(std::string* str, std::string* pat);
     std::string* str_replace_regex(std::string* str, regex* e, std::string* val);
-    std::string* str_replace_noregex(std::string* str, std::string* pat, std::string* val);
     char get_char_from_string(std::string* str, int64_t index);
 
     void* str_from_int32(int in);
@@ -191,7 +188,6 @@ extern "C"
         PyObject_SetAttrString(m, "str_contains_noregex", PyLong_FromVoidPtr((void*)(&str_contains_noregex)));
         PyObject_SetAttrString(m, "str_contains_regex", PyLong_FromVoidPtr((void*)(&str_contains_regex)));
         PyObject_SetAttrString(m, "str_replace_regex", PyLong_FromVoidPtr((void*)(&str_replace_regex)));
-        PyObject_SetAttrString(m, "str_replace_noregex", PyLong_FromVoidPtr((void*)(&str_replace_noregex)));
         PyObject_SetAttrString(m, "str_from_int32", PyLong_FromVoidPtr((void*)(&str_from_int32)));
         PyObject_SetAttrString(m, "str_from_int64", PyLong_FromVoidPtr((void*)(&str_from_int64)));
         PyObject_SetAttrString(m, "str_from_float32", PyLong_FromVoidPtr((void*)(&str_from_float32)));
@@ -531,10 +527,10 @@ extern "C"
         uint32_t start = offsets[index];
         try
         {
-            *out = boost::lexical_cast<int64_t>(data + start, (std::size_t)size);
+            *out = stoll(std::string(data + start, (std::size_t)size));
             return 0;
         }
-        catch (const boost::bad_lexical_cast&)
+        catch (const std::exception&)
         {
             *out = 0;
             return -1;
@@ -548,10 +544,10 @@ extern "C"
         uint32_t start = offsets[index];
         try
         {
-            *out = boost::lexical_cast<double>(data + start, (std::size_t)size);
+            *out = stod(std::string(data + start, (std::size_t)size));
             return 0;
         }
-        catch (const boost::bad_lexical_cast&)
+        catch (const std::exception&)
         {
             *out = std::nan(""); // TODO: numpy NaN
             return -1;
@@ -563,9 +559,9 @@ extern "C"
     {
         try
         {
-            return boost::lexical_cast<int64_t>(data, (std::size_t)length);
+            return stoll(std::string(data, (std::size_t)length));
         }
-        catch (const boost::bad_lexical_cast&)
+        catch (const std::exception&)
         {
             std::cerr << "invalid string to int conversion" << std::endl;
             return -1;
@@ -596,14 +592,6 @@ extern "C"
     std::string* str_replace_regex(std::string* str, regex* e, std::string* val)
     {
         return new std::string(regex_replace(*str, *e, *val));
-    }
-
-    std::string* str_replace_noregex(std::string* str, std::string* pat, std::string* val)
-    {
-        std::string* out = new std::string(*str);
-        boost::replace_all(*out, *pat, *val);
-        // std::cout << *out << std::endl;
-        return out;
     }
 
     void print_str(std::string* str)

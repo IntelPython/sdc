@@ -40,7 +40,7 @@ from numba.errors import TypingError
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size)
-from sdc.utilities.utils import sdc_overload
+from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 
 
 def astype(self, dtype):

@@ -43,7 +43,7 @@ from sdc.tests.test_utils import (check_numba_version,
                                   count_parfor_OneDs,
                                   count_parfor_REPs,
                                   dist_IR_contains,
-                                  gen_df,
+                                  gen_df, gen_df_int_cols,
                                   get_start_end,
                                   skip_numba_jit,
                                   skip_sdc_jit,
@@ -1213,24 +1213,28 @@ class TestDataFrame(TestCase):
         sdc_func = self.jit(test_impl)
         pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
-    @skip_sdc_jit('DF.getitem unsupported Series name')
-    def test_df_getitem_str_literal_idx(self):
-        dfs = [gen_df(test_global_input_data_float64),
-               gen_df(test_global_input_data_float64, with_index=True),
-               pd.DataFrame({'A': []})]
-        for df in dfs:
-            with self.subTest(df=df):
-                self._test_df_getitem_str_literal_idx(df)
+    def _test_df_getitem_unicode_idx(self, df, idx):
+        def test_impl(df, idx):
+            return df[idx]
 
-    @skip_sdc_jit('DF.getitem unsupported Series name')
-    def test_df_getitem_str_literal_idx_multiple_types(self):
-        int_data = [-1, 1, 0]
-        float_data = [0.1, 0., -0.1]
-        str_data = ['ascii', '12345', '1234567890']
-        for a, b, c in permutations([int_data, float_data, str_data], 3):
-            df = pd.DataFrame({'A': a, 'B': b, 'C': c})
-            with self.subTest(df=df):
-                self._test_df_getitem_str_literal_idx(df)
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_series_equal(sdc_func(df, idx), test_impl(df, idx))
+
+    def _test_df_getitem_slice_idx(self, df):
+        def test_impl(df):
+            return df[1:3]
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    def _test_df_getitem_unbox_slice_idx(self, df, start, end):
+        def test_impl(df, start, end):
+            return df[start:end]
+
+        sdc_func = self.jit(test_impl)
+        jit_result = sdc_func(df, start, end)
+        ref_result = test_impl(df, start, end)
+        pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DF.getitem unsupported exceptions')
     def test_df_getitem_str_literal_idx_exception_key_error(self):
@@ -1244,32 +1248,6 @@ class TestDataFrame(TestCase):
                 with self.assertRaises(KeyError):
                     sdc_func(df)
 
-    def _test_df_getitem_unicode_idx(self, df, idx):
-        def test_impl(df, idx):
-            return df[idx]
-
-        sdc_func = self.jit(test_impl)
-        pd.testing.assert_series_equal(sdc_func(df, idx), test_impl(df, idx))
-
-    @skip_sdc_jit('DF.getitem unsupported Series name')
-    def test_df_getitem_unicode_idx(self):
-        dfs = [gen_df(test_global_input_data_float64),
-               gen_df(test_global_input_data_float64, with_index=True),
-               pd.DataFrame({'A': []})]
-        for df in dfs:
-            with self.subTest(df=df):
-                self._test_df_getitem_unicode_idx(df, 'A')
-
-    @skip_sdc_jit('DF.getitem unsupported Series name')
-    def test_df_getitem_unicode_idx_multiple_types(self):
-        int_data = [-1, 1, 0]
-        float_data = [0.1, 0., -0.1]
-        str_data = ['ascii', '12345', '1234567890']
-        for a, b, c in permutations([int_data, float_data, str_data], 3):
-            df = pd.DataFrame({'A': a, 'B': b, 'C': c})
-            with self.subTest(df=df):
-                self._test_df_getitem_unicode_idx(df, 'A')
-
     @skip_sdc_jit('DF.getitem unsupported exceptions')
     def test_df_getitem_unicode_idx_exception_key_error(self):
         def test_impl(df, idx):
@@ -1281,6 +1259,51 @@ class TestDataFrame(TestCase):
             with self.subTest(df=df):
                 with self.assertRaises(KeyError):
                     sdc_func(df, 'ABC')
+
+    @skip_sdc_jit('DF.getitem unsupported Series name')
+    def test_df_getitem_idx(self):
+        dfs = [gen_df(test_global_input_data_float64),
+               gen_df(test_global_input_data_float64, with_index=True),
+               pd.DataFrame({'A': []})]
+        for df in dfs:
+            with self.subTest(df=df):
+                self._test_df_getitem_str_literal_idx(df)
+                self._test_df_getitem_unicode_idx(df, 'A')
+                self._test_df_getitem_slice_idx(df)
+                self._test_df_getitem_unbox_slice_idx(df, 1, 3)
+
+    @skip_sdc_jit('DF.getitem unsupported Series name')
+    def test_df_getitem_idx_multiple_types(self):
+        int_data = [-1, 1, 0]
+        float_data = [0.1, 0., -0.1]
+        str_data = ['ascii', '12345', '1234567890']
+        for a, b, c in permutations([int_data, float_data, str_data], 3):
+            df = pd.DataFrame({'A': a, 'B': b, 'C': c})
+            with self.subTest(df=df):
+                self._test_df_getitem_str_literal_idx(df)
+                self._test_df_getitem_unicode_idx(df, 'A')
+                self._test_df_getitem_slice_idx(df)
+                self._test_df_getitem_unbox_slice_idx(df, 1, 3)
+
+    @unittest.skip('DF.getitem unsupported integer columns')
+    def test_df_getitem_int_literal_idx(self):
+        def test_impl(df):
+            return df[1]
+
+        sdc_func = self.jit(test_impl)
+        df = gen_df_int_cols(test_global_input_data_float64)
+
+        pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
+
+    @unittest.skip('DF.getitem unsupported idx as a tuple')
+    def test_df_getitem_unicode_tuple_idx(self):
+        def test_impl(df):
+            return df[['A', 'B']]
+
+        sdc_func = self.jit(lambda df: df[('A', 'B')])
+        df = gen_df(test_global_input_data_float64)
+
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
     @skip_numba_jit
     def test_isin_df1(self):

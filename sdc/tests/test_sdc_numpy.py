@@ -160,6 +160,5 @@ class TestArrays(TestCase):
                 with self.subTest(data=case, type=type_):
                     np.testing.assert_array_equal(sdc_func(a, type_), ref_impl(a, type_))
 
-
 if __name__ == "__main__":
     unittest.main()

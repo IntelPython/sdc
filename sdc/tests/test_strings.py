@@ -190,23 +190,6 @@ class TestStrings(TestCase):
             _str.replace(re.compile(pat).search(_str).group(), val)
         )
 
-    def test_replace_noregex_std(self):
-        def test_impl(_str, pat, val):
-            s = unicode_to_std_str(_str)
-            e = unicode_to_std_str(pat)
-            val = unicode_to_std_str(val)
-            out = sdc.str_ext.str_replace_noregex(s, e, val)
-            return std_str_to_unicode(out)
-        hpat_func = self.jit(test_impl)
-
-        _str = 'What does the fox say'
-        pat = 'does the fox'
-        val = 'does the cat'
-        self.assertEqual(
-            hpat_func(_str, pat, val),
-            _str.replace(pat, val)
-        )
-
     # string array tests
     def test_string_array_constructor(self):
         # create StringArray and return as list of strings
@@ -352,15 +335,6 @@ class TestStrings(TestCase):
         hpat_func = self.jit(test_impl)
 
         self.assertEqual(hpat_func(), test_impl())
-
-    def test_dict_string(self):
-        def test_impl():
-            s = sdc.dict_ext.dict_unicode_type_unicode_type_init()
-            s['aa'] = 'bb'
-            return s['aa'], ('aa' in s)
-        hpat_func = self.jit(test_impl)
-
-        self.assertEqual(hpat_func(), ('bb', True))
 
 
 if __name__ == "__main__":
