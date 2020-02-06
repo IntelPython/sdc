@@ -56,5 +56,3 @@ def gen_df(data_num, data_length, input_data):
         args.append(test_data)
 
     return args
-
-
