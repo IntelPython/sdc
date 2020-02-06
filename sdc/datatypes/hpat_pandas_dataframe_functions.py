@@ -929,7 +929,7 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
     return sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns)
 
 
-def df_getitem_slice_idx_main_codelines(self, idx):
+def df_getitem_slice_idx_main_codelines(self):
     """Generate main code lines for df.getitem"""
     if isinstance(self.index, types.NoneType):
         func_lines = ['  length = len(get_dataframe_data(self, 0))',
@@ -953,7 +953,7 @@ def df_getitem_slice_idx_main_codelines(self, idx):
     return func_lines
 
 
-def df_getitem_str_slice_codegen(self, idx):
+def df_getitem_str_slice_codegen(self):
     """
     Example of generated implementation with provided index:
         def _df_getitem_slice_idx_impl(self, idx):
@@ -966,7 +966,7 @@ def df_getitem_str_slice_codegen(self, idx):
     """
     func_lines = ['def _df_getitem_slice_idx_impl(self, idx):']
     if self.columns:
-        func_lines += df_getitem_slice_idx_main_codelines(self, idx)
+        func_lines += df_getitem_slice_idx_main_codelines(self)
     else:
         # raise KeyError if input DF is empty
         func_lines += ['  raise KeyError']
@@ -978,8 +978,8 @@ def df_getitem_str_slice_codegen(self, idx):
     return func_text, global_vars
 
 
-def gen_df_getitem_slice_idx_impl(self, idx):
-    func_text, global_vars = df_getitem_str_slice_codegen(self, idx)
+def gen_df_getitem_slice_idx_impl(self):
+    func_text, global_vars = df_getitem_str_slice_codegen(self)
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
@@ -1019,7 +1019,7 @@ def sdc_pandas_dataframe_getitem(self, idx):
         return _df_getitem_unicode_idx_impl
 
     if isinstance(idx, types.SliceType):
-        return gen_df_getitem_slice_idx_impl(self, idx)
+        return gen_df_getitem_slice_idx_impl(self)
 
     ty_checker = TypeChecker('Operator getitem().')
     ty_checker.raise_exc(idx, 'str', 'idx')
