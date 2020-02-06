@@ -55,6 +55,15 @@ class TestDataFrameMethods(TestBase):
 
         return data
 
+    def gen_args(self, data_num, data_length, input_data):
+        datas = self.gen_data(data_num, data_length, input_data)
+        args = []
+        for data in datas:
+            test_data = pandas.DataFrame({f"f{i}": data for i in range(3)})
+            args.append(test_data)
+
+        return args
+
     def _test_case(self, pyfunc, name, total_data_length, input_data, data_num=1):
         test_name = 'DataFrame.{}'.format(name)
 
@@ -67,11 +76,7 @@ class TestDataFrameMethods(TestBase):
                 "data_size": data_length,
             }
 
-            datas = self.gen_data(data_num, data_length, input_data)
-            args = []
-            for data in datas:
-                test_data = pandas.DataFrame({f"f{i}": data for i in range(3)})
-                args.append(test_data)
+            args = self.gen_args(data_num, data_length, input_data)
 
             self.test_jit(pyfunc, base, *args)
             self.test_py(pyfunc, base, *args)

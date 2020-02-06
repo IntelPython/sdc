@@ -57,6 +57,15 @@ class TestSeriesMethods(TestBase):
 
         return data
 
+    def gen_args(self, data_num, data_length, input_data):
+        datas = self.gen_data(data_num, data_length, input_data)
+        args = []
+        for data in datas:
+            test_data = pandas.Series(data)
+            args.append(test_data)
+
+        return args
+
     def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
         test_name = 'Series.{}'.format(name)
 
@@ -69,11 +78,7 @@ class TestSeriesMethods(TestBase):
                 "data_size": data_length,
             }
 
-            datas = self.gen_data(data_num, data_length, input_data)
-            args = []
-            for data in datas:
-                test_data = pandas.Series(data)
-                args.append(test_data)
+            args = self.gen_args(data_num, data_length, input_data)
 
             self.test_jit(pyfunc, base, *args)
             self.test_py(pyfunc, base, *args)
