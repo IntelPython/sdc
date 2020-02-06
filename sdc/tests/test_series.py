@@ -3167,6 +3167,14 @@ class TestSeries(
                 pd.testing.assert_series_equal(hpat_func(S), test_impl(S),
                                                check_names=check_names)
 
+    def test_series_capitalize_str_with_none(self):
+        def test_impl(S):
+            return S.str.capitalize()
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None])
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
     def test_series_capitalize_str(self):
         def test_impl(S):
             return S.str.capitalize()
@@ -3183,6 +3191,14 @@ class TestSeries(
         s = pd.Series(test_global_input_data_unicode_kind4)
         pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
+    def test_series_title_str_with_none(self):
+        def test_impl(S):
+            return S.str.title()
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None])
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
     def test_series_swapcase_str(self):
         def test_impl(S):
             return S.str.swapcase()
@@ -3191,12 +3207,28 @@ class TestSeries(
         s = pd.Series(test_global_input_data_unicode_kind4)
         pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
+    def test_series_swapcase_str_with_none(self):
+        def test_impl(S):
+            return S.str.swapcase()
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None])
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
     def test_series_casefold_str(self):
         def test_impl(S):
             return S.str.casefold()
 
         sdc_func = self.jit(test_impl)
         s = pd.Series(test_global_input_data_unicode_kind4)
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_casefold_str_with_none(self):
+        def test_impl(S):
+            return S.str.casefold()
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None])
         pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     @sdc_limitation

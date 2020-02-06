@@ -72,6 +72,8 @@ from numba.types import (Boolean, Integer, NoneType,
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.utilities.utils import sdc_overload_method
+from sdc.hiframes.api import get_nan_mask
+from sdc.str_arr_ext import str_arr_set_na_by_mask, create_str_arr_from_list
 
 _hpat_pandas_stringmethods_autogen_global_dict = {
     'pandas': pandas,
@@ -908,10 +910,13 @@ def hpat_pandas_stringmethods_capitalize(self):
     ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_capitalize_impl(self):
+        mask = get_nan_mask(self._data._data)
         item_count = len(self._data)
-        result = [''] * item_count
+        res_list = [''] * item_count
         for idx in numba.prange(item_count):
-            result[idx] = self._data._data[idx].capitalize()
+            res_list[idx] = self._data._data[idx].capitalize()
+        str_arr = create_str_arr_from_list(res_list)
+        result = str_arr_set_na_by_mask(str_arr, mask)
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
@@ -924,10 +929,13 @@ def hpat_pandas_stringmethods_title(self):
     ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_title_impl(self):
+        mask = get_nan_mask(self._data._data)
         item_count = len(self._data)
-        result = [''] * item_count
+        res_list = [''] * item_count
         for idx in numba.prange(item_count):
-            result[idx] = self._data._data[idx].title()
+            res_list[idx] = self._data._data[idx].title()
+        str_arr = create_str_arr_from_list(res_list)
+        result = str_arr_set_na_by_mask(str_arr, mask)
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
@@ -940,10 +948,13 @@ def hpat_pandas_stringmethods_swapcase(self):
     ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_swapcase_impl(self):
+        mask = get_nan_mask(self._data._data)
         item_count = len(self._data)
-        result = [''] * item_count
+        res_list = [''] * item_count
         for idx in numba.prange(item_count):
-            result[idx] = self._data._data[idx].swapcase()
+            res_list[idx] = self._data._data[idx].swapcase()
+        str_arr = create_str_arr_from_list(res_list)
+        result = str_arr_set_na_by_mask(str_arr, mask)
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
@@ -956,10 +967,13 @@ def hpat_pandas_stringmethods_casefold(self):
     ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_casefold_impl(self):
+        mask = get_nan_mask(self._data._data)
         item_count = len(self._data)
-        result = [''] * item_count
+        res_list = [''] * item_count
         for idx in numba.prange(item_count):
-            result[idx] = self._data._data[idx].casefold()
+            res_list[idx] = self._data._data[idx].casefold()
+        str_arr = create_str_arr_from_list(res_list)
+        result = str_arr_set_na_by_mask(str_arr, mask)
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
