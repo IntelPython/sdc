@@ -29,23 +29,23 @@ def gen_data(data_num, data_length, input_data):
 
 
 def gen_series_str(data_num, data_length, input_data, data_width):
-    datas = gen_str_data(data_num, data_length, input_data, data_width)
-    args = []
-    for data in datas:
+    all_data = gen_str_data(data_num, data_length, input_data, data_width)
+    results = []
+    for data in all_data:
         test_data = pd.Series(data)
-        args.append(test_data)
+        results.append(test_data)
 
-    return args
+    return results
 
 
 def gen_series(data_num, data_length, input_data):
-    datas = gen_data(data_num, data_length, input_data)
-    args = []
-    for data in datas:
+    all_data = gen_data(data_num, data_length, input_data)
+    results = []
+    for data in all_data:
         test_data = pd.Series(data)
-        args.append(test_data)
+        results.append(test_data)
 
-    return args
+    return results
 
 
 def gen_df(data_num, data_length, input_data, columns=3):
