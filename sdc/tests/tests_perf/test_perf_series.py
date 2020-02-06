@@ -46,6 +46,13 @@ class TestSeriesMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
 
+    def gen_extra_data(self, data_num, data_length, args):
+        for i in range(data_num - 1):
+            np.random.seed(i)
+            extra_data = np.random.ranf(data_length)
+            args.append(pandas.Series(extra_data))
+        return args
+
     def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
         test_name = 'Series.{}'.format(name)
 
@@ -63,10 +70,7 @@ class TestSeriesMethods(TestBase):
             test_data = pandas.Series(data)
 
             args = [test_data]
-            for i in range(data_num - 1):
-                np.random.seed(i)
-                extra_data = np.random.ranf(data_length)
-                args.append(pandas.Series(extra_data))
+            args = self.gen_extra_data(data_num, data_length, args)
 
             self.test_jit(pyfunc, base, *args)
             self.test_py(pyfunc, base, *args)

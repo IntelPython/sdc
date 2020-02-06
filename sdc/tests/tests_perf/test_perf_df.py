@@ -44,6 +44,13 @@ class TestDataFrameMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
 
+    def gen_extra_data(self, data_num, data_length, args):
+        for i in range(data_num - 1):
+            np.random.seed(i)
+            extra_data = np.random.ranf(data_length)
+            args.append(pandas.DataFrame({f"f{i}": extra_data for i in range(3)}))
+        return args
+
     def _test_case(self, pyfunc, name, total_data_length, input_data, data_num=1):
         test_name = 'DataFrame.{}'.format(name)
 
@@ -61,10 +68,7 @@ class TestDataFrameMethods(TestBase):
             test_data = pandas.DataFrame({f"f{i}": data for i in range(3)})
 
             args = [test_data]
-            for i in range(data_num - 1):
-                np.random.seed(i)
-                extra_data = np.random.ranf(data_length)
-                args.append(pandas.DataFrame({f"f{i}": extra_data for i in range(3)}))
+            args = self.gen_extra_data(data_num, data_length, args)
 
             self.test_jit(pyfunc, base, *args)
             self.test_py(pyfunc, base, *args)
