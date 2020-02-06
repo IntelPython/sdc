@@ -31,8 +31,6 @@ import time
 import unittest
 from contextlib import contextmanager
 
-import numpy as np
-
 from sdc.tests.test_utils import *
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import *
