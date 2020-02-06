@@ -85,7 +85,7 @@ cases = [
        usecase_params='A, B', data_num=2),
     TC(name='copy', size=[10 ** 8]),
     TC(name='corr',  size=[10 ** 7],params='other', data_num=2),
-    TC(name='count', size=[10 ** 7]),
+    TC(name='count', size=[10 ** 8]),
     TC(name='cov', size=[10 ** 8], params='other', data_num=2),
     TC(name='cumsum', size=[10 ** 8]),
     TC(name='describe', size=[10 ** 7]),

@@ -4556,8 +4556,11 @@ def hpat_pandas_series_count(self, level=None):
         Returns number of unique elements in the object
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_count
         """
-        data_no_nan = self._data[~numpy.isnan(self._data)]
-        return len(data_no_nan)
+        result = 0
+        for i in prange(len(self._data)):
+            if not numpy.isnan(self._data[i]):
+                result = result + 1
+        return result
 
     return hpat_pandas_series_count_impl
 
