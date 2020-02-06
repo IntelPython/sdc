@@ -933,34 +933,36 @@ def df_getitem_slice_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem"""
     if isinstance(self.index, types.NoneType):
         func_lines = ['  length = len(get_dataframe_data(self, 0))',
-                      '  index = numpy.arange(length)']
+                      '  _index = numpy.arange(length)',
+                      '  res_index = _index[idx]']
     else:
-        func_lines = ['  index = self._index']
+        func_lines = ['  res_index = self._index[idx]']
 
     results = []
     for i, col in enumerate(self.columns):
-        res_data = f'result_data_{i}'
+        res_data = f'res_data_{i}'
         func_lines += [
             f'  data_{i} = get_dataframe_data(self, {i})',
-            f'  {res_data} = pandas.Series(data_{i}[idx], index=index[idx], name="{col}")'
+            f'  {res_data} = pandas.Series(data_{i}[idx], index=res_index, name="{col}")'
         ]
         results.append((col, res_data))
 
     data = ', '.join(f'"{col}": {data}' for col, data in results)
-    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=index[idx])']
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index)']
 
     return func_lines
 
 
 def df_getitem_str_slice_codegen(self, idx):
     """
-    def _df_getitem_slice_idx_impl(self, idx):
-      index = self._index
-      data_0 = get_dataframe_data(self, 0)
-      result_data_0 = pandas.Series(data_0[idx], index=index[idx], name="A")
-      data_1 = get_dataframe_data(self, 1)
-      result_data_1 = pandas.Series(data_1[idx], index=index[idx], name="B")
-      return pandas.DataFrame({"A": result_data_0, "B": result_data_1}, index=index[idx])
+    Example of generated implementation with provided index:
+        def _df_getitem_slice_idx_impl(self, idx):
+          res_index = self._index[idx]
+          data_0 = get_dataframe_data(self, 0)
+          res_data_0 = pandas.Series(data_0[idx], index=res_index, name="A")
+          data_1 = get_dataframe_data(self, 1)
+          res_data_1 = pandas.Series(data_1[idx], index=res_index, name="B")
+          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index)
     """
     func_lines = ['def _df_getitem_slice_idx_impl(self, idx):']
     if self.columns:
