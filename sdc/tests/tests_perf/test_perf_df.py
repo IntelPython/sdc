@@ -48,7 +48,7 @@ class TestDataFrameMethods(TestBase):
         data = []
         full_input_data_length = sum(len(i) for i in input_data)
         data.append(perf_data_gen_fixed_len(input_data, full_input_data_length,
-                                       data_length))
+                                            data_length))
         for i in range(data_num - 1):
             np.random.seed(i)
             data.append(np.random.ranf(data_length))
