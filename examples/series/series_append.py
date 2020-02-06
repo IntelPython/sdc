@@ -24,10 +24,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import pandas as pd
-from numba import njit
-
-
 """
 Expect Series
 0      one
@@ -38,6 +34,10 @@ Expect Series
 2      six
 dtype: object
 """
+import pandas as pd
+from numba import njit
+
+
 @njit
 def series_append():
     s1 = pd.Series(['one', 'two', 'three'])

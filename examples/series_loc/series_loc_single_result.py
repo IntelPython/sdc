@@ -24,6 +24,11 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+Expected Series:
+4    3
+dtype: int64
+"""
 import numpy as np
 import pandas as pd
 from numba import njit
@@ -32,10 +37,8 @@ from numba import njit
 @njit
 def series_loc_value():
     series = pd.Series([5, 4, 3, 2, 1], index=[0, 2, 4, 6, 8])
+
     return series.loc[4]
-    # Expected Series:
-    # 4    3
-    # dtype: int64
 
 
 print(series_loc_value())

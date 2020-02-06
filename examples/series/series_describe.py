@@ -24,11 +24,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import numpy as np
-import pandas as pd
-from numba import njit
-
-
 """
 Expect Series
 count    5.000000
@@ -41,6 +36,11 @@ min      0.000000
 max      9.200000
 dtype: float64
 """
+import numpy as np
+import pandas as pd
+from numba import njit
+
+
 @njit
 def series_describe():
     s = pd.Series([5., 0, 3.3, 4.4, 9.2])

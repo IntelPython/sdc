@@ -24,11 +24,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import numpy as np
-import pandas as pd
-from numba import njit
-
-
 """
 Expect Series
 0         NaN
@@ -38,6 +33,11 @@ Expect Series
 4    1.787879
 dtype: float64
 """
+import numpy as np
+import pandas as pd
+from numba import njit
+
+
 @njit
 def series_pct_change():
     s = pd.Series([5., 0, 3.3, np.nan, 9.2])

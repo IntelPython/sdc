@@ -269,7 +269,7 @@ def hpat_pandas_series_getitem(self, idx):
     --------
     .. literalinclude:: ../../../examples/series_getitem/series_getitem_scalar_single_result.py
        :language: python
-       :lines: 27-
+       :lines: 32-
        :caption: Getting Pandas Series elements. Returns single value.
        :name: ex_series_getitem
 
@@ -278,7 +278,7 @@ def hpat_pandas_series_getitem(self, idx):
 
     .. literalinclude:: ../../../examples/series_getitem/series_getitem_scalar_multiple_result.py
        :language: python
-       :lines: 27-
+       :lines: 34-
        :caption: Getting Pandas Series elements. Returns multiple value.
        :name: ex_series_getitem
 
@@ -287,7 +287,7 @@ def hpat_pandas_series_getitem(self, idx):
 
     .. literalinclude:: ../../../examples/series_getitem/series_getitem_slice.py
        :language: python
-       :lines: 27-
+       :lines: 35-
        :caption: Getting Pandas Series elements by slice.
        :name: ex_series_getitem
 
@@ -296,7 +296,7 @@ def hpat_pandas_series_getitem(self, idx):
 
     .. literalinclude:: ../../../examples/series_getitem/series_getitem_bool_array.py
        :language: python
-       :lines: 27-
+       :lines: 37-
        :caption: Getting Pandas Series elements by array of booleans.
        :name: ex_series_getitem
 
@@ -305,7 +305,7 @@ def hpat_pandas_series_getitem(self, idx):
 
     .. literalinclude:: ../../../examples/series_getitem/series_getitem_series.py
        :language: python
-       :lines: 27-
+       :lines: 36-
        :caption: Getting Pandas Series elements by another Series.
        :name: ex_series_getitem
 
@@ -515,7 +515,7 @@ def hpat_pandas_series_iloc(self):
 
     .. literalinclude:: ../../../examples/series_iloc/series_iloc_slice.py
        :language: python
-       :lines: 27-
+       :lines: 33-
        :caption: With a slice object.
        :name: ex_series_iloc
 
@@ -571,7 +571,7 @@ def hpat_pandas_series_loc(self):
     --------
     .. literalinclude:: ../../../examples/series_loc/series_loc_single_result.py
        :language: python
-       :lines: 27-
+       :lines: 32-
        :caption: With a scalar integer. Returns single value.
        :name: ex_series_loc
 
@@ -580,7 +580,7 @@ def hpat_pandas_series_loc(self):
 
     .. literalinclude:: ../../../examples/series_loc/series_loc_multiple_result.py
        :language: python
-       :lines: 27-
+       :lines: 34-
        :caption: With a scalar integer. Returns multiple value.
        :name: ex_series_loc
 
@@ -589,7 +589,7 @@ def hpat_pandas_series_loc(self):
 
     .. literalinclude:: ../../../examples/series_loc/series_loc_slice.py
        :language: python
-       :lines: 27-
+       :lines: 34-
        :caption: With a slice object. Returns multiple value.
        :name: ex_series_loc
 
@@ -1032,7 +1032,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
     --------
     .. literalinclude:: ../../../examples/series/series_value_counts.py
        :language: python
-       :lines: 27-
+       :lines: 35-
        :caption: Getting the number of values excluding NaNs
        :name: ex_series_value_counts
 
@@ -1492,7 +1492,7 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
     --------
     .. literalinclude:: ../../../examples/series/series_astype.py
        :language: python
-       :lines: 27-
+       :lines: 36-
        :caption: Cast a pandas object to a specified dtype dtype.
        :name: ex_series_astype
 
@@ -1621,7 +1621,7 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
     --------
     .. literalinclude:: ../../../examples/series/series_shift.py
        :language: python
-       :lines: 27-
+       :lines: 36-
        :caption: Shift index by desired number of periods with an optional time freq.
        :name: ex_series_shift
 
@@ -1773,7 +1773,7 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
     --------
     .. literalinclude:: ../../../examples/series/series_append.py
        :language: python
-       :lines: 27-
+       :lines: 37-
        :caption: Concatenate two or more Series.
        :name: ex_series_append
 
@@ -2005,7 +2005,7 @@ def hpat_pandas_series_head(self, n=5):
     --------
     .. literalinclude:: ../../../examples/series/series_head.py
        :language: python
-       :lines: 27-
+       :lines: 34-
        :caption: Getting the first n rows.
        :name: ex_series_head
 
@@ -2070,7 +2070,7 @@ def hpat_pandas_series_groupby(
     --------
     .. literalinclude:: ../../../examples/series/series_groupby.py
        :language: python
-       :lines: 27-
+       :lines: 33-
        :caption: Return the mean of the values for the requested axis.
        :name: ex_series_groupby
 
@@ -3258,7 +3258,7 @@ def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=
     --------
     .. literalinclude:: ../../../examples/series/series_rename.py
        :language: python
-       :lines: 27-
+       :lines: 36-
        :caption: Alter Series index labels or name.
        :name: ex_series_rename
 
@@ -4529,7 +4529,7 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     --------
     .. literalinclude:: ../../../examples/series/series_sort_values.py
        :language: python
-       :lines: 27-
+       :lines: 36-
        :caption: Sort by the values.
        :name: ex_series_sort_values
 
@@ -4640,7 +4640,7 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
     --------
     .. literalinclude:: ../../../examples/series/series_dropna.py
        :language: python
-       :lines: 27-
+       :lines: 34-
        :caption: Return a new Series with missing values removed.
        :name: ex_series_dropna
 
@@ -4711,7 +4711,7 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
     --------
     .. literalinclude:: ../../../examples/series/series_fillna.py
        :language: python
-       :lines: 27-
+       :lines: 35-
        :caption: Fill NA/NaN values using the specified method.
        :name: ex_series_fillna
 
@@ -4923,7 +4923,7 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
     --------
     .. literalinclude:: ../../../examples/series/series_pct_change.py
        :language: python
-       :lines: 27-
+       :lines: 36-
        :caption: Percentage change between the current and a prior element.
        :name: ex_series_pct_change
 
@@ -5040,7 +5040,7 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
     --------
     .. literalinclude:: ../../../examples/series/series_describe.py
        :language: python
-       :lines: 27-
+       :lines: 39-
        :caption: Generate descriptive statistics.
        :name: ex_series_describe
 

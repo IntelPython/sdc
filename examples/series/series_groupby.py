@@ -24,16 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import pandas as pd
-from numba import njit
-
-
 """
 Expect Series
 a    210.0
 b    185.0
 dtype: float64
 """
+import pandas as pd
+from numba import njit
+
+
 @njit
 def series_groupby():
     s = pd.Series([390., 350., 30., 20.]).mean()

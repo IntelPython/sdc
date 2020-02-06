@@ -32,9 +32,8 @@ from numba import njit
 @njit
 def series_iloc_value():
     series = pd.Series([5, 4, 3, 2, 1], index=[0, 2, 4, 6, 8])
-    return series.iloc[4]
-    # Expected Value:
-    # 1
+
+    return series.iloc[4]  # Expect value: 1
 
 
 print(series_iloc_value())
