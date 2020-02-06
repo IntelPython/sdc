@@ -41,7 +41,7 @@ from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             mk_unique_var)
 import sdc
 from sdc import distributed, distributed_analysis
-from sdc.utils import alloc_arr_tup, debug_prints
+from sdc.utilities.utils import alloc_arr_tup, debug_prints
 from sdc.distributed_analysis import Distribution
 
 from sdc.str_arr_ext import (string_array_type, to_string_list,

@@ -30,13 +30,15 @@
 '''
 
 
+import operator
 import pandas
 import numpy
 import sdc
 
 from numba import types
+from numba.special import literally
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
-from sdc.datatypes.common_functions import TypeChecker
+from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.str_arr_ext import StringArrayType
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
@@ -44,9 +46,8 @@ from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
-from sdc.datatypes.common_functions import TypeChecker
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
-from sdc.utils import sdc_overload_method, sdc_overload_attribute
+from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
 
 
 @sdc_overload_attribute(DataFrameType, 'index')
@@ -926,6 +927,102 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
         return _drop_impl
 
     return sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns)
+
+
+def df_getitem_slice_idx_main_codelines(self):
+    """Generate main code lines for df.getitem"""
+    if isinstance(self.index, types.NoneType):
+        func_lines = ['  length = len(get_dataframe_data(self, 0))',
+                      '  _index = numpy.arange(length)',
+                      '  res_index = _index[idx]']
+    else:
+        func_lines = ['  res_index = self._index[idx]']
+
+    results = []
+    for i, col in enumerate(self.columns):
+        res_data = f'res_data_{i}'
+        func_lines += [
+            f'  data_{i} = get_dataframe_data(self, {i})',
+            f'  {res_data} = pandas.Series(data_{i}[idx], index=res_index, name="{col}")'
+        ]
+        results.append((col, res_data))
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index)']
+
+    return func_lines
+
+
+def df_getitem_str_slice_codegen(self):
+    """
+    Example of generated implementation with provided index:
+        def _df_getitem_slice_idx_impl(self, idx):
+          res_index = self._index[idx]
+          data_0 = get_dataframe_data(self, 0)
+          res_data_0 = pandas.Series(data_0[idx], index=res_index, name="A")
+          data_1 = get_dataframe_data(self, 1)
+          res_data_1 = pandas.Series(data_1[idx], index=res_index, name="B")
+          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index)
+    """
+    func_lines = ['def _df_getitem_slice_idx_impl(self, idx):']
+    if self.columns:
+        func_lines += df_getitem_slice_idx_main_codelines(self)
+    else:
+        # raise KeyError if input DF is empty
+        func_lines += ['  raise KeyError']
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def gen_df_getitem_slice_idx_impl(self):
+    func_text, global_vars = df_getitem_str_slice_codegen(self)
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _impl = loc_vars['_df_getitem_slice_idx_impl']
+
+    return _impl
+
+
+@sdc_overload(operator.getitem)
+def sdc_pandas_dataframe_getitem(self, idx):
+
+    if not isinstance(self, DataFrameType):
+        return None
+
+    if isinstance(idx, types.StringLiteral):
+        try:
+            col_idx = self.columns.index(idx.literal_value)
+            key_error = False
+        except ValueError:
+            key_error = True
+
+        def _df_getitem_str_literal_idx_impl(self, idx):
+            if key_error == False:  # noqa
+                data = get_dataframe_data(self, col_idx)
+                return pandas.Series(data, index=self._index, name=idx)
+            else:
+                raise KeyError
+
+        return _df_getitem_str_literal_idx_impl
+
+    if isinstance(idx, types.UnicodeType):
+        def _df_getitem_unicode_idx_impl(self, idx):
+            # http://numba.pydata.org/numba-doc/dev/developer/literal.html#specifying-for-literal-typing
+            # literally raises special exception to call getitem with literal idx value got from unicode
+            return literally(idx)
+
+        return _df_getitem_unicode_idx_impl
+
+    if isinstance(idx, types.SliceType):
+        return gen_df_getitem_slice_idx_impl(self)
+
+    ty_checker = TypeChecker('Operator getitem().')
+    ty_checker.raise_exc(idx, 'str', 'idx')
 
 
 @sdc_overload_method(DataFrameType, 'pct_change')
