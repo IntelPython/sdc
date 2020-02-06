@@ -44,5 +44,7 @@ from sdc.tests.test_io import *
 
 from sdc.tests.test_hpat_jit import *
 
+from sdc.tests.test_sdc_numpy import *
+
 # performance tests
 import sdc.tests.tests_perf

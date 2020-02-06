@@ -25,9 +25,12 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import string
+import unittest
+
 import numba
 import numpy as np
-import unittest
+import pandas
 
 import sdc
 from sdc.config import config_inline_overloads, config_use_parallel_overloads
@@ -54,6 +57,39 @@ test_global_input_data_float64 = [
     [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
     [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO],
 ]
+
+
+def gen_int_df_index(length):
+    """Generate random integer index for DataFrame"""
+    arr = np.arange(length)
+    np.random.seed(0)
+    np.random.shuffle(arr)
+
+    return arr
+
+
+def gen_df(input_data, with_index=False):
+    """Generate DataFrame based on list of data like a [[1, 2, 3], [4, 5, 6]]"""
+    length = min(len(d) for d in input_data)
+    data = {n: d[:length] for n, d in zip(string.ascii_uppercase, input_data)}
+
+    index = None
+    if with_index:
+        index = gen_int_df_index(length)
+
+    return pandas.DataFrame(data, index=index)
+
+
+def gen_df_int_cols(input_data, with_index=False):
+    """Generate DataFrame based on list of data like a [[1, 2, 3], [4, 5, 6]]"""
+    length = min(len(d) for d in input_data)
+    data = {n: d[:length] for n, d in enumerate(input_data)}
+
+    index = None
+    if with_index:
+        index = gen_int_df_index(length)
+
+    return pandas.DataFrame(data, index=index)
 
 
 def count_array_REPs():

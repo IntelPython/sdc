@@ -57,29 +57,31 @@ class TestSeriesStringMethods(TestBase):
         super().setUpClass()
         cls.width = [16, 64, 512, 1024]
 
-    def _test_case(self, pyfunc, name, total_data_length, input_data=None, *args, **kwargs):
-        test_name = 'series_str_{}'.format(name)
+    def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
+        test_name = 'Series.{}'.format(name)
+
         input_data = input_data or test_global_input_data_unicode_kind4
-        hpat_func = sdc.jit(pyfunc)
+
         for data_length, data_width in itertools.product(total_data_length, self.width):
-            data = perf_data_gen_fixed_len(input_data, data_width, data_length)
+            base = {
+                "test_name": test_name,
+                "data_size": data_length,
+                "data_width": data_width,
+            }
+            full_input_data_length = data_width
+            data = perf_data_gen_fixed_len(input_data, full_input_data_length,
+                                           data_length)
             test_data = pd.Series(data)
 
-            compile_results = calc_compilation(pyfunc, test_data, iter_number=self.iter_number)
-            # Warming up
-            hpat_func(test_data)
+            args = [test_data]
 
-            exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)
-
-            self.test_results.add(test_name, 'SDC', test_data.size, exec_times, data_width,
-                                  boxing_times, compile_results=compile_results, num_threads=self.num_threads)
-            exec_times, _ = get_times(pyfunc, test_data, iter_number=self.iter_number)
-            self.test_results.add(test_name, 'Python', test_data.size, exec_times, data_width,
-                                  num_threads=self.num_threads)
+            self.test_jit(pyfunc, base, *args)
+            self.test_py(pyfunc, base, *args)
 
 
 cases = [
-    TC(name='capitalize', size=[10 ** 4, 10 ** 5], skip=True),
+    TC(name='capitalize', size=[10 ** 4, 10 ** 5]),
+    TC(name='casefold', size=[10 ** 4, 10 ** 5]),
     TC(name='center', params='1', size=[10 ** 4, 10 ** 5],  input_data=test_global_input_data_unicode_kind1),
     TC(name='endswith', params='"e"', size=[10 ** 4, 10 ** 5]),
     TC(name='find', params='"e"', size=[10 ** 4, 10 ** 5]),
@@ -94,8 +96,8 @@ cases = [
     TC(name='startswith', params='"e"', size=[10 ** 4, 10 ** 5]),
     TC(name='strip', size=[10 ** 4, 10 ** 5],
        input_data=['\t{}  '.format(case) for case in test_global_input_data_unicode_kind4]),
-    TC(name='swapcase', size=[10 ** 4, 10 ** 5], skip=True),
-    TC(name='title', size=[10 ** 4, 10 ** 5], skip=True),
+    TC(name='swapcase', size=[10 ** 4, 10 ** 5]),
+    TC(name='title', size=[10 ** 4, 10 ** 5]),
     TC(name='upper', size=[10 ** 4, 10 ** 5]),
     TC(name='zfill', params='1', size=[10 ** 4, 10 ** 5], input_data=test_global_input_data_unicode_kind1),
 ]

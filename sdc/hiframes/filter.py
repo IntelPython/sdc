@@ -34,7 +34,7 @@ from numba.typing import signature
 import sdc
 from sdc import distributed, distributed_analysis
 from sdc.distributed_analysis import Distribution
-from sdc.utils import debug_prints
+from sdc.utilities.utils import debug_prints
 from sdc.str_arr_ext import string_array_type
 from sdc.hiframes.split_impl import string_array_split_view_type
 

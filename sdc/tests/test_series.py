@@ -39,8 +39,8 @@ from numba.config import IS_32BITS
 from numba.errors import TypingError
 from numba.special import literally
 
-from .test_series_apply import TestSeries_apply
-from .test_series_map import TestSeries_map
+from sdc.tests.test_series_apply import TestSeries_apply
+from sdc.tests.test_series_map import TestSeries_map
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (count_array_OneDs,
                                   count_array_REPs,
@@ -1390,8 +1390,8 @@ class TestSeries(
     @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support division/modulo/etc by zero')
     def test_series_op2_integer(self):
-        """Verifies using all various Series arithmetic binary operators
-           on an integer Series with default index and a scalar value"""
+        '''Verifies using all various Series arithmetic binary operators
+           on an integer Series with default index and a scalar value'''
         n = 11
         np.random.seed(0)
         data_to_test = [np.arange(-5, -5 + n, dtype=np.int32),
@@ -3168,22 +3168,37 @@ class TestSeries(
                 pd.testing.assert_series_equal(hpat_func(S), test_impl(S),
                                                check_names=check_names)
 
-    @skip_sdc_jit('Series.str.<method>() unsupported')
-    def test_series_str2str_unsupported(self):
-        unsupported_methods = ['capitalize', 'swapcase', 'title']
-        for method in unsupported_methods:
-            func_lines = ['def test_impl(S):',
-                          '  return S.str.{}()'.format(method)]
-            func_text = '\n'.join(func_lines)
-            test_impl = _make_func_from_text(func_text)
-            hpat_func = self.jit(test_impl)
+    def test_series_capitalize_str(self):
+        def test_impl(S):
+            return S.str.capitalize()
 
-            S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'])
-            # TypingError with expected message is raised internally by Numba
-            with self.assertRaises(TypingError) as raises:
-                hpat_func(S)
-            expected_msg = 'Series.str.{} is not supported yet'.format(method)
-            self.assertIn(expected_msg, str(raises.exception))
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(test_global_input_data_unicode_kind4)
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_title_str(self):
+        def test_impl(S):
+            return S.str.title()
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(test_global_input_data_unicode_kind4)
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_swapcase_str(self):
+        def test_impl(S):
+            return S.str.swapcase()
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(test_global_input_data_unicode_kind4)
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_casefold_str(self):
+        def test_impl(S):
+            return S.str.casefold()
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(test_global_input_data_unicode_kind4)
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     @sdc_limitation
     def test_series_append_same_names(self):
@@ -5688,14 +5703,14 @@ class TestSeries(
         B = pd.Series(np.random.ranf(n), index=index2)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
-    @skip_sdc_jit('Test hangs due to a call of Series.sort_values')
+    @skip_sdc_jit('Arithmetic operations on Series requiring alignment of indexes are not supported in old-style')
     def test_series_operator_add_align_index_str_capacity(self):
         """Verifies implementation of Series.operator.add and alignment of string indexes of large size"""
         def test_impl(A, B):
             return A + B
         hpat_func = self.jit(test_impl)
 
-        n = 20000
+        n = 2000
         np.random.seed(0)
         valid_ids = ['', 'aaa', 'a', 'b', 'ccc', 'ef', 'ff', 'fff', 'fa', 'dddd']
         index1 = [valid_ids[i] for i in np.random.randint(0, len(valid_ids), n)]
@@ -5705,7 +5720,6 @@ class TestSeries(
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
     @skip_sdc_jit
-    @skip_numba_jit("TODO: support arithemetic operations on StringArrays and extend Series.operator.add overload")
     def test_series_operator_add_str_same_index_default(self):
         """Verifies implementation of Series.operator.add between two string Series
         with default indexes and same size"""
@@ -5715,6 +5729,24 @@ class TestSeries(
 
         A = pd.Series(['a', '', 'ae', 'b', 'cccc', 'oo', None])
         B = pd.Series(['b', 'aa', '', 'b', 'o', None, 'oo'])
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
+
+    @skip_parallel
+    @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
+    def test_series_operator_add_str_align_index_int(self):
+        """Verifies implementation of Series.operator.add between two string Series with non-equal integer indexes"""
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        np.random.seed(0)
+        index_A = [0, 1, 1, 2, 3, 3, 3, 4, 6, 8, 9]
+        index_B = [0, 1, 1, 3, 4, 4, 5, 5, 6, 6, 9]
+        np.random.shuffle(index_A)
+        np.random.shuffle(index_B)
+        data = ['', '', 'aa', 'aa', None, 'ae', 'b', 'ccc', 'cccc', None, 'oo']
+        A = pd.Series(data, index=index_A)
+        B = pd.Series(data, index=index_B)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
     def test_series_operator_add_result_name1(self):
@@ -5768,20 +5800,6 @@ class TestSeries(
                 A = pd.Series(np.array(np.arange(n), dtype=dtype_left))
                 B = pd.Series(np.array(np.arange(n)**2, dtype=dtype_right))
                 pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
-
-    @skip_numba_jit("BUG: new-style impl of arithmetic operators for series do not consider scalar as left argument")
-    def test_series_operator_add_scalar_left(self):
-        """Verifies using all various Series arithmetic binary operators on two integer Series with default indexes"""
-        def test_impl(S, value):
-            return value + S
-        hpat_func = self.jit(test_impl)
-
-        n = 11
-        A = pd.Series(np.arange(-5, -5 + n))
-        scalar = 24
-
-        # check_dtype=False because SDC implementation always returns float64 Series
-        pd.testing.assert_series_equal(hpat_func(A, scalar), test_impl(A, scalar), check_dtype=False)
 
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support Series indexes')
     def test_series_operator_lt_index_mismatch1(self):
@@ -5901,7 +5919,6 @@ class TestSeries(
         self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit
-    @skip_numba_jit("TODO: support arithemetic operations on StringArrays and extend Series.operator.lt overload")
     def test_series_operator_lt_str(self):
         """Verifies implementation of Series.operator.lt between two string Series with default indexes"""
         def test_impl(A, B):
@@ -5921,7 +5938,7 @@ class TestSeries(
 
     @skip_sdc_jit("Series.str.istitle is not supported yet")
     @skip_numba_jit("Not work with None and np.nan")
-    def test_series_istitle_str(self):
+    def test_series_istitle_str_fixme(self):
         series = pd.Series(['Cat', 'dog', 'Bird', None, np.nan])
 
         cfunc = self.jit(istitle_usecase)
@@ -6095,6 +6112,160 @@ class TestSeries(
             pandas_exception = context.exception
 
             self.assertRaises(type(pandas_exception), hpat_func, S, percentiles)
+
+    @skip_sdc_jit('Arithmetic operations on string series not implemented in old-pipeline')
+    def test_series_operator_add_str_scalar(self):
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        series_data = ['a', '', 'ae', 'b', 'cccc', 'oo', None]
+        S = pd.Series(series_data)
+        values_to_test = [' ', 'wq', '', '23']
+        for scalar in values_to_test:
+            with self.subTest(left=series_data, right=scalar):
+                result_ref = test_impl(S, scalar)
+                result = hpat_func(S, scalar)
+                pd.testing.assert_series_equal(result, result_ref)
+
+            with self.subTest(left=scalar, right=series_data):
+                result_ref = test_impl(scalar, S)
+                result = hpat_func(scalar, S)
+                pd.testing.assert_series_equal(result, result_ref)
+
+    @skip_sdc_jit('Arithmetic operations on string series not implemented in old-pipeline')
+    def test_series_operator_add_str_unsupported(self):
+        def test_impl(A, B):
+            return A + B
+        hpat_func = self.jit(test_impl)
+
+        n = 7
+        series_data = ['a', '', 'ae', 'b', 'cccc', 'oo', None]
+        S = pd.Series(series_data)
+        other_operands = [
+            1,
+            3.0,
+            pd.Series(np.arange(n)),
+            pd.Series([True, False, False, True, False, True, True]),
+        ]
+
+        for operand in other_operands:
+            with self.subTest(right=operand):
+                with self.assertRaises(TypingError) as raises:
+                    hpat_func(S, operand)
+                expected_msg = 'Operator add(). Not supported for not-comparable operands.'
+                self.assertIn(expected_msg, str(raises.exception))
+
+    @skip_sdc_jit('Arithmetic operations on string series not implemented in old-pipeline')
+    def test_series_operator_mul_str_scalar(self):
+        def test_impl(A, B):
+            return A * B
+        hpat_func = self.jit(test_impl)
+
+        series_data = ['a', '', 'ae', 'b', ' ', 'cccc', 'oo', None]
+        S = pd.Series(series_data)
+        values_to_test = [-1, 0, 2, 5]
+        for scalar in values_to_test:
+            with self.subTest(left=series_data, right=scalar):
+                result_ref = test_impl(S, scalar)
+                result = hpat_func(S, scalar)
+                pd.testing.assert_series_equal(result, result_ref)
+
+            with self.subTest(left=scalar, right=series_data):
+                result_ref = test_impl(scalar, S)
+                result = hpat_func(scalar, S)
+                pd.testing.assert_series_equal(result, result_ref)
+
+    @skip_sdc_jit
+    def test_series_operator_mul_str_same_index_default(self):
+        """Verifies implementation of Series.operator.add between two string Series
+        with default indexes and same size"""
+        def test_impl(A, B):
+            return A * B
+        hpat_func = self.jit(test_impl)
+
+        A = pd.Series(['a', '', 'ae', 'b', 'cccc', 'oo', None])
+        B = pd.Series([-1, 2, 0, 5, 3, -5, 4])
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
+
+    @skip_parallel
+    @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
+    def test_series_operator_mul_str_align_index_int1(self):
+        """ Verifies implementation of Series.operator.add between two string Series
+            with integer indexes containg same unique values (so alignment doesn't produce NaNs) """
+        def test_impl(A, B):
+            return A * B
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        np.random.seed(0)
+        shuffled_data = np.arange(n, dtype=np.int)
+        np.random.shuffle(shuffled_data)
+        index_A = shuffled_data
+        np.random.shuffle(shuffled_data)
+        index_B = shuffled_data
+        str_series_values = ['', '', 'aa', 'aa', None, 'ae', 'b', 'ccc', 'cccc', None, 'oo']
+        int_series_values = np.random.randint(-5, 5, n)
+
+        A = pd.Series(str_series_values, index=index_A)
+        B = pd.Series(int_series_values, index=index_B)
+        for swap_operands in (False, True):
+            if swap_operands:
+                A, B = B, A
+            with self.subTest(left=A, right=B):
+                result = hpat_func(A, B)
+                result_ref = test_impl(A, B)
+                pd.testing.assert_series_equal(result, result_ref)
+
+    @unittest.expectedFailure   # pandas can't calculate this due to adding NaNs to int series during alignment
+    def test_series_operator_mul_str_align_index_int2(self):
+        """ Verifies implementation of Series.operator.add between two string Series
+            with integer indexes that cannot be aligned without NaNs """
+        def test_impl(A, B):
+            return A * B
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        np.random.seed(0)
+        index_A = [0, 1, 1, 2, 3, 3, 3, 4, 6, 8, 9]
+        index_B = [0, 1, 1, 3, 4, 4, 5, 5, 6, 6, 9]
+        np.random.shuffle(index_A)
+        np.random.shuffle(index_B)
+        str_series_values = ['', '', 'aa', 'aa', None, 'ae', 'b', 'ccc', 'cccc', None, 'oo']
+        int_series_values = np.random.randint(-5, 5, n)
+
+        A = pd.Series(str_series_values, index=index_A)
+        B = pd.Series(int_series_values, index=index_B)
+        for swap_operands in (False, True):
+            if swap_operands:
+                A, B = B, A
+            with self.subTest(left=A, right=B):
+                result = hpat_func(A, B)
+                result_ref = test_impl(A, B)
+                pd.testing.assert_series_equal(result, result_ref)
+
+    @skip_sdc_jit('Arithmetic operations on string series not implemented in old-pipeline')
+    def test_series_operator_mul_str_unsupported(self):
+        def test_impl(A, B):
+            return A * B
+        hpat_func = self.jit(test_impl)
+
+        n = 7
+        series_data = ['a', '', 'ae', 'b', 'cccc', 'oo', None]
+        S = pd.Series(series_data)
+        other_operands = [
+            'abc',
+            3.0,
+            pd.Series(series_data),
+            pd.Series([True, False, False, True, False, True, True]),
+        ]
+
+        for operand in other_operands:
+            with self.subTest(right=operand):
+                with self.assertRaises(TypingError) as raises:
+                    hpat_func(S, operand)
+                expected_msg = 'Operator mul(). Not supported between operands of types:'
+                self.assertIn(expected_msg, str(raises.exception))
 
 
 if __name__ == "__main__":
