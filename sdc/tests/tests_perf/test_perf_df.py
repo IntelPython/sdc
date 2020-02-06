@@ -64,6 +64,14 @@ class TestDataFrameMethods(TestBase):
 
         return args
 
+    def gen_base(self, test_name, data_length):
+        base = {
+            "test_name": test_name,
+            "data_size": data_length,
+        }
+
+        return base
+
     def _test_case(self, pyfunc, name, total_data_length, input_data, data_num=1):
         test_name = 'DataFrame.{}'.format(name)
 
@@ -71,10 +79,7 @@ class TestDataFrameMethods(TestBase):
             input_data = test_global_input_data_float64
 
         for data_length in total_data_length:
-            base = {
-                "test_name": test_name,
-                "data_size": data_length,
-            }
+            base = self.gen_base(test_name, data_length)
 
             args = self.gen_args(data_num, data_length, input_data)
 
