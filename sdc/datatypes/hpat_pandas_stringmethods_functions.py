@@ -873,24 +873,7 @@ sdc_pandas_series_str_docstring_template = """
            :cwd: ../../../examples
 
         .. seealso::
-            :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
-                Check whether all characters are alphabetic.
-            :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
-                Check whether all characters are numeric.
-            :ref:`Series.str.isalnum <pandas.Series.str.isalnum>`
-                Check whether all characters are alphanumeric.
-            :ref:`Series.str.isdigit <pandas.Series.str.isdigit>`
-                Check whether all characters are digits.
-            :ref:`Series.str.isdecimal <pandas.Series.str.isdecimal>`
-                Check whether all characters are decimal.
-            :ref:`Series.str.isspace <pandas.Series.str.isspace>`
-                Check whether all characters are whitespace.
-            :ref:`Series.str.islower <pandas.Series.str.islower>`
-                Check whether all characters are lowercase.
-            :ref:`Series.str.isupper <pandas.Series.str.isupper>`
-                Check whether all characters are uppercase.
-            :ref:`Series.str.istitle <pandas.Series.str.istitle>`
-                Check whether all characters are titlecase.
+            {seealso}
 
         Intel Scalable Dataframe Compiler Developer Guide
         *************************************************
@@ -1048,31 +1031,155 @@ def hpat_pandas_stringmethods_isdecimal(self):
     return hpat_pandas_stringmethods_isdecimal_impl
 
 
+@sdc_overload_method(StringMethodsType, 'capitalize')
+def hpat_pandas_stringmethods_capitalize(self):
+    ty_checker = TypeChecker('Method capitalize().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_capitalize_impl(self):
+        item_count = len(self._data)
+        result = [''] * item_count
+        for idx in numba.prange(item_count):
+            result[idx] = self._data._data[idx].capitalize()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_capitalize_impl
+
+
+@sdc_overload_method(StringMethodsType, 'title')
+def hpat_pandas_stringmethods_title(self):
+    ty_checker = TypeChecker('Method title().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_title_impl(self):
+        item_count = len(self._data)
+        result = [''] * item_count
+        for idx in numba.prange(item_count):
+            result[idx] = self._data._data[idx].title()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_title_impl
+
+
+@sdc_overload_method(StringMethodsType, 'swapcase')
+def hpat_pandas_stringmethods_swapcase(self):
+    ty_checker = TypeChecker('Method swapcase().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_swapcase_impl(self):
+        item_count = len(self._data)
+        result = [''] * item_count
+        for idx in numba.prange(item_count):
+            result[idx] = self._data._data[idx].swapcase()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_swapcase_impl
+
+
+@sdc_overload_method(StringMethodsType, 'casefold')
+def hpat_pandas_stringmethods_casefold(self):
+    ty_checker = TypeChecker('Method casefold().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_casefold_impl(self):
+        item_count = len(self._data)
+        result = [''] * item_count
+        for idx in numba.prange(item_count):
+            result[idx] = self._data._data[idx].casefold()
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_casefold_impl
+
+
+seealso_check_methods = """
+                        :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
+                            Check whether all characters are alphabetic.
+                        :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
+                            Check whether all characters are numeric.
+                        :ref:`Series.str.isalnum <pandas.Series.str.isalnum>`
+                            Check whether all characters are alphanumeric.
+                        :ref:`Series.str.isdigit <pandas.Series.str.isdigit>`
+                            Check whether all characters are digits.
+                        :ref:`Series.str.isdecimal <pandas.Series.str.isdecimal>`
+                            Check whether all characters are decimal.
+                        :ref:`Series.str.isspace <pandas.Series.str.isspace>`
+                            Check whether all characters are whitespace.
+                        :ref:`Series.str.islower <pandas.Series.str.islower>`
+                            Check whether all characters are lowercase.
+                        :ref:`Series.str.isupper <pandas.Series.str.isupper>`
+                            Check whether all characters are uppercase.
+                        :ref:`Series.str.istitle <pandas.Series.str.istitle>`
+                            Check whether all characters are titlecase.
+                        """
+
+
+seealso_transform_methods = """
+                            :ref:`Series.str.lower <pandas.Series.str.lower>`
+                                Converts all characters to lowercase.
+                            :ref:`Series.str.upper <pandas.Series.str.upper>`
+                                Converts all characters to uppercase.
+                            :ref:`Series.str.title <pandas.Series.str.title>`
+                                Converts first character of each word to uppercase and remaining to lowercase.
+                            :ref:`Series.str.capitalize <pandas.Series.str.capitalize>`
+                                Converts first character to uppercase and remaining to lowercase.
+                            :ref:`Series.str.swapcase <pandas.Series.str.swapcase>`
+                                Converts uppercase to lowercase and lowercase to uppercase.
+                            :ref:`Series.str.casefold <pandas.Series.str.casefold>`
+                                Removes all case distinctions in the string.
+                           """
+
+
 stringmethods_funcs = {
     'istitle': {'method': hpat_pandas_stringmethods_istitle,
-                'caption': 'Check if each word start with an upper case letter'},
+                'caption': 'Check if each word start with an upper case letter',
+                'seealso': seealso_check_methods},
     'isspace': {'method': hpat_pandas_stringmethods_isspace,
-                'caption': 'Check if all the characters in the text are whitespaces'},
+                'caption': 'Check if all the characters in the text are whitespaces',
+                'seealso': seealso_check_methods},
     'isalpha': {'method': hpat_pandas_stringmethods_isalpha,
-                'caption': 'Check whether all characters in each string are alphabetic'},
+                'caption': 'Check whether all characters in each string are alphabetic',
+                'seealso': seealso_check_methods},
     'islower': {'method': hpat_pandas_stringmethods_islower,
-                'caption': 'Check if all the characters in the text are alphanumeric'},
+                'caption': 'Check if all the characters in the text are alphanumeric',
+                'seealso': seealso_check_methods},
     'isalnum': {'method': hpat_pandas_stringmethods_isalnum,
-                'caption': 'Check if all the characters in the text are alphanumeric'},
+                'caption': 'Check if all the characters in the text are alphanumeric',
+                'seealso': seealso_check_methods},
     'isnumeric': {'method': hpat_pandas_stringmethods_isnumeric,
-                  'caption': 'Check whether all characters in each string are numeric.'},
+                  'caption': 'Check whether all characters in each string are numeric.',
+                  'seealso': seealso_check_methods},
     'isdigit': {'method': hpat_pandas_stringmethods_isdigit,
-                'caption': 'Check whether all characters in each string in the Series/Index are digits.'},
+                'caption': 'Check whether all characters in each string in the Series/Index are digits.',
+                'seealso': seealso_check_methods},
     'isdecimal': {'method': hpat_pandas_stringmethods_isdecimal,
-                  'caption': 'Check whether all characters in each string are decimal.'},
+                  'caption': 'Check whether all characters in each string are decimal.',
+                  'seealso': seealso_check_methods},
     'isupper': {'method': hpat_pandas_stringmethods_isupper,
-                'caption': 'Check whether all characters in each string are uppercase.'},
+                'caption': 'Check whether all characters in each string are uppercase.',
+                'seealso': seealso_check_methods},
+    'capitalize': {'method': hpat_pandas_stringmethods_capitalize,
+                   'caption': 'Convert strings in the Series/Index to be capitalized.',
+                   'seealso': seealso_transform_methods},
+    'title': {'method': hpat_pandas_stringmethods_title,
+              'caption': 'Convert strings in the Series/Index to titlecase.',
+              'seealso': seealso_transform_methods},
+    'swapcase': {'method': hpat_pandas_stringmethods_swapcase,
+                 'caption': 'Convert strings in the Series/Index to be swapcased.',
+                 'seealso': seealso_transform_methods},
+    'casefold': {'method': hpat_pandas_stringmethods_casefold,
+                 'caption': 'Convert strings in the Series/Index to be casefolded.',
+                 'seealso': seealso_transform_methods},
 }
 
 
 for name, data in stringmethods_funcs.items():
     data['method'].__doc__ = sdc_pandas_series_str_docstring_template.format(**{'method_name': name,
-                                                                                'caption': data['caption']})
+                                                                                'caption': data['caption'],
+                                                                                'seealso': data['seealso']})
 
 
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))

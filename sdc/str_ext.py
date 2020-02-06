@@ -471,7 +471,6 @@ ll.add_symbol('compile_regex', hstr_ext.compile_regex)
 ll.add_symbol('str_contains_regex', hstr_ext.str_contains_regex)
 ll.add_symbol('str_contains_noregex', hstr_ext.str_contains_noregex)
 ll.add_symbol('str_replace_regex', hstr_ext.str_replace_regex)
-ll.add_symbol('str_replace_noregex', hstr_ext.str_replace_noregex)
 ll.add_symbol('str_from_int32', hstr_ext.str_from_int32)
 ll.add_symbol('str_from_int64', hstr_ext.str_from_int64)
 ll.add_symbol('str_from_float32', hstr_ext.str_from_float32)
@@ -487,9 +486,6 @@ _str_to_int64 = types.ExternalFunction(
 
 str_replace_regex = types.ExternalFunction(
     "str_replace_regex", std_str_type(std_str_type, regex_type, std_str_type))
-
-str_replace_noregex = types.ExternalFunction(
-    "str_replace_noregex", std_str_type(std_str_type, std_str_type, std_str_type))
 
 
 def gen_unicode_to_std_str(context, builder, unicode_val):

@@ -3168,22 +3168,37 @@ class TestSeries(
                 pd.testing.assert_series_equal(hpat_func(S), test_impl(S),
                                                check_names=check_names)
 
-    @skip_sdc_jit('Series.str.<method>() unsupported')
-    def test_series_str2str_unsupported(self):
-        unsupported_methods = ['capitalize', 'swapcase', 'title']
-        for method in unsupported_methods:
-            func_lines = ['def test_impl(S):',
-                          '  return S.str.{}()'.format(method)]
-            func_text = '\n'.join(func_lines)
-            test_impl = _make_func_from_text(func_text)
-            hpat_func = self.jit(test_impl)
+    def test_series_capitalize_str(self):
+        def test_impl(S):
+            return S.str.capitalize()
 
-            S = pd.Series([' \tbbCD\t ', 'ABC', ' mCDm\t', 'abc'])
-            # TypingError with expected message is raised internally by Numba
-            with self.assertRaises(TypingError) as raises:
-                hpat_func(S)
-            expected_msg = 'Series.str.{} is not supported yet'.format(method)
-            self.assertIn(expected_msg, str(raises.exception))
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(test_global_input_data_unicode_kind4)
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_title_str(self):
+        def test_impl(S):
+            return S.str.title()
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(test_global_input_data_unicode_kind4)
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_swapcase_str(self):
+        def test_impl(S):
+            return S.str.swapcase()
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(test_global_input_data_unicode_kind4)
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_casefold_str(self):
+        def test_impl(S):
+            return S.str.casefold()
+
+        sdc_func = self.jit(test_impl)
+        s = pd.Series(test_global_input_data_unicode_kind4)
+        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     @sdc_limitation
     def test_series_append_same_names(self):
