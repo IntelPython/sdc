@@ -29,8 +29,6 @@ class TestSuite(unittest.TestCase):
 
             # calculate compilation time of `hpat_func` based in `pyfunc`
             compile_results = calc_compilation(pyfunc, test_data, iter_number=self.iter_number)
-            # Warming up
-            hpat_func(test_data)
 
             # calculate execution and boxing/unboxing times of `hpat_func`
             exec_times, boxing_times = get_times(hpat_func, test_data, iter_number=self.iter_number)

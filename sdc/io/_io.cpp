@@ -30,7 +30,6 @@
 #include <iostream>
 #include <string>
 
-#include "_csv.h"
 
 void file_read(char* file_name, void* buff, int64_t size)
 {
@@ -86,8 +85,6 @@ PyMODINIT_FUNC PyInit_hio(void)
     // numpy read
     PyObject_SetAttrString(m, "file_read", PyLong_FromVoidPtr((void*)(&file_read)));
     PyObject_SetAttrString(m, "file_write", PyLong_FromVoidPtr((void*)(&file_write)));
-
-    PyInit_csv(m);
 
     return m;
 }

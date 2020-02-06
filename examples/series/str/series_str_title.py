@@ -24,27 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from numba import njit
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
+@njit
+def series_str_title():
+    series = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
+    out_series = series.str.title()
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
+    return out_series  # Expect series of 'Lower', 'Capitals', 'This Is A Sentence', 'Swapcase'
 
-from sdc.tests.test_ml import *
 
-from sdc.tests.test_io import *
-
-from sdc.tests.test_hpat_jit import *
-
-from sdc.tests.test_sdc_numpy import *
-
-# performance tests
-import sdc.tests.tests_perf
+print(series_str_title())

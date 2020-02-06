@@ -25,27 +25,34 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas
 import numpy as np
 
-import pandas
-import numba
+import time
+import random
+
 import sdc
 
-from sdc.tests.tests_perf.test_perf_base import TestBase
-from sdc.tests.tests_perf.test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
+from .test_perf_base import TestBase
 from sdc.tests.test_utils import test_global_input_data_float64
+from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from .generator import generate_test_cases
 from .generator import TestCase as TC
 
 
-# python -m sdc.runtests sdc.tests.tests_perf.test_perf_df.TestDataFrameMethods.test_df_{method_name}
-class TestDataFrameMethods(TestBase):
+"""
+python -m sdc.runtests
+sdc.tests.tests_perf.test_perf_series_operators.TestSeriesOperatorMethods.test_series_operator_{name}
+"""
+
+
+class TestSeriesOperatorMethods(TestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_case(self, pyfunc, name, total_data_length, input_data, data_num=1):
-        test_name = 'DataFrame.{}'.format(name)
+    def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
+        test_name = 'Series.{}'.format(name)
 
         if input_data is None:
             input_data = test_global_input_data_float64
@@ -58,31 +65,32 @@ class TestDataFrameMethods(TestBase):
             }
             data = perf_data_gen_fixed_len(input_data, full_input_data_length,
                                            data_length)
-            test_data = pandas.DataFrame({f"f{i}": data for i in range(3)})
+            test_data = pandas.Series(data)
 
             args = [test_data]
             for i in range(data_num - 1):
                 np.random.seed(i)
                 extra_data = np.random.ranf(data_length)
-                args.append(pandas.DataFrame({f"f{i}": extra_data for i in range(3)}))
+                args.append(pandas.Series(extra_data))
 
             self.test_jit(pyfunc, base, *args)
             self.test_py(pyfunc, base, *args)
 
 
 cases = [
-    TC(name='append', size=[10 ** 7], params='other', data_num=2),
-    TC(name='count', size=[10 ** 7]),
-    TC(name='drop', size=[10 ** 8], params='columns="f0"'),
-    TC(name='max', size=[10 ** 7]),
-    TC(name='mean', size=[10 ** 7]),
-    TC(name='median', size=[10 ** 7]),
-    TC(name='min', size=[10 ** 7]),
-    TC(name='pct_change', size=[10 ** 7]),
-    TC(name='prod', size=[10 ** 7]),
-    TC(name='std', size=[10 ** 7]),
-    TC(name='sum', size=[10 ** 7]),
-    TC(name='var', size=[10 ** 7]),
+    TC(name='operator_add', size=[10 ** 7], call_expr='A + B', usecase_params='A, B', data_num=2),
+    TC(name='operator_eq', size=[10 ** 7], call_expr='A == B', usecase_params='A, B', data_num=2),
+    TC(name='operator_floordiv', size=[10 ** 7], call_expr='A // B', usecase_params='A, B', data_num=2),
+    TC(name='operator_ge', size=[10 ** 7], call_expr='A >= B', usecase_params='A, B', data_num=2),
+    TC(name='operator_gt', size=[10 ** 7], call_expr='A > B', usecase_params='A, B', data_num=2),
+    TC(name='operator_le', size=[10 ** 7], call_expr='A <= B', usecase_params='A, B', data_num=2),
+    TC(name='operator_lt', size=[10 ** 7], call_expr='A < B', usecase_params='A, B', data_num=2),
+    TC(name='operator_mod', size=[10 ** 7], call_expr='A % B', usecase_params='A, B', data_num=2),
+    TC(name='operator_mul', size=[10 ** 7], call_expr='A * B', usecase_params='A, B', data_num=2),
+    TC(name='operator_ne', size=[10 ** 7], call_expr='A != B', usecase_params='A, B', data_num=2),
+    TC(name='operator_pow', size=[10 ** 7], call_expr='A ** B', usecase_params='A, B', data_num=2),
+    TC(name='operator_sub', size=[10 ** 7], call_expr='A - B', usecase_params='A, B', data_num=2),
+    TC(name='operator_truediv', size=[10 ** 7], call_expr='A / B', usecase_params='A, B', data_num=2),
 ]
 
-generate_test_cases(cases, TestDataFrameMethods, 'df')
+generate_test_cases(cases, TestSeriesOperatorMethods, 'series')
