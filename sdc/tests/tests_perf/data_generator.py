@@ -48,11 +48,11 @@ def gen_series(data_num, data_length, input_data):
     return args
 
 
-def gen_df(data_num, data_length, input_data):
-    datas = gen_data(data_num, data_length, input_data)
-    args = []
-    for data in datas:
-        test_data = pandas.DataFrame({f"f{i}": data for i in range(3)})
-        args.append(test_data)
+def gen_df(data_num, data_length, input_data, columns=3):
+    all_data = gen_data(data_num, data_length, input_data)
+    results = []
+    for data in all_data:
+        test_data = pd.DataFrame({f"f{i}": data for i in range(columns)})
+        results.append(test_data)
 
-    return args
+    return results
