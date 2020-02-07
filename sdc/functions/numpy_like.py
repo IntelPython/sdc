@@ -119,7 +119,7 @@ def sdc_astype_overload(self, dtype):
 
 
 @sdc_overload(nanargmin)
-def sdc_invert_overload(self):
+def sdc_nanargmin_overload(self):
     """
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -164,7 +164,7 @@ def sdc_invert_overload(self):
 
 
 @sdc_overload(nanargmax)
-def sdc_invert_overload(self):
+def sdc_nanargmax_overload(self):
     """
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -209,7 +209,7 @@ def sdc_invert_overload(self):
 
 
 @sdc_overload(argmin)
-def sdc_invert_overload(self):
+def sdc_argmin_overload(self):
     """
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -261,7 +261,7 @@ def sdc_invert_overload(self):
 
 
 @sdc_overload(argmax)
-def sdc_invert_overload(self):
+def sdc_argmax_overload(self):
     """
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
