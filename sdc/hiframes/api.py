@@ -570,8 +570,9 @@ def get_nan_mask(arr):
 def get_nan_mask_overload(arr):
 
     def get_nan_mask_via_isna_impl(arr):
-        res = np.empty(len(arr), dtype=np.bool_)
-        for i in numba.prange(len(arr)):
+        len_arr = len(arr)
+        res = np.empty(len_arr, dtype=np.bool_)
+        for i in numba.prange(len_arr):
             res[i] = isna(arr, i)
         return res
 
