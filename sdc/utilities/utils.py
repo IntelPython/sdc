@@ -83,6 +83,27 @@ _numba_to_c_type_map = {
 }
 
 
+# Maximum and minimum int values
+max_ = np.iinfo(np.int64).max
+min_ = np.iinfo(np.int64).min
+
+
+def min_dtype_int_val(dtype):
+    return np.iinfo(str(dtype)).min
+
+
+def max_dtype_int_val(dtype):
+    return np.iinfo(str(dtype)).max
+
+
+def min_dtype_float_val(dtype):
+    return np.finfo(str(dtype)).min
+
+
+def max_dtype_float_val(dtype):
+    return np.finfo(str(dtype)).max
+
+
 # silence Numba error messages for now
 # TODO: customize through @sdc.jit
 numba.errors.error_extras = {

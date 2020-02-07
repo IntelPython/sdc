@@ -36,14 +36,29 @@ import numpy
 
 from numba import types, jit, prange, numpy_support
 from numba.errors import TypingError
+from numba.targets.arraymath import get_isnan
 
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size)
-from sdc.utilities.utils import sdc_overload, sdc_register_jitable
+from sdc.utilities.utils import (sdc_overload, sdc_register_jitable, max_, min_,
+                                 min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
+                                 max_dtype_float_val)
 
 
 def astype(self, dtype):
+    pass
+
+def argmin(self):
+    pass
+
+def argmax(self):
+    pass
+
+def nanargmin(self):
+    pass
+
+def nanargmax(self):
     pass
 
 
@@ -97,3 +112,193 @@ def sdc_astype_overload(self, dtype):
             return arr
 
         return sdc_astype_number_impl
+
+
+@sdc_overload(nanargmin)
+def sdc_invert_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.nanargmin.
+
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k nanargmin
+
+    """
+
+    ty_checker = TypeChecker("numpy-like 'nanargmin'")
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if isinstance(dtype, types.Integer):
+        max_ref = max_dtype_int_val(dtype)
+
+    if isinstance(dtype, types.Float):
+        max_ref = max_dtype_float_val(dtype)
+
+    if not isinstance(self, types.Array):
+        return None
+
+    if isinstance(dtype, types.Number):
+        def sdc_nanargmin_impl(self):
+            res = max_ref
+            position = max_
+            length = len(self)
+            for i in prange(length):
+                if min(res, self[i]) == self[i]:
+                    if not isnan(self[i]):
+                        if res == self[i]:
+                            position = min(position, i)
+                        else:
+                            position = i
+                        res = self[i]
+            return position
+
+        return sdc_nanargmin_impl
+
+    ty_checker.raise_exc(dtype, 'number', 'self.dtype')
+
+
+@sdc_overload(nanargmax)
+def sdc_invert_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.nanargmax.
+
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k nanargmax
+
+    """
+
+    ty_checker = TypeChecker("numpy-like 'nanargmax'")
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if isinstance(dtype, types.Integer):
+        min_ref = min_dtype_int_val(dtype)
+
+    if isinstance(dtype, types.Float):
+        min_ref = min_dtype_float_val(dtype)
+
+    if not isinstance(self, types.Array):
+        return None
+
+    if isinstance(dtype, types.Number):
+        def sdc_nanargmax_impl(self):
+            res = min_ref
+            position =  max_
+            length = len(self)
+            for i in prange(length):
+                if max(res, self[i]) == self[i]:
+                    if not isnan(self[i]):
+                        if res == self[i]:
+                            position = min(position, i)
+                        else:
+                            position = i
+                        res = self[i]
+            return position
+
+        return sdc_nanargmax_impl
+
+    ty_checker.raise_exc(dtype, 'number', 'self.dtype')
+
+
+@sdc_overload(argmin)
+def sdc_invert_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.argmin.
+
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k argmin
+
+    """
+
+    ty_checker = TypeChecker("numpy-like 'argmin'")
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if isinstance(dtype, types.Integer):
+        max_ref = max_dtype_int_val(dtype)
+
+    if isinstance(dtype, types.Float):
+        max_ref = max_dtype_float_val(dtype)
+
+    if not isinstance(self, types.Array):
+        return None
+
+    if isinstance(dtype, types.Number):
+        def sdc_argmin_impl(self):
+            res = max_ref
+            position = max_
+            length = len(self)
+            for i in prange(length):
+                if not isnan(self[i]):
+                    if min(res, self[i]) == self[i]:
+                        if res == self[i]:
+                            position = min(position, i)
+                        else:
+                            position = i
+                        res = self[i]
+                else:
+                    if numpy.isnan(res):
+                        position = min(position, i)
+                    else:
+                        res = self[i]
+                        position = i
+
+            return position
+
+        return sdc_argmin_impl
+
+    ty_checker.raise_exc(dtype, 'number', 'self.dtype')
+
+
+@sdc_overload(argmax)
+def sdc_invert_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.argmax.
+
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k argmax
+
+    """
+
+    ty_checker = TypeChecker("numpy-like 'argmax'")
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if isinstance(dtype, types.Integer):
+        min_ref = min_dtype_int_val(dtype)
+
+    if isinstance(dtype, types.Float):
+        min_ref = min_dtype_float_val(dtype)
+
+    if not isinstance(self, types.Array):
+        return None
+
+    if isinstance(dtype, types.Number):
+        def sdc_argmax_impl(self):
+            res = min_ref
+            position = max_
+            length = len(self)
+            for i in prange(length):
+                if not isnan(self[i]):
+                    if max(res, self[i]) == self[i]:
+                        if res == self[i]:
+                            position = min(position, i)
+                        else:
+                            position = i
+                        res = self[i]
+                else:
+                    if numpy.isnan(res):
+                        position = min(position, i)
+                    else:
+                        res = self[i]
+                        position = i
+
+            return position
+
+        return sdc_argmax_impl
+
+    ty_checker.raise_exc(dtype, 'number', 'self.dtype')
