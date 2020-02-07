@@ -35,7 +35,7 @@ from sdc.str_arr_ext import StringArray
 from sdc.str_ext import std_str_to_unicode, unicode_to_std_str
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
-from sdc.functions.numpy_like import astype
+from sdc.functions import numpy_like
 
 
 class TestArrays(TestCase):
@@ -45,30 +45,12 @@ class TestArrays(TestCase):
             return a.astype(t)
 
         def sdc_impl(a, t):
-            return astype(a, t)
+            return numpy_like.astype(a, t)
 
         sdc_func = self.jit(sdc_impl)
 
         cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan]]
-        cases_type = [np.float64, np.int64]
-        for case in cases:
-            a = np.array(case)
-            for type_ in cases_type:
-                with self.subTest(data=case, type=type_):
-                    np.testing.assert_array_equal(sdc_func(a, type_), ref_impl(a, type_))
-
-    @unittest.skip("Need implement support for non-literal dtype parameter")
-    def test_astype_to_num_unbox(self):
-        def ref_impl(a, t):
-            return a.astype(t)
-
-        def sdc_impl(a, t):
-            return astype(a, t)
-
-        sdc_func = self.jit(sdc_impl)
-
-        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, 3.4]]
-        cases_type = ['float64', 'int64', 'str']
+        cases_type = [np.float64, np.int64, 'float64', 'int64']
         for case in cases:
             a = np.array(case)
             for type_ in cases_type:
@@ -80,7 +62,7 @@ class TestArrays(TestCase):
             return a.astype('float64')
 
         def sdc_impl(a):
-            return astype(a, 'float64')
+            return numpy_like.astype(a, 'float64')
 
         sdc_func = self.jit(sdc_impl)
 
@@ -95,7 +77,7 @@ class TestArrays(TestCase):
             return a.astype(np.int64)
 
         def sdc_impl(a):
-            return astype(a, np.int64)
+            return numpy_like.astype(a, np.int64)
 
         sdc_func = self.jit(sdc_impl)
 
@@ -110,7 +92,7 @@ class TestArrays(TestCase):
             return a.astype(str)
 
         def sdc_impl(a):
-            return astype(a, str)
+            return numpy_like.astype(a, str)
 
         sdc_func = self.jit(sdc_impl)
 
@@ -123,7 +105,7 @@ class TestArrays(TestCase):
             return a.astype(str)
 
         def sdc_impl(a):
-            return astype(a, str)
+            return numpy_like.astype(a, str)
 
         sdc_func = self.jit(sdc_impl)
 
@@ -135,7 +117,7 @@ class TestArrays(TestCase):
             return a.astype('str')
 
         def sdc_impl(a):
-            return astype(a, 'str')
+            return numpy_like.astype(a, 'str')
 
         sdc_func = self.jit(sdc_impl)
 
@@ -148,7 +130,7 @@ class TestArrays(TestCase):
             return a.astype(t)
 
         def sdc_impl(a, t):
-            return astype(a, t)
+            return numpy_like.astype(a, t)
 
         sdc_func = self.jit(sdc_impl)
 
