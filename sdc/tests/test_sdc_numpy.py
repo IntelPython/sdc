@@ -184,7 +184,7 @@ class TestArrays(TestCase):
 
         sdc_func = self.jit(sdc_impl)
 
-        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases = [[np.nan, np.nan, np.inf, np.nan], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
         for case in cases:
             a = np.array(case)
             with self.subTest(data=case):
@@ -214,7 +214,7 @@ class TestArrays(TestCase):
 
         sdc_func = self.jit(sdc_impl)
 
-        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases = [[np.nan, np.nan, np.inf, np.nan], [5, 2, -9, 333, -4], [3.3, 5.4, np.nan, 7.9]]
         for case in cases:
             a = np.array(case)
             with self.subTest(data=case):

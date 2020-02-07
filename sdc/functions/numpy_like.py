@@ -41,7 +41,7 @@ from numba.targets.arraymath import get_isnan
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size)
-from sdc.utilities.utils import (sdc_overload, sdc_register_jitable, max_, min_,
+from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
                                  max_dtype_float_val)
 
@@ -49,14 +49,18 @@ from sdc.utilities.utils import (sdc_overload, sdc_register_jitable, max_, min_,
 def astype(self, dtype):
     pass
 
+
 def argmin(self):
     pass
+
 
 def argmax(self):
     pass
 
+
 def nanargmin(self):
     pass
+
 
 def nanargmax(self):
     pass
@@ -129,6 +133,7 @@ def sdc_invert_overload(self):
     ty_checker = TypeChecker("numpy-like 'nanargmin'")
     dtype = self.dtype
     isnan = get_isnan(dtype)
+    max_int64 = max_dtype_int_val(numpy_support.from_dtype(numpy.int64))
     if isinstance(dtype, types.Integer):
         max_ref = max_dtype_int_val(dtype)
 
@@ -141,7 +146,7 @@ def sdc_invert_overload(self):
     if isinstance(dtype, types.Number):
         def sdc_nanargmin_impl(self):
             res = max_ref
-            position = max_
+            position = max_int64
             length = len(self)
             for i in prange(length):
                 if min(res, self[i]) == self[i]:
@@ -173,6 +178,7 @@ def sdc_invert_overload(self):
     ty_checker = TypeChecker("numpy-like 'nanargmax'")
     dtype = self.dtype
     isnan = get_isnan(dtype)
+    max_int64 = max_dtype_int_val(numpy_support.from_dtype(numpy.int64))
     if isinstance(dtype, types.Integer):
         min_ref = min_dtype_int_val(dtype)
 
@@ -185,7 +191,7 @@ def sdc_invert_overload(self):
     if isinstance(dtype, types.Number):
         def sdc_nanargmax_impl(self):
             res = min_ref
-            position =  max_
+            position = max_int64
             length = len(self)
             for i in prange(length):
                 if max(res, self[i]) == self[i]:
@@ -217,6 +223,7 @@ def sdc_invert_overload(self):
     ty_checker = TypeChecker("numpy-like 'argmin'")
     dtype = self.dtype
     isnan = get_isnan(dtype)
+    max_int64 = max_dtype_int_val(numpy_support.from_dtype(numpy.int64))
     if isinstance(dtype, types.Integer):
         max_ref = max_dtype_int_val(dtype)
 
@@ -229,7 +236,7 @@ def sdc_invert_overload(self):
     if isinstance(dtype, types.Number):
         def sdc_argmin_impl(self):
             res = max_ref
-            position = max_
+            position = max_int64
             length = len(self)
             for i in prange(length):
                 if not isnan(self[i]):
@@ -268,6 +275,7 @@ def sdc_invert_overload(self):
     ty_checker = TypeChecker("numpy-like 'argmax'")
     dtype = self.dtype
     isnan = get_isnan(dtype)
+    max_int64 = max_dtype_int_val(numpy_support.from_dtype(numpy.int64))
     if isinstance(dtype, types.Integer):
         min_ref = min_dtype_int_val(dtype)
 
@@ -280,7 +288,7 @@ def sdc_invert_overload(self):
     if isinstance(dtype, types.Number):
         def sdc_argmax_impl(self):
             res = min_ref
-            position = max_
+            position = max_int64
             length = len(self)
             for i in prange(length):
                 if not isnan(self[i]):
