@@ -70,8 +70,8 @@ class TestSeriesStringMethods(TestBase):
 
             args = gen_series_str(data_num, data_length, input_data, data_width)
 
-            self.test_jit(pyfunc, base, *args)
-            self.test_py(pyfunc, base, *args)
+            self._test_jit(pyfunc, base, *args)
+            self._test_py(pyfunc, base, *args)
 
 
 cases = [

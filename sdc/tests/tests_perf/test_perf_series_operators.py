@@ -63,8 +63,8 @@ class TestSeriesOperatorMethods(TestBase):
 
             args = gen_series(data_num, data_length, input_data)
 
-            self.test_jit(pyfunc, base, *args)
-            self.test_py(pyfunc, base, *args)
+            self._test_jit(pyfunc, base, *args)
+            self._test_py(pyfunc, base, *args)
 
 
 cases = [
