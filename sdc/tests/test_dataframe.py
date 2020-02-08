@@ -33,6 +33,7 @@ import string
 import unittest
 from itertools import permutations, product
 from numba.config import IS_32BITS
+from numba.special import literal_unroll
 
 import sdc
 from sdc.tests.gen_test_data import ParquetGenerator
@@ -1662,6 +1663,26 @@ class TestDataFrame(TestCase):
         self.assertTrue(isinstance(one, np.ndarray))
         self.assertTrue(isinstance(two, np.ndarray))
         self.assertTrue(isinstance(three, np.ndarray))
+
+    def test_df_create_str_from_optional(self):
+        from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
+        def test_impl():
+            df = pd.DataFrame({
+                        'A': ['a', 'b', None, 'a', '', 'None', 'b'],
+                        'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
+                        'C': [2, 1, np.nan, 1, np.nan, 2, 1]
+            })
+
+            total_elements = 0
+            column_ids = (0, 1, 2)
+            for col_id in literal_unroll(column_ids):
+                total_elements += len(get_dataframe_data(df, col_id))
+            return total_elements
+        hpat_func = self.jit(test_impl)
+
+        result = hpat_func()
+        expected = 21
+        self.assertEqual(result, expected)
 
 
 if __name__ == "__main__":
