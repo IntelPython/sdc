@@ -38,6 +38,7 @@ from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from .generator import generate_test_cases
 from .generator import TestCase as TC
+from .generator import CallExpression as CE
 from sdc.functions import numpy_like
 
 
@@ -61,7 +62,7 @@ class TestFunctions(TestBase):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
+    def _test_case(self, cases, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
         test_name = '{}'.format(name)
 
         if input_data is None:
@@ -83,16 +84,21 @@ class TestFunctions(TestBase):
                 extra_data = np.random.ranf(data_length)
                 args.append(np.array(extra_data))
 
-            record = base.copy()
-            record["test_type"] = 'jit'
-            self._test_jitted(pyfunc, record, *args)
-            self.test_results.add(**record)
-
+            for case in cases:
+                record = base.copy()
+                record["test_type"] = case['type_']
+                if case['jitted']:
+                    self._test_jitted(case['func'], record, *args)
+                else:
+                    self._test_python(case['func'], record, *args)
+                self.test_results.add(**record)
 
 cases = [
-    TC(name='astype_numpy', size=[10 ** 7], call_expr='data.astype(np.int64)', usecase_params='data'),
-    TC(name='astype_sdc', size=[10 ** 7], call_expr='sdc.functions.numpy_like.astype(data, np.int64)',
-       usecase_params='data'),
+    TC(name='astype', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='data.astype(np.int64)', jitted=False),
+        CE(type_='Numba', code='data.astype(np.int64)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.astype(data, np.int64)', jitted=True),
+    ], usecase_params='data'),
 ]
 
 generate_test_cases(cases, TestFunctions, 'function')

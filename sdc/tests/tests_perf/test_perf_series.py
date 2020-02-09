@@ -46,20 +46,6 @@ class TestSeriesMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_jitted(self, pyfunc, record, *args, **kwargs):
-        # compilation time
-        record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
-
-        sdc_func = sdc.jit(pyfunc)
-
-        # execution and boxing time
-        record["test_results"], record["boxing_results"] = \
-            get_times(sdc_func, *args, **kwargs)
-
-    def _test_python(self, pyfunc, record, *args, **kwargs):
-        record["test_results"], _ = \
-            get_times(pyfunc, *args, **kwargs)
-
     def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
         test_name = 'Series.{}'.format(name)
 
@@ -82,15 +68,8 @@ class TestSeriesMethods(TestBase):
                 extra_data = np.random.ranf(data_length)
                 args.append(pandas.Series(extra_data))
 
-            record = base.copy()
-            record["test_type"] = 'SDC'
-            self._test_jitted(pyfunc, record, *args)
-            self.test_results.add(**record)
-
-            record = base.copy()
-            record["test_type"] = 'Python'
-            self._test_python(pyfunc, record, *args)
-            self.test_results.add(**record)
+            self._test_jit(pyfunc, base, *args)
+            self._test_py(pyfunc, base, *args)
 
 
 cases = [
@@ -151,7 +130,7 @@ cases = [
     TC(name='pow', size=[10 ** 7], params='other', data_num=2),
     TC(name='quantile', size=[10 ** 8]),
     TC(name='rename', size=[10 ** 7], call_expr='data.rename("new_series")', usecase_params='data'),
-    TC(name='setitem', size=[10 ** 7], call_expr='data[100000] = 0', usecase_params='data'),
+    # TC(name='setitem', size=[10 ** 7], call_expr='data[100000] = 0', usecase_params='data'),
     TC(name='shape', size=[10 ** 7], call_expr='data.shape', usecase_params='data'),
     TC(name='shift', size=[10 ** 8]),
     TC(name='size', size=[10 ** 7], call_expr='data.size', usecase_params='data'),

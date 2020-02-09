@@ -34,13 +34,13 @@
 import numba
 import numpy
 
-from numba import types, jit, prange, numpy_support
+from numba import types, jit, prange, numpy_support, literally
 from numba.errors import TypingError
 
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size)
-from sdc.utilities.utils import sdc_overload
+from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 
 
 def astype(self, dtype):
@@ -59,8 +59,15 @@ def sdc_astype_overload(self, dtype):
 
     """
 
+    ty_checker = TypeChecker("numpy-like 'astype'")
     if not isinstance(self, types.Array):
         return None
+
+    if not isinstance(dtype, (types.functions.NumberClass, types.Function, types.Literal)):
+        def impl(self, dtype):
+            return astype(self, literally(dtype))
+
+        return impl
 
     if not isinstance(dtype, (types.StringLiteral, types.UnicodeType, types.Function, types.functions.NumberClass)):
         ty_checker.raise_exc(dtype, 'string or type', 'dtype')
@@ -97,3 +104,5 @@ def sdc_astype_overload(self, dtype):
             return arr
 
         return sdc_astype_number_impl
+
+    ty_checker.raise_exc(self.dtype, 'str or type', 'self.dtype')
