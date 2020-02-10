@@ -154,7 +154,7 @@ def sdc_isnan_overload(self):
             length = len(self)
             res = numpy.empty(shape=length, dtype=numpy.bool_)
             for i in prange(length):
-                res[i] = isnan(self[i])
+                res[i] = not isnan(self[i])
 
             return res
 
