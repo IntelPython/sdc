@@ -32,9 +32,8 @@ from numba import njit
 @njit
 def series_at_many_idx():
     series = pd.Series([5, 4, 3, 2, 1], index=[0, 2, 0, 6, 0])
-    return series.at[0]
-    # Expected Array:
-    # [5 3 1]
+
+    return series.at[0]  # Expect array: [5 3 1]
 
 
 print(series_at_many_idx())
