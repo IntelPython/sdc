@@ -2319,6 +2319,14 @@ class TestSeries(
         S = pd.Series([1., 2., 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def test_series_sum_bool(self):
+        def test_impl(S):
+            return S.sum()
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([True, True, False])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
     def test_series_sum_nan(self):
         def test_impl(S):
             return S.sum()

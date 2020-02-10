@@ -146,9 +146,21 @@ def sdc_sum_overload(self):
 
         return sdc_sum_number_impl
 
+    if isinstance(dtype, (types.Boolean, bool)):
+        def sdc_sum_number_impl(self):
+            length = len(self)
+            result = 0
+            for i in prange(length):
+                if self[i]:
+                    result += self[i]
+
+            return result
+
+        return sdc_sum_number_impl
+
 
 @sdc_overload(nansum)
-def sdc_sum_overload(self):
+def sdc_nansum_overload(self):
     """
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -168,6 +180,18 @@ def sdc_sum_overload(self):
             result = 0
             for i in prange(length):
                 if not numpy.isnan(self[i]):
+                    result += self[i]
+
+            return result
+
+        return sdc_nansum_number_impl
+
+    if isinstance(dtype, (types.Boolean, bool)):
+        def sdc_nansum_number_impl(self):
+            length = len(self)
+            result = 0
+            for i in prange(length):
+                if self[i]:
                     result += self[i]
 
             return result
