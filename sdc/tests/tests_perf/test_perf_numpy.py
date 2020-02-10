@@ -113,6 +113,16 @@ cases = [
         CE(type_='Numba', code='np.sum(data)', jitted=True),
         CE(type_='SDC', code='sdc.functions.numpy_like.sum(data)', jitted=True),
     ], usecase_params='data'),
+    TC(name='nanmin', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.nanmin(data)', jitted=False),
+        CE(type_='Numba', code='np.nanmin(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.nanmin(data)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='nanmax', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.nanmax(data)', jitted=False),
+        CE(type_='Numba', code='np.nanmax(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.nanmax(data)', jitted=True),
+    ], usecase_params='data'),
 ]
 
 generate_test_cases(cases, TestFunctions, 'function')
