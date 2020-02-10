@@ -24,6 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+Expected Series:
+0    10
+2     8
+3     7
+5     5
+7     3
+8     2
+dtype: int64
+"""
 import numpy as np
 import pandas as pd
 from numba import njit
@@ -33,15 +43,8 @@ from numba import njit
 def series_getitem_array():
     series = pd.Series(np.arange(10, 0, -1))  # Series of 10, 9, ..., 1
     array = np.array([True, False, True, True, False] * 2)
+
     return series[array]  # Accessing series by array
-    # Expected Series:
-    # 0    10
-    # 2     8
-    # 3     7
-    # 5     5
-    # 7     3
-    # 8     2
-    # dtype: int64
 
 
 print(series_getitem_array())

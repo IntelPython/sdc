@@ -36,6 +36,7 @@ import numpy
 
 from numba import types, jit, prange, numpy_support, literally
 from numba.errors import TypingError
+from numba.targets.arraymath import get_isnan
 
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
@@ -48,6 +49,14 @@ def astype(self, dtype):
 
 
 def copy(self):
+    pass
+
+
+def sum(self):
+    pass
+
+
+def nansum(self):
     pass
 
 
@@ -155,3 +164,61 @@ def sdc_copy_overload(self):
             return self.copy()
 
         return sdc_copy_string_impl
+
+
+@sdc_overload(sum)
+def sdc_sum_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.sum.
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k sum
+    """
+
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if not isinstance(self, types.Array):
+        return None
+
+    if isinstance(dtype, types.Number):
+        def sdc_sum_number_impl(self):
+            length = len(self)
+            result = 0
+            for i in prange(length):
+                if not isnan(self[i]):
+                    result += self[i]
+                else:
+                    return numpy.nan
+
+            return result
+
+        return sdc_sum_number_impl
+
+
+@sdc_overload(nansum)
+def sdc_sum_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.nansum.
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k nansum
+    """
+
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if not isinstance(self, types.Array):
+        return None
+
+    if isinstance(dtype, types.Number):
+        def sdc_nansum_number_impl(self):
+            length = len(self)
+            result = 0
+            for i in prange(length):
+                if not numpy.isnan(self[i]):
+                    result += self[i]
+
+            return result
+
+        return sdc_nansum_number_impl
