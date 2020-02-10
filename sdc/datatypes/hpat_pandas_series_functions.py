@@ -4550,6 +4550,11 @@ def hpat_pandas_series_count(self, level=None):
 
         return hpat_pandas_series_count_str_impl
 
+    if isinstance(self.data, types.Array) and isinstance(self.data.dtype, types.Integer):
+        def hpat_pandas_series_count_int_impl(self, level=None):
+            return len(self._data)
+        return hpat_pandas_series_count_int_impl
+
     def hpat_pandas_series_count_impl(self, level=None):
         """
         Return number of non-NA/null observations in the object
