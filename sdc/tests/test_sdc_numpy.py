@@ -211,7 +211,7 @@ class TestArrays(TestCase):
         sdc_func = self.jit(sdc_impl)
         np.testing.assert_array_equal(sdc_func(), ref_impl())
 
-    @unittest.skip('Numba have not string array')
+    @unittest.skip("Numba doesn't have string array")
     def test_copy_str(self):
         def ref_impl():
             a = np.array(['a', 'vv', 'o12oo'])
