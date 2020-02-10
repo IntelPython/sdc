@@ -124,10 +124,10 @@ def sdc_copy_overload(self):
 
     """
 
-    dtype = self.dtype
     if not isinstance(self, types.Array):
         return None
 
+    dtype = self.dtype
     if isinstance(dtype, types.Number):
         def sdc_copy_number_impl(self):
             length = len(self)
@@ -139,7 +139,7 @@ def sdc_copy_overload(self):
 
         return sdc_copy_number_impl
 
-    if isinstance(self.dtype, (types.Boolean, bool)):
+    if isinstance(dtype, (types.Boolean, bool)):
         def sdc_copy_bool_impl(self):
             length = len(self)
             res = numpy.empty(length, dtype=numpy.bool_)
@@ -150,7 +150,7 @@ def sdc_copy_overload(self):
 
         return sdc_copy_bool_impl
 
-    if isinstance(self.dtype, types.npytypes.UnicodeCharSeq):
+    if isinstance(dtype, types.npytypes.UnicodeCharSeq):
         def sdc_copy_string_impl(self):
             return self.copy()
 
