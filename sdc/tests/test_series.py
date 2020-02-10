@@ -3406,7 +3406,7 @@ class TestSeries(
         S2 = pd.Series([-2., 5.0], ['a2', 'b2'])
         with self.assertRaises(TypingError) as raises:
             hpat_func(S1, S2, ignore_index)
-        msg = 'Method append(). The ignore_index must be a literal Boolean constant. Given: {}'
+        msg = 'Method append(). The object ignore_index\n given: bool\n expected: literal Boolean constant\n'
         self.assertIn(msg.format(types.bool_), str(raises.exception))
 
     @skip_sdc_jit("BUG: old-style append implementation doesn't handle series index")
