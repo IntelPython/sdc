@@ -172,6 +172,52 @@ class TestArrays(TestCase):
             with self.subTest(data=case):
                 np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
 
+    def test_isnan(self):
+        def ref_impl(a):
+            return np.isnan(a)
+
+        def sdc_impl(a):
+            return numpy_like.isnan(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+    @unittest.skip('Needs provide String Array boxing')
+    def test_isnan_str(self):
+        def ref_impl(a):
+            return np.isnan(a)
+
+        def sdc_impl(a):
+            return numpy_like.isnan(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [['a', 'cc', np.nan], ['se', None, 'vvv']]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+    def test_notnan(self):
+        def ref_impl(a):
+            return np.invert(np.isnan(a))
+
+        def sdc_impl(a):
+            return numpy_like.notnan(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
     def test_copy(self):
         def ref_impl(a):
             return np.copy(a)
