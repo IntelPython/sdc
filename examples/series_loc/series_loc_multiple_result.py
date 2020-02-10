@@ -24,6 +24,13 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+Expected Series:
+0    5
+0    3
+0    1
+dtype: int64
+"""
 import numpy as np
 import pandas as pd
 from numba import njit
@@ -32,12 +39,8 @@ from numba import njit
 @njit
 def series_loc_many_idx():
     series = pd.Series([5, 4, 3, 2, 1], index=[0, 2, 0, 6, 0])
+
     return series.loc[0]
-    # Expected Series:
-    # 0    5
-    # 0    3
-    # 0    1
-    # dtype: int64
 
 
 print(series_loc_many_idx())

@@ -24,6 +24,15 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+Expect Series
+1   -10.0
+3     0.0
+0     3.0
+4    92.0
+2     NaN
+dtype: float64
+"""
 import numpy as np
 import pandas as pd
 from numba import njit
@@ -31,15 +40,6 @@ from numba import njit
 
 @njit
 def series_sort_values():
-    """
-    Expect Series
-    1   -10.0
-    3     0.0
-    0     3.0
-    4    92.0
-    2     NaN
-    dtype: float64
-    """
     series = pd.Series([3, -10, np.nan, 0, 92])
 
     return series.sort_values()

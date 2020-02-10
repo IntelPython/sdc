@@ -24,6 +24,12 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+Expected Series:
+0    3
+1    2
+dtype: int64
+"""
 import numpy as np
 import pandas as pd
 from numba import njit
@@ -32,11 +38,8 @@ from numba import njit
 @njit
 def series_iloc_slice():
     series = pd.Series([5, 4, 3, 2, 1], index=[0, 2, 4, 6, 8])
+
     return series.iloc[2:4]
-    # Expected Series:
-    # 0    3
-    # 1    2
-    # dtype: int64
 
 
 print(series_iloc_slice())
