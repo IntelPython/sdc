@@ -1227,31 +1227,33 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, values, all_params, columns)
                     f'      result.append(False)']
             else:
                 func_lines += [
-                    f'  for i in numba.prange(len(series_num_legs)):',
-                    f'    idx = series_{c}.index.get(i)',
-                    f'    value = series_{c}._data.get(i)',
+                    f'  for i in range(len(series_{c})):',
+                    f'    idx = series_{c}.index[i]',
+                    f'    value = series_{c}._data[i]',
+                    f'    n = 0',
                     f'    for j in numba.prange(len(series_{c}_values)):',
-                    f'      idx_val = series_{c}_values.index.get(j)',
-                    f'      value_val = series_{c}_values._data.get(j)',
+                    f'      idx_val = series_{c}_values.index[j]',
                     f'      if idx == idx_val:',
+                    f'        value_val = series_{c}_values._data[j]',
                     f'        if value == value_val:',
                     f'          result.append(True)',
-                    f'        else:',
-                    f'          result.append(False)',
                     f'      else:',
-                    f'        result.append(False)'
-                ]
+                    f'        n += 1',
+                    f'        if n == len(series_{c}_values._data):',
+                    f'          result.append(False)'
+                    ]
         else:
             func_lines += [
                 f'  result = [False] * len(series_{c}._data)']
         func_lines += [f'  {result_c} = pandas.Series(result)']
         result_name.append((result_c, c))
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
-    func_lines += [f'  return pandas.DataFrame({{{data}}})']
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=df._index)']
     func_text = '\n'.join(func_lines)
-    print(func_text)
+
     global_vars = {'pandas': pandas,
                    'numba': numba,
+                   'numpy': numpy,
                    'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
