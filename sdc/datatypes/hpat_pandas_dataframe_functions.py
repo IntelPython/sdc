@@ -1227,15 +1227,20 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, values, all_params, columns)
                     f'      result.append(False)']
             else:
                 func_lines += [
-                    f'  for i in series_{c}.index:',
-                    f'    if i in series_{c}_values.index:',
-                    f'      for j in range(len(series_{c}[i]._data)):',
-                    f'        if series_{c}[i]._data[j] == series_{c}_values[i]._data:',
+                    f'  for i in numba.prange(len(series_num_legs)):',
+                    f'    idx = series_{c}.index.get(i)',
+                    f'    value = series_{c}._data.get(i)',
+                    f'    for j in numba.prange(len(series_{c}_values)):',
+                    f'      idx_val = series_{c}_values.index.get(j)',
+                    f'      value_val = series_{c}_values._data.get(j)',
+                    f'      if idx == idx_val:',
+                    f'        if value == value_val:',
                     f'          result.append(True)',
                     f'        else:',
                     f'          result.append(False)',
-                    f'    else:',
-                    f'      result.append(False)']
+                    f'      else:',
+                    f'        result.append(False)'
+                ]
         else:
             func_lines += [
                 f'  result = [False] * len(series_{c}._data)']
@@ -1246,6 +1251,7 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, values, all_params, columns)
     func_text = '\n'.join(func_lines)
     print(func_text)
     global_vars = {'pandas': pandas,
+                   'numba': numba,
                    'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
