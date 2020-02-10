@@ -1248,7 +1248,7 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, values, all_params, columns)
         func_lines += [f'  {result_c} = pandas.Series(result)']
         result_name.append((result_c, c))
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
-    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=df._index)']
+    func_lines += [f'  return pandas.DataFrame({{{data}}})']
     func_text = '\n'.join(func_lines)
 
     global_vars = {'pandas': pandas,
