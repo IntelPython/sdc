@@ -33,6 +33,7 @@
 import operator
 import pandas
 import numpy
+import numba
 import sdc
 
 from numba import types
@@ -1171,8 +1172,8 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, values, all_params, columns
             ]
         else:
             func_lines += [
-                f'  for i in series_{c}.index:',
-                f'    if i in values.index:',
+                f'  for i in list(series_{c}.index):',
+                f'    if i in list(values.index):',
                 f'      if series_{c}[i] == values[i]:',
                 f'        result.append(True)',
                 f'      else:',
@@ -1228,10 +1229,11 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, values, all_params, columns)
                 func_lines += [
                     f'  for i in series_{c}.index:',
                     f'    if i in series_{c}_values.index:',
-                    f'      if series_{c}[i] == series_{c}_values[i]:',
-                    f'        result.append(True)',
-                    f'      else:',
-                    f'        result.append(False)',
+                    f'      for j in range(len(series_{c}[i]._data)):',
+                    f'        if series_{c}[i]._data[j] == series_{c}_values[i]._data:',
+                    f'          result.append(True)',
+                    f'        else:',
+                    f'          result.append(False)',
                     f'    else:',
                     f'      result.append(False)']
         else:
@@ -1239,11 +1241,10 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, values, all_params, columns)
                 f'  result = [False] * len(series_{c}._data)']
         func_lines += [f'  {result_c} = pandas.Series(result)']
         result_name.append((result_c, c))
-
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
     func_lines += [f'  return pandas.DataFrame({{{data}}})']
     func_text = '\n'.join(func_lines)
-
+    print(func_text)
     global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
 
