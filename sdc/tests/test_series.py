@@ -3541,7 +3541,7 @@ class TestSeries(
 
         jit_func = self.jit(test_impl)
 
-        datas = [[0, 1, 2, 3], [0., 1., np.inf, np.nan], ['a', None, 'b', 'c']]
+        datas = [[0, 1, 2, 3], [0., 1., np.inf, np.nan], ['a', None, 'b', 'c'], [True, True, False, False]]
         indices = [None, [3, 2, 1, 0], ['a', 'b', 'c', 'd']]
         names = [None, 'A']
 
@@ -3559,7 +3559,7 @@ class TestSeries(
 
         jit_func = self.jit(test_impl)
 
-        datas = [[0, 1, 2, 3], [0., 1., np.inf, np.nan], ['a', None, 'b', 'c']]
+        datas = [[0, 1, 2, 3], [0., 1., np.inf, np.nan], ['a', None, 'b', 'c'], [True, True, False, False]]
         indices = [None, [3, 2, 1, 0], ['a', 'b', 'c', 'd']]
         names = [None, 'A']
 
@@ -3585,7 +3585,7 @@ class TestSeries(
 
         jit_func = self.jit(test_impl)
 
-        datas = [[0, 1, 2, 3], [0., 1., np.inf, np.nan], ['a', None, 'b', 'c']]
+        datas = [[0, 1, 2, 3], [0., 1., np.inf, np.nan], ['a', None, 'b', 'c'], [True, True, False, False]]
         indices = [None, [3, 2, 1, 0], ['a', 'b', 'c', 'd']]
         names = [None, 'A']
 
