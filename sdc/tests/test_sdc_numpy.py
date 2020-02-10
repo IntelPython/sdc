@@ -50,25 +50,7 @@ class TestArrays(TestCase):
         sdc_func = self.jit(sdc_impl)
 
         cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan]]
-        cases_type = [np.float64, np.int64]
-        for case in cases:
-            a = np.array(case)
-            for type_ in cases_type:
-                with self.subTest(data=case, type=type_):
-                    np.testing.assert_array_equal(sdc_func(a, type_), ref_impl(a, type_))
-
-    @unittest.skip("Need implement support for non-literal dtype parameter")
-    def test_astype_to_num_unbox(self):
-        def ref_impl(a, t):
-            return a.astype(t)
-
-        def sdc_impl(a, t):
-            return numpy_like.astype(a, t)
-
-        sdc_func = self.jit(sdc_impl)
-
-        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, 3.4]]
-        cases_type = ['float64', 'int64', 'str']
+        cases_type = [np.float64, np.int64, 'float64', 'int64']
         for case in cases:
             a = np.array(case)
             for type_ in cases_type:
