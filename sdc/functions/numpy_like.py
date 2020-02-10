@@ -144,10 +144,9 @@ def sdc_isnan_overload(self):
     if isinstance(dtype, types.Float):
         def sdc_notnan_float_impl(self):
             length = len(self)
-            res = numpy.ones(shape=length, dtype=numpy.bool_)
+            res = numpy.empty(shape=length, dtype=numpy.bool_)
             for i in prange(length):
-                if isnan(self[i]):
-                    res[i] = False
+                res[i] = isnan(self[i])
 
             return res
 
@@ -183,10 +182,9 @@ def sdc_isnan_overload(self):
     if isinstance(dtype, types.Float):
         def sdc_isnan_float_impl(self):
             length = len(self)
-            res = numpy.zeros(shape=length, dtype=numpy.bool_)
+            res = numpy.empty(shape=length, dtype=numpy.bool_)
             for i in prange(length):
-                if isnan(self[i]):
-                    res[i] = True
+                res[i] = isnan(self[i])
 
             return res
 
