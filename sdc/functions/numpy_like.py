@@ -56,6 +56,14 @@ def notnan(self):
     pass
 
 
+def sum(self):
+    pass
+
+
+def nansum(self):
+    pass
+
+
 @sdc_overload(astype)
 def sdc_astype_overload(self, dtype):
     """
@@ -191,3 +199,61 @@ def sdc_isnan_overload(self):
         return sdc_isnan_float_impl
 
     ty_checker.raise_exc(dtype, 'int or float', 'self.dtype')
+
+
+@sdc_overload(sum)
+def sdc_sum_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.sum.
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k sum
+    """
+
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if not isinstance(self, types.Array):
+        return None
+
+    if isinstance(dtype, types.Number):
+        def sdc_sum_number_impl(self):
+            length = len(self)
+            result = 0
+            for i in prange(length):
+                if not isnan(self[i]):
+                    result += self[i]
+                else:
+                    return numpy.nan
+
+            return result
+
+        return sdc_sum_number_impl
+
+
+@sdc_overload(nansum)
+def sdc_sum_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.nansum.
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k nansum
+    """
+
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if not isinstance(self, types.Array):
+        return None
+
+    if isinstance(dtype, types.Number):
+        def sdc_nansum_number_impl(self):
+            length = len(self)
+            result = 0
+            for i in prange(length):
+                if not numpy.isnan(self[i]):
+                    result += self[i]
+
+            return result
+
+        return sdc_nansum_number_impl

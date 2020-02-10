@@ -24,11 +24,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import numpy as np
-import pandas as pd
-from numba import njit
-
-
 """
 Expect Series
 0     NaN
@@ -38,6 +33,11 @@ Expect Series
 4     0.0
 dtype: float64
 """
+import numpy as np
+import pandas as pd
+from numba import njit
+
+
 @njit
 def series_shift():
     series = pd.Series([3, -10, np.nan, 0, 92])
