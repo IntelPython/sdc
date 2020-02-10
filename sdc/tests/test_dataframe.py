@@ -1236,6 +1236,17 @@ class TestDataFrame(TestCase):
         ref_result = test_impl(df, start, end)
         pd.testing.assert_frame_equal(jit_result, ref_result)
 
+    @skip_sdc_jit('DF.getitem unsupported Series name')
+    def _test_df_getitem_tuple_idx(self, df):
+        def test_impl(df):
+            # pd.df.getitem does not support idx as a tuple
+            return df[['A', 'C']]
+
+        # SDC pd.df.getitem does not support idx as a list
+        sdc_func = self.jit(lambda df: df[('A', 'C')])
+
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
     @skip_sdc_jit('DF.getitem unsupported exceptions')
     def test_df_getitem_str_literal_idx_exception_key_error(self):
         def test_impl(df):
@@ -1261,16 +1272,26 @@ class TestDataFrame(TestCase):
                     sdc_func(df, 'ABC')
 
     @skip_sdc_jit('DF.getitem unsupported Series name')
+    def test_df_getitem_tuple_idx_exception_key_error(self):
+        sdc_func = self.jit(lambda df: df[('A', 'Z')])
+
+        for df in [gen_df(test_global_input_data_float64), pd.DataFrame()]:
+            with self.subTest(df=df):
+                with self.assertRaises(KeyError):
+                    sdc_func(df)
+
+    @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx(self):
         dfs = [gen_df(test_global_input_data_float64),
                gen_df(test_global_input_data_float64, with_index=True),
-               pd.DataFrame({'A': []})]
+               pd.DataFrame({'A': [], 'B': [], 'C': []})]
         for df in dfs:
             with self.subTest(df=df):
                 self._test_df_getitem_str_literal_idx(df)
                 self._test_df_getitem_unicode_idx(df, 'A')
                 self._test_df_getitem_slice_idx(df)
                 self._test_df_getitem_unbox_slice_idx(df, 1, 3)
+                self._test_df_getitem_tuple_idx(df)
 
     @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx_multiple_types(self):
@@ -1284,6 +1305,7 @@ class TestDataFrame(TestCase):
                 self._test_df_getitem_unicode_idx(df, 'A')
                 self._test_df_getitem_slice_idx(df)
                 self._test_df_getitem_unbox_slice_idx(df, 1, 3)
+                self._test_df_getitem_tuple_idx(df)
 
     @unittest.skip('DF.getitem unsupported integer columns')
     def test_df_getitem_int_literal_idx(self):
