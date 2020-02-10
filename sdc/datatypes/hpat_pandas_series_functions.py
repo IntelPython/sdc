@@ -420,11 +420,18 @@ def hpat_pandas_series_getitem(self, idx):
 
 
 @sdc_overload(operator.setitem)
-def hpat_pandas_series_setitem(self, idx, value):
+def sdc_pandas_series_setitem(self, idx, value):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
     Pandas API: pandas.Series.__setitem__
+
+    Limitations
+    -----------
+        Not supported for idx as a string slice, e.g. S['a':'f'] = value
+        Not supported for string series
+        Not supported for a case of setting value for non existing index
+        Not supported for cases when setting causes change of the Series dtype
 
     Examples
     --------
@@ -471,30 +478,258 @@ def hpat_pandas_series_setitem(self, idx, value):
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_setitem*
     """
 
-    ty_checker = TypeChecker('Operator setitem.')
+    _func_name = 'Operator setitem().'
+    ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if not (isinstance(idx, (types.Integer, types.SliceType, SeriesType))):
-        ty_checker.raise_exc(idx, 'int, Slice, Series', 'idx')
+    if not (isinstance(idx, (types.Number, types.UnicodeType, types.SliceType, types.Array, SeriesType))):
+        ty_checker.raise_exc(idx, 'scalar, Slice, Array or Series', 'idx')
 
-    if not((isinstance(value, SeriesType) and isinstance(value.dtype, self.dtype)) or \
-           isinstance(value, type(self.dtype))):
-        ty_checker.raise_exc(value, self.dtype, 'value')
+    all_supported_scalar_types = (types.Number, types.UnicodeType, types.Boolean)
+    if not (isinstance(value, all_supported_scalar_types) or isinstance(value, (SeriesType, types.Array))):
+        ty_checker.raise_exc(value, 'scalar, Array or Series', 'value')
 
-    if isinstance(idx, types.Integer) or isinstance(idx, types.SliceType):
-        def hpat_pandas_series_setitem_idx_integer_impl(self, idx, value):
-            self._data[idx] = value
+    if not check_types_comparable(self, value):
+        msg = '{} The value and Series data must be comparable. Given: self.dtype={}, value={}'
+        raise TypingError(msg.format(_func_name, self.dtype, value))
+
+    # idx is not necessarily of the same dtype as self.index, e.g. it might be a Boolean indexer or a Slice
+    if not (check_types_comparable(idx, self.index)
+            or isinstance(idx, (types.Integer, types.SliceType))
+            or (isinstance(idx, (SeriesType, types.Array)) and isinstance(idx.dtype, (types.Integer, types.Boolean)))):
+        msg = '{} The idx is not comparable to Series index, not a Boolean or integer indexer or a Slice. ' + \
+              'Given: self.index={}, idx={}'
+        raise TypingError(msg.format(_func_name, self.index, idx))
+
+    value_is_series = isinstance(value, SeriesType)
+    value_is_array = isinstance(value, types.Array)
+
+    # for many cases pandas setitem assigns values along positions in self._data
+    # not considering Series index, so a common implementation exists
+    idx_is_boolean_array = isinstance(idx, types.Array) and isinstance(idx.dtype, types.Boolean)
+    idx_is_boolean_series = isinstance(idx, SeriesType) and isinstance(idx.dtype, types.Boolean)
+    idx_and_self_index_comparable = check_types_comparable(self.index, idx)
+    self_index_is_none = isinstance(self.index, types.NoneType)
+    assign_along_positions = ((self_index_is_none
+                               or isinstance(idx, types.SliceType)
+                               or not idx_and_self_index_comparable)
+                              and not idx_is_boolean_series
+                              and not idx_is_boolean_array)
+
+    idx_is_scalar = isinstance(idx, (types.Number, types.UnicodeType))
+    if assign_along_positions or idx_is_scalar:
+
+        idx_is_numeric_or_boolean_series = (isinstance(idx, SeriesType)
+                                            and isinstance(idx.dtype, (types.Number, types.Boolean)))
+        assign_via_idx_mask = idx_is_scalar and idx_and_self_index_comparable
+        assign_via_idx_data = idx_is_numeric_or_boolean_series and not idx_and_self_index_comparable
+
+        def sdc_pandas_series_setitem_no_reindexing_impl(self, idx, value):
+
+            if assign_via_idx_mask == True:  # noqa
+                _idx = self._index == idx
+            elif assign_via_idx_data == True:  # noqa
+                _idx = idx._data
+            else:
+                _idx = idx
+
+            _value = value._data if value_is_series == True else value  # noqa
+            self._data[_idx] = _value
             return self
 
-        return hpat_pandas_series_setitem_idx_integer_impl
+        return sdc_pandas_series_setitem_no_reindexing_impl
 
-    if isinstance(idx, SeriesType):
-        def hpat_pandas_series_setitem_idx_series_impl(self, idx, value):
-            super_index = idx._data
-            self._data[super_index] = value
+    if (idx_is_boolean_array or idx_is_boolean_series) and value_is_series:
+
+        self_index_dtype = types.int64 if isinstance(self.index, types.NoneType) else self.index.dtype
+        value_index_dtype = types.int64 if isinstance(value.index, types.NoneType) else value.index.dtype
+        if (isinstance(self_index_dtype, types.Number) and isinstance(value_index_dtype, types.Number)):
+            indexes_common_dtype = find_common_dtype_from_numpy_dtypes([self_index_dtype, value_index_dtype], [])
+        elif (isinstance(self_index_dtype, types.UnicodeType) and isinstance(value_index_dtype, types.UnicodeType)):
+            indexes_common_dtype = types.unicode_type
+        else:
+            msg = '{} The self and value indexes must be comparable. Given: self.dtype={}, value.dtype={}'
+            raise TypingError(msg.format(_func_name, self_index_dtype, value_index_dtype))
+
+    if idx_is_boolean_array:
+
+        def sdc_pandas_series_setitem_idx_bool_array_align_impl(self, idx, value):
+
+            # if idx is a Boolean array (and value is a series) it's used as a mask for self.index
+            # and filtered indexes are looked in value.index, and if found corresponding value is set
+            if value_is_series == True:  # noqa
+                value_index, self_index = value.index, self.index
+                unique_value_indices, unique_self_indices = set(value_index), set(self_index)
+
+                # pandas behaves differently if value.index has duplicates and if it has no
+                # in case of duplicates in value.index assignment is made via positions
+                # in case there are no duplicates, value.index is used as reindexer
+                self_index_has_duplicates = len(unique_self_indices) != len(self_index)
+                value_index_has_duplicates = len(unique_value_indices) != len(value_index)
+                if (self_index_has_duplicates or value_index_has_duplicates):
+                    self._data[idx] = value._data
+                else:
+                    map_index_to_position = Dict.empty(
+                        key_type=indexes_common_dtype,
+                        value_type=types.int32
+                    )
+                    for i, index_value in enumerate(value_index):
+                        map_index_to_position[index_value] = types.int32(i)
+
+                    # such iterative setitem on a StringArray will be inefficient
+                    # TODO: refactor this when str_arr setitem is fully supported
+                    for i in numba.prange(len(self_index)):
+                        if idx[i]:
+                            self_index_value = self_index[i]
+                            if self_index_value in map_index_to_position:
+                                self._data[i] = value._data[map_index_to_position[self_index_value]]
+                            else:
+                                sdc.hiframes.join.setitem_arr_nan(self._data, i)
+
+            else:
+                # if value has no index - nothing to reindex and assignment is made along positions set by idx mask
+                self._data[idx] = value
+
             return self
 
-        return hpat_pandas_series_setitem_idx_series_impl
+        return sdc_pandas_series_setitem_idx_bool_array_align_impl
+
+    elif idx_is_boolean_series:
+
+        def sdc_pandas_series_setitem_idx_bool_series_align_impl(self, idx, value):
+
+            self_index, idx_index = self.index, idx.index
+            # FIXME: for now just use sorted, as == is not implemented for sets of unicode strings
+            if (sorted(self_index) != sorted(idx_index)):
+                msg = "Unalignable boolean Series provided as indexer " + \
+                      "(index of the boolean Series and of the indexed object do not match)"
+                raise ValueError(msg)
+
+            # if idx is a Boolean Series it's data is used as a mask for it's index
+            # and filtered indexes are either looked in value.index (if value is a Series)
+            # or in self.index (if value is scalar or array)
+            filtered_idx_indices = idx_index[idx._data]
+            filtered_idx_indices_set = set(filtered_idx_indices)
+            if value_is_series == True:  # noqa
+
+                if len(filtered_idx_indices_set) != len(filtered_idx_indices):
+                    raise ValueError("cannot reindex from a duplicate axis")
+
+                map_self_index_to_position = Dict.empty(
+                    key_type=indexes_common_dtype,
+                    value_type=types.int32
+                )
+                for i, index_value in enumerate(self_index):
+                    map_self_index_to_position[index_value] = types.int32(i)
+
+                value_index = value.index
+                map_value_index_to_position = Dict.empty(
+                    key_type=indexes_common_dtype,
+                    value_type=types.int32
+                )
+                for i, index_value in enumerate(value_index):
+                    map_value_index_to_position[index_value] = types.int32(i)
+
+                # for all index values in filtered index assign element of value with this index
+                # to element of self with this index
+                for i in numba.prange(len(filtered_idx_indices)):
+                    idx_index_value = filtered_idx_indices[i]
+                    if idx_index_value in map_value_index_to_position:
+                        self_index_pos = map_self_index_to_position[idx_index_value]
+                        value_index_pos = map_value_index_to_position[idx_index_value]
+                        self._data[self_index_pos] = value._data[value_index_pos]
+                    else:
+                        sdc.hiframes.join.setitem_arr_nan(self._data, map_self_index_to_position[idx_index_value])
+            else:
+                # use filtered index values to create a set mask, then make assignment to self
+                # using this mask (i.e. the order of filtered indices in self.index does not matter)
+                self_index_size = len(self_index)
+                set_mask = numpy.zeros(self_index_size, dtype=numpy.bool_)
+                for i in numba.prange(self_index_size):
+                    if self_index[i] in filtered_idx_indices_set:
+                        set_mask[i] = True
+                self._data[set_mask] = value
+
+            return self
+
+        return sdc_pandas_series_setitem_idx_bool_series_align_impl
+
+    elif isinstance(idx, (SeriesType, types.Array)) and idx_and_self_index_comparable:
+
+        # idx is numeric Series or array comparable with self.index, hence reindexing is possible
+        if isinstance(self.index.dtype, types.Number):
+
+            idx_is_series = isinstance(idx, SeriesType)
+            value_is_scalar = not (value_is_series or value_is_array)
+            def sdc_pandas_series_setitem_idx_int_series_align_impl(self, idx, value):
+
+                _idx = idx._data if idx_is_series == True else idx  # noqa
+                _value = value._data if value_is_series == True else value  # noqa
+
+                self_index_size = len(self._index)
+                idx_size = len(_idx)
+                valid_indices = numpy.repeat(-1, self_index_size)
+                for i in numba.prange(self_index_size):
+                    for j in numpy.arange(idx_size):
+                        if self._index[i] == _idx[j]:
+                            valid_indices[i] = j
+
+                valid_indices_positions = numpy.arange(self_index_size)[valid_indices != -1]
+                valid_indices_masked = valid_indices[valid_indices != -1]
+
+                indexes_found = self._index[valid_indices_positions]
+                if len(numpy.unique(indexes_found)) != len(indexes_found):
+                    raise ValueError("Reindexing only valid with uniquely valued Index objects")
+
+                if len(valid_indices_masked) != idx_size:
+                    raise ValueError("Reindexing not possible: idx has index not found in Series")
+
+                if value_is_scalar == True:  # noqa
+                    self._data[valid_indices_positions] = _value
+                else:
+                    self._data[valid_indices_positions] = numpy.take(_value, valid_indices_masked)
+
+                return self
+
+            return sdc_pandas_series_setitem_idx_int_series_align_impl
+
+        elif isinstance(self.index.dtype, types.UnicodeType):
+
+            def sdc_pandas_series_setitem_idx_str_series_align_impl(self, idx, value):
+
+                map_index_to_position = Dict.empty(
+                    key_type=types.unicode_type,
+                    value_type=types.int32
+                )
+                for i, index_value in enumerate(self._index):
+                    if index_value in map_index_to_position:
+                        raise ValueError("Reindexing only valid with uniquely valued Index objects")
+                    map_index_to_position[index_value] = types.int32(i)
+
+                idx_data_size = len(idx._data)
+                number_of_found = 0
+                set_positions = numpy.empty(idx_data_size, dtype=types.int32)
+                for i in numba.prange(len(idx._data)):
+                    index_value = idx._data[i]
+                    if index_value in map_index_to_position:
+                        number_of_found += 1
+                        set_positions[i] = map_index_to_position[index_value]
+
+                if number_of_found != idx_data_size:
+                    raise ValueError("Reindexing not possible: idx has index not found in Series")
+
+                if value_is_series == True:  # noqa
+                    self._data[set_positions] = value._data
+                else:
+                    self._data[set_positions] = value
+                return self
+
+            return sdc_pandas_series_setitem_idx_str_series_align_impl
+
+        else:  # self.index.dtype other than types.Number or types.Unicode
+            return None
+
+    return None
 
 
 @sdc_overload_attribute(SeriesType, 'iloc')
