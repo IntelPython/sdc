@@ -929,21 +929,46 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
     return sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns)
 
 
-def df_getitem_slice_idx_main_codelines(self):
-    """Generate main code lines for df.getitem"""
+def df_index_codelines(self):
+    """Generate code lines to get or create index of DF"""
     if isinstance(self.index, types.NoneType):
         func_lines = ['  length = len(get_dataframe_data(self, 0))',
                       '  _index = numpy.arange(length)',
-                      '  res_index = _index[idx]']
+                      '  res_index = _index']
     else:
-        func_lines = ['  res_index = self._index[idx]']
+        func_lines = ['  res_index = self._index']
 
+    return func_lines
+
+
+def df_getitem_slice_idx_main_codelines(self, idx):
+    """Generate main code lines for df.getitem with idx of slice"""
     results = []
+    func_lines = df_index_codelines(self)
     for i, col in enumerate(self.columns):
         res_data = f'res_data_{i}'
         func_lines += [
             f'  data_{i} = get_dataframe_data(self, {i})',
-            f'  {res_data} = pandas.Series(data_{i}[idx], index=res_index, name="{col}")'
+            f'  {res_data} = pandas.Series(data_{i}[idx], index=res_index[idx], name="{col}")'
+        ]
+        results.append((col, res_data))
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index[idx])']
+
+    return func_lines
+
+
+def df_getitem_tuple_idx_main_codelines(self, literal_idx):
+    """Generate main code lines for df.getitem with idx of tuple"""
+    results = []
+    func_lines = df_index_codelines(self)
+    needed_cols = {col: i for i, col in enumerate(self.columns) if col in literal_idx}
+    for col, i in needed_cols.items():
+        res_data = f'res_data_{i}'
+        func_lines += [
+            f'  data_{i} = get_dataframe_data(self, {i})',
+            f'  {res_data} = pandas.Series(data_{i}, index=res_index, name="{col}")'
         ]
         results.append((col, res_data))
 
@@ -953,20 +978,20 @@ def df_getitem_slice_idx_main_codelines(self):
     return func_lines
 
 
-def df_getitem_str_slice_codegen(self):
+def df_getitem_slice_idx_codegen(self, idx):
     """
     Example of generated implementation with provided index:
-        def _df_getitem_slice_idx_impl(self, idx):
-          res_index = self._index[idx]
+        def _df_getitem_slice_idx_impl(self, idx)
+          res_index = self._index
           data_0 = get_dataframe_data(self, 0)
-          res_data_0 = pandas.Series(data_0[idx], index=res_index, name="A")
+          res_data_0 = pandas.Series(data_0[idx], index=res_index[idx], name="A")
           data_1 = get_dataframe_data(self, 1)
           res_data_1 = pandas.Series(data_1[idx], index=res_index, name="B")
-          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index)
+          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index[idx])
     """
     func_lines = ['def _df_getitem_slice_idx_impl(self, idx):']
     if self.columns:
-        func_lines += df_getitem_slice_idx_main_codelines(self)
+        func_lines += df_getitem_slice_idx_main_codelines(self, idx)
     else:
         # raise KeyError if input DF is empty
         func_lines += ['  raise KeyError']
@@ -978,14 +1003,52 @@ def df_getitem_str_slice_codegen(self):
     return func_text, global_vars
 
 
-def gen_df_getitem_slice_idx_impl(self):
-    func_text, global_vars = df_getitem_str_slice_codegen(self)
+def df_getitem_tuple_idx_codegen(self, idx):
+    """
+    Example of generated implementation with provided index:
+        def _df_getitem_tuple_idx_impl(self, idx)
+          res_index = self._index
+          data_1 = get_dataframe_data(self, 1)
+          res_data_1 = pandas.Series(data_1, index=res_index, name="B")
+          data_2 = get_dataframe_data(self, 2)
+          res_data_2 = pandas.Series(data_2, index=res_index, name="C")
+          return pandas.DataFrame({"B": res_data_1, "C": res_data_2}, index=res_index)
+    """
+    func_lines = ['def _df_getitem_tuple_idx_impl(self, idx):']
+    literal_idx = {col.literal_value for col in idx}
+    key_error = any(i not in self.columns for i in literal_idx)
 
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _impl = loc_vars['_df_getitem_slice_idx_impl']
+    if self.columns and not key_error:
+        func_lines += df_getitem_tuple_idx_main_codelines(self, literal_idx)
+    else:
+        # raise KeyError if input DF is empty or idx is invalid
+        func_lines += ['  raise KeyError']
 
-    return _impl
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def gen_df_getitem_impl_generator(codegen, impl_name):
+    """Generate generator of df.getitem"""
+    def _df_getitem_impl_generator(self, idx):
+        func_text, global_vars = codegen(self, idx)
+
+        loc_vars = {}
+        exec(func_text, global_vars, loc_vars)
+        _impl = loc_vars[impl_name]
+
+        return _impl
+
+    return _df_getitem_impl_generator
+
+
+gen_df_getitem_slice_idx_impl = gen_df_getitem_impl_generator(
+    df_getitem_slice_idx_codegen, '_df_getitem_slice_idx_impl')
+gen_df_getitem_tuple_idx_impl = gen_df_getitem_impl_generator(
+    df_getitem_tuple_idx_codegen, '_df_getitem_tuple_idx_impl')
 
 
 @sdc_overload(operator.getitem)
@@ -1018,8 +1081,11 @@ def sdc_pandas_dataframe_getitem(self, idx):
 
         return _df_getitem_unicode_idx_impl
 
+    if isinstance(idx, types.Tuple):
+        return gen_df_getitem_tuple_idx_impl(self, idx)
+
     if isinstance(idx, types.SliceType):
-        return gen_df_getitem_slice_idx_impl(self)
+        return gen_df_getitem_slice_idx_impl(self, idx)
 
     ty_checker = TypeChecker('Operator getitem().')
     ty_checker.raise_exc(idx, 'str', 'idx')

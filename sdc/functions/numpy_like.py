@@ -34,7 +34,7 @@
 import numba
 import numpy
 
-from numba import types, jit, prange, numpy_support
+from numba import types, jit, prange, numpy_support, literally
 from numba.errors import TypingError
 from numba.targets.arraymath import get_isnan
 
@@ -68,8 +68,15 @@ def sdc_astype_overload(self, dtype):
 
     """
 
+    ty_checker = TypeChecker("numpy-like 'astype'")
     if not isinstance(self, types.Array):
         return None
+
+    if not isinstance(dtype, (types.functions.NumberClass, types.Function, types.Literal)):
+        def impl(self, dtype):
+            return astype(self, literally(dtype))
+
+        return impl
 
     if not isinstance(dtype, (types.StringLiteral, types.UnicodeType, types.Function, types.functions.NumberClass)):
         ty_checker.raise_exc(dtype, 'string or type', 'dtype')
@@ -106,6 +113,8 @@ def sdc_astype_overload(self, dtype):
             return arr
 
         return sdc_astype_number_impl
+
+    ty_checker.raise_exc(self.dtype, 'str or type', 'self.dtype')
 
 
 @sdc_overload(sum)
