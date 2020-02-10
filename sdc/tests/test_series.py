@@ -3151,8 +3151,9 @@ class TestSeries(
         test_data = [test_global_input_data_unicode_kind4,
                      ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
         for data in test_data:
-            s = pd.Series(data)
-            pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     def test_series_title_str(self):
         def test_impl(S):
@@ -3162,8 +3163,9 @@ class TestSeries(
         test_data = [test_global_input_data_unicode_kind4,
                      ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
         for data in test_data:
-            s = pd.Series(data)
-            pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     def test_series_swapcase_str(self):
         def test_impl(S):
@@ -3173,8 +3175,9 @@ class TestSeries(
         test_data = [test_global_input_data_unicode_kind4,
                      ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
         for data in test_data:
-            s = pd.Series(data)
-            pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     def test_series_casefold_str(self):
         def test_impl(S):
@@ -3184,8 +3187,9 @@ class TestSeries(
         test_data = [test_global_input_data_unicode_kind4,
                      ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
         for data in test_data:
-            s = pd.Series(data)
-            pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     @sdc_limitation
     def test_series_append_same_names(self):
