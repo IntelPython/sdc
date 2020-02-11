@@ -1301,7 +1301,6 @@ class TestSeries(
             -3      6
             -3      3
             dtype: int64
-
             >>>S.loc[0:-3]
              0    6
             -3    6
@@ -3196,32 +3195,48 @@ class TestSeries(
             return S.str.capitalize()
 
         sdc_func = self.jit(test_impl)
-        s = pd.Series(test_global_input_data_unicode_kind4)
-        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+        test_data = [test_global_input_data_unicode_kind4,
+                     ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
+        for data in test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     def test_series_title_str(self):
         def test_impl(S):
             return S.str.title()
 
         sdc_func = self.jit(test_impl)
-        s = pd.Series(test_global_input_data_unicode_kind4)
-        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+        test_data = [test_global_input_data_unicode_kind4,
+                     ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
+        for data in test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     def test_series_swapcase_str(self):
         def test_impl(S):
             return S.str.swapcase()
 
         sdc_func = self.jit(test_impl)
-        s = pd.Series(test_global_input_data_unicode_kind4)
-        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+        test_data = [test_global_input_data_unicode_kind4,
+                     ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
+        for data in test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     def test_series_casefold_str(self):
         def test_impl(S):
             return S.str.casefold()
 
         sdc_func = self.jit(test_impl)
-        s = pd.Series(test_global_input_data_unicode_kind4)
-        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+        test_data = [test_global_input_data_unicode_kind4,
+                     ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
+        for data in test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     @sdc_limitation
     def test_series_append_same_names(self):
