@@ -547,7 +547,7 @@ def isna_overload(arr, i):
     if arr == string_array_split_view_type:
         return lambda arr, i: False
     # TODO: extend to other types
-    assert isinstance(arr, types.Array)
+    assert isinstance(arr, types.Array) or isinstance(arr, types.List)
     dtype = arr.dtype
     if isinstance(dtype, types.Float):
         return lambda arr, i: np.isnan(arr[i])
@@ -569,6 +569,7 @@ def get_nan_mask(arr):
 @overload(get_nan_mask)
 def get_nan_mask_overload(arr):
 
+    _func_name = "Function: get_nan_mask"
     def get_nan_mask_via_isna_impl(arr):
         len_arr = len(arr)
         res = np.empty(len_arr, dtype=np.bool_)

@@ -36,7 +36,8 @@ import numpy
 import sdc
 
 from numba import types
-from numba.special import literally
+from numba.typed import List, Dict
+
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric,
@@ -49,8 +50,10 @@ from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
+from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
+from sdc.hiframes.api import isna
 
 
 @sdc_overload_attribute(DataFrameType, 'index')
@@ -1210,3 +1213,33 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     ser_par = {'periods': 'periods', 'fill_method': 'fill_method', 'limit': 'limit', 'freq': 'freq'}
 
     return sdc_pandas_dataframe_apply_columns(df, name, params, ser_par)
+
+
+@sdc_overload_method(DataFrameType, 'groupby')
+def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=True, sort=True,
+                                 group_keys=True, squeeze=False, observed=False):
+
+    if not isinstance(by, types.StringLiteral):
+        return None
+
+    column_id = self.columns.index(by.literal_value)
+    list_type = types.ListType(types.int64)
+    by_type = self.data[column_id].dtype
+
+    def sdc_pandas_dataframe_groupby_impl(self, by=None, axis=0, level=None, as_index=True, sort=True,
+                                          group_keys=True, squeeze=False, observed=False):
+
+        grouped = Dict.empty(by_type, list_type)
+        by_column_data = get_dataframe_data(self, column_id)
+        for i in numpy.arange(len(by_column_data)):
+            if isna(by_column_data, i):
+                continue
+            value = by_column_data[i]
+            group_list = grouped.get(value, List.empty_list(types.int64))
+            group_list.append(i)
+            grouped[value] = group_list
+
+        return init_dataframe_groupby(self, column_id, grouped, sort)
+
+    return sdc_pandas_dataframe_groupby_impl
+

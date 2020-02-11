@@ -39,7 +39,8 @@ from sdc.tests.test_utils import (count_array_OneDs,
                                   dist_IR_contains,
                                   get_start_end,
                                   skip_numba_jit,
-                                  skip_sdc_jit)
+                                  skip_sdc_jit,
+                                  sdc_limitation)
 
 
 _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
@@ -53,6 +54,271 @@ _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
 
 
 class TestGroupBy(TestCase):
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    @sdc_limitation
+    def test_dataframe_groupby_index_name(self):
+        """SDC indexes do not have names, so index created from a named Series looses it's name."""
+        def test_impl(df):
+            return df.groupby('A').min()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': [2, 1, 1, 1, 2, 2, 1, 0, 3, 1, 3],
+                    'B': np.arange(n, dtype=np.intp)
+        })
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        pd.testing.assert_frame_equal(result, result_ref)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    def test_dataframe_groupby_count_by_int(self):
+        def test_impl(df):
+            return df.groupby('A').count()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': [2, 1, 1, 1, 2, 2, 1, 0, 3, 1, 3],
+                    'B': np.arange(n, dtype=np.intp),
+                    'C': np.arange(n, dtype=np.float_),
+                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                    'E': ['a', 'bb', 'd', 'c', ' ', None, 'aaa', None, 'bb', None, 'd']
+        })
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    def test_dataframe_groupby_count_by_float(self):
+        def test_impl(df):
+            return df.groupby('A').count()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': [2, 1, 1, 1, 2, 2, 1, 3, np.nan, 1, np.nan],
+                    'B': np.arange(n, dtype=np.intp),
+                    'C': np.arange(n, dtype=np.float_),
+                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                    'E': ['a', 'bb', 'd', 'c', ' ', None, 'aaa', None, 'bb', None, 'd']
+        })
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    def test_dataframe_groupby_count_by_str(self):
+        def test_impl(df):
+            return df.groupby('A').count()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': ['b', 'a', 'a', 'a', 'b', 'b', 'a', ' ', None, 'a', None],
+                    'B': np.arange(n, dtype=np.intp),
+                    'C': np.arange(n, dtype=np.float_),
+                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                    'E': ['a', 'bb', 'd', 'c', ' ', None, 'aaa', None, 'bb', None, 'd']
+        })
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    def test_dataframe_groupby_sort(self):
+        def test_impl(df, param):
+            return df.groupby('A', sort=param).min()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': ['b', 'a', 'a', 'a', 'b', 'b', 'a', ' ', None, 'a', None],
+                    'B': np.arange(n, dtype=np.intp),
+                    'C': np.arange(n, dtype=np.float_),
+                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+        })
+
+        for value in [True, False]:
+            with self.subTest(sort=value):
+                result = hpat_func(df, value) if value else hpat_func(df, value).sort_index()
+                result_ref = test_impl(df, value) if value else hpat_func(df, value).sort_index()
+                # TODO: implement index classes, as current indexes do not have names
+                pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    def test_dataframe_groupby_max(self):
+        def test_impl(df):
+            return df.groupby('A').max()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                    'B': np.arange(n, dtype=np.intp),
+                    'C': np.arange(n, dtype=np.float_),
+                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+        })
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    def test_dataframe_groupby_min(self):
+        def test_impl(df):
+            return df.groupby('A').min()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                    'B': np.arange(n, dtype=np.intp),
+                    'C': np.arange(n, dtype=np.float_),
+                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+        })
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    def test_dataframe_groupby_mean(self):
+        def test_impl(df):
+            return df.groupby('A').mean()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                    'B': np.arange(n, dtype=np.intp),
+                    'C': np.arange(n, dtype=np.float_),
+                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+        })
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    def test_dataframe_groupby_median(self):
+        def test_impl(df):
+            return df.groupby('A').median()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                    'B': np.arange(n, dtype=np.intp),
+                    'C': np.arange(n, dtype=np.float_),
+                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+        })
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    @unittest.expectedFailure   # pandas groupby.median returns unstable dtype (int or float) unlike series.median
+    def test_dataframe_groupby_median_result_dtype(self):
+        def test_impl(df):
+            return df.groupby('A').median()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': [2, 1, 1, 1, 2, 2, 1, 0, 3, 1, 3],
+                    'B': np.arange(n, dtype=np.intp)
+        })
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    def test_dataframe_groupby_prod(self):
+        def test_impl(df):
+            return df.groupby('A').prod()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                    'B': np.arange(n, dtype=np.intp),
+                    'C': np.arange(n, dtype=np.float_),
+                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+        })
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    def test_dataframe_groupby_sum(self):
+        def test_impl(df):
+            return df.groupby('A').sum()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                    'B': np.arange(n, dtype=np.intp),
+                    'C': np.arange(n, dtype=np.float_),
+                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+        })
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    def test_dataframe_groupby_std(self):
+        def test_impl(df):
+            return df.groupby('A').std()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                    'B': np.arange(n, dtype=np.intp),
+                    'C': np.arange(n, dtype=np.float_),
+                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+        })
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
+    def test_dataframe_groupby_var(self):
+        def test_impl(df):
+            return df.groupby('A').var()
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        df = pd.DataFrame({
+                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                    'B': np.arange(n, dtype=np.intp),
+                    'C': np.arange(n, dtype=np.float_),
+                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+        })
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
     @skip_sdc_jit
     @skip_numba_jit
     def test_agg_seq(self):

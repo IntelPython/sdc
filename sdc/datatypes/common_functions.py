@@ -41,10 +41,12 @@ from numba.extending import register_jitable
 from numba import numpy_support
 
 import sdc
+from sdc.hiframes.api import isna
 from sdc.str_arr_type import string_array_type
 from sdc.str_arr_ext import (num_total_chars, append_string_array_to,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na,
-                             cp_str_list_to_array)
+                             cp_str_list_to_array, create_str_arr_from_list,
+                             get_utf8_size)
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 from sdc.utilities.sdc_typing_utils import find_common_dtype_from_numpy_dtypes
 
@@ -481,18 +483,21 @@ def sdc_arrays_argsort(A, kind='quicksort'):
 
 @sdc_overload(sdc_arrays_argsort, jit_options={'parallel': False})
 def sdc_arrays_argsort_overload(A, kind='quicksort'):
-    """Function overloading argsort for different 1D array types"""
+    """Function providing pandas argsort implementation for different 1D array types"""
 
     # kind is not known at compile time, so get this function here and use in impl if needed
     quicksort_func = quicksort.make_jit_quicksort().run_quicksort
 
+    kind_is_default = isinstance(kind, str)
     if isinstance(A, types.Array):
-        def _sdc_arrays_argsort_numeric_impl(A, kind='quicksort'):
-            return numpy.argsort(A, kind=kind)
-        return _sdc_arrays_argsort_numeric_impl
+        def _sdc_arrays_argsort_array_impl(A, kind='quicksort'):
+            _kind = 'quicksort' if kind_is_default == True else kind  # noqa
+            return numpy.argsort(A, kind=_kind)
+
+        return _sdc_arrays_argsort_array_impl
 
     elif A == string_array_type:
-        def _sdc_arrays_argsort_str_impl(A, kind='quicksort'):
+        def _sdc_arrays_argsort_str_arr_impl(A, kind='quicksort'):
 
             nan_mask = sdc.hiframes.api.get_nan_mask(A)
             idx = numpy.arange(len(A))
@@ -513,7 +518,10 @@ def sdc_arrays_argsort_overload(A, kind='quicksort'):
             argsorted.extend(old_nan_positions)
             return numpy.asarray(argsorted, dtype=numpy.int32)
 
-        return _sdc_arrays_argsort_str_impl
+        return _sdc_arrays_argsort_str_arr_impl
+
+    elif isinstance(A, types.List):
+        return None
 
     return None
 
@@ -535,5 +543,78 @@ def _sdc_pandas_series_check_axis_overload(axis):
             if axis != 0:
                 raise ValueError("Method sort_values(). Unsupported parameter. Given axis != 0")
         return _sdc_pandas_series_check_axis_impl
+
+    return None
+
+
+def _sdc_asarray(data):
+    pass
+
+
+@sdc_overload(_sdc_asarray, jit_options={'parallel': True})
+def _sdc_asarray_overload(data):
+
+    # TODO: extend with other types
+    if not isinstance(data, types.List):
+        return None
+
+    if isinstance(data.dtype, types.UnicodeType):
+        def _sdc_asarray_impl(data):
+            return create_str_arr_from_list(data)
+
+        return _sdc_asarray_impl
+
+    else:
+        result_dtype = data.dtype
+        def _sdc_asarray_impl(data):
+            # TODO: check if elementwise copy is needed at all
+            res_size = len(data)
+            res_arr = numpy.empty(res_size, dtype=result_dtype)
+            for i in numba.prange(res_size):
+                res_arr[i] = data[i]
+            return res_arr
+
+        return _sdc_asarray_impl
+
+    return None
+
+
+def _sdc_take(data, indexes):
+    pass
+
+
+@sdc_overload(_sdc_take, jit_options={'parallel': True})
+def _sdc_take_overload(data, indexes):
+
+    if isinstance(data, types.Array):
+        arr_dtype = data.dtype
+        def _sdc_take_array_impl(data, indexes):
+            res_size = len(indexes)
+            res_arr = numpy.empty(res_size, dtype=arr_dtype)
+            for i in numba.prange(res_size):
+                res_arr[i] = data[indexes[i]]
+            return res_arr
+
+        return _sdc_take_array_impl
+
+    elif data == string_array_type:
+        def _sdc_take_str_arr_impl(data, indexes):
+            res_size = len(indexes)
+            nan_mask = numpy.zeros(res_size, dtype=numpy.bool_)
+            num_total_bytes = 0
+            for i in numba.prange(res_size):
+                num_total_bytes += get_utf8_size(data[indexes[i]])
+                if isna(data, indexes[i]):
+                    nan_mask[i] = True
+
+            res_arr = pre_alloc_string_array(res_size, num_total_bytes)
+            for i in numpy.arange(res_size):
+                res_arr[i] = data[indexes[i]]
+                if nan_mask[i]:
+                    str_arr_set_na(res_arr, i)
+
+            return res_arr
+
+        return _sdc_take_str_arr_impl
 
     return None

@@ -63,7 +63,7 @@ COL_IND = 0
 class TestDataFrame(TestCase):
 
     def test_create1(self):
-        def test_impl(n, A, B):
+        def test_impl(A, B):
             df = pd.DataFrame({'A': A, 'B': B})
             return df
 
@@ -71,7 +71,7 @@ class TestDataFrame(TestCase):
         n = 11
         A = np.ones(n)
         B = np.random.ranf(n)
-        pd.testing.assert_frame_equal(hpat_func(n, A, B), test_impl(n, A, B))
+        pd.testing.assert_frame_equal(hpat_func(A, B), test_impl(A, B))
 
     @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_create2(self):
