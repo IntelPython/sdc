@@ -140,7 +140,7 @@ def sdc_copy_overload(self):
        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k copy
     """
 
-    if not isinstance(self, types.Array):
+    if not isinstance(self, (types.Array, StringArrayType)):
         return None
 
     dtype = self.dtype
@@ -155,7 +155,7 @@ def sdc_copy_overload(self):
 
         return sdc_copy_number_impl
 
-    if isinstance(dtype, types.npytypes.UnicodeCharSeq):
+    if isinstance(dtype, (types.npytypes.UnicodeCharSeq, types.UnicodeType, types.StringLiteral)):
         def sdc_copy_string_impl(self):
             return self.copy()
 
