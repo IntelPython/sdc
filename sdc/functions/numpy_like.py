@@ -201,6 +201,20 @@ def sdc_isnan_overload(self):
     ty_checker.raise_exc(dtype, 'int or float', 'self.dtype')
 
 
+def gen_sum_bool_impl():
+    """Generate sum bool implementation."""
+    def _sum_bool_impl(self):
+        length = len(self)
+        result = 0
+        for i in prange(length):
+            if self[i]:
+                result += self[i]
+
+        return result
+
+    return _sum_bool_impl
+
+
 @sdc_overload(sum)
 def sdc_sum_overload(self):
     """
@@ -231,16 +245,7 @@ def sdc_sum_overload(self):
         return sdc_sum_number_impl
 
     if isinstance(dtype, (types.Boolean, bool)):
-        def sdc_sum_number_impl(self):
-            length = len(self)
-            result = 0
-            for i in prange(length):
-                if self[i]:
-                    result += self[i]
-
-            return result
-
-        return sdc_sum_number_impl
+        return gen_sum_bool_impl()
 
 
 @sdc_overload(nansum)
@@ -271,16 +276,7 @@ def sdc_nansum_overload(self):
         return sdc_nansum_number_impl
 
     if isinstance(dtype, (types.Boolean, bool)):
-        def sdc_nansum_number_impl(self):
-            length = len(self)
-            result = 0
-            for i in prange(length):
-                if self[i]:
-                    result += self[i]
-
-            return result
-
-        return sdc_nansum_number_impl
+        return gen_sum_bool_impl()
 
 
 def nanmin(a):
