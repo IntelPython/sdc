@@ -24,54 +24,81 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
+import string
+import time
 
 import numba
-import sdc
+import pandas
+import numpy as np
 
-from sdc.tests.test_utils import *
+from sdc.tests.test_utils import test_global_input_data_float64
 from sdc.tests.tests_perf.test_perf_base import TestBase
+from sdc.tests.tests_perf.test_perf_utils import (calc_compilation, get_times,
+                                                  perf_data_gen_fixed_len)
 from .generator import generate_test_cases
 from .generator import TestCase as TC
-from .data_generator import gen_df
 
 
-# python -m sdc.runtests sdc.tests.tests_perf.test_perf_df.TestDataFrameMethods.test_df_{method_name}
-class TestDataFrameMethods(TestBase):
+def get_rolling_params(window=100, min_periods=None):
+    """Generate supported rolling parameters"""
+    rolling_params = [f'{window}']
+    if min_periods:
+        rolling_params.append(f'min_periods={min_periods}')
+
+    return ', '.join(rolling_params)
+
+
+# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series_rolling.TestSeriesRollingMethods
+class TestSeriesRollingMethods(TestBase):
+    # more than 19 columns raise SystemError: CPUDispatcher() returned a result with an error set
+    max_columns_num = 19
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_case(self, pyfunc, name, total_data_length, input_data, typ, data_num=1):
-        test_name = 'DataFrame.{}'.format(name)
+    def _test_case(self, pyfunc, name, total_data_length, typ, data_num=1,
+                   input_data=test_global_input_data_float64):
+        test_name = 'Series.rolling.{}'.format(name)
 
         if input_data is None:
             input_data = test_global_input_data_float64
 
+        full_input_data_length = sum(len(i) for i in input_data)
         for data_length in total_data_length:
             base = {
-                "test_name": test_name,
-                "data_size": data_length,
+                'test_name': test_name,
+                'data_size': data_length,
             }
+            data = perf_data_gen_fixed_len(input_data, full_input_data_length, data_length, typ)
+            test_data = pandas.Series(data)
 
-            args = gen_df(data_num, data_length, input_data, typ)
+            args = [test_data]
+            for i in range(data_num - 1):
+                np.random.seed(i)
+                extra_data = np.random.ranf(data_length)
+                args.append(pandas.Series(extra_data))
 
             self._test_jit(pyfunc, base, *args)
             self._test_py(pyfunc, base, *args)
 
 
 cases = [
-    TC(name='append', size=[10 ** 7], params=['other'], data_num=2),
+    TC(name='apply', size=[10 ** 7], params=['func=lambda x: numpy.nan if len(x) == 0 else x.mean()']),
+    TC(name='corr', size=[10 ** 7]),
     TC(name='count', size=[10 ** 7]),
-    TC(name='drop', size=[10 ** 8], params=['columns="f0"']),
+    TC(name='cov', size=[10 ** 7]),
+    TC(name='kurt', size=[10 ** 7]),
     TC(name='max', size=[10 ** 7]),
     TC(name='mean', size=[10 ** 7]),
     TC(name='median', size=[10 ** 7]),
     TC(name='min', size=[10 ** 7]),
-    TC(name='pct_change', size=[10 ** 7]),
-    TC(name='prod', size=[10 ** 7]),
+    TC(name='quantile', size=[10 ** 7], params=['0.2']),
+    TC(name='skew', size=[10 ** 7]),
     TC(name='std', size=[10 ** 7]),
     TC(name='sum', size=[10 ** 7]),
     TC(name='var', size=[10 ** 7]),
 ]
 
-generate_test_cases(cases, TestDataFrameMethods, 'df')
+
+generate_test_cases(cases, TestSeriesRollingMethods, 'series', 'rolling({})'.format(get_rolling_params()))

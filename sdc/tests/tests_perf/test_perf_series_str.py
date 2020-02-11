@@ -30,15 +30,12 @@ import os
 import time
 import unittest
 from contextlib import contextmanager
-
-import pandas as pd
-import numpy as np
-
 from sdc.tests.test_utils import *
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import *
 from .generator import generate_test_cases
 from .generator import TestCase as TC
+from .data_generator import gen_series_str
 
 
 test_global_input_data_unicode_kind1 = [
@@ -58,8 +55,11 @@ class TestSeriesStringMethods(TestBase):
         super().setUpClass()
         cls.width = [16, 64, 512, 1024]
 
-    def _test_case(self, pyfunc, name, total_data_length, input_data, typ, data_num=1):
-        test_name = 'Series.{}'.format(name)
+    def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64,
+                   *args, **kwargs):
+        test_name = 'Series.str.{}'.format(name)
+
+        input_data = input_data or test_global_input_data_unicode_kind4
 
         for data_length, data_width in itertools.product(total_data_length, self.width):
             base = {
@@ -67,25 +67,11 @@ class TestSeriesStringMethods(TestBase):
                 "data_size": data_length,
                 "data_width": data_width,
             }
-            full_input_data_length = data_width
-            data = perf_data_gen_fixed_len(input_data, full_input_data_length,
-                                           data_length)
-            test_data = pd.Series(data)
 
-            args = [test_data]
+            args = gen_series_str(data_num, data_length, input_data, data_width)
 
-            for i in range(data_num - 1):
-                np.random.seed(i)
-                if typ == 'float':
-                    extra_data = np.random.ranf(data_length)
-                elif typ == 'int':
-                    extra_data = np.random.randint(10 ** 4, size=data_length)
-                elif typ == 'str':
-                    extra_data = np.random.choice(input_data, data_length)
-                args.append(pd.Series(extra_data))
-
-            self.test_jit(pyfunc, base, *args)
-            self.test_py(pyfunc, base, *args)
+            self._test_jit(pyfunc, base, *args)
+            self._test_py(pyfunc, base, *args)
 
 
 cases = [

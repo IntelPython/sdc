@@ -43,9 +43,6 @@ class TestBase(unittest.TestCase):
 
         cfunc = numba.njit(pyfunc)
 
-        # Warming up
-        cfunc(*args, **kwargs)
-
         # execution and boxing time
         record["test_results"], record["boxing_results"] = \
             get_times(cfunc, *args, **kwargs)
@@ -54,13 +51,13 @@ class TestBase(unittest.TestCase):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def test_jit(self, pyfunc, base, *args):
+    def _test_jit(self, pyfunc, base, *args):
         record = base.copy()
         record["test_type"] = 'SDC'
         self._test_jitted(pyfunc, record, *args)
         self.test_results.add(**record)
 
-    def test_py(self, pyfunc, base, *args):
+    def _test_py(self, pyfunc, base, *args):
         record = base.copy()
         record["test_type"] = 'Python'
         self._test_python(pyfunc, record, *args)

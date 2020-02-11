@@ -24,11 +24,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import numpy as np
-import pandas as pd
-from numba import njit
-
-
 """
 Expect Series
 0    4.0
@@ -36,6 +31,11 @@ Expect Series
 3    1.0
 dtype: float64
 """
+import numpy as np
+import pandas as pd
+from numba import njit
+
+
 @njit
 def series_dropna():
     s = pd.Series([4, np.nan, 2, 1])

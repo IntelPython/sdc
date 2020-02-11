@@ -24,25 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-"""
-Expect Series
-0      3.000000
-1    -10.000000
-2           nan
-3      0.000000
-4     92.000000
-dtype: object
-"""
-import numpy as np
 import pandas as pd
 from numba import njit
 
 
 @njit
-def series_astype():
-    series = pd.Series([3, -10, np.nan, 0, 92])
+def series_str_title():
+    series = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
+    out_series = series.str.title()
 
-    return series.astype(str)
+    return out_series  # Expect series of 'Lower', 'Capitals', 'This Is A Sentence', 'Swapcase'
 
 
-print(series_astype())
+print(series_str_title())
