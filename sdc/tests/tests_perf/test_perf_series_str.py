@@ -31,13 +31,12 @@ import time
 import unittest
 from contextlib import contextmanager
 
-import pandas as pd
-
 from sdc.tests.test_utils import *
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import *
 from .generator import generate_test_cases
 from .generator import TestCase as TC
+from .data_generator import gen_series_str
 
 
 test_global_input_data_unicode_kind1 = [
@@ -68,12 +67,8 @@ class TestSeriesStringMethods(TestBase):
                 "data_size": data_length,
                 "data_width": data_width,
             }
-            full_input_data_length = data_width
-            data = perf_data_gen_fixed_len(input_data, full_input_data_length,
-                                           data_length)
-            test_data = pd.Series(data)
 
-            args = [test_data]
+            args = gen_series_str(data_num, data_length, input_data, data_width)
 
             self._test_jit(pyfunc, base, *args)
             self._test_py(pyfunc, base, *args)
