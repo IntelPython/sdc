@@ -2398,7 +2398,7 @@ def hpat_pandas_series_isnull(self):
 
     if isinstance(self.data.dtype, (types.Number, types.Boolean, bool)):
         def hpat_pandas_series_isnull_impl(self):
-            return pandas.Series(data=numpy.isnan(self._data), index=self._index, name=self._name)
+            return pandas.Series(data=numpy_like.isnan(self._data), index=self._index, name=self._name)
 
         return hpat_pandas_series_isnull_impl
 
@@ -2466,7 +2466,7 @@ def hpat_pandas_series_isna(self):
 
     if isinstance(self.data.dtype, (types.Number, types.Boolean, bool)):
         def hpat_pandas_series_isna_impl(self):
-            return pandas.Series(data=numpy.isnan(self._data), index=self._index, name=self._name)
+            return pandas.Series(data=numpy_like.isnan(self._data), index=self._index, name=self._name)
 
         return hpat_pandas_series_isna_impl
 
@@ -2534,7 +2534,7 @@ def hpat_pandas_series_notna(self):
 
     if isinstance(self.data.dtype, (types.Number, types.Boolean, bool)):
         def hpat_pandas_series_notna_impl(self):
-            return pandas.Series(numpy.invert(numpy.isnan(self._data)), index=self._index, name=self._name)
+            return pandas.Series(numpy_like.notnan(self._data), index=self._index, name=self._name)
 
         return hpat_pandas_series_notna_impl
 
