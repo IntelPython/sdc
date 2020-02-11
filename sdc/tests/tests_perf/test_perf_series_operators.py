@@ -37,7 +37,7 @@ from .generator import TestCase as TC
 from .data_generator import gen_series
 
 
-# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series_operators.TestSeriesOperatorMethods.test_series_operator_{name}
+# python -m sdc.runtests sdc.tests.tests_perf.test_perf_series_operators.TestSeriesOperatorMethods.test_series_{name}
 class TestSeriesOperatorMethods(TestBase):
     @classmethod
     def setUpClass(cls):
