@@ -3635,7 +3635,7 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
             _skipna = skipna
 
         if _skipna:
-            return numpy.nanmin(self._data)
+            return numpy_like.nanmin(self._data)
 
         return self._data.min()
 
@@ -3716,7 +3716,7 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
             _skipna = skipna
 
         if _skipna:
-            return numpy.nanmax(self._data)
+            return numpy_like.nanmax(self._data)
 
         return self._data.max()
 
@@ -4551,14 +4551,22 @@ def hpat_pandas_series_count(self, level=None):
 
         return hpat_pandas_series_count_str_impl
 
+    if isinstance(self.data, types.Array) and isinstance(self.data.dtype, types.Integer):
+        def hpat_pandas_series_count_int_impl(self, level=None):
+            return len(self._data)
+        return hpat_pandas_series_count_int_impl
+
     def hpat_pandas_series_count_impl(self, level=None):
         """
         Return number of non-NA/null observations in the object
         Returns number of unique elements in the object
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_count
         """
-        data_no_nan = self._data[~numpy.isnan(self._data)]
-        return len(data_no_nan)
+        result = 0
+        for i in prange(len(self._data)):
+            if not numpy.isnan(self._data[i]):
+                result = result + 1
+        return result
 
     return hpat_pandas_series_count_impl
 
