@@ -35,6 +35,7 @@ from sdc.tests.test_utils import test_global_input_data_float64
 from .generator import generate_test_cases
 from .generator import TestCase as TC
 from .data_generator import gen_series
+from .test_perf_series import test_integer64
 
 
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_series_operators.TestSeriesOperatorMethods.test_series_{name}
@@ -45,9 +46,6 @@ class TestSeriesOperatorMethods(TestBase):
 
     def _test_case(self, pyfunc, name, total_data_length, typ, data_num=1, input_data=test_global_input_data_float64):
         test_name = 'Series.{}'.format(name)
-
-        if input_data is None:
-            input_data = test_global_input_data_float64
 
         for data_length in total_data_length:
             base = {
@@ -62,19 +60,32 @@ class TestSeriesOperatorMethods(TestBase):
 
 
 cases = [
-    TC(name='operator_add', size=[10 ** 7], call_expr='A + B', usecase_params='A, B', data_num=2),
-    TC(name='operator_eq', size=[10 ** 7], call_expr='A == B', usecase_params='A, B', data_num=2),
-    TC(name='operator_floordiv', size=[10 ** 7], call_expr='A // B', usecase_params='A, B', data_num=2),
-    TC(name='operator_ge', size=[10 ** 7], call_expr='A >= B', usecase_params='A, B', data_num=2),
-    TC(name='operator_gt', size=[10 ** 7], call_expr='A > B', usecase_params='A, B', data_num=2),
-    TC(name='operator_le', size=[10 ** 7], call_expr='A <= B', usecase_params='A, B', data_num=2),
-    TC(name='operator_lt', size=[10 ** 7], call_expr='A < B', usecase_params='A, B', data_num=2),
-    TC(name='operator_mod', size=[10 ** 7], call_expr='A % B', usecase_params='A, B', data_num=2),
-    TC(name='operator_mul', size=[10 ** 7], call_expr='A * B', usecase_params='A, B', data_num=2),
-    TC(name='operator_ne', size=[10 ** 7], call_expr='A != B', usecase_params='A, B', data_num=2),
-    TC(name='operator_pow', size=[10 ** 7], call_expr='A ** B', usecase_params='A, B', data_num=2),
-    TC(name='operator_sub', size=[10 ** 7], call_expr='A - B', usecase_params='A, B', data_num=2),
-    TC(name='operator_truediv', size=[10 ** 7], call_expr='A / B', usecase_params='A, B', data_num=2),
+    TC(name='operator_add', size=[10 ** 7], call_expr='A + B', usecase_params='A, B', data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='operator_eq', size=[10 ** 7], call_expr='A == B', usecase_params='A, B', data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='operator_floordiv', size=[10 ** 7], call_expr='A // B', usecase_params='A, B', data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='operator_ge', size=[10 ** 7], call_expr='A >= B', usecase_params='A, B', data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='operator_gt', size=[10 ** 7], call_expr='A > B', usecase_params='A, B', data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='operator_le', size=[10 ** 7], call_expr='A <= B', usecase_params='A, B', data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='operator_lt', size=[10 ** 7], call_expr='A < B', usecase_params='A, B', data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='operator_mod', size=[10 ** 7], call_expr='A % B', usecase_params='A, B', data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='operator_mul', size=[10 ** 7], call_expr='A * B', usecase_params='A, B', data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='operator_ne', size=[10 ** 7], call_expr='A != B', usecase_params='A, B', data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='operator_pow', size=[10 ** 7], call_expr='A ** B', usecase_params='A, B', data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='operator_sub', size=[10 ** 7], call_expr='A - B', usecase_params='A, B', data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='operator_truediv', size=[10 ** 7], call_expr='A / B', usecase_params='A, B', data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
 ]
 
 generate_test_cases(cases, TestSeriesOperatorMethods, 'series')

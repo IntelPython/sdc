@@ -33,6 +33,7 @@ from sdc.tests.tests_perf.test_perf_base import TestBase
 from .generator import generate_test_cases
 from .generator import TestCase as TC
 from .data_generator import gen_df
+from .test_perf_series import test_integer64
 
 
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_df.TestDataFrameMethods.test_df_{method_name}
@@ -43,9 +44,6 @@ class TestDataFrameMethods(TestBase):
 
     def _test_case(self, pyfunc, name, total_data_length, input_data, typ, data_num=1):
         test_name = 'DataFrame.{}'.format(name)
-
-        if input_data is None:
-            input_data = test_global_input_data_float64
 
         for data_length in total_data_length:
             base = {
@@ -60,18 +58,30 @@ class TestDataFrameMethods(TestBase):
 
 
 cases = [
-    TC(name='append', size=[10 ** 7], params=['other'], data_num=2),
-    TC(name='count', size=[10 ** 7]),
-    TC(name='drop', size=[10 ** 8], params=['columns="f0"']),
-    TC(name='max', size=[10 ** 7]),
-    TC(name='mean', size=[10 ** 7]),
-    TC(name='median', size=[10 ** 7]),
-    TC(name='min', size=[10 ** 7]),
-    TC(name='pct_change', size=[10 ** 7]),
-    TC(name='prod', size=[10 ** 7]),
-    TC(name='std', size=[10 ** 7]),
-    TC(name='sum', size=[10 ** 7]),
-    TC(name='var', size=[10 ** 7]),
+    TC(name='append', size=[10 ** 7], params=['other'], data_num=2,
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='count', size=[10 ** 7],
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='drop', size=[10 ** 8], params=['columns="f0"'],
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='max', size=[10 ** 7],
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='mean', size=[10 ** 7],
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='median', size=[10 ** 7],
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='min', size=[10 ** 7],
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='pct_change', size=[10 ** 7],
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='prod', size=[10 ** 7],
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='std', size=[10 ** 7],
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='sum', size=[10 ** 7],
+       input_data=[test_global_input_data_float64, test_integer64]),
+    TC(name='var', size=[10 ** 7],
+       input_data=[test_global_input_data_float64, test_integer64]),
 ]
 
 generate_test_cases(cases, TestDataFrameMethods, 'df')
