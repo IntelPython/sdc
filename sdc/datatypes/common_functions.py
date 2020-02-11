@@ -566,6 +566,7 @@ def _sdc_asarray_overload(data):
 
     else:
         result_dtype = data.dtype
+
         def _sdc_asarray_impl(data):
             # TODO: check if elementwise copy is needed at all
             res_size = len(data)
@@ -588,6 +589,7 @@ def _sdc_take_overload(data, indexes):
 
     if isinstance(data, types.Array):
         arr_dtype = data.dtype
+
         def _sdc_take_array_impl(data, indexes):
             res_size = len(indexes)
             res_arr = numpy.empty(res_size, dtype=arr_dtype)

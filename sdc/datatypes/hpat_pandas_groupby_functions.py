@@ -126,15 +126,15 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, de
 
 
 series_method_to_func = {
-    'count':    lambda S: S.count(),
-    'max':      lambda S: S.max(),
-    'mean':     lambda S: S.mean(),
-    'median':   lambda S: S.median(),
-    'min':      lambda S: S.min(),
-    'prod':     lambda S: S.prod(),
-    'std':      lambda S: S.std(),
-    'sum':      lambda S: S.sum(),
-    'var':      lambda S: S.var()
+    'count': lambda S: S.count(),
+    'max': lambda S: S.max(),
+    'mean': lambda S: S.mean(),
+    'median': lambda S: S.median(),
+    'min': lambda S: S.min(),
+    'prod': lambda S: S.prod(),
+    'std': lambda S: S.std(),
+    'sum': lambda S: S.sum(),
+    'var': lambda S: S.var()
 }
 
 
@@ -212,6 +212,7 @@ def sdc_pandas_dataframe_groupby_mean(self, *args):
     applied_func_name = 'mean'
     return sdc_pandas_groupby_apply_func(self, applied_func_name, method_args)
 
+
 @sdc_overload_method(DataFrameGroupByType, 'median')
 def sdc_pandas_dataframe_groupby_median(self):
 
@@ -259,8 +260,8 @@ def sdc_pandas_dataframe_groupby_std(self, ddof=1, *args):
         ty_checker.raise_exc(ddof, 'int', 'ddof')
 
     method_args = ['self', 'ddof', '*args']
-    default_values = {'ddof':1}
-    impl_used_params = {'ddof':'ddof'}
+    default_values = {'ddof': 1}
+    impl_used_params = {'ddof': 'ddof'}
 
     applied_func_name = 'std'
     return sdc_pandas_groupby_apply_func(self, applied_func_name, method_args, default_values, impl_used_params)
@@ -289,8 +290,8 @@ def sdc_pandas_dataframe_groupby_var(self, ddof=1, *args):
         ty_checker.raise_exc(ddof, 'int', 'ddof')
 
     method_args = ['self', 'ddof', '*args']
-    default_values = {'ddof':1}
-    impl_used_params = {'ddof':'ddof'}
+    default_values = {'ddof': 1}
+    impl_used_params = {'ddof': 'ddof'}
 
     applied_func_name = 'var'
     return sdc_pandas_groupby_apply_func(self, applied_func_name, method_args, default_values, impl_used_params)

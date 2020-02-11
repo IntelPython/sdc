@@ -36,6 +36,7 @@ import numpy
 import sdc
 
 from numba import types
+from numba.special import literally
 from numba.typed import List, Dict
 
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
@@ -1242,4 +1243,3 @@ def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=Tru
         return init_dataframe_groupby(self, column_id, grouped, sort)
 
     return sdc_pandas_dataframe_groupby_impl
-

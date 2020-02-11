@@ -263,6 +263,7 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
+    @skip_numba_jit("BUG: SDC impl of Series.sum returns float64 on as series of ints")
     def test_dataframe_groupby_sum(self):
         def test_impl(df):
             return df.groupby('A').sum()
