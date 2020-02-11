@@ -207,8 +207,7 @@ def gen_sum_bool_impl():
         length = len(self)
         result = 0
         for i in prange(length):
-            if self[i]:
-                result += self[i]
+            result += self[i]
 
         return result
 
