@@ -48,6 +48,10 @@ def astype(self, dtype):
     pass
 
 
+def copy(self):
+    pass
+
+
 def isnan(self):
     pass
 
@@ -123,6 +127,39 @@ def sdc_astype_overload(self, dtype):
         return sdc_astype_number_impl
 
     ty_checker.raise_exc(self.dtype, 'str or type', 'self.dtype')
+
+
+@sdc_overload(copy)
+def sdc_copy_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.copy.
+
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k copy
+    """
+
+    if not isinstance(self, types.Array):
+        return None
+
+    dtype = self.dtype
+    if isinstance(dtype, (types.Number, types.Boolean, bool)):
+        def sdc_copy_number_impl(self):
+            length = len(self)
+            res = numpy.empty(length, dtype=dtype)
+            for i in prange(length):
+                res[i] = self[i]
+
+            return res
+
+        return sdc_copy_number_impl
+
+    if isinstance(dtype, types.npytypes.UnicodeCharSeq):
+        def sdc_copy_string_impl(self):
+            return self.copy()
+
+        return sdc_copy_string_impl
 
 
 @sdc_overload(notnan)
