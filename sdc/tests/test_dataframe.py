@@ -1236,16 +1236,36 @@ class TestDataFrame(TestCase):
         ref_result = test_impl(df, start, end)
         pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DF.getitem unsupported Series name')
     def _test_df_getitem_tuple_idx(self, df):
-        def test_impl(df):
-            # pd.df.getitem does not support idx as a tuple
-            return df[['A', 'C']]
+        def gen_test_impl(do_jit=False):
+            def test_impl(df):
+                if do_jit == True:  # noqa
+                    return df[('A', 'C')]
+                else:
+                    return df[['A', 'C']]
 
-        # SDC pd.df.getitem does not support idx as a list
-        sdc_func = self.jit(lambda df: df[('A', 'C')])
+            return test_impl
+
+        test_impl = gen_test_impl()
+        sdc_func = self.jit(gen_test_impl(do_jit=True))
 
         pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    def _test_df_getitem_bool_series_idx(self, df):
+        def test_impl(df):
+            return df[df['A'] == -1.]
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    def _test_df_getitem_bool_series_even_idx(self, df):
+        def test_impl(df, series):
+            return df[series]
+
+        s = pd.Series([False, True] * 5)
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(df, s), test_impl(df, s))
 
     @skip_sdc_jit('DF.getitem unsupported exceptions')
     def test_df_getitem_str_literal_idx_exception_key_error(self):
@@ -1292,6 +1312,14 @@ class TestDataFrame(TestCase):
                 self._test_df_getitem_slice_idx(df)
                 self._test_df_getitem_unbox_slice_idx(df, 1, 3)
                 self._test_df_getitem_tuple_idx(df)
+                self._test_df_getitem_bool_series_idx(df)
+
+    @skip_sdc_jit('DF.getitem unsupported Series name')
+    def test_df_getitem_idx_no_index(self):
+        dfs = [gen_df(test_global_input_data_float64), pd.DataFrame({'A': []})]
+        for df in dfs:
+            with self.subTest(df=df):
+                self._test_df_getitem_bool_series_even_idx(df)
 
     @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx_multiple_types(self):
@@ -1306,6 +1334,12 @@ class TestDataFrame(TestCase):
                 self._test_df_getitem_slice_idx(df)
                 self._test_df_getitem_unbox_slice_idx(df, 1, 3)
                 self._test_df_getitem_tuple_idx(df)
+                self._test_df_getitem_bool_series_even_idx(df)
+
+    @unittest.skip('DF.getitem df[bool_series] unsupported index')
+    def test_df_getitem_bool_series_even_idx_with_index(self):
+        df = gen_df(test_global_input_data_float64, with_index=True)
+        self._test_df_getitem_bool_series_even_idx(df)
 
     @unittest.skip('DF.getitem unsupported integer columns')
     def test_df_getitem_int_literal_idx(self):
