@@ -44,9 +44,6 @@ class TestBase(unittest.TestCase):
 
         cfunc = numba.njit(pyfunc)
 
-        # Warming up
-        cfunc(*args, **kwargs)
-
         # execution and boxing time
         record["test_results"], record["boxing_results"] = \
             get_times(cfunc, *args, **kwargs)

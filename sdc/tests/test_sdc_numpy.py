@@ -142,5 +142,108 @@ class TestArrays(TestCase):
                 with self.subTest(data=case, type=type_):
                     np.testing.assert_array_equal(sdc_func(a, type_), ref_impl(a, type_))
 
-if __name__ == "__main__":
-    unittest.main()
+    def test_isnan(self):
+        def ref_impl(a):
+            return np.isnan(a)
+
+        def sdc_impl(a):
+            return numpy_like.isnan(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+    @unittest.skip('Needs provide String Array boxing')
+    def test_isnan_str(self):
+        def ref_impl(a):
+            return np.isnan(a)
+
+        def sdc_impl(a):
+            return numpy_like.isnan(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [['a', 'cc', np.nan], ['se', None, 'vvv']]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+    def test_notnan(self):
+        def ref_impl(a):
+            return np.invert(np.isnan(a))
+
+        def sdc_impl(a):
+            return numpy_like.notnan(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+
+class TestArrayReductions(TestCase):
+
+    def check_reduction_basic(self, pyfunc, alt_pyfunc, all_nans=True):
+        alt_cfunc = self.jit(alt_pyfunc)
+
+        def cases():
+            yield np.array([5, 2, 0, 333, -4])
+            yield np.array([3.3, 5.4, np.nan, 7.9, np.nan])
+            yield np.float64([1.0, 2.0, 0.0, -0.0, 1.0, -1.5])
+            yield np.float64([-0.0, -1.5])
+            yield np.float64([-1.5, 2.5, 'inf'])
+            yield np.float64([-1.5, 2.5, '-inf'])
+            yield np.float64([-1.5, 2.5, 'inf', '-inf'])
+            yield np.float64(['nan', -1.5, 2.5, 'nan', 3.0])
+            yield np.float64(['nan', -1.5, 2.5, 'nan', 'inf', '-inf', 3.0])
+            if all_nans:
+                # Only NaNs
+                yield np.float64(['nan', 'nan'])
+
+        for case in cases():
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(alt_cfunc(case), pyfunc(case))
+
+    def test_nanmin(self):
+        def ref_impl(a):
+            return np.nanmin(a)
+
+        def sdc_impl(a):
+            return numpy_like.nanmin(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl)
+
+    def test_nanmax(self):
+        def ref_impl(a):
+            return np.nanmax(a)
+
+        def sdc_impl(a):
+            return numpy_like.nanmax(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl)
+
+    def test_nansum(self):
+        def ref_impl(a):
+            return np.nansum(a)
+
+        def sdc_impl(a):
+            return numpy_like.nansum(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl)
+
+    def test_sum(self):
+        def ref_impl(a):
+            return np.sum(a)
+
+        def sdc_impl(a):
+            return numpy_like.sum(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl)
