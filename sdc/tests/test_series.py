@@ -2469,9 +2469,12 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         # TODO type_min/type_max
-        for input_data in [[np.nan, 2., np.nan, 3., np.inf, 1, -1000],
-                           [8, 31, 1123, -1024],
-                           [2., 3., 1, -1000, np.inf]]:
+        for input_data in [
+                [np.nan, 2., np.nan, 3., np.inf, 1, -1000],
+                [8, 31, 1123, -1024],
+                [2., 3., 1, -1000, np.inf],
+                [np.nan, np.nan, np.inf, np.nan],
+            ]:
             S = pd.Series(input_data)
 
             result_ref = test_impl(S)
@@ -2499,14 +2502,32 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         # TODO type_min/type_max
-        for input_data in [[np.nan, 2., np.nan, 3., np.inf, 1, -1000],
-                           [8, 31, 1123, -1024],
-                           [2., 3., 1, -1000, np.inf]]:
-            S = pd.Series(input_data)
+        for input_data in [
+                [np.nan, 2., np.nan, 3., np.inf, 1, -1000],
+                [8, 31, 1123, -1024],
+                [2., 3., 1, -1000, np.inf],
+                [np.inf, np.inf, np.inf, np.inf],
+                [np.inf, np.nan, np.nan, np.nan],
 
-            result_ref = test_impl(S)
-            result = hpat_func(S)
-            self.assertEqual(result, result_ref)
+                [np.nan, np.nan, np.nan, np.nan],
+                [np.nan, 1.0, np.nan, np.nan],
+                [np.nan, 1.0, 1.0, np.nan],
+
+                [np.nan, np.nan, 1.0, np.nan],
+                [np.nan, np.nan, 1.0, np.nan, np.nan],
+
+                [np.nan, np.nan, np.inf, np.nan],
+                [np.nan, np.nan, np.inf, np.nan, np.nan],
+
+                [np.nan, np.nan, np.nan, np.inf],
+                np.arange(11),
+            ]:
+            with self.subTest(data=input_data):
+                S = pd.Series(input_data)
+
+                result_ref = test_impl(S)
+                result = hpat_func(S)
+                np.testing.assert_equal(result, result_ref)
 
     @skip_sdc_jit("Series.max() any parameters unsupported")
     def test_series_max_param(self):
