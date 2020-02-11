@@ -349,18 +349,17 @@ if sdc.config.config_pipeline_hpat_default:
             index = df.columns.index(ind.literal_value)
             return lambda df, ind: sdc.hiframes.api.init_series(df._data[index])
 
+    @infer_global(operator.getitem)
+    class GetItemDataFrame(AbstractTemplate):
+        key = operator.getitem
 
-@infer_global(operator.getitem)
-class GetItemDataFrame(AbstractTemplate):
-    key = operator.getitem
-
-    def generic(self, args, kws):
-        df, idx = args
-        # df1 = df[df.A > .5]
-        if (isinstance(df, DataFrameType)
-                and isinstance(idx, (SeriesType, types.Array))
-                and idx.dtype == types.bool_):
-            return signature(df, *args)
+        def generic(self, args, kws):
+            df, idx = args
+            # df1 = df[df.A > .5]
+            if (isinstance(df, DataFrameType)
+                    and isinstance(idx, (SeriesType, types.Array))
+                    and idx.dtype == types.bool_):
+                return signature(df, *args)
 
 
 @infer
