@@ -45,27 +45,18 @@ def to_varname_without_excess_underscores(string):
 def generate_test_cases(cases, class_add, typ, prefix=''):
     for test_case in cases:
         for params in test_case.params:
-            print(params)
             for input_data in test_case.input_data:
                 typ_input_data = qualifier_type(input_data)
-                if typ_input_data == 'str':
-                    test_name_parts = ['test', typ, prefix, test_case.name,
-                                       gen_params_wo_data(test_case.data_num, params)]
-                else:
-                    test_name_parts = ['test', typ, prefix, test_case.name,
-                                       gen_params_wo_data(test_case.data_num, params), typ_input_data]
-                print(test_name_parts)
+                test_name_parts = ['test', typ, prefix, test_case.name,
+                                   gen_params_wo_data(test_case.data_num, params), typ_input_data]
                 test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
-                print(test_name)
                 setattr(class_add, test_name, gen_test(test_case, prefix, params, typ_input_data, input_data))
 
 
 def gen_params_wo_data(data_num, params):
     """Generate API item parameters without parameters with data, e.g. without parameter other"""
     extra_data_num = data_num - 1
-    print(params)
     method_params = params.split(', ')[extra_data_num:]
-    print(', '.join(method_params))
     return ', '.join(method_params)
 
 
