@@ -195,6 +195,8 @@ class TestArrays(TestCase):
         def sdc_impl(a):
             return numpy_like.copy(a)
 
+        sdc_func = self.jit(sdc_impl)
+
         cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan], [True, False, True], ['a', 'vv', 'o12oo']]
         for case in cases:
             a = np.array(case)
@@ -237,7 +239,6 @@ class TestArrays(TestCase):
 
         sdc_func = self.jit(sdc_impl)
         np.testing.assert_array_equal(sdc_func(), ref_impl())
-        self.check_reduction_basic(ref_impl, sdc_impl)
 
 class TestArrayReductions(TestCase):
 
