@@ -2136,7 +2136,8 @@ def hpat_pandas_series_copy(self, deep=True):
     else:
         def hpat_pandas_series_copy_impl(self, deep=True):
             if deep:
-                return pandas.Series(data=numpy_like.copy(self._data), index=numpy_like.copy(self._index), name=self._name)
+                return pandas.Series(data=numpy_like.copy(self._data), index=numpy_like.copy(self._index),
+                                     name=self._name)
             else:
                 # Shallow copy of index is not supported yet
                 return pandas.Series(data=self._data, index=numpy_like.copy(self._index), name=self._name)
