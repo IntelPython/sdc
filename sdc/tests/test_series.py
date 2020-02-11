@@ -2505,6 +2505,24 @@ class TestSeries(
             result = hpat_func(S, param_skipna)
             self.assertEqual(result, result_ref)
 
+    @unittest.expectedFailure
+    def test_series_min_param_fail(self):
+        def test_impl(S, param_skipna):
+            return S.min(skipna=param_skipna)
+
+        hpat_func = self.jit(test_impl)
+
+        cases = [
+            ([2., 3., 1, np.inf, -1000, np.nan], False),  # min == np.nan
+        ]
+
+        for input_data, param_skipna in cases:
+            S = pd.Series(input_data)
+
+            result_ref = test_impl(S, param_skipna)
+            result = hpat_func(S, param_skipna)
+            self.assertEqual(result, result_ref)
+
     def test_series_max(self):
         def test_impl(S):
             return S.max()
