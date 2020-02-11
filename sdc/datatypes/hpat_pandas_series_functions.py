@@ -2839,8 +2839,8 @@ def hpat_pandas_series_sum(
             _skipna = skipna
 
         if _skipna:
-            return numpy.nansum(self._data)
-        return numpy.sum(self._data)
+            return numpy_like.nansum(self._data)
+        return numpy_like.sum(self._data)
 
     return hpat_pandas_series_sum_impl
 

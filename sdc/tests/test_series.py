@@ -1301,7 +1301,6 @@ class TestSeries(
             -3      6
             -3      3
             dtype: int64
-
             >>>S.loc[0:-3]
              0    6
             -3    6
@@ -2319,6 +2318,14 @@ class TestSeries(
         S = pd.Series([1., 2., 3.])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def test_series_sum_bool(self):
+        def test_impl(S):
+            return S.sum()
+        hpat_func = self.jit(test_impl)
+
+        S = pd.Series([True, True, False])
+        self.assertEqual(hpat_func(S), test_impl(S))
+
     def test_series_sum_nan(self):
         def test_impl(S):
             return S.sum()
@@ -2491,6 +2498,24 @@ class TestSeries(
 
         for input_data, param_skipna in [([np.nan, 2., np.nan, 3., 1, -1000, np.inf], True),
                                          ([2., 3., 1, np.inf, -1000], False)]:
+            S = pd.Series(input_data)
+
+            result_ref = test_impl(S, param_skipna)
+            result = hpat_func(S, param_skipna)
+            self.assertEqual(result, result_ref)
+
+    @unittest.expectedFailure
+    def test_series_min_param_fail(self):
+        def test_impl(S, param_skipna):
+            return S.min(skipna=param_skipna)
+
+        hpat_func = self.jit(test_impl)
+
+        cases = [
+            ([2., 3., 1, np.inf, -1000, np.nan], False),  # min == np.nan
+        ]
+
+        for input_data, param_skipna in cases:
             S = pd.Series(input_data)
 
             result_ref = test_impl(S, param_skipna)
@@ -3170,32 +3195,48 @@ class TestSeries(
             return S.str.capitalize()
 
         sdc_func = self.jit(test_impl)
-        s = pd.Series(test_global_input_data_unicode_kind4)
-        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+        test_data = [test_global_input_data_unicode_kind4,
+                     ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
+        for data in test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     def test_series_title_str(self):
         def test_impl(S):
             return S.str.title()
 
         sdc_func = self.jit(test_impl)
-        s = pd.Series(test_global_input_data_unicode_kind4)
-        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+        test_data = [test_global_input_data_unicode_kind4,
+                     ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
+        for data in test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     def test_series_swapcase_str(self):
         def test_impl(S):
             return S.str.swapcase()
 
         sdc_func = self.jit(test_impl)
-        s = pd.Series(test_global_input_data_unicode_kind4)
-        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+        test_data = [test_global_input_data_unicode_kind4,
+                     ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
+        for data in test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     def test_series_casefold_str(self):
         def test_impl(S):
             return S.str.casefold()
 
         sdc_func = self.jit(test_impl)
-        s = pd.Series(test_global_input_data_unicode_kind4)
-        pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+        test_data = [test_global_input_data_unicode_kind4,
+                     ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
+        for data in test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
     @sdc_limitation
     def test_series_append_same_names(self):
