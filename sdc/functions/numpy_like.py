@@ -294,3 +294,54 @@ def sdc_sum_overload(self):
             return result
 
         return sdc_nansum_number_impl
+
+
+def nanmin(a):
+    pass
+
+
+def nanmax(a):
+    pass
+
+
+def nan_min_max_overload_factory(reduce_op):
+    def ov_impl(a):
+        if not isinstance(a, types.Array):
+            return
+
+        if isinstance(a.dtype, (types.Float, types.Complex)):
+            isnan = get_isnan(a.dtype)
+            initial_result = {
+                min: numpy.inf,
+                max: -numpy.inf,
+            }[reduce_op]
+
+            def impl(a):
+                result = initial_result
+                nan_count = 0
+                length = len(a)
+                for i in prange(length):
+                    v = a[i]
+                    if not isnan(v):
+                        result = reduce_op(result, v)
+                    else:
+                        nan_count += 1
+
+                if nan_count == length:
+                    return numpy.nan
+
+                return result
+            return impl
+        else:
+            def impl(a):
+                result = a[0]
+                for i in prange(len(a) - 1):
+                    result = reduce_op(result, a[i + 1])
+                return result
+            return impl
+
+    return ov_impl
+
+
+sdc_overload(nanmin)(nan_min_max_overload_factory(min))
+sdc_overload(nanmax)(nan_min_max_overload_factory(max))
