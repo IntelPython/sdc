@@ -365,6 +365,7 @@ def nan_min_max_overload_factory(reduce_op):
 sdc_overload(nanmin)(nan_min_max_overload_factory(min))
 sdc_overload(nanmax)(nan_min_max_overload_factory(max))
 
+
 def nanprod(a):
     pass
 
