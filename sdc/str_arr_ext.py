@@ -675,19 +675,19 @@ def impl_string_array_single(context, builder, sig, args):
     arg = args[0]
     if isinstance(arg, (types.UniTuple, types.List)):
         assert (arg.dtype == string_type
-                or (isinstance(arg, types.optional) and arg.type == string_type))
+                or (isinstance(arg.dtype, types.optional) and arg.type == string_type))
 
-    # TODO: check whether below works at all, otherwise it might be removed
-#     if isinstance(arg, types.Tuple):
-#         for i in arg:
-#             assert i.dtype == string_type or i.dtype == types.StringLiteral
+    # FIXME: doesn't work for Tuple with None values
+    if isinstance(arg, types.Tuple):
+        for i in arg:
+            assert i.dtype == string_type or i.dtype == types.StringLiteral
 
     if not sig.args:  # return empty string array if no args
         res = context.compile_internal(
             builder, lambda: pre_alloc_string_array(0, 0), sig, args)
         return res
 
-    def str_arr_from_list(in_list):
+    def str_arr_from_sequence(in_list):
         n_strs = len(in_list)
         total_chars = 0
         # TODO: use vector to avoid two passes?
@@ -701,17 +701,13 @@ def impl_string_array_single(context, builder, sig, args):
                 total_chars += get_utf8_size(s)
 
         A = pre_alloc_string_array(n_strs, total_chars)
-
-        for i in numba.prange(n_strs):
-            if nan_mask[i]:
-                A[i] = ''
-            else:
-                A[i] = in_list[i]
+        for i in np.arange(n_strs):
+            A[i] = '' if nan_mask[i] else in_list[i]
         str_arr_set_na_by_mask(A, nan_mask)
 
         return A
 
-    res = context.compile_internal(builder, str_arr_from_list, sig, args)
+    res = context.compile_internal(builder, str_arr_from_sequence, sig, args)
     return res
 
 # @lower_builtin(StringArray)

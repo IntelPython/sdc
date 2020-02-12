@@ -49,6 +49,7 @@ from sdc.tests.test_utils import (check_numba_version,
                                   skip_numba_jit,
                                   skip_sdc_jit,
                                   test_global_input_data_float64,)
+from sdc.hiframes.api import get_nan_mask
 
 
 @sdc.jit
@@ -1664,25 +1665,46 @@ class TestDataFrame(TestCase):
         self.assertTrue(isinstance(two, np.ndarray))
         self.assertTrue(isinstance(three, np.ndarray))
 
-    def test_df_create_str_from_optional(self):
+    def test_df_iterate_over_columns1(self):
+        """ Verifies iteration over df columns using literal tuple of column indices. """
         from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
-        def test_impl():
+        from sdc.hiframes.api import get_nan_mask
+
+        @self.jit
+        def jitted_func():
             df = pd.DataFrame({
-                        'A': ['a', 'b', None, 'a', '', 'None', 'b'],
+                        'A': ['a', 'b', None, 'a', '', None, 'b'],
                         'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
-                        'C': [2, 1, np.nan, 1, np.nan, 2, 1]
+                        'C': [np.nan, 1, 2, 1, np.nan, 2, 1],
+                        'D': [1, 2, 9, 5, 2, 1, 0]
             })
 
-            total_elements = 0
-            column_ids = (0, 1, 2)
+            # tuple of literals has to be created in a jitted function, otherwise
+            # col_id won't be literal and unboxing in get_dataframe_data won't compile
+            column_ids = (0, 1, 2, 3)
+            res_nan_mask = np.zeros(len(df), dtype=np.bool_)
             for col_id in literal_unroll(column_ids):
-                total_elements += len(get_dataframe_data(df, col_id))
-            return total_elements
+                res_nan_mask += get_nan_mask(get_dataframe_data(df, col_id))
+            return res_nan_mask
+
+        # expected is a boolean mask of df rows that have None values
+        expected = np.asarray([True, False, True, False, True, True, False])
+        result = jitted_func()
+        np.testing.assert_array_equal(result, expected)
+
+    def test_df_create_str_with_none(self):
+        """ Verifies creation of a dataframe with a string column from a list of Optional values. """
+        def test_impl():
+            df = pd.DataFrame({
+                        'A': ['a', 'b', None, 'a', '', None, 'b'],
+                        'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
+                        'C': [np.nan, 1, 2, 1, np.nan, 2, 1]
+            })
+
+            return df['A'].isna()
         hpat_func = self.jit(test_impl)
 
-        result = hpat_func()
-        expected = 21
-        self.assertEqual(result, expected)
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
 
 
 if __name__ == "__main__":
