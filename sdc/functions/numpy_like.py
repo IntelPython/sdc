@@ -48,6 +48,10 @@ def astype(self, dtype):
     pass
 
 
+def fillna(self, inplace=False, value=None):
+    pass
+
+
 def copy(self):
     pass
 
@@ -313,6 +317,46 @@ def sdc_nansum_overload(self):
 
     if isinstance(dtype, (types.Boolean, bool)):
         return gen_sum_bool_impl()
+
+
+@sdc_overload(fillna)
+def sdc_fillna_overload(self, inplace=False, value=None):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of fillna.
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k fillna
+    """
+
+    if not isinstance(self, types.Array):
+        return None
+    print("PRIVET")
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if ((isinstance(inplace, types.Literal) and inplace.literal_value == True)
+        or (isinstance(inplace, bool) and inplace == True)):
+        def sdc_fillna_inplace_impl(self, inplace=False, value=None):
+            length = len(self)
+            for i in prange(length):
+                if isnan(self[i]):
+                    self[i] = value
+            return None
+
+        return sdc_fillna_inplace_impl
+
+    else:
+        def sdc_fillna_impl(self, inplace=False, value=None):
+            length = len(self)
+            filled_data = numpy.empty(length, dtype=dtype)
+            for i in prange(length):
+                if isnan(self[i]):
+                    filled_data[i] = value
+                else:
+                    filled_data[i] = self[i]
+            return filled_data
+
+        return sdc_fillna_impl
 
 
 def nanmin(a):

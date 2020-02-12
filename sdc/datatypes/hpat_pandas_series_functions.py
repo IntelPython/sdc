@@ -5030,15 +5030,16 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
 
             return hpat_pandas_series_no_nan_fillna_impl
         else:
-            def hpat_pandas_series_fillna_impl(self, value=None, method=None, axis=None, inplace=False,
-                                               limit=None, downcast=None):
-                length = len(self._data)
-                for i in prange(length):
-                    if isnan(self._data[i]):
-                        self._data[i] = value
-                return None
+            return numpy_like.fillna(self.data, inplace=True, value=value)
+            # def hpat_pandas_series_fillna_impl(self, value=None, method=None, axis=None, inplace=False,
+            #                                    limit=None, downcast=None):
+            #     length = len(self._data)
+            #     for i in prange(length):
+            #         if isnan(self._data[i]):
+            #             self._data[i] = value
+            #     return None
 
-            return hpat_pandas_series_fillna_impl
+            # return hpat_pandas_series_fillna_impl
     else:
         # non inplace implementations, copy array, fill the NA/NaN and return a new Series
         if isinstance(self.dtype, types.UnicodeType):
@@ -5074,17 +5075,25 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
             return hpat_pandas_series_no_nan_fillna_impl
 
         else:
+            print("priv")
             def hpat_pandas_series_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
-                length = len(self._data)
-                filled_data = numpy.empty(length, dtype=dtype)
-                for i in prange(length):
-                    if isnan(self._data[i]):
-                        filled_data[i] = value
-                    else:
-                        filled_data[i] = self._data[i]
-                return pandas.Series(data=filled_data, index=self._index, name=self._name)
-
+                filled_data = numpy_like.fillna(self._data, inplace=False, value=value)
+                return pandas.Series(data=filled_data,
+                                    index=self._index, name=self._name)
+            # return pandas.Series(data=numpy_like.fillna(self.data, inplace=False, value=value),
+            #                      index=self.index, name=self.name)
             return hpat_pandas_series_fillna_impl
+            # def hpat_pandas_series_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
+            #     length = len(self._data)
+            #     filled_data = numpy.empty(length, dtype=dtype)
+            #     for i in prange(length):
+            #         if isnan(self._data[i]):
+            #             filled_data[i] = value
+            #         else:
+            #             filled_data[i] = self._data[i]
+            #     return pandas.Series(data=filled_data, index=self._index, name=self._name)
+
+            # return hpat_pandas_series_fillna_impl
 
 
 @sdc_overload_method(SeriesType, 'cov')
