@@ -99,6 +99,11 @@ cases = [
         CE(type_='Numba', code='data.astype(np.int64)', jitted=True),
         CE(type_='SDC', code='sdc.functions.numpy_like.astype(data, np.int64)', jitted=True),
     ], usecase_params='data'),
+    TC(name='copy', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.copy(data)', jitted=False),
+        CE(type_='Numba', code='np.copy(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.copy(data)', jitted=True),
+    ], usecase_params='data'),
     TC(name='isnan', size=[10 ** 7], call_expr=[
         CE(type_='Python', code='np.isnan(data)', jitted=False),
         CE(type_='Numba', code='np.isnan(data)', jitted=True),

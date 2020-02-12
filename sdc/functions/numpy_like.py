@@ -48,6 +48,10 @@ def astype(self, dtype):
     pass
 
 
+def copy(self):
+    pass
+
+
 def isnan(self):
     pass
 
@@ -125,8 +129,41 @@ def sdc_astype_overload(self, dtype):
     ty_checker.raise_exc(self.dtype, 'str or type', 'self.dtype')
 
 
+@sdc_overload(copy)
+def sdc_copy_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.copy.
+
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k copy
+    """
+
+    if not isinstance(self, (types.Array, StringArrayType)):
+        return None
+
+    dtype = self.dtype
+    if isinstance(dtype, (types.Number, types.Boolean, bool)):
+        def sdc_copy_number_impl(self):
+            length = len(self)
+            res = numpy.empty(length, dtype=dtype)
+            for i in prange(length):
+                res[i] = self[i]
+
+            return res
+
+        return sdc_copy_number_impl
+
+    if isinstance(dtype, (types.npytypes.UnicodeCharSeq, types.UnicodeType, types.StringLiteral)):
+        def sdc_copy_string_impl(self):
+            return self.copy()
+
+        return sdc_copy_string_impl
+
+
 @sdc_overload(notnan)
-def sdc_isnan_overload(self):
+def sdc_notnan_overload(self):
     """
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -140,7 +177,7 @@ def sdc_isnan_overload(self):
 
     dtype = self.dtype
     isnan = get_isnan(dtype)
-    if isinstance(dtype, types.Integer):
+    if isinstance(dtype, (types.Integer, types.Boolean, bool)):
         def sdc_notnan_int_impl(self):
             length = len(self)
             res = numpy.ones(shape=length, dtype=numpy.bool_)
@@ -178,7 +215,7 @@ def sdc_isnan_overload(self):
 
     dtype = self.dtype
     isnan = get_isnan(dtype)
-    if isinstance(dtype, types.Integer):
+    if isinstance(dtype, (types.Integer, types.Boolean, bool)):
         def sdc_isnan_int_impl(self):
             length = len(self)
             res = numpy.zeros(shape=length, dtype=numpy.bool_)
@@ -199,6 +236,19 @@ def sdc_isnan_overload(self):
         return sdc_isnan_float_impl
 
     ty_checker.raise_exc(dtype, 'int or float', 'self.dtype')
+
+
+def gen_sum_bool_impl():
+    """Generate sum bool implementation."""
+    def _sum_bool_impl(self):
+        length = len(self)
+        result = 0
+        for i in prange(length):
+            result += self[i]
+
+        return result
+
+    return _sum_bool_impl
 
 
 @sdc_overload(sum)
@@ -230,9 +280,12 @@ def sdc_sum_overload(self):
 
         return sdc_sum_number_impl
 
+    if isinstance(dtype, (types.Boolean, bool)):
+        return gen_sum_bool_impl()
+
 
 @sdc_overload(nansum)
-def sdc_sum_overload(self):
+def sdc_nansum_overload(self):
     """
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -257,6 +310,9 @@ def sdc_sum_overload(self):
             return result
 
         return sdc_nansum_number_impl
+
+    if isinstance(dtype, (types.Boolean, bool)):
+        return gen_sum_bool_impl()
 
 
 def nanmin(a):
