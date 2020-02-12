@@ -154,7 +154,7 @@ def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
           python -m sdc.runtests sdc.tests.test_hiframes.TestHiFrames.test_str_replace_noregex
           python -m sdc.runtests sdc.tests.test_hiframes.TestHiFrames.test_str_split
           python -m sdc.runtests sdc.tests.test_hiframes.TestHiFrames.test_str_contains_regex
-    
+
     Parameters
     ----------
     self: :class:`pandas.core.strings.StringMethods`
@@ -162,30 +162,30 @@ def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
     other: {methodparams}
         input arguments decription in
         https://pandas.pydata.org/pandas-docs/version/0.25/reference/series.html#string-handling
-    
+
     Returns
     -------
     :obj:`pandas.Series`
          returns :obj:`pandas.Series` object
     \"\"\"
-    
+
     ty_checker = TypeChecker('Method {methodname}().')
     ty_checker.check(self, StringMethodsType)
-    
+
     def hpat_pandas_stringmethods_{methodname}_impl(self{methodparams}):
         item_count = len(self._data)
         result = [''] * item_count
         # result = numba.typed.List.empty_list(numba.types.unicode_type)
-    
+
         for it in range(item_count):
             item = self._data._data[it]
             if len(item) > 0:
                 result[it] = item.{methodname}({methodparams_call})
             else:
                 result[it] = item
-    
+
         return pandas.Series(result, self._data._index, name=self._data._name)
-    
+
     return hpat_pandas_stringmethods_{methodname}_impl
 """
 
@@ -831,7 +831,7 @@ def _hpat_pandas_stringmethods_autogen(method_name):
     if len(params) > 0:
         """
         Translate parameters string for method
-    
+
         For example:
             parameters for split(): ', pat=None, n=-1, expand=False'
                     translate into: 'pat, n, expand'
@@ -858,11 +858,11 @@ sdc_pandas_series_str_docstring_template = """
         Intel Scalable Dataframe Compiler User Guide
         ********************************************
         Pandas API: pandas.Series.str.{method_name}
-    
+
         Limitations
         -----------
         Series elements are expected to be Unicode strings. Elements cannot be NaN.
-    
+
         Examples
         --------
         .. literalinclude:: ../../../examples/series/str/series_str_{method_name}.py
@@ -870,29 +870,29 @@ sdc_pandas_series_str_docstring_template = """
            :lines: 27-
            :caption: {caption}
            :name: ex_series_str_{method_name}
-    
+
         .. command-output:: python ./series/str/series_str_{method_name}.py
            :cwd: ../../../examples
-    
+
         .. seealso::
             {seealso}
-    
+
         Intel Scalable Dataframe Compiler Developer Guide
         *************************************************
-    
+
         Pandas Series method :meth:`pandas.core.strings.StringMethods.{method_name}()` implementation.
-    
+
         Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-    
+
         .. only:: developer
-    
+
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_{method_name}_str
-    
+
         Parameters
         ----------
         self: :class:`pandas.core.strings.StringMethods`
             input arg
-    
+
         Returns
         -------
         :obj:`pandas.Series`
