@@ -76,27 +76,18 @@ def gen_call_expr(test_case, prefix):
 
 
 def gen_test(test_case, prefix):
-    func_name = 'func'
-
     usecase = gen_usecase(test_case, prefix)
-
-    skip = '@skip_numba_jit\n' if test_case.skip else ''
 
     test_name = test_case.name
     if test_case.params:
-        test_name = f'{test_name}({test_case.params})'
+        test_name += f'({test_case.params})'
 
-    func_text = f"""
-{skip}def {func_name}(self):
-  self._test_case(usecase, name='{test_name}', total_data_length={test_case.size},
-                  data_num={test_case.data_num}, input_data={test_case.input_data})
-"""
+    def func(self):
+        self._test_case(usecase, name=test_name, total_data_length=test_case.size,
+                        data_num=test_case.data_num, input_data=test_case.input_data)
 
-    loc_vars = {}
-    global_vars = {'usecase': usecase,
-                   'skip_numba_jit': skip_numba_jit}
-    exec(func_text, global_vars, loc_vars)
-    func = loc_vars[func_name]
+    if test_case.skip:
+        func = skip_numba_jit(func)
 
     return func
 
