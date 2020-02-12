@@ -24,11 +24,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import numpy as np
-import pandas as pd
-from numba import njit
-
-
 """
 Expect Series
 0      3.000000
@@ -38,6 +33,11 @@ Expect Series
 4     92.000000
 dtype: object
 """
+import numpy as np
+import pandas as pd
+from numba import njit
+
+
 @njit
 def series_astype():
     series = pd.Series([3, -10, np.nan, 0, 92])

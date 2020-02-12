@@ -53,7 +53,7 @@ from numba.targets.imputils import (
 from numba.targets.arrayobj import make_array
 
 import sdc
-from sdc.utils import _numba_to_c_type_map, unliteral_all
+from sdc.utilities.utils import (_numba_to_c_type_map, unliteral_all)
 from sdc.str_ext import string_type, list_string_array_type
 from sdc.set_ext import build_set
 from sdc.str_arr_ext import (
@@ -358,7 +358,7 @@ def lower_unique(context, builder, sig, args):
 def unique_overload(arr_typ):
     # TODO: extend to other types like datetime?
     def unique_seq(A):
-        return sdc.utils.to_array(build_set(A))
+        return sdc.utilities.utils.to_array(build_set(A))
     return unique_seq
 
 
@@ -374,7 +374,7 @@ def lower_unique_parallel(context, builder, sig, args):
 def unique_overload_parallel(arr_typ):
 
     def unique_par(A):
-        uniq_A = sdc.utils.to_array(build_set(A))
+        uniq_A = sdc.utilities.utils.to_array(build_set(A))
         key_arrs = (uniq_A,)
 
         n_pes = sdc.distributed_api.get_size()
@@ -399,7 +399,7 @@ def unique_overload_parallel(arr_typ):
         # shuffle
         out_arr, = alltoallv_tup(key_arrs, shuffle_meta)
 
-        return sdc.utils.to_array(build_set(out_arr))
+        return sdc.utilities.utils.to_array(build_set(out_arr))
 
     return unique_par
 
@@ -570,7 +570,11 @@ def get_nan_mask(arr):
 def get_nan_mask_overload(arr):
 
     def get_nan_mask_via_isna_impl(arr):
-        return np.array([isna(arr, i) for i in np.arange(len(arr))])
+        len_arr = len(arr)
+        res = np.empty(len_arr, dtype=np.bool_)
+        for i in numba.prange(len_arr):
+            res[i] = isna(arr, i)
+        return res
 
     if isinstance(arr, types.Array):
         dtype = arr.dtype

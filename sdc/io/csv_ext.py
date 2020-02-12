@@ -40,7 +40,8 @@ from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
 import sdc
 from sdc import distributed, distributed_analysis
-from sdc.utils import debug_prints, alloc_arr_tup, empty_like_type
+from sdc.utilities.utils import (debug_prints, alloc_arr_tup, empty_like_type,
+                                 _numba_to_c_type_map)
 from sdc.distributed_analysis import Distribution
 from sdc.str_ext import string_type
 from sdc.str_arr_ext import (string_array_type, to_string_list,
@@ -49,7 +50,6 @@ from sdc.str_arr_ext import (string_array_type, to_string_list,
                               pre_alloc_string_array, num_total_chars,
                               getitem_str_offset, copy_str_arr_slice)
 from sdc.timsort import copyElement_tup, getitem_arr_tup
-from sdc.utils import _numba_to_c_type_map
 from sdc import objmode
 import pandas as pd
 import numpy as np
@@ -229,8 +229,6 @@ def build_csv_definitions(csv_node, definitions=None):
 
 ir_utils.build_defs_extensions[CsvReader] = build_csv_definitions
 
-ll.add_symbol('csv_file_chunk_reader', hio.csv_file_chunk_reader)
-
 
 def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, targetctx, dist_pass):
     parallel = False
@@ -300,11 +298,6 @@ def box_stream_reader(typ, val, c):
     return val
 
 
-csv_file_chunk_reader = types.ExternalFunction(
-    "csv_file_chunk_reader", stream_reader_type(
-        types.voidptr, types.bool_, types.int64, types.int64))
-
-
 def _get_dtype_str(t):
     dtype = t.dtype
     if isinstance(dtype, PDCategoricalDtype):
@@ -341,47 +334,6 @@ def _get_pd_dtype_str(t):
 # the reference to the dynamic function inside them
 # (numba/lowering.py:self.context.add_dynamic_addr ...)
 compiled_funcs = []
-
-
-def _gen_csv_reader_py_pandas(col_names, col_typs, usecols, sep, typingctx, targetctx, parallel, skiprows):
-    # TODO: support non-numpy types like strings
-    date_inds = ", ".join(str(i) for i, t in enumerate(col_typs) if t.dtype == types.NPDatetime('ns'))
-    typ_strs = ", ".join(["{}='{}'".format(_sanitize_varname(cname), _get_dtype_str(t))
-                          for cname, t in zip(col_names, col_typs)])
-    pd_dtype_strs = ", ".join(["'{}':{}".format(cname, _get_pd_dtype_str(t)) for cname, t in zip(col_names, col_typs)])
-
-    func_text = "def csv_reader_py(fname):\n"
-    func_text += "  skiprows = {}\n".format(skiprows)
-    func_text += "  f_reader = csv_file_chunk_reader(fname._data, {}, skiprows, -1)\n".format(parallel)
-    func_text += "  with objmode({}):\n".format(typ_strs)
-    func_text += "    df = pd.read_csv(f_reader, names={},\n".format(col_names)
-    func_text += "       parse_dates=[{}],\n".format(date_inds)
-    func_text += "       dtype={{{}}},\n".format(pd_dtype_strs)
-    func_text += "       usecols={}, sep='{}')\n".format(usecols, sep)
-    for cname in col_names:
-        func_text += "    {} = df['{}'].values\n".format(_sanitize_varname(cname), cname)
-        # func_text += "    print({})\n".format(cname)
-    func_text += "  return ({},)\n".format(", ".join(_sanitize_varname(c) for c in col_names))
-
-    # print(func_text)
-    glbls = globals()  # TODO: fix globals after Numba's #3355 is resolved
-    # {'objmode': objmode, 'csv_file_chunk_reader': csv_file_chunk_reader,
-    # 'pd': pd, 'np': np}
-    loc_vars = {}
-    exec(func_text, glbls, loc_vars)
-    csv_reader_py = loc_vars['csv_reader_py']
-
-    # TODO: no_cpython_wrapper=True crashes for some reason
-    jit_func = numba.njit(csv_reader_py)
-    compiled_funcs.append(jit_func)
-    return jit_func
-
-
-def _sanitize_varname(varname):
-    new_name = varname.replace('$', '_').replace('.', '_')
-    if not new_name[0].isalpha():
-        new_name = '_' + new_name
-    return new_name
 
 
 # TODO: move to hpat.common
@@ -579,5 +531,4 @@ def _gen_csv_reader_py_pyarrow_jit_func(csv_reader_py):
     return jit_func
 
 
-# _gen_csv_reader_py = _gen_csv_reader_py_pandas
 _gen_csv_reader_py = _gen_csv_reader_py_pyarrow

@@ -24,6 +24,14 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+Expect Series:
+3.0    2
+4.0    1
+2.0    1
+1.0    1
+dtype: int64
+"""
 import pandas as pd
 import numpy as np
 from numba import njit
@@ -31,15 +39,6 @@ from numba import njit
 
 @njit
 def series_value_counts():
-    """
-    Expected result:
-    3.0    2
-    4.0    1
-    2.0    1
-    1.0    1
-    dtype: int64
-
-    """
     s = pd.Series([3, 1, 2, 3, 4, np.nan])
     out_series = s.value_counts()
 

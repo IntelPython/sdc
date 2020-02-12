@@ -26,14 +26,14 @@
 import numpy
 import pandas
 
-from numba.types import (float64, Boolean, Number, Omitted,
+from numba.types import (float64, Boolean, Integer, Number, Omitted,
                          NoneType, StringLiteral, UnicodeType)
-from sdc.datatypes.common_functions import TypeChecker, params2list
+from sdc.utilities.sdc_typing_utils import TypeChecker, params2list
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import DataFrameRollingType
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.hiframes.pd_series_type import SeriesType
-from sdc.utils import sdc_overload_method
+from sdc.utilities.utils import sdc_overload_method
 
 
 sdc_pandas_dataframe_rolling_docstring_tmpl = """
@@ -379,6 +379,18 @@ def sdc_pandas_dataframe_rolling_skew(self):
     return gen_df_rolling_method_impl('skew', self)
 
 
+@sdc_overload_method(DataFrameRollingType, 'std')
+def sdc_pandas_dataframe_rolling_std(self, ddof=1):
+
+    ty_checker = TypeChecker('Method rolling.std().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    if not isinstance(ddof, (int, Integer, Omitted)):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
+
+    return gen_df_rolling_method_impl('std', self, kws={'ddof': '1'})
+
+
 @sdc_overload_method(DataFrameRollingType, 'sum')
 def sdc_pandas_dataframe_rolling_sum(self):
 
@@ -386,6 +398,18 @@ def sdc_pandas_dataframe_rolling_sum(self):
     ty_checker.check(self, DataFrameRollingType)
 
     return gen_df_rolling_method_impl('sum', self)
+
+
+@sdc_overload_method(DataFrameRollingType, 'var')
+def sdc_pandas_dataframe_rolling_var(self, ddof=1):
+
+    ty_checker = TypeChecker('Method rolling.var().')
+    ty_checker.check(self, DataFrameRollingType)
+
+    if not isinstance(ddof, (int, Integer, Omitted)):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
+
+    return gen_df_rolling_method_impl('var', self, kws={'ddof': '1'})
 
 
 sdc_pandas_dataframe_rolling_apply.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
@@ -499,6 +523,22 @@ sdc_pandas_dataframe_rolling_skew.__doc__ = sdc_pandas_dataframe_rolling_docstri
     'extra_params': ''
 })
 
+sdc_pandas_dataframe_rolling_std.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'std',
+    'example_caption': 'Calculate rolling standard deviation.',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """,
+    'extra_params':
+    """
+    ddof: :obj:`int`
+        Delta Degrees of Freedom.
+    """
+})
+
 sdc_pandas_dataframe_rolling_sum.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
     'method_name': 'sum',
     'example_caption': 'Calculate rolling sum of given Series.',
@@ -509,4 +549,20 @@ sdc_pandas_dataframe_rolling_sum.__doc__ = sdc_pandas_dataframe_rolling_docstrin
     DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params': ''
+})
+
+sdc_pandas_dataframe_rolling_var.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
+    'method_name': 'var',
+    'example_caption': 'Calculate unbiased rolling variance.',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    """,
+    'extra_params':
+    """
+    ddof: :obj:`int`
+        Delta Degrees of Freedom.
+    """
 })

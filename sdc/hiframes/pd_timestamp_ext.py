@@ -41,7 +41,7 @@ from numba.typing.templates import (infer_getattr, AttributeTemplate,
 import numpy as np
 import ctypes
 import sdc.str_ext
-import sdc.utils
+import sdc.utilities.utils
 
 from llvmlite import ir as lir
 
