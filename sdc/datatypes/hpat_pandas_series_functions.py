@@ -2129,17 +2129,18 @@ def hpat_pandas_series_copy(self, deep=True):
     if isinstance(self.index, types.NoneType):
         def hpat_pandas_series_copy_impl(self, deep=True):
             if deep:
-                return pandas.Series(data=self._data.copy(), name=self._name)
+                return pandas.Series(data=numpy_like.copy(self._data), name=self._name)
             else:
                 return pandas.Series(data=self._data, name=self._name)
         return hpat_pandas_series_copy_impl
     else:
         def hpat_pandas_series_copy_impl(self, deep=True):
             if deep:
-                return pandas.Series(data=self._data.copy(), index=self._index.copy(), name=self._name)
+                return pandas.Series(data=numpy_like.copy(self._data), index=numpy_like.copy(self._index),
+                                     name=self._name)
             else:
                 # Shallow copy of index is not supported yet
-                return pandas.Series(data=self._data, index=self._index.copy(), name=self._name)
+                return pandas.Series(data=self._data, index=numpy_like.copy(self._index), name=self._name)
         return hpat_pandas_series_copy_impl
 
 
@@ -2395,9 +2396,9 @@ def hpat_pandas_series_isnull(self):
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if isinstance(self.data.dtype, (types.Integer, types.Float)):
+    if isinstance(self.data.dtype, (types.Number, types.Boolean, bool)):
         def hpat_pandas_series_isnull_impl(self):
-            return pandas.Series(data=numpy.isnan(self._data), index=self._index, name=self._name)
+            return pandas.Series(data=numpy_like.isnan(self._data), index=self._index, name=self._name)
 
         return hpat_pandas_series_isnull_impl
 
@@ -2463,9 +2464,9 @@ def hpat_pandas_series_isna(self):
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if isinstance(self.data.dtype, (types.Integer, types.Float)):
+    if isinstance(self.data.dtype, (types.Number, types.Boolean, bool)):
         def hpat_pandas_series_isna_impl(self):
-            return pandas.Series(data=numpy.isnan(self._data), index=self._index, name=self._name)
+            return pandas.Series(data=numpy_like.isnan(self._data), index=self._index, name=self._name)
 
         return hpat_pandas_series_isna_impl
 
@@ -2531,9 +2532,9 @@ def hpat_pandas_series_notna(self):
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if isinstance(self.data.dtype, types.Number):
+    if isinstance(self.data.dtype, (types.Number, types.Boolean, bool)):
         def hpat_pandas_series_notna_impl(self):
-            return pandas.Series(numpy.invert(numpy.isnan(self._data)), index=self._index, name=self._name)
+            return pandas.Series(numpy_like.notnan(self._data), index=self._index, name=self._name)
 
         return hpat_pandas_series_notna_impl
 

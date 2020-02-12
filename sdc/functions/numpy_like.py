@@ -140,7 +140,7 @@ def sdc_copy_overload(self):
        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k copy
     """
 
-    if not isinstance(self, types.Array):
+    if not isinstance(self, (types.Array, StringArrayType)):
         return None
 
     dtype = self.dtype
@@ -155,7 +155,7 @@ def sdc_copy_overload(self):
 
         return sdc_copy_number_impl
 
-    if isinstance(dtype, types.npytypes.UnicodeCharSeq):
+    if isinstance(dtype, (types.npytypes.UnicodeCharSeq, types.UnicodeType, types.StringLiteral)):
         def sdc_copy_string_impl(self):
             return self.copy()
 
@@ -163,7 +163,7 @@ def sdc_copy_overload(self):
 
 
 @sdc_overload(notnan)
-def sdc_isnan_overload(self):
+def sdc_notnan_overload(self):
     """
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -177,7 +177,7 @@ def sdc_isnan_overload(self):
 
     dtype = self.dtype
     isnan = get_isnan(dtype)
-    if isinstance(dtype, types.Integer):
+    if isinstance(dtype, (types.Integer, types.Boolean, bool)):
         def sdc_notnan_int_impl(self):
             length = len(self)
             res = numpy.ones(shape=length, dtype=numpy.bool_)
@@ -215,7 +215,7 @@ def sdc_isnan_overload(self):
 
     dtype = self.dtype
     isnan = get_isnan(dtype)
-    if isinstance(dtype, types.Integer):
+    if isinstance(dtype, (types.Integer, types.Boolean, bool)):
         def sdc_isnan_int_impl(self):
             length = len(self)
             res = numpy.zeros(shape=length, dtype=numpy.bool_)
