@@ -57,7 +57,7 @@ class TestSeriesStringMethods(TestBase):
         cls.width = [16, 64, 512, 1024]
 
     def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
-        test_name = 'Series.{}'.format(name)
+        test_name = 'Series.str.{}'.format(name)
 
         input_data = input_data or test_global_input_data_unicode_kind4
 
