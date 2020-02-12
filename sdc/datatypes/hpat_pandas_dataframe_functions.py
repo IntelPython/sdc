@@ -35,13 +35,14 @@ import pandas
 import numpy
 import sdc
 
+
 from numba import types
 from numba.special import literally
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric,
                                             check_types_comparable,
-                                            gen_df_impl_generator)
+                                            gen_df_impl_generator, find_common_dtype_from_numpy_dtypes)
 from sdc.str_arr_ext import StringArrayType
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
@@ -103,6 +104,132 @@ def hpat_pandas_dataframe_index(df):
             return df._index
 
         return hpat_pandas_df_index_impl
+
+
+def sdc_pandas_dataframe_values_codegen(df, numba_common_dtype):
+    """
+    Input:
+    column_len = 3
+    numba_common_dtype = float64
+
+    Func generated:
+    def sdc_pandas_dataframe_values_impl(df):
+        row_len = len(get_dataframe_data(df, 0))
+        df_col_A = get_dataframe_data(df, 0)
+        df_col_B = get_dataframe_data(df, 1)
+        df_col_C = get_dataframe_data(df, 2)
+        df_values = numpy.empty(row_len*3, numpy.dtype("float64"))
+        for i in range(row_len):
+            df_values[i * 3 + 0] = df_col_A[i]
+            df_values[i * 3 + 1] = df_col_B[i]
+            df_values[i * 3 + 2] = df_col_C[i]
+        return df_values.reshape(row_len, 3)
+
+    """
+
+    indent = 4 * ' '
+    func_args = ['df']
+
+    func_definition = [f'def sdc_pandas_dataframe_values_impl({", ".join(func_args)}):']
+    func_text = []
+    column_list = []
+    column_len = len(df.columns)
+    func_text.append(f'row_len = len(get_dataframe_data(df, 0))')
+
+    for index, column_name in enumerate(df.columns):
+        func_text.append(f'df_col_{column_name} = get_dataframe_data(df, {index})')
+        column_list.append(f'df_col_{column_name}')
+
+    func_text.append(f'df_values = numpy.empty(row_len*{column_len}, numpy.dtype("{numba_common_dtype}"))')
+    func_text.append('for i in range(row_len):')
+    for j in range(column_len):
+        func_text.append(indent + f'df_values[i * {column_len} + {j}] = {column_list[j]}[i]')
+
+    func_text.append(f"return df_values.reshape(row_len, {column_len})\n")
+    func_definition.extend([indent + func_line for func_line in func_text])
+    func_def = '\n'.join(func_definition)
+
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
+
+    return func_def, global_vars
+
+
+@sdc_overload_attribute(DataFrameType, 'values')
+def hpat_pandas_dataframe_values(df):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.values
+
+    Limitations
+    -----------
+    Only numeric values supported as an output
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_values.py
+      :language: python
+      :lines: 27-
+      :caption: The values data of the DataFrame.
+      :name: ex_dataframe_values
+
+    .. command-output:: python ./dataframe/dataframe_values.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.to_numpy <pandas.DataFrame.to_numpy>`
+            Recommended alternative to this method.
+        :ref:`DataFrame.index <pandas.DataFrame.index>`
+            Retrieve the index labels.
+        :ref:`DataFrame.columns <pandas.DataFrame.columns>`
+            Retrieving the column names.
+
+    .. note::
+
+        The dtype will be a lower-common-denominator dtype (implicit upcasting);
+        that is to say if the dtypes (even of numeric types) are mixed, the one that accommodates all will be chosen.
+        Use this with care if you are not dealing with the blocks.
+        e.g. If the dtypes are float16 and float32, dtype will be upcast to float32. If dtypes are int32 and uint8,
+        dtype will be upcast to int32. By numpy.find_common_type() convention,
+        mixing int64 and uint64 will result in a float64 dtype.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame attribute :attr:`pandas.DataFrame.values` implementation.
+    .. only:: developer
+    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_values*
+    Parameters
+    -----------
+    df: :obj:`pandas.DataFrame`
+       input arg
+    Returns
+    -------
+    :obj: `numpy.ndarray`
+       return a Numpy representation of the DataFrame
+    """
+
+    func_name = 'Attribute values.'
+    ty_checker = TypeChecker(func_name)
+    ty_checker.check(df, DataFrameType)
+
+    # TODO: Handle StringArrayType
+    for i, column in enumerate(df.data):
+        if isinstance(column, StringArrayType):
+            ty_checker.raise_exc(column, 'Numeric type', f'df.data["{df.columns[i]}"]')
+
+    numba_common_dtype = find_common_dtype_from_numpy_dtypes([column.dtype for column in df.data], [])
+
+    def hpat_pandas_df_values_impl(df, numba_common_dtype):
+        loc_vars = {}
+        func_def, global_vars = sdc_pandas_dataframe_values_codegen(df, numba_common_dtype)
+
+        exec(func_def, global_vars, loc_vars)
+        _values_impl = loc_vars['sdc_pandas_dataframe_values_impl']
+        return _values_impl
+
+    return hpat_pandas_df_values_impl(df, numba_common_dtype)
 
 
 def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
