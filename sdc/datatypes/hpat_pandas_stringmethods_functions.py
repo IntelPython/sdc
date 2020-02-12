@@ -143,7 +143,7 @@ _hpat_pandas_stringmethods_functions_template = """
 def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
     \"\"\"
     Pandas Series method :meth:`pandas.core.strings.StringMethods.{methodname}()` implementation.
-    
+
     Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
 
     .. only:: developer
