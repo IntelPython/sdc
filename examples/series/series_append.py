@@ -26,23 +26,24 @@
 
 """
 Expect Series
-0      3.000000
-1    -10.000000
-2           nan
-3      0.000000
-4     92.000000
+0      one
+1      two
+2    three
+0     four
+1     five
+2      six
 dtype: object
 """
-import numpy as np
 import pandas as pd
 from numba import njit
 
 
 @njit
-def series_astype():
-    series = pd.Series([3, -10, np.nan, 0, 92])
+def series_append():
+    s1 = pd.Series(['one', 'two', 'three'])
+    s2 = pd.Series(['four', 'five', 'six'])
 
-    return series.astype(str)
+    return s1.append(s2)
 
 
-print(series_astype())
+print(series_append())

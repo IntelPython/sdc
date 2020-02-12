@@ -168,3 +168,17 @@ def find_common_dtype_from_numpy_dtypes(array_types, scalar_types):
     numba_common_dtype = numpy_support.from_dtype(np_common_dtype)
 
     return numba_common_dtype
+
+
+def gen_df_impl_generator(codegen, impl_name):
+    """Generate generator of df methods"""
+    def _df_impl_generator(self, idx):
+        func_text, global_vars = codegen(self, idx)
+
+        loc_vars = {}
+        exec(func_text, global_vars, loc_vars)
+        _impl = loc_vars[impl_name]
+
+        return _impl
+
+    return _df_impl_generator

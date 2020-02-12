@@ -26,23 +26,19 @@
 
 """
 Expect Series
-0      3.000000
-1    -10.000000
-2           nan
-3      0.000000
-4     92.000000
-dtype: object
+a    210.0
+b    185.0
+dtype: float64
 """
-import numpy as np
 import pandas as pd
 from numba import njit
 
 
 @njit
-def series_astype():
-    series = pd.Series([3, -10, np.nan, 0, 92])
+def series_groupby():
+    s = pd.Series([390., 350., 30., 20.]).mean()
 
-    return series.astype(str)
+    return s.groupby(["a", "b", "a", "b"])
 
 
-print(series_astype())
+# print(series_groupby())

@@ -99,6 +99,40 @@ cases = [
         CE(type_='Numba', code='data.astype(np.int64)', jitted=True),
         CE(type_='SDC', code='sdc.functions.numpy_like.astype(data, np.int64)', jitted=True),
     ], usecase_params='data'),
+    TC(name='copy', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.copy(data)', jitted=False),
+        CE(type_='Numba', code='np.copy(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.copy(data)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='isnan', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.isnan(data)', jitted=False),
+        CE(type_='Numba', code='np.isnan(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.isnan(data)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='nansum', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.nansum(data)', jitted=False),
+        CE(type_='SDC', code='sdc.functions.numpy_like.nansum(data)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='nanprod', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.nanprod(data)', jitted=False),
+        CE(type_='Numba', code='np.nanprod(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.nanprod(data)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='sum', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.sum(data)', jitted=False),
+        CE(type_='Numba', code='np.sum(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.sum(data)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='nanmin', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.nanmin(data)', jitted=False),
+        CE(type_='Numba', code='np.nanmin(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.nanmin(data)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='nanmax', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.nanmax(data)', jitted=False),
+        CE(type_='Numba', code='np.nanmax(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.nanmax(data)', jitted=True),
+    ], usecase_params='data'),
 ]
 
 generate_test_cases(cases, TestFunctions, 'function')
