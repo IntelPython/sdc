@@ -328,24 +328,57 @@ def sdc_fillna_overload(self, inplace=False, value=None):
     .. only:: developer
        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k fillna
     """
-
-    if not isinstance(self, types.Array):
+    if not isinstance(self, (types.Array, StringArrayType)):
         return None
-    print("PRIVET")
+
     dtype = self.dtype
     isnan = get_isnan(dtype)
     if ((isinstance(inplace, types.Literal) and inplace.literal_value == True)
         or (isinstance(inplace, bool) and inplace == True)):
-        def sdc_fillna_inplace_impl(self, inplace=False, value=None):
+        if isinstance(dtype, (types.Integer, types.Boolean)):
+            def sdc_fillna_inplace_int_impl(self, inplace=False, value=None):
+                return None
+
+            return sdc_fillna_inplace_int_impl
+
+        def sdc_fillna_inplace_float_impl(self, inplace=False, value=None):
             length = len(self)
             for i in prange(length):
                 if isnan(self[i]):
                     self[i] = value
             return None
 
-        return sdc_fillna_inplace_impl
+        return sdc_fillna_inplace_float_impl
 
     else:
+        if isinstance(self.dtype, types.UnicodeType):
+            def sdc_fillna_str_impl(self, inplace=False, value=None):
+                n = len(self)
+                num_chars = 0
+                # get total chars in new array
+                for i in prange(n):
+                    s = self[i]
+                    if sdc.hiframes.api.isna(self, i):
+                        num_chars += len(value)
+                    else:
+                        num_chars += len(s)
+
+                filled_data = pre_alloc_string_array(n, num_chars)
+                for i in prange(n):
+                    if sdc.hiframes.api.isna(self, i):
+                        filled_data[i] = value
+                    else:
+                        filled_data[i] = self[i]
+                return filled_data
+
+            return sdc_fillna_str_impl
+
+        if isinstance(dtype, (types.Integer, types.Boolean)):
+            def sdc_fillna_int_impl(self, inplace=False, value=None):
+                return copy(self)
+
+            return sdc_fillna_int_impl
+
         def sdc_fillna_impl(self, inplace=False, value=None):
             length = len(self)
             filled_data = numpy.empty(length, dtype=dtype)
