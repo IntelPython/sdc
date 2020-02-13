@@ -2590,22 +2590,20 @@ class TestSeries(
                     result = hpat_func(S).sort_index()
                     pd.testing.assert_series_equal(result, result_ref)
 
-    @skip_sdc_jit
+    @skip_sdc_jit('Fails to compile with latest Numba')
     def test_series_value_counts_boolean(self):
         def test_impl(S):
-            return S.value_counts(sort=True)
+            return S.value_counts()
 
-        input_data = [[True, False, True, True, False]]
+        input_data = [True, False, True, True, False]
 
-        hpat_func = self.jit(test_impl)
+        sdc_func = self.jit(test_impl)
 
-        for data_to_test in input_data:
-            with self.subTest(series_data=data_to_test):
-                S = pd.Series(data_to_test)
-                # use sort_index() due to possible different order of values with the same counts in results
-                result_ref = test_impl(S).sort_index()
-                result = hpat_func(S).sort_index()
-                pd.testing.assert_series_equal(result, result_ref)
+        S = pd.Series(input_data)
+        # use sort_index() due to possible different order of values with the same counts in results
+        result_ref = test_impl(S).sort_index()
+        result = sdc_func(S).sort_index()
+        pd.testing.assert_series_equal(result, result_ref)
 
     @skip_sdc_jit('Bug in old-style value_counts implementation for ascending param support')
     def test_series_value_counts_sort(self):
