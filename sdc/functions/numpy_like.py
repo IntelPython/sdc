@@ -333,8 +333,10 @@ def sdc_fillna_overload(self, inplace=False, value=None):
 
     dtype = self.dtype
     isnan = get_isnan(dtype)
-    if ((isinstance(inplace, types.Literal) and inplace.literal_value == True)
-        or (isinstance(inplace, bool) and inplace == True)):
+    if (
+        (isinstance(inplace, types.Literal) and inplace.literal_value == True) or  # noqa
+        (isinstance(inplace, bool) and inplace == True)  # noqa
+    ):
         if isinstance(dtype, (types.Integer, types.Boolean)):
             def sdc_fillna_inplace_int_impl(self, inplace=False, value=None):
                 return None
