@@ -2909,15 +2909,15 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
 
     if isinstance(self.index, types.NoneType) or self.index is None:
         def hpat_pandas_series_take_noindex_impl(self, indices, axis=0, is_copy=False):
-            local_data = [self._data[i] for i in indices]
+            local_data = numpy_like.take(self._data, indices)
 
             return pandas.Series(local_data, indices)
 
         return hpat_pandas_series_take_noindex_impl
 
     def hpat_pandas_series_take_impl(self, indices, axis=0, is_copy=False):
-        local_data = [self._data[i] for i in indices]
-        local_index = [self._index[i] for i in indices]
+        local_data = numpy_like.take(self._data, indices)
+        local_index = numpy_like.take(self._index, indices)
 
         return pandas.Series(local_data, local_index)
 
@@ -3422,7 +3422,7 @@ def hpat_pandas_series_prod(self, axis=None, skipna=None, level=None, numeric_on
             _skipna = skipna
 
         if _skipna:
-            return numpy_like.nanprod(self._data)
+            return numpy.nanprod(self._data)
         else:
             return numpy.prod(self._data)
 

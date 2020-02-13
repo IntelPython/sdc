@@ -68,6 +68,10 @@ def nansum(self):
     pass
 
 
+def take(self, indices):
+    pass
+
+
 @sdc_overload(astype)
 def sdc_astype_overload(self, dtype):
     """
@@ -238,6 +242,40 @@ def sdc_isnan_overload(self):
     ty_checker.raise_exc(dtype, 'int or float', 'self.dtype')
 
 
+@sdc_overload(take)
+def sdc_take_overload(self, indices):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of take.
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k take
+    """
+
+    if not isinstance(self, (types.Array, StringArrayType)):
+        return None
+
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if isinstance(dtype, (types.Number, types.Boolean)):
+        def sdc_take_impl(self, indices):
+            length = len(self)
+            length_res = len(indices)
+            res = numpy.empty(length_res, dtype=dtype)
+            for i in range(length_res):
+                res[i] = self[indices[i]]
+
+            return res
+
+        return sdc_take_impl
+
+    if isinstance(dtype, (types.npytypes.UnicodeCharSeq, types.UnicodeType, types.StringLiteral)):
+        def sdc_take_str_impl(self, indices):
+            return [self[i] for i in indices]
+
+        return sdc_take_str_impl
+
+
 def gen_sum_bool_impl():
     """Generate sum bool implementation."""
     def _sum_bool_impl(self):
@@ -364,32 +402,3 @@ def nan_min_max_overload_factory(reduce_op):
 
 sdc_overload(nanmin)(nan_min_max_overload_factory(min))
 sdc_overload(nanmax)(nan_min_max_overload_factory(max))
-
-
-def nanprod(a):
-    pass
-
-
-@sdc_overload(nanprod)
-def np_nanprod(a):
-    """
-    Reimplemented with parfor from numba.targets.arraymath.
-    """
-    if not isinstance(a, types.Array):
-        return
-    if isinstance(a.dtype, types.Integer):
-        retty = types.intp
-    else:
-        retty = a.dtype
-    one = retty(1)
-    isnan = get_isnan(a.dtype)
-
-    def nanprod_impl(a):
-        c = one
-        for i in prange(len(a)):
-            v = a[i]
-            if not isnan(v):
-                c *= v
-        return c
-
-    return nanprod_impl
