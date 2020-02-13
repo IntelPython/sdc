@@ -1990,7 +1990,15 @@ def hpat_pandas_series_isin(self, values):
     def hpat_pandas_series_isin_impl(self, values):
         # TODO: replace with below line when Numba supports np.isin in nopython mode
         # return pandas.Series(np.isin(self._data, values))
-        return pandas.Series(data=[(x in values) for x in self._data], index=self._index, name=self._name)
+
+        data_len = len(self._data)
+        d = dict(zip(values, numpy.arange(len(values))))
+        res_lst = [False] * data_len
+        result = numpy.array(res_lst)
+        for i in numba.prange(data_len):
+            result[i] = self._data[i] in values
+
+        return pandas.Series(data=result, index=self._index, name=self._name)
 
     return hpat_pandas_series_isin_impl
 
