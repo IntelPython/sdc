@@ -2600,9 +2600,8 @@ class TestSeries(
         sdc_func = self.jit(test_impl)
 
         S = pd.Series(input_data)
-        # use sort_index() due to possible different order of values with the same counts in results
-        result_ref = test_impl(S).sort_index()
-        result = sdc_func(S).sort_index()
+        result_ref = test_impl(S)
+        result = sdc_func(S)
         pd.testing.assert_series_equal(result, result_ref)
 
     @skip_sdc_jit('Bug in old-style value_counts implementation for ascending param support')
