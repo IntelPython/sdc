@@ -39,7 +39,7 @@ If you do not have conda, we recommend using Miniconda3::
     ./miniconda.sh -b
     export PATH=$HOME/miniconda3/bin:$PATH
 
-Intel SDC uses Numba ``ef119bcd1733ff49d71bdf2da8a66e91bb704f83`` commit from master branch as Numba package for build and run.
+Intel SDC uses Numba ``ef119bcd1733ff49d71bdf2da8a66e91bb704f83`` commit (referred later as ``numba_commit``) from master branch for build and run.
 That is why it is required to build specified Numba first. Build steps are described below.
 
 It is possible to build Intel SDC via conda-build or setuptools. Follow one of the
@@ -66,15 +66,15 @@ Building on Linux with setuptools
 
     PYVER=<3.6 or 3.7>
     NUMPYVER=<1.16 or 1.17>
-    conda create -n SDC -q -y -c numba -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER pandas=0.25.3 scipy pyarrow=0.15.1 gcc_linux-64 gxx_linux-64 tbb-devel llvmlite=0.31.0rc1=py*_0
+    conda create -n SDC -q -y -c numba -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER pandas=0.25.3 scipy pyarrow=0.15.1 gcc_linux-64 gxx_linux-64 tbb-devel llvmlite=0.31.0
     source activate SDC
     # Build Numba
     git clone https://github.com/numba/numba.git
     cd numba
-    git checkout ef119bcd1733ff49d71bdf2da8a66e91bb704f83
+    git checkout numba_commit
     python setup.py install
     # build SDC
-    cd ../
+    cd ..
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
     python setup.py install
@@ -114,14 +114,14 @@ Building on Windows with setuptools
 
     set PYVER=<3.6 or 3.7>
     set NUMPYVER=<1.16 or 1.17>
-    conda create -n SDC -c numba -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% pandas=0.25.3 scipy pyarrow=0.15.1 tbb-devel llvmlite=0.31.0rc1=py*_0
+    conda create -n SDC -c numba -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% pandas=0.25.3 scipy pyarrow=0.15.1 tbb-devel llvmlite=0.31.0
     conda activate SDC
     set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
     set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
     # Build Numba
     git clone https://github.com/numba/numba.git
     cd numba
-    git checkout ef119bcd1733ff49d71bdf2da8a66e91bb704f83
+    git checkout numba_commit
     python setup.py install
     # Build Intel SDC
     cd ..
