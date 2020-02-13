@@ -59,6 +59,13 @@ test_global_input_data_float64 = [
 ]
 
 
+test_global_input_data_float64_without_nan_inf = [
+    [1., -1., 0.1, min_float64, max_float64, max_float64, min_float64, -0.1],
+    [1., -1., 0., min_float64, max_float64, max_float64, min_float64],
+    [1., -1., 0.],
+]
+
+
 def gen_int_df_index(length):
     """Generate random integer index for DataFrame"""
     arr = np.arange(length)
