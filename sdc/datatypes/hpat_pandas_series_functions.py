@@ -1369,7 +1369,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
 
         return hpat_pandas_series_value_counts_str_impl
 
-    elif isinstance(self.dtype, types.Number):
+    elif isinstance(self.dtype, (types.Number, types.Boolean)):
 
         series_dtype = self.dtype
         def hpat_pandas_series_value_counts_number_impl(

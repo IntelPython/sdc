@@ -2590,6 +2590,23 @@ class TestSeries(
                     result = hpat_func(S).sort_index()
                     pd.testing.assert_series_equal(result, result_ref)
 
+    @skip_sdc_jit
+    def test_series_value_counts_boolean(self):
+        def test_impl(S):
+            return S.value_counts(sort=True)
+
+        input_data = [[True, False, True, True, False]]
+
+        hpat_func = self.jit(test_impl)
+
+        for data_to_test in input_data:
+            with self.subTest(series_data=data_to_test):
+                S = pd.Series(data_to_test)
+                # use sort_index() due to possible different order of values with the same counts in results
+                result_ref = test_impl(S).sort_index()
+                result = hpat_func(S).sort_index()
+                pd.testing.assert_series_equal(result, result_ref)
+
     @skip_sdc_jit('Bug in old-style value_counts implementation for ascending param support')
     def test_series_value_counts_sort(self):
         def test_impl(S, value):
