@@ -137,7 +137,7 @@ class TestDFRollingMethods(TestBase):
         full_input_data_length = sum(len(i) for i in input_data)
         for data_length in self.total_data_length[name]:
             base = {
-                'test_name': f'DF.rolling.{name}',
+                'test_name': f'DataFrame.rolling.{name}',
                 'data_size': data_length,
             }
             data = perf_data_gen_fixed_len(input_data, full_input_data_length,
