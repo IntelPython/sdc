@@ -1,5 +1,5 @@
 import time
-import numpy
+import numpy as np
 from typing import NamedTuple
 from sdc.io.csv_ext import to_varname
 from sdc.tests.test_utils import *
