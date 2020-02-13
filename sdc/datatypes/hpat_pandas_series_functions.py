@@ -3423,7 +3423,7 @@ def hpat_pandas_series_prod(self, axis=None, skipna=None, level=None, numeric_on
             _skipna = skipna
 
         if _skipna:
-            return numpy.nanprod(self._data)
+            return numpy_like.nanprod(self._data)
         else:
             return numpy.prod(self._data)
 

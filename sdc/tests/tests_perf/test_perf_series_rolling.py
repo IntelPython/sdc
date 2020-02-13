@@ -84,7 +84,7 @@ class TestSeriesRollingMethods(TestBase):
 
 
 cases = [
-    TC(name='apply', size=[10 ** 7], params='func=lambda x: numpy.nan if len(x) == 0 else x.mean()'),
+    TC(name='apply', size=[10 ** 7], params='func=lambda x: numpy.nan if len(x) == 0 else x.mean()', skip=True),
     TC(name='corr', size=[10 ** 7]),
     TC(name='count', size=[10 ** 7]),
     TC(name='cov', size=[10 ** 7]),
