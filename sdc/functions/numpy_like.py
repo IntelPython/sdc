@@ -33,10 +33,12 @@
 
 import numba
 import numpy
+import pandas
 
 from numba import types, jit, prange, numpy_support, literally
 from numba.errors import TypingError
 from numba.targets.arraymath import get_isnan
+from typing import NamedTuple
 
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
@@ -412,7 +414,7 @@ def get_chunks(size, pool_size=0):
 
     chunk_size = size//pool_size + 1
 
-    Chunk = namedtuple('start', 'stop')
+    Chunk = NamedTuple('start', 'stop')
 
     chunks = []
 
@@ -423,9 +425,13 @@ def get_chunks(size, pool_size=0):
 
     return chunks
 
+class Chunk(NamedTuple):
+    start: int
+    stop: int
+
 @sdc_overload(get_chunks)
 def get_chunks_overload(size, pool_size=0):
-    Chunk = namedtuple('Chunk', ['start', 'stop'])
+    # Chunk = NamedTuple('Chunk', ['start', 'stop'])
 
     def get_chunks_impl(size, pool_size=0):
         if pool_size == 0:
@@ -445,35 +451,47 @@ def get_chunks_overload(size, pool_size=0):
 
     return get_chunks_impl
 
-def dropna(arr):
+def dropna(arr, idx, name):
     pass
 
 @sdc_overload(dropna)
-def dropna_overload(arr):
+def dropna_overload(arr, idx, name):
     dtype = arr.dtype
+    dtype_idx = idx.dtype
     isnan = get_isnan(dtype)
-    def dropna_impl(arr):
+    def dropna_impl(arr, idx, name):
         chunks = get_chunks(len(arr))
-        # partial_sum = numpy.zeros(len(chunks), dtype=arr.dtype)
-        # result = numpy.empty_like(arr)
+        arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
+        length = 0
 
         for i in prange(len(chunks)):
             chunk = chunks[i]
-            length = chunk.stop - chunk.start
-            # res = numpy.empty(shape=length, dtype=dtype)
-            # partial = 0
+            res = 0
             for j in range(chunk.start, chunk.stop):
-                partial += arr[j]
-                result[j] = partial
+                if not isnan(arr[j]):
+                    res += 1
+            length += res
+            arr_len[i] = res
 
-            partial_sum[i] = partial
-
+        result_data = numpy.empty(shape=length, dtype=dtype)
+        result_index = numpy.empty(shape=length, dtype=dtype_idx)
         for i in prange(len(chunks)):
-            prefix = sum(partial_sum[0:i])
             chunk = chunks[i]
+            if i == 0:
+                new_start = 0
+                new_stop = arr_len[0]
+            else:
+                for x in range(i):
+                    new_start += arr_len[x]
+                new_stop = new_start + arr_len[i]
+
             for j in range(chunk.start, chunk.stop):
-                result[j] += prefix
+                if new_start < new_stop:
+                    if not isnan(arr[j]):
+                        result_data[new_start] = arr[j]
+                        result_index[new_start] = idx[j]
+                        new_start += 1
 
-        return result
+        return pandas.Series(result_data, result_index, name)
 
-    return cumsum_impl
+    return dropna_impl
