@@ -69,9 +69,6 @@ class TestFunctions(TestBase):
         if input_data is None:
             input_data = test_global_input_data_float64
 
-        if input_data is None:
-            input_data = test_global_input_data_float64
-
         for data_length in total_data_length:
             base = {
                 "test_name": test_name,
