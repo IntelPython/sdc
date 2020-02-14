@@ -398,7 +398,10 @@ def np_nanprod(a):
 
 
 def get_pool_size():
-    return numba.config.NUMBA_NUM_THREADS
+    if sdc.config.config_use_parallel_overloads:
+        return numba.config.NUMBA_NUM_THREADS
+    else:
+        return 1
 
 @sdc_overload(get_pool_size)
 def get_pool_size_overload():
