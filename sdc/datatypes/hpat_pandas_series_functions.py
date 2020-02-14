@@ -1992,7 +1992,7 @@ def hpat_pandas_series_isin(self, values):
         # return pandas.Series(np.isin(self._data, values))
 
         data_len = len(self._data)
-        result = numpy.array([False] * data_len)
+        result = numpy.empty(data_len, dtype=numpy.bool_)
         for i in numba.prange(data_len):
             result[i] = self._data[i] in values
 
