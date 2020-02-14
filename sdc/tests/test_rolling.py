@@ -1331,6 +1331,27 @@ class TestRolling(TestCase):
         series = pd.Series([1., -1., 0., 0.1, -0.1])
         self._test_rolling_corr_unsupported_types(series)
 
+    @skip_sdc_jit('Series.rolling.corr() unsupported Series index')
+    @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2377
+    def test_series_rolling_corr_index(self):
+        def test_impl(S1, S2):
+            return S1.rolling(window=3).corr(S2)
+
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        np.random.seed(0)
+        index_values = np.arange(n)
+
+        np.random.shuffle(index_values)
+        S1 = pd.Series(np.arange(n), index=index_values, name='A')
+        np.random.shuffle(index_values)
+        S2 = pd.Series(2 * np.arange(n) - 5, index=index_values, name='B')
+
+        result = hpat_func(S1, S2)
+        result_ref = test_impl(S1, S2)
+        pd.testing.assert_series_equal(result, result_ref)
+
     @skip_sdc_jit('Series.rolling.count() unsupported Series index')
     def test_series_rolling_count(self):
         all_data = test_global_input_data_float64

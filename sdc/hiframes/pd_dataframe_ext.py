@@ -61,11 +61,12 @@ class DataFrameAttribute(AttributeTemplate):
     def resolve_loc(self, ary):
         return DataFrameLocType(ary)
 
-    def resolve_values(self, ary):
-        # using np.stack(data, 1) for both typing and implementation
-        stack_sig = self.context.resolve_function_type(
-            np.stack, (types.Tuple(ary.data), types.IntegerLiteral(1)), {})
-        return stack_sig.return_type
+    if sdc.config.config_pipeline_hpat_default:
+        def resolve_values(self, ary):
+            # using np.stack(data, 1) for both typing and implementation
+            stack_sig = self.context.resolve_function_type(
+                np.stack, (types.Tuple(ary.data), types.IntegerLiteral(1)), {})
+            return stack_sig.return_type
 
     @bound_function("df.apply")
     def resolve_apply(self, df, args, kws):
@@ -342,24 +343,24 @@ def df_len_overload(df):
     return lambda df: len(df._data[0])
 
 
-@overload(operator.getitem)  # TODO: avoid lowering?
-def df_getitem_overload(df, ind):
-    if isinstance(df, DataFrameType) and isinstance(ind, types.StringLiteral):
-        index = df.columns.index(ind.literal_value)
-        return lambda df, ind: sdc.hiframes.api.init_series(df._data[index])
+if sdc.config.config_pipeline_hpat_default:
+    @overload(operator.getitem)  # TODO: avoid lowering?
+    def df_getitem_overload(df, ind):
+        if isinstance(df, DataFrameType) and isinstance(ind, types.StringLiteral):
+            index = df.columns.index(ind.literal_value)
+            return lambda df, ind: sdc.hiframes.api.init_series(df._data[index])
 
+    @infer_global(operator.getitem)
+    class GetItemDataFrame(AbstractTemplate):
+        key = operator.getitem
 
-@infer_global(operator.getitem)
-class GetItemDataFrame(AbstractTemplate):
-    key = operator.getitem
-
-    def generic(self, args, kws):
-        df, idx = args
-        # df1 = df[df.A > .5]
-        if (isinstance(df, DataFrameType)
-                and isinstance(idx, (SeriesType, types.Array))
-                and idx.dtype == types.bool_):
-            return signature(df, *args)
+        def generic(self, args, kws):
+            df, idx = args
+            # df1 = df[df.A > .5]
+            if (isinstance(df, DataFrameType)
+                    and isinstance(idx, (SeriesType, types.Array))
+                    and idx.dtype == types.bool_):
+                return signature(df, *args)
 
 
 @infer
