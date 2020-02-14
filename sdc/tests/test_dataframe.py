@@ -1367,6 +1367,15 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
+    def test_df_getitem_attr(self):
+        def test_impl(df):
+            return df.A
+
+        sdc_func = self.jit(test_impl)
+        df = gen_df(test_global_input_data_float64)
+
+        pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
+
     @skip_numba_jit
     def test_isin_df1(self):
         def test_impl(df, df2):
