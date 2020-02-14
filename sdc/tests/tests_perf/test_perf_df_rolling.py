@@ -117,8 +117,7 @@ class TestDFRollingMethods(TestBase):
 
     def _gen_df(self, data, columns_num=10):
         """Generate DataFrame based on input data"""
-        return pandas.DataFrame(
-            {col: data for col in string.ascii_uppercase[:columns_num]})
+        return pandas.DataFrame({col: data for col in string.ascii_uppercase[:columns_num]})
 
     def _test_case(self, pyfunc, name,
                    input_data=test_global_input_data_float64,
@@ -137,7 +136,7 @@ class TestDFRollingMethods(TestBase):
         full_input_data_length = sum(len(i) for i in input_data)
         for data_length in self.total_data_length[name]:
             base = {
-                'test_name': f'DF.rolling.{name}',
+                'test_name': f'DataFrame.rolling.{name}',
                 'data_size': data_length,
             }
             data = perf_data_gen_fixed_len(input_data, full_input_data_length,
@@ -180,6 +179,10 @@ class TestDFRollingMethods(TestBase):
 
     def test_df_rolling_count(self):
         self._test_df_rolling_method('count')
+
+    def test_df_rolling_cov(self):
+        self._test_df_rolling_method('cov', extra_usecase_params='other',
+                                     method_params='other=other')
 
     def test_df_rolling_kurt(self):
         self._test_df_rolling_method('kurt')
