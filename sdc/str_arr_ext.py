@@ -674,7 +674,7 @@ def impl_string_array_single(context, builder, sig, args):
     arg = args[0]
     if isinstance(arg, (types.UniTuple, types.List)):
         assert (arg.dtype == string_type
-                or (isinstance(arg.dtype, types.optional) and arg.type == string_type))
+                or (isinstance(arg.dtype, types.Optional) and arg.dtype.type == string_type))
 
     # FIXME: doesn't work for Tuple with None values
     if isinstance(arg, types.Tuple):

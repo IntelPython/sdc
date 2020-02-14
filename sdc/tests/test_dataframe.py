@@ -49,7 +49,6 @@ from sdc.tests.test_utils import (check_numba_version,
                                   skip_numba_jit,
                                   skip_sdc_jit,
                                   test_global_input_data_float64,)
-from sdc.hiframes.api import get_nan_mask
 
 
 @sdc.jit
