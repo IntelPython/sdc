@@ -28,6 +28,16 @@ def gen_data(data_num, data_length, input_data):
     return data
 
 
+def gen_numpy_arr(data_num, data_length, input_data):
+    all_data = gen_data(data_num, data_length, input_data)
+    results = []
+    for data in all_data:
+        test_data = np.array(data)
+        results.append(test_data)
+
+    return results
+
+
 def gen_series_str(data_num, data_length, input_data, data_width):
     all_data = gen_str_data(data_num, data_length, input_data, data_width)
     results = []

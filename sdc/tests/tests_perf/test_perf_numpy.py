@@ -40,6 +40,7 @@ from .generator import generate_test_cases
 from .generator import TestCase as TC
 from .generator import CallExpression as CE
 from sdc.functions import numpy_like
+from .data_generator import gen_numpy_arr
 
 
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_numpy.TestFunctions.test_function_{name}
@@ -68,21 +69,16 @@ class TestFunctions(TestBase):
         if input_data is None:
             input_data = test_global_input_data_float64
 
-        full_input_data_length = sum(len(i) for i in input_data)
+        if input_data is None:
+            input_data = test_global_input_data_float64
+
         for data_length in total_data_length:
             base = {
                 "test_name": test_name,
                 "data_size": data_length,
             }
-            data = perf_data_gen_fixed_len(input_data, full_input_data_length,
-                                           data_length)
-            test_data = np.array(data)
 
-            args = [test_data]
-            for i in range(data_num - 1):
-                np.random.seed(i)
-                extra_data = np.random.ranf(data_length)
-                args.append(np.array(extra_data))
+            args = gen_numpy_arr(data_num, data_length, input_data)
 
             for case in cases:
                 record = base.copy()
