@@ -108,6 +108,26 @@ cases = [
         CE(type_='Numba', code='np.copy(data)', jitted=True),
         CE(type_='SDC', code='sdc.functions.numpy_like.copy(data)', jitted=True),
     ], usecase_params='data'),
+    TC(name='cumsum', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.cumsum(data)', jitted=False),
+        CE(type_='Numba', code='np.cumsum(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.cumsum(data)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='nancumsum', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.nancumsum(data)', jitted=False),
+        CE(type_='Numba', code='np.nancumsum(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.nancumsum(data)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='cumprod', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.cumprod(data)', jitted=False),
+        CE(type_='Numba', code='np.cumprod(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.cumprod(data)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='nancumprod', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.nancumprod(data)', jitted=False),
+        CE(type_='Numba', code='np.nancumprod(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.nancumprod(data)', jitted=True),
+    ], usecase_params='data'),
     TC(name='isnan', size=[10 ** 7], call_expr=[
         CE(type_='Python', code='np.isnan(data)', jitted=False),
         CE(type_='Numba', code='np.isnan(data)', jitted=True),

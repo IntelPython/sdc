@@ -31,6 +31,8 @@
 
 """
 
+from collections import namedtuple
+
 import numba
 import numpy
 import sys
@@ -802,3 +804,192 @@ def np_nanvar(a):
         return np.divide(ssd, count)
 
     return nanvar_impl
+
+
+def nancumprod(a):
+    pass
+
+
+@sdc_overload(nancumprod)
+def np_nancumprod(a):
+    if not isinstance(a, types.Array):
+        return
+
+    if isinstance(a.dtype, (types.Boolean, types.Integer)):
+        # dtype cannot possibly contain NaN
+        return lambda a: cumprod(a)
+    else:
+        retty = a.dtype
+        is_nan = get_isnan(retty)
+        one = retty(1)
+
+        def nancumprod_impl(a):
+            out = np.empty(a.size, retty)
+            c = one
+            for idx, v in enumerate(a.flat):
+                if ~is_nan(v):
+                    c *= v
+                out[idx] = c
+            return out
+
+        return nancumprod_impl
+
+
+def cumprod(a):
+    pass
+
+
+@sdc_overload(cumprod)
+def np_cumprod(arr):
+    if not isinstance(arr, types.Array):
+        return
+
+    dtype = arr.dtype
+
+    def array_cumprod_impl(arr):
+        out = np.empty(arr.size, dtype)
+        c = 1
+        for idx, v in enumerate(arr.flat):
+            c *= v
+            out[idx] = c
+        return out
+
+    return array_cumprod_impl
+
+
+def cumsum(a):
+    pass
+
+
+def nancumsum(a):
+    pass
+
+
+def get_pool_size():
+    return numba.config.NUMBA_NUM_THREADS
+
+
+@sdc_overload(get_pool_size)
+def get_pool_size_overload():
+    pool_size = get_pool_size()
+
+    def get_pool_size_impl():
+        return pool_size
+
+    return get_pool_size_impl
+
+
+def get_chunks(size, pool_size=0):
+    if pool_size == 0:
+        pool_size = get_pool_size()
+
+    chunk_size = size//pool_size + 1
+
+    Chunk = namedtuple('start', 'stop')
+
+    chunks = []
+
+    for i in range(pool_size):
+        start = min(i*chunk_size, size)
+        stop = min((i + 1)*chunk_size, size)
+        chunks.append(Chunk(start, stop))
+
+    return chunks
+
+
+@sdc_overload(get_chunks)
+def get_chunks_overload(size, pool_size=0):
+    Chunk = namedtuple('Chunk', ['start', 'stop'])
+
+    def get_chunks_impl(size, pool_size=0):
+        if pool_size == 0:
+            pool_size = get_pool_size()
+
+        chunk_size = size//pool_size + 1
+
+        chunks = []
+
+        for i in range(pool_size):
+            start = min(i*chunk_size, size)
+            stop = min((i + 1)*chunk_size, size)
+            chunk = Chunk(start, stop)
+            chunks.append(chunk)
+
+        return chunks
+
+    return get_chunks_impl
+
+
+@sdc_overload(cumsum)
+def np_cumsum(arr):
+    if not isinstance(arr, types.Array):
+        return
+
+    retty = arr.dtype
+    zero = retty(0)
+
+    def cumsum_impl(arr):
+        chunks = get_chunks(len(arr))
+        partial_sum = numpy.zeros(len(chunks), dtype=retty)
+        result = numpy.empty_like(arr)
+
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            partial = zero
+            for j in range(chunk.start, chunk.stop):
+                result[j] = partial + arr[j]
+                partial = result[j]
+            partial_sum[i] = partial
+
+        for i in prange(len(chunks)):
+            prefix = sum(partial_sum[0:i])
+            chunk = chunks[i]
+            for j in range(chunk.start, chunk.stop):
+                result[j] += prefix
+
+        return result
+
+    return cumsum_impl
+
+
+@sdc_overload(nancumsum)
+def np_nancumsum(arr, like_pandas=False):
+    if not isinstance(arr, types.Array):
+        return
+
+    if isinstance(arr.dtype, (types.Boolean, types.Integer)):
+        # dtype cannot possibly contain NaN
+        return lambda arr, like_pandas=False: cumsum(arr)
+    else:
+        retty = arr.dtype
+        is_nan = get_isnan(retty)
+        zero = retty(0)
+
+        def nancumsum_impl(arr, like_pandas=False):
+            chunks = get_chunks(len(arr))
+            partial_sum = numpy.zeros(len(chunks), dtype=retty)
+            result = numpy.empty_like(arr)
+
+            for i in prange(len(chunks)):
+                chunk = chunks[i]
+                partial = zero
+                for j in range(chunk.start, chunk.stop):
+                    if like_pandas:
+                        result[j] = partial + arr[j]
+                        if ~is_nan(result[j]):
+                            partial = result[j]
+                    else:
+                        if ~is_nan(arr[j]):
+                            partial += arr[j]
+                        result[j] = partial
+                partial_sum[i] = partial
+
+            for i in prange(len(chunks)):
+                prefix = sum(partial_sum[0:i])
+                chunk = chunks[i]
+                for j in range(chunk.start, chunk.stop):
+                    result[j] += prefix
+
+            return result
+
+        return nancumsum_impl
