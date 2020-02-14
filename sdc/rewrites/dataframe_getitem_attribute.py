@@ -44,6 +44,7 @@ if not config_pipeline_hpat_default:
         """
 
         def match(self, func_ir, block, typemap, calltypes):
+            self.func_ir = func_ir
             self.block = block
             self.typemap = typemap
             self.calltypes = calltypes
@@ -61,27 +62,36 @@ if not config_pipeline_hpat_default:
             new_block = self.block.copy()
             new_block.clear()
             for inst in self.block.body:
-                if isinstance(inst, Assign):
-                    expr = inst.value
-                    if expr in self.getattrs:
-                        const_assign = self._assign_const(inst)
-                        new_block.append(const_assign)
+                if isinstance(inst, Assign) and inst.value in self.getattrs:
+                    const_assign = self._assign_const(inst)
+                    new_block.append(const_assign)
 
-                        new_expr = Expr.getitem(expr.value, const_assign.target, inst.loc)
-                        self.calltypes[new_expr] = signature(
-                            self.typemap[inst.target.name],
-                            self.typemap[expr.value.name],
-                            self.typemap[new_expr.index.name]
-                        )
-                        inst = Assign(value=new_expr, target=inst.target, loc=inst.loc)
+                    inst = self._assign_getitem(inst, index=const_assign.target)
+
                 new_block.append(inst)
 
             return new_block
 
         def _assign_const(self, inst, prefix='$const0'):
-            """Create constant from attribute of specified instruction."""
+            """Create constant from attribute of the instruction."""
             const_node = Const(inst.value.attr, inst.loc)
             const_var = Var(inst.target.scope, mk_unique_var(prefix), inst.loc)
+
+            self.func_ir._definitions[const_var.name] = [const_node]
             self.typemap[const_var.name] = StringLiteral(inst.value.attr)
 
             return Assign(const_node, const_var, inst.loc)
+
+        def _assign_getitem(self, inst, index):
+            """Create getitem instruction from the getattr instruction."""
+            new_expr = Expr.getitem(inst.value.value, index, inst.loc)
+            new_inst = Assign(value=new_expr, target=inst.target, loc=inst.loc)
+
+            self.func_ir._definitions[inst.target] = [new_expr]
+            self.calltypes[new_expr] = signature(
+                self.typemap[inst.target.name],
+                self.typemap[new_expr.value.name],
+                self.typemap[new_expr.index.name]
+            )
+
+            return new_inst
