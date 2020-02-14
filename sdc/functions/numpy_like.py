@@ -364,3 +364,32 @@ def nan_min_max_overload_factory(reduce_op):
 
 sdc_overload(nanmin)(nan_min_max_overload_factory(min))
 sdc_overload(nanmax)(nan_min_max_overload_factory(max))
+
+
+def nanprod(a):
+    pass
+
+
+@sdc_overload(nanprod)
+def np_nanprod(a):
+    """
+    Reimplemented with parfor from numba.targets.arraymath.
+    """
+    if not isinstance(a, types.Array):
+        return
+    if isinstance(a.dtype, types.Integer):
+        retty = types.intp
+    else:
+        retty = a.dtype
+    one = retty(1)
+    isnan = get_isnan(a.dtype)
+
+    def nanprod_impl(a):
+        c = one
+        for i in prange(len(a)):
+            v = a[i]
+            if not isnan(v):
+                c *= v
+        return c
+
+    return nanprod_impl

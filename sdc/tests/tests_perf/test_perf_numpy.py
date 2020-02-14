@@ -113,6 +113,11 @@ cases = [
         CE(type_='Python', code='np.nansum(data)', jitted=False),
         CE(type_='SDC', code='sdc.functions.numpy_like.nansum(data)', jitted=True),
     ], usecase_params='data'),
+    TC(name='nanprod', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.nanprod(data)', jitted=False),
+        CE(type_='Numba', code='np.nanprod(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.nanprod(data)', jitted=True),
+    ], usecase_params='data'),
     TC(name='sum', size=[10 ** 7], call_expr=[
         CE(type_='Python', code='np.sum(data)', jitted=False),
         CE(type_='Numba', code='np.sum(data)', jitted=True),
