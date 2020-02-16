@@ -95,6 +95,10 @@ cases = [
         CE(type_='Numba', code='np.isnan(data)', jitted=True),
         CE(type_='SDC', code='sdc.functions.numpy_like.isnan(data)', jitted=True),
     ], usecase_params='data'),
+    TC(name='mean', size=[10 ** 8], call_expr=[
+        CE(type_='Python', code='np.mean(data)', jitted=False),
+        CE(type_='Numba', code='np.mean(data)', jitted=True),
+    ], usecase_params='data'),
     TC(name='nansum', size=[10 ** 7], call_expr=[
         CE(type_='Python', code='np.nansum(data)', jitted=False),
         CE(type_='SDC', code='sdc.functions.numpy_like.nansum(data)', jitted=True),
