@@ -215,12 +215,6 @@ def arr_std(arr, ddof):
 
 
 @sdc_register_jitable
-def arr_sum(arr):
-    """Calculate sum of values"""
-    return arr.sum()
-
-
-@sdc_register_jitable
 def arr_var(arr, ddof):
     """Calculate unbiased variance of values"""
     length = len(arr)
@@ -308,8 +302,6 @@ hpat_pandas_rolling_series_skew_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_skew))
 hpat_pandas_rolling_series_std_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_std))
-hpat_pandas_rolling_series_sum_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_sum))
 hpat_pandas_rolling_series_var_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_var))
 
@@ -625,7 +617,55 @@ def hpat_pandas_series_rolling_sum(self):
     ty_checker = TypeChecker('Method rolling.sum().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_sum_impl
+    def _sdc_pandas_series_rolling_sum_impl(self):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        nfinite = 0
+        current_result = 0.
+        boundary = min(win, length)
+        for i in range(boundary):
+            value = input_arr[i]
+            if numpy.isfinite(value):
+                nfinite += 1
+                current_result += value
+
+            if nfinite < minp:
+                output_arr[i] = numpy.nan
+            else:
+                output_arr[i] = current_result
+
+        start_indices = range(length - boundary)
+        end_indices = range(boundary, length)
+        for start_idx, end_idx in zip(start_indices, end_indices):
+            if start_idx == end_idx:
+                # case when window == 0
+                output_arr[end_idx] = current_result
+                continue
+
+            first_val = input_arr[start_idx]
+            last_val = input_arr[end_idx]
+
+            if numpy.isfinite(first_val):
+                nfinite -= 1
+                current_result -= first_val
+            if numpy.isfinite(last_val):
+                nfinite += 1
+                current_result += last_val
+
+            if nfinite < minp:
+                output_arr[end_idx] = numpy.nan
+            else:
+                output_arr[end_idx] = current_result
+
+        return pandas.Series(output_arr, input_series._index, name=input_series._name)
+
+    return _sdc_pandas_series_rolling_sum_impl
 
 
 @sdc_rolling_overload(SeriesRollingType, 'var')
