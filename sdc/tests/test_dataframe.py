@@ -325,7 +325,7 @@ class TestDataFrame(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @skip_numba_jit('iadd unsupported')
+    @skip_numba_jit('np.sum of Series unsupported')
     def test_filter2(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -338,7 +338,7 @@ class TestDataFrame(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @skip_numba_jit('iadd unsupported')
+    @skip_numba_jit('np.sum of Series unsupported')
     def test_filter3(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
