@@ -73,7 +73,6 @@ class TestDataFrame(TestCase):
         B = np.random.ranf(n)
         pd.testing.assert_frame_equal(hpat_func(n, A, B), test_impl(n, A, B))
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_create2(self):
         def test_impl():
             df = pd.DataFrame({'A': [1, 2, 3]})
@@ -82,7 +81,6 @@ class TestDataFrame(TestCase):
 
         self.assertEqual(hpat_func(), test_impl())
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_create3(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n)})
@@ -92,7 +90,6 @@ class TestDataFrame(TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_create_str(self):
         def test_impl():
             df = pd.DataFrame({'A': ['a', 'b', 'c']})
@@ -112,7 +109,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_create_with_series2(self):
         # test creating dataframe from passed series
         def test_impl(A):
@@ -160,7 +156,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_pass_df1(self):
         def test_impl(df):
             return (df.A == 2).sum()
@@ -170,7 +165,6 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df), test_impl(df))
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_pass_df_str(self):
         def test_impl(df):
             return (df.A == 'a').sum()
@@ -230,7 +224,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @unittest.skip("pending df filter support")
+    @skip_sdc_jit("pending df filter support")
     def test_box3(self):
         def test_impl(df):
             df = df[df.A != 'dd']
@@ -319,7 +313,6 @@ class TestDataFrame(TestCase):
             {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @skip_numba_jit
     def test_filter1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -332,7 +325,7 @@ class TestDataFrame(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @skip_numba_jit
+    @skip_numba_jit('iadd unsupported')
     def test_filter2(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -345,7 +338,7 @@ class TestDataFrame(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @skip_numba_jit
+    @skip_numba_jit('iadd unsupported')
     def test_filter3(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -1720,7 +1713,6 @@ class TestDataFrame(TestCase):
                 result = hpat_func(df, periods, method)
                 pd.testing.assert_frame_equal(result, result_ref)
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_list_convert(self):
         def test_impl():
             df = pd.DataFrame({'one': np.array([-1, np.nan, 2.5]),
