@@ -298,8 +298,6 @@ hpat_pandas_rolling_series_kurt_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_kurt))
 hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max))
-hpat_pandas_rolling_series_mean_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_mean))
 hpat_pandas_rolling_series_median_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_median))
 hpat_pandas_rolling_series_min_impl = register_jitable(
@@ -482,7 +480,30 @@ def _gen_hpat_pandas_rolling_series_cov_impl(other, align_finiteness=False):
         bias_adj = count / (count - ddof)
 
         def mean(series):
-            return series.rolling(win, min_periods=minp).mean()
+            # cannot call return series.rolling(win, min_periods=minp).mean()
+            # due to different float rounding in new and old implementations
+            # TODO: fix this during optimizing of covariance
+            input_arr = series._data
+            length = len(input_arr)
+            output_arr = numpy.empty(length, dtype=float64)
+
+            def apply_minp(arr, minp):
+                finite_arr = arr[numpy.isfinite(arr)]
+                if len(finite_arr) < minp:
+                    return numpy.nan
+                else:
+                    return arr_mean(finite_arr)
+
+            boundary = min(win, length)
+            for i in prange(boundary):
+                arr_range = input_arr[:i + 1]
+                output_arr[i] = apply_minp(arr_range, minp)
+
+            for i in prange(boundary, length):
+                arr_range = input_arr[i + 1 - win:i + 1]
+                output_arr[i] = apply_minp(arr_range, minp)
+
+            return pandas.Series(output_arr, series._index, name=series._name)
 
         return (mean(main_aligned * other_aligned) - mean(main_aligned) * mean(other_aligned)) * bias_adj
 
@@ -529,7 +550,65 @@ def hpat_pandas_series_rolling_mean(self):
     ty_checker = TypeChecker('Method rolling.mean().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_mean_impl
+    def _sdc_pandas_series_rolling_mean_impl(self):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        nfinite = 0
+        current_result = numpy.nan
+        boundary = min(win, length)
+        for i in range(boundary):
+            value = input_arr[i]
+            if numpy.isfinite(value):
+                nfinite += 1
+                if numpy.isnan(current_result):
+                    current_result = value / nfinite
+                else:
+                    current_result = ((nfinite - 1) * current_result + value) / nfinite
+
+            if nfinite < minp:
+                output_arr[i] = numpy.nan
+            else:
+                output_arr[i] = current_result
+
+        start_indices = range(length - boundary)
+        end_indices = range(boundary, length)
+        for start_idx, end_idx in zip(start_indices, end_indices):
+            if start_idx == end_idx:
+                # case when window == 0
+                output_arr[end_idx] = current_result
+                continue
+
+            first_val = input_arr[start_idx]
+            last_val = input_arr[end_idx]
+
+            if numpy.isfinite(first_val):
+                nfinite -= 1
+                if nfinite:
+                    current_result = ((nfinite + 1) * current_result - first_val) / nfinite
+                else:
+                    current_result = numpy.nan
+
+            if numpy.isfinite(last_val):
+                nfinite += 1
+                if numpy.isnan(current_result):
+                    current_result = last_val / nfinite
+                else:
+                    current_result = ((nfinite - 1) * current_result + last_val) / nfinite
+
+            if nfinite < minp:
+                output_arr[end_idx] = numpy.nan
+            else:
+                output_arr[end_idx] = current_result
+
+        return pandas.Series(output_arr, input_series._index, name=input_series._name)
+
+    return _sdc_pandas_series_rolling_mean_impl
 
 
 @sdc_rolling_overload(SeriesRollingType, 'median')
