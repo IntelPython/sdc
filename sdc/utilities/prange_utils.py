@@ -78,7 +78,7 @@ def get_chunks_overload(size, pool_size=0):
         if pool_size == 0:
             pool_size = get_pool_size()
 
-        chunk_size = size//pool_size + 1
+        chunk_size = (size - 1)//pool_size + 1
 
         chunks = []
 
