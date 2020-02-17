@@ -48,7 +48,7 @@ class TestSeriesMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_case(self, pyfunc, name, total_data_length, typ, input_data, data_num=1):
+    def _test_case(self, pyfunc, name, total_data_length, input_data, data_num=1):
         test_name = 'Series.{}'.format(name)
 
         for data_length in total_data_length:
@@ -57,7 +57,7 @@ class TestSeriesMethods(TestBase):
                 "data_size": data_length,
             }
 
-            args = gen_series(data_num, data_length, input_data, typ)
+            args = gen_series(data_num, data_length, input_data)
 
             self._test_jit(pyfunc, base, *args)
             self._test_py(pyfunc, base, *args)

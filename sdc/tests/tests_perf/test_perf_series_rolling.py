@@ -57,7 +57,7 @@ class TestSeriesRollingMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_case(self, pyfunc, name, total_data_length, typ, data_num=1,
+    def _test_case(self, pyfunc, name, total_data_length, data_num=1,
                    input_data=test_global_input_data_float64):
         test_name = 'Series.rolling.{}'.format(name)
 
@@ -67,7 +67,7 @@ class TestSeriesRollingMethods(TestBase):
                 "data_size": data_length,
             }
 
-            args = gen_series(data_num, data_length, input_data, typ)
+            args = gen_series(data_num, data_length, input_data)
 
             self._test_jit(pyfunc, base, *args)
             self._test_py(pyfunc, base, *args)

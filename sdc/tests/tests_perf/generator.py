@@ -50,7 +50,7 @@ def generate_test_cases(cases, class_add, typ, prefix=''):
                 test_name_parts = ['test', typ, prefix, test_case.name,
                                    gen_params_wo_data(test_case.data_num, params), typ_input_data]
                 test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
-                setattr(class_add, test_name, gen_test(test_case, prefix, params, typ_input_data, input_data))
+                setattr(class_add, test_name, gen_test(test_case, prefix, params, input_data))
 
 
 def gen_params_wo_data(data_num, params):
@@ -86,7 +86,7 @@ def qualifier_type(input_data):
         return res
 
 
-def gen_test(test_case, prefix, params, typ_input_data, input_data):
+def gen_test(test_case, prefix, params, input_data):
     func_name = 'func'
 
     usecase = gen_usecase(test_case, prefix, params)
@@ -99,8 +99,8 @@ def gen_test(test_case, prefix, params, typ_input_data, input_data):
 
     func_text = f"""
 {skip}def {func_name}(self):
-  self._test_case(usecase, name='{test_name + '_' + typ_input_data}', total_data_length={test_case.size},
-                  data_num={test_case.data_num}, input_data=input_data, typ='{typ_input_data}')
+  self._test_case(usecase, name='{test_name + '_' + qualifier_type(input_data)}', total_data_length={test_case.size},
+                  data_num={test_case.data_num}, input_data=input_data)
 """
 
     loc_vars = {}

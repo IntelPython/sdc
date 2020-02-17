@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from sdc.tests.tests_perf.test_perf_utils import *
+from .generator import qualifier_type
 
 
 def gen_str_data(data_num, data_length, input_data, data_width):
@@ -41,7 +42,8 @@ def gen_series_str(data_num, data_length, input_data, data_width):
     return results
 
 
-def gen_series(data_num, data_length, input_data, typ):
+def gen_series(data_num, data_length, input_data):
+    typ = qualifier_type(input_data)
     all_data = gen_data(data_num, data_length, input_data, typ)
     results = []
     for data in all_data:
@@ -51,8 +53,9 @@ def gen_series(data_num, data_length, input_data, typ):
     return results
 
 
-def gen_df(data_num, data_length, input_data, typ, columns=3):
-    all_data = gen_data(data_num, data_length, input_data, typ)
+def gen_df(data_num, data_length, input_data, columns=3):
+    typ = qualifier_type(input_data)
+    all_data = gen_data(data_num, data_length, input_data)
     results = []
     for data in all_data:
         test_data = pd.DataFrame({f"f{i}": data for i in range(columns)})
