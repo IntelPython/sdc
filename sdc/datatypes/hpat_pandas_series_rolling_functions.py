@@ -303,8 +303,6 @@ def gen_hpat_pandas_series_rolling_ddof_impl(rolling_func):
 
 hpat_pandas_rolling_series_kurt_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_kurt))
-hpat_pandas_rolling_series_max_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_max))
 hpat_pandas_rolling_series_mean_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_mean))
 hpat_pandas_rolling_series_median_impl = register_jitable(
@@ -530,7 +528,65 @@ def hpat_pandas_series_rolling_max(self):
     ty_checker = TypeChecker('Method rolling.max().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_max_impl
+    def _sdc_pandas_series_rolling_max_impl(self):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        nfinite = 0
+        current_result = numpy.nan
+        boundary = min(win, length)
+        for i in range(boundary):
+            value = input_arr[i]
+            val_is_finite = numpy.isfinite(value)
+
+            if val_is_finite:
+                nfinite += 1
+                if numpy.isnan(current_result) or value > current_result:
+                    current_result = value
+
+            if nfinite < minp:
+                output_arr[i] = numpy.nan
+            else:
+                output_arr[i] = current_result
+
+        start_indices = range(length - boundary)
+        end_indices = range(boundary, length)
+        for start_idx, end_idx in zip(start_indices, end_indices):
+            if start_idx == end_idx:
+                output_arr[end_idx] = current_result
+                continue
+
+            first_val = input_arr[start_idx]
+            last_val = input_arr[end_idx]
+
+            if numpy.isfinite(first_val):
+                nfinite -= 1
+                if nfinite:
+                    if first_val == current_result:
+                        arr_range = input_arr[start_idx + 1:end_idx + 1]
+                        finite_arr = arr_range[numpy.isfinite(arr_range)]
+                        current_result = arr_max(finite_arr)
+                else:
+                    current_result = numpy.nan
+
+            if numpy.isfinite(last_val):
+                nfinite += 1
+                if numpy.isnan(current_result) or last_val > current_result:
+                    current_result = last_val
+
+            if nfinite < minp:
+                output_arr[end_idx] = numpy.nan
+            else:
+                output_arr[end_idx] = current_result
+
+        return pandas.Series(output_arr, input_series._index, name=input_series._name)
+
+    return _sdc_pandas_series_rolling_max_impl
 
 
 @sdc_rolling_overload(SeriesRollingType, 'mean')
