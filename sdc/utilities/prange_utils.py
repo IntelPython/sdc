@@ -126,6 +126,4 @@ def get_chunks(size, pool_size=0):
             stop = max(stop, size)
         chunks.append(Chunk(start, stop))
 
-    chunks.append(Chunk(start, stop))
-
     return chunks
