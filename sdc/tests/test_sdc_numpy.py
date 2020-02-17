@@ -243,7 +243,10 @@ class TestArrays(TestCase):
 
 class TestArrayReductions(TestCase):
 
-    def check_reduction_basic(self, pyfunc, alt_pyfunc, all_nans=True):
+    def check_reduction_basic(self, pyfunc, alt_pyfunc, all_nans=True, comparator=None):
+        if not comparator:
+            comparator = np.testing.assert_array_equal
+
         alt_cfunc = self.jit(alt_pyfunc)
 
         def cases():
@@ -262,7 +265,7 @@ class TestArrayReductions(TestCase):
 
         for case in cases():
             with self.subTest(data=case):
-                np.testing.assert_array_equal(alt_cfunc(case), pyfunc(case))
+                comparator(alt_cfunc(case), pyfunc(case))
 
     def test_nanmean(self):
         def ref_impl(a):
@@ -308,6 +311,16 @@ class TestArrayReductions(TestCase):
             return numpy_like.nansum(a)
 
         self.check_reduction_basic(ref_impl, sdc_impl)
+
+    def test_nanvar(self):
+        def ref_impl(a):
+            return np.nanvar(a)
+
+        def sdc_impl(a):
+            return numpy_like.nanvar(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl,
+                                   comparator=np.testing.assert_array_almost_equal)
 
     def test_sum(self):
         def ref_impl(a):

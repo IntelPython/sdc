@@ -497,3 +497,32 @@ def np_nanmean(a):
         return np.divide(c, count)
 
     return nanmean_impl
+
+
+def nanvar(a):
+    pass
+
+
+@sdc_overload(nanvar)
+def np_nanvar(a):
+    if not isinstance(a, types.Array):
+        return
+    isnan = get_isnan(a.dtype)
+
+    def nanvar_impl(a):
+        # Compute the mean
+        m = nanmean(a)
+
+        # Compute the sum of square diffs
+        ssd = 0.0
+        count = 0
+        for i in prange(len(a)):
+            v = a[i]
+            if not isnan(v):
+                val = (v.item() - m)
+                ssd += np.real(val * np.conj(val))
+                count += 1
+        # np.divide() doesn't raise ZeroDivisionError
+        return np.divide(ssd, count)
+
+    return nanvar_impl
