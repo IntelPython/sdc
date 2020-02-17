@@ -2,10 +2,11 @@ import os
 import unittest
 import numba
 
+from sdc.tests.test_base import TestCase
 from sdc.tests.tests_perf.test_perf_utils import *
 
 
-class TestBase(unittest.TestCase):
+class TestBase(TestCase):
     iter_number = 5
     results_class = TestResults
 
@@ -42,7 +43,7 @@ class TestBase(unittest.TestCase):
         # compilation time
         record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
 
-        cfunc = numba.njit(pyfunc)
+        cfunc = self.jit(pyfunc)
 
         # execution and boxing time
         record["test_results"], record["boxing_results"] = \
