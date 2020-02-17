@@ -58,12 +58,15 @@ def get_chunks(size, pool_size=0):
     if pool_size == 0:
         pool_size = get_pool_size()
 
-    chunk_size = (size - 1) // pool_size + 1
+    chunk_size = size // pool_size
 
     chunks = []
     for i in range(pool_size):
         start = min(i * chunk_size, size)
         stop = min((i + 1) * chunk_size, size)
+        if i == pool_size - 1:
+            rest = size - size // pool_size
+            stop = min((i + 1) * chunk_size + rest, size)
         chunks.append(Chunk(start, stop))
 
     return chunks
@@ -75,14 +78,16 @@ def get_chunks_overload(size, pool_size=0):
         if pool_size == 0:
             pool_size = get_pool_size()
 
-        chunk_size = (size - 1) // pool_size + 1
+        chunk_size = size // pool_size
 
         chunks = []
         for i in range(pool_size):
             start = min(i * chunk_size, size)
             stop = min((i + 1) * chunk_size, size)
-            chunk = Chunk(start, stop)
-            chunks.append(chunk)
+            if i == pool_size - 1:
+                rest = size - size // pool_size
+                stop = min((i + 1) * chunk_size + rest, size)
+            chunks.append(Chunk(start, stop))
 
         return chunks
 
