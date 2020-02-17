@@ -96,7 +96,7 @@ cases = [
     TC(name='quantile', size=[10 ** 7], params='0.2'),
     TC(name='skew', size=[10 ** 7]),
     TC(name='std', size=[10 ** 7]),
-    TC(name='sum', size=[10 ** 7]),
+    TC(name='sum', size=[4 * 10 ** 7]),
     TC(name='var', size=[10 ** 7]),
 ]
 

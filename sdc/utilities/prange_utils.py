@@ -29,7 +29,7 @@ import numba
 import sdc
 
 from typing import NamedTuple
-from sdc.utilities.utils import sdc_overload
+from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 
 
 class Chunk(NamedTuple):
@@ -54,6 +54,7 @@ def get_pool_size_overload():
     return get_pool_size_impl
 
 
+@sdc_register_jitable
 def get_chunks(size, pool_size=0):
     if pool_size == 0:
         pool_size = get_pool_size()
@@ -72,18 +73,6 @@ def get_chunks(size, pool_size=0):
 @sdc_overload(get_chunks)
 def get_chunks_overload(size, pool_size=0):
     def get_chunks_impl(size, pool_size=0):
-        if pool_size == 0:
-            pool_size = get_pool_size()
-
-        chunk_size = (size - 1) // pool_size + 1
-
-        chunks = []
-        for i in range(pool_size):
-            start = min(i * chunk_size, size)
-            stop = min((i + 1) * chunk_size, size)
-            chunk = Chunk(start, stop)
-            chunks.append(chunk)
-
-        return chunks
+        return get_chunks(size, pool_size=pool_size)
 
     return get_chunks_impl

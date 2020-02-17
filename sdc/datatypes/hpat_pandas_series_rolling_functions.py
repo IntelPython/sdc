@@ -37,6 +37,7 @@ from numba.types import (float64, Boolean, Integer, NoneType, Number,
 from sdc.datatypes.common_functions import _sdc_pandas_series_align
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.hiframes.pd_series_type import SeriesType
+from sdc.utilities.prange_utils import get_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
 
@@ -626,42 +627,57 @@ def hpat_pandas_series_rolling_sum(self):
         length = len(input_arr)
         output_arr = numpy.empty(length, dtype=float64)
 
-        nfinite = 0
-        current_result = 0.
-        boundary = min(win, length)
-        for i in range(boundary):
-            value = input_arr[i]
-            if numpy.isfinite(value):
-                nfinite += 1
-                current_result += value
+        chunks = get_chunks(length)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
 
-            if nfinite < minp:
-                output_arr[i] = numpy.nan
-            else:
-                output_arr[i] = current_result
+            start = max(chunk.start - (win - 1), 0)
+            win_length = chunk.stop - start
 
-        start_indices = range(length - boundary)
-        end_indices = range(boundary, length)
-        for start_idx, end_idx in zip(start_indices, end_indices):
-            if start_idx == end_idx:
-                # case when window == 0
-                output_arr[end_idx] = current_result
-                continue
+            nfinite = 0
+            current_result = 0.
+            boundary = start + min(win, win_length)
+            for idx in range(start, boundary):
+                value = input_arr[idx]
+                if numpy.isfinite(value):
+                    nfinite += 1
+                    current_result += value
 
-            first_val = input_arr[start_idx]
-            last_val = input_arr[end_idx]
+                if idx < chunk.start:
+                    continue
 
-            if numpy.isfinite(first_val):
-                nfinite -= 1
-                current_result -= first_val
-            if numpy.isfinite(last_val):
-                nfinite += 1
-                current_result += last_val
+                if nfinite < minp:
+                    output_arr[idx] = numpy.nan
+                else:
+                    output_arr[idx] = current_result
 
-            if nfinite < minp:
-                output_arr[end_idx] = numpy.nan
-            else:
-                output_arr[end_idx] = current_result
+            start_indices = range(start, start + chunk.stop - boundary)
+            end_indices = range(boundary, chunk.stop)
+            for start_idx, end_idx in zip(start_indices, end_indices):
+                if start_idx == end_idx:
+                    # case when window == 0
+                    if end_idx < chunk.start:
+                        continue
+                    output_arr[end_idx] = current_result
+                    continue
+
+                excluded_val = input_arr[start_idx]
+                included_val = input_arr[end_idx]
+
+                if numpy.isfinite(excluded_val):
+                    nfinite -= 1
+                    current_result -= excluded_val
+                if numpy.isfinite(included_val):
+                    nfinite += 1
+                    current_result += included_val
+
+                if end_idx < chunk.start:
+                    continue
+
+                if nfinite < minp:
+                    output_arr[end_idx] = numpy.nan
+                else:
+                    output_arr[end_idx] = current_result
 
         return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
