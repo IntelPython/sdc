@@ -317,6 +317,14 @@ class TestStrings(TestCase):
         A = np.array(['AA', 'B'])
         self.assertEqual(hpat_func(A), test_impl(A))
 
+    @unittest.skip("No glob support on windows yet. Segfault on Linux if no files found by pattern")
+    def test_glob(self):
+        def test_impl():
+            glob.glob("*py")
+        hpat_func = self.jit(test_impl)
+
+        self.assertEqual(hpat_func(), test_impl())
+
     def test_set_string(self):
         def test_impl():
             s = sdc.set_ext.init_set_string()
