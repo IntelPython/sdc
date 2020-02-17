@@ -2410,58 +2410,44 @@ class TestSeries(
         S = pd.Series(['aa', 'bb', np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def _mean_data_samples(self):
+        yield [6, 6, 2, 1, 3, 3, 2, 1, 2]
+        yield [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2]
+        yield [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2]
+        yield [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf]
+        yield [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf]
+        yield [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2]
+        yield [np.nan, np.nan, np.nan]
+        yield [np.nan, np.nan, np.inf]
+
+    def _check_mean(self, pyfunc, *args):
+        cfunc = self.jit(pyfunc)
+
+        actual = cfunc(*args)
+        expected = pyfunc(*args)
+        if np.isnan(actual) or np.isnan(expected):
+            self.assertEqual(np.isnan(actual), np.isnan(expected))
+        else:
+            self.assertEqual(actual, expected)
+
     def test_series_mean(self):
         def test_impl(S):
             return S.mean()
-        hpat_func = self.jit(test_impl)
 
-        data_samples = [
-            [6, 6, 2, 1, 3, 3, 2, 1, 2],
-            [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
-            [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
-            [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
-            [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
-            [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
-            [np.nan, np.nan, np.nan],
-            [np.nan, np.nan, np.inf],
-        ]
-
-        for data in data_samples:
+        for data in self._mean_data_samples():
             with self.subTest(data=data):
                 S = pd.Series(data)
-                actual = hpat_func(S)
-                expected = test_impl(S)
-                if np.isnan(actual) or np.isnan(expected):
-                    self.assertEqual(np.isnan(actual), np.isnan(expected))
-                else:
-                    self.assertEqual(actual, expected)
+                self._check_mean(test_impl, S)
 
     @skip_sdc_jit("Series.mean() any parameters unsupported")
     def test_series_mean_skipna(self):
         def test_impl(S, skipna):
             return S.mean(skipna=skipna)
-        hpat_func = self.jit(test_impl)
-
-        data_samples = [
-            [6, 6, 2, 1, 3, 3, 2, 1, 2],
-            [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
-            [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
-            [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
-            [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
-            [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
-            [np.nan, np.nan, np.nan],
-            [np.nan, np.nan, np.inf],
-        ]
 
         for skipna in [True, False]:
-            for data in data_samples:
+            for data in self._mean_data_samples():
                 S = pd.Series(data)
-                actual = hpat_func(S, skipna)
-                expected = test_impl(S, skipna)
-                if np.isnan(actual) or np.isnan(expected):
-                    self.assertAlmostEqual(np.isnan(actual), np.isnan(expected))
-                else:
-                    self.assertAlmostEqual(actual, expected)
+                self._check_mean(test_impl, S, skipna)
 
     def test_series_var1(self):
         def test_impl(S):
