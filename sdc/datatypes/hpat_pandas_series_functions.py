@@ -42,6 +42,7 @@ from numba.extending import intrinsic
 from numba import (types, numpy_support, cgutils)
 from numba.typed import Dict
 from numba import prange
+from numba.targets.arraymath import get_isnan
 
 import sdc
 import sdc.datatypes.common_functions as common_functions
@@ -1369,7 +1370,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
 
         return hpat_pandas_series_value_counts_str_impl
 
-    elif isinstance(self.dtype, types.Number):
+    elif isinstance(self.dtype, (types.Number, types.Boolean)):
 
         series_dtype = self.dtype
         def hpat_pandas_series_value_counts_number_impl(
@@ -2129,17 +2130,18 @@ def hpat_pandas_series_copy(self, deep=True):
     if isinstance(self.index, types.NoneType):
         def hpat_pandas_series_copy_impl(self, deep=True):
             if deep:
-                return pandas.Series(data=self._data.copy(), name=self._name)
+                return pandas.Series(data=numpy_like.copy(self._data), name=self._name)
             else:
                 return pandas.Series(data=self._data, name=self._name)
         return hpat_pandas_series_copy_impl
     else:
         def hpat_pandas_series_copy_impl(self, deep=True):
             if deep:
-                return pandas.Series(data=self._data.copy(), index=self._index.copy(), name=self._name)
+                return pandas.Series(data=numpy_like.copy(self._data), index=numpy_like.copy(self._index),
+                                     name=self._name)
             else:
                 # Shallow copy of index is not supported yet
-                return pandas.Series(data=self._data, index=self._index.copy(), name=self._name)
+                return pandas.Series(data=self._data, index=numpy_like.copy(self._index), name=self._name)
         return hpat_pandas_series_copy_impl
 
 
@@ -2395,9 +2397,9 @@ def hpat_pandas_series_isnull(self):
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if isinstance(self.data.dtype, (types.Integer, types.Float)):
+    if isinstance(self.data.dtype, (types.Number, types.Boolean, bool)):
         def hpat_pandas_series_isnull_impl(self):
-            return pandas.Series(data=numpy.isnan(self._data), index=self._index, name=self._name)
+            return pandas.Series(data=numpy_like.isnan(self._data), index=self._index, name=self._name)
 
         return hpat_pandas_series_isnull_impl
 
@@ -2463,9 +2465,9 @@ def hpat_pandas_series_isna(self):
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if isinstance(self.data.dtype, (types.Integer, types.Float)):
+    if isinstance(self.data.dtype, (types.Number, types.Boolean, bool)):
         def hpat_pandas_series_isna_impl(self):
-            return pandas.Series(data=numpy.isnan(self._data), index=self._index, name=self._name)
+            return pandas.Series(data=numpy_like.isnan(self._data), index=self._index, name=self._name)
 
         return hpat_pandas_series_isna_impl
 
@@ -2531,9 +2533,9 @@ def hpat_pandas_series_notna(self):
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if isinstance(self.data.dtype, types.Number):
+    if isinstance(self.data.dtype, (types.Number, types.Boolean, bool)):
         def hpat_pandas_series_notna_impl(self):
-            return pandas.Series(numpy.invert(numpy.isnan(self._data)), index=self._index, name=self._name)
+            return pandas.Series(numpy_like.notnan(self._data), index=self._index, name=self._name)
 
         return hpat_pandas_series_notna_impl
 
@@ -2838,8 +2840,8 @@ def hpat_pandas_series_sum(
             _skipna = skipna
 
         if _skipna:
-            return numpy.nansum(self._data)
-        return numpy.sum(self._data)
+            return numpy_like.nansum(self._data)
+        return numpy_like.sum(self._data)
 
     return hpat_pandas_series_sum_impl
 
@@ -3421,7 +3423,7 @@ def hpat_pandas_series_prod(self, axis=None, skipna=None, level=None, numeric_on
             _skipna = skipna
 
         if _skipna:
-            return numpy.nanprod(self._data)
+            return numpy_like.nanprod(self._data)
         else:
             return numpy.prod(self._data)
 
@@ -4551,14 +4553,22 @@ def hpat_pandas_series_count(self, level=None):
 
         return hpat_pandas_series_count_str_impl
 
+    if isinstance(self.data, types.Array) and isinstance(self.data.dtype, types.Integer):
+        def hpat_pandas_series_count_int_impl(self, level=None):
+            return len(self._data)
+        return hpat_pandas_series_count_int_impl
+
     def hpat_pandas_series_count_impl(self, level=None):
         """
         Return number of non-NA/null observations in the object
         Returns number of unique elements in the object
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_count
         """
-        data_no_nan = self._data[~numpy.isnan(self._data)]
-        return len(data_no_nan)
+        result = 0
+        for i in prange(len(self._data)):
+            if not numpy.isnan(self._data[i]):
+                result = result + 1
+        return result
 
     return hpat_pandas_series_count_impl
 
@@ -5010,21 +5020,13 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
             raise TypingError('{} Not implemented when Series dtype is {} and\
                  inplace={}'.format(_func_name, self.dtype, inplace))
 
-        elif isinstance(self.dtype, (types.Integer, types.Boolean)):
-            def hpat_pandas_series_no_nan_fillna_impl(self, value=None, method=None, axis=None, inplace=False,
-                                                      limit=None, downcast=None):
-                # no NaNs in series of Integers or Booleans
-                return None
-
-            return hpat_pandas_series_no_nan_fillna_impl
         else:
             def hpat_pandas_series_fillna_impl(self, value=None, method=None, axis=None, inplace=False,
                                                limit=None, downcast=None):
-                na_data_arr = sdc.hiframes.api.get_nan_mask(self._data)
-                self._data[na_data_arr] = value
-                return None
+                return numpy_like.fillna(self._data, inplace=inplace, value=value)
 
             return hpat_pandas_series_fillna_impl
+
     else:
         # non inplace implementations, copy array, fill the NA/NaN and return a new Series
         if isinstance(self.dtype, types.UnicodeType):
@@ -5032,39 +5034,26 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
             # (can be called directly when it's index handling is fixed)
             def hpat_pandas_series_str_fillna_impl(self, value=None, method=None, axis=None,
                                                    inplace=False, limit=None, downcast=None):
-
-                n = len(self._data)
-                num_chars = 0
-                # get total chars in new array
-                for i in prange(n):
-                    s = self._data[i]
-                    if sdc.hiframes.api.isna(self._data, i):
-                        num_chars += len(value)
-                    else:
-                        num_chars += len(s)
-
-                filled_data = pre_alloc_string_array(n, num_chars)
-                for i in prange(n):
-                    if sdc.hiframes.api.isna(self._data, i):
-                        filled_data[i] = value
-                    else:
-                        filled_data[i] = self._data[i]
-                return pandas.Series(data=filled_data, index=self._index, name=self._name)
+                return pandas.Series(data=numpy_like.fillna(self._data, inplace=inplace, value=value),
+                                     index=self._index,
+                                     name=self._name)
 
             return hpat_pandas_series_str_fillna_impl
 
         elif isinstance(self.dtype, (types.Integer, types.Boolean)):
             def hpat_pandas_series_no_nan_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
-                return pandas.Series(data=numpy.copy(self._data), index=self._index, name=self._name)
+                return pandas.Series(data=numpy_like.fillna(self._data, inplace=inplace, value=value),
+                                     index=self._index,
+                                     name=self._name)
 
             return hpat_pandas_series_no_nan_fillna_impl
 
         else:
             def hpat_pandas_series_fillna_impl(self, value=None, method=None, axis=None, inplace=False, limit=None, downcast=None):
-                na_data_arr = sdc.hiframes.api.get_nan_mask(self._data)
-                filled_data = numpy.copy(self._data)
-                filled_data[na_data_arr] = value
-                return pandas.Series(data=filled_data, index=self._index, name=self._name)
+                filled_data = numpy_like.fillna(self._data, inplace=inplace, value=value)
+                return pandas.Series(data=filled_data,
+                                     index=self._index,
+                                     name=self._name)
 
             return hpat_pandas_series_fillna_impl
 

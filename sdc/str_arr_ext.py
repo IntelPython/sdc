@@ -74,7 +74,6 @@ def type_string_array_call2(context):
 def iternext_str_array(context, builder, sig, args, result):
     """
     Implementation of iternext() for the StringArrayIterator type
-
     :param context: context descriptor
     :param builder: llvmlite IR Builder
     :param sig: iterator signature

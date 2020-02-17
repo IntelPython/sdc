@@ -25,9 +25,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import pandas
-import numpy as np
-
 import time
 import random
 
@@ -38,6 +35,7 @@ from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from .generator import generate_test_cases
 from .generator import TestCase as TC
+from .data_generator import gen_series
 
 
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods.test_series_{method_name}
@@ -52,21 +50,13 @@ class TestSeriesMethods(TestBase):
         if input_data is None:
             input_data = test_global_input_data_float64
 
-        full_input_data_length = sum(len(i) for i in input_data)
         for data_length in total_data_length:
             base = {
                 "test_name": test_name,
                 "data_size": data_length,
             }
-            data = perf_data_gen_fixed_len(input_data, full_input_data_length,
-                                           data_length)
-            test_data = pandas.Series(data)
 
-            args = [test_data]
-            for i in range(data_num - 1):
-                np.random.seed(i)
-                extra_data = np.random.ranf(data_length)
-                args.append(pandas.Series(extra_data))
+            args = gen_series(data_num, data_length, input_data)
 
             self._test_jit(pyfunc, base, *args)
             self._test_py(pyfunc, base, *args)
@@ -83,9 +73,9 @@ cases = [
     TC(name='at', size=[10 ** 7], call_expr='data.at[3]', usecase_params='data'),
     TC(name='chain_add_and_sum', size=[20 * 10 ** 6, 25 * 10 ** 6, 30 * 10 ** 6], call_expr='(A + B).sum()',
        usecase_params='A, B', data_num=2),
-    TC(name='copy', size=[10 ** 8]),
+    TC(name='copy', size=[10 ** 7]),
     TC(name='corr',  size=[10 ** 7],params='other', data_num=2),
-    TC(name='count', size=[10 ** 7]),
+    TC(name='count', size=[10 ** 8]),
     TC(name='cov', size=[10 ** 8], params='other', data_num=2),
     TC(name='cumsum', size=[10 ** 8]),
     TC(name='describe', size=[10 ** 7]),
@@ -125,7 +115,8 @@ cases = [
     TC(name='notna', size=[10 ** 7]),
     TC(name='nsmallest', size=[10 ** 6]),
     TC(name='nunique', size=[10 ** 7]),
-    TC(name='prod', size=[10 ** 8]),
+    TC(name='prod', size=[10 ** 8], params='skipna=True'),
+    TC(name='prod', size=[10 ** 8], params='skipna=False'),
     TC(name='pct_change', size=[10 ** 7], params='periods=1, limit=None, freq=None'),
     TC(name='pow', size=[10 ** 7], params='other', data_num=2),
     TC(name='quantile', size=[10 ** 8]),

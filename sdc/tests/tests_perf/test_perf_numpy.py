@@ -48,20 +48,6 @@ class TestFunctions(TestBase):
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_jitted(self, pyfunc, record, *args, **kwargs):
-        # compilation time
-        record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
-
-        sdc_func = sdc.jit(pyfunc)
-
-        # execution and boxing time
-        record["test_results"], record["boxing_results"] = \
-            get_times(sdc_func, *args, **kwargs)
-
-    def _test_python(self, pyfunc, record, *args, **kwargs):
-        record["test_results"], _ = \
-            get_times(pyfunc, *args, **kwargs)
-
     def _test_case(self, cases, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
         test_name = '{}'.format(name)
 
@@ -99,6 +85,11 @@ cases = [
         CE(type_='Numba', code='data.astype(np.int64)', jitted=True),
         CE(type_='SDC', code='sdc.functions.numpy_like.astype(data, np.int64)', jitted=True),
     ], usecase_params='data'),
+    TC(name='copy', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.copy(data)', jitted=False),
+        CE(type_='Numba', code='np.copy(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.copy(data)', jitted=True),
+    ], usecase_params='data'),
     TC(name='isnan', size=[10 ** 7], call_expr=[
         CE(type_='Python', code='np.isnan(data)', jitted=False),
         CE(type_='Numba', code='np.isnan(data)', jitted=True),
@@ -107,6 +98,11 @@ cases = [
     TC(name='nansum', size=[10 ** 7], call_expr=[
         CE(type_='Python', code='np.nansum(data)', jitted=False),
         CE(type_='SDC', code='sdc.functions.numpy_like.nansum(data)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='nanprod', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.nanprod(data)', jitted=False),
+        CE(type_='Numba', code='np.nanprod(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.nanprod(data)', jitted=True),
     ], usecase_params='data'),
     TC(name='sum', size=[10 ** 7], call_expr=[
         CE(type_='Python', code='np.sum(data)', jitted=False),

@@ -188,6 +188,58 @@ class TestArrays(TestCase):
             with self.subTest(data=case):
                 np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
 
+    def test_copy(self):
+        def ref_impl(a):
+            return np.copy(a)
+
+        def sdc_impl(a):
+            return numpy_like.copy(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan], [True, False, True], ['a', 'vv', 'o12oo']]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+    def test_copy_int(self):
+        def ref_impl():
+            a = np.array([5, 2, 0, 333, -4])
+            return np.copy(a)
+
+        def sdc_impl():
+            a = np.array([5, 2, 0, 333, -4])
+            return numpy_like.copy(a)
+
+        sdc_func = self.jit(sdc_impl)
+        np.testing.assert_array_equal(sdc_func(), ref_impl())
+
+    def test_copy_bool(self):
+        def ref_impl():
+            a = np.array([True, False, True])
+            return np.copy(a)
+
+        def sdc_impl():
+            a = np.array([True, False, True])
+            return numpy_like.copy(a)
+
+        sdc_func = self.jit(sdc_impl)
+        np.testing.assert_array_equal(sdc_func(), ref_impl())
+
+    @unittest.skip("Numba doesn't have string array")
+    def test_copy_str(self):
+        def ref_impl():
+            a = np.array(['a', 'vv', 'o12oo'])
+            return np.copy(a)
+
+        def sdc_impl():
+            a = np.array(['a', 'vv', 'o12oo'])
+            return numpy_like.copy(a)
+
+        sdc_func = self.jit(sdc_impl)
+        np.testing.assert_array_equal(sdc_func(), ref_impl())
+
 
 class TestArrayReductions(TestCase):
 
@@ -227,6 +279,15 @@ class TestArrayReductions(TestCase):
 
         def sdc_impl(a):
             return numpy_like.nanmax(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl)
+
+    def test_nanprod(self):
+        def ref_impl(a):
+            return np.nanprod(a)
+
+        def sdc_impl(a):
+            return numpy_like.nanprod(a)
 
         self.check_reduction_basic(ref_impl, sdc_impl)
 
