@@ -1991,6 +1991,7 @@ def hpat_pandas_series_isin(self, values):
         # TODO: replace with below line when Numba supports np.isin in nopython mode
         # return pandas.Series(np.isin(self._data, values))
 
+        values = set(values)
         data_len = len(self._data)
         result = numpy.empty(data_len, dtype=numpy.bool_)
         for i in numba.prange(data_len):
