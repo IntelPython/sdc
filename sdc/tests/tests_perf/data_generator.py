@@ -55,7 +55,7 @@ def gen_series(data_num, data_length, input_data):
 
 def gen_df(data_num, data_length, input_data, columns=3):
     typ = qualifier_type(input_data)
-    all_data = gen_data(data_num, data_length, input_data)
+    all_data = gen_data(data_num, data_length, input_data, typ)
     results = []
     for data in all_data:
         test_data = pd.DataFrame({f"f{i}": data for i in range(columns)})

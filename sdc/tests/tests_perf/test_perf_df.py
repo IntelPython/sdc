@@ -42,7 +42,7 @@ class TestDataFrameMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_case(self, pyfunc, name, total_data_length, input_data, typ, data_num=1):
+    def _test_case(self, pyfunc, name, total_data_length, input_data, data_num=1):
         test_name = 'DataFrame.{}'.format(name)
 
         for data_length in total_data_length:
@@ -51,7 +51,7 @@ class TestDataFrameMethods(TestBase):
                 "data_size": data_length,
             }
 
-            args = gen_df(data_num, data_length, input_data, typ)
+            args = gen_df(data_num, data_length, input_data)
 
             self._test_jit(pyfunc, base, *args)
             self._test_py(pyfunc, base, *args)
