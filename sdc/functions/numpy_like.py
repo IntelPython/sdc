@@ -38,12 +38,12 @@ import pandas
 from numba import types, jit, prange, numpy_support, literally
 from numba.errors import TypingError
 from numba.targets.arraymath import get_isnan
-from typing import NamedTuple
 
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size, str_arr_is_na)
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
+from sdc.utilities.prange_utils import get_chunks
 
 
 def astype(self, dtype):
@@ -397,65 +397,9 @@ def np_nanprod(a):
     return nanprod_impl
 
 
-def get_pool_size():
-    if sdc.config.config_use_parallel_overloads:
-        return numba.config.NUMBA_NUM_THREADS
-    else:
-        return 1
-
-@sdc_overload(get_pool_size)
-def get_pool_size_overload():
-    pool_size = get_pool_size()
-    def get_pool_size_impl():
-        return pool_size
-
-    return get_pool_size_impl
-
-def get_chunks(size, pool_size=0):
-    if pool_size == 0:
-        pool_size = get_pool_size()
-
-    chunk_size = size//pool_size + 1
-
-    Chunk = NamedTuple('start', 'stop')
-
-    chunks = []
-
-    for i in range(pool_size):
-        start = min(i*chunk_size, size)
-        stop = min((i + 1)*chunk_size, size)
-        chunks.append(Chunk(start, stop))
-
-    return chunks
-
-class Chunk(NamedTuple):
-    start: int
-    stop: int
-
-@sdc_overload(get_chunks)
-def get_chunks_overload(size, pool_size=0):
-    # Chunk = NamedTuple('Chunk', ['start', 'stop'])
-
-    def get_chunks_impl(size, pool_size=0):
-        if pool_size == 0:
-            pool_size = get_pool_size()
-
-        chunk_size = size//pool_size + 1
-
-        chunks = []
-
-        for i in range(pool_size):
-            start = min(i*chunk_size, size)
-            stop = min((i + 1)*chunk_size, size)
-            chunk = Chunk(start, stop)
-            chunks.append(chunk)
-
-        return chunks
-
-    return get_chunks_impl
-
 def dropna(arr, idx, name):
     pass
+
 
 @sdc_overload(dropna)
 def dropna_overload(arr, idx, name):
