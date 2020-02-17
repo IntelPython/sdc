@@ -33,6 +33,7 @@
 
 import numba
 import numpy
+import sys
 
 from numba import types, jit, prange, numpy_support, literally
 from numba.errors import TypingError
@@ -44,6 +45,7 @@ from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
                                  max_dtype_float_val)
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size, str_arr_is_na)
+from sdc.utilities.prange_utils import get_chunks
 
 
 def astype(self, dtype):
@@ -176,18 +178,35 @@ def sdc_nanargmin_overload(self):
 
     if isinstance(dtype, types.Number):
         def sdc_nanargmin_impl(self):
-            res = max_ref
-            position = max_int64
-            length = len(self)
-            for i in prange(length):
-                if min(res, self[i]) == self[i]:
-                    if not isnan(self[i]):
-                        if res == self[i]:
-                            position = min(position, i)
-                        else:
-                            position = i
-                        res = self[i]
-            return position
+            chunks = get_chunks(len(self))
+            arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
+            arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
+            for i in prange(len(chunks)):
+                chunk = chunks[i]
+                res = max_ref
+                pos = max_int64
+                for j in range(chunk.start, chunk.stop):
+                    if min(res, self[j]) == self[j]:
+                        if not isnan(self[j]):
+                            if res == self[j]:
+                                pos = min(pos, j)
+                            else:
+                                pos = j
+                                res = self[j]
+                arr_res[i] = res
+                arr_pos[i] = pos
+
+            general_res = max_ref
+            general_pos = max_int64
+            for i in range(len(chunks)):
+                if min(general_res, arr_res[i]) == arr_res[i]:
+                    if general_res == arr_res[i]:
+                        general_pos = min(general_pos, arr_pos[i])
+                    else:
+                        general_pos = arr_pos[i]
+                        general_res = arr_res[i]
+
+            return general_pos
 
         return sdc_nanargmin_impl
 
@@ -221,18 +240,36 @@ def sdc_nanargmax_overload(self):
 
     if isinstance(dtype, types.Number):
         def sdc_nanargmax_impl(self):
-            res = min_ref
-            position = max_int64
-            length = len(self)
-            for i in prange(length):
-                if max(res, self[i]) == self[i]:
-                    if not isnan(self[i]):
-                        if res == self[i]:
-                            position = min(position, i)
+            chunks = get_chunks(len(self))
+            arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
+            arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
+            for i in prange(len(chunks)):
+                chunk = chunks[i]
+                res = min_ref
+                pos = max_int64
+                for j in range(chunk.start, chunk.stop):
+                    if max(res, self[j]) == self[j]:
+                        if not isnan(self[j]):
+                            if res == self[j]:
+                                pos = min(pos, j)
+                            else:
+                                pos = j
+                                res = self[j]
+                arr_res[i] = res
+                arr_pos[i] = pos
+
+            general_res = min_ref
+            general_pos = max_int64
+            for i in range(len(chunks)):
+                if max(general_res, arr_res[i]) == arr_res[i]:
+                    if not isnan(arr_res[i]):
+                        if general_res == arr_res[i]:
+                            general_pos = min(general_pos, arr_pos[i])
                         else:
-                            position = i
-                        res = self[i]
-            return position
+                            general_pos = arr_pos[i]
+                            general_res = arr_res[i]
+
+            return general_pos
 
         return sdc_nanargmax_impl
 
@@ -266,25 +303,47 @@ def sdc_argmin_overload(self):
 
     if isinstance(dtype, types.Number):
         def sdc_argmin_impl(self):
-            res = max_ref
-            position = max_int64
-            length = len(self)
-            for i in prange(length):
-                if not isnan(self[i]):
-                    if min(res, self[i]) == self[i]:
-                        if res == self[i]:
-                            position = min(position, i)
-                        else:
-                            position = i
-                        res = self[i]
-                else:
-                    if numpy.isnan(res):
-                        position = min(position, i)
+            chunks = get_chunks(len(self))
+            arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
+            arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
+            for i in prange(len(chunks)):
+                chunk = chunks[i]
+                res = max_ref
+                pos = max_int64
+                for j in range(chunk.start, chunk.stop):
+                    if not isnan(self[j]):
+                        if min(res, self[j]) == self[j]:
+                            if res == self[j]:
+                                pos = min(pos, j)
+                            else:
+                                pos = j
+                                res = self[j]
                     else:
-                        res = self[i]
-                        position = i
+                        if numpy.isnan(res):
+                            pos = min(pos, j)
+                        else:
+                            pos = j
+                        res = self[j]
 
-            return position
+                arr_res[i] = res
+                arr_pos[i] = pos
+            general_res = max_ref
+            general_pos = max_int64
+            for i in range(len(chunks)):
+                if not isnan(arr_res[i]):
+                    if min(general_res, arr_res[i]) == arr_res[i]:
+                        if general_res == arr_res[i]:
+                            general_pos = min(general_pos, arr_pos[i])
+                        else:
+                            general_pos = arr_pos[i]
+                            general_res = arr_res[i]
+                else:
+                    if numpy.isnan(general_res):
+                        general_pos = min(general_pos, arr_pos[i])
+                    else:
+                        general_pos = arr_pos[i]
+                    general_res = arr_res[i]
+            return general_pos
 
         return sdc_argmin_impl
 
@@ -318,25 +377,47 @@ def sdc_argmax_overload(self):
 
     if isinstance(dtype, types.Number):
         def sdc_argmax_impl(self):
-            res = min_ref
-            position = max_int64
-            length = len(self)
-            for i in prange(length):
-                if not isnan(self[i]):
-                    if max(res, self[i]) == self[i]:
-                        if res == self[i]:
-                            position = min(position, i)
-                        else:
-                            position = i
-                        res = self[i]
-                else:
-                    if numpy.isnan(res):
-                        position = min(position, i)
+            chunks = get_chunks(len(self))
+            arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
+            arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
+            for i in prange(len(chunks)):
+                chunk = chunks[i]
+                res = min_ref
+                pos = max_int64
+                for j in range(chunk.start, chunk.stop):
+                    if not isnan(self[j]):
+                        if max(res, self[j]) == self[j]:
+                            if res == self[j]:
+                                pos = min(pos, j)
+                            else:
+                                pos = j
+                                res = self[j]
                     else:
-                        res = self[i]
-                        position = i
+                        if numpy.isnan(res):
+                            pos = min(pos, j)
+                        else:
+                            pos = j
+                        res = self[j]
 
-            return position
+                arr_res[i] = res
+                arr_pos[i] = pos
+            general_res = min_ref
+            general_pos = max_int64
+            for i in range(len(chunks)):
+                if not isnan(arr_res[i]):
+                    if max(general_res, arr_res[i]) == arr_res[i]:
+                        if general_res == arr_res[i]:
+                            general_pos = min(general_pos, arr_pos[i])
+                        else:
+                            general_pos = arr_pos[i]
+                            general_res = arr_res[i]
+                else:
+                    if numpy.isnan(general_res):
+                        general_pos = min(general_pos, arr_pos[i])
+                    else:
+                        general_pos = arr_pos[i]
+                    general_res = arr_res[i]
+            return general_pos
 
         return sdc_argmax_impl
 
