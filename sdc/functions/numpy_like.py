@@ -34,16 +34,16 @@
 import numba
 import numpy
 
-from numba import types, jit, prange, numpy_support
+from numba import types, jit, prange, numpy_support, literally
 from numba.errors import TypingError
 from numba.targets.arraymath import get_isnan
 
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
-from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size)
 from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
                                  max_dtype_float_val)
+from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size, str_arr_is_na)
 
 
 def astype(self, dtype):
@@ -66,6 +66,30 @@ def nanargmax(self):
     pass
 
 
+def fillna(self, inplace=False, value=None):
+    pass
+
+
+def copy(self):
+    pass
+
+
+def isnan(self):
+    pass
+
+
+def notnan(self):
+    pass
+
+
+def sum(self):
+    pass
+
+
+def nansum(self):
+    pass
+
+
 @sdc_overload(astype)
 def sdc_astype_overload(self, dtype):
     """
@@ -78,8 +102,15 @@ def sdc_astype_overload(self, dtype):
 
     """
 
+    ty_checker = TypeChecker("numpy-like 'astype'")
     if not isinstance(self, types.Array):
         return None
+
+    if not isinstance(dtype, (types.functions.NumberClass, types.Function, types.Literal)):
+        def impl(self, dtype):
+            return astype(self, literally(dtype))
+
+        return impl
 
     if not isinstance(dtype, (types.StringLiteral, types.UnicodeType, types.Function, types.functions.NumberClass)):
         ty_checker.raise_exc(dtype, 'string or type', 'dtype')
@@ -310,3 +341,344 @@ def sdc_argmax_overload(self):
         return sdc_argmax_impl
 
     ty_checker.raise_exc(dtype, 'number', 'self.dtype')
+
+
+@sdc_overload(copy)
+def sdc_copy_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.copy.
+
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k copy
+    """
+
+    if not isinstance(self, (types.Array, StringArrayType)):
+        return None
+
+    dtype = self.dtype
+    if isinstance(dtype, (types.Number, types.Boolean, bool)):
+        def sdc_copy_number_impl(self):
+            length = len(self)
+            res = numpy.empty(length, dtype=dtype)
+            for i in prange(length):
+                res[i] = self[i]
+
+            return res
+
+        return sdc_copy_number_impl
+
+    if isinstance(dtype, (types.npytypes.UnicodeCharSeq, types.UnicodeType, types.StringLiteral)):
+        def sdc_copy_string_impl(self):
+            return self.copy()
+
+        return sdc_copy_string_impl
+
+
+@sdc_overload(notnan)
+def sdc_notnan_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.notnan.
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k notnan
+    """
+
+    if not isinstance(self, types.Array):
+        return None
+
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if isinstance(dtype, (types.Integer, types.Boolean, bool)):
+        def sdc_notnan_int_impl(self):
+            length = len(self)
+            res = numpy.ones(shape=length, dtype=numpy.bool_)
+
+            return res
+
+        return sdc_notnan_int_impl
+
+    if isinstance(dtype, types.Float):
+        def sdc_notnan_float_impl(self):
+            length = len(self)
+            res = numpy.empty(shape=length, dtype=numpy.bool_)
+            for i in prange(length):
+                res[i] = not isnan(self[i])
+
+            return res
+
+        return sdc_notnan_float_impl
+
+    ty_checker.raise_exc(dtype, 'int or float', 'self.dtype')
+
+
+@sdc_overload(isnan)
+def sdc_isnan_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.isnan.
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k isnan
+    """
+
+    if not isinstance(self, types.Array):
+        return None
+
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if isinstance(dtype, (types.Integer, types.Boolean, bool)):
+        def sdc_isnan_int_impl(self):
+            length = len(self)
+            res = numpy.zeros(shape=length, dtype=numpy.bool_)
+
+            return res
+
+        return sdc_isnan_int_impl
+
+    if isinstance(dtype, types.Float):
+        def sdc_isnan_float_impl(self):
+            length = len(self)
+            res = numpy.empty(shape=length, dtype=numpy.bool_)
+            for i in prange(length):
+                res[i] = isnan(self[i])
+
+            return res
+
+        return sdc_isnan_float_impl
+
+    ty_checker.raise_exc(dtype, 'int or float', 'self.dtype')
+
+
+def gen_sum_bool_impl():
+    """Generate sum bool implementation."""
+    def _sum_bool_impl(self):
+        length = len(self)
+        result = 0
+        for i in prange(length):
+            result += self[i]
+
+        return result
+
+    return _sum_bool_impl
+
+
+@sdc_overload(sum)
+def sdc_sum_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.sum.
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k sum
+    """
+
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if not isinstance(self, types.Array):
+        return None
+
+    if isinstance(dtype, types.Number):
+        def sdc_sum_number_impl(self):
+            length = len(self)
+            result = 0
+            for i in prange(length):
+                if not isnan(self[i]):
+                    result += self[i]
+                else:
+                    return numpy.nan
+
+            return result
+
+        return sdc_sum_number_impl
+
+    if isinstance(dtype, (types.Boolean, bool)):
+        return gen_sum_bool_impl()
+
+
+@sdc_overload(nansum)
+def sdc_nansum_overload(self):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of numpy.nansum.
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k nansum
+    """
+
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if not isinstance(self, types.Array):
+        return None
+
+    if isinstance(dtype, types.Number):
+        def sdc_nansum_number_impl(self):
+            length = len(self)
+            result = 0
+            for i in prange(length):
+                if not numpy.isnan(self[i]):
+                    result += self[i]
+
+            return result
+
+        return sdc_nansum_number_impl
+
+    if isinstance(dtype, (types.Boolean, bool)):
+        return gen_sum_bool_impl()
+
+
+@sdc_overload(fillna)
+def sdc_fillna_overload(self, inplace=False, value=None):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of fillna.
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k fillna
+    """
+    if not isinstance(self, (types.Array, StringArrayType)):
+        return None
+
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if (
+        (isinstance(inplace, types.Literal) and inplace.literal_value == True) or  # noqa
+        (isinstance(inplace, bool) and inplace == True)  # noqa
+    ):
+        if isinstance(dtype, (types.Integer, types.Boolean)):
+            def sdc_fillna_inplace_int_impl(self, inplace=False, value=None):
+                return None
+
+            return sdc_fillna_inplace_int_impl
+
+        def sdc_fillna_inplace_float_impl(self, inplace=False, value=None):
+            length = len(self)
+            for i in prange(length):
+                if isnan(self[i]):
+                    self[i] = value
+            return None
+
+        return sdc_fillna_inplace_float_impl
+
+    else:
+        if isinstance(self.dtype, types.UnicodeType):
+            def sdc_fillna_str_impl(self, inplace=False, value=None):
+                n = len(self)
+                num_chars = 0
+                # get total chars in new array
+                for i in prange(n):
+                    s = self[i]
+                    if sdc.hiframes.api.isna(self, i):
+                        num_chars += len(value)
+                    else:
+                        num_chars += len(s)
+
+                filled_data = pre_alloc_string_array(n, num_chars)
+                for i in prange(n):
+                    if sdc.hiframes.api.isna(self, i):
+                        filled_data[i] = value
+                    else:
+                        filled_data[i] = self[i]
+                return filled_data
+
+            return sdc_fillna_str_impl
+
+        if isinstance(dtype, (types.Integer, types.Boolean)):
+            def sdc_fillna_int_impl(self, inplace=False, value=None):
+                return copy(self)
+
+            return sdc_fillna_int_impl
+
+        def sdc_fillna_impl(self, inplace=False, value=None):
+            length = len(self)
+            filled_data = numpy.empty(length, dtype=dtype)
+            for i in prange(length):
+                if isnan(self[i]):
+                    filled_data[i] = value
+                else:
+                    filled_data[i] = self[i]
+            return filled_data
+
+        return sdc_fillna_impl
+
+
+def nanmin(a):
+    pass
+
+
+def nanmax(a):
+    pass
+
+
+def nan_min_max_overload_factory(reduce_op):
+    def ov_impl(a):
+        if not isinstance(a, types.Array):
+            return
+
+        if isinstance(a.dtype, (types.Float, types.Complex)):
+            isnan = get_isnan(a.dtype)
+            initial_result = {
+                min: numpy.inf,
+                max: -numpy.inf,
+            }[reduce_op]
+
+            def impl(a):
+                result = initial_result
+                nan_count = 0
+                length = len(a)
+                for i in prange(length):
+                    v = a[i]
+                    if not isnan(v):
+                        result = reduce_op(result, v)
+                    else:
+                        nan_count += 1
+
+                if nan_count == length:
+                    return numpy.nan
+
+                return result
+            return impl
+        else:
+            def impl(a):
+                result = a[0]
+                for i in prange(len(a) - 1):
+                    result = reduce_op(result, a[i + 1])
+                return result
+            return impl
+
+    return ov_impl
+
+
+sdc_overload(nanmin)(nan_min_max_overload_factory(min))
+sdc_overload(nanmax)(nan_min_max_overload_factory(max))
+
+
+def nanprod(a):
+    pass
+
+
+@sdc_overload(nanprod)
+def np_nanprod(a):
+    """
+    Reimplemented with parfor from numba.targets.arraymath.
+    """
+    if not isinstance(a, types.Array):
+        return
+    if isinstance(a.dtype, types.Integer):
+        retty = types.intp
+    else:
+        retty = a.dtype
+    one = retty(1)
+    isnan = get_isnan(a.dtype)
+
+    def nanprod_impl(a):
+        c = one
+        for i in prange(len(a)):
+            v = a[i]
+            if not isnan(v):
+                c *= v
+        return c
+
+    return nanprod_impl

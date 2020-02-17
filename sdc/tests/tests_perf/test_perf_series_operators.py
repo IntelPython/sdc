@@ -25,9 +25,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import pandas
-import numpy as np
-
 import time
 import random
 
@@ -38,6 +35,7 @@ from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from .generator import generate_test_cases
 from .generator import TestCase as TC
+from .data_generator import gen_series
 
 
 """
@@ -57,40 +55,32 @@ class TestSeriesOperatorMethods(TestBase):
         if input_data is None:
             input_data = test_global_input_data_float64
 
-        full_input_data_length = sum(len(i) for i in input_data)
         for data_length in total_data_length:
             base = {
                 "test_name": test_name,
                 "data_size": data_length,
             }
-            data = perf_data_gen_fixed_len(input_data, full_input_data_length,
-                                           data_length)
-            test_data = pandas.Series(data)
 
-            args = [test_data]
-            for i in range(data_num - 1):
-                np.random.seed(i)
-                extra_data = np.random.ranf(data_length)
-                args.append(pandas.Series(extra_data))
+            args = gen_series(data_num, data_length, input_data)
 
-            self.test_jit(pyfunc, base, *args)
-            self.test_py(pyfunc, base, *args)
+            self._test_jit(pyfunc, base, *args)
+            self._test_py(pyfunc, base, *args)
 
 
 cases = [
-    TC(name='operator_add', size=[10 ** 7], call_expr='A + B', usecase_params='A, B', data_num=2),
-    TC(name='operator_eq', size=[10 ** 7], call_expr='A == B', usecase_params='A, B', data_num=2),
-    TC(name='operator_floordiv', size=[10 ** 7], call_expr='A // B', usecase_params='A, B', data_num=2),
-    TC(name='operator_ge', size=[10 ** 7], call_expr='A >= B', usecase_params='A, B', data_num=2),
-    TC(name='operator_gt', size=[10 ** 7], call_expr='A > B', usecase_params='A, B', data_num=2),
-    TC(name='operator_le', size=[10 ** 7], call_expr='A <= B', usecase_params='A, B', data_num=2),
-    TC(name='operator_lt', size=[10 ** 7], call_expr='A < B', usecase_params='A, B', data_num=2),
-    TC(name='operator_mod', size=[10 ** 7], call_expr='A % B', usecase_params='A, B', data_num=2),
-    TC(name='operator_mul', size=[10 ** 7], call_expr='A * B', usecase_params='A, B', data_num=2),
-    TC(name='operator_ne', size=[10 ** 7], call_expr='A != B', usecase_params='A, B', data_num=2),
-    TC(name='operator_pow', size=[10 ** 7], call_expr='A ** B', usecase_params='A, B', data_num=2),
-    TC(name='operator_sub', size=[10 ** 7], call_expr='A - B', usecase_params='A, B', data_num=2),
-    TC(name='operator_truediv', size=[10 ** 7], call_expr='A / B', usecase_params='A, B', data_num=2),
+    TC(name='operator.add', size=[10 ** 7], call_expr='A + B', usecase_params='A, B', data_num=2),
+    TC(name='operator.eq', size=[10 ** 7], call_expr='A == B', usecase_params='A, B', data_num=2),
+    TC(name='operator.floordiv', size=[10 ** 7], call_expr='A // B', usecase_params='A, B', data_num=2),
+    TC(name='operator.ge', size=[10 ** 7], call_expr='A >= B', usecase_params='A, B', data_num=2),
+    TC(name='operator.gt', size=[10 ** 7], call_expr='A > B', usecase_params='A, B', data_num=2),
+    TC(name='operator.le', size=[10 ** 7], call_expr='A <= B', usecase_params='A, B', data_num=2),
+    TC(name='operator.lt', size=[10 ** 7], call_expr='A < B', usecase_params='A, B', data_num=2),
+    TC(name='operator.mod', size=[10 ** 7], call_expr='A % B', usecase_params='A, B', data_num=2),
+    TC(name='operator.mul', size=[10 ** 7], call_expr='A * B', usecase_params='A, B', data_num=2),
+    TC(name='operator.ne', size=[10 ** 7], call_expr='A != B', usecase_params='A, B', data_num=2),
+    TC(name='operator.pow', size=[10 ** 7], call_expr='A ** B', usecase_params='A, B', data_num=2),
+    TC(name='operator.sub', size=[10 ** 7], call_expr='A - B', usecase_params='A, B', data_num=2),
+    TC(name='operator.truediv', size=[10 ** 7], call_expr='A / B', usecase_params='A, B', data_num=2),
 ]
 
 generate_test_cases(cases, TestSeriesOperatorMethods, 'series')

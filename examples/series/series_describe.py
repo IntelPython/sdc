@@ -26,12 +26,15 @@
 
 """
 Expect Series
-0      3.000000
-1    -10.000000
-2           nan
-3      0.000000
-4     92.000000
-dtype: object
+count    5.000000
+mean     4.380000
+std      3.315419
+min      0.000000
+25%      3.300000
+50%      4.400000
+75%      5.000000
+max      9.200000
+dtype: float64
 """
 import numpy as np
 import pandas as pd
@@ -39,10 +42,10 @@ from numba import njit
 
 
 @njit
-def series_astype():
-    series = pd.Series([3, -10, np.nan, 0, 92])
+def series_describe():
+    s = pd.Series([5., 0, 3.3, 4.4, 9.2])
 
-    return series.astype(str)
+    return s.describe()
 
 
-print(series_astype())
+print(series_describe())

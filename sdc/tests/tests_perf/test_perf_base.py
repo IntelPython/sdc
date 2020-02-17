@@ -2,10 +2,11 @@ import os
 import unittest
 import numba
 
+from sdc.tests.test_base import TestCase
 from sdc.tests.tests_perf.test_perf_utils import *
 
 
-class TestBase(unittest.TestCase):
+class TestBase(TestCase):
     iter_number = 5
     results_class = TestResults
 
@@ -42,10 +43,7 @@ class TestBase(unittest.TestCase):
         # compilation time
         record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
 
-        cfunc = numba.njit(pyfunc)
-
-        # Warming up
-        cfunc(*args, **kwargs)
+        cfunc = self.jit(pyfunc)
 
         # execution and boxing time
         record["test_results"], record["boxing_results"] = \
@@ -55,13 +53,13 @@ class TestBase(unittest.TestCase):
         record["test_results"], _ = \
             get_times(pyfunc, *args, **kwargs)
 
-    def test_jit(self, pyfunc, base, *args):
+    def _test_jit(self, pyfunc, base, *args):
         record = base.copy()
         record["test_type"] = 'SDC'
         self._test_jitted(pyfunc, record, *args)
         self.test_results.add(**record)
 
-    def test_py(self, pyfunc, base, *args):
+    def _test_py(self, pyfunc, base, *args):
         record = base.copy()
         record["test_type"] = 'Python'
         self._test_python(pyfunc, record, *args)

@@ -576,25 +576,41 @@ class TestDataFrame(TestCase):
         df2 = df.copy()
         np.testing.assert_almost_equal(hpat_func(df, arr), test_impl(df2, arr))
 
-    @skip_numba_jit
-    def test_df_values1(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
-            return df.values
-
-        hpat_func = self.jit(test_impl)
-        n = 11
-        np.testing.assert_array_equal(hpat_func(n), test_impl(n))
-
-    @skip_numba_jit
-    def test_df_values2(self):
+    def _test_df_values_unboxing(self, df):
         def test_impl(df):
             return df.values
 
-        hpat_func = self.jit(test_impl)
-        n = 11
-        df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
-        np.testing.assert_array_equal(hpat_func(df), test_impl(df))
+        sdc_func = self.jit(test_impl)
+        np.testing.assert_array_equal(sdc_func(df), test_impl(df))
+
+    def test_df_values_unboxing(self):
+        values_to_test = [[1, 2, 3, 4, 5],
+                          [.1, .2, .3, .4, .5],
+                          [np.nan, np.inf, .0, .1, -1.]]
+        n = 5
+        np.random.seed(0)
+        A = np.ones(n)
+        B = np.random.ranf(n)
+
+        for values in values_to_test:
+            with self.subTest(values=values):
+                df = pd.DataFrame({'A': A, 'B': B, 'C': values})
+                self._test_df_values_unboxing(df)
+
+    def test_df_values(self):
+        def test_impl(n, values):
+            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n), 'C': values})
+            return df.values
+
+        sdc_func = self.jit(test_impl)
+        n = 5
+        values_to_test = [[1, 2, 3, 4, 5],
+                          [.1, .2, .3, .4, .5],
+                          [np.nan, np.inf, .0, .1, -1.]]
+
+        for values in values_to_test:
+            with self.subTest(values=values):
+                np.testing.assert_array_equal(sdc_func(n, values), test_impl(n, values))
 
     @skip_numba_jit
     def test_df_values_parallel1(self):
@@ -1236,6 +1252,37 @@ class TestDataFrame(TestCase):
         ref_result = test_impl(df, start, end)
         pd.testing.assert_frame_equal(jit_result, ref_result)
 
+    def _test_df_getitem_tuple_idx(self, df):
+        def gen_test_impl(do_jit=False):
+            def test_impl(df):
+                if do_jit == True:  # noqa
+                    return df[('A', 'C')]
+                else:
+                    return df[['A', 'C']]
+
+            return test_impl
+
+        test_impl = gen_test_impl()
+        sdc_func = self.jit(gen_test_impl(do_jit=True))
+
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    def _test_df_getitem_bool_series_idx(self, df):
+        def test_impl(df):
+            return df[df['A'] == -1.]
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    def _test_df_getitem_bool_series_even_idx(self, df):
+        def test_impl(df, series):
+            return df[series]
+
+        s = pd.Series([False, True] * 5)
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(df, s), test_impl(df, s))
+
     @skip_sdc_jit('DF.getitem unsupported exceptions')
     def test_df_getitem_str_literal_idx_exception_key_error(self):
         def test_impl(df):
@@ -1261,16 +1308,34 @@ class TestDataFrame(TestCase):
                     sdc_func(df, 'ABC')
 
     @skip_sdc_jit('DF.getitem unsupported Series name')
+    def test_df_getitem_tuple_idx_exception_key_error(self):
+        sdc_func = self.jit(lambda df: df[('A', 'Z')])
+
+        for df in [gen_df(test_global_input_data_float64), pd.DataFrame()]:
+            with self.subTest(df=df):
+                with self.assertRaises(KeyError):
+                    sdc_func(df)
+
+    @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx(self):
         dfs = [gen_df(test_global_input_data_float64),
                gen_df(test_global_input_data_float64, with_index=True),
-               pd.DataFrame({'A': []})]
+               pd.DataFrame({'A': [], 'B': [], 'C': []})]
         for df in dfs:
             with self.subTest(df=df):
                 self._test_df_getitem_str_literal_idx(df)
                 self._test_df_getitem_unicode_idx(df, 'A')
                 self._test_df_getitem_slice_idx(df)
                 self._test_df_getitem_unbox_slice_idx(df, 1, 3)
+                self._test_df_getitem_tuple_idx(df)
+                self._test_df_getitem_bool_series_idx(df)
+
+    @skip_sdc_jit('DF.getitem unsupported Series name')
+    def test_df_getitem_idx_no_index(self):
+        dfs = [gen_df(test_global_input_data_float64), pd.DataFrame({'A': []})]
+        for df in dfs:
+            with self.subTest(df=df):
+                self._test_df_getitem_bool_series_even_idx(df)
 
     @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx_multiple_types(self):
@@ -1284,6 +1349,13 @@ class TestDataFrame(TestCase):
                 self._test_df_getitem_unicode_idx(df, 'A')
                 self._test_df_getitem_slice_idx(df)
                 self._test_df_getitem_unbox_slice_idx(df, 1, 3)
+                self._test_df_getitem_tuple_idx(df)
+                self._test_df_getitem_bool_series_even_idx(df)
+
+    @unittest.skip('DF.getitem df[bool_series] unsupported index')
+    def test_df_getitem_bool_series_even_idx_with_index(self):
+        df = gen_df(test_global_input_data_float64, with_index=True)
+        self._test_df_getitem_bool_series_even_idx(df)
 
     @unittest.skip('DF.getitem unsupported integer columns')
     def test_df_getitem_int_literal_idx(self):
@@ -1295,15 +1367,14 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
-    @unittest.skip('DF.getitem unsupported idx as a tuple')
-    def test_df_getitem_unicode_tuple_idx(self):
+    def test_df_getitem_attr(self):
         def test_impl(df):
-            return df[['A', 'B']]
+            return df.A
 
-        sdc_func = self.jit(lambda df: df[('A', 'B')])
+        sdc_func = self.jit(test_impl)
         df = gen_df(test_global_input_data_float64)
 
-        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+        pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
     @skip_numba_jit
     def test_isin_df1(self):

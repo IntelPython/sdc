@@ -24,25 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-"""
-Expect Series
-0      3.000000
-1    -10.000000
-2           nan
-3      0.000000
-4     92.000000
-dtype: object
-"""
-import numpy as np
 import pandas as pd
 from numba import njit
 
 
 @njit
-def series_astype():
-    series = pd.Series([3, -10, np.nan, 0, 92])
+def dataframe_values():
+    df = pd.DataFrame({'age': [3,  29], 'height': [94, 170], 'weight': [31, 115]})
+    result = df.values
 
-    return series.astype(str)
+    return result  # Numpy array of dataframe values: array([[3, 94, 31], [29, 170, 115]], dtype=int64)
 
 
-print(series_astype())
+print(dataframe_values())
