@@ -406,6 +406,7 @@ def dropna_overload(arr, idx, name):
     dtype = arr.dtype
     dtype_idx = idx.dtype
     isnan = get_isnan(dtype)
+
     def dropna_impl(arr, idx, name):
         chunks = get_chunks(len(arr))
         arr_len = numpy.empty(len(chunks), dtype=numpy.int64)

@@ -47,6 +47,7 @@ def get_pool_size():
 @sdc_overload(get_pool_size)
 def get_pool_size_overload():
     pool_size = get_pool_size()
+
     def get_pool_size_impl():
         return pool_size
 
