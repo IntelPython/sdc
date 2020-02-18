@@ -53,6 +53,7 @@ def get_pool_size_overload():
 
     return get_pool_size_impl
 
+
 @sdc_register_jitable
 def get_chunks(size, pool_size=0):
     if pool_size == 0:
