@@ -212,28 +212,22 @@ def skip_inline(msg_or_func):
     return wrapper(func) if func else wrapper
 
 
-def take_k_elements(k, data):
-    random_idx = np.arange(len(data))
-    np.random.shuffle(random_idx)
-    return np.asarray(data).take(random_idx[:k])
+def take_k_elements(k, data, repeat=False, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+    return np.random.choice(np.asarray(data), k, replace=repeat)
 
 
-def create_series_from_values(size, data_values, index_values=None, name=None, unique=True):
+def create_series_from_values(size, data_values, index_values=None, name=None, unique=True, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
 
     min_size = min(size, len(data_values))
     if index_values:
         min_size = min(min_size, len(index_values))
+    repeat = False if unique and min_size == size else True
 
-    if unique and min_size == size:
-        series_data = take_k_elements(size, data_values)
-        series_index = take_k_elements(size, index_values) if index_values else None
-    else:
-        data_values_pos = np.random.randint(0, len(data_values), size)
-        series_data = np.asarray(data_values).take(data_values_pos)
-        if index_values:
-            index_values_pos = np.random.randint(0, len(index_values), size)
-            series_index = np.asarray(index_values).take(index_values_pos)
-        else:
-            series_index = None
+    series_data = take_k_elements(size, data_values, repeat)
+    series_index = take_k_elements(size, index_values, repeat) if index_values else None
 
     return pandas.Series(series_data, series_index, name)
