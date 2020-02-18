@@ -425,20 +425,15 @@ def dropna_overload(arr, idx, name):
         result_index = numpy.empty(shape=length, dtype=dtype_idx)
         for i in prange(len(chunks)):
             chunk = chunks[i]
-            if i == 0:
-                new_start = 0
-                new_stop = arr_len[0]
-            else:
-                for x in range(i):
-                    new_start += arr_len[x]
-                new_stop = new_start + arr_len[i]
+            new_start = int(sum(arr_len[0:i]))
+            new_stop = new_start + arr_len[i]
+            current_pos = new_start
 
             for j in range(chunk.start, chunk.stop):
-                if new_start < new_stop:
-                    if not isnan(arr[j]):
-                        result_data[new_start] = arr[j]
-                        result_index[new_start] = idx[j]
-                        new_start += 1
+                if not isnan(arr[j]):
+                    result_data[current_pos] = arr[j]
+                    result_index[current_pos] = idx[j]
+                    current_pos += 1
 
         return pandas.Series(result_data, result_index, name)
 
