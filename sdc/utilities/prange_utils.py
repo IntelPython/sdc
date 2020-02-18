@@ -55,10 +55,7 @@ def get_pool_size_overload():
 
 
 @sdc_register_jitable
-def get_chunks(size, pool_size=0):
-    if pool_size == 0:
-        pool_size = get_pool_size()
-
+def get_chunks(size, pool_size):
     pool_size = min(pool_size, size)
     chunk_size = size // pool_size
     overload_size = size % pool_size
