@@ -63,6 +63,7 @@ if not sdc.config.config_pipeline_hpat_default:
     # sdc.datatypes.hpat_pandas_dataframe_pass.sdc_nopython_pipeline_lite_register
 
     import sdc.rewrites.dataframe_constructor
+    import sdc.rewrites.dataframe_getitem_attribute
     import sdc.datatypes.hpat_pandas_functions
     import sdc.datatypes.hpat_pandas_dataframe_functions
 else:

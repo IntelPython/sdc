@@ -240,6 +240,7 @@ class TestArrays(TestCase):
         sdc_func = self.jit(sdc_impl)
         np.testing.assert_array_equal(sdc_func(), ref_impl())
 
+
 class TestArrayReductions(TestCase):
 
     def check_reduction_basic(self, pyfunc, alt_pyfunc, all_nans=True):
@@ -263,6 +264,15 @@ class TestArrayReductions(TestCase):
             with self.subTest(data=case):
                 np.testing.assert_array_equal(alt_cfunc(case), pyfunc(case))
 
+    def test_nanmean(self):
+        def ref_impl(a):
+            return np.nanmean(a)
+
+        def sdc_impl(a):
+            return numpy_like.nanmean(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl)
+
     def test_nanmin(self):
         def ref_impl(a):
             return np.nanmin(a)
@@ -278,6 +288,15 @@ class TestArrayReductions(TestCase):
 
         def sdc_impl(a):
             return numpy_like.nanmax(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl)
+
+    def test_nanprod(self):
+        def ref_impl(a):
+            return np.nanprod(a)
+
+        def sdc_impl(a):
+            return numpy_like.nanprod(a)
 
         self.check_reduction_basic(ref_impl, sdc_impl)
 
