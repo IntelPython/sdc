@@ -33,6 +33,7 @@
 
 import numba
 import numpy
+import numpy as np
 
 from numba import types, jit, prange, numpy_support, literally
 from numba.errors import TypingError
@@ -472,3 +473,27 @@ def np_nanprod(a):
         return c
 
     return nanprod_impl
+
+
+def nanmean(a):
+    pass
+
+
+@sdc_overload(nanmean)
+def np_nanmean(a):
+    if not isinstance(a, types.Array):
+        return
+    isnan = get_isnan(a.dtype)
+
+    def nanmean_impl(a):
+        c = 0.0
+        count = 0
+        for i in prange(len(a)):
+            v = a[i]
+            if not isnan(v):
+                c += v
+                count += 1
+        # np.divide() doesn't raise ZeroDivisionError
+        return np.divide(c, count)
+
+    return nanmean_impl
