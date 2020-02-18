@@ -68,7 +68,7 @@ def get_chunks(size, pool_size=0):
         stop = min((i+1)*chunk_size, size)
         if start >= size:
             break
-        
+
         chunks.append(Chunk(start, stop))
 
     return chunks
