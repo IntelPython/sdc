@@ -865,61 +865,6 @@ def nancumsum(a):
     pass
 
 
-def get_pool_size():
-    return numba.config.NUMBA_NUM_THREADS
-
-
-@sdc_overload(get_pool_size)
-def get_pool_size_overload():
-    pool_size = get_pool_size()
-
-    def get_pool_size_impl():
-        return pool_size
-
-    return get_pool_size_impl
-
-
-def get_chunks(size, pool_size=0):
-    if pool_size == 0:
-        pool_size = get_pool_size()
-
-    chunk_size = size//pool_size + 1
-
-    Chunk = namedtuple('start', 'stop')
-
-    chunks = []
-
-    for i in range(pool_size):
-        start = min(i*chunk_size, size)
-        stop = min((i + 1)*chunk_size, size)
-        chunks.append(Chunk(start, stop))
-
-    return chunks
-
-
-@sdc_overload(get_chunks)
-def get_chunks_overload(size, pool_size=0):
-    Chunk = namedtuple('Chunk', ['start', 'stop'])
-
-    def get_chunks_impl(size, pool_size=0):
-        if pool_size == 0:
-            pool_size = get_pool_size()
-
-        chunk_size = size//pool_size + 1
-
-        chunks = []
-
-        for i in range(pool_size):
-            start = min(i*chunk_size, size)
-            stop = min((i + 1)*chunk_size, size)
-            chunk = Chunk(start, stop)
-            chunks.append(chunk)
-
-        return chunks
-
-    return get_chunks_impl
-
-
 @sdc_overload(cumsum)
 def np_cumsum(arr):
     if not isinstance(arr, types.Array):
@@ -929,7 +874,7 @@ def np_cumsum(arr):
     zero = retty(0)
 
     def cumsum_impl(arr):
-        chunks = get_chunks(len(arr))
+        chunks = parallel_chunks(len(arr))
         partial_sum = numpy.zeros(len(chunks), dtype=retty)
         result = numpy.empty_like(arr)
 
@@ -966,7 +911,7 @@ def np_nancumsum(arr, like_pandas=False):
         zero = retty(0)
 
         def nancumsum_impl(arr, like_pandas=False):
-            chunks = get_chunks(len(arr))
+            chunks = parallel_chunks(len(arr))
             partial_sum = numpy.zeros(len(chunks), dtype=retty)
             result = numpy.empty_like(arr)
 
