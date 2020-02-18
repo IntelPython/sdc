@@ -24,19 +24,29 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
-import string
+
 import time
 
-import numba
 import pandas
 import numpy as np
 
 from sdc.tests.test_utils import test_global_input_data_float64
 from sdc.tests.tests_perf.test_perf_base import TestBase
-from sdc.tests.tests_perf.test_perf_utils import (calc_compilation, get_times,
-                                                  perf_data_gen_fixed_len)
+from sdc.tests.tests_perf.test_perf_utils import perf_data_gen_fixed_len
 from .generator import generate_test_cases
 from .generator import TestCase as TC
+
+
+rolling_usecase_tmpl = """
+def series_rolling_{method_name}_usecase(data, {extra_usecase_params}):
+    start_time = time.time()
+    results = []
+    for i in range({ncalls}):
+        res = data.rolling({rolling_params}).{method_name}({method_params})
+        results.append(res)
+    end_time = time.time()
+    return end_time - start_time, results
+"""
 
 
 def get_rolling_params(window=100, min_periods=None):
@@ -48,14 +58,37 @@ def get_rolling_params(window=100, min_periods=None):
     return ', '.join(rolling_params)
 
 
+def gen_series_rolling_usecase(method_name, rolling_params=None,
+                               extra_usecase_params='',
+                               method_params='', ncalls=1):
+    """Generate series rolling method use case"""
+    if not rolling_params:
+        rolling_params = get_rolling_params()
+
+    func_text = rolling_usecase_tmpl.format(**{
+        'method_name': method_name,
+        'extra_usecase_params': extra_usecase_params,
+        'rolling_params': rolling_params,
+        'method_params': method_params,
+        'ncalls': ncalls
+    })
+
+    global_vars = {'np': np, 'time': time}
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _series_rolling_usecase = loc_vars[f'series_rolling_{method_name}_usecase']
+
+    return _series_rolling_usecase
+
+
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_series_rolling.TestSeriesRollingMethods
 class TestSeriesRollingMethods(TestBase):
-    # more than 19 columns raise SystemError: CPUDispatcher() returned a result with an error set
-    max_columns_num = 19
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls.map_ncalls_dlength = {
+            'sum': (100, [10 ** 5]),
+        }
 
     def _test_case(self, pyfunc, name, total_data_length, data_num=1,
                    input_data=test_global_input_data_float64):
@@ -82,6 +115,20 @@ class TestSeriesRollingMethods(TestBase):
             self._test_jit(pyfunc, base, *args)
             self._test_py(pyfunc, base, *args)
 
+    def _test_series_rolling_method(self, name, rolling_params=None,
+                                    extra_usecase_params='', method_params=''):
+        ncalls, total_data_length = self.map_ncalls_dlength[name]
+        usecase = gen_series_rolling_usecase(name, rolling_params=rolling_params,
+                                             extra_usecase_params=extra_usecase_params,
+                                             method_params=method_params, ncalls=ncalls)
+        data_num = 1
+        if extra_usecase_params:
+            data_num += len(extra_usecase_params.split(', '))
+        self._test_case(usecase, name, total_data_length, data_num=data_num)
+
+    def test_series_rolling_sum(self):
+        self._test_series_rolling_method('sum')
+
 
 cases = [
     TC(name='apply', size=[10 ** 7], params='func=lambda x: np.nan if len(x) == 0 else x.mean()'),
@@ -96,7 +143,6 @@ cases = [
     TC(name='quantile', size=[10 ** 7], params='0.2'),
     TC(name='skew', size=[10 ** 7]),
     TC(name='std', size=[10 ** 7]),
-    TC(name='sum', size=[4 * 10 ** 7]),
     TC(name='var', size=[10 ** 7]),
 ]
 
