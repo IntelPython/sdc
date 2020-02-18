@@ -73,6 +73,10 @@ def nansum(self):
     pass
 
 
+def corr(self):
+    pass
+
+
 @sdc_overload(astype)
 def sdc_astype_overload(self, dtype):
     """
@@ -132,6 +136,15 @@ def sdc_astype_overload(self, dtype):
         return sdc_astype_number_impl
 
     ty_checker.raise_exc(self.dtype, 'str or type', 'self.dtype')
+
+
+@sdc_overload(corr)
+def sdc_corr_overload(self):
+    def sdc_corr_impl(self):
+        print('QQQQ')
+        return 0
+
+    return sdc_corr_impl
 
 
 @sdc_overload(copy)

@@ -585,6 +585,32 @@ class TestSeries(
                     result = hpat_func(S1, S2, min_periods=period)
                     np.testing.assert_allclose(result, result_ref)
 
+    def test_series_corr_1(self):
+        def test_series_corr_impl(S1, S2, min_periods=None):
+            return S1.corr(S2, min_periods=min_periods)
+
+        hpat_func = self.jit(test_series_corr_impl)
+        test_input_data1 = [[.2, .0, .6, .2]]#,
+                            # [.2, .0, .6, .2, .5, .6, .7, .8],
+                            # [],
+                            # [2, 0, 6, 2],
+                            # [.2, .1, np.nan, .5, .3],
+                            # [-1, np.nan, 1, np.inf]]
+        test_input_data2 = [[.3, .6, .0, .1]]#,
+                            # [.3, .6, .0, .1, .8],
+                            # [],
+                            # [3, 6, 0, 1],
+                            # [.3, .2, .9, .6, np.nan],
+                            # [np.nan, np.nan, np.inf, np.nan]]
+        for input_data1 in test_input_data1:
+            for input_data2 in test_input_data2:
+                S1 = pd.Series(input_data1)
+                S2 = pd.Series(input_data2)
+                # for period in [None, 2, 1, 8, -4]:
+                result_ref = test_series_corr_impl(S1, S2)
+                result = hpat_func(S1, S2)
+                np.testing.assert_allclose(result, result_ref)
+
     @skip_sdc_jit('Series.corr() parameter "min_periods" unsupported')
     def test_series_corr_unsupported_dtype(self):
         def test_series_corr_impl(S1, S2, min_periods=None):
