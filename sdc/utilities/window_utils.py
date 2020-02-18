@@ -55,24 +55,40 @@ class WindowMean:
 
         return self._result
 
-    def roll(self, data, idx):
-        """Calculate the window mean."""
-        if self._nroll >= self.size:
-            excluded_value = data[idx - self.size]
-            if np.isfinite(excluded_value):
-                self._nfinite -= 1
-                if self._nfinite:
-                    self._result = ((self._nfinite + 1) * self._result - excluded_value) / self._nfinite
-                else:
-                    self._result = np.nan
-
-        value = data[idx]
+    def _include(self, value):
+        """Calculate the window mean with new value."""
         if np.isfinite(value):
             self._nfinite += 1
             if np.isnan(self._result):
                 self._result = value / self._nfinite
             else:
                 self._result = ((self._nfinite - 1) * self._result + value) / self._nfinite
+
+    def _exclude(self, value):
+        """Calculate the window mean without old value."""
+        if np.isfinite(value):
+            self._nfinite -= 1
+            if self._nfinite:
+                self._result = ((self._nfinite + 1) * self._result - value) / self._nfinite
+            else:
+                self._result = np.nan
+
+    def roll(self, data, idx):
+        """Calculate the window mean."""
+        if self._nroll == 0:
+            start = max(idx + 1 - self.size, 0)
+            for i in range(start, idx):
+                value = data[i]
+                self._include(value)
+
+                self._nroll += 1
+
+        if self._nroll >= self.size:
+            value = data[idx - self.size]
+            self._exclude(value)
+
+        value = data[idx]
+        self._include(value)
 
         self._nroll += 1
 
