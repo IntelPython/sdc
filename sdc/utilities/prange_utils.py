@@ -29,8 +29,7 @@ import numba
 import sdc
 
 from typing import NamedTuple
-from sdc.utilities.utils import sdc_overload
-from sdc.utilities.utils import sdc_register_jitable
+from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 
 
 class Chunk(NamedTuple):
@@ -41,8 +40,8 @@ class Chunk(NamedTuple):
 def get_pool_size():
     if sdc.config.config_use_parallel_overloads:
         return numba.config.NUMBA_NUM_THREADS
-    else:
-        return 1
+
+    return 1
 
 
 @sdc_overload(get_pool_size)
@@ -60,6 +59,7 @@ def get_chunks(size, pool_size=0):
     if pool_size == 0:
         pool_size = get_pool_size()
 
+    pool_size = min(pool_size, size)
     chunk_size = size // pool_size
 
     chunks = []
