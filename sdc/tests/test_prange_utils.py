@@ -79,4 +79,4 @@ class ChunkTest(TestCase):
     def test_get_chunks(self):
         for args, expected_chunks in self._get_chunks_date():
             with self.subTest(args=args):
-                self.assertEqual(get_chunks(*args), expected_chunks)
+                self._check_get_chunks(args, expected_chunks)
