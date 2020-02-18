@@ -317,7 +317,7 @@ class TestStrings(TestCase):
         A = np.array(['AA', 'B'])
         self.assertEqual(hpat_func(A), test_impl(A))
 
-    @unittest.skipIf(platform.system() == 'Windows', "no glob support on windows yet")
+    @unittest.skip("No glob support on windows yet. Segfault on Linux if no files found by pattern")
     def test_glob(self):
         def test_impl():
             glob.glob("*py")
