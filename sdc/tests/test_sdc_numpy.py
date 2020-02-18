@@ -240,7 +240,6 @@ class TestArrays(TestCase):
         sdc_func = self.jit(sdc_impl)
         np.testing.assert_array_equal(sdc_func(), ref_impl())
 
-
     def test_argmin(self):
         def ref_impl(a):
             return np.argmin(a)

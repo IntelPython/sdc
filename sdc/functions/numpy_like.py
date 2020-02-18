@@ -151,277 +151,164 @@ def sdc_astype_overload(self, dtype):
         return sdc_astype_number_impl
 
 
-@sdc_overload(nanargmin)
-def sdc_nanargmin_overload(self):
-    """
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Parallel replacement of numpy.nanargmin.
+def sdc_nanarg_overload(reduce_op):
+    def nanarg_impl(self):
+        """
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+        Parallel replacement of numpy.nanargmin/numpy.nanargmax.
 
-    .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k nanargmin
+        .. only:: developer
+        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k nanargmin
+        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k nanargmax
 
-    """
+        """
 
-    ty_checker = TypeChecker("numpy-like 'nanargmin'")
-    dtype = self.dtype
-    isnan = get_isnan(dtype)
-    max_int64 = max_dtype_int_val(numpy_support.from_dtype(numpy.int64))
-    if isinstance(dtype, types.Integer):
-        max_ref = max_dtype_int_val(dtype)
+        ty_checker = TypeChecker("numpy-like 'nanargmin'/'nanargmax'")
+        dtype = self.dtype
+        isnan = get_isnan(dtype)
+        max_int64 = max_dtype_int_val(numpy_support.from_dtype(numpy.int64))
+        if isinstance(dtype, types.Integer):
+            initial_result = {
+                min: max_dtype_int_val(dtype),
+                max: min_dtype_int_val(dtype),
+            }[reduce_op]
 
-    if isinstance(dtype, types.Float):
-        max_ref = max_dtype_float_val(dtype)
+        if isinstance(dtype, types.Float):
+            initial_result = {
+                min: max_dtype_float_val(dtype),
+                max: min_dtype_float_val(dtype),
+            }[reduce_op]
 
-    if not isinstance(self, types.Array):
-        return None
+        if not isinstance(self, types.Array):
+            return None
 
-    if isinstance(dtype, types.Number):
-        def sdc_nanargmin_impl(self):
-            chunks = get_chunks(len(self))
-            arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
-            arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
-            for i in prange(len(chunks)):
-                chunk = chunks[i]
-                res = max_ref
-                pos = max_int64
-                for j in range(chunk.start, chunk.stop):
-                    if min(res, self[j]) == self[j]:
+        if isinstance(dtype, types.Number):
+            def sdc_nanargmin_impl(self):
+                chunks = get_chunks(len(self))
+                arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
+                arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
+                for i in prange(len(chunks)):
+                    chunk = chunks[i]
+                    res = initial_result
+                    pos = max_int64
+                    for j in range(chunk.start, chunk.stop):
+                        if reduce_op(res, self[j]) == self[j]:
+                            if not isnan(self[j]):
+                                if res == self[j]:
+                                    pos = min(pos, j)
+                                else:
+                                    pos = j
+                                    res = self[j]
+                    arr_res[i] = res
+                    arr_pos[i] = pos
+
+                general_res = initial_result
+                general_pos = max_int64
+                for i in range(len(chunks)):
+                    if reduce_op(general_res, arr_res[i]) == arr_res[i]:
+                        if general_res == arr_res[i]:
+                            general_pos = min(general_pos, arr_pos[i])
+                        else:
+                            general_pos = arr_pos[i]
+                            general_res = arr_res[i]
+
+                return general_pos
+
+            return sdc_nanargmin_impl
+
+        ty_checker.raise_exc(dtype, 'number', 'self.dtype')
+    return nanarg_impl
+
+
+sdc_overload(nanargmin)(sdc_nanarg_overload(min))
+sdc_overload(nanargmax)(sdc_nanarg_overload(max))
+
+
+def sdc_arg_overload(reduce_op):
+    def arg_impl(self):
+        """
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+        Parallel replacement of numpy.argmin/numpy.argmax.
+
+        .. only:: developer
+        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k argmin
+        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k argmax
+
+        """
+
+        ty_checker = TypeChecker("numpy-like 'argmin'/'argmax'")
+        dtype = self.dtype
+        isnan = get_isnan(dtype)
+        max_int64 = max_dtype_int_val(numpy_support.from_dtype(numpy.int64))
+        if isinstance(dtype, types.Integer):
+            initial_result = {
+                min: max_dtype_int_val(dtype),
+                max: min_dtype_int_val(dtype),
+            }[reduce_op]
+
+        if isinstance(dtype, types.Float):
+            initial_result = {
+                min: max_dtype_float_val(dtype),
+                max: min_dtype_float_val(dtype),
+            }[reduce_op]
+
+        if not isinstance(self, types.Array):
+            return None
+
+        if isinstance(dtype, types.Number):
+            def sdc_argmin_impl(self):
+                chunks = get_chunks(len(self))
+                arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
+                arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
+                for i in prange(len(chunks)):
+                    chunk = chunks[i]
+                    res = initial_result
+                    pos = max_int64
+                    for j in range(chunk.start, chunk.stop):
                         if not isnan(self[j]):
-                            if res == self[j]:
+                            if reduce_op(res, self[j]) == self[j]:
+                                if res == self[j]:
+                                    pos = min(pos, j)
+                                else:
+                                    pos = j
+                                    res = self[j]
+                        else:
+                            if numpy.isnan(res):
                                 pos = min(pos, j)
                             else:
                                 pos = j
-                                res = self[j]
-                arr_res[i] = res
-                arr_pos[i] = pos
+                            res = self[j]
 
-            general_res = max_ref
-            general_pos = max_int64
-            for i in range(len(chunks)):
-                if min(general_res, arr_res[i]) == arr_res[i]:
-                    if general_res == arr_res[i]:
-                        general_pos = min(general_pos, arr_pos[i])
-                    else:
-                        general_pos = arr_pos[i]
-                        general_res = arr_res[i]
-
-            return general_pos
-
-        return sdc_nanargmin_impl
-
-    ty_checker.raise_exc(dtype, 'number', 'self.dtype')
-
-
-@sdc_overload(nanargmax)
-def sdc_nanargmax_overload(self):
-    """
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Parallel replacement of numpy.nanargmax.
-
-    .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k nanargmax
-
-    """
-
-    ty_checker = TypeChecker("numpy-like 'nanargmax'")
-    dtype = self.dtype
-    isnan = get_isnan(dtype)
-    max_int64 = max_dtype_int_val(numpy_support.from_dtype(numpy.int64))
-    if isinstance(dtype, types.Integer):
-        min_ref = min_dtype_int_val(dtype)
-
-    if isinstance(dtype, types.Float):
-        min_ref = min_dtype_float_val(dtype)
-
-    if not isinstance(self, types.Array):
-        return None
-
-    if isinstance(dtype, types.Number):
-        def sdc_nanargmax_impl(self):
-            chunks = get_chunks(len(self))
-            arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
-            arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
-            for i in prange(len(chunks)):
-                chunk = chunks[i]
-                res = min_ref
-                pos = max_int64
-                for j in range(chunk.start, chunk.stop):
-                    if max(res, self[j]) == self[j]:
-                        if not isnan(self[j]):
-                            if res == self[j]:
-                                pos = min(pos, j)
-                            else:
-                                pos = j
-                                res = self[j]
-                arr_res[i] = res
-                arr_pos[i] = pos
-
-            general_res = min_ref
-            general_pos = max_int64
-            for i in range(len(chunks)):
-                if max(general_res, arr_res[i]) == arr_res[i]:
+                    arr_res[i] = res
+                    arr_pos[i] = pos
+                general_res = initial_result
+                general_pos = max_int64
+                for i in range(len(chunks)):
                     if not isnan(arr_res[i]):
-                        if general_res == arr_res[i]:
-                            general_pos = min(general_pos, arr_pos[i])
-                        else:
-                            general_pos = arr_pos[i]
-                            general_res = arr_res[i]
-
-            return general_pos
-
-        return sdc_nanargmax_impl
-
-    ty_checker.raise_exc(dtype, 'number', 'self.dtype')
-
-
-@sdc_overload(argmin)
-def sdc_argmin_overload(self):
-    """
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Parallel replacement of numpy.argmin.
-
-    .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k argmin
-
-    """
-
-    ty_checker = TypeChecker("numpy-like 'argmin'")
-    dtype = self.dtype
-    isnan = get_isnan(dtype)
-    max_int64 = max_dtype_int_val(numpy_support.from_dtype(numpy.int64))
-    if isinstance(dtype, types.Integer):
-        max_ref = max_dtype_int_val(dtype)
-
-    if isinstance(dtype, types.Float):
-        max_ref = max_dtype_float_val(dtype)
-
-    if not isinstance(self, types.Array):
-        return None
-
-    if isinstance(dtype, types.Number):
-        def sdc_argmin_impl(self):
-            chunks = get_chunks(len(self))
-            arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
-            arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
-            for i in prange(len(chunks)):
-                chunk = chunks[i]
-                res = max_ref
-                pos = max_int64
-                for j in range(chunk.start, chunk.stop):
-                    if not isnan(self[j]):
-                        if min(res, self[j]) == self[j]:
-                            if res == self[j]:
-                                pos = min(pos, j)
+                        if reduce_op(general_res, arr_res[i]) == arr_res[i]:
+                            if general_res == arr_res[i]:
+                                general_pos = min(general_pos, arr_pos[i])
                             else:
-                                pos = j
-                                res = self[j]
+                                general_pos = arr_pos[i]
+                                general_res = arr_res[i]
                     else:
-                        if numpy.isnan(res):
-                            pos = min(pos, j)
-                        else:
-                            pos = j
-                        res = self[j]
-
-                arr_res[i] = res
-                arr_pos[i] = pos
-            general_res = max_ref
-            general_pos = max_int64
-            for i in range(len(chunks)):
-                if not isnan(arr_res[i]):
-                    if min(general_res, arr_res[i]) == arr_res[i]:
-                        if general_res == arr_res[i]:
+                        if numpy.isnan(general_res):
                             general_pos = min(general_pos, arr_pos[i])
                         else:
                             general_pos = arr_pos[i]
-                            general_res = arr_res[i]
-                else:
-                    if numpy.isnan(general_res):
-                        general_pos = min(general_pos, arr_pos[i])
-                    else:
-                        general_pos = arr_pos[i]
-                    general_res = arr_res[i]
-            return general_pos
+                        general_res = arr_res[i]
+                return general_pos
 
-        return sdc_argmin_impl
+            return sdc_argmin_impl
 
-    ty_checker.raise_exc(dtype, 'number', 'self.dtype')
+        ty_checker.raise_exc(dtype, 'number', 'self.dtype')
+    return arg_impl
 
 
-@sdc_overload(argmax)
-def sdc_argmax_overload(self):
-    """
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Parallel replacement of numpy.argmax.
-
-    .. only:: developer
-       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k argmax
-
-    """
-
-    ty_checker = TypeChecker("numpy-like 'argmax'")
-    dtype = self.dtype
-    isnan = get_isnan(dtype)
-    max_int64 = max_dtype_int_val(numpy_support.from_dtype(numpy.int64))
-    if isinstance(dtype, types.Integer):
-        min_ref = min_dtype_int_val(dtype)
-
-    if isinstance(dtype, types.Float):
-        min_ref = min_dtype_float_val(dtype)
-
-    if not isinstance(self, types.Array):
-        return None
-
-    if isinstance(dtype, types.Number):
-        def sdc_argmax_impl(self):
-            chunks = get_chunks(len(self))
-            arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
-            arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
-            for i in prange(len(chunks)):
-                chunk = chunks[i]
-                res = min_ref
-                pos = max_int64
-                for j in range(chunk.start, chunk.stop):
-                    if not isnan(self[j]):
-                        if max(res, self[j]) == self[j]:
-                            if res == self[j]:
-                                pos = min(pos, j)
-                            else:
-                                pos = j
-                                res = self[j]
-                    else:
-                        if numpy.isnan(res):
-                            pos = min(pos, j)
-                        else:
-                            pos = j
-                        res = self[j]
-
-                arr_res[i] = res
-                arr_pos[i] = pos
-            general_res = min_ref
-            general_pos = max_int64
-            for i in range(len(chunks)):
-                if not isnan(arr_res[i]):
-                    if max(general_res, arr_res[i]) == arr_res[i]:
-                        if general_res == arr_res[i]:
-                            general_pos = min(general_pos, arr_pos[i])
-                        else:
-                            general_pos = arr_pos[i]
-                            general_res = arr_res[i]
-                else:
-                    if numpy.isnan(general_res):
-                        general_pos = min(general_pos, arr_pos[i])
-                    else:
-                        general_pos = arr_pos[i]
-                    general_res = arr_res[i]
-            return general_pos
-
-        return sdc_argmax_impl
-
-    ty_checker.raise_exc(dtype, 'number', 'self.dtype')
+sdc_overload(argmin)(sdc_arg_overload(min))
+sdc_overload(argmax)(sdc_arg_overload(max))
 
 
 @sdc_overload(copy)
