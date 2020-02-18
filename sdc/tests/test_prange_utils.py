@@ -31,7 +31,7 @@ from sdc.utilities.prange_utils import get_chunks, Chunk
 
 class ChunkTest(TestCase):
 
-    def _get_chunks_date(self):
+    def _get_chunks_data(self):
         yield (5, 5), [
             Chunk(start=0, stop=1),
             Chunk(start=1, stop=2),
@@ -77,6 +77,6 @@ class ChunkTest(TestCase):
         self.assertEqual(cfunc(*args), expected_chunks)
 
     def test_get_chunks(self):
-        for args, expected_chunks in self._get_chunks_date():
+        for args, expected_chunks in self._get_chunks_data():
             with self.subTest(args=args):
                 self._check_get_chunks(args, expected_chunks)
