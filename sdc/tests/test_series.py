@@ -6291,14 +6291,13 @@ class TestSeries(
         for series_data in all_data:
             for series_index in indexes:
                 S = pd.Series(series_data, series_index, dtype=dtype)
-                for idx in idxs:
-                    for value in values:
-                        with self.subTest(series=S, idx=idx, value=value):
-                            S1 = S.copy(deep=True)
-                            S2 = S.copy(deep=True)
-                            hpat_func(S1, idx, value)
-                            test_impl(S2, idx, value)
-                            pd.testing.assert_series_equal(S1, S2)
+                for idx, value in product(idxs, values):
+                    with self.subTest(series=S, idx=idx, value=value):
+                        S1 = S.copy(deep=True)
+                        S2 = S.copy(deep=True)
+                        hpat_func(S1, idx, value)
+                        test_impl(S2, idx, value)
+                        pd.testing.assert_series_equal(S1, S2)
 
     @skip_sdc_jit('Not implemented in old-pipeline')
     @skip_numba_jit('Requires StringArray support of operator.eq')
@@ -6365,11 +6364,10 @@ class TestSeries(
             integer Series with index of matching dtype and scalar and non scalar assigned values """
 
         n, k = 11, 4
-        np.random.seed(0)
         series_data = np.arange(n)
         series_index = gen_strlist(n, 2, 'abcd123 ')
 
-        idx = create_series_from_values(k, series_index)
+        idx = create_series_from_values(k, series_index, seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
@@ -6382,11 +6380,10 @@ class TestSeries(
             integer Series with index of matching dtype and scalar and non scalar assigned values """
 
         n, k = 11, 4
-        np.random.seed(0)
         series_data = np.arange(n)
         series_index = np.arange(n, dtype=np.float)
 
-        idx = create_series_from_values(k, series_index)
+        idx = create_series_from_values(k, series_index, seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
@@ -6404,11 +6401,10 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         n, k = 11, 4
-        np.random.seed(0)
         series_data = np.arange(n)
         series_index = np.arange(n)
 
-        idx = create_series_from_values(k, series_index)
+        idx = create_series_from_values(k, series_index, seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
@@ -6421,11 +6417,10 @@ class TestSeries(
             integer Series with index of non-matching dtype and scalar and non scalar assigned values """
 
         n, k = 11, 4
-        np.random.seed(0)
         series_data = np.arange(n)
         series_index = gen_strlist(n, 2, 'abcd123 ')
 
-        idx = create_series_from_values(k, np.arange(n))
+        idx = create_series_from_values(k, np.arange(n), seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
@@ -6476,12 +6471,11 @@ class TestSeries(
             integer Series with integer index and scalar and non scalar assigned values """
 
         n, k = 11, 4
-        np.random.seed(0)
-
         series_data = np.arange(n)
         series_index = np.arange(n)
 
-        idx = take_k_elements(k, series_index)
+        np.random.seed(0)
+        idx = take_k_elements(k, series_index, seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
@@ -6496,11 +6490,10 @@ class TestSeries(
             integer Series with string index and scalar and non scalar assigned values """
 
         n, k = 11, 4
-        np.random.seed(0)
         series_data = np.arange(n)
         series_index = gen_strlist(n, 2, 'abcd123 ')
 
-        idx = take_k_elements(k, np.arange(n))
+        idx = take_k_elements(k, np.arange(n), seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,

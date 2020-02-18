@@ -1185,7 +1185,9 @@ class FixDfArrayType(AbstractTemplate):
             and (isinstance(column.dtype, types.Number)
                  or column.dtype == types.boolean)):
             ret_typ = types.Array(column.dtype, 1, 'C')
-        if isinstance(column, types.List) and column.dtype == string_type:
+        if (isinstance(column, types.List)
+            and (column.dtype == string_type
+                 or isinstance(column.dtype, types.Optional) and column.dtype.type == string_type)):
             ret_typ = string_array_type
         if isinstance(column, DatetimeIndexType):
             ret_typ = sdc.hiframes.pd_index_ext._dt_index_data_typ
@@ -1214,7 +1216,10 @@ def fix_df_array_overload(column):
         return fix_df_array_list_impl
 
     # convert list of strings to string array
-    if isinstance(column, types.List) and column.dtype == string_type:
+    if (isinstance(column, types.List)
+        and (column.dtype == string_type
+             or isinstance(column.dtype, types.Optional) and column.dtype.type == string_type)):
+
         def fix_df_array_str_impl(column):  # pragma: no cover
             return sdc.str_arr_ext.StringArray(column)
         return fix_df_array_str_impl
