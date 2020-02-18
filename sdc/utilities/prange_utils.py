@@ -60,14 +60,15 @@ def get_chunks(size, pool_size=0):
         pool_size = get_pool_size()
 
     pool_size = min(pool_size, size)
-    chunk_size = size // pool_size
+    chunk_size = (size - 1)//pool_size + 1
 
     chunks = []
     for i in range(pool_size):
-        start = i * chunk_size
-        stop = (i + 1) * chunk_size
-        if i == pool_size - 1:
-            stop = max(stop, size)
+        start = i*chunk_size
+        stop = min((i+1)*chunk_size, size)
+        if start >= size:
+            break
+        
         chunks.append(Chunk(start, stop))
 
     return chunks
