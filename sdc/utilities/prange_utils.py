@@ -37,21 +37,12 @@ class Chunk(NamedTuple):
     stop: int
 
 
+@sdc_register_jitable
 def get_pool_size():
     if sdc.config.config_use_parallel_overloads:
         return numba.config.NUMBA_NUM_THREADS
 
     return 1
-
-
-@sdc_overload(get_pool_size)
-def get_pool_size_overload():
-    pool_size = get_pool_size()
-
-    def get_pool_size_impl():
-        return pool_size
-
-    return get_pool_size_impl
 
 
 @sdc_register_jitable
@@ -67,3 +58,8 @@ def get_chunks(size, pool_size):
         chunks.append(Chunk(start, stop))
 
     return chunks
+
+
+@sdc_register_jitable
+def parallel_chunks(size):
+    return get_chunks(size, get_pool_size())
