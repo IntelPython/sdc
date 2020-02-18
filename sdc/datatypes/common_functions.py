@@ -673,4 +673,3 @@ def _sdc_take_overload(data, indexes):
         return _sdc_take_str_arr_impl
 
     return None
-

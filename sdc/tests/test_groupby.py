@@ -52,6 +52,13 @@ _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
                                  "large"],
                            "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
 
+_default_df_numeric_data = {
+                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                    'B': np.arange(11, dtype=np.intp),
+                    'C': np.arange(11, dtype=np.float_),
+                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+    }
 
 class TestGroupBy(TestCase):
 
@@ -73,61 +80,24 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(result, result_ref)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    def test_dataframe_groupby_count_by_int(self):
+    def test_dataframe_groupby_by_all_dtypes(self):
         def test_impl(df):
             return df.groupby('A').count()
         hpat_func = self.jit(test_impl)
 
-        n = 11
-        df = pd.DataFrame({
-                    'A': [2, 1, 1, 1, 2, 2, 1, 0, 3, 1, 3],
-                    'B': np.arange(n, dtype=np.intp),
-                    'C': np.arange(n, dtype=np.float_),
-                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
-                    'E': ['a', 'bb', 'd', 'c', ' ', None, 'aaa', None, 'bb', None, 'd']
-        })
-        result = hpat_func(df)
-        result_ref = test_impl(df)
-        # TODO: implement index classes, as current indexes do not have names
-        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
-
-    @skip_sdc_jit('Fails with old-pipeline from the start')
-    def test_dataframe_groupby_count_by_float(self):
-        def test_impl(df):
-            return df.groupby('A').count()
-        hpat_func = self.jit(test_impl)
-
-        n = 11
-        df = pd.DataFrame({
-                    'A': [2, 1, 1, 1, 2, 2, 1, 3, np.nan, 1, np.nan],
-                    'B': np.arange(n, dtype=np.intp),
-                    'C': np.arange(n, dtype=np.float_),
-                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
-                    'E': ['a', 'bb', 'd', 'c', ' ', None, 'aaa', None, 'bb', None, 'd']
-        })
-        result = hpat_func(df)
-        result_ref = test_impl(df)
-        # TODO: implement index classes, as current indexes do not have names
-        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
-
-    @skip_sdc_jit('Fails with old-pipeline from the start')
-    def test_dataframe_groupby_count_by_str(self):
-        def test_impl(df):
-            return df.groupby('A').count()
-        hpat_func = self.jit(test_impl)
-
-        n = 11
-        df = pd.DataFrame({
-                    'A': ['b', 'a', 'a', 'a', 'b', 'b', 'a', ' ', None, 'a', None],
-                    'B': np.arange(n, dtype=np.intp),
-                    'C': np.arange(n, dtype=np.float_),
-                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
-                    'E': ['a', 'bb', 'd', 'c', ' ', None, 'aaa', None, 'bb', None, 'd']
-        })
-        result = hpat_func(df)
-        result_ref = test_impl(df)
-        # TODO: implement index classes, as current indexes do not have names
-        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+        dtype_to_column_data = {
+                'int': [2, 1, 1, 1, 2, 2, 1, 0, 3, 1, 3],
+                'float': [2, 1, 1, 1, 2, 2, 1, 3, np.nan, 1, np.nan],
+                'string': ['b', 'a', 'a', 'a', 'b', 'b', 'a', ' ', None, 'a', None]
+        }
+        df = pd.DataFrame(_default_df_numeric_data)
+        for dtype, col_data in dtype_to_column_data.items():
+            with self.subTest(by_dtype=dtype, by_data=col_data):
+                df['A'] = col_data
+                result = hpat_func(df)
+                result_ref = test_impl(df)
+                # TODO: implement index classes, as current indexes do not have names
+                pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_sort(self):
@@ -151,19 +121,24 @@ class TestGroupBy(TestCase):
                 pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
+    def test_dataframe_groupby_count(self):
+        def test_impl(df):
+            return df.groupby('A').count()
+        hpat_func = self.jit(test_impl)
+
+        df = pd.DataFrame(_default_df_numeric_data)
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_max(self):
         def test_impl(df):
             return df.groupby('A').max()
         hpat_func = self.jit(test_impl)
 
-        n = 11
-        df = pd.DataFrame({
-                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
-                    'B': np.arange(n, dtype=np.intp),
-                    'C': np.arange(n, dtype=np.float_),
-                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
-                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
-        })
+        df = pd.DataFrame(_default_df_numeric_data)
         result = hpat_func(df)
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
@@ -175,14 +150,7 @@ class TestGroupBy(TestCase):
             return df.groupby('A').min()
         hpat_func = self.jit(test_impl)
 
-        n = 11
-        df = pd.DataFrame({
-                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
-                    'B': np.arange(n, dtype=np.intp),
-                    'C': np.arange(n, dtype=np.float_),
-                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
-                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
-        })
+        df = pd.DataFrame(_default_df_numeric_data)
         result = hpat_func(df)
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
@@ -194,14 +162,7 @@ class TestGroupBy(TestCase):
             return df.groupby('A').mean()
         hpat_func = self.jit(test_impl)
 
-        n = 11
-        df = pd.DataFrame({
-                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
-                    'B': np.arange(n, dtype=np.intp),
-                    'C': np.arange(n, dtype=np.float_),
-                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
-                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
-        })
+        df = pd.DataFrame(_default_df_numeric_data)
         result = hpat_func(df)
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
@@ -213,14 +174,7 @@ class TestGroupBy(TestCase):
             return df.groupby('A').median()
         hpat_func = self.jit(test_impl)
 
-        n = 11
-        df = pd.DataFrame({
-                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
-                    'B': np.arange(n, dtype=np.intp),
-                    'C': np.arange(n, dtype=np.float_),
-                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
-                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
-        })
+        df = pd.DataFrame(_default_df_numeric_data)
         result = hpat_func(df)
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
@@ -249,14 +203,7 @@ class TestGroupBy(TestCase):
             return df.groupby('A').prod()
         hpat_func = self.jit(test_impl)
 
-        n = 11
-        df = pd.DataFrame({
-                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
-                    'B': np.arange(n, dtype=np.intp),
-                    'C': np.arange(n, dtype=np.float_),
-                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
-                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
-        })
+        df = pd.DataFrame(_default_df_numeric_data)
         result = hpat_func(df)
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
@@ -269,14 +216,7 @@ class TestGroupBy(TestCase):
             return df.groupby('A').sum()
         hpat_func = self.jit(test_impl)
 
-        n = 11
-        df = pd.DataFrame({
-                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
-                    'B': np.arange(n, dtype=np.intp),
-                    'C': np.arange(n, dtype=np.float_),
-                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
-                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
-        })
+        df = pd.DataFrame(_default_df_numeric_data)
         result = hpat_func(df)
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
@@ -288,14 +228,7 @@ class TestGroupBy(TestCase):
             return df.groupby('A').std()
         hpat_func = self.jit(test_impl)
 
-        n = 11
-        df = pd.DataFrame({
-                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
-                    'B': np.arange(n, dtype=np.intp),
-                    'C': np.arange(n, dtype=np.float_),
-                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
-                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
-        })
+        df = pd.DataFrame(_default_df_numeric_data)
         result = hpat_func(df)
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
@@ -307,14 +240,7 @@ class TestGroupBy(TestCase):
             return df.groupby('A').var()
         hpat_func = self.jit(test_impl)
 
-        n = 11
-        df = pd.DataFrame({
-                    'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
-                    'B': np.arange(n, dtype=np.intp),
-                    'C': np.arange(n, dtype=np.float_),
-                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
-                    'E': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
-        })
+        df = pd.DataFrame(_default_df_numeric_data)
         result = hpat_func(df)
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
