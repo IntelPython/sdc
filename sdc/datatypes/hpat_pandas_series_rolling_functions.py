@@ -29,7 +29,7 @@ import pandas
 
 from functools import partial
 
-from numba import objmode, prange
+from numba import prange
 from numba.extending import register_jitable
 from numba.types import (float64, Boolean, Integer, NoneType, Number,
                          Omitted, StringLiteral, UnicodeType)
