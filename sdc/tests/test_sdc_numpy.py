@@ -324,6 +324,15 @@ class TestArrayReductions(TestCase):
             with self.subTest(data=case):
                 np.testing.assert_array_equal(alt_cfunc(case), pyfunc(case))
 
+    def test_nanmean(self):
+        def ref_impl(a):
+            return np.nanmean(a)
+
+        def sdc_impl(a):
+            return numpy_like.nanmean(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl)
+
     def test_nanmin(self):
         def ref_impl(a):
             return np.nanmin(a)

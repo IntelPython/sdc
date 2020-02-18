@@ -670,11 +670,15 @@ def construct_string_array(context, builder):
 @lower_builtin(StringArray, types.UniTuple)
 @lower_builtin(StringArray, types.Tuple)
 def impl_string_array_single(context, builder, sig, args):
-    if isinstance(args[0], types.UniTuple):
-        assert args[0].dtype == string_type
 
-    if isinstance(args[0], types.Tuple):
-        for i in args[0]:
+    arg = args[0]
+    if isinstance(arg, (types.UniTuple, types.List)):
+        assert (arg.dtype == string_type
+                or (isinstance(arg.dtype, types.Optional) and arg.dtype.type == string_type))
+
+    # FIXME: doesn't work for Tuple with None values
+    if isinstance(arg, types.Tuple):
+        for i in arg:
             assert i.dtype == string_type or i.dtype == types.StringLiteral
 
     if not sig.args:  # return empty string array if no args
@@ -682,21 +686,27 @@ def impl_string_array_single(context, builder, sig, args):
             builder, lambda: pre_alloc_string_array(0, 0), sig, args)
         return res
 
-    def str_arr_from_list(in_list):
+    def str_arr_from_sequence(in_list):
         n_strs = len(in_list)
         total_chars = 0
         # TODO: use vector to avoid two passes?
         # get total number of chars
-        for s in in_list:
-            total_chars += get_utf8_size(s)
+        nan_mask = np.zeros(n_strs, dtype=np.bool_)
+        for i in numba.prange(n_strs):
+            s = in_list[i]
+            if s is None:
+                nan_mask[i] = True
+            else:
+                total_chars += get_utf8_size(s)
 
         A = pre_alloc_string_array(n_strs, total_chars)
-        for i in range(n_strs):
-            A[i] = in_list[i]
+        for i in np.arange(n_strs):
+            A[i] = '' if nan_mask[i] else in_list[i]
+        str_arr_set_na_by_mask(A, nan_mask)
 
         return A
 
-    res = context.compile_internal(builder, str_arr_from_list, sig, args)
+    res = context.compile_internal(builder, str_arr_from_sequence, sig, args)
     return res
 
 # @lower_builtin(StringArray)
