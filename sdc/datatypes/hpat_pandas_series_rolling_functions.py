@@ -37,8 +37,10 @@ from numba.types import (float64, Boolean, Integer, NoneType, Number,
 from sdc.datatypes.common_functions import _sdc_pandas_series_align
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.hiframes.pd_series_type import SeriesType
+from sdc.utilities.prange_utils import get_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
+from sdc.utilities.window_utils import WindowMean
 
 
 # disabling parallel execution for rolling due to numba issue https://github.com/numba/numba/issues/5098
@@ -559,54 +561,17 @@ def hpat_pandas_series_rolling_mean(self):
         length = len(input_arr)
         output_arr = numpy.empty(length, dtype=float64)
 
-        nfinite = 0
-        current_result = numpy.nan
-        boundary = min(win, length)
-        for i in range(boundary):
-            value = input_arr[i]
-            if numpy.isfinite(value):
-                nfinite += 1
-                if numpy.isnan(current_result):
-                    current_result = value / nfinite
-                else:
-                    current_result = ((nfinite - 1) * current_result + value) / nfinite
+        chunks = get_chunks(length)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            window = WindowMean(win, minp)
+            for idx in range(chunk.start, chunk.stop):
+                window.roll(input_arr, idx)
+                output_arr[idx] = window.result
+            window.free()
 
-            if nfinite < minp:
-                output_arr[i] = numpy.nan
-            else:
-                output_arr[i] = current_result
-
-        start_indices = range(length - boundary)
-        end_indices = range(boundary, length)
-        for start_idx, end_idx in zip(start_indices, end_indices):
-            if start_idx == end_idx:
-                # case when window == 0
-                output_arr[end_idx] = current_result
-                continue
-
-            first_val = input_arr[start_idx]
-            last_val = input_arr[end_idx]
-
-            if numpy.isfinite(first_val):
-                nfinite -= 1
-                if nfinite:
-                    current_result = ((nfinite + 1) * current_result - first_val) / nfinite
-                else:
-                    current_result = numpy.nan
-
-            if numpy.isfinite(last_val):
-                nfinite += 1
-                if numpy.isnan(current_result):
-                    current_result = last_val / nfinite
-                else:
-                    current_result = ((nfinite - 1) * current_result + last_val) / nfinite
-
-            if nfinite < minp:
-                output_arr[end_idx] = numpy.nan
-            else:
-                output_arr[end_idx] = current_result
-
-        return pandas.Series(output_arr, input_series._index, name=input_series._name)
+        return pandas.Series(output_arr, input_series._index,
+                             name=input_series._name)
 
     return _sdc_pandas_series_rolling_mean_impl
 
