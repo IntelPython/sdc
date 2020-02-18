@@ -29,7 +29,7 @@ import pandas
 
 from functools import partial
 
-from numba import prange
+from numba import objmode, prange
 from numba.extending import register_jitable
 from numba.types import (float64, Boolean, Integer, NoneType, Number,
                          Omitted, StringLiteral, UnicodeType)
@@ -40,6 +40,7 @@ from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.prange_utils import get_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
+from sdc.utilities.window_utils import WindowSum
 
 
 # disabling parallel execution for rolling due to numba issue https://github.com/numba/numba/issues/5098
@@ -630,56 +631,14 @@ def hpat_pandas_series_rolling_sum(self):
         chunks = get_chunks(length)
         for i in prange(len(chunks)):
             chunk = chunks[i]
+            window = WindowSum(win, minp)
+            for idx in range(chunk.start, chunk.stop):
+                window.roll(input_arr, idx)
+                output_arr[idx] = window.result
+            window.free()
 
-            start = max(chunk.start - (win - 1), 0)
-            win_length = chunk.stop - start
-
-            nfinite = 0
-            current_result = 0.
-            boundary = start + min(win, win_length)
-            for idx in range(start, boundary):
-                value = input_arr[idx]
-                if numpy.isfinite(value):
-                    nfinite += 1
-                    current_result += value
-
-                if idx < chunk.start:
-                    continue
-
-                if nfinite < minp:
-                    output_arr[idx] = numpy.nan
-                else:
-                    output_arr[idx] = current_result
-
-            start_indices = range(start, start + chunk.stop - boundary)
-            end_indices = range(boundary, chunk.stop)
-            for start_idx, end_idx in zip(start_indices, end_indices):
-                if start_idx == end_idx:
-                    # case when window == 0
-                    if end_idx < chunk.start:
-                        continue
-                    output_arr[end_idx] = current_result
-                    continue
-
-                excluded_val = input_arr[start_idx]
-                included_val = input_arr[end_idx]
-
-                if numpy.isfinite(excluded_val):
-                    nfinite -= 1
-                    current_result -= excluded_val
-                if numpy.isfinite(included_val):
-                    nfinite += 1
-                    current_result += included_val
-
-                if end_idx < chunk.start:
-                    continue
-
-                if nfinite < minp:
-                    output_arr[end_idx] = numpy.nan
-                else:
-                    output_arr[end_idx] = current_result
-
-        return pandas.Series(output_arr, input_series._index, name=input_series._name)
+        return pandas.Series(output_arr, input_series._index,
+                             name=input_series._name)
 
     return _sdc_pandas_series_rolling_sum_impl
 
