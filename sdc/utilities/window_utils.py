@@ -55,8 +55,8 @@ if __name__ == '__main__':
     @njit
     def sum():
         win_sum = WindowSum(3, 2)
-        data = list(range(5)) # 0, 1, 2, 3, 4
+        data = list(range(5))  # 0, 1, 2, 3, 4
         for i in data:
             win_sum.roll(data, i)
-            print(win_sum.result) # nan, 1.0, 3.0, 6.0, 9.0
+            print(win_sum.result)  # nan, 1.0, 3.0, 6.0, 9.0
     sum()
