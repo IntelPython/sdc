@@ -3787,7 +3787,7 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
             _skipna = skipna
 
         if _skipna:
-            return numpy.nanmean(self._data)
+            return numpy_like.nanmean(self._data)
 
         return self._data.mean()
 

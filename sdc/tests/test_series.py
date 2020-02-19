@@ -2410,58 +2410,44 @@ class TestSeries(
         S = pd.Series(['aa', 'bb', np.nan])
         self.assertEqual(hpat_func(S), test_impl(S))
 
+    def _mean_data_samples(self):
+        yield [6, 6, 2, 1, 3, 3, 2, 1, 2]
+        yield [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2]
+        yield [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2]
+        yield [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf]
+        yield [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf]
+        yield [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2]
+        yield [np.nan, np.nan, np.nan]
+        yield [np.nan, np.nan, np.inf]
+
+    def _check_mean(self, pyfunc, *args):
+        cfunc = self.jit(pyfunc)
+
+        actual = cfunc(*args)
+        expected = pyfunc(*args)
+        if np.isnan(actual) or np.isnan(expected):
+            self.assertEqual(np.isnan(actual), np.isnan(expected))
+        else:
+            self.assertEqual(actual, expected)
+
     def test_series_mean(self):
         def test_impl(S):
             return S.mean()
-        hpat_func = self.jit(test_impl)
 
-        data_samples = [
-            [6, 6, 2, 1, 3, 3, 2, 1, 2],
-            [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
-            [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
-            [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
-            [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
-            [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
-            [np.nan, np.nan, np.nan],
-            [np.nan, np.nan, np.inf],
-        ]
-
-        for data in data_samples:
+        for data in self._mean_data_samples():
             with self.subTest(data=data):
                 S = pd.Series(data)
-                actual = hpat_func(S)
-                expected = test_impl(S)
-                if np.isnan(actual) or np.isnan(expected):
-                    self.assertEqual(np.isnan(actual), np.isnan(expected))
-                else:
-                    self.assertEqual(actual, expected)
+                self._check_mean(test_impl, S)
 
     @skip_sdc_jit("Series.mean() any parameters unsupported")
     def test_series_mean_skipna(self):
         def test_impl(S, skipna):
             return S.mean(skipna=skipna)
-        hpat_func = self.jit(test_impl)
-
-        data_samples = [
-            [6, 6, 2, 1, 3, 3, 2, 1, 2],
-            [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
-            [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
-            [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
-            [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
-            [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
-            [np.nan, np.nan, np.nan],
-            [np.nan, np.nan, np.inf],
-        ]
 
         for skipna in [True, False]:
-            for data in data_samples:
+            for data in self._mean_data_samples():
                 S = pd.Series(data)
-                actual = hpat_func(S, skipna)
-                expected = test_impl(S, skipna)
-                if np.isnan(actual) or np.isnan(expected):
-                    self.assertAlmostEqual(np.isnan(actual), np.isnan(expected))
-                else:
-                    self.assertAlmostEqual(actual, expected)
+                self._check_mean(test_impl, S, skipna)
 
     def test_series_var1(self):
         def test_impl(S):
@@ -6305,14 +6291,13 @@ class TestSeries(
         for series_data in all_data:
             for series_index in indexes:
                 S = pd.Series(series_data, series_index, dtype=dtype)
-                for idx in idxs:
-                    for value in values:
-                        with self.subTest(series=S, idx=idx, value=value):
-                            S1 = S.copy(deep=True)
-                            S2 = S.copy(deep=True)
-                            hpat_func(S1, idx, value)
-                            test_impl(S2, idx, value)
-                            pd.testing.assert_series_equal(S1, S2)
+                for idx, value in product(idxs, values):
+                    with self.subTest(series=S, idx=idx, value=value):
+                        S1 = S.copy(deep=True)
+                        S2 = S.copy(deep=True)
+                        hpat_func(S1, idx, value)
+                        test_impl(S2, idx, value)
+                        pd.testing.assert_series_equal(S1, S2)
 
     @skip_sdc_jit('Not implemented in old-pipeline')
     @skip_numba_jit('Requires StringArray support of operator.eq')
@@ -6379,11 +6364,10 @@ class TestSeries(
             integer Series with index of matching dtype and scalar and non scalar assigned values """
 
         n, k = 11, 4
-        np.random.seed(0)
         series_data = np.arange(n)
         series_index = gen_strlist(n, 2, 'abcd123 ')
 
-        idx = create_series_from_values(k, series_index)
+        idx = create_series_from_values(k, series_index, seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
@@ -6396,11 +6380,10 @@ class TestSeries(
             integer Series with index of matching dtype and scalar and non scalar assigned values """
 
         n, k = 11, 4
-        np.random.seed(0)
         series_data = np.arange(n)
         series_index = np.arange(n, dtype=np.float)
 
-        idx = create_series_from_values(k, series_index)
+        idx = create_series_from_values(k, series_index, seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
@@ -6418,11 +6401,10 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         n, k = 11, 4
-        np.random.seed(0)
         series_data = np.arange(n)
         series_index = np.arange(n)
 
-        idx = create_series_from_values(k, series_index)
+        idx = create_series_from_values(k, series_index, seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
@@ -6435,11 +6417,10 @@ class TestSeries(
             integer Series with index of non-matching dtype and scalar and non scalar assigned values """
 
         n, k = 11, 4
-        np.random.seed(0)
         series_data = np.arange(n)
         series_index = gen_strlist(n, 2, 'abcd123 ')
 
-        idx = create_series_from_values(k, np.arange(n))
+        idx = create_series_from_values(k, np.arange(n), seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
@@ -6490,12 +6471,11 @@ class TestSeries(
             integer Series with integer index and scalar and non scalar assigned values """
 
         n, k = 11, 4
-        np.random.seed(0)
-
         series_data = np.arange(n)
         series_index = np.arange(n)
 
-        idx = take_k_elements(k, series_index)
+        np.random.seed(0)
+        idx = take_k_elements(k, series_index, seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
@@ -6510,11 +6490,10 @@ class TestSeries(
             integer Series with string index and scalar and non scalar assigned values """
 
         n, k = 11, 4
-        np.random.seed(0)
         series_data = np.arange(n)
         series_index = gen_strlist(n, 2, 'abcd123 ')
 
-        idx = take_k_elements(k, np.arange(n))
+        idx = take_k_elements(k, np.arange(n), seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
                             -100,
