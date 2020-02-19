@@ -37,7 +37,7 @@ from numba.types import (float64, Boolean, Integer, NoneType, Number,
 from sdc.datatypes.common_functions import _sdc_pandas_series_align
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.hiframes.pd_series_type import SeriesType
-from sdc.utilities.prange_utils import get_chunks
+from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
 from sdc.utilities.window_utils import WindowMean
@@ -314,6 +314,35 @@ hpat_pandas_rolling_series_var_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_var))
 
 
+def gen_sdc_pandas_series_rolling_impl(window_cls):
+    """Generate series rolling methods implementations based on window class"""
+    def impl(self):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        chunks = parallel_chunks(length)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            window = window_cls(win, minp)
+            for idx in range(chunk.start, chunk.stop):
+                window.roll(input_arr, idx)
+                output_arr[idx] = window.result
+            window.free()
+
+        return pandas.Series(output_arr, input_series._index,
+                             name=input_series._name)
+    return impl
+
+
+sdc_pandas_rolling_series_mean_impl = register_jitable(
+    gen_sdc_pandas_series_rolling_impl(WindowMean))
+
+
 @sdc_rolling_overload(SeriesRollingType, 'apply')
 def hpat_pandas_series_rolling_apply(self, func, raw=None):
 
@@ -546,34 +575,13 @@ def hpat_pandas_series_rolling_max(self):
     return hpat_pandas_rolling_series_max_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'mean')
+@sdc_overload_method(SeriesRollingType, 'mean')
 def hpat_pandas_series_rolling_mean(self):
 
     ty_checker = TypeChecker('Method rolling.mean().')
     ty_checker.check(self, SeriesRollingType)
 
-    def _sdc_pandas_series_rolling_mean_impl(self):
-        win = self._window
-        minp = self._min_periods
-
-        input_series = self._data
-        input_arr = input_series._data
-        length = len(input_arr)
-        output_arr = numpy.empty(length, dtype=float64)
-
-        chunks = get_chunks(length)
-        for i in prange(len(chunks)):
-            chunk = chunks[i]
-            window = WindowMean(win, minp)
-            for idx in range(chunk.start, chunk.stop):
-                window.roll(input_arr, idx)
-                output_arr[idx] = window.result
-            window.free()
-
-        return pandas.Series(output_arr, input_series._index,
-                             name=input_series._name)
-
-    return _sdc_pandas_series_rolling_mean_impl
+    return sdc_pandas_rolling_series_mean_impl
 
 
 @sdc_rolling_overload(SeriesRollingType, 'median')
