@@ -70,14 +70,3 @@ class SDCBuildDoc(Command):
         self._remove_cwd_from_syspath()
         self.sdc_build_doc_command = BuildDoc(dist)
         self.sdc_build_doc_command.initialize_options()
-
-
-# Sphinx Developer's Documentation Build
-
-#class build_devdoc(build.build):
-#    description = "Build developer's documentation"
-#
-#    def run(self):
-#        spawn(['rm', '-rf', 'docs/_builddev'])
-#        spawn(['sphinx-build', '-b', 'html', '-d', 'docs/_builddev/docstrees',
-#               '-j1', 'docs/devsource', '-t', 'developer', 'docs/_builddev/html'])
