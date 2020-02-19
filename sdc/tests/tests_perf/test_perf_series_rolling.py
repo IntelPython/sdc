@@ -40,12 +40,10 @@ from .generator import TestCase as TC
 rolling_usecase_tmpl = """
 def series_rolling_{method_name}_usecase(data, {extra_usecase_params}):
     start_time = time.time()
-    results = []
     for i in range({ncalls}):
         res = data.rolling({rolling_params}).{method_name}({method_params})
-        results.append(res)
     end_time = time.time()
-    return end_time - start_time, results
+    return end_time - start_time, res
 """
 
 
@@ -87,7 +85,7 @@ class TestSeriesRollingMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
         cls.map_ncalls_dlength = {
-            'sum': (100, [10 ** 5]),
+            'sum': (100, [2 * 10 ** 5]),
         }
 
     def _test_case(self, pyfunc, name, total_data_length, data_num=1,
