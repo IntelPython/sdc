@@ -44,7 +44,7 @@ import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size, str_arr_is_na)
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
-from sdc.utilities.prange_utils import get_chunks
+from sdc.utilities.prange_utils import parallel_chunks
 
 
 def astype(self, dtype):
@@ -488,7 +488,7 @@ def dropna_overload(arr, idx, name):
     isnan = get_isnan(dtype)
 
     def dropna_impl(arr, idx, name):
-        chunks = get_chunks(len(arr))
+        chunks = parallel_chunks(len(arr))
         arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
         length = 0
 
