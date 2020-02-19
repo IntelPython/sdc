@@ -55,36 +55,37 @@ class WindowSum:
 
         return self._result
 
-    def _include(self, value):
+    def _put(self, value):
         """Calculate the window sum with new value."""
         if np.isfinite(value):
             self._nfinite += 1
             self._result += value
 
-    def _exclude(self, value):
+    def _pop(self, value):
         """Calculate the window sum without old value."""
         if np.isfinite(value):
             self._nfinite -= 1
             self._result -= value
+
+    def _roll(self, data, idx):
+        """Calculate the window sum based on the previous result."""
+        if self._nroll >= self.size:
+            value = data[idx - self.size]
+            self._pop(value)
+
+        value = data[idx]
+        self._put(value)
+
+        self._nroll += 1
 
     def roll(self, data, idx):
         """Calculate the window sum."""
         if self._nroll == 0:
             start = max(idx + 1 - self.size, 0)
             for i in range(start, idx):
-                value = data[i]
-                self._include(value)
+                self._roll(data, i)
 
-                self._nroll += 1
-
-        if self._nroll >= self.size:
-            value = data[idx - self.size]
-            self._exclude(value)
-
-        value = data[idx]
-        self._include(value)
-
-        self._nroll += 1
+        self._roll(data, idx)
 
     def free(self):
         """Free the window."""
