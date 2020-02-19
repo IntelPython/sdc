@@ -37,8 +37,10 @@ from numba.types import (float64, Boolean, Integer, NoneType, Number,
 from sdc.datatypes.common_functions import _sdc_pandas_series_align
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.hiframes.pd_series_type import SeriesType
+from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
+from sdc.utilities.window_utils import WindowMin
 
 
 # disabling parallel execution for rolling due to numba issue https://github.com/numba/numba/issues/5098
@@ -163,15 +165,6 @@ def arr_median(arr):
         return numpy.nan
 
     return numpy.median(arr)
-
-
-@sdc_register_jitable
-def arr_min(arr):
-    """Calculate minimum of values"""
-    if len(arr) == 0:
-        return numpy.nan
-
-    return arr.min()
 
 
 @sdc_register_jitable
@@ -302,8 +295,6 @@ hpat_pandas_rolling_series_mean_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_mean))
 hpat_pandas_rolling_series_median_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_median))
-hpat_pandas_rolling_series_min_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_min))
 hpat_pandas_rolling_series_skew_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_skew))
 hpat_pandas_rolling_series_std_impl = register_jitable(
@@ -312,6 +303,35 @@ hpat_pandas_rolling_series_sum_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_sum))
 hpat_pandas_rolling_series_var_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_var))
+
+
+def gen_sdc_pandas_series_rolling_impl(window_cls):
+    """Generate series rolling methods implementations based on window class"""
+    def impl(self):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        chunks = parallel_chunks(length)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            window = window_cls(win, minp)
+            for idx in range(chunk.start, chunk.stop):
+                window.roll(input_arr, idx)
+                output_arr[idx] = window.result
+            window.free()
+
+        return pandas.Series(output_arr, input_series._index,
+                             name=input_series._name)
+    return impl
+
+
+sdc_pandas_rolling_series_min_impl = register_jitable(
+    gen_sdc_pandas_series_rolling_impl(WindowMin))
 
 
 @sdc_rolling_overload(SeriesRollingType, 'apply')
@@ -541,71 +561,13 @@ def hpat_pandas_series_rolling_median(self):
     return hpat_pandas_rolling_series_median_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'min')
+@sdc_overload_method(SeriesRollingType, 'min')
 def hpat_pandas_series_rolling_min(self):
 
     ty_checker = TypeChecker('Method rolling.min().')
     ty_checker.check(self, SeriesRollingType)
 
-    def _sdc_pandas_series_rolling_min_impl(self):
-        win = self._window
-        minp = self._min_periods
-
-        input_series = self._data
-        input_arr = input_series._data
-        length = len(input_arr)
-        output_arr = numpy.empty(length, dtype=float64)
-
-        nfinite = 0
-        current_result = numpy.nan
-        boundary = min(win, length)
-        for i in range(boundary):
-            value = input_arr[i]
-            if numpy.isfinite(value):
-                nfinite += 1
-                if numpy.isnan(current_result) or value < current_result:
-                    current_result = value
-
-            if nfinite < minp:
-                output_arr[i] = numpy.nan
-            else:
-                output_arr[i] = current_result
-
-        start_indices = range(length - boundary)
-        end_indices = range(boundary, length)
-        for start_idx, end_idx in zip(start_indices, end_indices):
-            if start_idx == end_idx:
-                # case when window == 0
-                output_arr[end_idx] = current_result
-                continue
-
-            first_val = input_arr[start_idx]
-            last_val = input_arr[end_idx]
-
-            if numpy.isfinite(first_val):
-                nfinite -= 1
-                if nfinite:
-                    if first_val == current_result:
-                        arr_range = input_arr[start_idx + 1:end_idx + 1]
-                        finite_arr = arr_range[numpy.isfinite(arr_range)]
-                        current_result = arr_min(finite_arr)
-                else:
-                    current_result = numpy.nan
-
-            if numpy.isfinite(last_val):
-                nfinite += 1
-                if numpy.isnan(current_result) or last_val < current_result:
-                    current_result = last_val
-
-            if nfinite < minp:
-                output_arr[end_idx] = numpy.nan
-            else:
-                output_arr[end_idx] = current_result
-
-        return pandas.Series(output_arr, input_series._index, name=input_series._name)
-
-    return _sdc_pandas_series_rolling_min_impl
-
+    return sdc_pandas_rolling_series_min_impl
 
 @sdc_rolling_overload(SeriesRollingType, 'quantile')
 def hpat_pandas_series_rolling_quantile(self, quantile, interpolation='linear'):
