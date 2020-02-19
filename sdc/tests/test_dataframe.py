@@ -33,6 +33,7 @@ import string
 import unittest
 from itertools import permutations, product
 from numba.config import IS_32BITS
+from numba.special import literal_unroll
 
 import sdc
 from sdc.tests.gen_test_data import ParquetGenerator
@@ -63,7 +64,7 @@ COL_IND = 0
 class TestDataFrame(TestCase):
 
     def test_create1(self):
-        def test_impl(n, A, B):
+        def test_impl(A, B):
             df = pd.DataFrame({'A': A, 'B': B})
             return df
 
@@ -71,9 +72,8 @@ class TestDataFrame(TestCase):
         n = 11
         A = np.ones(n)
         B = np.random.ranf(n)
-        pd.testing.assert_frame_equal(hpat_func(n, A, B), test_impl(n, A, B))
+        pd.testing.assert_frame_equal(hpat_func(A, B), test_impl(A, B))
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_create2(self):
         def test_impl():
             df = pd.DataFrame({'A': [1, 2, 3]})
@@ -82,7 +82,6 @@ class TestDataFrame(TestCase):
 
         self.assertEqual(hpat_func(), test_impl())
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_create3(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n)})
@@ -92,7 +91,6 @@ class TestDataFrame(TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_create_str(self):
         def test_impl():
             df = pd.DataFrame({'A': ['a', 'b', 'c']})
@@ -112,7 +110,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_create_with_series2(self):
         # test creating dataframe from passed series
         def test_impl(A):
@@ -160,7 +157,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_pass_df1(self):
         def test_impl(df):
             return (df.A == 2).sum()
@@ -170,7 +166,6 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df), test_impl(df))
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_pass_df_str(self):
         def test_impl(df):
             return (df.A == 'a').sum()
@@ -230,7 +225,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @unittest.skip("pending df filter support")
+    @skip_sdc_jit("pending df filter support")
     def test_box3(self):
         def test_impl(df):
             df = df[df.A != 'dd']
@@ -319,7 +314,6 @@ class TestDataFrame(TestCase):
             {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @skip_numba_jit
     def test_filter1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -332,7 +326,7 @@ class TestDataFrame(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @skip_numba_jit
+    @skip_numba_jit('np.sum of Series unsupported')
     def test_filter2(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -345,7 +339,7 @@ class TestDataFrame(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @skip_numba_jit
+    @skip_numba_jit('np.sum of Series unsupported')
     def test_filter3(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -1283,6 +1277,15 @@ class TestDataFrame(TestCase):
         sdc_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(sdc_func(df, s), test_impl(df, s))
 
+    def _test_df_getitem_bool_array_even_idx(self, df):
+        def test_impl(df, arr):
+            return df[arr]
+
+        arr = np.array([i % 2 for i in range(len(df))], dtype=np.bool_)
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(df, arr), test_impl(df, arr))
+
     @skip_sdc_jit('DF.getitem unsupported exceptions')
     def test_df_getitem_str_literal_idx_exception_key_error(self):
         def test_impl(df):
@@ -1307,7 +1310,7 @@ class TestDataFrame(TestCase):
                 with self.assertRaises(KeyError):
                     sdc_func(df, 'ABC')
 
-    @skip_sdc_jit('DF.getitem unsupported Series name')
+    @skip_sdc_jit('DF.getitem unsupported exceptions')
     def test_df_getitem_tuple_idx_exception_key_error(self):
         sdc_func = self.jit(lambda df: df[('A', 'Z')])
 
@@ -1315,6 +1318,18 @@ class TestDataFrame(TestCase):
             with self.subTest(df=df):
                 with self.assertRaises(KeyError):
                     sdc_func(df)
+
+    @skip_sdc_jit('DF.getitem unsupported exceptions')
+    def test_df_getitem_bool_array_idx_exception_value_error(self):
+        sdc_func = self.jit(lambda df, arr: df[arr])
+
+        for df in [gen_df(test_global_input_data_float64), pd.DataFrame()]:
+            arr = np.array([i % 2 for i in range(len(df) + 1)], dtype=np.bool_)
+            with self.subTest(df=df, arr=arr):
+                with self.assertRaises(ValueError) as raises:
+                    sdc_func(df, arr)
+                self.assertIn('Item wrong length', str(raises.exception))
+
 
     @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx(self):
@@ -1336,6 +1351,7 @@ class TestDataFrame(TestCase):
         for df in dfs:
             with self.subTest(df=df):
                 self._test_df_getitem_bool_series_even_idx(df)
+                self._test_df_getitem_bool_array_even_idx(df)
 
     @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx_multiple_types(self):
@@ -1351,6 +1367,7 @@ class TestDataFrame(TestCase):
                 self._test_df_getitem_unbox_slice_idx(df, 1, 3)
                 self._test_df_getitem_tuple_idx(df)
                 self._test_df_getitem_bool_series_even_idx(df)
+                self._test_df_getitem_bool_array_even_idx(df)
 
     @unittest.skip('DF.getitem df[bool_series] unsupported index')
     def test_df_getitem_bool_series_even_idx_with_index(self):
@@ -1364,6 +1381,15 @@ class TestDataFrame(TestCase):
 
         sdc_func = self.jit(test_impl)
         df = gen_df_int_cols(test_global_input_data_float64)
+
+        pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
+
+    def test_df_getitem_attr(self):
+        def test_impl(df):
+            return df.A
+
+        sdc_func = self.jit(test_impl)
+        df = gen_df(test_global_input_data_float64)
 
         pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
@@ -1711,7 +1737,6 @@ class TestDataFrame(TestCase):
                 result = hpat_func(df, periods, method)
                 pd.testing.assert_frame_equal(result, result_ref)
 
-    @skip_numba_jit("Accessing series with df.A syntax is not implemented yet")
     def test_list_convert(self):
         def test_impl():
             df = pd.DataFrame({'one': np.array([-1, np.nan, 2.5]),
@@ -1724,6 +1749,47 @@ class TestDataFrame(TestCase):
         self.assertTrue(isinstance(one, np.ndarray))
         self.assertTrue(isinstance(two, np.ndarray))
         self.assertTrue(isinstance(three, np.ndarray))
+
+    def test_df_iterate_over_columns1(self):
+        """ Verifies iteration over df columns using literal tuple of column indices. """
+        from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
+        from sdc.hiframes.api import get_nan_mask
+
+        @self.jit
+        def jitted_func():
+            df = pd.DataFrame({
+                        'A': ['a', 'b', None, 'a', '', None, 'b'],
+                        'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
+                        'C': [np.nan, 1, 2, 1, np.nan, 2, 1],
+                        'D': [1, 2, 9, 5, 2, 1, 0]
+            })
+
+            # tuple of literals has to be created in a jitted function, otherwise
+            # col_id won't be literal and unboxing in get_dataframe_data won't compile
+            column_ids = (0, 1, 2, 3)
+            res_nan_mask = np.zeros(len(df), dtype=np.bool_)
+            for col_id in literal_unroll(column_ids):
+                res_nan_mask += get_nan_mask(get_dataframe_data(df, col_id))
+            return res_nan_mask
+
+        # expected is a boolean mask of df rows that have None values
+        expected = np.asarray([True, False, True, False, True, True, False])
+        result = jitted_func()
+        np.testing.assert_array_equal(result, expected)
+
+    def test_df_create_str_with_none(self):
+        """ Verifies creation of a dataframe with a string column from a list of Optional values. """
+        def test_impl():
+            df = pd.DataFrame({
+                        'A': ['a', 'b', None, 'a', '', None, 'b'],
+                        'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
+                        'C': [np.nan, 1, 2, 1, np.nan, 2, 1]
+            })
+
+            return df['A'].isna()
+        hpat_func = self.jit(test_impl)
+
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
 
 
 if __name__ == "__main__":
