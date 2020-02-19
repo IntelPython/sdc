@@ -25,27 +25,47 @@
 # *****************************************************************************
 
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
+import numba
+from numba import types, cgutils
+from numba.extending import (models, register_model, make_attribute_wrapper)
+from numba.typed import Dict, List
+from sdc.str_ext import string_type
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
+class DataFrameGroupByType(types.Type):
+    """
+    Type definition for DataFrameGroupBy functions handling.
+    """
 
-from sdc.tests.test_ml import *
+    def __init__(self, parent, col_id):
+        self.parent = parent
+        self.col_id = col_id
+        super(DataFrameGroupByType, self).__init__(
+            name="DataFrameGroupByType({}, {})".format(parent, col_id))
 
-from sdc.tests.test_io import *
+    @property
+    def key(self):
+        return self.parent, self.col_id
 
-from sdc.tests.test_hpat_jit import *
 
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
+@register_model(DataFrameGroupByType)
+class DataFrameGroupByModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        by_series_dtype = fe_type.parent.data[fe_type.col_id.literal_value].dtype
+        ty_data = types.containers.DictType(
+            by_series_dtype,
+            types.containers.ListType(types.int64)
+        )
+        members = [
+            ('parent', fe_type.parent),
+            ('col_id', types.int64),
+            ('data', ty_data),
+            ('sort', types.bool_)
+        ]
+        super(DataFrameGroupByModel, self).__init__(dmm, fe_type, members)
 
-# performance tests
-import sdc.tests.tests_perf
+
+make_attribute_wrapper(DataFrameGroupByType, 'parent', '_parent')
+make_attribute_wrapper(DataFrameGroupByType, 'col_id', '_col_id')
+make_attribute_wrapper(DataFrameGroupByType, 'data', '_data')
+make_attribute_wrapper(DataFrameGroupByType, 'sort', '_sort')
