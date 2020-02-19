@@ -34,6 +34,7 @@
 import numba
 import numpy
 import sys
+import pandas
 import numpy as np
 
 from numba import types, jit, prange, numpy_support, literally
@@ -46,6 +47,7 @@ from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
                                  max_dtype_float_val)
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size, str_arr_is_na)
+from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 from sdc.utilities.prange_utils import parallel_chunks
 
 
@@ -658,6 +660,49 @@ def np_nanprod(a):
     return nanprod_impl
 
 
+def dropna(arr, idx, name):
+    pass
+
+
+@sdc_overload(dropna)
+def dropna_overload(arr, idx, name):
+    dtype = arr.dtype
+    dtype_idx = idx.dtype
+    isnan = get_isnan(dtype)
+
+    def dropna_impl(arr, idx, name):
+        chunks = parallel_chunks(len(arr))
+        arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
+        length = 0
+
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            res = 0
+            for j in range(chunk.start, chunk.stop):
+                if not isnan(arr[j]):
+                    res += 1
+            length += res
+            arr_len[i] = res
+
+        result_data = numpy.empty(shape=length, dtype=dtype)
+        result_index = numpy.empty(shape=length, dtype=dtype_idx)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            new_start = int(sum(arr_len[0:i]))
+            new_stop = new_start + arr_len[i]
+            current_pos = new_start
+
+            for j in range(chunk.start, chunk.stop):
+                if not isnan(arr[j]):
+                    result_data[current_pos] = arr[j]
+                    result_index[current_pos] = idx[j]
+                    current_pos += 1
+
+        return pandas.Series(result_data, result_index, name)
+
+    return dropna_impl
+
+
 def nanmean(a):
     pass
 
@@ -680,3 +725,32 @@ def np_nanmean(a):
         return np.divide(c, count)
 
     return nanmean_impl
+
+
+def nanvar(a):
+    pass
+
+
+@sdc_overload(nanvar)
+def np_nanvar(a):
+    if not isinstance(a, types.Array):
+        return
+    isnan = get_isnan(a.dtype)
+
+    def nanvar_impl(a):
+        # Compute the mean
+        m = nanmean(a)
+
+        # Compute the sum of square diffs
+        ssd = 0.0
+        count = 0
+        for i in prange(len(a)):
+            v = a[i]
+            if not isnan(v):
+                val = (v.item() - m)
+                ssd += np.real(val * np.conj(val))
+                count += 1
+        # np.divide() doesn't raise ZeroDivisionError
+        return np.divide(ssd, count)
+
+    return nanvar_impl
