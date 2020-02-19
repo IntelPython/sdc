@@ -2194,50 +2194,9 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
 
     if not isinstance(min_periods, (int, types.Integer, types.Omitted, types.NoneType)) and min_periods is not None:
         ty_checker.raise_exc(min_periods, 'int64', 'min_periods')
-    dtype = self.data.dtype
+
     def hpat_pandas_series_corr_impl(self, other, method='pearson', min_periods=None):
-        len_self = len(self._data)
-        len_other = len(other._data)
-        if method not in ('pearson', ''):
-            raise ValueError("Method corr(). Unsupported parameter. Given method != 'pearson'")
-
-        if min_periods is None:
-            min_periods = 1
-
-        if len_self == 0 or len_other == 0:
-            return numpy.nan
-        # print(numpy_like.corr(0))
-        # if len_self != len_other:
-        min_len = min(len_self, len_other)
-            # self_arr = numpy.empty(min_len, dtype=dtype)
-            # other_arr = numpy.empty(min_len, dtype=dtype)
-        for i in prange(min_len):
-            # self_arr[i] = self._data[i]
-            # other_arr[i] = other._data[i]
-            # Как в dropna
-            # И потом переписать в новый arr
-        # invalid = numpy_like.isnan(self_arr) | numpy_like.isnan(other_arr)
-        # if invalid.any():
-        #     self_arr = self_arr[~invalid]
-        #     other_arr = other_arr[~invalid]
-
-        if len(self_arr) < min_periods:
-            return numpy.nan
-
-        new_self = pandas.Series(self_arr)
-        new_other = pandas.Series(other_arr)
-
-        n = new_self.count()
-        ma = new_self.sum()
-        mb = new_other.sum()
-        a = n * (self_arr * other_arr).sum() - ma * mb
-        b1 = n * (self_arr * self_arr).sum() - ma * ma
-        b2 = n * (other_arr * other_arr).sum() - mb * mb
-
-        if b1 == 0 or b2 == 0:
-            return numpy.nan
-
-        return a / numpy.sqrt(b1 * b2)
+        return numpy_like.corr(self._data, other._data, method, min_periods)
 
     return hpat_pandas_series_corr_impl
 

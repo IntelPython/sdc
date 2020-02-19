@@ -43,6 +43,7 @@ import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size, str_arr_is_na)
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
+from sdc.utilities.prange_utils import parallel_chunks
 
 
 def astype(self, dtype):
@@ -136,15 +137,6 @@ def sdc_astype_overload(self, dtype):
         return sdc_astype_number_impl
 
     ty_checker.raise_exc(self.dtype, 'str or type', 'self.dtype')
-
-
-@sdc_overload(corr)
-def sdc_corr_overload(self):
-    def sdc_corr_impl(self):
-        print('QQQQ')
-        return 0
-
-    return sdc_corr_impl
 
 
 @sdc_overload(copy)
@@ -510,3 +502,72 @@ def np_nanmean(a):
         return np.divide(c, count)
 
     return nanmean_impl
+
+
+def corr(self, other, method='pearson', min_periods=None):
+    pass
+
+
+@sdc_overload(corr)
+def corr_overload(self, other, method='pearson', min_periods=None):
+    dtype_self = self.dtype
+    dtype_other = other.dtype
+    isnan_self = get_isnan(dtype_self)
+    isnan_other = get_isnan(dtype_other)
+
+    def corr_impl(self, other, method='pearson', min_periods=None):
+        len_self = len(self)
+        len_other = len(other)
+        if method not in ('pearson', ''):
+            raise ValueError("Method corr(). Unsupported parameter. Given method != 'pearson'")
+
+        if min_periods is None:
+            min_periods = 1
+
+        if len_self == 0 or len_other == 0:
+            return numpy.nan
+
+        min_len = min(len_self, len_other)
+        chunks = parallel_chunks(min_len)
+        arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
+        length = 0
+
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            res = 0
+            for j in range(chunk.start, chunk.stop):
+                if not isnan_self(self[j]) or not isnan_other(other[j]):
+                    res += 1
+            length += res
+            arr_len[i] = res
+
+        result_self = numpy.empty(shape=length, dtype=dtype_self)
+        result_other = numpy.empty(shape=length, dtype=dtype_other)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            new_start = int(sum(arr_len[0:i]))
+            new_stop = new_start + arr_len[i]
+            current_pos = new_start
+
+            for j in range(chunk.start, chunk.stop):
+                if not isnan_self(self[j]) or not isnan_other(other[j]):
+                    result_self[current_pos] = self[j]
+                    result_other[current_pos] = other[j]
+                    current_pos += 1
+
+        if len(result_self) < min_periods:
+            return numpy.nan
+
+        n = length
+        ma = sum(result_self)
+        mb = sum(result_other)
+        a = n * (result_self * result_other).sum() - ma * mb
+        b1 = n * (result_self * result_self).sum() - ma * ma
+        b2 = n * (result_other * result_other).sum() - mb * mb
+
+        if b1 == 0 or b2 == 0:
+            return numpy.nan
+
+        return a / numpy.sqrt(b1 * b2)
+
+    return corr_impl
