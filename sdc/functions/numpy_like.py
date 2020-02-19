@@ -804,57 +804,6 @@ def np_nanvar(a):
     return nanvar_impl
 
 
-def nancumprod(a):
-    pass
-
-
-@sdc_overload(nancumprod)
-def np_nancumprod(a):
-    if not isinstance(a, types.Array):
-        return
-
-    if isinstance(a.dtype, (types.Boolean, types.Integer)):
-        # dtype cannot possibly contain NaN
-        return lambda a: cumprod(a)
-    else:
-        retty = a.dtype
-        is_nan = get_isnan(retty)
-        one = retty(1)
-
-        def nancumprod_impl(a):
-            out = np.empty(a.size, retty)
-            c = one
-            for idx, v in enumerate(a.flat):
-                if ~is_nan(v):
-                    c *= v
-                out[idx] = c
-            return out
-
-        return nancumprod_impl
-
-
-def cumprod(a):
-    pass
-
-
-@sdc_overload(cumprod)
-def np_cumprod(arr):
-    if not isinstance(arr, types.Array):
-        return
-
-    dtype = arr.dtype
-
-    def array_cumprod_impl(arr):
-        out = np.empty(arr.size, dtype)
-        c = 1
-        for idx, v in enumerate(arr.flat):
-            c *= v
-            out[idx] = c
-        return out
-
-    return array_cumprod_impl
-
-
 def cumsum(a):
     pass
 
