@@ -46,7 +46,7 @@ from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
                                  max_dtype_float_val)
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size, str_arr_is_na)
-from sdc.utilities.prange_utils import get_chunks
+from sdc.utilities.prange_utils import parallel_chunks
 
 
 def astype(self, dtype):
@@ -186,7 +186,7 @@ def sdc_nanarg_overload(reduce_op):
 
         if isinstance(dtype, types.Number):
             def sdc_nanargmin_impl(self):
-                chunks = get_chunks(len(self))
+                chunks = parallel_chunks(len(self))
                 arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
                 arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
                 for i in prange(len(chunks)):
@@ -260,7 +260,7 @@ def sdc_arg_overload(reduce_op):
 
         if isinstance(dtype, types.Number):
             def sdc_argmin_impl(self):
-                chunks = get_chunks(len(self))
+                chunks = parallel_chunks(len(self))
                 arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
                 arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
                 for i in prange(len(chunks)):
