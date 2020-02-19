@@ -47,11 +47,15 @@ def get_pool_size():
 
 @sdc_register_jitable
 def get_chunks(size, pool_size):
+    chunks = []
+
+    if size < 1 or pool_size < 1:
+        return chunks
+
     pool_size = min(pool_size, size)
     chunk_size = size // pool_size
     overload_size = size % pool_size
 
-    chunks = []
     for i in range(pool_size):
         start = i * chunk_size + min(i, overload_size)
         stop = (i + 1) * chunk_size + min(i + 1, overload_size)
