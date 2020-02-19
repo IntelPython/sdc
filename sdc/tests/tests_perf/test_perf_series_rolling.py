@@ -85,7 +85,7 @@ class TestSeriesRollingMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
         cls.map_ncalls_dlength = {
-            'sum': (100, [2 * 10 ** 5]),
+            'sum': (100, [8 * 10 ** 5]),
         }
 
     def _test_case(self, pyfunc, name, total_data_length, data_num=1,

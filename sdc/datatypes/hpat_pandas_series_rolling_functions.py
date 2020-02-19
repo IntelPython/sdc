@@ -40,7 +40,6 @@ from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
-from sdc.utilities.window_utils import WindowSum
 
 
 # disabling parallel execution for rolling due to numba issue https://github.com/numba/numba/issues/5098
@@ -308,8 +307,28 @@ hpat_pandas_rolling_series_var_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_var))
 
 
-def gen_sdc_pandas_series_rolling_impl(window_cls):
-    """Generate series rolling methods implementations based on window class"""
+@sdc_register_jitable
+def pop_sum(value, nfinite, result):
+    """Calculate the window sum without old value."""
+    if numpy.isfinite(value):
+        nfinite -= 1
+        result -= value
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def put_sum(value, nfinite, result):
+    """Calculate the window sum with new value."""
+    if numpy.isfinite(value):
+        nfinite += 1
+        result += value
+
+    return nfinite, result
+
+
+def gen_sdc_pandas_series_rolling_impl(pop, put, init_result=numpy.nan):
+    """Generate series rolling methods implementations based on pop/put funcs"""
     def impl(self):
         win = self._window
         minp = self._min_periods
@@ -322,19 +341,37 @@ def gen_sdc_pandas_series_rolling_impl(window_cls):
         chunks = parallel_chunks(length)
         for i in prange(len(chunks)):
             chunk = chunks[i]
-            window = window_cls(win, minp)
+            nroll = 0
+            nfinite = 0
+            result = init_result
             for idx in range(chunk.start, chunk.stop):
-                window.roll(input_arr, idx)
-                output_arr[idx] = window.result
-            window.free()
+                if nroll == 0:
+                    start = max(idx + 1 - win, 0)
+                    for j in range(start, idx):
+                        value = input_arr[j]
+                        nfinite, result = put(value, nfinite, result)
+                        nroll += 1
+
+                if nroll >= win:
+                    value = input_arr[idx - win]
+                    nfinite, result = pop(value, nfinite, result)
+
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+                nroll += 1
+
+                if nfinite < minp:
+                    output_arr[idx] = numpy.nan
+                else:
+                    output_arr[idx] = result
 
         return pandas.Series(output_arr, input_series._index,
                              name=input_series._name)
     return impl
 
 
-sdc_pandas_rolling_series_sum_impl = register_jitable(
-    gen_sdc_pandas_series_rolling_impl(WindowSum))
+sdc_pandas_series_rolling_sum_impl = register_jitable(
+    gen_sdc_pandas_series_rolling_impl(pop_sum, put_sum, init_result=0.))
 
 
 @sdc_rolling_overload(SeriesRollingType, 'apply')
@@ -648,7 +685,7 @@ def hpat_pandas_series_rolling_sum(self):
     ty_checker = TypeChecker('Method rolling.sum().')
     ty_checker.check(self, SeriesRollingType)
 
-    return sdc_pandas_rolling_series_sum_impl
+    return sdc_pandas_series_rolling_sum_impl
 
 
 @sdc_rolling_overload(SeriesRollingType, 'var')
