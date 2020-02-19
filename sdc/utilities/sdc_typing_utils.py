@@ -90,9 +90,14 @@ class TypeChecker:
             self.raise_exc(data, accepted_type.__name__, name=name)
 
 
-def params2list(params):
+def kwsparams2list(params):
     """Convert parameters dict to a list of string of a format 'key=value'"""
     return ['{}={}'.format(k, v) for k, v in params.items()]
+
+
+def sigparams2list(param_names, defaults):
+    """Creates a list of strings of a format 'key=value' from parameter names and default values"""
+    return [(f'{param}' if param not in defaults else f'{param}={defaults[param]}') for param in param_names]
 
 
 def has_literal_value(var, value):
