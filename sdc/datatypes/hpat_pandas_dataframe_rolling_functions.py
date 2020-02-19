@@ -28,7 +28,7 @@ import pandas
 
 from numba.types import (float64, Boolean, Integer, Number, Omitted,
                          NoneType, StringLiteral, UnicodeType)
-from sdc.utilities.sdc_typing_utils import TypeChecker, params2list
+from sdc.utilities.sdc_typing_utils import TypeChecker, kwsparams2list
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import DataFrameRollingType
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.hiframes.pd_dataframe_type import DataFrameType
@@ -95,7 +95,7 @@ def df_rolling_method_other_df_codegen(method_name, self, other, args=None, kws=
 
     rolling_params = df_rolling_params_codegen()
     method_kws = {k: k for k in kwargs}
-    impl_params = ['self'] + args + params2list(kwargs)
+    impl_params = ['self'] + args + kwsparams2list(kwargs)
     impl_params_as_str = ', '.join(impl_params)
 
     data_columns = {col: idx for idx, col in enumerate(self.data.columns)}
@@ -132,7 +132,7 @@ def df_rolling_method_other_df_codegen(method_name, self, other, args=None, kws=
         if col in common_columns:
             other_series = f'other_series_{col}'
             method_kws['other'] = other_series
-            method_params = ', '.join(args + params2list(method_kws))
+            method_params = ', '.join(args + kwsparams2list(method_kws))
             func_lines += [
                 f'  data_{col} = get_dataframe_data(self._data, {data_columns[col]})',
                 f'  other_data_{col} = get_dataframe_data(other, {other_columns[col]})',
@@ -189,7 +189,7 @@ def gen_df_rolling_method_other_none_codegen(rewrite_name=None):
         args = args or []
         kwargs = kws or {}
 
-        impl_params = ['self'] + args + params2list(kwargs)
+        impl_params = ['self'] + args + kwsparams2list(kwargs)
         impl_params_as_str = ', '.join(impl_params)
 
         impl_name = f'_df_rolling_{_method_name}_other_none_impl'
@@ -223,7 +223,7 @@ def df_rolling_method_codegen(method_name, self, args=None, kws=None):
     args = args or []
     kwargs = kws or {}
 
-    impl_params = ['self'] + args + params2list(kwargs)
+    impl_params = ['self'] + args + kwsparams2list(kwargs)
     impl_params_as_str = ', '.join(impl_params)
 
     impl_name = f'_df_rolling_{method_name}_impl'

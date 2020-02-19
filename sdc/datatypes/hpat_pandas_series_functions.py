@@ -1497,7 +1497,7 @@ def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
             if valuable_length <= ddof:
                 return numpy.nan
 
-            return numpy.nanvar(self._data) * valuable_length / (valuable_length - ddof)
+            return numpy_like.nanvar(self._data) * valuable_length / (valuable_length - ddof)
 
         if len(self._data) <= ddof:
             return numpy.nan
@@ -3787,7 +3787,7 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
             _skipna = skipna
 
         if _skipna:
-            return numpy.nanmean(self._data)
+            return numpy_like.nanmean(self._data)
 
         return self._data.mean()
 

@@ -95,6 +95,11 @@ cases = [
         CE(type_='Numba', code='np.isnan(data)', jitted=True),
         CE(type_='SDC', code='sdc.functions.numpy_like.isnan(data)', jitted=True),
     ], usecase_params='data'),
+    TC(name='nanmean', size=[10 ** 8], call_expr=[
+        CE(type_='Python', code='np.nanmean(data)', jitted=False),
+        CE(type_='Numba', code='np.nanmean(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.nanmean(data)', jitted=True),
+    ], usecase_params='data'),
     TC(name='nansum', size=[10 ** 7], call_expr=[
         CE(type_='Python', code='np.nansum(data)', jitted=False),
         CE(type_='SDC', code='sdc.functions.numpy_like.nansum(data)', jitted=True),
@@ -103,6 +108,11 @@ cases = [
         CE(type_='Python', code='np.nanprod(data)', jitted=False),
         CE(type_='Numba', code='np.nanprod(data)', jitted=True),
         CE(type_='SDC', code='sdc.functions.numpy_like.nanprod(data)', jitted=True),
+    ], usecase_params='data'),
+    TC(name='nanvar', size=[10 ** 7], call_expr=[
+        CE(type_='Python', code='np.nanvar(data)', jitted=False),
+        CE(type_='Numba', code='np.nanvar(data)', jitted=True),
+        CE(type_='SDC', code='sdc.functions.numpy_like.nanvar(data)', jitted=True),
     ], usecase_params='data'),
     TC(name='sum', size=[10 ** 7], call_expr=[
         CE(type_='Python', code='np.sum(data)', jitted=False),
