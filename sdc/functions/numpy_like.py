@@ -33,6 +33,7 @@
 
 import numba
 import numpy
+import pandas
 import numpy as np
 
 from numba import types, jit, prange, numpy_support, literally
@@ -43,6 +44,7 @@ import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size, str_arr_is_na)
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
+from sdc.utilities.prange_utils import parallel_chunks
 
 
 def astype(self, dtype):
@@ -473,6 +475,49 @@ def np_nanprod(a):
         return c
 
     return nanprod_impl
+
+
+def dropna(arr, idx, name):
+    pass
+
+
+@sdc_overload(dropna)
+def dropna_overload(arr, idx, name):
+    dtype = arr.dtype
+    dtype_idx = idx.dtype
+    isnan = get_isnan(dtype)
+
+    def dropna_impl(arr, idx, name):
+        chunks = parallel_chunks(len(arr))
+        arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
+        length = 0
+
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            res = 0
+            for j in range(chunk.start, chunk.stop):
+                if not isnan(arr[j]):
+                    res += 1
+            length += res
+            arr_len[i] = res
+
+        result_data = numpy.empty(shape=length, dtype=dtype)
+        result_index = numpy.empty(shape=length, dtype=dtype_idx)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            new_start = int(sum(arr_len[0:i]))
+            new_stop = new_start + arr_len[i]
+            current_pos = new_start
+
+            for j in range(chunk.start, chunk.stop):
+                if not isnan(arr[j]):
+                    result_data[current_pos] = arr[j]
+                    result_index[current_pos] = idx[j]
+                    current_pos += 1
+
+        return pandas.Series(result_data, result_index, name)
+
+    return dropna_impl
 
 
 def nanmean(a):
