@@ -31,8 +31,6 @@
 
 """
 
-from collections import namedtuple
-
 import numba
 import numpy
 import sys
