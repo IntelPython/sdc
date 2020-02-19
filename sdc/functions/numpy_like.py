@@ -194,25 +194,28 @@ def sdc_nanarg_overload(reduce_op):
                     res = initial_result
                     pos = max_int64
                     for j in range(chunk.start, chunk.stop):
-                        if reduce_op(res, self[j]) == self[j]:
-                            if not isnan(self[j]):
-                                if res == self[j]:
-                                    pos = min(pos, j)
-                                else:
-                                    pos = j
-                                    res = self[j]
+                        if reduce_op(res, self[j]) != self[j]:
+                            continue
+                        if isnan(self[j]):
+                            continue
+                        if res == self[j]:
+                            pos = min(pos, j)
+                        else:
+                            pos = j
+                            res = self[j]
                     arr_res[i] = res
                     arr_pos[i] = pos
 
                 general_res = initial_result
                 general_pos = max_int64
                 for i in range(len(chunks)):
-                    if reduce_op(general_res, arr_res[i]) == arr_res[i]:
-                        if general_res == arr_res[i]:
-                            general_pos = min(general_pos, arr_pos[i])
-                        else:
-                            general_pos = arr_pos[i]
-                            general_res = arr_res[i]
+                    if reduce_op(general_res, arr_res[i]) != arr_res[i]:
+                        continue
+                    if general_res == arr_res[i]:
+                        general_pos = min(general_pos, arr_pos[i])
+                    else:
+                        general_pos = arr_pos[i]
+                        general_res = arr_res[i]
 
                 return general_pos
 
@@ -269,12 +272,13 @@ def sdc_arg_overload(reduce_op):
                     pos = max_int64
                     for j in range(chunk.start, chunk.stop):
                         if not isnan(self[j]):
-                            if reduce_op(res, self[j]) == self[j]:
-                                if res == self[j]:
-                                    pos = min(pos, j)
-                                else:
-                                    pos = j
-                                    res = self[j]
+                            if reduce_op(res, self[j]) != self[j]:
+                                continue
+                            if res == self[j]:
+                                pos = min(pos, j)
+                            else:
+                                pos = j
+                                res = self[j]
                         else:
                             if numpy.isnan(res):
                                 pos = min(pos, j)
@@ -288,12 +292,13 @@ def sdc_arg_overload(reduce_op):
                 general_pos = max_int64
                 for i in range(len(chunks)):
                     if not isnan(arr_res[i]):
-                        if reduce_op(general_res, arr_res[i]) == arr_res[i]:
-                            if general_res == arr_res[i]:
-                                general_pos = min(general_pos, arr_pos[i])
-                            else:
-                                general_pos = arr_pos[i]
-                                general_res = arr_res[i]
+                        if reduce_op(general_res, arr_res[i]) != arr_res[i]:
+                            continue
+                        if general_res == arr_res[i]:
+                            general_pos = min(general_pos, arr_pos[i])
+                        else:
+                            general_pos = arr_pos[i]
+                            general_res = arr_res[i]
                     else:
                         if numpy.isnan(general_res):
                             general_pos = min(general_pos, arr_pos[i])
