@@ -4933,14 +4933,22 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
     if not (inplace is False or isinstance(inplace, types.Omitted)):
         ty_checker.raise_exc(inplace, 'bool', 'inplace')
 
-    def hpat_pandas_series_dropna_impl(self, axis=0, inplace=False):
-        # generate Series index if needed by using SeriesType.index (i.e. not self._index)
-        na_data_arr = sdc.hiframes.api.get_nan_mask(self._data)
-        data = self._data[~na_data_arr]
-        index = self.index[~na_data_arr]
-        return pandas.Series(data, index, self._name)
+    if isinstance(self.data.dtype, types.Number) and isinstance(self.index, (types.Number, types.NoneType)):
+        def hpat_pandas_series_dropna_impl(self, axis=0, inplace=False):
+            index = self.index
+            return numpy_like.dropna(self._data, index, self._name)
 
-    return hpat_pandas_series_dropna_impl
+        return hpat_pandas_series_dropna_impl
+
+    else:
+        def hpat_pandas_series_dropna_str_impl(self, axis=0, inplace=False):
+            # generate Series index if needed by using SeriesType.index (i.e. not self._index)
+            na_data_arr = sdc.hiframes.api.get_nan_mask(self._data)
+            data = self._data[~na_data_arr]
+            index = self.index[~na_data_arr]
+            return pandas.Series(data, index, self._name)
+
+        return hpat_pandas_series_dropna_str_impl
 
 
 @sdc_overload_method(SeriesType, 'fillna')
