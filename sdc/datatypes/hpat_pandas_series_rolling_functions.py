@@ -37,7 +37,7 @@ from numba.types import (float64, Boolean, Integer, NoneType, Number,
 from sdc.datatypes.common_functions import _sdc_pandas_series_align
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.hiframes.pd_series_type import SeriesType
-from sdc.utilities.prange_utils import get_chunks
+from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
 from sdc.utilities.window_utils import WindowSum
@@ -628,7 +628,7 @@ def hpat_pandas_series_rolling_sum(self):
         length = len(input_arr)
         output_arr = numpy.empty(length, dtype=float64)
 
-        chunks = get_chunks(length)
+        chunks = parallel_chunks(length)
         for i in prange(len(chunks)):
             chunk = chunks[i]
             window = WindowSum(win, minp)

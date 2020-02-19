@@ -26,40 +26,46 @@
 
 
 import numba
-import sdc
-
-from typing import NamedTuple
-from sdc.utilities.utils import sdc_register_jitable
-
-
-class Chunk(NamedTuple):
-    start: int
-    stop: int
+from numba import types, cgutils
+from numba.extending import (models, register_model, make_attribute_wrapper)
+from numba.typed import Dict, List
+from sdc.str_ext import string_type
 
 
-@sdc_register_jitable
-def get_pool_size():
-    if sdc.config.config_use_parallel_overloads:
-        return numba.config.NUMBA_NUM_THREADS
+class DataFrameGroupByType(types.Type):
+    """
+    Type definition for DataFrameGroupBy functions handling.
+    """
 
-    return 1
+    def __init__(self, parent, col_id):
+        self.parent = parent
+        self.col_id = col_id
+        super(DataFrameGroupByType, self).__init__(
+            name="DataFrameGroupByType({}, {})".format(parent, col_id))
 
-
-@sdc_register_jitable
-def get_chunks(size, pool_size):
-    pool_size = min(pool_size, size)
-    chunk_size = size // pool_size
-    overload_size = size % pool_size
-
-    chunks = []
-    for i in range(pool_size):
-        start = i * chunk_size + min(i, overload_size)
-        stop = (i + 1) * chunk_size + min(i + 1, overload_size)
-        chunks.append(Chunk(start, stop))
-
-    return chunks
+    @property
+    def key(self):
+        return self.parent, self.col_id
 
 
-@sdc_register_jitable
-def parallel_chunks(size):
-    return get_chunks(size, get_pool_size())
+@register_model(DataFrameGroupByType)
+class DataFrameGroupByModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        by_series_dtype = fe_type.parent.data[fe_type.col_id.literal_value].dtype
+        ty_data = types.containers.DictType(
+            by_series_dtype,
+            types.containers.ListType(types.int64)
+        )
+        members = [
+            ('parent', fe_type.parent),
+            ('col_id', types.int64),
+            ('data', ty_data),
+            ('sort', types.bool_)
+        ]
+        super(DataFrameGroupByModel, self).__init__(dmm, fe_type, members)
+
+
+make_attribute_wrapper(DataFrameGroupByType, 'parent', '_parent')
+make_attribute_wrapper(DataFrameGroupByType, 'col_id', '_col_id')
+make_attribute_wrapper(DataFrameGroupByType, 'data', '_data')
+make_attribute_wrapper(DataFrameGroupByType, 'sort', '_sort')
