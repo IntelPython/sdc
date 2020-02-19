@@ -310,6 +310,7 @@ class TestArrayReductions(TestCase):
         alt_cfunc = self.jit(alt_pyfunc)
 
         def cases():
+            yield np.empty(0)
             yield np.array([5, 2, 0, 333, -4])
             yield np.array([3.3, 5.4, np.nan, 7.9, np.nan])
             yield np.float64([1.0, 2.0, 0.0, -0.0, 1.0, -1.5])
