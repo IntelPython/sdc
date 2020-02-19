@@ -9,6 +9,8 @@ package:
 source:
   git_url: https://github.com/numba/numba
   git_tag: ef119bcd1733ff49d71bdf2da8a66e91bb704f83
+  patches:
+    - 0001-Add-prange-variant-to-has_no_side_effect.patch
 
 build:
   number: 0

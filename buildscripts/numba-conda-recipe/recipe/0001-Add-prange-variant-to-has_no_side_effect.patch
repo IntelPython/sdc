@@ -1,0 +1,63 @@
+From 7f11aa6330d42142424b7e55f8a3751f0c3d0add Mon Sep 17 00:00:00 2001
+From: "Todd A. Anderson" <drtodd13@comcast.net>
+Date: Tue, 18 Feb 2020 11:21:48 -0800
+Subject: [PATCH] Add prange variant to has_no_side_effect.
+
+---
+ numba/ir_utils.py | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/numba/ir_utils.py b/numba/ir_utils.py
+index 2dea66345..aa9f3fb20 100644
+--- a/numba/ir_utils.py
++++ b/numba/ir_utils.py
+@@ -584,6 +584,8 @@ def remove_dead_block(block, lives, call_table, arg_aliases, alias_map,
+             stmt = f(stmt, lives_n_aliases, arg_aliases, alias_map, func_ir,
+                      typemap)
+             if stmt is None:
++                if config.DEBUG_ARRAY_OPT >= 2:
++                    print("Statement was removed.")
+                 removed = True
+                 continue
+ 
+@@ -593,21 +595,29 @@ def remove_dead_block(block, lives, call_table, arg_aliases, alias_map,
+             rhs = stmt.value
+             if lhs.name not in lives and has_no_side_effect(
+                     rhs, lives_n_aliases, call_table):
++                if config.DEBUG_ARRAY_OPT >= 2:
++                    print("Statement was removed.")
+                 removed = True
+                 continue
+             if isinstance(rhs, ir.Var) and lhs.name == rhs.name:
++                if config.DEBUG_ARRAY_OPT >= 2:
++                    print("Statement was removed.")
+                 removed = True
+                 continue
+             # TODO: remove other nodes like SetItem etc.
+ 
+         if isinstance(stmt, ir.Del):
+             if stmt.value not in lives:
++                if config.DEBUG_ARRAY_OPT >= 2:
++                    print("Statement was removed.")
+                 removed = True
+                 continue
+ 
+         if isinstance(stmt, ir.SetItem):
+             name = stmt.target.name
+             if name not in lives_n_aliases:
++                if config.DEBUG_ARRAY_OPT >= 2:
++                    print("Statement was removed.")
+                 continue
+ 
+         if type(stmt) in analysis.ir_extension_usedefs:
+@@ -651,6 +661,7 @@ def has_no_side_effect(rhs, lives, call_table):
+             call_list == ['dtype', numpy] or
+             call_list == [numba.array_analysis.wrap_index] or
+             call_list == [numba.special.prange] or
++            call_list == ['prange', numba] or
+             call_list == [numba.parfor.internal_prange]):
+             return True
+         elif (isinstance(call_list[0], numba.extending._Intrinsic) and
+-- 
+2.14.3
+
