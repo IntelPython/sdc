@@ -308,6 +308,35 @@ hpat_pandas_rolling_series_var_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_var))
 
 
+def gen_sdc_pandas_series_rolling_impl(window_cls):
+    """Generate series rolling methods implementations based on window class"""
+    def impl(self):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        chunks = parallel_chunks(length)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            window = window_cls(win, minp)
+            for idx in range(chunk.start, chunk.stop):
+                window.roll(input_arr, idx)
+                output_arr[idx] = window.result
+            window.free()
+
+        return pandas.Series(output_arr, input_series._index,
+                             name=input_series._name)
+    return impl
+
+
+sdc_pandas_rolling_series_sum_impl = register_jitable(
+    gen_sdc_pandas_series_rolling_impl(WindowSum))
+
+
 @sdc_rolling_overload(SeriesRollingType, 'apply')
 def hpat_pandas_series_rolling_apply(self, func, raw=None):
 
@@ -613,34 +642,13 @@ def hpat_pandas_series_rolling_std(self, ddof=1):
     return hpat_pandas_rolling_series_std_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'sum')
+@sdc_overload_method(SeriesRollingType, 'sum')
 def hpat_pandas_series_rolling_sum(self):
 
     ty_checker = TypeChecker('Method rolling.sum().')
     ty_checker.check(self, SeriesRollingType)
 
-    def _sdc_pandas_series_rolling_sum_impl(self):
-        win = self._window
-        minp = self._min_periods
-
-        input_series = self._data
-        input_arr = input_series._data
-        length = len(input_arr)
-        output_arr = numpy.empty(length, dtype=float64)
-
-        chunks = parallel_chunks(length)
-        for i in prange(len(chunks)):
-            chunk = chunks[i]
-            window = WindowSum(win, minp)
-            for idx in range(chunk.start, chunk.stop):
-                window.roll(input_arr, idx)
-                output_arr[idx] = window.result
-            window.free()
-
-        return pandas.Series(output_arr, input_series._index,
-                             name=input_series._name)
-
-    return _sdc_pandas_series_rolling_sum_impl
+    return sdc_pandas_rolling_series_sum_impl
 
 
 @sdc_rolling_overload(SeriesRollingType, 'var')
