@@ -17,8 +17,9 @@ def gen_str_data(data_num, data_length, input_data, data_width):
     return data
 
 
-def gen_data(data_num, data_length, input_data, typ):
+def gen_data(data_num, data_length, input_data):
     data = []
+    typ = qualifier_type(input_data)
     full_input_data_length = sum(len(i) for i in input_data)
     data.append(perf_data_gen_fixed_len(input_data, full_input_data_length,
                                         data_length))
@@ -43,8 +44,7 @@ def gen_series_str(data_num, data_length, input_data, data_width):
 
 
 def gen_series(data_num, data_length, input_data):
-    typ = qualifier_type(input_data)
-    all_data = gen_data(data_num, data_length, input_data, typ)
+    all_data = gen_data(data_num, data_length, input_data)
     results = []
     for data in all_data:
         test_data = pd.Series(data)
@@ -54,8 +54,7 @@ def gen_series(data_num, data_length, input_data):
 
 
 def gen_df(data_num, data_length, input_data, columns=3):
-    typ = qualifier_type(input_data)
-    all_data = gen_data(data_num, data_length, input_data, typ)
+    all_data = gen_data(data_num, data_length, input_data)
     results = []
     for data in all_data:
         test_data = pd.DataFrame({f"f{i}": data for i in range(columns)})
