@@ -82,7 +82,6 @@ cases = [
     TC(name='find', params='"e"', size=[10 ** 4, 10 ** 5]),
     TC(name='isalnum', size=[10 ** 4, 10 ** 5]),
     TC(name='isalpha', size=[10 ** 4, 10 ** 5]),
-    TC(name='isalnum', size=[10 ** 4, 10 ** 5]),
     TC(name='isdecimal', size=[10 ** 4, 10 ** 5]),
     TC(name='isdigit', size=[10 ** 4, 10 ** 5]),
     TC(name='islower', size=[10 ** 4, 10 ** 5]),
