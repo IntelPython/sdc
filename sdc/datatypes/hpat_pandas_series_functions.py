@@ -2196,7 +2196,7 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
         ty_checker.raise_exc(min_periods, 'int64', 'min_periods')
 
     def hpat_pandas_series_corr_impl(self, other, method='pearson', min_periods=None):
-        return numpy_like.corr(self._data, other._data, method, min_periods)
+        return numpy_like.corr(self, other, method, min_periods)
 
     return hpat_pandas_series_corr_impl
 

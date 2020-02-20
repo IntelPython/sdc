@@ -74,10 +74,6 @@ def nansum(self):
     pass
 
 
-def corr(self):
-    pass
-
-
 @sdc_overload(astype)
 def sdc_astype_overload(self, dtype):
     """
@@ -510,65 +506,44 @@ def corr(self, other, method='pearson', min_periods=None):
 
 @sdc_overload(corr)
 def corr_overload(self, other, method='pearson', min_periods=None):
-    dtype_self = self.dtype
-    dtype_other = other.dtype
-    isnan_self = get_isnan(dtype_self)
-    isnan_other = get_isnan(dtype_other)
-
     def corr_impl(self, other, method='pearson', min_periods=None):
-        len_self = len(self)
-        len_other = len(other)
         if method not in ('pearson', ''):
             raise ValueError("Method corr(). Unsupported parameter. Given method != 'pearson'")
 
-        if min_periods is None:
+        if min_periods is None or min_periods < 1:
             min_periods = 1
 
-        if len_self == 0 or len_other == 0:
+        min_len = min(len(self._data), len(other._data))
+
+        if min_len == 0:
             return numpy.nan
 
-        min_len = min(len_self, len_other)
-        chunks = parallel_chunks(min_len)
-        arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
-        length = 0
+        sum_y = 0.
+        sum_x = 0.
+        sum_xy = 0.
+        sum_xx = 0.
+        sum_yy = 0.
+        total_count = 0
+        for i in prange(min_len):
+            x = self._data[i]
+            y = other._data[i]
+            if not (numpy.isnan(x) or numpy.isnan(y)):
+                sum_x += x
+                sum_y += y
+                sum_xy += x*y
+                sum_xx += x*x
+                sum_yy += y*y
+                total_count += 1
 
-        for i in prange(len(chunks)):
-            chunk = chunks[i]
-            res = 0
-            for j in range(chunk.start, chunk.stop):
-                if not isnan_self(self[j]) or not isnan_other(other[j]):
-                    res += 1
-            length += res
-            arr_len[i] = res
-
-        result_self = numpy.empty(shape=length, dtype=dtype_self)
-        result_other = numpy.empty(shape=length, dtype=dtype_other)
-        for i in prange(len(chunks)):
-            chunk = chunks[i]
-            new_start = int(sum(arr_len[0:i]))
-            new_stop = new_start + arr_len[i]
-            current_pos = new_start
-
-            for j in range(chunk.start, chunk.stop):
-                if not isnan_self(self[j]) or not isnan_other(other[j]):
-                    result_self[current_pos] = self[j]
-                    result_other[current_pos] = other[j]
-                    current_pos += 1
-
-        if len(result_self) < min_periods:
+        if total_count < min_periods:
             return numpy.nan
 
-        n = length
-        ma = sum(result_self)
-        mb = sum(result_other)
-        a = n * (result_self * result_other).sum() - ma * mb
-        b1 = n * (result_self * result_self).sum() - ma * ma
-        b2 = n * (result_other * result_other).sum() - mb * mb
+        cov_xy = (sum_xy - sum_x*sum_y/total_count)
+        var_x = (sum_xx - sum_x*sum_x/total_count)
+        var_y = (sum_yy - sum_y*sum_y/total_count)
+        corr_xy = cov_xy/numpy.sqrt(var_x*var_y)
 
-        if b1 == 0 or b2 == 0:
-            return numpy.nan
-
-        return a / numpy.sqrt(b1 * b2)
+        return corr_xy
 
     return corr_impl
 
