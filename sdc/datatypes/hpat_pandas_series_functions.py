@@ -1801,9 +1801,10 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
             else:
                 raise TypingError(f'Needs Numba astype impl support converting unicode_type to {dtype.literal_value}')
 
-    if ((isinstance(self.data, types.npytypes.Array) and
-         isinstance(dtype, (types.functions.NumberClass, types.StringLiteral))) or str_check
-       ):
+    data_narr = isinstance(self.data, types.npytypes.Array)
+    dtype_num_liter = isinstance(dtype, (types.functions.NumberClass, types.StringLiteral))
+
+    if data_narr and dtype_num_liter or str_check:
         return hpat_pandas_series_astype_numba_impl
 
     if errors == 'raise':
