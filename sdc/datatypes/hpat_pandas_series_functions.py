@@ -2926,7 +2926,7 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
 
 
 @sdc_overload_method(SeriesType, 'idxmax')
-def hpat_pandas_series_idxmax(self, axis=None, skipna=True):
+def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
@@ -2975,25 +2975,48 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=True):
     if not isinstance(self.data.dtype, types.Number):
         ty_checker.raise_exc(self.data.dtype, 'int, float', 'self.data.dtype')
 
-    if not (isinstance(skipna, (types.Omitted, types.Boolean, bool)) or skipna is True):
+    if not (isinstance(skipna, (types.Omitted, types.Boolean, bool)) or skipna is None):
         ty_checker.raise_exc(skipna, 'bool', 'skipna')
 
     if not (isinstance(axis, types.Omitted) or axis is None):
         ty_checker.raise_exc(axis, 'None', 'axis')
 
-    if isinstance(self.index, types.NoneType) or self.index is None:
-        def hpat_pandas_series_idxmax_impl(self, axis=None, skipna=True):
-            return numpy.argmax(self._data)
+    none_index = isinstance(self.index, types.NoneType) or self.index is None
+    if isinstance(self.data, StringArrayType):
+        def hpat_pandas_series_idxmax_str_impl(self, axis=None, skipna=None):
+            if skipna is None:
+                _skipna = True
+            else:
+                raise ValueError("Method idxmax(). Unsupported parameter 'skipna'=False with str data")
 
-        return hpat_pandas_series_idxmax_impl
-
-    else:
-        def hpat_pandas_series_idxmax_index_impl(self, axis=None, skipna=True):
-            # no numpy.nanargmax is supported by Numba at this time
             result = numpy.argmax(self._data)
+            if none_index == True:  # noqa
+                return result
+            else:
+                return self._index[int(result)]
+
+        return hpat_pandas_series_idxmax_str_impl
+
+    def hpat_pandas_series_idxmax_impl(self, axis=None, skipna=None):
+        # return numpy.argmax(self._data)
+        if skipna is None:
+            _skipna = True
+        else:
+            _skipna = skipna
+
+        if _skipna:
+            result = numpy_like.nanargmax(self._data)
+        else:
+            result = numpy_like.argmax(self._data)
+
+        if none_index == True:  # noqa
+            return result
+        else:
             return self._index[int(result)]
 
-        return hpat_pandas_series_idxmax_index_impl
+        return numpy_like.argmax(self._data)
+
+    return hpat_pandas_series_idxmax_impl
 
 
 @sdc_overload_method(SeriesType, 'mul')
@@ -3987,7 +4010,7 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
 
 
 @sdc_overload_method(SeriesType, 'idxmin')
-def hpat_pandas_series_idxmin(self, axis=None, skipna=True):
+def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
@@ -4036,25 +4059,48 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=True):
     if not isinstance(self.data.dtype, types.Number):
         ty_checker.raise_exc(self.data.dtype, 'int, float', 'self.data.dtype')
 
-    if not (isinstance(skipna, (types.Omitted, types.Boolean, bool)) or skipna is True):
+    if not (isinstance(skipna, (types.Omitted, types.Boolean, bool)) or skipna is None):
         ty_checker.raise_exc(skipna, 'bool', 'skipna')
 
     if not (isinstance(axis, types.Omitted) or axis is None):
         ty_checker.raise_exc(axis, 'None', 'axis')
 
-    if isinstance(self.index, types.NoneType) or self.index is None:
-        def hpat_pandas_series_idxmin_impl(self, axis=None, skipna=True):
-            return numpy.argmin(self._data)
+    none_index = isinstance(self.index, types.NoneType) or self.index is None
+    if isinstance(self.data, StringArrayType):
+        def hpat_pandas_series_idxmin_str_impl(self, axis=None, skipna=None):
+            if skipna is None:
+                _skipna = True
+            else:
+                raise ValueError("Method idxmin(). Unsupported parameter 'skipna'=False with str data")
 
-        return hpat_pandas_series_idxmin_impl
-
-    else:
-        def hpat_pandas_series_idxmin_index_impl(self, axis=None, skipna=True):
-            # no numpy.nanargmin is supported by Numba at this time
             result = numpy.argmin(self._data)
+            if none_index == True:  # noqa
+                return result
+            else:
+                return self._index[int(result)]
+
+        return hpat_pandas_series_idxmin_str_impl
+
+    def hpat_pandas_series_idxmin_impl(self, axis=None, skipna=None):
+        # return numpy.argmin(self._data)
+        if skipna is None:
+            _skipna = True
+        else:
+            _skipna = skipna
+
+        if _skipna:
+            result = numpy_like.nanargmin(self._data)
+        else:
+            result = numpy_like.argmin(self._data)
+
+        if none_index == True:  # noqa
+            return result
+        else:
             return self._index[int(result)]
 
-        return hpat_pandas_series_idxmin_index_impl
+        return numpy_like.argmin(self._data)
+
+    return hpat_pandas_series_idxmin_impl
 
 
 @sdc_overload_method(SeriesType, 'lt')
@@ -4933,14 +4979,22 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
     if not (inplace is False or isinstance(inplace, types.Omitted)):
         ty_checker.raise_exc(inplace, 'bool', 'inplace')
 
-    def hpat_pandas_series_dropna_impl(self, axis=0, inplace=False):
-        # generate Series index if needed by using SeriesType.index (i.e. not self._index)
-        na_data_arr = sdc.hiframes.api.get_nan_mask(self._data)
-        data = self._data[~na_data_arr]
-        index = self.index[~na_data_arr]
-        return pandas.Series(data, index, self._name)
+    if isinstance(self.data.dtype, types.Number) and isinstance(self.index, (types.Number, types.NoneType)):
+        def hpat_pandas_series_dropna_impl(self, axis=0, inplace=False):
+            index = self.index
+            return numpy_like.dropna(self._data, index, self._name)
 
-    return hpat_pandas_series_dropna_impl
+        return hpat_pandas_series_dropna_impl
+
+    else:
+        def hpat_pandas_series_dropna_str_impl(self, axis=0, inplace=False):
+            # generate Series index if needed by using SeriesType.index (i.e. not self._index)
+            na_data_arr = sdc.hiframes.api.get_nan_mask(self._data)
+            data = self._data[~na_data_arr]
+            index = self.index[~na_data_arr]
+            return pandas.Series(data, index, self._name)
+
+        return hpat_pandas_series_dropna_str_impl
 
 
 @sdc_overload_method(SeriesType, 'fillna')

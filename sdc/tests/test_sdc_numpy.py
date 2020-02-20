@@ -240,6 +240,66 @@ class TestArrays(TestCase):
         sdc_func = self.jit(sdc_impl)
         np.testing.assert_array_equal(sdc_func(), ref_impl())
 
+    def test_argmin(self):
+        def ref_impl(a):
+            return np.argmin(a)
+
+        def sdc_impl(a):
+            return numpy_like.argmin(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+    def test_argmax(self):
+        def ref_impl(a):
+            return np.argmax(a)
+
+        def sdc_impl(a):
+            return numpy_like.argmax(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[np.nan, np.nan, np.inf, np.nan], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+    def test_nanargmin(self):
+        def ref_impl(a):
+            return np.nanargmin(a)
+
+        def sdc_impl(a):
+            return numpy_like.nanargmin(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+    def test_nanargmax(self):
+        def ref_impl(a):
+            return np.nanargmax(a)
+
+        def sdc_impl(a):
+            return numpy_like.nanargmax(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[np.nan, np.nan, np.inf, np.nan], [5, 2, -9, 333, -4], [3.3, 5.4, np.nan, 7.9]]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
 
 class TestArrayReductions(TestCase):
 
