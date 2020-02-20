@@ -106,9 +106,11 @@ def sdc_astype_overload(self, dtype):
        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k astype
 
     """
-
+    print('qqqqq')
+    print(dtype)
+    print(type(dtype))
     ty_checker = TypeChecker("numpy-like 'astype'")
-    if not isinstance(self, types.Array):
+    if not isinstance(self, (types.Array, StringArrayType)):
         return None
 
     if not isinstance(dtype, (types.functions.NumberClass, types.Function, types.Literal)):

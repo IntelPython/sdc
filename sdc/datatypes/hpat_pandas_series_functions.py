@@ -1795,21 +1795,22 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
         return pandas.Series(data=data, index=self._index, name=self._name)
 
     # Return npytypes.Array from npytypes.Array for astype(types.functions.NumberClass), example - astype(np.int64)
-    def hpat_pandas_series_astype_numba_impl(self, dtype, copy=True, errors='raise'):
-        return pandas.Series(data=self._data.astype(dtype), index=self._index, name=self._name)
-
     # Return npytypes.Array from npytypes.Array for astype(types.StringLiteral), example - astype('int64')
-    def hpat_pandas_series_astype_literal_type_numba_impl(self, dtype, copy=True, errors='raise'):
-        return pandas.Series(data=self._data.astype(numpy.dtype(dtype)), index=self._index, name=self._name)
+    def hpat_pandas_series_astype_numba_impl(self, dtype, copy=True, errors='raise'):
+        return pandas.Series(data=numpy_like.astype(self._data, dtype), index=self._index, name=self._name)
+
+    # # Return npytypes.Array from npytypes.Array for astype(types.StringLiteral), example - astype('int64')
+    # def hpat_pandas_series_astype_literal_type_numba_impl(self, dtype, copy=True, errors='raise'):
+    #     return pandas.Series(data=numpy_like.astype(self._data, dtype), index=self._index, name=self._name)
 
     # Return self
     def hpat_pandas_series_astype_no_modify_impl(self, dtype, copy=True, errors='raise'):
         return pandas.Series(data=self._data, index=self._index, name=self._name)
 
 
-    if ((isinstance(dtype, types.Function) and dtype.typing_key == str)
-        or (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
-        return hpat_pandas_series_astype_to_str_impl
+    # if ((isinstance(dtype, types.Function) and dtype.typing_key == str)
+    #     or (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
+    #     return hpat_pandas_series_astype_to_str_impl
 
     # Needs Numba astype impl support converting unicode_type to NumberClass and other types
     if isinstance(self.data, StringArrayType):
@@ -1823,16 +1824,22 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
             else:
                 raise TypingError(f'Needs Numba astype impl support converting unicode_type to {dtype.literal_value}')
 
-    if isinstance(self.data, types.npytypes.Array) and isinstance(dtype, types.functions.NumberClass):
+    # if ((isinstance(self.data, types.npytypes.Array) and isinstance(dtype, (types.functions.NumberClass, types.StringLiteral))) or
+    #    ((isinstance(dtype, types.Function) and dtype.typing_key == str) or
+    #     (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str'))
+    # ):
+    if ((isinstance(dtype, types.Function) and dtype.typing_key == str)
+        or (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str')):
+        print('eeee')
         return hpat_pandas_series_astype_numba_impl
 
-    if isinstance(self.data, types.npytypes.Array) and isinstance(dtype, types.StringLiteral):
-        try:
-            literal_value = numpy.dtype(dtype.literal_value)
-        except:
-            pass # Will raise the exception later
-        else:
-            return hpat_pandas_series_astype_literal_type_numba_impl
+    # if isinstance(self.data, types.npytypes.Array) and isinstance(dtype, types.StringLiteral):
+    #     try:
+    #         literal_value = numpy.dtype(dtype.literal_value)
+    #     except:
+    #         pass # Will raise the exception later
+    #     else:
+    #         return hpat_pandas_series_astype_literal_type_numba_impl
 
     # Raise error if dtype is not supported
     if errors == 'raise':
