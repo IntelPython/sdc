@@ -108,7 +108,7 @@ def sdc_astype_overload(self, dtype):
     """
 
     ty_checker = TypeChecker("numpy-like 'astype'")
-    if not isinstance(self, types.Array):
+    if not isinstance(self, (types.Array, StringArrayType)):
         return None
 
     if not isinstance(dtype, (types.functions.NumberClass, types.Function, types.Literal)):
