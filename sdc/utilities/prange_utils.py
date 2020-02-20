@@ -29,7 +29,7 @@ import numba
 import sdc
 
 from typing import NamedTuple
-from sdc.utilities.utils import sdc_overload, sdc_register_jitable
+from sdc.utilities.utils import sdc_register_jitable
 
 
 class Chunk(NamedTuple):
