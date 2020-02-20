@@ -306,32 +306,6 @@ hpat_pandas_rolling_series_var_impl = register_jitable(
 
 
 @sdc_register_jitable
-def pop_mean(value, nfinite, result):
-    """Calculate the window mean without old value."""
-    if numpy.isfinite(value):
-        nfinite -= 1
-        if nfinite:
-            result = ((nfinite + 1) * result - value) / nfinite
-        else:
-            result = numpy.nan
-
-    return nfinite, result
-
-
-@sdc_register_jitable
-def put_mean(value, nfinite, result):
-    """Calculate the window mean with new value."""
-    if numpy.isfinite(value):
-        nfinite += 1
-        if numpy.isnan(result):
-            result = value / nfinite
-        else:
-            result = ((nfinite - 1) * result + value) / nfinite
-
-    return nfinite, result
-
-
-@sdc_register_jitable
 def pop_sum(value, nfinite, result):
     """Calculate the window sum without old value."""
     if numpy.isfinite(value):
@@ -360,7 +334,17 @@ def result_or_nan(nfinite, minp, result):
     return result
 
 
-def gen_sdc_pandas_series_rolling_impl(pop, put, init_result=numpy.nan):
+@sdc_register_jitable
+def mean_result_or_nan(nfinite, minp, result):
+    """Get result mean taking into account min periods."""
+    if nfinite == 0 or nfinite < minp:
+        return numpy.nan
+
+    return result / nfinite
+
+
+def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
+                                       init_result=numpy.nan):
     """Generate series rolling methods implementations based on pop/put funcs"""
     def impl(self):
         win = self._window
@@ -390,24 +374,24 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, init_result=numpy.nan):
             for idx in range(interlude_start, interlude_stop):
                 value = input_arr[idx]
                 nfinite, result = put(value, nfinite, result)
-                output_arr[idx] = result_or_nan(nfinite, minp, result)
+                output_arr[idx] = get_result(nfinite, minp, result)
 
             for idx in range(interlude_stop, chunk.stop):
                 put_value = input_arr[idx]
                 pop_value = input_arr[idx - win]
                 nfinite, result = put(put_value, nfinite, result)
                 nfinite, result = pop(pop_value, nfinite, result)
-                output_arr[idx] = result_or_nan(nfinite, minp, result)
+                output_arr[idx] = get_result(nfinite, minp, result)
 
         return pandas.Series(output_arr, input_series._index,
                              name=input_series._name)
     return impl
 
 
-sdc_pandas_series_rolling_mean_impl = register_jitable(
-    gen_sdc_pandas_series_rolling_impl(pop_mean, put_mean))
-sdc_pandas_series_rolling_sum_impl = register_jitable(
-    gen_sdc_pandas_series_rolling_impl(pop_sum, put_sum, init_result=0.))
+sdc_pandas_series_rolling_mean_impl = gen_sdc_pandas_series_rolling_impl(
+    pop_sum, put_sum, get_result=mean_result_or_nan, init_result=0.)
+sdc_pandas_series_rolling_sum_impl = gen_sdc_pandas_series_rolling_impl(
+    pop_sum, put_sum, init_result=0.)
 
 
 @sdc_rolling_overload(SeriesRollingType, 'apply')
