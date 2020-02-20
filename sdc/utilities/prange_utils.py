@@ -25,27 +25,45 @@
 # *****************************************************************************
 
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
+import numba
+import sdc
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
+from typing import NamedTuple
+from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
 
-from sdc.tests.test_ml import *
+class Chunk(NamedTuple):
+    start: int
+    stop: int
 
-from sdc.tests.test_io import *
 
-from sdc.tests.test_hpat_jit import *
+@sdc_register_jitable
+def get_pool_size():
+    if sdc.config.config_use_parallel_overloads:
+        return numba.config.NUMBA_NUM_THREADS
 
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
+    return 1
 
-# performance tests
-import sdc.tests.tests_perf
+
+@sdc_register_jitable
+def get_chunks(size, pool_size):
+    chunks = []
+
+    if size < 1 or pool_size < 1:
+        return chunks
+
+    pool_size = min(pool_size, size)
+    chunk_size = size // pool_size
+    overload_size = size % pool_size
+
+    for i in range(pool_size):
+        start = i * chunk_size + min(i, overload_size)
+        stop = (i + 1) * chunk_size + min(i + 1, overload_size)
+        chunks.append(Chunk(start, stop))
+
+    return chunks
+
+
+@sdc_register_jitable
+def parallel_chunks(size):
+    return get_chunks(size, get_pool_size())

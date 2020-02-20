@@ -72,10 +72,19 @@ if not config_pipeline_hpat_default:
 
             return new_block
 
+        def _mk_unique_var(self, prefix):
+            """Make unique var name checking self.func_ir._definitions"""
+            name = mk_unique_var(prefix)
+            while name in self.func_ir._definitions:
+                name = mk_unique_var(prefix)
+
+            return name
+
         def _assign_const(self, inst, prefix='$const0'):
             """Create constant from attribute of the instruction."""
             const_node = Const(inst.value.attr, inst.loc)
-            const_var = Var(inst.target.scope, mk_unique_var(prefix), inst.loc)
+            unique_var_name = self._mk_unique_var(prefix)
+            const_var = Var(inst.target.scope, unique_var_name, inst.loc)
 
             self.func_ir._definitions[const_var.name] = [const_node]
             self.typemap[const_var.name] = StringLiteral(inst.value.attr)
