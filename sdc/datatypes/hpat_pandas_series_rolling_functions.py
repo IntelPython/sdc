@@ -327,6 +327,15 @@ def put_sum(value, nfinite, result):
     return nfinite, result
 
 
+@sdc_register_jitable
+def result_or_nan(nfinite, minp, result):
+    """Get result taking into account min periods."""
+    if nfinite < minp:
+        return numpy.nan
+
+    return result
+
+
 def gen_sdc_pandas_series_rolling_impl(pop, put, init_result=numpy.nan):
     """Generate series rolling methods implementations based on pop/put funcs"""
     def impl(self):
@@ -341,29 +350,30 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, init_result=numpy.nan):
         chunks = parallel_chunks(length)
         for i in prange(len(chunks)):
             chunk = chunks[i]
-            nroll = 0
             nfinite = 0
             result = init_result
-            for idx in range(chunk.start, chunk.stop):
-                if nroll == 0:
-                    start = max(idx + 1 - win, 0)
-                    for j in range(start, idx):
-                        value = input_arr[j]
-                        nfinite, result = put(value, nfinite, result)
-                        nroll += 1
 
-                if nroll >= win:
-                    value = input_arr[idx - win]
-                    nfinite, result = pop(value, nfinite, result)
+            prelude_start = max(0, chunk.start - win + 1)
+            prelude_stop = min(chunk.start, prelude_start + win)
 
+            interlude_start = prelude_stop
+            interlude_stop = min(prelude_start + win, chunk.stop)
+
+            for idx in range(prelude_start, prelude_stop):
                 value = input_arr[idx]
                 nfinite, result = put(value, nfinite, result)
-                nroll += 1
 
-                if nfinite < minp:
-                    output_arr[idx] = numpy.nan
-                else:
-                    output_arr[idx] = result
+            for idx in range(interlude_start, interlude_stop):
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+                output_arr[idx] = result_or_nan(nfinite, minp, result)
+
+            for idx in range(interlude_stop, chunk.stop):
+                put_value = input_arr[idx]
+                pop_value = input_arr[idx - win]
+                nfinite, result = put(put_value, nfinite, result)
+                nfinite, result = pop(pop_value, nfinite, result)
+                output_arr[idx] = result_or_nan(nfinite, minp, result)
 
         return pandas.Series(output_arr, input_series._index,
                              name=input_series._name)
