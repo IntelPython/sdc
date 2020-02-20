@@ -26,9 +26,8 @@
 
 
 import numba
-from numba import types, cgutils
+from numba import types
 from numba.extending import (models, register_model, make_attribute_wrapper)
-from numba.typed import Dict, List
 from sdc.str_ext import string_type
 
 
@@ -37,15 +36,16 @@ class DataFrameGroupByType(types.Type):
     Type definition for DataFrameGroupBy functions handling.
     """
 
-    def __init__(self, parent, col_id):
+    def __init__(self, parent, col_id, target_columns):
         self.parent = parent
         self.col_id = col_id
+        self.target_columns = target_columns
         super(DataFrameGroupByType, self).__init__(
-            name="DataFrameGroupByType({}, {})".format(parent, col_id))
+            name="DataFrameGroupByType({}, {})".format(parent, col_id, target_columns))
 
     @property
     def key(self):
-        return self.parent, self.col_id
+        return self.parent, self.col_id, self.target_columns
 
 
 @register_model(DataFrameGroupByType)
@@ -56,11 +56,15 @@ class DataFrameGroupByModel(models.StructModel):
             by_series_dtype,
             types.containers.ListType(types.int64)
         )
+
+        n_target_cols = len(fe_type.target_columns)
         members = [
             ('parent', fe_type.parent),
             ('col_id', types.int64),
             ('data', ty_data),
-            ('sort', types.bool_)
+            ('sort', types.bool_),
+            ('target_default', types.bool_),
+            ('target_columns', types.UniTuple(string_type, n_target_cols))
         ]
         super(DataFrameGroupByModel, self).__init__(dmm, fe_type, members)
 
@@ -69,3 +73,5 @@ make_attribute_wrapper(DataFrameGroupByType, 'parent', '_parent')
 make_attribute_wrapper(DataFrameGroupByType, 'col_id', '_col_id')
 make_attribute_wrapper(DataFrameGroupByType, 'data', '_data')
 make_attribute_wrapper(DataFrameGroupByType, 'sort', '_sort')
+make_attribute_wrapper(DataFrameGroupByType, 'target_default', '_target_default')
+make_attribute_wrapper(DataFrameGroupByType, 'target_columns', '_target_columns')
