@@ -66,38 +66,14 @@ class TestPandasReadCSV(TestBase):
         cls.columns = 10
         cls.generated_file = generate_csv(cls.rows, cls.columns)
 
-    def _test_jitted(self, pyfunc, record, *args, **kwargs):
-        # compilation time
-        record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
-
-        sdc_func = sdc.jit(pyfunc)
-
-        # Warming up
-        sdc_func(*args, **kwargs)
-
-        # execution and boxing time
-        record["test_results"], record["boxing_results"] = \
-            get_times(sdc_func, *args, **kwargs)
-
-    def _test_python(self, pyfunc, record, *args, **kwargs):
-        record["test_results"], _ = \
-            get_times(pyfunc, *args, **kwargs)
-
     def _test_case(self, pyfunc, name):
         base = {
             "test_name": name,
             "data_size": f"[{self.rows},{self.columns}]",
         }
 
-        record = base.copy()
-        record["test_type"] = 'SDC'
-        self._test_jitted(pyfunc, record)
-        self.test_results.add(**record)
-
-        record = base.copy()
-        record["test_type"] = 'Python'
-        self._test_python(pyfunc, record)
-        self.test_results.add(**record)
+        self._test_jit(pyfunc, base)
+        self._test_py(pyfunc, base)
 
     def test_read_csv(self):
         self._test_case(make_func(self.generated_file), 'read_csv')

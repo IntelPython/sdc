@@ -46,6 +46,7 @@ from sdc.datatypes.common_functions import (sdc_join_series_indexes, sdc_check_i
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_arr_ext import (string_array_type, str_arr_is_na)
 from sdc.utilities.utils import sdc_overload
+from sdc.functions.numpy_like import astype
 
 
 def sdc_pandas_series_operator_binop(self, other):
@@ -128,7 +129,7 @@ def sdc_pandas_series_operator_binop(self, other):
             def _series_operator_binop_none_indexes_impl(self, other):
 
                 if (len(self._data) == len(other._data)):
-                    result_data = self._data.astype(numpy.float64)
+                    result_data = astype(self._data, numpy.float64)
                     result_data = result_data + other._data
                     return pandas.Series(result_data)
                 else:
@@ -165,7 +166,7 @@ def sdc_pandas_series_operator_binop(self, other):
                     result_data[:] = self._data + other._data
 
                     if none_or_numeric_indexes == True:  # noqa
-                        result_index = left_index.astype(numba_index_common_dtype)
+                        result_index = astype(left_index, numba_index_common_dtype)
                     else:
                         result_index = self._index
 
@@ -273,7 +274,7 @@ def sdc_pandas_series_operator_comp_binop(self, other):
 
                 if sdc_check_indexes_equal(left_index, right_index):
                     if none_or_numeric_indexes == True:  # noqa
-                        new_index = left_index.astype(numba_index_common_dtype)
+                        new_index = astype(left_index, numba_index_common_dtype)
                     else:
                         new_index = self._index
                     return pandas.Series(self._data < other._data,

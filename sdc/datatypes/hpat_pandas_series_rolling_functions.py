@@ -34,8 +34,11 @@ from numba.extending import register_jitable
 from numba.types import (float64, Boolean, Integer, NoneType, Number,
                          Omitted, StringLiteral, UnicodeType)
 
-from sdc.utilities.sdc_typing_utils import TypeChecker
+from sdc.datatypes.common_functions import _sdc_pandas_series_align
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
+from sdc.hiframes.pd_series_type import SeriesType
+from sdc.utilities.prange_utils import parallel_chunks
+from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
 
 
@@ -109,15 +112,6 @@ def arr_corr(x, y):
 def arr_nonnan_count(arr):
     """Count non-NaN values"""
     return len(arr) - numpy.isnan(arr).sum()
-
-
-@sdc_register_jitable
-def arr_cov(x, y, ddof):
-    """Calculate covariance of values 1D arrays x and y of the same size"""
-    if len(x) == 0:
-        return numpy.nan
-
-    return numpy.cov(x, y, ddof=ddof)[0, 1]
 
 
 @sdc_register_jitable
@@ -222,12 +216,6 @@ def arr_std(arr, ddof):
 
 
 @sdc_register_jitable
-def arr_sum(arr):
-    """Calculate sum of values"""
-    return arr.sum()
-
-
-@sdc_register_jitable
 def arr_var(arr, ddof):
     """Calculate unbiased variance of values"""
     length = len(arr)
@@ -315,10 +303,85 @@ hpat_pandas_rolling_series_skew_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_skew))
 hpat_pandas_rolling_series_std_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_std))
-hpat_pandas_rolling_series_sum_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_sum))
 hpat_pandas_rolling_series_var_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_var))
+
+
+@sdc_register_jitable
+def pop_sum(value, nfinite, result):
+    """Calculate the window sum without old value."""
+    if numpy.isfinite(value):
+        nfinite -= 1
+        result -= value
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def put_sum(value, nfinite, result):
+    """Calculate the window sum with new value."""
+    if numpy.isfinite(value):
+        nfinite += 1
+        result += value
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def result_or_nan(nfinite, minp, result):
+    """Get result taking into account min periods."""
+    if nfinite < minp:
+        return numpy.nan
+
+    return result
+
+
+def gen_sdc_pandas_series_rolling_impl(pop, put, init_result=numpy.nan):
+    """Generate series rolling methods implementations based on pop/put funcs"""
+    def impl(self):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        chunks = parallel_chunks(length)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            nfinite = 0
+            result = init_result
+
+            prelude_start = max(0, chunk.start - win + 1)
+            prelude_stop = min(chunk.start, prelude_start + win)
+
+            interlude_start = prelude_stop
+            interlude_stop = min(prelude_start + win, chunk.stop)
+
+            for idx in range(prelude_start, prelude_stop):
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+
+            for idx in range(interlude_start, interlude_stop):
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+                output_arr[idx] = result_or_nan(nfinite, minp, result)
+
+            for idx in range(interlude_stop, chunk.stop):
+                put_value = input_arr[idx]
+                pop_value = input_arr[idx - win]
+                nfinite, result = put(put_value, nfinite, result)
+                nfinite, result = pop(pop_value, nfinite, result)
+                output_arr[idx] = result_or_nan(nfinite, minp, result)
+
+        return pandas.Series(output_arr, input_series._index,
+                             name=input_series._name)
+    return impl
+
+
+sdc_pandas_series_rolling_sum_impl = register_jitable(
+    gen_sdc_pandas_series_rolling_impl(pop_sum, put_sum, init_result=0.))
 
 
 @sdc_rolling_overload(SeriesRollingType, 'apply')
@@ -451,16 +514,15 @@ def hpat_pandas_series_rolling_count(self):
     return hpat_pandas_rolling_series_count_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'cov')
-def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
-
+def _hpat_pandas_series_rolling_cov_check_types(self, other=None,
+                                                pairwise=None, ddof=1):
+    """Check types of parameters of series.rolling.cov()"""
     ty_checker = TypeChecker('Method rolling.cov().')
     ty_checker.check(self, SeriesRollingType)
 
-    # TODO: check `other` is Series after a circular import of SeriesType fixed
-    # accepted_other = (bool, Omitted, NoneType, SeriesType)
-    # if not isinstance(other, accepted_other) and other is not None:
-    #     ty_checker.raise_exc(other, 'Series', 'other')
+    accepted_other = (bool, Omitted, NoneType, SeriesType)
+    if not isinstance(other, accepted_other) and other is not None:
+        ty_checker.raise_exc(other, 'Series', 'other')
 
     accepted_pairwise = (bool, Boolean, Omitted, NoneType)
     if not isinstance(pairwise, accepted_pairwise) and pairwise is not None:
@@ -469,50 +531,48 @@ def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
     if not isinstance(ddof, (int, Integer, Omitted)):
         ty_checker.raise_exc(ddof, 'int', 'ddof')
 
+
+def _gen_hpat_pandas_rolling_series_cov_impl(other, align_finiteness=False):
+    """Generate series.rolling.cov() implementation based on series alignment"""
     nan_other = isinstance(other, (Omitted, NoneType)) or other is None
 
-    def hpat_pandas_rolling_series_cov_impl(self, other=None, pairwise=None, ddof=1):
+    def _impl(self, other=None, pairwise=None, ddof=1):
         win = self._window
         minp = self._min_periods
 
         main_series = self._data
-        main_arr = main_series._data
-        main_arr_length = len(main_arr)
-
         if nan_other == True:  # noqa
-            other_arr = main_arr
+            other_series = main_series
         else:
-            other_arr = other._data
+            other_series = other
 
-        other_arr_length = len(other_arr)
-        length = max(main_arr_length, other_arr_length)
-        output_arr = numpy.empty(length, dtype=float64)
+        main_aligned, other_aligned = _sdc_pandas_series_align(main_series, other_series,
+                                                               finiteness=align_finiteness)
+        count = (main_aligned + other_aligned).rolling(win).count()
+        bias_adj = count / (count - ddof)
 
-        def calc_cov(main, other, ddof, minp):
-            # align arrays `main` and `other` by size and finiteness
-            min_length = min(len(main), len(other))
-            main_valid_indices = numpy.isfinite(main[:min_length])
-            other_valid_indices = numpy.isfinite(other[:min_length])
-            valid = main_valid_indices & other_valid_indices
+        def mean(series):
+            return series.rolling(win, min_periods=minp).mean()
 
-            if len(main[valid]) < minp:
-                return numpy.nan
-            else:
-                return arr_cov(main[valid], other[valid], ddof)
+        return (mean(main_aligned * other_aligned) - mean(main_aligned) * mean(other_aligned)) * bias_adj
 
-        for i in prange(min(win, length)):
-            main_arr_range = main_arr[:i + 1]
-            other_arr_range = other_arr[:i + 1]
-            output_arr[i] = calc_cov(main_arr_range, other_arr_range, ddof, minp)
+    return _impl
 
-        for i in prange(win, length):
-            main_arr_range = main_arr[i + 1 - win:i + 1]
-            other_arr_range = other_arr[i + 1 - win:i + 1]
-            output_arr[i] = calc_cov(main_arr_range, other_arr_range, ddof, minp)
 
-        return pandas.Series(output_arr)
+@sdc_rolling_overload(SeriesRollingType, 'cov')
+def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
+    _hpat_pandas_series_rolling_cov_check_types(self, other=other,
+                                                pairwise=pairwise, ddof=ddof)
 
-    return hpat_pandas_rolling_series_cov_impl
+    return _gen_hpat_pandas_rolling_series_cov_impl(other, align_finiteness=True)
+
+
+@sdc_rolling_overload(SeriesRollingType, '_df_cov')
+def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
+    _hpat_pandas_series_rolling_cov_check_types(self, other=other,
+                                                pairwise=pairwise, ddof=ddof)
+
+    return _gen_hpat_pandas_rolling_series_cov_impl(other)
 
 
 @sdc_rolling_overload(SeriesRollingType, 'kurt')
@@ -629,13 +689,13 @@ def hpat_pandas_series_rolling_std(self, ddof=1):
     return hpat_pandas_rolling_series_std_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'sum')
+@sdc_overload_method(SeriesRollingType, 'sum')
 def hpat_pandas_series_rolling_sum(self):
 
     ty_checker = TypeChecker('Method rolling.sum().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_sum_impl
+    return sdc_pandas_series_rolling_sum_impl
 
 
 @sdc_rolling_overload(SeriesRollingType, 'var')

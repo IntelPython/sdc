@@ -35,10 +35,16 @@ import pandas
 import numpy
 import sdc
 
+
 from numba import types
 from numba.special import literally
+from numba.typed import List, Dict
+
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
-from sdc.utilities.sdc_typing_utils import TypeChecker
+from sdc.hiframes.pd_series_type import SeriesType
+from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric,
+                                            check_types_comparable,
+                                            gen_df_impl_generator, find_common_dtype_from_numpy_dtypes)
 from sdc.str_arr_ext import StringArrayType
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
@@ -46,8 +52,10 @@ from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
+from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
+from sdc.hiframes.api import isna
 
 
 @sdc_overload_attribute(DataFrameType, 'index')
@@ -100,6 +108,132 @@ def hpat_pandas_dataframe_index(df):
             return df._index
 
         return hpat_pandas_df_index_impl
+
+
+def sdc_pandas_dataframe_values_codegen(df, numba_common_dtype):
+    """
+    Input:
+    column_len = 3
+    numba_common_dtype = float64
+
+    Func generated:
+    def sdc_pandas_dataframe_values_impl(df):
+        row_len = len(get_dataframe_data(df, 0))
+        df_col_A = get_dataframe_data(df, 0)
+        df_col_B = get_dataframe_data(df, 1)
+        df_col_C = get_dataframe_data(df, 2)
+        df_values = numpy.empty(row_len*3, numpy.dtype("float64"))
+        for i in range(row_len):
+            df_values[i * 3 + 0] = df_col_A[i]
+            df_values[i * 3 + 1] = df_col_B[i]
+            df_values[i * 3 + 2] = df_col_C[i]
+        return df_values.reshape(row_len, 3)
+
+    """
+
+    indent = 4 * ' '
+    func_args = ['df']
+
+    func_definition = [f'def sdc_pandas_dataframe_values_impl({", ".join(func_args)}):']
+    func_text = []
+    column_list = []
+    column_len = len(df.columns)
+    func_text.append(f'row_len = len(get_dataframe_data(df, 0))')
+
+    for index, column_name in enumerate(df.columns):
+        func_text.append(f'df_col_{column_name} = get_dataframe_data(df, {index})')
+        column_list.append(f'df_col_{column_name}')
+
+    func_text.append(f'df_values = numpy.empty(row_len*{column_len}, numpy.dtype("{numba_common_dtype}"))')
+    func_text.append('for i in range(row_len):')
+    for j in range(column_len):
+        func_text.append(indent + f'df_values[i * {column_len} + {j}] = {column_list[j]}[i]')
+
+    func_text.append(f"return df_values.reshape(row_len, {column_len})\n")
+    func_definition.extend([indent + func_line for func_line in func_text])
+    func_def = '\n'.join(func_definition)
+
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
+
+    return func_def, global_vars
+
+
+@sdc_overload_attribute(DataFrameType, 'values')
+def hpat_pandas_dataframe_values(df):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.values
+
+    Limitations
+    -----------
+    Only numeric values supported as an output
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_values.py
+      :language: python
+      :lines: 27-
+      :caption: The values data of the DataFrame.
+      :name: ex_dataframe_values
+
+    .. command-output:: python ./dataframe/dataframe_values.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.to_numpy <pandas.DataFrame.to_numpy>`
+            Recommended alternative to this method.
+        :ref:`DataFrame.index <pandas.DataFrame.index>`
+            Retrieve the index labels.
+        :ref:`DataFrame.columns <pandas.DataFrame.columns>`
+            Retrieving the column names.
+
+    .. note::
+
+        The dtype will be a lower-common-denominator dtype (implicit upcasting);
+        that is to say if the dtypes (even of numeric types) are mixed, the one that accommodates all will be chosen.
+        Use this with care if you are not dealing with the blocks.
+        e.g. If the dtypes are float16 and float32, dtype will be upcast to float32. If dtypes are int32 and uint8,
+        dtype will be upcast to int32. By numpy.find_common_type() convention,
+        mixing int64 and uint64 will result in a float64 dtype.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame attribute :attr:`pandas.DataFrame.values` implementation.
+    .. only:: developer
+    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_values*
+    Parameters
+    -----------
+    df: :obj:`pandas.DataFrame`
+       input arg
+    Returns
+    -------
+    :obj: `numpy.ndarray`
+       return a Numpy representation of the DataFrame
+    """
+
+    func_name = 'Attribute values.'
+    ty_checker = TypeChecker(func_name)
+    ty_checker.check(df, DataFrameType)
+
+    # TODO: Handle StringArrayType
+    for i, column in enumerate(df.data):
+        if isinstance(column, StringArrayType):
+            ty_checker.raise_exc(column, 'Numeric type', f'df.data["{df.columns[i]}"]')
+
+    numba_common_dtype = find_common_dtype_from_numpy_dtypes([column.dtype for column in df.data], [])
+
+    def hpat_pandas_df_values_impl(df, numba_common_dtype):
+        loc_vars = {}
+        func_def, global_vars = sdc_pandas_dataframe_values_codegen(df, numba_common_dtype)
+
+        exec(func_def, global_vars, loc_vars)
+        _values_impl = loc_vars['sdc_pandas_dataframe_values_impl']
+        return _values_impl
+
+    return hpat_pandas_df_values_impl(df, numba_common_dtype)
 
 
 def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
@@ -929,84 +1063,286 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
     return sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns)
 
 
-def df_getitem_str_literal_idx_main_codelines(self, idx):
-    """Generate main code lines for df.getitem"""
-    try:
-        col_idx = self.columns.index(idx)
-    except ValueError:
-        func_lines = ['  raise KeyError']
+def df_length_codelines(self):
+    """Generate code lines to get length of DF"""
+    if self.columns:
+        return ['  length = len(get_dataframe_data(self, 0))']
+
+    return ['  length = 0']
+
+
+def df_index_codelines(self, with_length=False):
+    """Generate code lines to get or create index of DF"""
+    func_lines = []
+    if isinstance(self.index, types.NoneType):
+        if with_length:
+            func_lines += df_length_codelines(self)
+
+        func_lines += ['  res_index = numpy.arange(length)']
     else:
-        col_data = f'data_{col_idx}'
-        func_lines = [
-            f'  {col_data} = get_dataframe_data(self, {col_idx})',
-            f'  return pandas.Series({col_data}, index=self._index, name=idx)'
-        ]
+        func_lines += ['  res_index = self._index']
 
     return func_lines
 
 
-def df_getitem_str_literal_idx_codegen(self, idx):
+def df_getitem_slice_idx_main_codelines(self, idx):
+    """Generate main code lines for df.getitem with idx of slice"""
+    results = []
+    func_lines = df_index_codelines(self, with_length=True)
+    for i, col in enumerate(self.columns):
+        res_data = f'res_data_{i}'
+        func_lines += [
+            f'  data_{i} = get_dataframe_data(self, {i})',
+            f'  {res_data} = pandas.Series(data_{i}[idx], index=res_index[idx], name="{col}")'
+        ]
+        results.append((col, res_data))
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index[idx])']
+
+    return func_lines
+
+
+def df_getitem_tuple_idx_main_codelines(self, literal_idx):
+    """Generate main code lines for df.getitem with idx of tuple"""
+    results = []
+    func_lines = df_index_codelines(self, with_length=True)
+    needed_cols = {col: i for i, col in enumerate(self.columns) if col in literal_idx}
+    for col, i in needed_cols.items():
+        res_data = f'res_data_{i}'
+        func_lines += [
+            f'  data_{i} = get_dataframe_data(self, {i})',
+            f'  {res_data} = pandas.Series(data_{i}, index=res_index, name="{col}")'
+        ]
+        results.append((col, res_data))
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index)']
+
+    return func_lines
+
+
+def df_getitem_bool_series_idx_main_codelines(self, idx):
+    """Generate main code lines for df.getitem"""
+    func_lines = df_length_codelines(self)
+    func_lines += ['  _idx_data = idx._data[:length]']
+    func_lines += df_index_codelines(self)
+
+    results = []
+    for i, col in enumerate(self.columns):
+        res_data = f'res_data_{i}'
+        func_lines += [
+            f'  data_{i} = get_dataframe_data(self, {i})',
+            f'  series_{i} = pandas.Series(data_{i}, index=res_index, name="{col}")',
+            f'  {res_data} = series_{i}[_idx_data]'
+        ]
+        results.append((col, res_data))
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index[_idx_data])']
+
+    return func_lines
+
+
+def df_getitem_bool_array_idx_main_codelines(self, idx):
+    """Generate main code lines for df.getitem"""
+    func_lines = df_length_codelines(self)
+    func_lines += ['  if length != len(idx):',
+                   '    raise ValueError("Item wrong length.")']
+    func_lines += df_index_codelines(self)
+
+    results = []
+    for i, col in enumerate(self.columns):
+        res_data = f'res_data_{i}'
+        func_lines += [
+            f'  data_{i} = get_dataframe_data(self, {i})',
+            f'  {res_data} = pandas.Series(data_{i}[idx], index=res_index[idx], name="{col}")'
+        ]
+        results.append((col, res_data))
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index[idx])']
+
+    return func_lines
+
+
+def df_getitem_key_error_codelines():
+    """Generate code lines to raise KeyError"""
+    return ['  raise KeyError("Column is not in the DataFrame")']
+
+
+def df_getitem_slice_idx_codegen(self, idx):
     """
-        def _df_getitem_str_literal_idx_impl(self, idx):
+    Example of generated implementation with provided index:
+        def _df_getitem_slice_idx_impl(self, idx)
+          res_index = self._index
           data_0 = get_dataframe_data(self, 0)
-          return pandas.Series(data_0, index=self._index, name=idx)
+          res_data_0 = pandas.Series(data_0[idx], index=res_index[idx], name="A")
+          data_1 = get_dataframe_data(self, 1)
+          res_data_1 = pandas.Series(data_1[idx], index=res_index, name="B")
+          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index[idx])
     """
-    func_lines = ['def _df_getitem_str_literal_idx_impl(self, idx):']
+    func_lines = ['def _df_getitem_slice_idx_impl(self, idx):']
     if self.columns:
-        func_lines += df_getitem_str_literal_idx_main_codelines(self, idx)
+        func_lines += df_getitem_slice_idx_main_codelines(self, idx)
     else:
         # raise KeyError if input DF is empty
-        func_lines += ['  raise KeyError']
+        func_lines += df_getitem_key_error_codelines()
 
     func_text = '\n'.join(func_lines)
-    global_vars = {'pandas': pandas, 'get_dataframe_data': get_dataframe_data}
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
 
 
-def gen_df_getitem_str_literal_idx_impl(self, idx):
-    func_text, global_vars = df_getitem_str_literal_idx_codegen(self, idx)
+def df_getitem_tuple_idx_codegen(self, idx):
+    """
+    Example of generated implementation with provided index:
+        def _df_getitem_tuple_idx_impl(self, idx)
+          res_index = self._index
+          data_1 = get_dataframe_data(self, 1)
+          res_data_1 = pandas.Series(data_1, index=res_index, name="B")
+          data_2 = get_dataframe_data(self, 2)
+          res_data_2 = pandas.Series(data_2, index=res_index, name="C")
+          return pandas.DataFrame({"B": res_data_1, "C": res_data_2}, index=res_index)
+    """
+    func_lines = ['def _df_getitem_tuple_idx_impl(self, idx):']
+    literal_idx = {col.literal_value for col in idx}
+    key_error = any(i not in self.columns for i in literal_idx)
 
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _impl = loc_vars['_df_getitem_str_literal_idx_impl']
+    if self.columns and not key_error:
+        func_lines += df_getitem_tuple_idx_main_codelines(self, literal_idx)
+    else:
+        # raise KeyError if input DF is empty or idx is invalid
+        func_lines += df_getitem_key_error_codelines()
 
-    return _impl
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
 
 
-def gen_df_getitem_unicode_idx_impl(self):
-    df_is_empty = False if self.columns else True
+def df_getitem_bool_series_idx_codegen(self, idx):
+    """
+    Example of generated implementation with provided index:
+        def _df_getitem_bool_series_idx_impl(self, idx):
+          length = len(get_dataframe_data(self, 0))
+          _idx_data = idx._data[:length]
+          res_index = self._index
+          data_0 = get_dataframe_data(self, 0)
+          series_0 = pandas.Series(data_0, index=res_index, name="A")
+          res_data_0 = series_0[_idx_data]
+          data_1 = get_dataframe_data(self, 1)
+          series_1 = pandas.Series(data_1, index=res_index, name="B")
+          res_data_1 = series_1[_idx_data]
+          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index[_idx_data])
+    """
+    func_lines = ['def _df_getitem_bool_series_idx_impl(self, idx):']
+    func_lines += df_getitem_bool_series_idx_main_codelines(self, idx)
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
 
-    def _df_getitem_unicode_idx_impl(self, idx):
-        if df_is_empty == False:  # noqa
-            if idx not in self._columns:
-                raise KeyError
+    return func_text, global_vars
 
-            literal_idx = literally(idx)
-            col_idx = self._columns.index(literal_idx)
-            res_data = get_dataframe_data(self, col_idx)
 
-            return pandas.Series(res_data, index=self._index, name=idx)
-        else:
-            raise KeyError
+def df_getitem_bool_array_idx_codegen(self, idx):
+    """
+    Example of generated implementation with provided index:
+        def _df_getitem_bool_array_idx_impl(self, idx):
+          length = len(get_dataframe_data(self, 0))
+          if length != len(idx):
+            raise ValueError("Item wrong length.")
+          res_index = numpy.arange(length)
+          data_0 = get_dataframe_data(self, 0)
+          res_data_0 = pandas.Series(data_0[idx], index=res_index[idx], name="A")
+          data_1 = get_dataframe_data(self, 1)
+          res_data_1 = pandas.Series(data_1[idx], index=res_index[idx], name="B")
+          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index[idx])
+    """
+    func_lines = ['def _df_getitem_bool_array_idx_impl(self, idx):']
+    func_lines += df_getitem_bool_array_idx_main_codelines(self, idx)
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
 
-    return _df_getitem_unicode_idx_impl
+    return func_text, global_vars
+
+
+gen_df_getitem_slice_idx_impl = gen_df_impl_generator(
+    df_getitem_slice_idx_codegen, '_df_getitem_slice_idx_impl')
+gen_df_getitem_tuple_idx_impl = gen_df_impl_generator(
+    df_getitem_tuple_idx_codegen, '_df_getitem_tuple_idx_impl')
+gen_df_getitem_bool_series_idx_impl = gen_df_impl_generator(
+    df_getitem_bool_series_idx_codegen, '_df_getitem_bool_series_idx_impl')
+gen_df_getitem_bool_array_idx_impl = gen_df_impl_generator(
+    df_getitem_bool_array_idx_codegen, '_df_getitem_bool_array_idx_impl')
 
 
 @sdc_overload(operator.getitem)
 def sdc_pandas_dataframe_getitem(self, idx):
+    ty_checker = TypeChecker('Operator getitem().')
 
     if not isinstance(self, DataFrameType):
         return None
 
     if isinstance(idx, types.StringLiteral):
-        return gen_df_getitem_str_literal_idx_impl(self, idx.literal_value)
+        try:
+            col_idx = self.columns.index(idx.literal_value)
+            key_error = False
+        except ValueError:
+            key_error = True
+
+        def _df_getitem_str_literal_idx_impl(self, idx):
+            if key_error == False:  # noqa
+                data = get_dataframe_data(self, col_idx)
+                return pandas.Series(data, index=self._index, name=idx)
+            else:
+                raise KeyError('Column is not in the DataFrame')
+
+        return _df_getitem_str_literal_idx_impl
 
     if isinstance(idx, types.UnicodeType):
-        return gen_df_getitem_unicode_idx_impl(self)
+        def _df_getitem_unicode_idx_impl(self, idx):
+            # http://numba.pydata.org/numba-doc/dev/developer/literal.html#specifying-for-literal-typing
+            # literally raises special exception to call getitem with literal idx value got from unicode
+            return literally(idx)
+
+        return _df_getitem_unicode_idx_impl
+
+    if isinstance(idx, types.Tuple):
+        if all([isinstance(item, types.StringLiteral) for item in idx]):
+            return gen_df_getitem_tuple_idx_impl(self, idx)
+
+    if isinstance(idx, types.SliceType):
+        return gen_df_getitem_slice_idx_impl(self, idx)
+
+    if isinstance(idx, SeriesType) and isinstance(idx.dtype, types.Boolean):
+        self_index_is_none = isinstance(self.index, types.NoneType)
+        idx_index_is_none = isinstance(idx.index, types.NoneType)
+
+        if self_index_is_none and not idx_index_is_none:
+            if not check_index_is_numeric(idx):
+                ty_checker.raise_exc(idx.index.dtype, 'number', 'idx.index.dtype')
+
+        if not self_index_is_none and idx_index_is_none:
+            if not check_index_is_numeric(self):
+                ty_checker.raise_exc(idx.index.dtype, self.index.dtype, 'idx.index.dtype')
+
+        if not self_index_is_none and not idx_index_is_none:
+            if not check_types_comparable(self.index, idx.index):
+                ty_checker.raise_exc(idx.index.dtype, self.index.dtype, 'idx.index.dtype')
+
+        return gen_df_getitem_bool_series_idx_impl(self, idx)
+
+    if isinstance(idx, types.Array) and isinstance(idx.dtype, types.Boolean):
+        return gen_df_getitem_bool_array_idx_impl(self, idx)
 
     ty_checker = TypeChecker('Operator getitem().')
-    ty_checker.raise_exc(idx, 'str', 'idx')
+    expected_types = 'str, tuple(str), slice, series(bool), array(bool)'
+    ty_checker.raise_exc(idx, expected_types, 'idx')
 
 
 @sdc_overload_method(DataFrameType, 'pct_change')
@@ -1058,3 +1394,32 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     ser_par = {'periods': 'periods', 'fill_method': 'fill_method', 'limit': 'limit', 'freq': 'freq'}
 
     return sdc_pandas_dataframe_apply_columns(df, name, params, ser_par)
+
+
+@sdc_overload_method(DataFrameType, 'groupby')
+def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=True, sort=True,
+                                 group_keys=True, squeeze=False, observed=False):
+
+    if not isinstance(by, types.StringLiteral):
+        return None
+
+    column_id = self.columns.index(by.literal_value)
+    list_type = types.ListType(types.int64)
+    by_type = self.data[column_id].dtype
+
+    def sdc_pandas_dataframe_groupby_impl(self, by=None, axis=0, level=None, as_index=True, sort=True,
+                                          group_keys=True, squeeze=False, observed=False):
+
+        grouped = Dict.empty(by_type, list_type)
+        by_column_data = get_dataframe_data(self, column_id)
+        for i in numpy.arange(len(by_column_data)):
+            if isna(by_column_data, i):
+                continue
+            value = by_column_data[i]
+            group_list = grouped.get(value, List.empty_list(types.int64))
+            group_list.append(i)
+            grouped[value] = group_list
+
+        return init_dataframe_groupby(self, column_id, grouped, sort)
+
+    return sdc_pandas_dataframe_groupby_impl

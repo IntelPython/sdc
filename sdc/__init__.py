@@ -31,7 +31,6 @@ from numba import (typeof, prange, pndindex, gdb, gdb_breakpoint, gdb_init,
                    stencil, threading_layer, jitclass, objmode)
 
 import sdc.config
-import sdc.dict_ext
 import sdc.set_ext
 import sdc.io
 import sdc.io.np_io
@@ -45,6 +44,7 @@ import sdc.datatypes.hpat_pandas_series_functions
 import sdc.datatypes.hpat_pandas_series_rolling_functions
 import sdc.datatypes.hpat_pandas_seriesgroupby_functions
 import sdc.datatypes.hpat_pandas_stringmethods_functions
+import sdc.datatypes.hpat_pandas_groupby_functions
 
 from ._version import get_versions
 
@@ -63,6 +63,7 @@ if not sdc.config.config_pipeline_hpat_default:
     # sdc.datatypes.hpat_pandas_dataframe_pass.sdc_nopython_pipeline_lite_register
 
     import sdc.rewrites.dataframe_constructor
+    import sdc.rewrites.dataframe_getitem_attribute
     import sdc.datatypes.hpat_pandas_functions
     import sdc.datatypes.hpat_pandas_dataframe_functions
 else:

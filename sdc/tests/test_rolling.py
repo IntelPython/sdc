@@ -629,6 +629,54 @@ class TestRolling(TestCase):
                     ref_result = test_impl(obj, window, min_periods)
                     assert_equal(jit_result, ref_result)
 
+    def _test_rolling_cov(self, obj, other):
+        def test_impl(obj, window, min_periods, other, ddof):
+            return obj.rolling(window, min_periods).cov(other, ddof=ddof)
+
+        hpat_func = self.jit(test_impl)
+        assert_equal = self._get_assert_equal(obj)
+
+        for window in range(0, len(obj) + 3, 2):
+            for min_periods, ddof in product(range(0, window, 2), [0, 1]):
+                with self.subTest(obj=obj, other=other, window=window,
+                                  min_periods=min_periods, ddof=ddof):
+                    jit_result = hpat_func(obj, window, min_periods, other, ddof)
+                    ref_result = test_impl(obj, window, min_periods, other, ddof)
+                    assert_equal(jit_result, ref_result)
+
+    def _test_rolling_cov_with_no_other(self, obj):
+        def test_impl(obj, window, min_periods):
+            return obj.rolling(window, min_periods).cov(pairwise=False)
+
+        hpat_func = self.jit(test_impl)
+        assert_equal = self._get_assert_equal(obj)
+
+        for window in range(0, len(obj) + 3, 2):
+            for min_periods in range(0, window, 2):
+                with self.subTest(obj=obj, window=window,
+                                  min_periods=min_periods):
+                    jit_result = hpat_func(obj, window, min_periods)
+                    ref_result = test_impl(obj, window, min_periods)
+                    assert_equal(jit_result, ref_result)
+
+    def _test_rolling_cov_unsupported_types(self, obj):
+        def test_impl(obj, pairwise, ddof):
+            return obj.rolling(3, 3).cov(pairwise=pairwise, ddof=ddof)
+
+        hpat_func = self.jit(test_impl)
+
+        msg_tmpl = 'Method rolling.cov(). The object {}\n given: {}\n expected: {}'
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, 1, 1)
+        msg = msg_tmpl.format('pairwise', 'int64', 'bool')
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(obj, None, '1')
+        msg = msg_tmpl.format('ddof', 'unicode_type', 'int')
+        self.assertIn(msg, str(raises.exception))
+
     def _test_rolling_kurt(self, obj):
         def test_impl(obj, window, min_periods):
             return obj.rolling(window, min_periods).kurt()
@@ -799,8 +847,8 @@ class TestRolling(TestCase):
         hpat_func = self.jit(test_impl)
         assert_equal = self._get_assert_equal(obj)
 
-        for window in range(0, len(obj) + 3, 2):
-            for min_periods in range(0, window + 1, 2):
+        for window in range(len(obj) + 2):
+            for min_periods in range(window):
                 with self.subTest(obj=obj, window=window,
                                   min_periods=min_periods):
                     jit_result = hpat_func(obj, window, min_periods)
@@ -956,6 +1004,102 @@ class TestRolling(TestCase):
         df = pd.DataFrame(data)
 
         self._test_rolling_count(df)
+
+    @skip_sdc_jit('DataFrame.rolling.cov() unsupported')
+    def test_df_rolling_cov(self):
+        all_data = [
+            list(range(10)), [1., -1., 0., 0.1, -0.1],
+            [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
+            [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
+        ]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+        for d in all_data:
+            other = pd.Series(d)
+            self._test_rolling_cov(df, other)
+
+        other_all_data = deepcopy(all_data) + [list(range(10))[::-1]]
+        other_all_data[1] = [-1., 1., 0., -0.1, 0.1]
+        other_length = min(len(d) for d in other_all_data)
+        other_data = {n: d[:other_length] for n, d in zip(string.ascii_uppercase, other_all_data)}
+        other = pd.DataFrame(other_data)
+
+        self._test_rolling_cov(df, other)
+
+    @skip_sdc_jit('DataFrame.rolling.cov() unsupported')
+    def test_df_rolling_cov_no_other(self):
+        all_data = [
+            list(range(10)), [1., -1., 0., 0.1, -0.1],
+            [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
+            [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
+        ]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_cov_with_no_other(df)
+
+    @skip_sdc_jit('DataFrame.rolling.cov() unsupported exceptions')
+    def test_df_rolling_cov_unsupported_types(self):
+        all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
+        length = min(len(d) for d in all_data)
+        data = {n: d[:length] for n, d in zip(string.ascii_uppercase, all_data)}
+        df = pd.DataFrame(data)
+
+        self._test_rolling_cov_unsupported_types(df)
+
+    @skip_sdc_jit('DataFrame.rolling.cov() unsupported exceptions')
+    def test_df_rolling_cov_unsupported_values(self):
+        def test_impl(df, other, pairwise):
+            return df.rolling(3, 3).cov(other=other, pairwise=pairwise)
+
+        hpat_func = self.jit(test_impl)
+        msg_tmpl = 'Method rolling.cov(). The object pairwise\n expected: {}'
+
+        df = pd.DataFrame({'A': [1., -1., 0., 0.1, -0.1],
+                           'B': [-1., 1., 0., -0.1, 0.1]})
+        for pairwise in [None, True]:
+            with self.assertRaises(ValueError) as raises:
+                hpat_func(df, None, pairwise)
+            self.assertIn(msg_tmpl.format('False'), str(raises.exception))
+
+        other = pd.DataFrame({'A': [-1., 1., 0., -0.1, 0.1],
+                              'C': [1., -1., 0., 0.1, -0.1]})
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(df, other, True)
+        self.assertIn(msg_tmpl.format('False, None'), str(raises.exception))
+
+    @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
+    @unittest.expectedFailure
+    def test_df_rolling_cov_issue_floating_point_rounding(self):
+        """
+            Cover issue of different float rounding in Python and SDC/Numba:
+
+            s = np.Series([1., -1., 0., 0.1, -0.1])
+            s.rolling(2, 0).mean()
+
+            Python:                  SDC/Numba:
+            0    1.000000e+00        0    1.00
+            1    0.000000e+00        1    0.00
+            2   -5.000000e-01        2   -0.50
+            3    5.000000e-02        3    0.05
+            4   -1.387779e-17        4    0.00
+            dtype: float64           dtype: float64
+
+            BTW: cov uses mean inside itself
+        """
+        def test_impl(df, window, min_periods, other, ddof):
+            return df.rolling(window, min_periods).cov(other, ddof=ddof)
+
+        hpat_func = self.jit(test_impl)
+
+        df = pd.DataFrame({'A': [1., -1., 0., 0.1, -0.1]})
+        other = pd.DataFrame({'A': [-1., 1., 0., -0.1, 0.1, 0.]})
+
+        jit_result = hpat_func(df, 2, 0, other, 1)
+        ref_result = test_impl(df, 2, 0, other, 1)
+        pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.kurt() unsupported')
     def test_df_rolling_kurt(self):
@@ -1187,6 +1331,27 @@ class TestRolling(TestCase):
         series = pd.Series([1., -1., 0., 0.1, -0.1])
         self._test_rolling_corr_unsupported_types(series)
 
+    @skip_sdc_jit('Series.rolling.corr() unsupported Series index')
+    @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2377
+    def test_series_rolling_corr_index(self):
+        def test_impl(S1, S2):
+            return S1.rolling(window=3).corr(S2)
+
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        np.random.seed(0)
+        index_values = np.arange(n)
+
+        np.random.shuffle(index_values)
+        S1 = pd.Series(np.arange(n), index=index_values, name='A')
+        np.random.shuffle(index_values)
+        S2 = pd.Series(2 * np.arange(n) - 5, index=index_values, name='B')
+
+        result = hpat_func(S1, S2)
+        result_ref = test_impl(S1, S2)
+        pd.testing.assert_series_equal(result, result_ref)
+
     @skip_sdc_jit('Series.rolling.count() unsupported Series index')
     def test_series_rolling_count(self):
         all_data = test_global_input_data_float64
@@ -1197,11 +1362,6 @@ class TestRolling(TestCase):
 
     @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
     def test_series_rolling_cov(self):
-        def test_impl(series, window, min_periods, other, ddof):
-            return series.rolling(window, min_periods).cov(other, ddof=ddof)
-
-        hpat_func = self.jit(test_impl)
-
         all_data = [
             list(range(5)), [1., -1., 0., 0.1, -0.1],
             [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
@@ -1210,21 +1370,10 @@ class TestRolling(TestCase):
         for main_data, other_data in product(all_data, all_data):
             series = pd.Series(main_data)
             other = pd.Series(other_data)
-            for window in range(0, len(series) + 3, 2):
-                for min_periods, ddof in product(range(0, window, 2), [0, 1]):
-                    with self.subTest(series=series, other=other, window=window,
-                                      min_periods=min_periods, ddof=ddof):
-                        jit_result = hpat_func(series, window, min_periods, other, ddof)
-                        ref_result = test_impl(series, window, min_periods, other, ddof)
-                        pd.testing.assert_series_equal(jit_result, ref_result)
+            self._test_rolling_cov(series, other)
 
     @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
-    def test_series_rolling_cov_default(self):
-        def test_impl(series, window, min_periods):
-            return series.rolling(window, min_periods).cov()
-
-        hpat_func = self.jit(test_impl)
-
+    def test_series_rolling_cov_no_other(self):
         all_data = [
             list(range(5)), [1., -1., 0., 0.1, -0.1],
             [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
@@ -1232,13 +1381,7 @@ class TestRolling(TestCase):
         ]
         for data in all_data:
             series = pd.Series(data)
-            for window in range(0, len(series) + 3, 2):
-                for min_periods in range(0, window, 2):
-                    with self.subTest(series=series, window=window,
-                                      min_periods=min_periods):
-                        jit_result = hpat_func(series, window, min_periods)
-                        ref_result = test_impl(series, window, min_periods)
-                        pd.testing.assert_series_equal(jit_result, ref_result)
+            self._test_rolling_cov_with_no_other(series)
 
     @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
     @unittest.expectedFailure
@@ -1257,23 +1400,8 @@ class TestRolling(TestCase):
 
     @skip_sdc_jit('Series.rolling.cov() unsupported exceptions')
     def test_series_rolling_cov_unsupported_types(self):
-        def test_impl(pairwise, ddof):
-            series = pd.Series([1., -1., 0., 0.1, -0.1])
-            return series.rolling(3, 3).cov(pairwise=pairwise, ddof=ddof)
-
-        hpat_func = self.jit(test_impl)
-
-        msg_tmpl = 'Method rolling.cov(). The object {}\n given: {}\n expected: {}'
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(1, 1)
-        msg = msg_tmpl.format('pairwise', 'int64', 'bool')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(None, '1')
-        msg = msg_tmpl.format('ddof', 'unicode_type', 'int')
-        self.assertIn(msg, str(raises.exception))
+        series = pd.Series([1., -1., 0., 0.1, -0.1])
+        self._test_rolling_cov_unsupported_types(series)
 
     @skip_sdc_jit('Series.rolling.kurt() unsupported Series index')
     def test_series_rolling_kurt(self):

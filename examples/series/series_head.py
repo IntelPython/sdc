@@ -24,19 +24,19 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+Expected Series
+0    7
+2    6
+4    5
+dtype: int64
+"""
 import pandas as pd
 from numba import njit
 
 
 @njit
 def series_head():
-    """
-    Expected Series
-    0    7
-    2    6
-    4    5
-    dtype: int64
-    """
     s = pd.Series([7, 6, 5, 4, 3, 2, 1], index=[0, 2, 4, 6, 8, 10, 12])
 
     return s.head(3)

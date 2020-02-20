@@ -184,6 +184,10 @@ def get_times(f, *args, iter_number=5):
     """Get time of boxing+unboxing and internal execution"""
     exec_times = []
     boxing_times = []
+
+    # Warming up
+    f(*args)
+
     for _ in range(iter_number):
         ext_start = time.time()
         int_result, _ = f(*args)
@@ -244,7 +248,7 @@ class CSVResultsDriver(ResultsDriver):
         grouped_data.to_csv(self.file_name)
 
     def dump_test_results_data(self, test_results_data, logger=None):
-        test_results_data.to_csv(self.raw_file_name)
+        test_results_data.to_csv(self.raw_file_name, index=False)
 
     def load(self, logger=None):
         raw_perf_results_csv = Path(self.raw_file_name)
@@ -261,7 +265,7 @@ class CSVResultsDriver(ResultsDriver):
 
 class TestResults:
     index = ['name', 'nthreads', 'type', 'size']
-    test_results_data = pandas.DataFrame(index=index)
+    test_results_data = pandas.DataFrame()
     logger = setup_logging()
 
     def __init__(self, drivers=None):
@@ -286,13 +290,22 @@ class TestResults:
         if self.test_results_data.empty:
             return pandas.DataFrame()
 
-        median_col = self.test_results_data.groupby(self.index)['Time(s)'].median()
-        min_col = self.test_results_data.groupby(self.index)['Time(s)'].min()
-        max_col = self.test_results_data.groupby(self.index)['Time(s)'].max()
-        compilation_col = self.test_results_data.groupby(self.index)['Compile(s)'].median(skipna=False)
-        boxing_col = self.test_results_data.groupby(self.index)['Boxing(s)'].median(skipna=False)
+        time_columns = ['Time(s)', 'Compile(s)', 'Boxing(s)']
+        index = [column for column in self.test_results_data.columns if column not in time_columns]
 
-        test_results_data = self.test_results_data.set_index(self.index)
+        # by default Pandas drop data with NaN in index during groupby
+        # so replace NaN in index with empty string
+        data = self.test_results_data.fillna(value={column: '' for column in index})
+
+        grouped = data.groupby(index)
+
+        median_col = grouped['Time(s)'].median()
+        min_col = grouped['Time(s)'].min()
+        max_col = grouped['Time(s)'].max()
+        compilation_col = grouped['Compile(s)'].median(skipna=False)
+        boxing_col = grouped['Boxing(s)'].median(skipna=False)
+
+        test_results_data = data.set_index(index)
         test_results_data['median'] = median_col
         test_results_data['min'] = min_col
         test_results_data['max'] = max_col
@@ -301,7 +314,7 @@ class TestResults:
         test_results_data = test_results_data.reset_index()
 
         columns = ['median', 'min', 'max', 'compile', 'boxing']
-        return test_results_data.groupby(self.index)[columns].first().sort_values(self.index)
+        return test_results_data.groupby(index)[columns].first().sort_values(index)
 
     def add(self, test_name, test_type, data_size, test_results,
             boxing_results=None, compile_results=None, num_threads=config.NUMBA_NUM_THREADS):
@@ -379,7 +392,7 @@ class TestResultsStr(TestResults):
             'Compile(s)': compile_results,
             'Boxing(s)': boxing_results
         }
-        local_results = pandas.DataFrame(data, index=self.index)
+        local_results = pandas.DataFrame(data)
         self.test_results_data = self.test_results_data.append(local_results, sort=False)
 
 

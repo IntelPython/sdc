@@ -59,6 +59,15 @@ test_global_input_data_float64 = [
 ]
 
 
+def gen_int_df_index(length):
+    """Generate random integer index for DataFrame"""
+    arr = np.arange(length)
+    np.random.seed(0)
+    np.random.shuffle(arr)
+
+    return arr
+
+
 def gen_df(input_data, with_index=False):
     """Generate DataFrame based on list of data like a [[1, 2, 3], [4, 5, 6]]"""
     length = min(len(d) for d in input_data)
@@ -66,11 +75,19 @@ def gen_df(input_data, with_index=False):
 
     index = None
     if with_index:
-        # generate integer index
-        arr = np.arange(length)
-        np.random.seed(0)
-        np.random.shuffle(arr)
-        index = arr
+        index = gen_int_df_index(length)
+
+    return pandas.DataFrame(data, index=index)
+
+
+def gen_df_int_cols(input_data, with_index=False):
+    """Generate DataFrame based on list of data like a [[1, 2, 3], [4, 5, 6]]"""
+    length = min(len(d) for d in input_data)
+    data = {n: d[:length] for n, d in enumerate(input_data)}
+
+    index = None
+    if with_index:
+        index = gen_int_df_index(length)
 
     return pandas.DataFrame(data, index=index)
 
@@ -193,3 +210,24 @@ def skip_inline(msg_or_func):
         wrapper = unittest.expectedFailure
     # wrapper = lambda f: f  # disable skipping
     return wrapper(func) if func else wrapper
+
+
+def take_k_elements(k, data, repeat=False, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+    return np.random.choice(np.asarray(data), k, replace=repeat)
+
+
+def create_series_from_values(size, data_values, index_values=None, name=None, unique=True, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+
+    min_size = min(size, len(data_values))
+    if index_values:
+        min_size = min(min_size, len(index_values))
+    repeat = False if unique and min_size == size else True
+
+    series_data = take_k_elements(size, data_values, repeat)
+    series_index = take_k_elements(size, index_values, repeat) if index_values else None
+
+    return pandas.Series(series_data, series_index, name)

@@ -90,9 +90,14 @@ class TypeChecker:
             self.raise_exc(data, accepted_type.__name__, name=name)
 
 
-def params2list(params):
+def kwsparams2list(params):
     """Convert parameters dict to a list of string of a format 'key=value'"""
     return ['{}={}'.format(k, v) for k, v in params.items()]
+
+
+def sigparams2list(param_names, defaults):
+    """Creates a list of strings of a format 'key=value' from parameter names and default values"""
+    return [(f'{param}' if param not in defaults else f'{param}={defaults[param]}') for param in param_names]
 
 
 def has_literal_value(var, value):
@@ -168,3 +173,17 @@ def find_common_dtype_from_numpy_dtypes(array_types, scalar_types):
     numba_common_dtype = numpy_support.from_dtype(np_common_dtype)
 
     return numba_common_dtype
+
+
+def gen_df_impl_generator(codegen, impl_name):
+    """Generate generator of df methods"""
+    def _df_impl_generator(self, idx):
+        func_text, global_vars = codegen(self, idx)
+
+        loc_vars = {}
+        exec(func_text, global_vars, loc_vars)
+        _impl = loc_vars[impl_name]
+
+        return _impl
+
+    return _df_impl_generator

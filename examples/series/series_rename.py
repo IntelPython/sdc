@@ -24,12 +24,8 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import numpy as np
-import pandas as pd
-from numba import njit
-
-
 """
+Expect Series
 0    0
 1    1
 2    2
@@ -37,6 +33,11 @@ from numba import njit
 4    4
 Name: new_series, dtype: int64
 """
+import numpy as np
+import pandas as pd
+from numba import njit
+
+
 @njit
 def series_rename():
     s = pd.Series(np.arange(5))

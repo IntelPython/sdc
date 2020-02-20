@@ -1,10 +1,12 @@
 import os
 import unittest
+import numba
 
+from sdc.tests.test_base import TestCase
 from sdc.tests.tests_perf.test_perf_utils import *
 
 
-class TestBase(unittest.TestCase):
+class TestBase(TestCase):
     iter_number = 5
     results_class = TestResults
 
@@ -36,3 +38,29 @@ class TestBase(unittest.TestCase):
         # TODO: https://jira.devtools.intel.com/browse/SAT-2371
         cls.test_results.print()
         cls.test_results.dump()
+
+    def _test_jitted(self, pyfunc, record, *args, **kwargs):
+        # compilation time
+        record["compile_results"] = calc_compilation(pyfunc, *args, **kwargs)
+
+        cfunc = self.jit(pyfunc)
+
+        # execution and boxing time
+        record["test_results"], record["boxing_results"] = \
+            get_times(cfunc, *args, **kwargs)
+
+    def _test_python(self, pyfunc, record, *args, **kwargs):
+        record["test_results"], _ = \
+            get_times(pyfunc, *args, **kwargs)
+
+    def _test_jit(self, pyfunc, base, *args):
+        record = base.copy()
+        record["test_type"] = 'SDC'
+        self._test_jitted(pyfunc, record, *args)
+        self.test_results.add(**record)
+
+    def _test_py(self, pyfunc, base, *args):
+        record = base.copy()
+        record["test_type"] = 'Python'
+        self._test_python(pyfunc, record, *args)
+        self.test_results.add(**record)

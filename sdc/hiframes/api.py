@@ -547,7 +547,7 @@ def isna_overload(arr, i):
     if arr == string_array_split_view_type:
         return lambda arr, i: False
     # TODO: extend to other types
-    assert isinstance(arr, types.Array)
+    assert isinstance(arr, types.Array) or isinstance(arr, types.List)
     dtype = arr.dtype
     if isinstance(dtype, types.Float):
         return lambda arr, i: np.isnan(arr[i])
@@ -569,8 +569,13 @@ def get_nan_mask(arr):
 @overload(get_nan_mask)
 def get_nan_mask_overload(arr):
 
+    _func_name = "Function: get_nan_mask"
     def get_nan_mask_via_isna_impl(arr):
-        return np.array([isna(arr, i) for i in np.arange(len(arr))])
+        len_arr = len(arr)
+        res = np.empty(len_arr, dtype=np.bool_)
+        for i in numba.prange(len_arr):
+            res[i] = isna(arr, i)
+        return res
 
     if isinstance(arr, types.Array):
         dtype = arr.dtype
@@ -1181,7 +1186,9 @@ class FixDfArrayType(AbstractTemplate):
             and (isinstance(column.dtype, types.Number)
                  or column.dtype == types.boolean)):
             ret_typ = types.Array(column.dtype, 1, 'C')
-        if isinstance(column, types.List) and column.dtype == string_type:
+        if (isinstance(column, types.List)
+            and (column.dtype == string_type
+                 or isinstance(column.dtype, types.Optional) and column.dtype.type == string_type)):
             ret_typ = string_array_type
         if isinstance(column, DatetimeIndexType):
             ret_typ = sdc.hiframes.pd_index_ext._dt_index_data_typ
@@ -1210,7 +1217,10 @@ def fix_df_array_overload(column):
         return fix_df_array_list_impl
 
     # convert list of strings to string array
-    if isinstance(column, types.List) and column.dtype == string_type:
+    if (isinstance(column, types.List)
+        and (column.dtype == string_type
+             or isinstance(column.dtype, types.Optional) and column.dtype.type == string_type)):
+
         def fix_df_array_str_impl(column):  # pragma: no cover
             return sdc.str_arr_ext.StringArray(column)
         return fix_df_array_str_impl
