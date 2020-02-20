@@ -81,14 +81,12 @@ def gen_series_rolling_usecase(method_name, rolling_params=None,
 
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_series_rolling.TestSeriesRollingMethods
 class TestSeriesRollingMethods(TestBase):
-    # more than 19 columns raise SystemError: CPUDispatcher() returned a result with an error set
-    max_columns_num = 19
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.map_ncalls_dlength = {
-            'min': (100, [2 * 10 ** 5]),
+            'min': (100, [8 * 10 ** 5]),
+            'sum': (100, [8 * 10 ** 5]),
         }
 
     def _test_case(self, pyfunc, name, total_data_length, data_num=1,
@@ -130,6 +128,10 @@ class TestSeriesRollingMethods(TestBase):
     def test_series_rolling_min(self):
         self._test_series_rolling_method('min')
 
+    def test_series_rolling_sum(self):
+        self._test_series_rolling_method('sum')
+
+
 cases = [
     TC(name='apply', size=[10 ** 7], params='func=lambda x: np.nan if len(x) == 0 else x.mean()'),
     TC(name='corr', size=[10 ** 7]),
@@ -142,7 +144,6 @@ cases = [
     TC(name='quantile', size=[10 ** 7], params='0.2'),
     TC(name='skew', size=[10 ** 7]),
     TC(name='std', size=[10 ** 7]),
-    TC(name='sum', size=[10 ** 7]),
     TC(name='var', size=[10 ** 7]),
 ]
 

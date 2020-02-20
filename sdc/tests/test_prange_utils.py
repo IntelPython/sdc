@@ -68,6 +68,8 @@ class ChunkTest(TestCase):
             Chunk(start=3, stop=6),
             Chunk(start=6, stop=9),
         ]
+        yield (0, 5), []
+        yield (5, 0), []
 
     def _check_get_chunks(self, args, expected_chunks):
         pyfunc = get_chunks

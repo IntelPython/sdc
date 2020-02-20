@@ -38,6 +38,7 @@ from numba.typing import signature
 from numba.typing.templates import infer_global, AbstractTemplate
 from numba.targets.imputils import lower_builtin
 from numba.extending import overload, intrinsic, lower_cast
+from numba import numpy_support
 import numpy as np
 import sdc
 from sdc.str_ext import string_type, list_string_array_type
@@ -81,6 +82,26 @@ _numba_to_c_type_map = {
     types.int16: CTypeEnum.Int16.value,
     types.uint16: CTypeEnum.UInt16.value,
 }
+
+
+def min_dtype_int_val(dtype):
+    numpy_dtype = numpy_support.as_dtype(dtype)
+    return np.iinfo(numpy_dtype).min
+
+
+def max_dtype_int_val(dtype):
+    numpy_dtype = numpy_support.as_dtype(dtype)
+    return np.iinfo(numpy_dtype).max
+
+
+def min_dtype_float_val(dtype):
+    numpy_dtype = numpy_support.as_dtype(dtype)
+    return np.finfo(numpy_dtype).min
+
+
+def max_dtype_float_val(dtype):
+    numpy_dtype = numpy_support.as_dtype(dtype)
+    return np.finfo(numpy_dtype).max
 
 
 # silence Numba error messages for now
