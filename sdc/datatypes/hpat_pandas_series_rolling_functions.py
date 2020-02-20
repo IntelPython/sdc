@@ -308,6 +308,32 @@ hpat_pandas_rolling_series_var_impl = register_jitable(
 
 
 @sdc_register_jitable
+def pop_count(value, nfinite, result):
+    """Calculate the window sum without old value."""
+    if not numpy.isnan(value):
+        nfinite -= 1
+        result -= 1
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def put_count(value, nfinite, result):
+    """Calculate the window sum with new value."""
+    if not numpy.isnan(value):
+        nfinite += 1
+        result += 1
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def result_count(nfinite, minp, result):
+    """Get result taking into account min periods."""
+    return result
+
+
+@sdc_register_jitable
 def pop_sum(value, nfinite, result):
     """Calculate the window sum without old value."""
     if numpy.isfinite(value):
@@ -336,7 +362,7 @@ def result_or_nan(nfinite, minp, result):
     return result
 
 
-def gen_sdc_pandas_series_rolling_impl(pop, put, init_result=numpy.nan):
+def gen_sdc_pandas_series_rolling_impl(pop, put, func_result=result_or_nan, init_result=numpy.nan):
     """Generate series rolling methods implementations based on pop/put funcs"""
     def impl(self):
         win = self._window
@@ -346,6 +372,13 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, init_result=numpy.nan):
         input_arr = input_series._data
         length = len(input_arr)
         output_arr = numpy.empty(length, dtype=float64)
+
+        if minp == 0 and win == 0:
+            for i in prange(length):
+                output_arr[i] = init_result
+
+            return pandas.Series(output_arr, input_series._index,
+                                 name=input_series._name)
 
         chunks = parallel_chunks(length)
         for i in prange(len(chunks)):
@@ -366,20 +399,22 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, init_result=numpy.nan):
             for idx in range(interlude_start, interlude_stop):
                 value = input_arr[idx]
                 nfinite, result = put(value, nfinite, result)
-                output_arr[idx] = result_or_nan(nfinite, minp, result)
+                output_arr[idx] = func_result(nfinite, minp, result)
 
             for idx in range(interlude_stop, chunk.stop):
                 put_value = input_arr[idx]
                 pop_value = input_arr[idx - win]
                 nfinite, result = put(put_value, nfinite, result)
                 nfinite, result = pop(pop_value, nfinite, result)
-                output_arr[idx] = result_or_nan(nfinite, minp, result)
+                output_arr[idx] = func_result(nfinite, minp, result)
 
         return pandas.Series(output_arr, input_series._index,
                              name=input_series._name)
     return impl
 
 
+sdc_pandas_series_rolling_count_impl = register_jitable(
+    gen_sdc_pandas_series_rolling_impl(pop_count, put_count, result_count, init_result=0.))
 sdc_pandas_series_rolling_sum_impl = register_jitable(
     gen_sdc_pandas_series_rolling_impl(pop_sum, put_sum, init_result=0.))
 
@@ -492,46 +527,7 @@ def hpat_pandas_series_rolling_count(self):
     ty_checker = TypeChecker('Method rolling.count().')
     ty_checker.check(self, SeriesRollingType)
 
-    def hpat_pandas_rolling_series_count_impl(self):
-        win = self._window
-
-        input_series = self._data
-        input_arr = input_series._data
-        length = len(input_arr)
-        output_arr = numpy.empty(length, dtype=float64)
-
-        current_result = 0
-        boundary = min(win, length)
-        for i in prange(boundary):
-            value = input_arr[i]
-            val_is_nan = numpy.isnan(value)
-
-            if not val_is_nan:
-                current_result += 1
-
-            output_arr[i] = current_result
-
-        start_indices = range(length - boundary)
-        end_indices = range(boundary, length)
-        for start_idx, end_idx in zip(start_indices, end_indices):
-            if start_idx == end_idx:
-                output_arr[end_idx] = current_result
-                continue
-
-            first_val = input_arr[start_idx]
-            last_val = input_arr[end_idx]
-
-            if numpy.isnan(last_val):
-                current_result -= 1
-
-            if numpy.isnan(first_val):
-                current_result += 1
-
-            output_arr[end_idx] = current_result
-
-        return pandas.Series(output_arr, input_series._index, name=input_series._name)
-
-    return hpat_pandas_rolling_series_count_impl
+    return sdc_pandas_series_rolling_count_impl
 
 
 def _hpat_pandas_series_rolling_cov_check_types(self, other=None,
