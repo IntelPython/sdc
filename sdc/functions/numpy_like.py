@@ -530,18 +530,18 @@ def corr_overload(self, other, method='pearson', min_periods=None):
             if not (numpy.isnan(x) or numpy.isnan(y)):
                 sum_x += x
                 sum_y += y
-                sum_xy += x*y
-                sum_xx += x*x
-                sum_yy += y*y
+                sum_xy += x * y
+                sum_xx += x * x
+                sum_yy += y * y
                 total_count += 1
 
         if total_count < min_periods:
             return numpy.nan
 
-        cov_xy = (sum_xy - sum_x*sum_y/total_count)
-        var_x = (sum_xx - sum_x*sum_x/total_count)
-        var_y = (sum_yy - sum_y*sum_y/total_count)
-        corr_xy = cov_xy/numpy.sqrt(var_x*var_y)
+        cov_xy = (sum_xy - sum_x * sum_y / total_count)
+        var_x = (sum_xx - sum_x * sum_x / total_count)
+        var_y = (sum_yy - sum_y * sum_y / total_count)
+        corr_xy = cov_xy / numpy.sqrt(var_x * var_y)
 
         return corr_xy
 
