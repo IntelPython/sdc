@@ -2286,86 +2286,6 @@ def hpat_pandas_series_head(self, n=5):
 
         return hpat_pandas_series_head_index_impl
 
-# 
-# @sdc_overload_method(SeriesType, 'groupby')
-# def hpat_pandas_series_groupby(
-#         self,
-#         by=None,
-#         axis=0,
-#         level=None,
-#         as_index=True,
-#         sort=True,
-#         group_keys=True,
-#         squeeze=False,
-#         observed=False):
-#     """
-#     Intel Scalable Dataframe Compiler User Guide
-#     ********************************************
-# 
-#     Pandas API: pandas.Series.groupby
-# 
-#     Limitations
-#     -----------
-#     - Parameters level, as_index, sort, group_keys, squeeze, observed
-#     are currently unsupported by Intel Scalable Dataframe Compiler
-# 
-#     Examples
-#     --------
-#     .. literalinclude:: ../../../examples/series/series_groupby.py
-#        :language: python
-#        :lines: 33-
-#        :caption: Return the mean of the values for the requested axis.
-#        :name: ex_series_groupby
-# 
-#     .. command-output:: python ./series/series_groupby.py
-#        :cwd: ../../../examples
-# 
-#     .. seealso::
-# 
-#         :ref:`Series.resample <pandas.Series.resample>`
-#             Resample time-series data.
-# 
-#     .. note::
-# 
-#         Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-# 
-#     Intel Scalable Dataframe Compiler Developer Guide
-#     *************************************************
-#     Pandas Series method :meth:`pandas.Series.groupby` implementation.
-# 
-#     .. only:: developer
-#         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_groupby_count
-#     """
-# 
-#     _func_name = 'Method Series.groupby().'
-# 
-#     ty_checker = TypeChecker(_func_name)
-#     ty_checker.check(self, SeriesType)
-# 
-#     if by is None and axis is None:
-#         ty_checker.raise_exc(by, "supply one of 'by' or 'axis'", 'by')
-# 
-#     if level is not None and not isinstance(level, (types.Integer, types.NoneType, types.Omitted)):
-#         ty_checker.raise_exc(level, 'int', 'level')
-# 
-#     def hpat_pandas_series_groupby_impl(
-#             self,
-#             by=None,
-#             axis=0,
-#             level=None,
-#             as_index=True,
-#             sort=True,
-#             group_keys=True,
-#             squeeze=False,
-#             observed=False):
-#         # TODO Needs to implement parameters value check
-#         # if level is not None and (level < -1 or level > 0):
-#         #     raise ValueError("Method Series.groupby(). level > 0 or level < -1 only valid with MultiIndex")
-# 
-#         return pandas.core.groupby.SeriesGroupBy(self)
-# 
-#     return hpat_pandas_series_groupby_impl
-
 
 @sdc_overload_method(SeriesType, 'isnull')
 def hpat_pandas_series_isnull(self):
@@ -5699,13 +5619,76 @@ def sdc_pandas_str_series_operator_mul(self, other):
 @sdc_overload_method(SeriesType, 'groupby')
 def sdc_pandas_series_groupby(self, by=None, axis=0, level=None, as_index=True, sort=True,
                               group_keys=True, squeeze=False, observed=False):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-    _func_name = 'Method groupby().'
+    Pandas API: pandas.Series.groupby
+
+    Limitations
+    -----------
+    - Parameters level, as_index, group_keys, squeeze, observed
+    are currently unsupported by Intel Scalable Dataframe Compiler
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_groupby.py
+       :language: python
+       :lines: 33-
+       :caption: Return the mean of the values grouped by numpy array.
+       :name: ex_series_groupby
+
+    .. command-output:: python ./series/series_groupby.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`Series.resample <pandas.Series.resample>`
+            Resample time-series data.
+
+    .. note::
+
+        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas Series method :meth:`pandas.Series.groupby` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests sdc.tests.test_groupby.TestGroupBy.test_series_groupby*
+    """
+
+    _func_name = 'Method Series.groupby().'
+
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
+
     # we support only simpliest case of by being 1D array (a column of a DataFrame)
     # TODO: extend and support fully functional SeriesGroupBy
     if not ((isinstance(by, types.Array) and by.ndim == 1)
             or by == string_array_type):
         return None
+
+    if not (isinstance(axis, (types.Integer, types.UnicodeType, types.Omitted)) or axis == 0):
+        ty_checker.raise_exc(axis, 'int or str', 'axis')
+
+    if not (level is None or isinstance(level, types.Omitted)):
+        raise TypingError('{} Unsupported parameters. Given inplace: {}'.format(_func_name, level))
+
+    if not (as_index is True or isinstance(as_index, types.Omitted)):
+        raise TypingError('{} Unsupported parameters. Given inplace: {}'.format(_func_name, as_index))
+
+    if not (isinstance(sort, (types.Omitted, types.Boolean)) or sort is True):
+        ty_checker.raise_exc(sort, 'bool', 'sort')
+
+    if not (group_keys is True or isinstance(group_keys, types.Omitted)):
+        raise TypingError('{} Unsupported parameters. Given inplace: {}'.format(_func_name, group_keys))
+
+    if not (squeeze is False or isinstance(squeeze, types.Omitted)):
+        raise TypingError('{} Unsupported parameters. Given inplace: {}'.format(_func_name, squeeze))
+
+    if not (observed is False or isinstance(observed, types.Omitted)):
+        raise TypingError('{} Unsupported parameters. Given inplace: {}'.format(_func_name, observed))
 
     by_type = by.dtype
     list_type = types.ListType(types.int64)

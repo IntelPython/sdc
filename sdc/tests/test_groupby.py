@@ -728,6 +728,19 @@ class TestGroupBy(TestCase):
                 result_ref = test_impl(S, by_arr)
                 pd.testing.assert_series_equal(result, result_ref)
 
+    @unittest.skip("getiter for this type is not implemented yet")
+    def test_series_groupby_iterator_int(self):
+        def test_impl():
+            A = pd.Series([13, 11, 21, 13, 13, 51, 42, 21])
+            grouped = A.groupby(A)
+            return [i for i in grouped]
+
+        hpat_func = self.jit(test_impl)
+
+        ref_result = test_impl()
+        result = hpat_func()
+        np.testing.assert_array_equal(result, ref_result)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -414,7 +414,8 @@ def sdc_pandas_dataframe_groupby_std(self, ddof=1, *args):
     impl_used_params = {'ddof': 'ddof'}
 
     applied_func_name = 'std'
-    return sdc_pandas_dataframe_groupby_apply_func(self, applied_func_name, method_args, default_values, impl_used_params)
+    return sdc_pandas_dataframe_groupby_apply_func(
+        self, applied_func_name, method_args, default_values, impl_used_params)
 
 
 @sdc_overload_method(DataFrameGroupByType, 'sum')
@@ -444,7 +445,8 @@ def sdc_pandas_dataframe_groupby_var(self, ddof=1, *args):
     impl_used_params = {'ddof': 'ddof'}
 
     applied_func_name = 'var'
-    return sdc_pandas_dataframe_groupby_apply_func(self, applied_func_name, method_args, default_values, impl_used_params)
+    return sdc_pandas_dataframe_groupby_apply_func(
+        self, applied_func_name, method_args, default_values, impl_used_params)
 
 
 @sdc_overload_method(SeriesGroupByType, 'count')
