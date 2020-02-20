@@ -31,6 +31,7 @@
 import pandas
 import numba
 import numpy
+import operator
 import sdc
 
 from numba import types
@@ -39,20 +40,31 @@ from numba.extending import intrinsic
 from numba.targets.registry import cpu_target
 from numba.typed import List, Dict
 from numba.typing import signature
+from numba.special import literally
 
 from sdc.datatypes.common_functions import sdc_arrays_argsort, _sdc_asarray, _sdc_take
 from sdc.datatypes.hpat_pandas_groupby_types import DataFrameGroupByType
 from sdc.utilities.sdc_typing_utils import TypeChecker, kwsparams2list, sigparams2list
-from sdc.utilities.utils import sdc_overload_method, sdc_overload_attribute
+from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.hiframes.pd_series_type import SeriesType
+from sdc.str_ext import string_type
 
 
 @intrinsic
-def init_dataframe_groupby(typingctx, parent, column_id, data, sort):
+def init_dataframe_groupby(typingctx, parent, column_id, data, sort, target_columns=None):
 
+    target_columns = types.none if target_columns is None else target_columns
+    if isinstance(target_columns, types.NoneType):
+        target_not_specified = True
+        selected_col_names = tuple([a for i, a in enumerate(parent.columns) if i != column_id.literal_value])
+    else:
+        target_not_specified = False
+        selected_col_names = tuple([a.literal_value for a in target_columns])
+
+    n_target_cols = len(selected_col_names)
     def codegen(context, builder, signature, args):
-        parent_val, column_id_val, data_val, sort_val = args
+        parent_val, column_id_val, data_val, sort_val, target_columns = args
         # create series struct and store values
         groupby_obj = cgutils.create_struct_proxy(
             signature.return_type)(context, builder)
@@ -60,18 +72,60 @@ def init_dataframe_groupby(typingctx, parent, column_id, data, sort):
         groupby_obj.col_id = column_id_val
         groupby_obj.data = data_val
         groupby_obj.sort = sort_val
+        groupby_obj.target_default = context.get_constant(types.bool_, target_not_specified)
+
+        column_strs = [numba.unicode.make_string_from_constant(
+            context, builder, string_type, c) for c in selected_col_names]
+        column_tup = context.make_tuple(
+            builder, types.UniTuple(string_type, n_target_cols), column_strs)
+
+        groupby_obj.target_columns = column_tup
 
         # increase refcount of stored values
         if context.enable_nrt:
             context.nrt.incref(builder, signature.args[0], parent_val)
             context.nrt.incref(builder, signature.args[1], column_id_val)
             context.nrt.incref(builder, signature.args[2], data_val)
+            for var in column_strs:
+                context.nrt.incref(builder, string_type, var)
 
         return groupby_obj._getvalue()
 
-    ret_typ = DataFrameGroupByType(parent, column_id)
-    sig = signature(ret_typ, parent, column_id, data, sort)
+    ret_typ = DataFrameGroupByType(parent, column_id, selected_col_names)
+    sig = signature(ret_typ, parent, column_id, data, sort, target_columns)
     return sig, codegen
+
+
+@sdc_overload(operator.getitem)
+def sdc_pandas_dataframe_getitem(self, idx):
+
+    if not isinstance(self, DataFrameGroupByType):
+        return None
+
+    idx_is_literal_str = isinstance(idx, types.StringLiteral)
+    if (idx_is_literal_str
+        or (isinstance(idx, types.Tuple)
+            and all(isinstance(a, types.StringLiteral) for a in idx))):
+
+        col_id_literal = self.col_id.literal_value
+        idx_literal = idx.literal_value if idx_is_literal_str else None
+        def sdc_pandas_dataframe_getitem_common_impl(self, idx):
+
+            _idx = (idx_literal, ) if idx_is_literal_str == True else idx  # noqa
+            # calling getitem twice raises IndexError, just as in pandas
+            if not self._target_default:
+                raise IndexError("DataFrame.GroupBy.getitem: Columns already selected")
+            return init_dataframe_groupby(self._parent, col_id_literal, self._data, self._sort, _idx)
+
+        return sdc_pandas_dataframe_getitem_common_impl
+
+    if isinstance(idx, types.UnicodeType):
+        def sdc_pandas_dataframe_getitem_idx_unicode_str_impl(self, idx):
+            # just call literally as it will raise and compilation will continue via common impl
+            return literally(idx)
+        return sdc_pandas_dataframe_getitem_idx_unicode_str_impl
+
+    return None
 
 
 def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, defaults, impl_params):
@@ -155,7 +209,8 @@ def sdc_pandas_groupby_apply_func(self, func_name, func_args, defaults=None, imp
     df_column_types = self.parent.data
     df_column_names = self.parent.columns
     by_column_id = self.col_id.literal_value
-    subject_columns = [(name, i) for i, name in enumerate(df_column_names) if i != by_column_id]
+    selected_cols_set = set(self.target_columns)
+    subject_columns = [(name, i) for i, name in enumerate(df_column_names) if name in selected_cols_set]
 
     # resolve types of result dataframe columns
     res_arrays_dtypes = tuple(

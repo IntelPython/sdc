@@ -258,45 +258,53 @@ class TestGroupBy(TestCase):
         # np.testing.assert_array_equal(hpat_func(df), test_impl(df))
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
-    @skip_numba_jit
+    @skip_numba_jit("BUG: SDC impl of Series.sum returns float64 on as series of ints")
     def test_agg_seq_sum(self):
         def test_impl(df):
-            A = df.groupby('A')['B'].sum()
-            return A.values
+            return df.groupby('A')['B'].sum()
 
         hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
-        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+        # pandas returns groupby.generic.SeriesGroupBy object in this case, hence align result_ref
+        result = hpat_func(df)
+        result_ref = pd.DataFrame(test_impl(df))
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @skip_numba_jit
+    @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
     def test_agg_seq_count(self):
         def test_impl(df):
-            A = df.groupby('A')['B'].count()
-            return A.values
+            return df.groupby('A')['B'].count()
 
         hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
-        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+        # pandas returns groupby.generic.SeriesGroupBy object in this case, hence align result_ref
+        result = hpat_func(df)
+        result_ref = pd.DataFrame(test_impl(df))
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @skip_numba_jit
+    @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
     def test_agg_seq_mean(self):
         def test_impl(df):
-            A = df.groupby('A')['B'].mean()
-            return A.values
+            return df.groupby('A')['B'].mean()
 
         hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
-        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+        # pandas returns groupby.generic.SeriesGroupBy object in this case, hence align result_ref
+        result = hpat_func(df)
+        result_ref = pd.DataFrame(test_impl(df))
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @skip_numba_jit
+    @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
     def test_agg_seq_min(self):
         def test_impl(df):
-            A = df.groupby('A')['B'].min()
-            return A.values
+            return df.groupby('A')['B'].min()
 
         hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
-        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+        # pandas returns groupby.generic.SeriesGroupBy object in this case, hence align result_ref
+        result = hpat_func(df)
+        result_ref = pd.DataFrame(test_impl(df))
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_numba_jit
     def test_agg_seq_min_date(self):
@@ -308,15 +316,17 @@ class TestGroupBy(TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': pd.date_range('2019-1-3', '2019-1-9')})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
-    @skip_numba_jit
+    @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
     def test_agg_seq_max(self):
         def test_impl(df):
-            A = df.groupby('A')['B'].max()
-            return A.values
+            return df.groupby('A')['B'].max()
 
         hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
-        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+        # pandas returns groupby.generic.SeriesGroupBy object in this case, hence align result_ref
+        result = hpat_func(df)
+        result_ref = pd.DataFrame(test_impl(df))
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_numba_jit
     def test_agg_seq_all_col(self):
@@ -338,37 +348,43 @@ class TestGroupBy(TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
-    @skip_numba_jit
+    @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
     def test_agg_seq_prod(self):
         def test_impl(df):
-            A = df.groupby('A')['B'].prod()
-            return A.values
+            return df.groupby('A')['B'].prod()
 
         hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
-        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+        # pandas returns groupby.generic.SeriesGroupBy object in this case, hence align result_ref
+        result = hpat_func(df)
+        result_ref = pd.DataFrame(test_impl(df))
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit
     @skip_numba_jit
     def test_agg_seq_var(self):
         def test_impl(df):
-            A = df.groupby('A')['B'].var()
-            return A.values
+            return df.groupby('A')['B'].var()
 
         hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
-        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+        # pandas returns groupby.generic.SeriesGroupBy object in this case, hence align result_ref
+        result = hpat_func(df)
+        result_ref = pd.DataFrame(test_impl(df))
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit
     @skip_numba_jit
     def test_agg_seq_std(self):
         def test_impl(df):
-            A = df.groupby('A')['B'].std()
-            return A.values
+            return df.groupby('A')['B'].std()
 
         hpat_func = self.jit(test_impl)
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
-        self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
+        # pandas returns groupby.generic.SeriesGroupBy object in this case, hence align result_ref
+        result = hpat_func(df)
+        result_ref = pd.DataFrame(test_impl(df))
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_numba_jit
     def test_agg_seq_multiselect(self):
@@ -661,6 +677,53 @@ class TestGroupBy(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_dataframe_groupby_getitem_literal_tuple(self):
+        def test_impl(df):
+            return df.groupby('A')['B', 'C'].count()
+        hpat_func = self.jit(test_impl)
+
+        df = pd.DataFrame(_default_df_numeric_data)
+        result = hpat_func(df)
+        result_ref = test_impl(df)
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    def test_dataframe_groupby_getitem_literal_str(self):
+        def test_impl(df):
+            return df.groupby('C')['B'].count()
+        hpat_func = self.jit(test_impl)
+
+        df = pd.DataFrame(_default_df_numeric_data)
+        # pandas returns groupby.generic.SeriesGroupBy object in this case, hence align result_ref
+        result = hpat_func(df)
+        result_ref = pd.DataFrame(test_impl(df))
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    def test_dataframe_groupby_getitem_unicode_str(self):
+        def test_impl(df, col_name):
+            return df.groupby('A')[col_name].count()
+        hpat_func = self.jit(test_impl)
+
+        df = pd.DataFrame(_default_df_numeric_data)
+        col_name = 'C'
+        # pandas returns groupby.generic.SeriesGroupBy object in this case, hence align result_ref
+        result = hpat_func(df, col_name)
+        result_ref = pd.DataFrame(test_impl(df, col_name))
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    def test_dataframe_groupby_getitem_repeated(self):
+        def test_impl(df):
+            return df.groupby('A')['B', 'C']['D']
+        hpat_func = self.jit(test_impl)
+
+        df = pd.DataFrame(_default_df_numeric_data)
+        with self.assertRaises(Exception) as context:
+            test_impl(df)
+        pandas_exception = context.exception
+
+        self.assertRaises(type(pandas_exception), hpat_func, df)
 
 if __name__ == "__main__":
     unittest.main()
