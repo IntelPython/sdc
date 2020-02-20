@@ -217,12 +217,6 @@ def arr_std(arr, ddof):
 
 
 @sdc_register_jitable
-def arr_sum(arr):
-    """Calculate sum of values"""
-    return arr.sum()
-
-
-@sdc_register_jitable
 def arr_var(arr, ddof):
     """Calculate unbiased variance of values"""
     length = len(arr)
@@ -308,14 +302,41 @@ hpat_pandas_rolling_series_skew_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_skew))
 hpat_pandas_rolling_series_std_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_std))
-hpat_pandas_rolling_series_sum_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_sum))
 hpat_pandas_rolling_series_var_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_var))
 
 
-def gen_sdc_pandas_series_rolling_impl(window_cls):
-    """Generate series rolling methods implementations based on window class"""
+@sdc_register_jitable
+def pop_sum(value, nfinite, result):
+    """Calculate the window sum without old value."""
+    if numpy.isfinite(value):
+        nfinite -= 1
+        result -= value
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def put_sum(value, nfinite, result):
+    """Calculate the window sum with new value."""
+    if numpy.isfinite(value):
+        nfinite += 1
+        result += value
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def result_or_nan(nfinite, minp, result):
+    """Get result taking into account min periods."""
+    if nfinite < minp:
+        return numpy.nan
+
+    return result
+
+
+def gen_sdc_pandas_series_rolling_impl(pop, put, init_result=numpy.nan):
+    """Generate series rolling methods implementations based on pop/put funcs"""
     def impl(self):
         win = self._window
         minp = self._min_periods
@@ -328,19 +349,38 @@ def gen_sdc_pandas_series_rolling_impl(window_cls):
         chunks = parallel_chunks(length)
         for i in prange(len(chunks)):
             chunk = chunks[i]
-            window = window_cls(win, minp)
-            for idx in range(chunk.start, chunk.stop):
-                window.roll(input_arr, idx)
-                output_arr[idx] = window.result
-            window.free()
+            nfinite = 0
+            result = init_result
+
+            prelude_start = max(0, chunk.start - win + 1)
+            prelude_stop = min(chunk.start, prelude_start + win)
+
+            interlude_start = prelude_stop
+            interlude_stop = min(prelude_start + win, chunk.stop)
+
+            for idx in range(prelude_start, prelude_stop):
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+
+            for idx in range(interlude_start, interlude_stop):
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+                output_arr[idx] = result_or_nan(nfinite, minp, result)
+
+            for idx in range(interlude_stop, chunk.stop):
+                put_value = input_arr[idx]
+                pop_value = input_arr[idx - win]
+                nfinite, result = put(put_value, nfinite, result)
+                nfinite, result = pop(pop_value, nfinite, result)
+                output_arr[idx] = result_or_nan(nfinite, minp, result)
 
         return pandas.Series(output_arr, input_series._index,
                              name=input_series._name)
     return impl
 
 
-sdc_pandas_rolling_series_mean_impl = register_jitable(
-    gen_sdc_pandas_series_rolling_impl(WindowMean))
+sdc_pandas_series_rolling_sum_impl = register_jitable(
+    gen_sdc_pandas_series_rolling_impl(pop_sum, put_sum, init_result=0.))
 
 
 @sdc_rolling_overload(SeriesRollingType, 'apply')
@@ -671,13 +711,13 @@ def hpat_pandas_series_rolling_std(self, ddof=1):
     return hpat_pandas_rolling_series_std_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'sum')
+@sdc_overload_method(SeriesRollingType, 'sum')
 def hpat_pandas_series_rolling_sum(self):
 
     ty_checker = TypeChecker('Method rolling.sum().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_sum_impl
+    return sdc_pandas_series_rolling_sum_impl
 
 
 @sdc_rolling_overload(SeriesRollingType, 'var')
