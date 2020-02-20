@@ -64,15 +64,15 @@ cases = [
     TC(name='append', size=[10 ** 7], params='other', data_num=2),
     TC(name='count', size=[10 ** 7]),
     TC(name='drop', size=[10 ** 8], params='columns="f0"'),
-    TC(name='max', size=[10 ** 7]),
-    TC(name='mean', size=[10 ** 7]),
-    TC(name='median', size=[10 ** 7]),
-    TC(name='min', size=[10 ** 7]),
+    TC(name='max', size=[10 ** 7], check_skipna=True),
+    TC(name='mean', size=[10 ** 7], check_skipna=True),
+    TC(name='median', size=[10 ** 7], check_skipna=True),
+    TC(name='min', size=[10 ** 7], check_skipna=True),
     TC(name='pct_change', size=[10 ** 7]),
-    TC(name='prod', size=[10 ** 7]),
-    TC(name='std', size=[10 ** 7]),
-    TC(name='sum', size=[10 ** 7]),
-    TC(name='var', size=[10 ** 7]),
+    TC(name='prod', size=[10 ** 7], check_skipna=True),
+    TC(name='std', size=[10 ** 7], check_skipna=True),
+    TC(name='sum', size=[10 ** 7], check_skipna=True),
+    TC(name='var', size=[10 ** 7], check_skipna=True),
 ]
 
 generate_test_cases(cases, TestDataFrameMethods, 'df')
