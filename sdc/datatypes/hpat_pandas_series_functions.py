@@ -1786,7 +1786,7 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
     def hpat_pandas_series_astype_no_modify_impl(self, dtype, copy=True, errors='raise'):
         return pandas.Series(data=self._data, index=self._index, name=self._name)
 
-    str_check = ((isinstance(dtype, types.Function) and dtype.typing_key == str) or 
+    str_check = ((isinstance(dtype, types.Function) and dtype.typing_key == str) or
                  (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str'))
 
     # Needs Numba astype impl support converting unicode_type to NumberClass and other types
@@ -1801,9 +1801,9 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
             else:
                 raise TypingError(f'Needs Numba astype impl support converting unicode_type to {dtype.literal_value}')
 
-    if ((isinstance(self.data, types.npytypes.Array) and 
+    if ((isinstance(self.data, types.npytypes.Array) and
          isinstance(dtype, (types.functions.NumberClass, types.StringLiteral))) or str_check
-    ):
+       ):
         return hpat_pandas_series_astype_numba_impl
 
     if errors == 'raise':
