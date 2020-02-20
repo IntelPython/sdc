@@ -40,7 +40,6 @@ from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
-from sdc.utilities.window_utils import WindowMean
 
 
 # disabling parallel execution for rolling due to numba issue https://github.com/numba/numba/issues/5098
@@ -307,6 +306,32 @@ hpat_pandas_rolling_series_var_impl = register_jitable(
 
 
 @sdc_register_jitable
+def pop_mean(value, nfinite, result):
+    """Calculate the window mean without old value."""
+    if numpy.isfinite(value):
+        nfinite -= 1
+        if nfinite:
+            result = ((nfinite + 1) * result - value) / nfinite
+        else:
+            result = numpy.nan
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def put_mean(value, nfinite, result):
+    """Calculate the window mean with new value."""
+    if numpy.isfinite(value):
+        nfinite += 1
+        if numpy.isnan(result):
+            result = value / nfinite
+        else:
+            result = ((nfinite - 1) * result + value) / nfinite
+
+    return nfinite, result
+
+
+@sdc_register_jitable
 def pop_sum(value, nfinite, result):
     """Calculate the window sum without old value."""
     if numpy.isfinite(value):
@@ -379,6 +404,8 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, init_result=numpy.nan):
     return impl
 
 
+sdc_pandas_series_rolling_mean_impl = register_jitable(
+    gen_sdc_pandas_series_rolling_impl(pop_mean, put_mean))
 sdc_pandas_series_rolling_sum_impl = register_jitable(
     gen_sdc_pandas_series_rolling_impl(pop_sum, put_sum, init_result=0.))
 
@@ -621,7 +648,7 @@ def hpat_pandas_series_rolling_mean(self):
     ty_checker = TypeChecker('Method rolling.mean().')
     ty_checker.check(self, SeriesRollingType)
 
-    return sdc_pandas_rolling_series_mean_impl
+    return sdc_pandas_series_rolling_mean_impl
 
 
 @sdc_rolling_overload(SeriesRollingType, 'median')
