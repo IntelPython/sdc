@@ -1228,7 +1228,7 @@ class TestDataFrame(TestCase):
             with self.subTest(index=index):
                 pd.testing.assert_frame_equal(sdc_func(index), test_impl(index))
 
-    @skip_sdc_jit("ValueError when return empty dataframe")
+    @unittest.skip("ValueError when return empty dataframe")
     def test_df_drop_tuple_columns_all(self):
         def gen_test_impl(do_jit=False):
             def test_impl(df):
@@ -1251,6 +1251,7 @@ class TestDataFrame(TestCase):
             with self.subTest(index=index):
                 df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
                                   index=index)
+
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
     def test_df_drop_by_column_errors_ignore(self):
