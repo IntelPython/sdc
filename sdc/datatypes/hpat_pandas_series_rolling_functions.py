@@ -40,7 +40,6 @@ from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
-from sdc.utilities.window_utils import WindowMin
 
 
 # disabling parallel execution for rolling due to numba issue https://github.com/numba/numba/issues/5098
@@ -298,6 +297,44 @@ hpat_pandas_rolling_series_var_impl = register_jitable(
 
 
 @sdc_register_jitable
+def calc_min(arr, idx, win_size):
+    """Recalculate the window min based on data, index and window size."""
+    start = max(0, idx - win_size + 1)
+    nfinite = 0
+    result = numpy.nan
+    for i in range(start, idx + 1):
+        value = arr[i]
+        nfinite, result = put_min(value, nfinite, result)
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def pop_min(value, nfinite, result, arr, idx, win_size):
+    """Calculate the window min without old value."""
+    if numpy.isfinite(value):
+        nfinite -= 1
+        if nfinite:
+            if value == result:
+                return calc_min(arr, idx, win_size)
+        else:
+            result = numpy.nan
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def put_min(value, nfinite, result):
+    """Calculate the window min with new value."""
+    if numpy.isfinite(value):
+        nfinite += 1
+        if numpy.isnan(result) or value < result:
+            result = value
+
+    return nfinite, result
+
+
+@sdc_register_jitable
 def pop_sum(value, nfinite, result):
     """Calculate the window sum without old value."""
     if numpy.isfinite(value):
@@ -370,8 +407,55 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, init_result=numpy.nan):
     return impl
 
 
-sdc_pandas_series_rolling_sum_impl = register_jitable(
-    gen_sdc_pandas_series_rolling_impl(pop_sum, put_sum, init_result=0.))
+def gen_sdc_pandas_series_rolling_minmax_impl(pop, put, init_result=numpy.nan):
+    """Generate series rolling min/max implementations based on pop/put funcs"""
+    def impl(self):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        chunks = parallel_chunks(length)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            nfinite = 0
+            result = init_result
+
+            prelude_start = max(0, chunk.start - win + 1)
+            prelude_stop = min(chunk.start, prelude_start + win)
+
+            interlude_start = prelude_stop
+            interlude_stop = min(prelude_start + win, chunk.stop)
+
+            for idx in range(prelude_start, prelude_stop):
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+
+            for idx in range(interlude_start, interlude_stop):
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+                output_arr[idx] = result_or_nan(nfinite, minp, result)
+
+            for idx in range(interlude_stop, chunk.stop):
+                put_value = input_arr[idx]
+                pop_value = input_arr[idx - win]
+                nfinite, result = put(put_value, nfinite, result)
+                nfinite, result = pop(pop_value, nfinite, result,
+                                      input_arr, idx, win)
+                output_arr[idx] = result_or_nan(nfinite, minp, result)
+
+        return pandas.Series(output_arr, input_series._index,
+                             name=input_series._name)
+    return impl
+
+
+sdc_pandas_series_rolling_min_impl = gen_sdc_pandas_series_rolling_minmax_impl(
+    pop_min, put_min)
+sdc_pandas_series_rolling_sum_impl = gen_sdc_pandas_series_rolling_impl(
+    pop_sum, put_sum, init_result=0.)
 
 
 @sdc_rolling_overload(SeriesRollingType, 'apply')
@@ -607,7 +691,7 @@ def hpat_pandas_series_rolling_min(self):
     ty_checker = TypeChecker('Method rolling.min().')
     ty_checker.check(self, SeriesRollingType)
 
-    return sdc_pandas_rolling_series_min_impl
+    return sdc_pandas_series_rolling_min_impl
 
 @sdc_rolling_overload(SeriesRollingType, 'quantile')
 def hpat_pandas_series_rolling_quantile(self, quantile, interpolation='linear'):

@@ -85,7 +85,7 @@ class TestSeriesRollingMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
         cls.map_ncalls_dlength = {
-            'min': (100, [8 * 10 ** 5]),
+            'min': (100, [4 * 10 ** 5]),
             'sum': (100, [8 * 10 ** 5]),
         }
 
