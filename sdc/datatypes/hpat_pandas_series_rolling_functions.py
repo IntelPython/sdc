@@ -430,14 +430,34 @@ def hpat_pandas_series_rolling_count(self):
         length = len(input_arr)
         output_arr = numpy.empty(length, dtype=float64)
 
+        current_result = 0
         boundary = min(win, length)
         for i in prange(boundary):
-            arr_range = input_arr[:i + 1]
-            output_arr[i] = arr_nonnan_count(arr_range)
+            value = input_arr[i]
+            val_is_nan = numpy.isnan(value)
 
-        for i in prange(boundary, length):
-            arr_range = input_arr[i + 1 - win:i + 1]
-            output_arr[i] = arr_nonnan_count(arr_range)
+            if not val_is_nan:
+                current_result += 1
+
+            output_arr[i] = current_result
+
+        start_indices = range(length - boundary)
+        end_indices = range(boundary, length)
+        for start_idx, end_idx in zip(start_indices, end_indices):
+            if start_idx == end_idx:
+                output_arr[end_idx] = current_result
+                continue
+
+            first_val = input_arr[start_idx]
+            last_val = input_arr[end_idx]
+
+            if numpy.isnan(last_val):
+                current_result -= 1
+
+            if numpy.isnan(first_val):
+                current_result += 1
+
+            output_arr[end_idx] = current_result
 
         return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
