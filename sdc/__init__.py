@@ -42,7 +42,6 @@ from sdc.decorators import jit
 import sdc.datatypes.hpat_pandas_dataframe_rolling_functions
 import sdc.datatypes.hpat_pandas_series_functions
 import sdc.datatypes.hpat_pandas_series_rolling_functions
-import sdc.datatypes.hpat_pandas_seriesgroupby_functions
 import sdc.datatypes.hpat_pandas_stringmethods_functions
 import sdc.datatypes.hpat_pandas_groupby_functions
 
