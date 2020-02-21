@@ -1806,10 +1806,8 @@ class TestDataFrame(TestCase):
             it = sdc.concurrent_hash.createiter_int_hashmap(h)
             while 0 == sdc.concurrent_hash.enditer_int_hashmap(it):
                 key = sdc.concurrent_hash.iterkey_int_hashmap(it)
-                sz = sdc.concurrent_hash.itersize_int_hashmap(it)
-                for i in range(sz):
-                    val = sdc.concurrent_hash.iterelem_int_hashmap(it, i)
-                    print(key, val)
+                val = sdc.concurrent_hash.iterval_int_hashmap(it)
+                print(key, val)
 
                 sdc.concurrent_hash.nextiter_int_hashmap(it)
 

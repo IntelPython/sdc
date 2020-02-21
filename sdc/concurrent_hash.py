@@ -42,8 +42,7 @@ ll.add_symbol('createiter_int_hashmap', hconcurrent_hash.createiter_int_hashmap)
 ll.add_symbol('enditer_int_hashmap', hconcurrent_hash.enditer_int_hashmap)
 ll.add_symbol('nextiter_int_hashmap', hconcurrent_hash.nextiter_int_hashmap)
 ll.add_symbol('iterkey_int_hashmap', hconcurrent_hash.iterkey_int_hashmap)
-ll.add_symbol('itersize_int_hashmap', hconcurrent_hash.itersize_int_hashmap)
-ll.add_symbol('iterelem_int_hashmap', hconcurrent_hash.iterelem_int_hashmap)
+ll.add_symbol('iterval_int_hashmap', hconcurrent_hash.iterval_int_hashmap)
 ll.add_symbol('deleteiter_int_hashmap', hconcurrent_hash.deleteiter_int_hashmap)
 
 _create_int_hashmap = types.ExternalFunction("create_int_hashmap",
@@ -61,10 +60,8 @@ _nextiter_int_hashmap = types.ExternalFunction("nextiter_int_hashmap",
                                                types.void(types.voidptr))
 _iterkey_int_hashmap = types.ExternalFunction("iterkey_int_hashmap",
                                               types.int64(types.voidptr))
-_itersize_int_hashmap = types.ExternalFunction("itersize_int_hashmap",
-                                               types.intp(types.voidptr))
-_iterelem_int_hashmap = types.ExternalFunction("iterelem_int_hashmap",
-                                               types.intp(types.voidptr, types.intp))
+_iterval_int_hashmap = types.ExternalFunction("iterval_int_hashmap",
+                                              types.intp(types.voidptr))
 _deleteiter_int_hashmap = types.ExternalFunction("deleteiter_int_hashmap",
                                                  types.void(types.voidptr))
 
@@ -97,11 +94,7 @@ def iterkey_int_hashmap():
     pass
 
 
-def itersize_int_hashmap():
-    pass
-
-
-def iterelem_int_hashmap():
+def iterval_int_hashmap():
     pass
 
 
@@ -144,14 +137,9 @@ def iterkey_int_hashmap_overload(h):
     return lambda h: _iterkey_int_hashmap(h)
 
 
-@overload(itersize_int_hashmap)
-def itersize_int_hashmap_overload(h):
-    return lambda h: _itersize_int_hashmap(h)
-
-
-@overload(iterelem_int_hashmap)
-def iterelem_int_hashmap_overload(h, i):
-    return lambda h, i: _iterelem_int_hashmap(h, i)
+@overload(iterval_int_hashmap)
+def iterval_int_hashmap_overload(h):
+    return lambda h: _iterval_int_hashmap(h)
 
 
 @overload(deleteiter_int_hashmap)

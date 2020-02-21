@@ -26,12 +26,11 @@
 
 #include <Python.h>
 #include <cstdint>
-#include <tbb/concurrent_hash_map.h>
-#include <tbb/concurrent_vector.h>
+#include <tbb/concurrent_unordered_map.h>
 
 
 template<typename Key, typename Val>
-using hashmap = tbb::concurrent_hash_map<Key,tbb::concurrent_vector<Val>>;
+using hashmap = tbb::concurrent_unordered_multimap<Key,Val>;
 
 template<typename Key, typename Val>
 using iter_range = std::pair<typename hashmap<Key, Val>::iterator, typename hashmap<Key, Val>::iterator>;
@@ -54,12 +53,7 @@ void delete_int_hashmap(void* obj)
 void addelem_int_hashmap(void* obj, int64_t key, size_t val)
 {
     auto& h = *static_cast<int_hashmap*>(obj);
-    int_hashmap::accessor ac;
-    h.insert(ac, key);
-    auto& vec = ac->second;
-    ac.release();
-    vec.push_back(val);
-    // h[key].push_back(val);
+    h.insert({key,val});
 }
 
 void* createiter_int_hashmap(void* obj)
@@ -86,16 +80,10 @@ int64_t iterkey_int_hashmap(void* it)
     return r.first->first;
 }
 
-size_t itersize_int_hashmap(void* it)
+size_t iterval_int_hashmap(void* it)
 {
     auto& r = *static_cast<int_hashmap_iters*>(it);
-    return r.first->second.size();
-}
-
-size_t iterelem_int_hashmap(void* it, size_t index)
-{
-    auto& r = *static_cast<int_hashmap_iters*>(it);
-    return r.first->second[index];
+    return r.first->second;
 }
 
 void deleteiter_int_hashmap(void* obj)
@@ -128,8 +116,7 @@ PyMODINIT_FUNC PyInit_hconcurrent_hash()
     REGISTER(enditer_int_hashmap)
     REGISTER(nextiter_int_hashmap)
     REGISTER(iterkey_int_hashmap)
-    REGISTER(itersize_int_hashmap)
-    REGISTER(iterelem_int_hashmap)
+    REGISTER(iterval_int_hashmap)
     REGISTER(deleteiter_int_hashmap)
 #undef REGISTER
     return m;
