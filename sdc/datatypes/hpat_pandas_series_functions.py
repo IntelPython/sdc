@@ -5251,12 +5251,13 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
 
     if not isinstance(freq, (types.Omitted, types.NoneType)):
         ty_checker.raise_exc(freq, 'None', 'freq')
-
+    dtype = self.data.dtype
     def hpat_pandas_series_pct_change_impl(self, periods=1, fill_method='pad', limit=None, freq=None):
         if not (fill_method is None or fill_method in ['pad', 'ffill', 'backfill', 'bfill']):
             raise ValueError(
                 "Method pct_change(). Unsupported parameter. The function uses fill_method pad (ffill) or backfill (bfill) or None.")
         local_series = self.copy()
+        # local_data = numpy.empty(shape=len(self._data), dtype=dtype)
         if fill_method is not None:
             # replacement method fillna for given method
             # =========================================
@@ -5264,39 +5265,51 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
             # s = [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2]
             # result = [1.1, 0.3, 0.3, 1, inf, 0, 1.1, 1.1, 2.2, inf, 2, 2]
             # ==========================================
-            for i in range(len(local_series._data)):
+            for i in prange(len(local_series._data)):
                 # check each element on numpy.nan
-                if numpy.isnan(local_series._data[i]):
-                    if fill_method in ['pad', 'ffill']:
-                        # if it first element is nan, element will be is nan
-                        # if it not first element, element will be is nearest is not nan element
-                        # take a step back while will not find is not nan element
-                        # if before the first element you did not find one, the element will be equal nan
-                        if i == 0:
-                            local_series._data[i] = numpy.nan
-                        else:
-                            k = 1
-                            while numpy.isnan(local_series._data[i - k]):
-                                if i - k == 0:
-                                    local_series._data[i] = numpy.nan
-                                    break
-                                k += 1
-                            local_series._data[i] = local_series._data[i - k]
-                    elif fill_method in ['backfill', 'bfill']:
-                        # if it last element is nan, element will be is nan
-                        # if it not last element, element will be is nearest is not nan element
-                        # take a step front while will not find is not nan element
-                        # if before the last element you did not find one, the element will be equal nan
-                        if i == len(local_series._data)-1:
-                            local_series._data[i] = numpy.nan
-                        else:
-                            k = 1
-                            while numpy.isnan(local_series._data[i + k]):
-                                if i + k == len(local_series._data) - 1:
-                                    local_series._data[i] = numpy.nan
-                                    break
-                                k += 1
-                            local_series._data[i] = local_series._data[i + k]
+                if not numpy.isnan(local_series._data[i]):
+                    # print('loc', local_series._data[i])
+                    # print('self', self._data[i])
+                    local_series._data[i] = self._data[i]
+                    continue
+                if fill_method in ['pad', 'ffill']:
+                    # if it first element is nan, element will be is nan
+                    # if it not first element, element will be is nearest is not nan element
+                    # take a step back while will not find is not nan element
+                    # if before the first element you did not find one, the element will be equal nan
+                    if i == 0:
+                        local_series._data[i] = numpy.nan
+                    else:
+                        k = 1
+                        while numpy.isnan(local_series._data[i - k]):
+                            if i - k == 0:
+                                local_series._data[i] = numpy.nan
+                                break
+                            k += 1
+                        local_series._data[i] = local_series._data[i - k]
+                elif fill_method in ['backfill', 'bfill']:
+                    # if it last element is nan, element will be is nan
+                    # if it not last element, element will be is nearest is not nan element
+                    # take a step front while will not find is not nan element
+                    # if before the last element you did not find one, the element will be equal nan
+                    # if i == len(local_series._data)-1:
+                    #     local_series._data[i] = numpy.nan
+                    # else:
+                    k = 1
+                    for j in range(len(local_series._data)):
+                        if numpy.isnan(local_series._data[i + k]):
+                            if i + k == len(local_series._data) - 1:
+                                local_series._data[i] = numpy.nan
+                                break
+                            k += 1
+                    # while numpy.isnan(local_series._data[i + k]):
+                    #     if i + k == len(local_series._data) - 1:
+                    #         local_series._data[i] = numpy.nan
+                    #         break
+                    #     k += 1
+                    local_series._data[i] = local_series._data[i + k]
+                    if i == len(local_series._data)-1:
+                        local_series._data[i] = numpy.nan
         rshift = local_series.shift(periods=periods, freq=freq)
         rdiv = local_series.div(rshift)
         result = rdiv._data - 1

@@ -5285,7 +5285,7 @@ class TestSeries(
         msg = 'Method cov(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
-    @skip_numba_jit
+    # @skip_numba_jit
     @skip_sdc_jit('Series.pct_change unsupported some Series')
     def test_series_pct_change(self):
         def test_series_pct_change_impl(S, periods, method):
@@ -5305,9 +5305,10 @@ class TestSeries(
             S = pd.Series(input_data)
             for periods in [0, 1, 2, 5, 10, -1, -2, -5]:
                 for method in [None, 'pad', 'ffill', 'backfill', 'bfill']:
-                    result_ref = test_series_pct_change_impl(S, periods, method)
-                    result = hpat_func(S, periods, method)
-                    pd.testing.assert_series_equal(result, result_ref)
+                    with self.subTest(data=input_data, period=periods, method=method):
+                        result_ref = test_series_pct_change_impl(S, periods, method)
+                        result = hpat_func(S, periods, method)
+                        pd.testing.assert_series_equal(result, result_ref)
 
     @skip_sdc_jit('Series.pct_change() strings as input data unsupported')
     def test_series_pct_change_str(self):
