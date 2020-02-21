@@ -276,8 +276,8 @@ def _groupby_resolve_impl_func_type(series_dtype, method_name):
 
 def sdc_pandas_dataframe_groupby_apply_func(self, func_name, func_args, defaults=None, impl_args=None):
 
-    defaults = defaults if defaults else {}
-    impl_args = impl_args if impl_args else {}
+    defaults = defaults or {}
+    impl_args = impl_args or {}
 
     df_column_types = self.parent.data
     df_column_names = self.parent.columns
@@ -307,8 +307,8 @@ def sdc_pandas_dataframe_groupby_apply_func(self, func_name, func_args, defaults
 
 def sdc_pandas_series_groupby_apply_func(self, func_name, func_args, defaults=None, impl_args=None):
 
-    defaults = defaults if defaults else {}
-    impl_args = impl_args if impl_args else {}
+    defaults = defaults or {}
+    impl_args = impl_args or {}
 
     # resolve type of result series
     res_dtype = _groupby_resolve_impl_func_type(self.parent.dtype, func_name).return_type
