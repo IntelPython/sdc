@@ -925,8 +925,8 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
         column_list.append((f'new_col_{column}_data_df', column))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
-    # TODO: Handle index
-    func_text.append(f"return pandas.DataFrame({{{data}}})\n")
+    index = 'df.index'
+    func_text.append(f"return pandas.DataFrame({{{data}}}, index={index})\n")
     func_definition.extend([indent + func_line for func_line in func_text])
     func_def = '\n'.join(func_definition)
 
@@ -977,7 +977,7 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
     *************************************************
     Pandas DataFrame method :meth:`pandas.DataFrame.drop` implementation.
     .. only:: developer
-    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_drop*
+    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_drop*
     Parameters
     -----------
     df: :obj:`pandas.DataFrame`
