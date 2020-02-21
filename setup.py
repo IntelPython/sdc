@@ -26,6 +26,7 @@
 # *****************************************************************************
 
 from setuptools import setup, Extension, find_packages, Command
+import sys
 import platform
 import os
 from docs.source.buildscripts.sdc_build_doc import SDCBuildDoc
@@ -197,6 +198,59 @@ if _has_pyarrow:
 if _has_opencv:
     _ext_mods.append(ext_cv_wrapper)
 
+# Copypaste from numba
+def check_file_at_path(path2file):
+        """
+        Takes a list as a path, a single glob (*) is permitted as an entry which
+        indicates that expansion at this location is required (i.e. version
+        might not be known).
+        """
+        found = None
+        path2check = [os.path.split(os.path.split(sys.executable)[0])[0]]
+        path2check += [os.getenv(n, '') for n in ['CONDA_PREFIX', 'PREFIX']]
+        if sys.platform.startswith('win'):
+            path2check += [os.path.join(p, 'Library') for p in path2check]
+        for p in path2check:
+            if p:
+                if '*' in path2file:
+                    globloc = path2file.index('*')
+                    searchroot = os.path.join(*path2file[:globloc])
+                    try:
+                        potential_locs = os.listdir(os.path.join(p, searchroot))
+                    except BaseException:
+                        continue
+                    searchfor = path2file[globloc + 1:]
+                    for x in potential_locs:
+                        potpath = os.path.join(p, searchroot, x, *searchfor)
+                        if os.path.isfile(potpath):
+                            found = p  # the latest is used
+                elif os.path.isfile(os.path.join(p, *path2file)):
+                    found = p  # the latest is used
+        return found
+
+# Search for Intel TBB, first check env var TBBROOT then conda locations
+tbb_root = os.getenv('TBBROOT')
+if not tbb_root:
+    tbb_root = check_file_at_path(['include', 'tbb', 'tbb.h'])
+
+print("Using Intel TBB from:", tbb_root)
+ext_hconcurrent_hash = Extension(
+    name="sdc.hconcurrent_hash",
+    sources=["sdc/_concurrent_hash.cpp"],
+    include_dirs=[os.path.join(tbb_root, 'include')],
+    libraries=['tbb'],
+    library_dirs=[
+      # for Linux
+      os.path.join(tbb_root, 'lib', 'intel64', 'gcc4.4'),
+      # for MacOS
+      os.path.join(tbb_root, 'lib'),
+      # for Windows
+      os.path.join(tbb_root, 'lib', 'intel64', 'vc_mt'),
+    ],
+    language="c++",
+    )
+
+_ext_mods.append(ext_hconcurrent_hash)
 
 class style(Command):
     """ Command to check and adjust code style

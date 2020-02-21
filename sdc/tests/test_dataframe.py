@@ -1791,6 +1791,33 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    def test_tbb(self):
+        import sdc.concurrent_hash
+        def test_impl():
+            h = sdc.concurrent_hash.create_int_hashmap()
+
+            sdc.concurrent_hash.addelem_int_hashmap(h,1,2)
+            sdc.concurrent_hash.addelem_int_hashmap(h,1,3)
+            sdc.concurrent_hash.addelem_int_hashmap(h,1,4)
+            sdc.concurrent_hash.addelem_int_hashmap(h,1,5)
+            sdc.concurrent_hash.addelem_int_hashmap(h,2,6)
+
+            it = sdc.concurrent_hash.createiter_int_hashmap(h)
+            while 0 == sdc.concurrent_hash.enditer_int_hashmap(it):
+                key = sdc.concurrent_hash.iterkey_int_hashmap(it)
+                sz = sdc.concurrent_hash.itersize_int_hashmap(it)
+                for i in range(sz):
+                    val = sdc.concurrent_hash.iterelem_int_hashmap(it, i)
+                    print(key, val)
+
+                sdc.concurrent_hash.nextiter_int_hashmap(it)
+
+            sdc.concurrent_hash.deleteiter_int_hashmap(it)
+            sdc.concurrent_hash.delete_int_hashmap(h)
+
+        hpat_func = self.jit(test_impl)
+        hpat_func()
+
 
 if __name__ == "__main__":
     unittest.main()
