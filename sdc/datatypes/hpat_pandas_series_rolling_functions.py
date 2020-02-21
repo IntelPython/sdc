@@ -225,6 +225,15 @@ def arr_var(arr, ddof):
     return numpy.var(arr) * length / (length - ddof)
 
 
+@sdc_register_jitable
+def win_finite_arr(arr, idx, win_size):
+    """Get array of finite values from the window."""
+    start = max(0, idx - win_size + 1)
+    arr_range = arr[start:idx + 1]
+
+    return arr_range[numpy.isfinite(arr_range)]
+
+
 def gen_hpat_pandas_series_rolling_impl(rolling_func):
     """Generate series rolling methods implementations based on input func"""
     def impl(self):
@@ -236,21 +245,13 @@ def gen_hpat_pandas_series_rolling_impl(rolling_func):
         length = len(input_arr)
         output_arr = numpy.empty(length, dtype=float64)
 
-        def apply_minp(arr, minp):
-            finite_arr = arr[numpy.isfinite(arr)]
+        # Implementation with chunks is much slower than simple prange
+        for i in prange(length):
+            finite_arr = win_finite_arr(input_arr, i, win)
             if len(finite_arr) < minp:
-                return numpy.nan
+                output_arr[i] = numpy.nan
             else:
-                return rolling_func(finite_arr)
-
-        boundary = min(win, length)
-        for i in prange(boundary):
-            arr_range = input_arr[:i + 1]
-            output_arr[i] = apply_minp(arr_range, minp)
-
-        for i in prange(boundary, length):
-            arr_range = input_arr[i + 1 - win:i + 1]
-            output_arr[i] = apply_minp(arr_range, minp)
+                output_arr[i] = rolling_func(finite_arr)
 
         return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
@@ -293,7 +294,7 @@ hpat_pandas_rolling_series_kurt_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_kurt))
 hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max))
-hpat_pandas_rolling_series_median_impl = register_jitable(
+sdc_pandas_series_rolling_median_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_median))
 hpat_pandas_rolling_series_min_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_min))
@@ -635,13 +636,13 @@ def hpat_pandas_series_rolling_mean(self):
     return sdc_pandas_series_rolling_mean_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'median')
+@sdc_overload_method(SeriesRollingType, 'median')
 def hpat_pandas_series_rolling_median(self):
 
     ty_checker = TypeChecker('Method rolling.median().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_median_impl
+    return sdc_pandas_series_rolling_median_impl
 
 
 @sdc_rolling_overload(SeriesRollingType, 'min')

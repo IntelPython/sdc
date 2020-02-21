@@ -86,6 +86,7 @@ class TestSeriesRollingMethods(TestBase):
         super().setUpClass()
         cls.map_ncalls_dlength = {
             'mean': (100, [8 * 10 ** 5]),
+            'median': (10, [10 ** 5]),
             'sum': (100, [8 * 10 ** 5]),
         }
 
@@ -128,6 +129,9 @@ class TestSeriesRollingMethods(TestBase):
     def test_series_rolling_mean(self):
         self._test_series_rolling_method('mean')
 
+    def test_series_rolling_median(self):
+        self._test_series_rolling_method('median')
+
     def test_series_rolling_sum(self):
         self._test_series_rolling_method('sum')
 
@@ -139,7 +143,6 @@ cases = [
     TC(name='cov', size=[10 ** 7]),
     TC(name='kurt', size=[10 ** 7]),
     TC(name='max', size=[10 ** 7]),
-    TC(name='median', size=[10 ** 7]),
     TC(name='min', size=[10 ** 7]),
     TC(name='quantile', size=[10 ** 7], params='0.2'),
     TC(name='skew', size=[10 ** 7]),
