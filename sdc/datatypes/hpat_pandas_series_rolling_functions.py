@@ -369,8 +369,8 @@ def mean_result_or_nan(nfinite, minp, result):
     return result / nfinite
 
 
-
-def gen_sdc_pandas_series_rolling_impl(pop, put, func_result=result_or_nan, init_result=numpy.nan):
+def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
+                                       init_result=numpy.nan):
     """Generate series rolling methods implementations based on pop/put funcs"""
     def impl(self):
         win = self._window
@@ -407,23 +407,22 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, func_result=result_or_nan, init
             for idx in range(interlude_start, interlude_stop):
                 value = input_arr[idx]
                 nfinite, result = put(value, nfinite, result)
-                output_arr[idx] = func_result(nfinite, minp, result)
+                output_arr[idx] = get_result(nfinite, minp, result)
 
             for idx in range(interlude_stop, chunk.stop):
                 put_value = input_arr[idx]
                 pop_value = input_arr[idx - win]
                 nfinite, result = put(put_value, nfinite, result)
                 nfinite, result = pop(pop_value, nfinite, result)
-                output_arr[idx] = func_result(nfinite, minp, result)
+                output_arr[idx] = get_result(nfinite, minp, result)
 
         return pandas.Series(output_arr, input_series._index,
                              name=input_series._name)
     return impl
 
 
-
 sdc_pandas_series_rolling_count_impl = register_jitable(
-    gen_sdc_pandas_series_rolling_impl(pop_count, put_count, result_count, init_result=0.))
+    gen_sdc_pandas_series_rolling_impl(pop_count, put_count, get_result=result_count, init_result=0.))
 sdc_pandas_series_rolling_mean_impl = gen_sdc_pandas_series_rolling_impl(
     pop_sum, put_sum, get_result=mean_result_or_nan, init_result=0.)
 sdc_pandas_series_rolling_sum_impl = gen_sdc_pandas_series_rolling_impl(
@@ -532,7 +531,7 @@ def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
     return hpat_pandas_rolling_series_corr_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'count')
+@sdc_overload_method(SeriesRollingType, 'count')
 def hpat_pandas_series_rolling_count(self):
 
     ty_checker = TypeChecker('Method rolling.count().')
