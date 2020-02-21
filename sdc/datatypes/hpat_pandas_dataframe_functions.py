@@ -935,6 +935,25 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
     return func_def, global_vars
 
 
+@sdc_overload_method(DataFrameType, 'head')
+def min_overload(df, n=5):
+    """
+    """
+
+    name = 'head'
+
+    ty_checker = TypeChecker('Method {}().'.format(name))
+    ty_checker.check(df, DataFrameType)
+
+    if not (isinstance(n, (types.Omitted, types.Integer)) or n == 5):
+        ty_checker.raise_exc(n, 'int64', 'n')
+
+    params = {'n': 5}
+    ser_par = {'n': 5}
+
+    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
+
+
 @sdc_overload_method(DataFrameType, 'drop')
 def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None, level=None, inplace=False,
                               errors='raise'):
