@@ -2168,40 +2168,7 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
         ty_checker.raise_exc(min_periods, 'int64', 'min_periods')
 
     def hpat_pandas_series_corr_impl(self, other, method='pearson', min_periods=None):
-        if method not in ('pearson', ''):
-            raise ValueError("Method corr(). Unsupported parameter. Given method != 'pearson'")
-
-        if min_periods is None:
-            min_periods = 1
-
-        if len(self._data) == 0 or len(other._data) == 0:
-            return numpy.nan
-
-        self_arr = self._data[:min(len(self._data), len(other._data))]
-        other_arr = other._data[:min(len(self._data), len(other._data))]
-
-        invalid = numpy.isnan(self_arr) | numpy.isnan(other_arr)
-        if invalid.any():
-            self_arr = self_arr[~invalid]
-            other_arr = other_arr[~invalid]
-
-        if len(self_arr) < min_periods:
-            return numpy.nan
-
-        new_self = pandas.Series(self_arr)
-        new_other = pandas.Series(other_arr)
-
-        n = new_self.count()
-        ma = new_self.sum()
-        mb = new_other.sum()
-        a = n * (self_arr * other_arr).sum() - ma * mb
-        b1 = n * (self_arr * self_arr).sum() - ma * ma
-        b2 = n * (other_arr * other_arr).sum() - mb * mb
-
-        if b1 == 0 or b2 == 0:
-            return numpy.nan
-
-        return a / numpy.sqrt(b1 * b2)
+        return numpy_like.corr(self, other, method, min_periods)
 
     return hpat_pandas_series_corr_impl
 
