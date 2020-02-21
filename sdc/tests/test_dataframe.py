@@ -1793,14 +1793,15 @@ class TestDataFrame(TestCase):
 
     def test_tbb(self):
         import sdc.concurrent_hash
+
         def test_impl():
             h = sdc.concurrent_hash.create_int_hashmap()
 
-            sdc.concurrent_hash.addelem_int_hashmap(h,1,2)
-            sdc.concurrent_hash.addelem_int_hashmap(h,1,3)
-            sdc.concurrent_hash.addelem_int_hashmap(h,1,4)
-            sdc.concurrent_hash.addelem_int_hashmap(h,1,5)
-            sdc.concurrent_hash.addelem_int_hashmap(h,2,6)
+            sdc.concurrent_hash.addelem_int_hashmap(h, 1, 2)
+            sdc.concurrent_hash.addelem_int_hashmap(h, 1, 3)
+            sdc.concurrent_hash.addelem_int_hashmap(h, 1, 4)
+            sdc.concurrent_hash.addelem_int_hashmap(h, 1, 5)
+            sdc.concurrent_hash.addelem_int_hashmap(h, 2, 6)
 
             it = sdc.concurrent_hash.createiter_int_hashmap(h)
             while 0 == sdc.concurrent_hash.enditer_int_hashmap(it):
