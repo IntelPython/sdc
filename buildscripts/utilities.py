@@ -33,6 +33,60 @@ import subprocess
 import time
 import traceback
 
+from pathlib import Path
+
+from conda.cli.python_api import Commands as Conda_Commands
+from conda.cli.python_api import run_command as exec_conda_command
+
+
+class SDC_Vars:
+    def __init__(self, sdc_local_channel=None):
+        self.src_path = Path(__file__).resolve().parent
+        self.env_name = 'sdc_env'
+        self.channel_list = ['-c', 'intel/label/beta', '-c', 'intel', '-c', 'defaults', '-c', 'conda-forge']
+
+        # Set SDC local channel
+        if sdc_local_channel:
+            sdc_local_channel = Path(sdc_local_channel).resolve().as_uri()
+            self.channel_list = ['-c', sdc_local_channel] + self.channel_list
+        self.channels = ' '.join(self.channel_list)
+
+        if platform.system() == 'Windows':
+            self.env_activate = f'activate {self.env_name}'
+        else:
+            self.env_activate = f'source activate {self.env_name}'
+
+        # build_doc vars
+        self.doc_path = self.src_path / 'docs'
+        self.doc_tag = 'dev'
+        self.doc_repo_name = 'sdc-doc'
+        self.doc_repo_link = 'https://github.com/IntelPython/sdc-doc.git'
+        self.doc_repo_branch = 'gh-pages'
+
+def create_environment(sdc_vars, packages=[]):
+    # Clear Intel SDC environment
+    remove_args = ['-q', '-y', '--name', sdc_vars.env_name, '--all']
+    run_conda_command(Conda_Commands.REMOVE, remove_args)
+    # Create Intel SDC environment
+    create_args = ['-q', '-y', '-n', sdc_vars.env_name, f'python={sdc_vars.python}']
+    create_args += packages + sdc_vars.channel_list + ['--override-channels']
+    run_conda_command(Conda_Commands.CREATE, create_args)
+    return
+
+def conda_install(sdc_vars, packages):
+    install_args = ['-n', sdc_vars.env_name]
+    install_args += sdc_vars.channel_list + ['--override-channels', '-q', '-y'] + packages
+    run_conda_command(Conda_Commands.INSTALL, install_args)
+    return
+
+def run_conda_command(conda_command, command_args):
+    output, errors, return_code = exec_conda_command(conda_command, *command_args, use_exception_handler=True)
+    if return_code != 0:
+        raise Exception(output + errors + f'Return code: {str(return_code)}')
+    return output
+
+def run_command_in_env(sdc_vars, command):
+    run_command(f'{sdc_vars.env_activate} && {command}')
 
 """
 Create conda environment with desired python and packages
