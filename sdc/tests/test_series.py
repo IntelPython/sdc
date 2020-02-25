@@ -4908,32 +4908,6 @@ class TestSeries(
         result = hpat_func().size
         np.testing.assert_array_equal(ref_result, result)
 
-    @skip_numba_jit
-    def test_series_groupby_count(self):
-        def test_impl():
-            A = pd.Series([13, 11, 21, 13, 13, 51, 42, 21])
-            grouped = A.groupby(A, sort=False)
-            return grouped.count()
-
-        hpat_func = self.jit(test_impl)
-
-        ref_result = test_impl()
-        result = hpat_func()
-        pd.testing.assert_series_equal(result, ref_result)
-
-    @unittest.skip("getiter for this type is not implemented yet")
-    def test_series_groupby_iterator_int(self):
-        def test_impl():
-            A = pd.Series([13, 11, 21, 13, 13, 51, 42, 21])
-            grouped = A.groupby(A)
-            return [i for i in grouped]
-
-        hpat_func = self.jit(test_impl)
-
-        ref_result = test_impl()
-        result = hpat_func()
-        np.testing.assert_array_equal(result, ref_result)
-
     def test_series_std(self):
         def pyfunc():
             series = pd.Series([1.0, np.nan, -1.0, 0.0, 5e-324])
