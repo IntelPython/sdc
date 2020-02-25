@@ -43,7 +43,7 @@ from numba.typing import signature
 from numba.special import literally
 
 from sdc.datatypes.common_functions import sdc_arrays_argsort, _sdc_asarray, _sdc_take
-from sdc.datatypes.hpat_pandas_groupby_types import DataFrameGroupByType
+from sdc.datatypes.hpat_pandas_groupby_types import DataFrameGroupByType, SeriesGroupByType
 from sdc.utilities.sdc_typing_utils import TypeChecker, kwsparams2list, sigparams2list
 from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
@@ -84,7 +84,6 @@ def init_dataframe_groupby(typingctx, parent, column_id, data, sort, target_colu
         # increase refcount of stored values
         if context.enable_nrt:
             context.nrt.incref(builder, signature.args[0], parent_val)
-            context.nrt.incref(builder, signature.args[1], column_id_val)
             context.nrt.incref(builder, signature.args[2], data_val)
             for var in column_strs:
                 context.nrt.incref(builder, string_type, var)
@@ -93,6 +92,30 @@ def init_dataframe_groupby(typingctx, parent, column_id, data, sort, target_colu
 
     ret_typ = DataFrameGroupByType(parent, column_id, selected_col_names)
     sig = signature(ret_typ, parent, column_id, data, sort, target_columns)
+    return sig, codegen
+
+
+@intrinsic
+def init_series_groupby(typingctx, parent, by_data, data, sort):
+
+    def codegen(context, builder, signature, args):
+        parent_val, _, data_val, sort_val = args
+        # create series struct and store values
+        groupby_obj = cgutils.create_struct_proxy(
+            signature.return_type)(context, builder)
+        groupby_obj.parent = parent_val
+        groupby_obj.data = data_val
+        groupby_obj.sort = sort_val
+
+        # increase refcount of stored values
+        if context.enable_nrt:
+            context.nrt.incref(builder, signature.args[0], parent_val)
+            context.nrt.incref(builder, signature.args[2], data_val)
+
+        return groupby_obj._getvalue()
+
+    ret_typ = SeriesGroupByType(parent, by_data)
+    sig = signature(ret_typ, parent, by_data, data, sort)
     return sig, codegen
 
 
@@ -107,15 +130,24 @@ def sdc_pandas_dataframe_getitem(self, idx):
         or (isinstance(idx, types.Tuple)
             and all(isinstance(a, types.StringLiteral) for a in idx))):
 
-        col_id_literal = self.col_id.literal_value
-        idx_literal = idx.literal_value if idx_is_literal_str else None
+        by_col_id_literal = self.col_id.literal_value
+        target_col_id_literal = self.parent.columns.index(idx.literal_value) if idx_is_literal_str else None
         def sdc_pandas_dataframe_getitem_common_impl(self, idx):
 
-            _idx = (idx_literal, ) if idx_is_literal_str == True else idx  # noqa
             # calling getitem twice raises IndexError, just as in pandas
             if not self._target_default:
                 raise IndexError("DataFrame.GroupBy.getitem: Columns already selected")
-            return init_dataframe_groupby(self._parent, col_id_literal, self._data, self._sort, _idx)
+
+            if idx_is_literal_str == True:  # noqa
+                # no need to pass index into this series, as we group by array
+                target_series = pandas.Series(
+                    data=get_dataframe_data(self._parent, target_col_id_literal),
+                    name=self._parent._columns[target_col_id_literal]
+                )
+                by_arr_data = get_dataframe_data(self._parent, by_col_id_literal)
+                return init_series_groupby(target_series, by_arr_data, self._data, self._sort)
+            else:
+                return init_dataframe_groupby(self._parent, by_col_id_literal, self._data, self._sort, idx)
 
         return sdc_pandas_dataframe_getitem_common_impl
 
@@ -140,7 +172,7 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, de
     column_names, column_ids = tuple(zip(*columns))
 
     func_lines = [
-        f'def _groupby_{func_name}_impl({all_params_as_str}):',
+        f'def _dataframe_groupby_{func_name}_impl({all_params_as_str}):',
         f'  group_keys = _sdc_asarray([key for key in {groupby_dict}])',
         f'  res_index_len = len(group_keys)',
         f'  if {groupby_param_sort}:',
@@ -179,6 +211,47 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, de
     return func_text, global_vars
 
 
+def _sdc_pandas_series_groupby_generic_func_codegen(func_name, func_params, defaults, impl_params):
+
+    all_params_as_str = ', '.join(sigparams2list(func_params, defaults))
+    extra_impl_params = ', '.join(kwsparams2list(impl_params))
+
+    groupby_obj = f'{func_params[0]}'
+    series = f'{groupby_obj}._parent'
+    groupby_dict = f'{groupby_obj}._data'
+    groupby_param_sort = f'{groupby_obj}._sort'
+
+    # TODO: remove conversion from Numba typed.List to reflected one while creating group_arr_{i}
+    func_lines = [
+        f'def _series_groupby_{func_name}_impl({all_params_as_str}):',
+        f'  group_keys = _sdc_asarray([key for key in {groupby_dict}])',
+        f'  res_index_len = len(group_keys)',
+        f'  if {groupby_param_sort}:',
+        f'    argsorted_index = sdc_arrays_argsort(group_keys, kind=\'mergesort\')',
+        f'  result_data = numpy.empty(res_index_len, dtype=res_dtype)',
+        f'  for j in numba.prange(res_index_len):',
+        f'    group_arr = _sdc_take({series}._data, list({groupby_dict}[group_keys[j]]))',
+        f'    group_series = pandas.Series(group_arr)',
+        f'    idx = argsorted_index[j] if {groupby_param_sort} else j',
+        f'    result_data[idx] = group_series.{func_name}({extra_impl_params})',
+        f'  if {groupby_param_sort}:',
+        f'    res_index = _sdc_take(group_keys, argsorted_index)',
+        f'  else:',
+        f'    res_index = group_keys',
+        f'  return pandas.Series(data=result_data, index=res_index, name={series}._name)'
+    ]
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas,
+                   'numpy': numpy,
+                   'numba': numba,
+                   '_sdc_asarray': _sdc_asarray,
+                   '_sdc_take': _sdc_take,
+                   'sdc_arrays_argsort': sdc_arrays_argsort}
+
+    return func_text, global_vars
+
+
 series_method_to_func = {
     'count': lambda S: S.count(),
     'max': lambda S: S.max(),
@@ -201,10 +274,10 @@ def _groupby_resolve_impl_func_type(series_dtype, method_name):
     return cpu_target.typing_context.resolve_function_type(jitted_func, (ty_series, ), {})
 
 
-def sdc_pandas_groupby_apply_func(self, func_name, func_args, defaults=None, impl_args=None):
+def sdc_pandas_dataframe_groupby_apply_func(self, func_name, func_args, defaults=None, impl_args=None):
 
-    defaults = defaults if defaults else {}
-    impl_args = impl_args if impl_args else {}
+    defaults = defaults or {}
+    impl_args = impl_args or {}
 
     df_column_types = self.parent.data
     df_column_names = self.parent.columns
@@ -218,12 +291,34 @@ def sdc_pandas_groupby_apply_func(self, func_name, func_args, defaults=None, imp
             ty_arr.dtype, func_name
             ).return_type for i, ty_arr in enumerate(df_column_types) if i != by_column_id)
 
-    groupby_func_name = f'_groupby_{func_name}_impl'
+    groupby_func_name = f'_dataframe_groupby_{func_name}_impl'
     func_text, global_vars = _sdc_pandas_groupby_generic_func_codegen(
         func_name, subject_columns, func_args, defaults, impl_args)
 
     # capture result column types into generated func context
     global_vars['res_arrays_dtypes'] = res_arrays_dtypes
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _groupby_method_impl = loc_vars[groupby_func_name]
+
+    return _groupby_method_impl
+
+
+def sdc_pandas_series_groupby_apply_func(self, func_name, func_args, defaults=None, impl_args=None):
+
+    defaults = defaults or {}
+    impl_args = impl_args or {}
+
+    # resolve type of result series
+    res_dtype = _groupby_resolve_impl_func_type(self.parent.dtype, func_name).return_type
+
+    groupby_func_name = f'_series_groupby_{func_name}_impl'
+    func_text, global_vars = _sdc_pandas_series_groupby_generic_func_codegen(
+        func_name, func_args, defaults, impl_args)
+
+    # capture result column types into generated func context
+    global_vars['res_dtype'] = res_dtype
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
@@ -241,7 +336,7 @@ def sdc_pandas_dataframe_groupby_count(self):
 
     method_args = ['self']
     applied_func_name = 'count'
-    return sdc_pandas_groupby_apply_func(self, applied_func_name, method_args)
+    return sdc_pandas_dataframe_groupby_apply_func(self, applied_func_name, method_args)
 
 
 @sdc_overload_method(DataFrameGroupByType, 'max')
@@ -253,7 +348,7 @@ def sdc_pandas_dataframe_groupby_max(self):
 
     method_args = ['self']
     applied_func_name = 'max'
-    return sdc_pandas_groupby_apply_func(self, applied_func_name, method_args)
+    return sdc_pandas_dataframe_groupby_apply_func(self, applied_func_name, method_args)
 
 
 @sdc_overload_method(DataFrameGroupByType, 'mean')
@@ -265,7 +360,7 @@ def sdc_pandas_dataframe_groupby_mean(self, *args):
 
     method_args = ['self', '*args']
     applied_func_name = 'mean'
-    return sdc_pandas_groupby_apply_func(self, applied_func_name, method_args)
+    return sdc_pandas_dataframe_groupby_apply_func(self, applied_func_name, method_args)
 
 
 @sdc_overload_method(DataFrameGroupByType, 'median')
@@ -277,7 +372,7 @@ def sdc_pandas_dataframe_groupby_median(self):
 
     method_args = ['self']
     applied_func_name = 'median'
-    return sdc_pandas_groupby_apply_func(self, applied_func_name, method_args)
+    return sdc_pandas_dataframe_groupby_apply_func(self, applied_func_name, method_args)
 
 
 @sdc_overload_method(DataFrameGroupByType, 'min')
@@ -289,7 +384,7 @@ def sdc_pandas_dataframe_groupby_min(self):
 
     method_args = ['self']
     applied_func_name = 'min'
-    return sdc_pandas_groupby_apply_func(self, applied_func_name, method_args)
+    return sdc_pandas_dataframe_groupby_apply_func(self, applied_func_name, method_args)
 
 
 @sdc_overload_method(DataFrameGroupByType, 'prod')
@@ -301,7 +396,7 @@ def sdc_pandas_dataframe_groupby_prod(self):
 
     method_args = ['self']
     applied_func_name = 'prod'
-    return sdc_pandas_groupby_apply_func(self, applied_func_name, method_args)
+    return sdc_pandas_dataframe_groupby_apply_func(self, applied_func_name, method_args)
 
 
 @sdc_overload_method(DataFrameGroupByType, 'std')
@@ -319,7 +414,8 @@ def sdc_pandas_dataframe_groupby_std(self, ddof=1, *args):
     impl_used_params = {'ddof': 'ddof'}
 
     applied_func_name = 'std'
-    return sdc_pandas_groupby_apply_func(self, applied_func_name, method_args, default_values, impl_used_params)
+    return sdc_pandas_dataframe_groupby_apply_func(
+        self, applied_func_name, method_args, default_values, impl_used_params)
 
 
 @sdc_overload_method(DataFrameGroupByType, 'sum')
@@ -331,7 +427,7 @@ def sdc_pandas_dataframe_groupby_sum(self):
 
     method_args = ['self']
     applied_func_name = 'sum'
-    return sdc_pandas_groupby_apply_func(self, applied_func_name, method_args)
+    return sdc_pandas_dataframe_groupby_apply_func(self, applied_func_name, method_args)
 
 
 @sdc_overload_method(DataFrameGroupByType, 'var')
@@ -349,4 +445,125 @@ def sdc_pandas_dataframe_groupby_var(self, ddof=1, *args):
     impl_used_params = {'ddof': 'ddof'}
 
     applied_func_name = 'var'
-    return sdc_pandas_groupby_apply_func(self, applied_func_name, method_args, default_values, impl_used_params)
+    return sdc_pandas_dataframe_groupby_apply_func(
+        self, applied_func_name, method_args, default_values, impl_used_params)
+
+
+@sdc_overload_method(SeriesGroupByType, 'count')
+def sdc_pandas_series_groupby_count(self):
+
+    method_name = 'GroupBy.count().'
+    ty_checker = TypeChecker(method_name)
+    ty_checker.check(self, SeriesGroupByType)
+
+    method_args = ['self']
+    applied_func_name = 'count'
+    return sdc_pandas_series_groupby_apply_func(self, applied_func_name, method_args)
+
+
+@sdc_overload_method(SeriesGroupByType, 'max')
+def sdc_pandas_series_groupby_max(self):
+
+    method_name = 'GroupBy.max().'
+    ty_checker = TypeChecker(method_name)
+    ty_checker.check(self, SeriesGroupByType)
+
+    method_args = ['self']
+    applied_func_name = 'max'
+    return sdc_pandas_series_groupby_apply_func(self, applied_func_name, method_args)
+
+
+@sdc_overload_method(SeriesGroupByType, 'mean')
+def sdc_pandas_series_groupby_mean(self, *args):
+
+    method_name = 'GroupBy.mean().'
+    ty_checker = TypeChecker(method_name)
+    ty_checker.check(self, SeriesGroupByType)
+
+    method_args = ['self', '*args']
+    applied_func_name = 'mean'
+    return sdc_pandas_series_groupby_apply_func(self, applied_func_name, method_args)
+
+
+@sdc_overload_method(SeriesGroupByType, 'median')
+def sdc_pandas_series_groupby_median(self):
+
+    method_name = 'GroupBy.median().'
+    ty_checker = TypeChecker(method_name)
+    ty_checker.check(self, SeriesGroupByType)
+
+    method_args = ['self']
+    applied_func_name = 'median'
+    return sdc_pandas_series_groupby_apply_func(self, applied_func_name, method_args)
+
+
+@sdc_overload_method(SeriesGroupByType, 'min')
+def sdc_pandas_series_groupby_min(self):
+
+    method_name = 'GroupBy.min().'
+    ty_checker = TypeChecker(method_name)
+    ty_checker.check(self, SeriesGroupByType)
+
+    method_args = ['self']
+    applied_func_name = 'min'
+    return sdc_pandas_series_groupby_apply_func(self, applied_func_name, method_args)
+
+
+@sdc_overload_method(SeriesGroupByType, 'prod')
+def sdc_pandas_series_groupby_prod(self):
+
+    method_name = 'GroupBy.prod().'
+    ty_checker = TypeChecker(method_name)
+    ty_checker.check(self, SeriesGroupByType)
+
+    method_args = ['self']
+    applied_func_name = 'prod'
+    return sdc_pandas_series_groupby_apply_func(self, applied_func_name, method_args)
+
+
+@sdc_overload_method(SeriesGroupByType, 'std')
+def sdc_pandas_series_groupby_std(self, ddof=1, *args):
+
+    method_name = 'GroupBy.std().'
+    ty_checker = TypeChecker(method_name)
+    ty_checker.check(self, SeriesGroupByType)
+
+    if not isinstance(ddof, (types.Omitted, int, types.Integer)):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
+
+    method_args = ['self', 'ddof', '*args']
+    default_values = {'ddof': 1}
+    impl_used_params = {'ddof': 'ddof'}
+
+    applied_func_name = 'std'
+    return sdc_pandas_series_groupby_apply_func(self, applied_func_name, method_args, default_values, impl_used_params)
+
+
+@sdc_overload_method(SeriesGroupByType, 'sum')
+def sdc_pandas_series_groupby_sum(self):
+
+    method_name = 'GroupBy.sum().'
+    ty_checker = TypeChecker(method_name)
+    ty_checker.check(self, SeriesGroupByType)
+
+    method_args = ['self']
+    applied_func_name = 'sum'
+    return sdc_pandas_series_groupby_apply_func(self, applied_func_name, method_args)
+
+
+@sdc_overload_method(SeriesGroupByType, 'var')
+def sdc_pandas_series_groupby_var(self, ddof=1, *args):
+
+    method_name = 'GroupBy.var().'
+    ty_checker = TypeChecker(method_name)
+    ty_checker.check(self, SeriesGroupByType)
+
+    if not isinstance(ddof, (types.Omitted, int, types.Integer)):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
+
+    method_args = ['self', 'ddof', '*args']
+    default_values = {'ddof': 1}
+    impl_used_params = {'ddof': 'ddof'}
+
+    applied_func_name = 'var'
+    return sdc_pandas_series_groupby_apply_func(self, applied_func_name, method_args, default_values, impl_used_params)
