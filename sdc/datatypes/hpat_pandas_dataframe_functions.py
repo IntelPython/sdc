@@ -1351,8 +1351,11 @@ def sdc_pandas_dataframe_getitem(self, idx):
 def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None):
     """
     Pandas DataFrame method :meth:`pandas.DataFrame.pct_change` implementation.
+
     .. only:: developer
+
       Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_pct_change*
+
     Parameters
     -----------
     df: :class:`pandas.DataFrame`
@@ -1365,6 +1368,7 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
       *unsupported*
     freq:
       *unsupported*
+
     Returns
     -------
     :obj:`pandas.Series` or `pandas.DataFrame`
