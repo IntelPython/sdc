@@ -324,8 +324,8 @@ def put_count(value, nfinite, result):
 
 
 @sdc_register_jitable
-def result_count(nfinite, minp, result):
-    """Get result count taking into account min periods."""
+def result(nfinite, minp, result):
+    """Get result."""
     return result
 
 
@@ -420,7 +420,7 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
 
 
 sdc_pandas_series_rolling_count_impl = gen_sdc_pandas_series_rolling_impl(
-    pop_count, put_count, get_result=result_count, init_result=0.)
+    pop_count, put_count, get_result=result, init_result=0.)
 sdc_pandas_series_rolling_mean_impl = gen_sdc_pandas_series_rolling_impl(
     pop_sum, put_sum, get_result=mean_result_or_nan, init_result=0.)
 sdc_pandas_series_rolling_sum_impl = gen_sdc_pandas_series_rolling_impl(
