@@ -115,31 +115,6 @@ def arr_nonnan_count(arr):
 
 
 @sdc_register_jitable
-def _moment(arr, moment):
-    mn = numpy.mean(arr)
-    s = numpy.power((arr - mn), moment)
-
-    return numpy.mean(s)
-
-
-@sdc_register_jitable
-def arr_kurt(arr):
-    """Calculate unbiased kurtosis of values"""
-    n = len(arr)
-    if n < 4:
-        return numpy.nan
-
-    m2 = _moment(arr, 2)
-    m4 = _moment(arr, 4)
-    val = 0 if m2 == 0 else m4 / m2 ** 2.0
-
-    if (n > 2) & (m2 > 0):
-        val = 1.0/(n-2)/(n-3) * ((n**2-1.0)*m4/m2**2.0 - 3*(n-1)**2.0)
-
-    return val
-
-
-@sdc_register_jitable
 def arr_max(arr):
     """Calculate maximum of values"""
     if len(arr) == 0:
@@ -289,8 +264,6 @@ def gen_hpat_pandas_series_rolling_ddof_impl(rolling_func):
     return impl
 
 
-hpat_pandas_rolling_series_kurt_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_kurt))
 hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max))
 hpat_pandas_rolling_series_median_impl = register_jitable(
@@ -303,6 +276,34 @@ hpat_pandas_rolling_series_std_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_std))
 hpat_pandas_rolling_series_var_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_var))
+
+
+@sdc_register_jitable
+def put_kurt(value, nfinite, result):
+    """Calculate the window sums for kurt with new value."""
+    _sum, power2_sum, power4_sum = result
+    if numpy.isfinite(value):
+        nfinite += 1
+        _sum += value
+        mn = _sum / nfinite
+        power2_sum += (value - mn) ** 2
+        power4_sum += (value - mn) ** 4
+
+    return nfinite, (_sum, power2_sum, power4_sum)
+
+
+@sdc_register_jitable
+def pop_kurt(value, nfinite, result):
+    """Calculate the window sums for kurt without old value."""
+    _sum, power2_sum, power4_sum = result
+    if numpy.isfinite(value):
+        nfinite -= 1
+        _sum -= value
+        mn = _sum / nfinite
+        power2_sum -= (value - mn) ** 2
+        power4_sum -= (value - mn) ** 4
+
+    return nfinite, (_sum, power2_sum, power4_sum)
 
 
 @sdc_register_jitable
@@ -332,6 +333,25 @@ def result_or_nan(nfinite, minp, result):
         return numpy.nan
 
     return result
+
+
+@sdc_register_jitable
+def kurt_result_or_nan(nfinite, minp, result):
+    """Get result kurt taking into account min periods."""
+    if nfinite < max(4, minp):
+        return numpy.nan
+
+    _, power2_sum, power4_sum = result
+
+    n = nfinite
+    m2 = power2_sum / n
+    m4 = power4_sum / n
+    res = 0 if m2 == 0 else m4 / m2 ** 2.0
+
+    if (n > 2) & (m2 > 0):
+        res = 1.0/(n-2)/(n-3) * ((n**2-1.0)*m4/m2**2.0 - 3*(n-1)**2.0)
+
+    return res
 
 
 @sdc_register_jitable
@@ -388,6 +408,8 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
     return impl
 
 
+sdc_pandas_series_rolling_kurt_impl = gen_sdc_pandas_series_rolling_impl(
+    pop_kurt, put_kurt, get_result=kurt_result_or_nan, init_result=(0., 0., 0.))
 sdc_pandas_series_rolling_mean_impl = gen_sdc_pandas_series_rolling_impl(
     pop_sum, put_sum, get_result=mean_result_or_nan, init_result=0.)
 sdc_pandas_series_rolling_sum_impl = gen_sdc_pandas_series_rolling_impl(
@@ -608,13 +630,13 @@ def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
     return _gen_hpat_pandas_rolling_series_cov_impl(other)
 
 
-@sdc_rolling_overload(SeriesRollingType, 'kurt')
+@sdc_overload_method(SeriesRollingType, 'kurt')
 def hpat_pandas_series_rolling_kurt(self):
 
     ty_checker = TypeChecker('Method rolling.kurt().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_kurt_impl
+    return sdc_pandas_series_rolling_kurt_impl
 
 
 @sdc_rolling_overload(SeriesRollingType, 'max')
