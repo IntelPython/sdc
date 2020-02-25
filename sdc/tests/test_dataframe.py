@@ -970,9 +970,12 @@ class TestDataFrame(TestCase):
                 sdc_impl = get_func(n)
                 sdc_func = self.jit(sdc_impl)
                 with self.subTest(n=n):
-                    df = pd.DataFrame({"FLOAT": [3.2, 4.4, 7.0, 3.3, 1.0],
-                                    "INT": [3, 4, 1, 0, 222],
-                                    "STRING": ['a', 'dd', 'c', '12', 'ddf']}, index=[3,4,2,6,1])
+                    df = pd.DataFrame(
+                        {"FLOAT": [3.2, 4.4, 7.0, 3.3, 1.0],
+                         "INT": [3, 4, 1, 0, 222],
+                         "STRING": ['a', 'dd', 'c', '12', 'ddf']},
+                        index=[3, 4, 2, 6, 1]
+                    )
                     pd.testing.assert_frame_equal(sdc_func(df), ref_impl(df))
 
     def test_pct_change1(self):
