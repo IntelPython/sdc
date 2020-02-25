@@ -101,24 +101,9 @@ class TestDFRollingMethods(TestBase):
             'var': [2 * 10 ** 5],
         }
 
-    def _test_jitted(self, pyfunc, record, *args, **kwargs):
-        # compilation time
-        record['compile_results'] = calc_compilation(pyfunc, *args, **kwargs)
-
-        cfunc = numba.njit(pyfunc)
-
-        # execution and boxing time
-        record['test_results'], record['boxing_results'] = get_times(cfunc,
-                                                                     *args,
-                                                                     **kwargs)
-
-    def _test_python(self, pyfunc, record, *args, **kwargs):
-        record['test_results'], _ = get_times(pyfunc, *args, **kwargs)
-
     def _gen_df(self, data, columns_num=10):
         """Generate DataFrame based on input data"""
-        return pandas.DataFrame(
-            {col: data for col in string.ascii_uppercase[:columns_num]})
+        return pandas.DataFrame({col: data for col in string.ascii_uppercase[:columns_num]})
 
     def _test_case(self, pyfunc, name,
                    input_data=test_global_input_data_float64,
@@ -180,6 +165,10 @@ class TestDFRollingMethods(TestBase):
 
     def test_df_rolling_count(self):
         self._test_df_rolling_method('count')
+
+    def test_df_rolling_cov(self):
+        self._test_df_rolling_method('cov', extra_usecase_params='other',
+                                     method_params='other=other')
 
     def test_df_rolling_kurt(self):
         self._test_df_rolling_method('kurt')

@@ -26,6 +26,7 @@ class TestCase(NamedTuple):
     data_num: total number of generated data, e.g. 2 (data, other)
     input_data: input data for generating test data
     skip: flag for skipping a test
+    check_skipna: flag for checking a function with both parameters skipna=True and skipna=False
     """
     name: str
     size: list
@@ -35,6 +36,7 @@ class TestCase(NamedTuple):
     data_num: int = 1
     input_data: list = None
     skip: bool = False
+    check_skipna: bool = False
 
 
 def to_varname_without_excess_underscores(string):
@@ -42,8 +44,24 @@ def to_varname_without_excess_underscores(string):
     return '_'.join(i for i in to_varname(string).split('_') if i)
 
 
+def skipna_cases(cases):
+    """Generator. Replaces a test case containing check_skipna=True
+    with two cases containing parameters skipna=True and skipna=False
+    """
+    for case in cases:
+        if case.check_skipna:
+            for skipna in [True, False]:
+                params = case.params
+                if params:
+                    params += ', '
+                params += f'skipna={skipna}'
+                yield case._replace(params=params)
+        else:
+            yield case
+
+
 def generate_test_cases(cases, class_add, typ, prefix=''):
-    for test_case in cases:
+    for test_case in skipna_cases(cases):
         test_name_parts = ['test', typ, prefix, test_case.name, gen_params_wo_data(test_case)]
         test_name = to_varname_without_excess_underscores('_'.join(test_name_parts))
 
@@ -76,27 +94,18 @@ def gen_call_expr(test_case, prefix):
 
 
 def gen_test(test_case, prefix):
-    func_name = 'func'
-
     usecase = gen_usecase(test_case, prefix)
-
-    skip = '@skip_numba_jit\n' if test_case.skip else ''
 
     test_name = test_case.name
     if test_case.params:
-        test_name = f'{test_name}({test_case.params})'
+        test_name += f'({test_case.params})'
 
-    func_text = f"""
-{skip}def {func_name}(self):
-  self._test_case(usecase, name='{test_name}', total_data_length={test_case.size},
-                  data_num={test_case.data_num}, input_data={test_case.input_data})
-"""
+    def func(self):
+        self._test_case(usecase, name=test_name, total_data_length=test_case.size,
+                        data_num=test_case.data_num, input_data=test_case.input_data)
 
-    loc_vars = {}
-    global_vars = {'usecase': usecase,
-                   'skip_numba_jit': skip_numba_jit}
-    exec(func_text, global_vars, loc_vars)
-    func = loc_vars[func_name]
+    if test_case.skip:
+        func = skip_numba_jit(func)
 
     return func
 

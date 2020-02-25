@@ -33,6 +33,9 @@
 
 import numba
 import numpy
+import sys
+import pandas
+import numpy as np
 
 from numba import types, jit, prange, numpy_support, literally
 from numba.errors import TypingError
@@ -40,11 +43,35 @@ from numba.targets.arraymath import get_isnan
 
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
+from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
+                                 min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
+                                 max_dtype_float_val)
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size, str_arr_is_na)
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
+from sdc.utilities.prange_utils import parallel_chunks
 
 
 def astype(self, dtype):
+    pass
+
+
+def argmin(self):
+    pass
+
+
+def argmax(self):
+    pass
+
+
+def nanargmin(self):
+    pass
+
+
+def nanargmax(self):
+    pass
+
+
+def fillna(self, inplace=False, value=None):
     pass
 
 
@@ -81,7 +108,7 @@ def sdc_astype_overload(self, dtype):
     """
 
     ty_checker = TypeChecker("numpy-like 'astype'")
-    if not isinstance(self, types.Array):
+    if not isinstance(self, (types.Array, StringArrayType)):
         return None
 
     if not isinstance(dtype, (types.functions.NumberClass, types.Function, types.Literal)):
@@ -126,7 +153,170 @@ def sdc_astype_overload(self, dtype):
 
         return sdc_astype_number_impl
 
-    ty_checker.raise_exc(self.dtype, 'str or type', 'self.dtype')
+
+def sdc_nanarg_overload(reduce_op):
+    def nanarg_impl(self):
+        """
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+        Parallel replacement of numpy.nanargmin/numpy.nanargmax.
+
+        .. only:: developer
+        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k nanargmin
+        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k nanargmax
+
+        """
+
+        ty_checker = TypeChecker("numpy-like 'nanargmin'/'nanargmax'")
+        dtype = self.dtype
+        isnan = get_isnan(dtype)
+        max_int64 = max_dtype_int_val(numpy_support.from_dtype(numpy.int64))
+        if isinstance(dtype, types.Integer):
+            initial_result = {
+                min: max_dtype_int_val(dtype),
+                max: min_dtype_int_val(dtype),
+            }[reduce_op]
+
+        if isinstance(dtype, types.Float):
+            initial_result = {
+                min: max_dtype_float_val(dtype),
+                max: min_dtype_float_val(dtype),
+            }[reduce_op]
+
+        if not isinstance(self, types.Array):
+            return None
+
+        if isinstance(dtype, types.Number):
+            def sdc_nanargmin_impl(self):
+                chunks = parallel_chunks(len(self))
+                arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
+                arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
+                for i in prange(len(chunks)):
+                    chunk = chunks[i]
+                    res = initial_result
+                    pos = max_int64
+                    for j in range(chunk.start, chunk.stop):
+                        if reduce_op(res, self[j]) != self[j]:
+                            continue
+                        if isnan(self[j]):
+                            continue
+                        if res == self[j]:
+                            pos = min(pos, j)
+                        else:
+                            pos = j
+                            res = self[j]
+                    arr_res[i] = res
+                    arr_pos[i] = pos
+
+                general_res = initial_result
+                general_pos = max_int64
+                for i in range(len(chunks)):
+                    if reduce_op(general_res, arr_res[i]) != arr_res[i]:
+                        continue
+                    if general_res == arr_res[i]:
+                        general_pos = min(general_pos, arr_pos[i])
+                    else:
+                        general_pos = arr_pos[i]
+                        general_res = arr_res[i]
+
+                return general_pos
+
+            return sdc_nanargmin_impl
+
+        ty_checker.raise_exc(dtype, 'number', 'self.dtype')
+    return nanarg_impl
+
+
+sdc_overload(nanargmin)(sdc_nanarg_overload(min))
+sdc_overload(nanargmax)(sdc_nanarg_overload(max))
+
+
+def sdc_arg_overload(reduce_op):
+    def arg_impl(self):
+        """
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+        Parallel replacement of numpy.argmin/numpy.argmax.
+
+        .. only:: developer
+        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k argmin
+        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k argmax
+
+        """
+
+        ty_checker = TypeChecker("numpy-like 'argmin'/'argmax'")
+        dtype = self.dtype
+        isnan = get_isnan(dtype)
+        max_int64 = max_dtype_int_val(numpy_support.from_dtype(numpy.int64))
+        if isinstance(dtype, types.Integer):
+            initial_result = {
+                min: max_dtype_int_val(dtype),
+                max: min_dtype_int_val(dtype),
+            }[reduce_op]
+
+        if isinstance(dtype, types.Float):
+            initial_result = {
+                min: max_dtype_float_val(dtype),
+                max: min_dtype_float_val(dtype),
+            }[reduce_op]
+
+        if not isinstance(self, types.Array):
+            return None
+
+        if isinstance(dtype, types.Number):
+            def sdc_argmin_impl(self):
+                chunks = parallel_chunks(len(self))
+                arr_res = numpy.empty(shape=len(chunks), dtype=dtype)
+                arr_pos = numpy.empty(shape=len(chunks), dtype=numpy.int64)
+                for i in prange(len(chunks)):
+                    chunk = chunks[i]
+                    res = initial_result
+                    pos = max_int64
+                    for j in range(chunk.start, chunk.stop):
+                        if not isnan(self[j]):
+                            if reduce_op(res, self[j]) != self[j]:
+                                continue
+                            if res == self[j]:
+                                pos = min(pos, j)
+                            else:
+                                pos = j
+                                res = self[j]
+                        else:
+                            if numpy.isnan(res):
+                                pos = min(pos, j)
+                            else:
+                                pos = j
+                            res = self[j]
+
+                    arr_res[i] = res
+                    arr_pos[i] = pos
+                general_res = initial_result
+                general_pos = max_int64
+                for i in range(len(chunks)):
+                    if not isnan(arr_res[i]):
+                        if reduce_op(general_res, arr_res[i]) != arr_res[i]:
+                            continue
+                        if general_res == arr_res[i]:
+                            general_pos = min(general_pos, arr_pos[i])
+                        else:
+                            general_pos = arr_pos[i]
+                            general_res = arr_res[i]
+                    else:
+                        if numpy.isnan(general_res):
+                            general_pos = min(general_pos, arr_pos[i])
+                        else:
+                            general_pos = arr_pos[i]
+                        general_res = arr_res[i]
+                return general_pos
+
+            return sdc_argmin_impl
+
+        ty_checker.raise_exc(dtype, 'number', 'self.dtype')
+    return arg_impl
+
+
+sdc_overload(argmin)(sdc_arg_overload(min))
+sdc_overload(argmax)(sdc_arg_overload(max))
 
 
 @sdc_overload(copy)
@@ -315,6 +505,81 @@ def sdc_nansum_overload(self):
         return gen_sum_bool_impl()
 
 
+@sdc_overload(fillna)
+def sdc_fillna_overload(self, inplace=False, value=None):
+    """
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Parallel replacement of fillna.
+    .. only:: developer
+       Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k fillna
+    """
+    if not isinstance(self, (types.Array, StringArrayType)):
+        return None
+
+    dtype = self.dtype
+    isnan = get_isnan(dtype)
+    if (
+        (isinstance(inplace, types.Literal) and inplace.literal_value == True) or  # noqa
+        (isinstance(inplace, bool) and inplace == True)  # noqa
+    ):
+        if isinstance(dtype, (types.Integer, types.Boolean)):
+            def sdc_fillna_inplace_int_impl(self, inplace=False, value=None):
+                return None
+
+            return sdc_fillna_inplace_int_impl
+
+        def sdc_fillna_inplace_float_impl(self, inplace=False, value=None):
+            length = len(self)
+            for i in prange(length):
+                if isnan(self[i]):
+                    self[i] = value
+            return None
+
+        return sdc_fillna_inplace_float_impl
+
+    else:
+        if isinstance(self.dtype, types.UnicodeType):
+            def sdc_fillna_str_impl(self, inplace=False, value=None):
+                n = len(self)
+                num_chars = 0
+                # get total chars in new array
+                for i in prange(n):
+                    s = self[i]
+                    if sdc.hiframes.api.isna(self, i):
+                        num_chars += len(value)
+                    else:
+                        num_chars += len(s)
+
+                filled_data = pre_alloc_string_array(n, num_chars)
+                for i in prange(n):
+                    if sdc.hiframes.api.isna(self, i):
+                        filled_data[i] = value
+                    else:
+                        filled_data[i] = self[i]
+                return filled_data
+
+            return sdc_fillna_str_impl
+
+        if isinstance(dtype, (types.Integer, types.Boolean)):
+            def sdc_fillna_int_impl(self, inplace=False, value=None):
+                return copy(self)
+
+            return sdc_fillna_int_impl
+
+        def sdc_fillna_impl(self, inplace=False, value=None):
+            length = len(self)
+            filled_data = numpy.empty(length, dtype=dtype)
+            for i in prange(length):
+                if isnan(self[i]):
+                    filled_data[i] = value
+                else:
+                    filled_data[i] = self[i]
+            return filled_data
+
+        return sdc_fillna_impl
+
+
 def nanmin(a):
     pass
 
@@ -393,3 +658,147 @@ def np_nanprod(a):
         return c
 
     return nanprod_impl
+
+
+def dropna(arr, idx, name):
+    pass
+
+
+@sdc_overload(dropna)
+def dropna_overload(arr, idx, name):
+    dtype = arr.dtype
+    dtype_idx = idx.dtype
+    isnan = get_isnan(dtype)
+
+    def dropna_impl(arr, idx, name):
+        chunks = parallel_chunks(len(arr))
+        arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
+        length = 0
+
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            res = 0
+            for j in range(chunk.start, chunk.stop):
+                if not isnan(arr[j]):
+                    res += 1
+            length += res
+            arr_len[i] = res
+
+        result_data = numpy.empty(shape=length, dtype=dtype)
+        result_index = numpy.empty(shape=length, dtype=dtype_idx)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            new_start = int(sum(arr_len[0:i]))
+            new_stop = new_start + arr_len[i]
+            current_pos = new_start
+
+            for j in range(chunk.start, chunk.stop):
+                if not isnan(arr[j]):
+                    result_data[current_pos] = arr[j]
+                    result_index[current_pos] = idx[j]
+                    current_pos += 1
+
+        return pandas.Series(result_data, result_index, name)
+
+    return dropna_impl
+
+
+def nanmean(a):
+    pass
+
+
+@sdc_overload(nanmean)
+def np_nanmean(a):
+    if not isinstance(a, types.Array):
+        return
+    isnan = get_isnan(a.dtype)
+
+    def nanmean_impl(a):
+        c = 0.0
+        count = 0
+        for i in prange(len(a)):
+            v = a[i]
+            if not isnan(v):
+                c += v
+                count += 1
+        # np.divide() doesn't raise ZeroDivisionError
+        return np.divide(c, count)
+
+    return nanmean_impl
+
+
+def corr(self, other, method='pearson', min_periods=None):
+    pass
+
+
+@sdc_overload(corr)
+def corr_overload(self, other, method='pearson', min_periods=None):
+    def corr_impl(self, other, method='pearson', min_periods=None):
+        if method not in ('pearson', ''):
+            raise ValueError("Method corr(). Unsupported parameter. Given method != 'pearson'")
+
+        if min_periods is None or min_periods < 1:
+            min_periods = 1
+
+        min_len = min(len(self._data), len(other._data))
+
+        if min_len == 0:
+            return numpy.nan
+
+        sum_y = 0.
+        sum_x = 0.
+        sum_xy = 0.
+        sum_xx = 0.
+        sum_yy = 0.
+        total_count = 0
+        for i in prange(min_len):
+            x = self._data[i]
+            y = other._data[i]
+            if not (numpy.isnan(x) or numpy.isnan(y)):
+                sum_x += x
+                sum_y += y
+                sum_xy += x * y
+                sum_xx += x * x
+                sum_yy += y * y
+                total_count += 1
+
+        if total_count < min_periods:
+            return numpy.nan
+
+        cov_xy = (sum_xy - sum_x * sum_y / total_count)
+        var_x = (sum_xx - sum_x * sum_x / total_count)
+        var_y = (sum_yy - sum_y * sum_y / total_count)
+        corr_xy = cov_xy / numpy.sqrt(var_x * var_y)
+
+        return corr_xy
+
+    return corr_impl
+
+
+def nanvar(a):
+    pass
+
+
+@sdc_overload(nanvar)
+def np_nanvar(a):
+    if not isinstance(a, types.Array):
+        return
+    isnan = get_isnan(a.dtype)
+
+    def nanvar_impl(a):
+        # Compute the mean
+        m = nanmean(a)
+
+        # Compute the sum of square diffs
+        ssd = 0.0
+        count = 0
+        for i in prange(len(a)):
+            v = a[i]
+            if not isnan(v):
+                val = (v.item() - m)
+                ssd += np.real(val * np.conj(val))
+                count += 1
+        # np.divide() doesn't raise ZeroDivisionError
+        return np.divide(ssd, count)
+
+    return nanvar_impl
