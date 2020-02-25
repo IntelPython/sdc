@@ -1473,7 +1473,6 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
-    @skip_numba_jit
     def test_isin_df1(self):
         def test_impl(df, df2):
             return df.isin(df2)
