@@ -309,7 +309,6 @@ hpat_pandas_rolling_series_var_impl = register_jitable(
 def pop_count(value, nfinite, result):
     """Calculate the window sum without old value."""
     if not numpy.isnan(value):
-        nfinite -= 1
         result -= 1
 
     return nfinite, result
@@ -319,7 +318,6 @@ def pop_count(value, nfinite, result):
 def put_count(value, nfinite, result):
     """Calculate the window sum with new value."""
     if not numpy.isnan(value):
-        nfinite += 1
         result += 1
 
     return nfinite, result
