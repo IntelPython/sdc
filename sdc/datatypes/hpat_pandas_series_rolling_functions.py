@@ -307,25 +307,25 @@ hpat_pandas_rolling_series_var_impl = register_jitable(
 
 @sdc_register_jitable
 def pop_count(value, nfinite, result):
-    """Calculate the window sum without old value."""
-    if not numpy.isnan(value):
-        result -= 1
+    """Calculate the window count without old value."""
+    if numpy.isnan(value):
+        return nfinite, result
 
-    return nfinite, result
+    return nfinite, result - 1
 
 
 @sdc_register_jitable
 def put_count(value, nfinite, result):
-    """Calculate the window sum with new value."""
-    if not numpy.isnan(value):
-        result += 1
+    """Calculate the window count with new value."""
+    if numpy.isnan(value):
+        return nfinite, result
 
-    return nfinite, result
+    return nfinite, result + 1
 
 
 @sdc_register_jitable
 def result_count(nfinite, minp, result):
-    """Get result taking into account min periods."""
+    """Get result count taking into account min periods."""
     return result
 
 
@@ -419,8 +419,8 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
     return impl
 
 
-sdc_pandas_series_rolling_count_impl = register_jitable(
-    gen_sdc_pandas_series_rolling_impl(pop_count, put_count, get_result=result_count, init_result=0.))
+sdc_pandas_series_rolling_count_impl = gen_sdc_pandas_series_rolling_impl(
+    pop_count, put_count, get_result=result_count, init_result=0.)
 sdc_pandas_series_rolling_mean_impl = gen_sdc_pandas_series_rolling_impl(
     pop_sum, put_sum, get_result=mean_result_or_nan, init_result=0.)
 sdc_pandas_series_rolling_sum_impl = gen_sdc_pandas_series_rolling_impl(
