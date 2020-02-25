@@ -2242,7 +2242,7 @@ def hpat_pandas_series_head(self, n=5):
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if not isinstance(n, (types.Integer, types.Omitted)) and n != 5:
+    if not isinstance(n, (types.Integer, types.Omitted, types.NoneType)) and n != 5:
         ty_checker.raise_exc(n, 'int', 'n')
 
     if isinstance(self.index, types.NoneType):

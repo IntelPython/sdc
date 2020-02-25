@@ -454,12 +454,115 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
 
 
     func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, s_par, df.columns)
-
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
 
     return _reduce_impl
+
+
+def _dataframe_reduce_columns_codegen_head(func_name, func_params, series_params, columns, df):
+    results = []
+    joined = ', '.join(func_params)
+    func_lines = [f'def _df_{func_name}_impl({joined}):']
+    ind = df_index_codegen(df)
+    for i, c in enumerate(columns):
+        result_c = f'result_{c}'
+        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({func_params[0]}, {i}))',
+                       f'  {result_c} = series_{c}.{func_name}({series_params})']
+        results.append((columns[i], result_c))
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}{ind})']
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+"""
+Example func_text for func_name='head' columns=('FLOAT', 'INT', 'STRING'):
+
+    def _df_head_impl(df, n=5):
+        series_FLOAT = pandas.Series(get_dataframe_data(df, 0))
+        result_FLOAT = series_FLOAT.head(n=n)
+        series_INT = pandas.Series(get_dataframe_data(df, 1))
+        result_INT = series_INT.head(n=n)
+        series_STRING = pandas.Series(get_dataframe_data(df, 2))
+        result_STRING = series_STRING.head(n=n)
+        return pandas.DataFrame({"FLOAT": result_FLOAT, "INT": result_INT, "STRING": result_STRING},
+                                index = df._index[:n])
+"""
+
+
+def sdc_pandas_dataframe_head_codegen(df, func_name, params, ser_params):
+    all_params = ['df']
+    ser_par = []
+
+    for key, value in params.items():
+        all_params.append('{}={}'.format(key, value))
+    for key, value in ser_params.items():
+        ser_par.append('{}={}'.format(key, value))
+
+    s_par = '{}'.format(', '.join(ser_par[:]))
+
+    df_func_name = f'_df_{func_name}_impl'
+    func_text, global_vars = _dataframe_reduce_columns_codegen_head(func_name, all_params, s_par, df.columns, df)
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _reduce_impl = loc_vars[df_func_name]
+
+    return _reduce_impl
+
+
+def df_index_codegen(self):
+    if isinstance(self.index, types.NoneType):
+        func_lines = ''
+    else:
+        func_lines = ', index = df._index[:n]'
+
+    return func_lines
+
+
+@sdc_overload_method(DataFrameType, 'head')
+def head_overload(df, n=5):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.DataFrame.head
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_head.py
+       :language: python
+       :lines: 37-
+       :caption: Return the first n rows.
+       :name: ex_dataframe_head
+
+    .. command-output:: python ./dataframe/dataframe_head.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.tail <pandas.DataFrame.tail>`
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas Series method :meth:`pandas.Series.head` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_head*
+    """
+    name = 'head'
+
+    if isinstance(n, types.Omitted):
+        n = n.value
+
+    params = {'n': 5}
+    ser_par = {'n': 'n'}
+    return sdc_pandas_dataframe_head_codegen(df, name, params, ser_par)
 
 
 def _dataframe_apply_columns_codegen(func_name, func_params, series_params, columns):
@@ -935,25 +1038,6 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
     return func_def, global_vars
 
 
-@sdc_overload_method(DataFrameType, 'head')
-def min_overload(df, n=5):
-    """
-    """
-
-    name = 'head'
-
-    ty_checker = TypeChecker('Method {}().'.format(name))
-    ty_checker.check(df, DataFrameType)
-
-    if not (isinstance(n, (types.Omitted, types.Integer)) or n == 5):
-        ty_checker.raise_exc(n, 'int64', 'n')
-
-    params = {'n': 5}
-    ser_par = {'n': 5}
-
-    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
-
-
 @sdc_overload_method(DataFrameType, 'drop')
 def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None, level=None, inplace=False,
                               errors='raise'):
@@ -1207,7 +1291,6 @@ def df_getitem_slice_idx_codegen(self, idx):
     else:
         # raise KeyError if input DF is empty
         func_lines += df_getitem_key_error_codelines()
-
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas, 'numpy': numpy,
                    'get_dataframe_data': get_dataframe_data}
