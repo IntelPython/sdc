@@ -868,7 +868,7 @@ def np_nancumsum(arr, like_pandas=False):
                 for j in range(chunk.start, chunk.stop):
                     if like_pandas:
                         result[j] = partial + arr[j]
-                        if ~is_nan(result[j]):
+                        if ~is_nan(arr[j]):
                             partial = result[j]
                     else:
                         if ~is_nan(arr[j]):
