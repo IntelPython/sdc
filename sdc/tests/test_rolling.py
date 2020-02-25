@@ -715,8 +715,8 @@ class TestRolling(TestCase):
         hpat_func = self.jit(test_impl)
         assert_equal = self._get_assert_equal(obj)
 
-        for window in range(0, len(obj) + 3, 2):
-            for min_periods in range(0, window + 1, 2):
+        for window in range(len(obj) + 2):
+            for min_periods in range(window):
                 with self.subTest(obj=obj, window=window,
                                   min_periods=min_periods):
                     jit_result = hpat_func(obj, window, min_periods)
@@ -847,8 +847,8 @@ class TestRolling(TestCase):
         hpat_func = self.jit(test_impl)
         assert_equal = self._get_assert_equal(obj)
 
-        for window in range(0, len(obj) + 3, 2):
-            for min_periods in range(0, window + 1, 2):
+        for window in range(len(obj) + 2):
+            for min_periods in range(window):
                 with self.subTest(obj=obj, window=window,
                                   min_periods=min_periods):
                     jit_result = hpat_func(obj, window, min_periods)

@@ -31,14 +31,16 @@ b    185.0
 dtype: float64
 """
 import pandas as pd
+import numpy as np
 from numba import njit
 
 
 @njit
 def series_groupby():
-    s = pd.Series([390., 350., 30., 20.]).mean()
+    S = pd.Series([390., 350., 30., 20.])
+    by = np.asarray([0, 1, 0, 1])
 
-    return s.groupby(["a", "b", "a", "b"])
+    return S.groupby(by).mean()
 
 
 # print(series_groupby())

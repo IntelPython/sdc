@@ -108,7 +108,7 @@ def sdc_astype_overload(self, dtype):
     """
 
     ty_checker = TypeChecker("numpy-like 'astype'")
-    if not isinstance(self, types.Array):
+    if not isinstance(self, (types.Array, StringArrayType)):
         return None
 
     if not isinstance(dtype, (types.functions.NumberClass, types.Function, types.Literal)):
@@ -725,6 +725,54 @@ def np_nanmean(a):
         return np.divide(c, count)
 
     return nanmean_impl
+
+
+def corr(self, other, method='pearson', min_periods=None):
+    pass
+
+
+@sdc_overload(corr)
+def corr_overload(self, other, method='pearson', min_periods=None):
+    def corr_impl(self, other, method='pearson', min_periods=None):
+        if method not in ('pearson', ''):
+            raise ValueError("Method corr(). Unsupported parameter. Given method != 'pearson'")
+
+        if min_periods is None or min_periods < 1:
+            min_periods = 1
+
+        min_len = min(len(self._data), len(other._data))
+
+        if min_len == 0:
+            return numpy.nan
+
+        sum_y = 0.
+        sum_x = 0.
+        sum_xy = 0.
+        sum_xx = 0.
+        sum_yy = 0.
+        total_count = 0
+        for i in prange(min_len):
+            x = self._data[i]
+            y = other._data[i]
+            if not (numpy.isnan(x) or numpy.isnan(y)):
+                sum_x += x
+                sum_y += y
+                sum_xy += x * y
+                sum_xx += x * x
+                sum_yy += y * y
+                total_count += 1
+
+        if total_count < min_periods:
+            return numpy.nan
+
+        cov_xy = (sum_xy - sum_x * sum_y / total_count)
+        var_x = (sum_xx - sum_x * sum_x / total_count)
+        var_y = (sum_yy - sum_y * sum_y / total_count)
+        corr_xy = cov_xy / numpy.sqrt(var_x * var_y)
+
+        return corr_xy
+
+    return corr_impl
 
 
 def nanvar(a):

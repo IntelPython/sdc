@@ -75,3 +75,41 @@ make_attribute_wrapper(DataFrameGroupByType, 'data', '_data')
 make_attribute_wrapper(DataFrameGroupByType, 'sort', '_sort')
 make_attribute_wrapper(DataFrameGroupByType, 'target_default', '_target_default')
 make_attribute_wrapper(DataFrameGroupByType, 'target_columns', '_target_columns')
+
+
+class SeriesGroupByType(types.Type):
+    """
+    Type definition for SeriesGroupBy functions handling.
+    """
+
+    def __init__(self, parent, by_data):
+        self.parent = parent
+        self.by_data = by_data
+        super(SeriesGroupByType, self).__init__(
+            name="SeriesGroupByType({}, {})".format(parent, by_data))
+
+    @property
+    def key(self):
+        return self.parent, self.by_data
+
+
+@register_model(SeriesGroupByType)
+class SeriesGroupByModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+        by_dtype = fe_type.by_data.dtype
+        ty_data = types.containers.DictType(
+            by_dtype,
+            types.containers.ListType(types.int64)
+        )
+
+        members = [
+            ('parent', fe_type.parent),
+            ('data', ty_data),
+            ('sort', types.bool_)
+        ]
+        super(SeriesGroupByModel, self).__init__(dmm, fe_type, members)
+
+
+make_attribute_wrapper(SeriesGroupByType, 'parent', '_parent')
+make_attribute_wrapper(SeriesGroupByType, 'data', '_data')
+make_attribute_wrapper(SeriesGroupByType, 'sort', '_sort')
