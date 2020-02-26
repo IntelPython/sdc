@@ -692,7 +692,7 @@ def hpat_pandas_series_rolling_kurt(self):
     return hpat_pandas_rolling_series_kurt_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'max')
+@sdc_overload_method(SeriesRollingType, 'max')
 def hpat_pandas_series_rolling_max(self):
 
     ty_checker = TypeChecker('Method rolling.max().')
