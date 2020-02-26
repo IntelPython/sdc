@@ -77,7 +77,7 @@ cases = [
     TC(name='corr',  size=[10 ** 7],params='other', data_num=2),
     TC(name='count', size=[10 ** 8]),
     TC(name='cov', size=[10 ** 8], params='other', data_num=2),
-    TC(name='cumsum', size=[10 ** 8], check_skipna=True),
+    TC(name='cumsum', size=[10 ** 7], check_skipna=True),
     TC(name='describe', size=[10 ** 7]),
     TC(name='div', size=[10 ** 7], params='other', data_num=2),
     TC(name='dropna', size=[10 ** 7]),
