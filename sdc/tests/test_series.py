@@ -2947,6 +2947,15 @@ class TestSeries(
         ref_result = test_impl(series, width)
         pd.testing.assert_series_equal(jit_result, ref_result)
 
+    def test_series_str_center_with_none(self):
+        def test_impl(series, width, fillchar):
+            return series.str.center(width, fillchar)
+
+        cfunc = self.jit(test_impl)
+        idx = ['City 1', 'City 2', 'City 3', 'City 4', 'City 5', 'City 6', 'City 7', 'City 8']
+        s = pd.Series(['New_York', 'Lisbon', np.nan, 'Tokyo', 'Paris', None, 'Munich', None], index=idx)
+        pd.testing.assert_series_equal(cfunc(s, width=13, fillchar='*'), test_impl(s, width=13, fillchar='*'))
+
     def test_series_str_endswith(self):
         def test_impl(series, pat):
             return series.str.endswith(pat)
