@@ -727,6 +727,54 @@ def np_nanmean(a):
     return nanmean_impl
 
 
+def corr(self, other, method='pearson', min_periods=None):
+    pass
+
+
+@sdc_overload(corr)
+def corr_overload(self, other, method='pearson', min_periods=None):
+    def corr_impl(self, other, method='pearson', min_periods=None):
+        if method not in ('pearson', ''):
+            raise ValueError("Method corr(). Unsupported parameter. Given method != 'pearson'")
+
+        if min_periods is None or min_periods < 1:
+            min_periods = 1
+
+        min_len = min(len(self._data), len(other._data))
+
+        if min_len == 0:
+            return numpy.nan
+
+        sum_y = 0.
+        sum_x = 0.
+        sum_xy = 0.
+        sum_xx = 0.
+        sum_yy = 0.
+        total_count = 0
+        for i in prange(min_len):
+            x = self._data[i]
+            y = other._data[i]
+            if not (numpy.isnan(x) or numpy.isnan(y)):
+                sum_x += x
+                sum_y += y
+                sum_xy += x * y
+                sum_xx += x * x
+                sum_yy += y * y
+                total_count += 1
+
+        if total_count < min_periods:
+            return numpy.nan
+
+        cov_xy = (sum_xy - sum_x * sum_y / total_count)
+        var_x = (sum_xx - sum_x * sum_x / total_count)
+        var_y = (sum_yy - sum_y * sum_y / total_count)
+        corr_xy = cov_xy / numpy.sqrt(var_x * var_y)
+
+        return corr_xy
+
+    return corr_impl
+
+
 def nanvar(a):
     pass
 
@@ -754,3 +802,86 @@ def np_nanvar(a):
         return np.divide(ssd, count)
 
     return nanvar_impl
+
+
+def cumsum(a):
+    pass
+
+
+def nancumsum(a):
+    pass
+
+
+@sdc_overload(cumsum)
+def np_cumsum(arr):
+    if not isinstance(arr, types.Array):
+        return
+
+    retty = arr.dtype
+    zero = retty(0)
+
+    def cumsum_impl(arr):
+        chunks = parallel_chunks(len(arr))
+        partial_sum = numpy.zeros(len(chunks), dtype=retty)
+        result = numpy.empty_like(arr)
+
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            partial = zero
+            for j in range(chunk.start, chunk.stop):
+                result[j] = partial + arr[j]
+                partial = result[j]
+            partial_sum[i] = partial
+
+        for i in prange(len(chunks)):
+            prefix = sum(partial_sum[0:i])
+            chunk = chunks[i]
+            for j in range(chunk.start, chunk.stop):
+                result[j] += prefix
+
+        return result
+
+    return cumsum_impl
+
+
+@sdc_overload(nancumsum)
+def np_nancumsum(arr, like_pandas=False):
+    if not isinstance(arr, types.Array):
+        return
+
+    if isinstance(arr.dtype, (types.Boolean, types.Integer)):
+        # dtype cannot possibly contain NaN
+        return lambda arr, like_pandas=False: cumsum(arr)
+    else:
+        retty = arr.dtype
+        is_nan = get_isnan(retty)
+        zero = retty(0)
+
+        def nancumsum_impl(arr, like_pandas=False):
+            chunks = parallel_chunks(len(arr))
+            partial_sum = numpy.zeros(len(chunks), dtype=retty)
+            result = numpy.empty_like(arr)
+
+            for i in prange(len(chunks)):
+                chunk = chunks[i]
+                partial = zero
+                for j in range(chunk.start, chunk.stop):
+                    if like_pandas:
+                        result[j] = partial + arr[j]
+                        if ~is_nan(arr[j]):
+                            partial = result[j]
+                    else:
+                        if ~is_nan(arr[j]):
+                            partial += arr[j]
+                        result[j] = partial
+                partial_sum[i] = partial
+
+            for i in prange(len(chunks)):
+                prefix = sum(partial_sum[0:i])
+                chunk = chunks[i]
+                for j in range(chunk.start, chunk.stop):
+                    result[j] += prefix
+
+            return result
+
+        return nancumsum_impl

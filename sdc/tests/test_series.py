@@ -4908,32 +4908,6 @@ class TestSeries(
         result = hpat_func().size
         np.testing.assert_array_equal(ref_result, result)
 
-    @skip_numba_jit
-    def test_series_groupby_count(self):
-        def test_impl():
-            A = pd.Series([13, 11, 21, 13, 13, 51, 42, 21])
-            grouped = A.groupby(A, sort=False)
-            return grouped.count()
-
-        hpat_func = self.jit(test_impl)
-
-        ref_result = test_impl()
-        result = hpat_func()
-        pd.testing.assert_series_equal(result, ref_result)
-
-    @unittest.skip("getiter for this type is not implemented yet")
-    def test_series_groupby_iterator_int(self):
-        def test_impl():
-            A = pd.Series([13, 11, 21, 13, 13, 51, 42, 21])
-            grouped = A.groupby(A)
-            return [i for i in grouped]
-
-        hpat_func = self.jit(test_impl)
-
-        ref_result = test_impl()
-        result = hpat_func()
-        np.testing.assert_array_equal(result, ref_result)
-
     def test_series_std(self):
         def pyfunc():
             series = pd.Series([1.0, np.nan, -1.0, 0.0, 5e-324])
@@ -5154,31 +5128,52 @@ class TestSeries(
         result_ref = test_impl()
         pd.testing.assert_series_equal(result, result_ref)
 
+    def _gen_cumulative_data_skip(self):
+        yield [min_int64, max_int64, max_int64, min_int64]
+        yield [max_uint64, max_uint64]
+
+    def _gen_cumulative_data(self):
+        for case in test_global_input_data_numeric:
+            if case not in self._gen_cumulative_data_skip():
+                yield case
+        yield [1.0, np.nan, -1.0, 0.0, 5e-324]
+        yield []
+
+    def _check_cumulative(self, pyfunc, generator, **kwds):
+        cfunc = self.jit(pyfunc)
+
+        for data in generator():
+            with self.subTest(series_data=data):
+                S = pd.Series(data)
+                pd.testing.assert_series_equal(cfunc(S, **kwds), pyfunc(S, **kwds))
+
     @skip_sdc_jit('Series.cumsum() np.nan as input data unsupported')
     def test_series_cumsum_unboxing(self):
         def test_impl(s):
             return s.cumsum()
-        hpat_func = self.jit(test_impl)
 
-        for data in test_global_input_data_numeric + [[]]:
-            with self.subTest(series_data=data):
-                S = pd.Series(data)
-                pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        self._check_cumulative(test_impl, self._gen_cumulative_data)
+
+    def _cumsum_full_usecase(self):
+        def test_impl(s, axis, skipna):
+            return s.cumsum(axis=axis, skipna=skipna)
+        return test_impl
 
     @skip_sdc_jit('Series.cumsum() parameters "axis", "skipna" unsupported')
     def test_series_cumsum_full(self):
-        def test_impl(s, axis, skipna):
-            return s.cumsum(axis=axis, skipna=skipna)
-        hpat_func = self.jit(test_impl)
-
         axis = None
-        for data in test_global_input_data_numeric + [[]]:
-            S = pd.Series(data)
-            for skipna in [True, False]:
-                with self.subTest(series_data=data, skipna=skipna):
-                    result = hpat_func(S, axis=axis, skipna=skipna)
-                    result_ref = test_impl(S, axis=axis, skipna=skipna)
-                    pd.testing.assert_series_equal(result, result_ref)
+        for skipna in [True, False]:
+            with self.subTest(skipna=skipna):
+                self._check_cumulative(self._cumsum_full_usecase(),
+                                       self._gen_cumulative_data, axis=axis, skipna=skipna)
+
+    @unittest.expectedFailure
+    def test_series_cumsum_expectedFailure(self):
+        axis = None
+        for skipna in [True, False]:
+            with self.subTest(skipna=skipna):
+                self._check_cumulative(self._cumsum_full_usecase(),
+                                       self._gen_cumulative_data_skip, axis=axis, skipna=skipna)
 
     @skip_sdc_jit('Series.cumsum() strings as input data unsupported')
     def test_series_cumsum_str(self):

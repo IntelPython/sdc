@@ -390,3 +390,21 @@ class TestArrayReductions(TestCase):
             return numpy_like.sum(a)
 
         self.check_reduction_basic(ref_impl, sdc_impl)
+
+    def test_cumsum(self):
+        def ref_impl(a):
+            return np.cumsum(a)
+
+        def sdc_impl(a):
+            return numpy_like.cumsum(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl)
+
+    def test_nancumsum(self):
+        def ref_impl(a):
+            return np.nancumsum(a)
+
+        def sdc_impl(a):
+            return numpy_like.nancumsum(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl)
