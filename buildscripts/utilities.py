@@ -108,13 +108,23 @@ class SDC_Build_Utilities:
         self.log_info(command)
         self.log_info(self.line_single)
         if platform.system() == 'Windows':
-            subprocess.check_call(command, stdout=None, stderr=None, shell=True)
+            subprocess.check_call(f'{self.env_activate} && {command}', stdout=None, stderr=None, shell=True)
         else:
-            subprocess.check_call(command, executable='/bin/bash', stdout=None, stderr=None, shell=True)
+            subprocess.check_call(f'{self.env_activate} && {command}', executable='/bin/bash', stdout=None, stderr=None, shell=True)
+
+    def get_command_output(self, command):
+        self.log_info(command)
+        self.log_info(self.line_single)
+        if platform.system() == 'Windows':
+            output = subprocess.check_output(f'{self.env_activate} && {command}', universal_newlines=True, shell=True)
+        else:
+            output = subprocess.check_output(f'{self.env_activate} && {command}', executable='/bin/bash', universal_newlines=True, shell=True)
+        print(output, flush=True)
+        return output
 
     def log_info(self, msg, separate=False):
         if separate:
-            print(self.line_double, flush=True)
+            print(f'{time.strftime("%d/%m/%Y %H:%M:%S")}: {self.line_double}', flush=True)
         print(f'{time.strftime("%d/%m/%Y %H:%M:%S")}: {msg}', flush=True)
 
 """

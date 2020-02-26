@@ -40,6 +40,7 @@ def build_doc(sdc_utils):
     sdc_utils.log_info('Start documentation build', separate=True)
     sdc_utils.run_command('make html')
     sdc_utils.log_info('Documentation build SUCCESSFUL', separate=True)
+
     return
 
 def publish_doc(sdc_utils):
@@ -51,6 +52,8 @@ def publish_doc(sdc_utils):
     git_access_token = os.environ['SDC_GIT_TOKEN']
     git_credentials_file = str(Path.home() / '.git-credentials')
     git_credentials = f'https://{git_access_token}:x-oauth-basic@github.com\n'
+
+    sdc_utils.log_info(f'Start documentation publish to {sdc_utils.doc_repo_link}', separate=True)
 
     os.chdir(str(sdc_utils.doc_path))
     sdc_utils.run_command(f'git clone {sdc_utils.doc_repo_link}')
@@ -67,8 +70,14 @@ def publish_doc(sdc_utils):
     shutil.rmtree(doc_repo_build)
     shutil.copytree(doc_local_build, doc_repo_build)
     sdc_utils.run_command(f'git add -A {sdc_utils.doc_tag}')
-    sdc_utils.run_command(f'git commit -m "Updated doc release: {sdc_utils.doc_tag}"')
-    sdc_utils.run_command('git push origin HEAD')
+    # Check if there is changes
+    output = sdc_utils.get_command_output(f'git commit -m "Updated doc release: {sdc_utils.doc_tag}"')
+    if 'nothing to commit, working tree clean' not in output:
+        sdc_utils.run_command('git push origin HEAD')
+        sdc_utils.log_info('Documentation publish SUCCESSFUL', separate=True)
+    else:
+        sdc_utils.log_info('No changes in documentation', separate=True)
+
     return
 
 
@@ -82,7 +91,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     sdc_utils = SDC_Build_Utilities(args.python, args.sdc_channel)
-    sdc_utils.log_info('Prepare environment', separate=True)
+    sdc_utils.log_info('Build Intel(R) SDC documentation', separate=True)
+    sdc_utils.log_info(sdc_utils.line_double)
     sdc_utils.create_environment(['sphinx', 'sphinxcontrib-programoutput'])
     sdc_utils.install_conda_package(['sdc'])
 
