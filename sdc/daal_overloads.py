@@ -24,29 +24,46 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numba
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
+from numba import types
+from numba.extending import overload
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
+# from numba import typing, generated_jit
+# from numba.extending import models, register_model
+# from numba.extending import lower_builtin, overload_method, intrinsic
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
+# from llvmlite import ir as lir
+import llvmlite.binding as ll
 
-from sdc.tests.test_ml import *
+from . import daal
 
-from sdc.tests.test_io import *
 
-from sdc.tests.test_hpat_jit import *
+ll.add_symbol('test', daal.test)
+ll.add_symbol('sum', daal.sum)
 
-from sdc.tests.test_daal import *
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
 
-# performance tests
-import sdc.tests.tests_perf
+_test = types.ExternalFunction("test", types.int_(types.int_))
+_sum = types.ExternalFunction("sum", types.float64(types.voidptr, types.int_))
+
+
+def test(x):
+    pass
+
+
+@overload(test)
+def test_overload(x):
+    return lambda x: _test(x)
+
+
+import ctypes
+
+functype_test = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_int)
+ctypes_test = functype_test(daal.test)
+
+# functype_sum = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.POINTER(ctypes.c_double), ctypes.c_int)
+functype_sum = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_void_p, ctypes.c_int)
+ctypes_sum = functype_sum(daal.sum)
+
+
+quantile = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_int, ctypes.c_void_p, ctypes.c_double)(daal.quantile)

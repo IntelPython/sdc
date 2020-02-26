@@ -24,29 +24,54 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy as np
+import ctypes
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
+from sdc.tests.test_base import TestCase
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
+from sdc.daal_overloads import test, ctypes_test, ctypes_sum, quantile
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
 
-from sdc.tests.test_ml import *
+class TestDaal(TestCase):
 
-from sdc.tests.test_io import *
+    def test_test(self):
+        def pyfunc():
+            return test(10)
 
-from sdc.tests.test_hpat_jit import *
+        def ctypes_pyfunc():
+            return ctypes_test(10)
 
-from sdc.tests.test_daal import *
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
+        cfunc = self.jit(pyfunc)
+        ctypes_cfunc = self.jit(ctypes_pyfunc)
+        # self.assertEqual(cfunc(), pyfunc())
+        self.assertEqual(cfunc(), ctypes_pyfunc())
+        self.assertEqual(ctypes_cfunc(), ctypes_pyfunc())
 
-# performance tests
-import sdc.tests.tests_perf
+    def test_sum(self):
+        def pyfunc(arr):
+            # return ctypes_sum(arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), len(arr))
+            return ctypes_sum(arr.ctypes, len(arr))
+        cfunc = self.jit(pyfunc)
+
+        arr = np.arange(10, dtype=np.float64)
+        expected = np.sum(arr)
+
+        # print(ctypes_sum.argtypes)
+
+        self.assertEqual(pyfunc(arr), expected)
+        self.assertEqual(cfunc(arr), expected)
+
+    def test_quantile(self):
+        def pyfunc(arr, q):
+            return quantile(len(arr), arr.ctypes, q)
+
+        cfunc = self.jit(pyfunc)
+
+        arr = np.arange(10, dtype=np.float64)
+        q = 0.5
+        expected = np.quantile(arr, q)
+
+        # print(ctypes_sum.argtypes)
+
+        self.assertEqual(pyfunc(arr, q), expected)
+        self.assertEqual(cfunc(arr, q), expected)

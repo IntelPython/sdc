@@ -197,6 +197,24 @@ if _has_pyarrow:
 if _has_opencv:
     _ext_mods.append(ext_cv_wrapper)
 
+daal_root = "/localdisk/spokhode/miniconda3/envs/sdc-env"
+
+ext_daal = Extension(name="sdc.daal",
+                     sources=["sdc/_daal.cpp"],
+                     include_dirs=[os.path.join(daal_root, 'include')],
+                     libraries=['daal_core', 'daal_thread'],
+                     library_dirs=[
+                        # for Linux
+                        os.path.join(daal_root, 'lib', 'intel64', 'gcc4.4'),
+                        # for MacOS
+                        os.path.join(daal_root, 'lib'),
+                        # for Windows
+                        os.path.join(daal_root, 'lib', 'intel64', 'vc_mt'),
+                     ],
+                     language="c++",
+                     )
+
+_ext_mods.append(ext_daal)
 
 class style(Command):
     """ Command to check and adjust code style
