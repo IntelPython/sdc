@@ -281,29 +281,29 @@ hpat_pandas_rolling_series_var_impl = register_jitable(
 @sdc_register_jitable
 def put_kurt(value, nfinite, result):
     """Calculate the window sums for kurt with new value."""
-    _sum, power2_sum, power4_sum = result
+    _sum, square_sum, cube_sum, fourth_degree_sum = result
     if numpy.isfinite(value):
         nfinite += 1
         _sum += value
-        mn = _sum / nfinite
-        power2_sum += (value - mn) ** 2
-        power4_sum += (value - mn) ** 4
+        square_sum += value * value
+        cube_sum += value * value * value
+        fourth_degree_sum += value * value * value * value
 
-    return nfinite, (_sum, power2_sum, power4_sum)
+    return nfinite, (_sum, square_sum, cube_sum, fourth_degree_sum)
 
 
 @sdc_register_jitable
 def pop_kurt(value, nfinite, result):
     """Calculate the window sums for kurt without old value."""
-    _sum, power2_sum, power4_sum = result
+    _sum, square_sum, cube_sum, fourth_degree_sum = result
     if numpy.isfinite(value):
         nfinite -= 1
         _sum -= value
-        mn = _sum / nfinite
-        power2_sum -= (value - mn) ** 2
-        power4_sum -= (value - mn) ** 4
+        square_sum -= value * value
+        cube_sum -= value * value * value
+        fourth_degree_sum -= value * value * value * value
 
-    return nfinite, (_sum, power2_sum, power4_sum)
+    return nfinite, (_sum, square_sum, cube_sum, fourth_degree_sum)
 
 
 @sdc_register_jitable
@@ -341,11 +341,11 @@ def kurt_result_or_nan(nfinite, minp, result):
     if nfinite < max(4, minp):
         return numpy.nan
 
-    _, power2_sum, power4_sum = result
+    _sum, square_sum, cube_sum, fourth_degree_sum = result
 
     n = nfinite
-    m2 = power2_sum / n
-    m4 = power4_sum / n
+    m2 = (square_sum - _sum * _sum / n) / n
+    m4 = (fourth_degree_sum - 4*_sum*cube_sum/n + 6*_sum*_sum*square_sum/n/n - 3*_sum*_sum*_sum*_sum/n/n/n) / n
     res = 0 if m2 == 0 else m4 / m2 ** 2.0
 
     if (n > 2) & (m2 > 0):
@@ -409,7 +409,8 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
 
 
 sdc_pandas_series_rolling_kurt_impl = gen_sdc_pandas_series_rolling_impl(
-    pop_kurt, put_kurt, get_result=kurt_result_or_nan, init_result=(0., 0., 0.))
+    pop_kurt, put_kurt, get_result=kurt_result_or_nan,
+    init_result=(0., 0., 0., 0.))
 sdc_pandas_series_rolling_mean_impl = gen_sdc_pandas_series_rolling_impl(
     pop_sum, put_sum, get_result=mean_result_or_nan, init_result=0.)
 sdc_pandas_series_rolling_sum_impl = gen_sdc_pandas_series_rolling_impl(
