@@ -119,11 +119,11 @@ if __name__ == '__main__':
     # Set build command
     create_conda_env(conda_activate, build_env, python, conda_build_packages)
     build_cmd = '{} && {}'.format(build_env_activate,
-                                    ' '.join(['conda build --no-test',
-                                             f'--python {python}',
-                                             f'--numpy {numpy}',
-                                             f'--output-folder {output_folder}',
-                                             f'{conda_channels} {sdc_recipe}']))
+                                  ' '.join(['conda build --no-test',
+                                            f'--python {python}',
+                                            f'--numpy {numpy}',
+                                            f'--output-folder {output_folder}',
+                                            f'{conda_channels} {sdc_recipe}']))
 
     # Start build
     format_print('START SDC BUILD')

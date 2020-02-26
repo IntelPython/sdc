@@ -110,7 +110,8 @@ class SDC_Build_Utilities:
         if platform.system() == 'Windows':
             subprocess.check_call(f'{self.env_activate} && {command}', stdout=None, stderr=None, shell=True)
         else:
-            subprocess.check_call(f'{self.env_activate} && {command}', executable='/bin/bash', stdout=None, stderr=None, shell=True)
+            subprocess.check_call(f'{self.env_activate} && {command}', executable='/bin/bash',
+                                  stdout=None, stderr=None, shell=True)
 
     def get_command_output(self, command):
         self.log_info(command)
@@ -118,7 +119,8 @@ class SDC_Build_Utilities:
         if platform.system() == 'Windows':
             output = subprocess.check_output(f'{self.env_activate} && {command}', universal_newlines=True, shell=True)
         else:
-            output = subprocess.check_output(f'{self.env_activate} && {command}', executable='/bin/bash', universal_newlines=True, shell=True)
+            output = subprocess.check_output(f'{self.env_activate} && {command}', executable='/bin/bash',
+                                             universal_newlines=True, shell=True)
         print(output, flush=True)
         return output
 

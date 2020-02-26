@@ -25,7 +25,6 @@
 # *****************************************************************************
 
 
-
 import argparse
 import os
 import shutil
@@ -42,6 +41,7 @@ def build_doc(sdc_utils):
     sdc_utils.log_info('Documentation build SUCCESSFUL', separate=True)
 
     return
+
 
 def publish_doc(sdc_utils):
     doc_local_build = str(sdc_utils.doc_path / 'build' / 'html')
