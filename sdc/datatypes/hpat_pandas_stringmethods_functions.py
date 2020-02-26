@@ -542,7 +542,7 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
 
     Pandas Series method :meth:`pandas.core.strings.StringMethods.ljust()` implementation.
 
-    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+    Note: Unicode type of list elements are supported only.
 
     .. only:: developer
 
@@ -574,10 +574,13 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
         ty_checker.raise_exc(fillchar, 'str', 'fillchar')
 
     def hpat_pandas_stringmethods_ljust_impl(self, width, fillchar=' '):
+        mask = get_nan_mask(self._data._data)
         item_count = len(self._data)
-        result = [''] * item_count
-        for idx, item in enumerate(self._data._data):
-            result[idx] = item.ljust(width, fillchar)
+        res_list = [''] * item_count
+        for idx in numba.prange(item_count):
+            res_list[idx] = self._data._data[idx].ljust(width, fillchar)
+        str_arr = create_str_arr_from_list(res_list)
+        result = str_arr_set_na_by_mask(str_arr, mask)
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
