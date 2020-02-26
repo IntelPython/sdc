@@ -219,7 +219,7 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
 
     Pandas Series method :meth:`pandas.core.strings.StringMethods.center()` implementation.
 
-    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
+    Note: Unicode type of list elements are supported only.
 
     .. only:: developer
 
