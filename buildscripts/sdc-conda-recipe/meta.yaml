@@ -1,4 +1,4 @@
-{% set NUMBA_VERSION = "==0.46" %}
+{% set NUMBA_VERSION = "==0.48" %}
 {% set PANDAS_VERSION = "==0.25.3" %}
 {% set PYARROW_VERSION = "==0.15.1" %}
 
@@ -11,6 +11,7 @@ source:
 
 build:
   number: {{ GIT_DESCRIBE_NUMBER|int }}
+  string: py{{ CONDA_PY }}{{ GIT_DESCRIBE_HASH }}_{{ GIT_DESCRIBE_NUMBER|int }}
   script_env:
     - SDC_CONFIG_PIPELINE_SDC
 
@@ -24,20 +25,19 @@ requirements:
   host:
     - python
     - setuptools
-    - numba {{ NUMBA_VERSION }}
+    - numba   {{ NUMBA_VERSION }}
     - numpy
-    - pandas {{ PANDAS_VERSION }}
+    - pandas  {{ PANDAS_VERSION }}
     - pyarrow {{ PYARROW_VERSION }}
-    - conda-package-handling ==1.3.11 # [win]
     - wheel
 
   run:
     - python
     - {{ pin_compatible('numpy') }}
-    - pandas {{ PANDAS_VERSION }}
+    - pandas  {{ PANDAS_VERSION }}
     - pyarrow {{ PYARROW_VERSION }}
-    - numba {{ NUMBA_VERSION }}
-    - conda-package-handling ==1.3.11 # [win]
+    - numba   {{ NUMBA_VERSION }}
+    - setuptools
 
 test:
   requires:
@@ -57,12 +57,10 @@ outputs:
         - python
         - wheel
         - setuptools
-        - numba {{ NUMBA_VERSION }}
+        - numba   {{ NUMBA_VERSION }}
         - numpy
-        - pandas {{ PANDAS_VERSION }}
+        - pandas  {{ PANDAS_VERSION }}
         - pyarrow {{ PYARROW_VERSION }}
-        - conda-package-handling ==1.3.11 # [win]
-
 
 about:
   home: https://github.com/IntelPython/sdc
