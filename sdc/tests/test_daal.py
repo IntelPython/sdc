@@ -64,14 +64,14 @@ class TestDaal(TestCase):
     def test_quantile(self):
         def pyfunc(arr, q):
             return quantile(len(arr), arr.ctypes, q)
-
         cfunc = self.jit(pyfunc)
 
         arr = np.arange(10, dtype=np.float64)
-        q = 0.5
-        expected = np.quantile(arr, q)
 
         # print(ctypes_sum.argtypes)
 
-        self.assertEqual(pyfunc(arr, q), expected)
-        self.assertEqual(cfunc(arr, q), expected)
+        for q in [0., 0.25, 0.5, 0.75, 1.]:
+            with self.subTest(q=q):
+                expected = np.quantile(arr, q)
+                self.assertEqual(pyfunc(arr, q), expected)
+                self.assertEqual(cfunc(arr, q), expected)
