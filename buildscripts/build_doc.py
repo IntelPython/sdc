@@ -31,17 +31,20 @@ import os
 import shutil
 
 from pathlib import Path
-from utilities import *
+from utilities import SDC_Build_Utilities
 
 
-def build_doc(sdc_vars):
-    os.chdir(str(sdc_vars.doc_path))
-    run_command_in_env(sdc_vars, 'make html')
+def build_doc(sdc_utils):
+    os.chdir(str(sdc_utils.doc_path))
+
+    sdc_utils.log_info('Start documentation build', separate=True)
+    sdc_utils.run_command('make html')
+    sdc_utils.log_info('Documentation build SUCCESSFUL', separate=True)
     return
 
-def publish_doc(sdc_vars):
-    doc_local_build = str(sdc_vars.doc_path / 'build' / 'html')
-    doc_repo_build = str(sdc_vars.doc_path / sdc_vars.doc_repo_name / sdc_vars.doc_tag)
+def publish_doc(sdc_utils):
+    doc_local_build = str(sdc_utils.doc_path / 'build' / 'html')
+    doc_repo_build = str(sdc_utils.doc_path / sdc_utils.doc_repo_name / sdc_utils.doc_tag)
 
     git_email = os.environ['SDC_GIT_EMAIL']
     git_username = os.environ['SDC_GIT_USERNAME']
@@ -49,23 +52,23 @@ def publish_doc(sdc_vars):
     git_credentials_file = str(Path.home() / '.git-credentials')
     git_credentials = f'https://{git_access_token}:x-oauth-basic@github.com\n'
 
-    os.chdir(str(sdc_vars.doc_path))
-    run_command(f'git clone {sdc_vars.doc_repo_link}')
-    os.chdir(str(sdc_vars.doc_repo_name))
+    os.chdir(str(sdc_utils.doc_path))
+    sdc_utils.run_command(f'git clone {sdc_utils.doc_repo_link}')
+    os.chdir(str(sdc_utils.doc_repo_name))
 
     # Set local git options
-    run_command('git config --local credential.helper store')
+    sdc_utils.run_command('git config --local credential.helper store')
     with open(git_credentials_file, "w") as fp:
         fp.write(git_credentials)
-    run_command(f'git config --local user.email "{git_email}"')
-    run_command(f'git config --local user.name "{git_username}"')
+    sdc_utils.run_command(f'git config --local user.email "{git_email}"')
+    sdc_utils.run_command(f'git config --local user.name "{git_username}"')
 
-    run_command(f'git checkout {sdc_vars.doc_repo_branch}')
+    sdc_utils.run_command(f'git checkout {sdc_utils.doc_repo_branch}')
     shutil.rmtree(doc_repo_build)
     shutil.copytree(doc_local_build, doc_repo_build)
-    run_command(f'git add -A {sdc_vars.doc_tag}')
-    run_command(f'git commit -m "Updated doc release: {sdc_vars.doc_tag}"')
-    run_command('git push origin HEAD')
+    sdc_utils.run_command(f'git add -A {sdc_utils.doc_tag}')
+    sdc_utils.run_command(f'git commit -m "Updated doc release: {sdc_utils.doc_tag}"')
+    sdc_utils.run_command('git push origin HEAD')
     return
 
 
@@ -78,12 +81,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    sdc_vars = SDC_Vars(args.sdc_channel)
-    sdc_vars.python = args.python
+    sdc_utils = SDC_Build_Utilities(args.python, args.sdc_channel)
+    sdc_utils.log_info('Prepare environment', separate=True)
+    sdc_utils.create_environment(['sphinx', 'sphinxcontrib-programoutput'])
+    sdc_utils.install_conda_package(['sdc'])
 
-    create_environment(sdc_vars, ['sphinx', 'sphinxcontrib-programoutput'])
-    conda_install(sdc_vars, ['sdc'])
-
-    build_doc(sdc_vars)
+    build_doc(sdc_utils)
     if args.publish:
-        publish_doc(sdc_vars)
+        publish_doc(sdc_utils)
