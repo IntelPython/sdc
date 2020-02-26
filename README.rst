@@ -23,7 +23,7 @@ Installing Binary Packages (conda)
 ----------------------------------
 ::
 
-   conda install -c intel -c intel/label/test sdc
+   Currently binary packages are not provided.
 
 
 Building Intel® SDC from Source on Linux
@@ -301,6 +301,8 @@ Developer's Guide and must not be included into User's Guide.
 Running unit tests
 ------------------
 ::
+    # Scipy is required for tests
+    conda install -y scipy
 
     python sdc/tests/gen_test_data.py
     python -m unittest
