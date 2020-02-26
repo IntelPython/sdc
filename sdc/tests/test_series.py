@@ -3148,6 +3148,17 @@ class TestSeries(
                 ref_result = test_impl(series, width)
                 pd.testing.assert_series_equal(jit_result, ref_result)
 
+    @unittest.expectedFailure # https://github.com/numba/numba/issues/5317
+    def test_series_str_zfill_with_none(self):
+        def test_impl(series, width):
+            return series.str.zfill(width)
+
+        cfunc = self.jit(test_impl)
+        s = pd.Series(['-1', '1', '1000', np.nan])
+        jit_result = cfunc(s, 3)
+        ref_result = test_impl(s, 3)
+        pd.testing.assert_series_equal(jit_result, ref_result)
+
     @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2348
     def test_series_str_zfill_exception_unsupported_kind4(self):
         def test_impl(series, width):
