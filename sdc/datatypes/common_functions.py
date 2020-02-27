@@ -47,6 +47,7 @@ from sdc.str_arr_type import string_array_type
 from sdc.str_arr_ext import (num_total_chars, append_string_array_to,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na, string_array_type,
                              cp_str_list_to_array, create_str_arr_from_list, get_utf8_size)
+from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 from sdc.utilities.sdc_typing_utils import (find_common_dtype_from_numpy_dtypes,
                                             TypeChecker)
@@ -548,6 +549,57 @@ def _sdc_pandas_series_check_axis_overload(axis):
     return None
 
 
+def _sdc_pandas_arr_align(arr, other_arr, size='max', finiteness=False):
+    """
+    Align array and other array by
+        size where size of output arrays is max/min size of input arrays
+        finiteness where all the infinite and matched finite values are replaced with nans, e.g.
+        arr:   [1., inf, inf, -1.,   0.] -> [1., nan, nan, -1.,   0.]
+        other: [1., -1.,  0., 0.1, -0.1] -> [1., nan, nan, 0.1, -0.1]
+    """
+    pass
+
+
+@sdc_overload(_sdc_pandas_arr_align)
+def _sdc_pandas_arr_align_overload(arr, other_arr, size='max', finiteness=False):
+    ty_checker = TypeChecker('Function sdc.common_functions._sdc_pandas_arr_align().')
+    ty_checker.check(arr, types.Array)
+    ty_checker.check(other_arr, types.Array)
+
+    str_types = (str, types.StringLiteral, types.UnicodeType, types.Omitted)
+    if not isinstance(size, str_types):
+        ty_checker.raise_exc(size, 'str', 'size')
+
+    if not isinstance(finiteness, (bool, types.Boolean, types.Omitted)):
+        ty_checker.raise_exc(finiteness, 'bool', 'finiteness')
+
+    def _sdc_pandas_series_align_impl(arr, other_arr, size='max', finiteness=False):
+        if size != 'max' and size != 'min':
+            raise ValueError("Function sdc.common_functions._sdc_pandas_arr_align(). "
+                             "The object size\n expected: 'max' or 'min'")
+
+        arr_len, other_arr_len = len(arr), len(other_arr)
+        min_length = min(arr_len, other_arr_len)
+        length = max(arr_len, other_arr_len) if size == 'max' else min_length
+
+        aligned_arr = numpy.repeat([numpy.nan], length)
+        aligned_other_arr = numpy.repeat([numpy.nan], length)
+
+        chunks = parallel_chunks(min_length)
+        for i in numba.prange(len(chunks)):
+            chunk = chunks[i]
+            for idx in range(chunk.start, chunk.stop):
+                if not finiteness or (numpy.isfinite(arr[idx]) and numpy.isfinite(other_arr[idx])):
+                    aligned_arr[idx] = arr[idx]
+                    aligned_other_arr[idx] = other_arr[idx]
+                else:
+                    aligned_arr[idx] = aligned_other_arr[idx] = numpy.nan
+
+        return aligned_arr, aligned_other_arr
+
+    return _sdc_pandas_series_align_impl
+
+
 def _sdc_pandas_series_align(series, other, size='max', finiteness=False):
     """
     Align series and other series by
@@ -559,7 +611,7 @@ def _sdc_pandas_series_align(series, other, size='max', finiteness=False):
     pass
 
 
-@sdc_overload(_sdc_pandas_series_align, jit_options={'parallel': False})
+@sdc_overload(_sdc_pandas_series_align)
 def _sdc_pandas_series_align_overload(series, other, size='max', finiteness=False):
     ty_checker = TypeChecker('Function sdc.common_functions._sdc_pandas_series_align().')
     ty_checker.check(series, SeriesType)
@@ -577,21 +629,8 @@ def _sdc_pandas_series_align_overload(series, other, size='max', finiteness=Fals
             raise ValueError("Function sdc.common_functions._sdc_pandas_series_align(). "
                              "The object size\n expected: 'max' or 'min'")
 
-        arr, other_arr = series._data, other._data
-        arr_len, other_arr_len = len(arr), len(other_arr)
-        min_length = min(arr_len, other_arr_len)
-        length = max(arr_len, other_arr_len) if size == 'max' else min_length
-
-        aligned_arr = numpy.repeat([numpy.nan], length)
-        aligned_other_arr = numpy.repeat([numpy.nan], length)
-
-        for i in numba.prange(min_length):
-            if not finiteness or (numpy.isfinite(arr[i]) and numpy.isfinite(other_arr[i])):
-                aligned_arr[i] = arr[i]
-                aligned_other_arr[i] = other_arr[i]
-            else:
-                aligned_arr[i] = aligned_other_arr[i] = numpy.nan
-
+        aligned_arr, aligned_other_arr = _sdc_pandas_arr_align(series._data, other._data,
+                                                               size=size, finiteness=finiteness)
         aligned = pandas.Series(aligned_arr, name=series._name)
         aligned_other = pandas.Series(aligned_other_arr, name=other._name)
 

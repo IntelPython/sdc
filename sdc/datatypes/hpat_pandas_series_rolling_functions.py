@@ -34,7 +34,8 @@ from numba.extending import register_jitable
 from numba.types import (float64, Boolean, Integer, NoneType, Number,
                          Omitted, StringLiteral, UnicodeType)
 
-from sdc.datatypes.common_functions import _sdc_pandas_series_align
+from sdc.datatypes.common_functions import (_sdc_pandas_arr_align,
+                                            _sdc_pandas_series_align)
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.prange_utils import parallel_chunks
@@ -97,15 +98,6 @@ hpat_pandas_series_rolling_docstring_tmpl = """
 def arr_apply(arr, func):
     """Apply function for values"""
     return func(arr)
-
-
-@sdc_register_jitable
-def arr_corr(x, y):
-    """Calculate correlation of values"""
-    if len(x) == 0:
-        return numpy.nan
-
-    return numpy.corrcoef(x, y)[0, 1]
 
 
 @sdc_register_jitable
@@ -241,6 +233,36 @@ hpat_pandas_rolling_series_var_impl = register_jitable(
 
 
 @sdc_register_jitable
+def pop_corr(x, y, nfinite, result):
+    """Calculate the window sums for corr without old value."""
+    sum_x, sum_y, sum_xy, sum_xx, sum_yy = result
+    if numpy.isfinite(x) and numpy.isfinite(y):
+        nfinite -= 1
+        sum_x -= x
+        sum_y -= y
+        sum_xy -= x * y
+        sum_xx -= x * x
+        sum_yy -= y * y
+
+    return nfinite, (sum_x, sum_y, sum_xy, sum_xx, sum_yy)
+
+
+@sdc_register_jitable
+def put_corr(x, y, nfinite, result):
+    """Calculate the window sums for corr with new value."""
+    sum_x, sum_y, sum_xy, sum_xx, sum_yy = result
+    if numpy.isfinite(x) and numpy.isfinite(y):
+        nfinite += 1
+        sum_x += x
+        sum_y += y
+        sum_xy += x * y
+        sum_xx += x * x
+        sum_yy += y * y
+
+    return nfinite, (sum_x, sum_y, sum_xy, sum_xx, sum_yy)
+
+
+@sdc_register_jitable
 def put_kurt(value, nfinite, result):
     """Calculate the window sums for kurt with new value."""
     _sum, square_sum, cube_sum, fourth_degree_sum = result
@@ -359,6 +381,27 @@ def result_or_nan(nfinite, minp, result):
         return numpy.nan
 
     return result
+
+
+@sdc_register_jitable
+def corr_result_or_nan(nfinite, minp, result):
+    """Get result corr taking into account min periods."""
+    if nfinite < max(1, minp):
+        return numpy.nan
+
+    sum_x, sum_y, sum_xy, sum_xx, sum_yy = result
+
+    var_x = (sum_xx - sum_x * sum_x / nfinite)
+    if var_x == 0:
+        return numpy.nan
+
+    var_y = (sum_yy - sum_y * sum_y / nfinite)
+    if var_y == 0:
+        return numpy.nan
+
+    cov_xy = (sum_xy - sum_x * sum_y / nfinite)
+
+    return cov_xy / numpy.sqrt(var_x * var_y)
 
 
 @sdc_register_jitable
@@ -552,16 +595,15 @@ def hpat_pandas_series_rolling_apply(self, func, raw=None):
     return hpat_pandas_rolling_series_apply_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'corr')
+@sdc_overload_method(SeriesRollingType, 'corr')
 def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
 
     ty_checker = TypeChecker('Method rolling.corr().')
     ty_checker.check(self, SeriesRollingType)
 
-    # TODO: check `other` is Series after a circular import of SeriesType fixed
-    # accepted_other = (bool, Omitted, NoneType, SeriesType)
-    # if not isinstance(other, accepted_other) and other is not None:
-    #     ty_checker.raise_exc(other, 'Series', 'other')
+    accepted_other = (bool, Omitted, NoneType, SeriesType)
+    if not isinstance(other, accepted_other) and other is not None:
+        ty_checker.raise_exc(other, 'Series', 'other')
 
     accepted_pairwise = (bool, Boolean, Omitted, NoneType)
     if not isinstance(pairwise, accepted_pairwise) and pairwise is not None:
@@ -575,38 +617,47 @@ def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
 
         main_series = self._data
         main_arr = main_series._data
-        main_arr_length = len(main_arr)
 
         if nan_other == True:  # noqa
             other_arr = main_arr
         else:
             other_arr = other._data
 
-        other_arr_length = len(other_arr)
-        length = max(main_arr_length, other_arr_length)
+        main_arr_aligned, other_arr_aligned = _sdc_pandas_arr_align(main_arr, other_arr)
+        length = len(main_arr_aligned)
         output_arr = numpy.empty(length, dtype=float64)
 
-        def calc_corr(main, other, minp):
-            # align arrays `main` and `other` by size and finiteness
-            min_length = min(len(main), len(other))
-            main_valid_indices = numpy.isfinite(main[:min_length])
-            other_valid_indices = numpy.isfinite(other[:min_length])
-            valid = main_valid_indices & other_valid_indices
+        chunks = parallel_chunks(length)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            nfinite = 0
+            result = (0., 0., 0., 0., 0.)
 
-            if len(main[valid]) < minp:
-                return numpy.nan
-            else:
-                return arr_corr(main[valid], other[valid])
+            prelude_start = max(0, chunk.start - win + 1)
+            prelude_stop = chunk.start
 
-        for i in prange(min(win, length)):
-            main_arr_range = main_arr[:i + 1]
-            other_arr_range = other_arr[:i + 1]
-            output_arr[i] = calc_corr(main_arr_range, other_arr_range, minp)
+            interlude_start = prelude_stop
+            interlude_stop = min(prelude_start + win, chunk.stop)
 
-        for i in prange(win, length):
-            main_arr_range = main_arr[i + 1 - win:i + 1]
-            other_arr_range = other_arr[i + 1 - win:i + 1]
-            output_arr[i] = calc_corr(main_arr_range, other_arr_range, minp)
+            for idx in range(prelude_start, prelude_stop):
+                x = main_arr_aligned[idx]
+                y = other_arr_aligned[idx]
+                nfinite, result = put_corr(x, y, nfinite, result)
+
+            for idx in range(interlude_start, interlude_stop):
+                x = main_arr_aligned[idx]
+                y = other_arr_aligned[idx]
+                nfinite, result = put_corr(x, y, nfinite, result)
+                output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
+
+            for idx in range(interlude_stop, chunk.stop):
+                put_x = main_arr_aligned[idx]
+                put_y = other_arr_aligned[idx]
+                pop_x = main_arr_aligned[idx - win]
+                pop_y = other_arr_aligned[idx - win]
+                nfinite, result = put_corr(put_x, put_y, nfinite, result)
+                nfinite, result = pop_corr(pop_x, pop_y, nfinite, result)
+                output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
 
         return pandas.Series(output_arr)
 
