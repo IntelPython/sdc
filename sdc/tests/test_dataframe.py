@@ -1482,9 +1482,9 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n)**2})
         df2.A[n // 2:] = n
+        hpat_func(df, df2)
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
-    @unittest.skip("not work with index")
     def test_isin_df2(self):
         def test_impl(df, df2):
             return df.isin(df2)

@@ -1410,14 +1410,15 @@ def sdc_pandas_dataframe_isin_iter_codegen(df, values, func_name, ser_param):
     return _apply_impl
 
 
-def sdc_pandas_dataframe_isin_ser_codegen(func_name, values, all_params, columns):
+def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params, columns):
     result_name = []
     joined = ', '.join(all_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
+    df = all_params[0]
     for i, c in enumerate(columns):
         result_c = f'result_{c}'
         func_lines += [
-            f'  series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))',
+            f'  series_{c} = pandas.Series(get_dataframe_data({df}, {i}))',
             f'  result = []']
         if isinstance(values.index, types.NoneType):
             func_lines += [
@@ -1442,7 +1443,10 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, values, all_params, columns
         result_name.append((result_c, c))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
-    func_lines += [f'  return pandas.DataFrame({{{data}}})']
+    if isinstance(df_type.index, types.NoneType):
+        func_lines += [f'  return pandas.DataFrame({{{data}}})']
+    else:
+        func_lines += [f'  return pandas.DataFrame({{{data}}}, index={df}._index)']
     func_text = '\n'.join(func_lines)
 
     global_vars = {'pandas': pandas,
@@ -1455,7 +1459,7 @@ def sdc_pandas_dataframe_isin_ser(df, values, func_name):
     all_params = ['df', 'values']
     df_func_name = f'_df_{func_name}_impl'
 
-    func_text, global_vars = sdc_pandas_dataframe_isin_ser_codegen(func_name, values, all_params, df.columns)
+    func_text, global_vars = sdc_pandas_dataframe_isin_ser_codegen(func_name, df, values, all_params, df.columns)
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
@@ -1464,41 +1468,43 @@ def sdc_pandas_dataframe_isin_ser(df, values, func_name):
     return _apply_impl
 
 
-def sdc_pandas_dataframe_isin_df_codegen(func_name, values, all_params, columns):
+def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params, columns):
     result_name = []
     joined = ', '.join(all_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
+    df = all_params[0]
+    val = all_params[1]
     for i, c in enumerate(columns):
         result_c = f'result_{c}'
-        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({all_params[0]}, {i}))']
-        if c in values.columns:
+        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({df}, {i}))']
+        if c in in_df.columns:
             func_lines += [
-                f'  series_{c}_values = pandas.Series(get_dataframe_data({all_params[1]}, {i}))',
-                f'  result = []',
+                f'  series_{c}_values = pandas.Series(get_dataframe_data({val}, {i}))',
+                f'  result = numpy.empty(len(series_{c}_values._data), numpy.bool_)',
             ]
-            if isinstance(values.index, types.NoneType):
+            if isinstance(in_df.index, types.NoneType):
                 func_lines += [
                     f'  for i in range(len(series_{c}._data)):',
                     f'    if series_{c}._data[i] == series_{c}_values._data[i]:',
-                    f'      result.append(True)',
+                    f'      result[i] = True',
                     f'    else:',
-                    f'      result.append(False)']
+                    f'      result[i] = False']
             else:
                 func_lines += [
                     f'  for i in range(len(series_{c})):',
-                    f'    idx = series_{c}.index[i]',
+                    f'    idx = {df}._index[i]',
                     f'    value = series_{c}._data[i]',
                     f'    n = 0',
                     f'    for j in numba.prange(len(series_{c}_values)):',
-                    f'      idx_val = series_{c}_values.index[j]',
+                    f'      idx_val = {val}._index[j]',
                     f'      if idx == idx_val:',
                     f'        value_val = series_{c}_values._data[j]',
                     f'        if value == value_val:',
-                    f'          result.append(True)',
+                    f'          result[i] = True',
+                    f'        else:',
+                    f'          result[i] = False',
                     f'      else:',
-                    f'        n += 1',
-                    f'        if n == len(series_{c}_values._data):',
-                    f'          result.append(False)'
+                    f'        result[i] = False'
                     ]
         else:
             func_lines += [
@@ -1506,7 +1512,10 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, values, all_params, columns)
         func_lines += [f'  {result_c} = pandas.Series(result)']
         result_name.append((result_c, c))
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
-    func_lines += [f'  return pandas.DataFrame({{{data}}})']
+    if isinstance(df_type.index, types.NoneType):
+        func_lines += [f'  return pandas.DataFrame({{{data}}})']
+    else:
+        func_lines += [f'  return pandas.DataFrame({{{data}}}, index={df}._index)']
     func_text = '\n'.join(func_lines)
 
     global_vars = {'pandas': pandas,
@@ -1521,7 +1530,7 @@ def sdc_pandas_dataframe_isin_df(df, values, func_name):
     all_params = ['df', 'values']
     df_func_name = f'_df_{func_name}_impl'
 
-    func_text, global_vars = sdc_pandas_dataframe_isin_df_codegen(func_name, values, all_params, df.columns)
+    func_text, global_vars = sdc_pandas_dataframe_isin_df_codegen(func_name, df, values, all_params, df.columns)
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
