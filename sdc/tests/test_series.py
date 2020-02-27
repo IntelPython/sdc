@@ -3148,7 +3148,7 @@ class TestSeries(
                 ref_result = test_impl(series, width)
                 pd.testing.assert_series_equal(jit_result, ref_result)
 
-    @unittest.expectedFailure # https://github.com/numba/numba/issues/5317
+    @unittest.expectedFailure  # https://github.com/numba/numba/issues/5317
     def test_series_str_zfill_with_none(self):
         def test_impl(series, width):
             return series.str.zfill(width)
