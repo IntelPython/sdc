@@ -1419,27 +1419,35 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params
         result_c = f'result_{c}'
         func_lines += [
             f'  series_{c} = pandas.Series(get_dataframe_data({df}, {i}))',
-            f'  result = []']
+            f'  result = numpy.empty(len(series_{c}._data), numpy.bool_)'
+        ]
         if isinstance(values.index, types.NoneType):
             func_lines += [
                 f'  for i in range(len(series_{c}._data)):',
                 f'    if series_{c}._data[i] == values._data[i]:',
-                f'      result.append(True)',
+                f'      result[i] = True',
                 f'    else:',
-                f'      result.append(False)',
-                f'  {result_c} = pandas.Series(result)'
+                f'      result[i] = False',
             ]
         else:
             func_lines += [
-                f'  for i in list(series_{c}.index):',
-                f'    if i in list(values.index):',
-                f'      if series_{c}[i] == values[i]:',
-                f'        result.append(True)',
+                f'  for i in range(len(series_{c})):',
+                f'    idx = {df}._index[i]',
+                f'    value = series_{c}._data[i]',
+                f'    for j in numba.prange(len(values)):',
+                f'      idx_val = values._index[j]',
+                f'      if idx == idx_val:',
+                f'        value_val = values._data[j]',
+                f'        if value == value_val:',
+                f'          result[i] = True',
+                f'          break',
+                f'        else:',
+                f'          result[i] = False',
                 f'      else:',
-                f'        result.append(False)',
-                f'    else:',
-                f'      result.append(False)']
+                f'        result[i] = False'
+            ]
 
+        func_lines += [f'  {result_c} = pandas.Series(result)']
         result_name.append((result_c, c))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
@@ -1450,6 +1458,8 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params
     func_text = '\n'.join(func_lines)
 
     global_vars = {'pandas': pandas,
+                   'numba': numba,
+                   'numpy': numpy,
                    'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
@@ -1494,13 +1504,13 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params, 
                     f'  for i in range(len(series_{c})):',
                     f'    idx = {df}._index[i]',
                     f'    value = series_{c}._data[i]',
-                    f'    n = 0',
                     f'    for j in numba.prange(len(series_{c}_values)):',
                     f'      idx_val = {val}._index[j]',
                     f'      if idx == idx_val:',
                     f'        value_val = series_{c}_values._data[j]',
                     f'        if value == value_val:',
                     f'          result[i] = True',
+                    f'          break',
                     f'        else:',
                     f'          result[i] = False',
                     f'      else:',
