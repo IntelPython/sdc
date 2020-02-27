@@ -1410,6 +1410,49 @@ def sdc_pandas_dataframe_isin_iter_codegen(df, values, func_name, ser_param):
     return _apply_impl
 
 
+def sdc_pandas_dataframe_isin_dict_codegen(func_name, df_type, values, all_params, columns):
+    result_name = []
+    joined = ', '.join(all_params)
+    func_lines = [f'def _df_{func_name}_impl({joined}):']
+    df = all_params[0]
+    for i, c in enumerate(columns):
+        result_c = f'result_{c}'
+        func_lines += [
+            f'  series_{c} = pandas.Series(get_dataframe_data({df}, {i}))',
+            f'  if "{c}" in list(values.keys()):',
+            f'    val = list(values["{c}"])',
+            f'    result_{c} = series_{c}.{func_name}(val)',
+            f'  else:',
+            f'    result = [False] * len(series_{c}._data)',
+            f'    result_{c} = pandas.Series(result)'
+        ]
+        result_name.append((result_c, c))
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
+    if isinstance(df_type.index, types.NoneType):
+        func_lines += [f'  return pandas.DataFrame({{{data}}})']
+    else:
+        func_lines += [f'  return pandas.DataFrame({{{data}}}, index={df}._index)']
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas,
+                   'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_isin_dict(df, values, func_name):
+    all_params = ['df', 'values']
+
+    df_func_name = f'_df_{func_name}_impl'
+    func_text, global_vars = sdc_pandas_dataframe_isin_dict_codegen(func_name, df, values, all_params, df.columns)
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _apply_impl = loc_vars[df_func_name]
+    return _apply_impl
+
+
 def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params, columns):
     result_name = []
     joined = ', '.join(all_params)
@@ -1581,6 +1624,9 @@ def isin_overload(df, values):
     if isinstance(values, (types.List, types.Set)):
         ser_par = 'values=values'
         return sdc_pandas_dataframe_isin_iter_codegen(df, values, name, ser_par)
+
+    if isinstance(values, types.DictType):
+        return sdc_pandas_dataframe_isin_dict(df, values, name)
 
     if isinstance(values, SeriesType):
         return sdc_pandas_dataframe_isin_ser(df, values, name)
