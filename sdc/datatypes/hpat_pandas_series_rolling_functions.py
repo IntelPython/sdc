@@ -151,31 +151,6 @@ def arr_quantile(arr, q):
 
 
 @sdc_register_jitable
-def _moment(arr, moment):
-    mn = numpy.mean(arr)
-    s = numpy.power((arr - mn), moment)
-
-    return numpy.mean(s)
-
-
-@sdc_register_jitable
-def arr_skew(arr):
-    """Calculate unbiased skewness of values"""
-    n = len(arr)
-    if n < 3:
-        return numpy.nan
-
-    m2 = _moment(arr, 2)
-    m3 = _moment(arr, 3)
-    val = 0 if m2 == 0 else m3 / m2 ** 1.5
-
-    if (n > 2) & (m2 > 0):
-        val = numpy.sqrt((n - 1.0) * n) / (n - 2.0) * m3 / m2 ** 1.5
-
-    return val
-
-
-@sdc_register_jitable
 def arr_std(arr, ddof):
     """Calculate standard deviation of values"""
     return arr_var(arr, ddof) ** 0.5
@@ -259,8 +234,6 @@ hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max))
 hpat_pandas_rolling_series_median_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_median))
-hpat_pandas_rolling_series_skew_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_skew))
 hpat_pandas_rolling_series_std_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_std))
 hpat_pandas_rolling_series_var_impl = register_jitable(
@@ -334,6 +307,32 @@ def put_min(value, nfinite, result):
 
 
 @sdc_register_jitable
+def put_skew(value, nfinite, result):
+    """Calculate the window sums for skew with new value."""
+    _sum, square_sum, cube_sum = result
+    if numpy.isfinite(value):
+        nfinite += 1
+        _sum += value
+        square_sum += value * value
+        cube_sum += value * value * value
+
+    return nfinite, (_sum, square_sum, cube_sum)
+
+
+@sdc_register_jitable
+def pop_skew(value, nfinite, result):
+    """Calculate the window sums for skew without old value."""
+    _sum, square_sum, cube_sum = result
+    if numpy.isfinite(value):
+        nfinite -= 1
+        _sum -= value
+        square_sum -= value * value
+        cube_sum -= value * value * value
+
+    return nfinite, (_sum, square_sum, cube_sum)
+
+
+@sdc_register_jitable
 def pop_sum(value, nfinite, result):
     """Calculate the window sum without old value."""
     if numpy.isfinite(value):
@@ -388,6 +387,25 @@ def mean_result_or_nan(nfinite, minp, result):
         return numpy.nan
 
     return result / nfinite
+
+
+@sdc_register_jitable
+def skew_result_or_nan(nfinite, minp, result):
+    """Get result skew taking into account min periods."""
+    if nfinite < max(3, minp):
+        return numpy.nan
+
+    _sum, square_sum, cube_sum = result
+
+    n = nfinite
+    m2 = (square_sum - _sum * _sum / n) / n
+    m3 = (cube_sum - 3.*_sum*square_sum/n + 2.*_sum*_sum*_sum/n/n) / n
+    res = 0 if m2 == 0 else m3 / m2 ** 1.5
+
+    if (n > 2) & (m2 > 0):
+        res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
+
+    return res
 
 
 def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
@@ -487,6 +505,8 @@ sdc_pandas_series_rolling_mean_impl = gen_sdc_pandas_series_rolling_impl(
     pop_sum, put_sum, get_result=mean_result_or_nan, init_result=0.)
 sdc_pandas_series_rolling_min_impl = gen_sdc_pandas_series_rolling_minmax_impl(
     pop_min, put_min)
+sdc_pandas_series_rolling_skew_impl = gen_sdc_pandas_series_rolling_impl(
+    pop_skew, put_skew, get_result=skew_result_or_nan, init_result=(0., 0., 0.))
 sdc_pandas_series_rolling_sum_impl = gen_sdc_pandas_series_rolling_impl(
     pop_sum, put_sum, init_result=0.)
 
@@ -797,13 +817,13 @@ def hpat_pandas_series_rolling_quantile(self, quantile, interpolation='linear'):
     return hpat_pandas_rolling_series_quantile_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'skew')
+@sdc_overload_method(SeriesRollingType, 'skew')
 def hpat_pandas_series_rolling_skew(self):
 
     ty_checker = TypeChecker('Method rolling.skew().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_skew_impl
+    return sdc_pandas_series_rolling_skew_impl
 
 
 @sdc_rolling_overload(SeriesRollingType, 'std')
