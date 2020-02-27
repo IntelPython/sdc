@@ -60,6 +60,10 @@ class TestBase(TestCase):
         self.test_results.add(**record)
 
     def _test_py(self, pyfunc, base, *args):
+        skip = 'NUMBA_NUM_THREADS' in os.environ and config.NUMBA_NUM_THREADS > 1
+        if skip:
+            return
+
         record = base.copy()
         record["test_type"] = 'Python'
         self._test_python(pyfunc, record, *args)
