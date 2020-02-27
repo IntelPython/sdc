@@ -240,10 +240,73 @@ class TestArrays(TestCase):
         sdc_func = self.jit(sdc_impl)
         np.testing.assert_array_equal(sdc_func(), ref_impl())
 
+    def test_argmin(self):
+        def ref_impl(a):
+            return np.argmin(a)
+
+        def sdc_impl(a):
+            return numpy_like.argmin(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+    def test_argmax(self):
+        def ref_impl(a):
+            return np.argmax(a)
+
+        def sdc_impl(a):
+            return numpy_like.argmax(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[np.nan, np.nan, np.inf, np.nan], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+    def test_nanargmin(self):
+        def ref_impl(a):
+            return np.nanargmin(a)
+
+        def sdc_impl(a):
+            return numpy_like.nanargmin(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+    def test_nanargmax(self):
+        def ref_impl(a):
+            return np.nanargmax(a)
+
+        def sdc_impl(a):
+            return numpy_like.nanargmax(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        cases = [[np.nan, np.nan, np.inf, np.nan], [5, 2, -9, 333, -4], [3.3, 5.4, np.nan, 7.9]]
+        for case in cases:
+            a = np.array(case)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
 
 class TestArrayReductions(TestCase):
 
-    def check_reduction_basic(self, pyfunc, alt_pyfunc, all_nans=True):
+    def check_reduction_basic(self, pyfunc, alt_pyfunc, all_nans=True, comparator=None):
+        if not comparator:
+            comparator = np.testing.assert_array_equal
+
         alt_cfunc = self.jit(alt_pyfunc)
 
         def cases():
@@ -262,7 +325,7 @@ class TestArrayReductions(TestCase):
 
         for case in cases():
             with self.subTest(data=case):
-                np.testing.assert_array_equal(alt_cfunc(case), pyfunc(case))
+                comparator(alt_cfunc(case), pyfunc(case))
 
     def test_nanmean(self):
         def ref_impl(a):
@@ -309,11 +372,39 @@ class TestArrayReductions(TestCase):
 
         self.check_reduction_basic(ref_impl, sdc_impl)
 
+    def test_nanvar(self):
+        def ref_impl(a):
+            return np.nanvar(a)
+
+        def sdc_impl(a):
+            return numpy_like.nanvar(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl,
+                                   comparator=np.testing.assert_array_almost_equal)
+
     def test_sum(self):
         def ref_impl(a):
             return np.sum(a)
 
         def sdc_impl(a):
             return numpy_like.sum(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl)
+
+    def test_cumsum(self):
+        def ref_impl(a):
+            return np.cumsum(a)
+
+        def sdc_impl(a):
+            return numpy_like.cumsum(a)
+
+        self.check_reduction_basic(ref_impl, sdc_impl)
+
+    def test_nancumsum(self):
+        def ref_impl(a):
+            return np.nancumsum(a)
+
+        def sdc_impl(a):
+            return numpy_like.nancumsum(a)
 
         self.check_reduction_basic(ref_impl, sdc_impl)

@@ -8,7 +8,7 @@ package:
 
 source:
   git_url: https://github.com/numba/numba
-  git_tag: ef119bcd1733ff49d71bdf2da8a66e91bb704f83
+  git_tag: 0.48.0
 
 build:
   number: 0
