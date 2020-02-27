@@ -1485,6 +1485,7 @@ class TestDataFrame(TestCase):
         hpat_func(df, df2)
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
+    @skip_sdc_jit
     def test_isin_df2(self):
         def test_impl(df, df2):
             return df.isin(df2)
@@ -1494,6 +1495,7 @@ class TestDataFrame(TestCase):
         df2 = pd.DataFrame({'num_legs': [8, 2], 'num_wings': [0, 2]}, index=['spider', 'falcon'])
         pd.testing.assert_frame_equal(cfunc(df, df2), test_impl(df, df2))
 
+    @skip_sdc_jit
     def test_isin_dict1(self):
         def test_impl(df):
             vals = {'A': (2., 3., 4.), 'C': (4., 5., 6.)}
