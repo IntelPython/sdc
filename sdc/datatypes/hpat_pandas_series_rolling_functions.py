@@ -200,22 +200,6 @@ def arr_skew(arr):
     return val
 
 
-@sdc_register_jitable
-def arr_std(arr, ddof):
-    """Calculate standard deviation of values"""
-    return arr_var(arr, ddof) ** 0.5
-
-
-@sdc_register_jitable
-def arr_var(arr, ddof):
-    """Calculate unbiased variance of values"""
-    length = len(arr)
-    if length in [0, ddof]:
-        return numpy.nan
-
-    return numpy.var(arr) * length / (length - ddof)
-
-
 def gen_hpat_pandas_series_rolling_impl(rolling_func):
     """Generate series rolling methods implementations based on input func"""
     def impl(self):
@@ -288,8 +272,6 @@ hpat_pandas_rolling_series_median_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_median))
 hpat_pandas_rolling_series_skew_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_skew))
-hpat_pandas_rolling_series_std_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_ddof_impl(arr_std))
 
 
 @sdc_register_jitable
@@ -411,6 +393,12 @@ def var_result_or_nan(nfinite, minp, result, ddof):
     res = (square_sum - _sum * _sum / nfinite) / nfinite
 
     return ddof_result(nfinite, minp, res, ddof)
+
+
+@sdc_register_jitable
+def std_result_or_nan(nfinite, minp, result, ddof):
+    """Get result std taking into account min periods."""
+    return var_result_or_nan(nfinite, minp, result, ddof) ** 0.5
 
 
 def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
@@ -556,6 +544,8 @@ sdc_pandas_series_rolling_sum_impl = gen_sdc_pandas_series_rolling_impl(
     pop_sum, put_sum, init_result=0.)
 sdc_pandas_series_rolling_var_impl = gen_sdc_pandas_series_rolling_ddof_impl(
     pop_sum2, put_sum2, get_result=var_result_or_nan, init_result=(0., 0.))
+sdc_pandas_series_rolling_std_impl = gen_sdc_pandas_series_rolling_ddof_impl(
+    pop_sum2, put_sum2, get_result=std_result_or_nan, init_result=(0., 0.))
 
 
 @sdc_rolling_overload(SeriesRollingType, 'apply')
@@ -873,7 +863,7 @@ def hpat_pandas_series_rolling_skew(self):
     return hpat_pandas_rolling_series_skew_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'std')
+@sdc_overload_method(SeriesRollingType, 'std')
 def hpat_pandas_series_rolling_std(self, ddof=1):
 
     ty_checker = TypeChecker('Method rolling.std().')
@@ -882,7 +872,7 @@ def hpat_pandas_series_rolling_std(self, ddof=1):
     if not isinstance(ddof, (int, Integer, Omitted)):
         ty_checker.raise_exc(ddof, 'int', 'ddof')
 
-    return hpat_pandas_rolling_series_std_impl
+    return sdc_pandas_series_rolling_std_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'sum')

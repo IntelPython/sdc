@@ -88,6 +88,7 @@ class TestSeriesRollingMethods(TestBase):
             'mean': (100, [8 * 10 ** 5]),
             'min': (100, [4 * 10 ** 5]),
             'sum': (100, [8 * 10 ** 5]),
+            'std': (100, [8 * 10 ** 5]),
             'var': (100, [8 * 10 ** 5]),
         }
 
@@ -135,6 +136,9 @@ class TestSeriesRollingMethods(TestBase):
 
     def test_series_rolling_sum(self):
         self._test_series_rolling_method('sum')
+
+    def test_series_rolling_std(self):
+        self._test_series_rolling_method('std')
 
     def test_series_rolling_var(self):
         self._test_series_rolling_method('var')
