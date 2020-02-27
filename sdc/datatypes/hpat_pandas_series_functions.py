@@ -4327,12 +4327,8 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True):
 
     def hpat_pandas_series_cumsum_impl(self, axis=None, skipna=True):
         if skipna:
-            # nampy.nancumsum replaces NANs with 0, series.cumsum does not, so replace back 0 with NANs
-            local_data = numpy.nancumsum(self._data)
-            local_data[numpy.isnan(self._data)] = numpy.nan
-            return pandas.Series(local_data)
-
-        return pandas.Series(self._data.cumsum())
+            return pandas.Series(numpy_like.nancumsum(self._data, like_pandas=True))
+        return pandas.Series(numpy_like.cumsum(self._data))
 
     return hpat_pandas_series_cumsum_impl
 
