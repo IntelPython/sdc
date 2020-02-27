@@ -167,15 +167,6 @@ def arr_median(arr):
 
 
 @sdc_register_jitable
-def arr_min(arr):
-    """Calculate minimum of values"""
-    if len(arr) == 0:
-        return numpy.nan
-
-    return arr.min()
-
-
-@sdc_register_jitable
 def arr_quantile(arr, q):
     """Calculate quantile of values"""
     if len(arr) == 0:
@@ -270,12 +261,48 @@ hpat_pandas_rolling_series_max_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_max))
 hpat_pandas_rolling_series_median_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_median))
-hpat_pandas_rolling_series_min_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_min))
 hpat_pandas_rolling_series_std_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_std))
 hpat_pandas_rolling_series_var_impl = register_jitable(
     gen_hpat_pandas_series_rolling_ddof_impl(arr_var))
+
+
+@sdc_register_jitable
+def calc_min(arr, idx, win_size):
+    """Recalculate the window min based on data, index and window size."""
+    start = max(0, idx - win_size + 1)
+    nfinite = 0
+    result = numpy.nan
+    for i in range(start, idx + 1):
+        value = arr[i]
+        nfinite, result = put_min(value, nfinite, result)
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def pop_min(value, nfinite, result, arr, idx, win_size):
+    """Calculate the window min without old value."""
+    if numpy.isfinite(value):
+        nfinite -= 1
+        if nfinite:
+            if value == result:
+                return calc_min(arr, idx, win_size)
+        else:
+            result = numpy.nan
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def put_min(value, nfinite, result):
+    """Calculate the window min with new value."""
+    if numpy.isfinite(value):
+        nfinite += 1
+        if numpy.isnan(result) or value < result:
+            result = value
+
+    return nfinite, result
 
 
 @sdc_register_jitable
@@ -406,8 +433,55 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
     return impl
 
 
+def gen_sdc_pandas_series_rolling_minmax_impl(pop, put, init_result=numpy.nan):
+    """Generate series rolling min/max implementations based on pop/put funcs"""
+    def impl(self):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        chunks = parallel_chunks(length)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            nfinite = 0
+            result = init_result
+
+            prelude_start = max(0, chunk.start - win + 1)
+            prelude_stop = chunk.start
+
+            interlude_start = prelude_stop
+            interlude_stop = min(interlude_start + win, chunk.stop)
+
+            for idx in range(prelude_start, prelude_stop):
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+
+            for idx in range(interlude_start, interlude_stop):
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+                output_arr[idx] = result_or_nan(nfinite, minp, result)
+
+            for idx in range(interlude_stop, chunk.stop):
+                put_value = input_arr[idx]
+                pop_value = input_arr[idx - win]
+                nfinite, result = put(put_value, nfinite, result)
+                nfinite, result = pop(pop_value, nfinite, result,
+                                      input_arr, idx, win)
+                output_arr[idx] = result_or_nan(nfinite, minp, result)
+
+        return pandas.Series(output_arr, input_series._index,
+                             name=input_series._name)
+    return impl
+
+
 sdc_pandas_series_rolling_mean_impl = gen_sdc_pandas_series_rolling_impl(
     pop_sum, put_sum, get_result=mean_result_or_nan, init_result=0.)
+sdc_pandas_series_rolling_min_impl = gen_sdc_pandas_series_rolling_minmax_impl(
+    pop_min, put_min)
 sdc_pandas_series_rolling_skew_impl = gen_sdc_pandas_series_rolling_impl(
     pop_skew, put_skew, get_result=skew_result_or_nan, init_result=(0., 0., 0.))
 sdc_pandas_series_rolling_sum_impl = gen_sdc_pandas_series_rolling_impl(
@@ -664,14 +738,13 @@ def hpat_pandas_series_rolling_median(self):
     return hpat_pandas_rolling_series_median_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'min')
+@sdc_overload_method(SeriesRollingType, 'min')
 def hpat_pandas_series_rolling_min(self):
 
     ty_checker = TypeChecker('Method rolling.min().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_min_impl
-
+    return sdc_pandas_series_rolling_min_impl
 
 @sdc_rolling_overload(SeriesRollingType, 'quantile')
 def hpat_pandas_series_rolling_quantile(self, quantile, interpolation='linear'):
