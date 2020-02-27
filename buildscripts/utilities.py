@@ -138,6 +138,7 @@ def create_conda_env(conda_activate, env_name, python, packages=[], channels='')
     format_print(f'Setup conda {env_name} environment')
     run_command(f'{conda_activate}conda remove -q -y --name {env_name} --all')
     run_command(f'{conda_activate}conda create -q -y -n {env_name} python={python} {packages_list} {channels}')
+    return
 
 
 """
