@@ -1148,6 +1148,16 @@ class TestDataFrame(TestCase):
         h_out = hpat_func(df)
         pd.testing.assert_frame_equal(out, h_out)
 
+    @skip_numba_jit
+    def test_df_colname_spaces(self):
+        def test_impl(df):
+            return df.drop(columns='A')
+
+        sdc_func = self.jit(test_impl)
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B C': [4, 5, 6, 7], 'C D E': [1.0, 2.0, np.nan, 1.0]})
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
     def test_df_drop_one_column_unboxing(self):
         def test_impl(df):
             return df.drop(columns='A')
