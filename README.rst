@@ -39,7 +39,7 @@ If you do not have conda, we recommend using Miniconda3::
     ./miniconda.sh -b
     export PATH=$HOME/miniconda3/bin:$PATH
 
-Intel SDC uses Numba ``ef119bcd1733ff49d71bdf2da8a66e91bb704f83`` commit (referred later as ``numba_commit``) from master branch for build and run.
+Intel SDC uses Numba ``0.48.0`` tag (referred later as ``numba_commit``) from master branch for build and run.
 That is why it is required to build specified Numba first. Build steps are described below.
 
 It is possible to build Intel SDC via conda-build or setuptools. Follow one of the
