@@ -1,26 +1,34 @@
 {% set name = "numba" %}
-{% set version = "0.46.0" %}
-{% set LLVMLITE_VERSION = "0.31.0rc1 py*_0" %}
+{% set version = "0.48.0" %}
+{% set LLVMLITE_VERSION = "==0.31" %}
+{% set TBB_VERSION = ">=2018.0.5" %}
 
 package:
   name: {{ name|lower }}
   version: {{ version }}
 
 source:
-  git_url: https://github.com/numba/numba
-  git_tag: ef119bcd1733ff49d71bdf2da8a66e91bb704f83
+  git_url: https://github.com/numba/numba.git
+  git_tag: 0.48.0
+  patches:
+    - 0001-Add-prange-variant-to-has_no_side_effect.patch
+    - 0002-Add-test-for-prange-side-effect.patch
+    - 0003-Line-length.patch
 
 build:
-  number: 0
+  number: {{ GIT_DESCRIBE_NUMBER|int }}
+  string: py{{ CONDA_PY }}{{ GIT_DESCRIBE_HASH }}_{{ GIT_DESCRIBE_NUMBER|int }}
   entry_points:
     - pycc = numba.pycc:main
     - numba = numba.numba_entry:main
   script_env:
-    - PY_VCRUNTIME_REDIST
-  missing_dso_whitelist:  # [osx]
+    - PY_VCRUNTIME_REDIST  # [win]
+    - VS90COMNTOOLS        # [win]
+    - VS140COMNTOOLS       # [win]
+  missing_dso_whitelist:   # [osx]
     # optional dependency: required only when omp is chosen as the backend for
     # the threading layer
-    - lib/libiomp5.dylib  # [osx]
+    - lib/libiomp5.dylib   # [osx]
 
 requirements:
   # build and run dependencies are duplicated to avoid setuptools issues
@@ -35,22 +43,18 @@ requirements:
     - python
     - numpy
     - setuptools
-    - llvmlite {{ LLVMLITE_VERSION }}
-    - funcsigs                 # [py27]
-    - singledispatch           # [py27]
-    - tbb-devel >=2018.0.5     # [not (win and py27)]
+    - llvmlite    {{ LLVMLITE_VERSION }}
+    - tbb-devel   {{ TBB_VERSION }}
     - llvm-openmp              # [osx]
     - intel-openmp             # [osx]
   run:
     - python
     - {{ pin_compatible('numpy') }}
-    - llvmlite {{ LLVMLITE_VERSION }}
-    - funcsigs                 # [py27]
-    - singledispatch           # [py27]
+    - llvmlite    {{ LLVMLITE_VERSION }}
   run_constrained:
     # If TBB is present it must be at least this version from Anaconda due to
     # build flag issues triggering UB
-    - tbb >=2018.0.5           # [not (win and py27)]
+    - tbb         {{ TBB_VERSION }}
 
 test:
   requires:
@@ -60,8 +64,7 @@ test:
     - scipy
     - ipython
     - setuptools
-    - faulthandler             # [py27]
-    - tbb >=2018.0.5           # [not (win and py27)]
+    - tbb         {{ TBB_VERSION }}
     - intel-openmp             # [osx]
     # Need these for AOT. Do not init msvc as it may not be present
     - {{ compiler('c') }}      # [not win]
@@ -110,7 +113,3 @@ about:
     infrastructure to compile Python syntax to machine code."
   doc_url: http://numba.pydata.org/
   dev_url: https://github.com/numba/numba
-
-extra:
-  recipe-maintainers:
-    - souravsingh

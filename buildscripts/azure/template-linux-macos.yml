@@ -46,3 +46,9 @@ jobs:
         fi
       displayName: 'Test package examples'
       continueOnError: ${{ parameters.allowFailure }}
+
+    - script: |
+        source $HOME/miniconda3/bin/activate
+        python buildscripts/build_doc.py --python=$PYTHON_VER --sdc-channel=./sdc-build
+      displayName: 'Build Intel SDC documentation'
+      continueOnError: ${{ parameters.allowFailure }}
