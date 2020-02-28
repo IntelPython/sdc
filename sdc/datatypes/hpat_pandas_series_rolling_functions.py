@@ -221,8 +221,6 @@ def gen_hpat_pandas_series_rolling_ddof_impl(rolling_func):
     return impl
 
 
-hpat_pandas_rolling_series_kurt_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_kurt))
 hpat_pandas_rolling_series_median_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_median))
 hpat_pandas_rolling_series_std_impl = register_jitable(
