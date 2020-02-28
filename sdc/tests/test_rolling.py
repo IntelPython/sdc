@@ -1307,6 +1307,7 @@ class TestRolling(TestCase):
     def test_series_rolling_corr(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
+            [-1., 1., 0., -0.1, 0.1, 0.],
             [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
             [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
         ]

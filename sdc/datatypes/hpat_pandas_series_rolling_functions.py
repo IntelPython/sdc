@@ -391,15 +391,18 @@ def corr_result_or_nan(nfinite, minp, result):
 
     sum_x, sum_y, sum_xy, sum_xx, sum_yy = result
 
-    var_x = (sum_xx - sum_x * sum_x / nfinite)
-    if var_x == 0:
+    var_x = sum_xx - sum_x * sum_x / nfinite
+    # handle floating point arithmetic limitations
+    abs_tol = 1e-17
+    if abs(var_x) <= abs_tol:
         return numpy.nan
 
-    var_y = (sum_yy - sum_y * sum_y / nfinite)
-    if var_y == 0:
+    var_y = sum_yy - sum_y * sum_y / nfinite
+    # handle floating point arithmetic limitations
+    if abs(var_y) <= abs_tol:
         return numpy.nan
 
-    cov_xy = (sum_xy - sum_x * sum_y / nfinite)
+    cov_xy = sum_xy - sum_x * sum_y / nfinite
 
     return cov_xy / numpy.sqrt(var_x * var_y)
 
