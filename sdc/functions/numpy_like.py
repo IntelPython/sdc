@@ -95,7 +95,7 @@ def nansum(self):
     pass
 
 
-@sdc_overload(astype)
+@sdc_overload(astype, inline='always')
 def sdc_astype_overload(self, dtype):
     """
     Intel Scalable Dataframe Compiler Developer Guide
@@ -531,7 +531,7 @@ def sdc_fillna_overload(self, inplace=False, value=None):
 
         def sdc_fillna_inplace_float_impl(self, inplace=False, value=None):
             length = len(self)
-            for i in prange(length):
+            for i in range(length):
                 if isnan(self[i]):
                     self[i] = value
             return None

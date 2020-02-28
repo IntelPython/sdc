@@ -219,9 +219,21 @@ def sdc_join_series_indexes_overload(left, right):
                 ridx = numpy.empty(est_total_size, numpy.int64)
                 joined = numpy.empty(est_total_size, numba_common_dtype)
 
+                left_nan = []
+                right_nan = []
+                for i in range(lsize):
+                    if numpy.isnan(left[i]):
+                        left_nan.append(i)
+                for i in range(rsize):
+                    if numpy.isnan(right[i]):
+                        right_nan.append(i)
+
                 # sort arrays saving the old positions
                 sorted_left = numpy.argsort(left, kind='mergesort')
                 sorted_right = numpy.argsort(right, kind='mergesort')
+                # put the position of the nans in an increasing sequence
+                sorted_left[lsize-len(left_nan):] = left_nan
+                sorted_right[rsize-len(right_nan):] = right_nan
 
                 i, j, k = 0, 0, 0
                 while (i < lsize and j < rsize):
@@ -232,13 +244,13 @@ def sdc_join_series_indexes_overload(left, right):
                     left_index = left[sorted_left[i]]
                     right_index = right[sorted_right[j]]
 
-                    if (left_index < right_index):
+                    if (left_index < right_index) or numpy.isnan(right_index):
                         joined[k] = left_index
                         lidx[k] = sorted_left[i]
                         ridx[k] = -1
                         i += 1
                         k += 1
-                    elif (left_index > right_index):
+                    elif (left_index > right_index) or numpy.isnan(left_index):
                         joined[k] = right_index
                         lidx[k] = -1
                         ridx[k] = sorted_right[j]

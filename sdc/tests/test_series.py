@@ -3495,6 +3495,94 @@ class TestSeries(
         pd.testing.assert_series_equal(hpat_func(S1, S2, S3),
                                        test_impl(S1, S2, S3))
 
+    # sdc.datatypes.common_functions.sdc_join_series_indexes work uncorrectly
+    # different indexes
+    @unittest.expectedFailure
+    def sdc_join_series_indexes(self):
+        def test_impl(S1, S2):
+            return S1.add(S2)
+
+        sdc_func = self.jit(test_impl)
+
+        data = [0, 1, 2, 3, 4]
+        index1 = [3.3, 5.4, np.nan, 7.9, np.nan]
+        index2 = [3, 4, 3, 9, 2]
+        S1 = pd.Series(data, index1)
+        S2 = pd.Series(data, index2)
+        pd.testing.assert_series_equal(sdc_func(S1, S2), test_impl(S1, S2))
+
+    @unittest.skip('SDC returns only float Series')
+    def test_series_add(self):
+        def test_impl(S1, S2, value):
+            return S1.add(S2, fill_value=value)
+
+        sdc_func = self.jit(test_impl)
+
+        cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases_index = [[0, 1, 2, 3, 4], [3, 4, 3, 9, 2], None]
+        cases_value = [None, 4, 5.5]
+        for data in cases_data:
+            for index in cases_index:
+                for value in cases_value:
+                    with self.subTest(data=data, index=index, value=value):
+                        S1 = pd.Series(data, index)
+                        S2 = pd.Series(index, data)
+                        pd.testing.assert_series_equal(sdc_func(S1, S2, value), test_impl(S1, S2, value))
+
+    @unittest.skip('SDC returns only float Series')
+    def test_series_add_scalar(self):
+        def test_impl(S1, S2, value):
+            return S1.add(S2, fill_value=value)
+
+        sdc_func = self.jit(test_impl)
+
+        cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases_index = [[0, 1, 2, 3, 4], [3, 4, 3, 9, 2], None]
+        cases_scalar = [0, 1, 5.5, np.nan]
+        cases_value = [None, 4, 5.5]
+        for data in cases_data:
+            for index in cases_index:
+                for scalar in cases_scalar:
+                    for value in cases_value:
+                        with self.subTest(data=data, index=index, scalar=scalar, value=value):
+                            S1 = pd.Series(data, index)
+                            pd.testing.assert_series_equal(sdc_func(S1, scalar, value), test_impl(S1, scalar, value))
+
+    def test_series_lt(self):
+        def test_impl(S1, S2, value):
+            return S1.lt(S2, fill_value=value)
+
+        sdc_func = self.jit(test_impl)
+
+        cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases_index = [[3, 4, 3, 9, 2], None]
+        cases_value = [None, 4, 5.5]
+        for data in cases_data:
+            for index in cases_index:
+                for value in cases_value:
+                    with self.subTest(data=data, index=index, value=value):
+                        S1 = pd.Series(data, index)
+                        S2 = pd.Series(data[::-1], index)
+                        pd.testing.assert_series_equal(sdc_func(S1, S2, value), test_impl(S1, S2, value))
+
+    def test_series_lt_scalar(self):
+        def test_impl(S1, S2, value):
+            return S1.lt(S2, fill_value=value)
+
+        sdc_func = self.jit(test_impl)
+
+        cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases_index = [[0, 1, 2, 3, 4], [3, 4, 3, 9, 2], None]
+        cases_scalar = [0, 1, 5.5, np.nan]
+        cases_value = [None, 4, 5.5]
+        for data in cases_data:
+            for index in cases_index:
+                for scalar in cases_scalar:
+                    for value in cases_value:
+                        with self.subTest(data=data, index=index, scalar=scalar, value=value):
+                            S1 = pd.Series(data, index)
+                            pd.testing.assert_series_equal(sdc_func(S1, scalar, value), test_impl(S1, scalar, value))
+
     def test_series_isin_list1(self):
         def test_impl(S, values):
             return S.isin(values)
