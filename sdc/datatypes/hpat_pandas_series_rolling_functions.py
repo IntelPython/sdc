@@ -450,6 +450,11 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
             nfinite = 0
             result = init_result
 
+            if win == 0:
+                for idx in range(chunk.start, chunk.stop):
+                    output_arr[idx] = get_result(nfinite, minp, result)
+                continue
+
             prelude_start = max(0, chunk.start - win + 1)
             prelude_stop = chunk.start
 
@@ -493,6 +498,11 @@ def gen_sdc_pandas_series_rolling_minmax_impl(pop, put, init_result=numpy.nan):
             chunk = chunks[i]
             nfinite = 0
             result = init_result
+
+            if win == 0:
+                for idx in range(chunk.start, chunk.stop):
+                    output_arr[idx] = result_or_nan(nfinite, minp, result)
+                continue
 
             prelude_start = max(0, chunk.start - win + 1)
             prelude_stop = chunk.start
