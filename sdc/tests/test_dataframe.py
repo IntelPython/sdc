@@ -820,11 +820,18 @@ class TestDataFrame(TestCase):
         for idx in indexes:
             df = pd.DataFrame({"float": [3.2, np.nan, 7.0, 3.3, np.nan],
                                "int": [3, 4, 1, 0, 222],
-                            #    "bool": [True, True, False, False, True],
-                               "string": ['a', 'dd', 'c', '12', None]
-                              }, index=idx)
+                               "string": ['a', 'dd', 'c', '12', None]}, index=idx)
             with self.subTest(index=idx):
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    @unittest.skip('DF with bool data Segmentation fault')
+    def test_df_bool(self):
+        def test_impl(df):
+            return df.isna()
+
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"bool": [True, True, False, False, True]}, index=None)
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
     @skip_numba_jit
     def test_df_astype_str1(self):
