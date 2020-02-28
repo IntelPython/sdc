@@ -478,7 +478,7 @@ def _dataframe_reduce_columns_codegen_head(func_name, func_params, series_params
     results = []
     joined = ', '.join(func_params)
     func_lines = [f'def _df_{func_name}_impl(df, {joined}):']
-    ind = df_index_codegen(df)
+    ind = df_index_codegen_head(df)
     for i, c in enumerate(columns):
         result_c = f'result_{c}'
         func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data(df, {i}))',
@@ -486,7 +486,7 @@ def _dataframe_reduce_columns_codegen_head(func_name, func_params, series_params
         results.append((columns[i], result_c))
 
     data = ', '.join(f'"{col}": {data}' for col, data in results)
-    func_lines += [f'  return pandas.DataFrame({{{data}}}{ind})']
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, {ind})']
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
@@ -508,11 +508,12 @@ def sdc_pandas_dataframe_head_codegen(df, func_name, params, ser_params):
     return _reduce_impl
 
 
-def df_index_codegen(self):
+def df_index_codegen_head(self):
+    # TODO: Rewrite when DF constructor will be fixed with index=None
     if isinstance(self.index, types.NoneType):
         return ''
 
-    return ', index=df._index[:n]'
+    return 'index=df._index[:n]'
 
 
 @sdc_overload_method(DataFrameType, 'head')
