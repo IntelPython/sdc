@@ -713,7 +713,20 @@ def _sdc_take_overload(data, indexes):
 
     return None
 
-@sdc_register_jitable
-def almost_equal(x, y):
-    """Check if floats are almost equal based on float epsilon"""
-    return abs(x - y) <= numpy.finfo(numpy.float64).eps
+
+def _almost_equal(x, y):
+    """Check if floats are almost equal based on the float epsilon"""
+    pass
+
+
+@sdc_overload(_almost_equal)
+def _almost_equal_overload(x, y):
+    ty_checker = TypeChecker('Function sdc.common_functions._almost_equal_overload().')
+    ty_checker.check(x, types.Float)
+    ty_checker.check(x, types.Float)
+
+    common_dtype = numpy.find_common_type([], [x.name, y.name])
+    def _almost_equal_impl(x, y):
+        return abs(x - y) <= numpy.finfo(common_dtype).eps
+
+    return _almost_equal_impl
