@@ -636,6 +636,11 @@ def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
             nfinite = 0
             result = (0., 0., 0., 0., 0.)
 
+            if win == 0:
+                for idx in range(chunk.start, chunk.stop):
+                    output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
+                continue
+
             prelude_start = max(0, chunk.start - win + 1)
             prelude_stop = chunk.start
 
