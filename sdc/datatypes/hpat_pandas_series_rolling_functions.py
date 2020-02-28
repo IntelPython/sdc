@@ -115,31 +115,6 @@ def arr_nonnan_count(arr):
 
 
 @sdc_register_jitable
-def _moment(arr, moment):
-    mn = numpy.mean(arr)
-    s = numpy.power((arr - mn), moment)
-
-    return numpy.mean(s)
-
-
-@sdc_register_jitable
-def arr_kurt(arr):
-    """Calculate unbiased kurtosis of values"""
-    n = len(arr)
-    if n < 4:
-        return numpy.nan
-
-    m2 = _moment(arr, 2)
-    m4 = _moment(arr, 4)
-    val = 0 if m2 == 0 else m4 / m2 ** 2.0
-
-    if (n > 2) & (m2 > 0):
-        val = 1.0/(n-2)/(n-3) * ((n**2-1.0)*m4/m2**2.0 - 3*(n-1)**2.0)
-
-    return val
-
-
-@sdc_register_jitable
 def arr_mean(arr):
     """Calculate mean of values"""
     if len(arr) == 0:
