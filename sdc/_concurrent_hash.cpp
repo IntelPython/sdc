@@ -91,6 +91,16 @@ void deleteiter_int_hashmap(void* obj)
     delete static_cast<int_hashmap_iters*>(obj);
 }
 
+using funcptr_t = int32_t(*)(int32_t,int32_t,int32_t);
+int32_t test_funcptr(funcptr_t func, int32_t a, int32_t b)
+{
+    int32_t res = 0;
+    for (int i = 0; i < 10; ++i)
+    {
+        res += func(a, b, i);
+    }
+    return res;
+}
 
 PyMODINIT_FUNC PyInit_hconcurrent_hash()
 {
@@ -118,6 +128,8 @@ PyMODINIT_FUNC PyInit_hconcurrent_hash()
     REGISTER(iterkey_int_hashmap)
     REGISTER(iterval_int_hashmap)
     REGISTER(deleteiter_int_hashmap)
+
+    REGISTER(test_funcptr)
 #undef REGISTER
     return m;
 }

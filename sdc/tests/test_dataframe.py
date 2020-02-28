@@ -1794,7 +1794,14 @@ class TestDataFrame(TestCase):
     def test_tbb(self):
         import sdc.concurrent_hash
 
-        def test_impl():
+        @numba.cfunc("int32(int32, int32, int32)")
+        def callback(x, y, z):
+            return x + y + z
+
+        global funcptr
+        funcptr = callback.address
+
+        def test_impl1():
             h = sdc.concurrent_hash.create_int_hashmap()
 
             sdc.concurrent_hash.addelem_int_hashmap(h, 1, 2)
@@ -1814,8 +1821,15 @@ class TestDataFrame(TestCase):
             sdc.concurrent_hash.deleteiter_int_hashmap(it)
             sdc.concurrent_hash.delete_int_hashmap(h)
 
-        hpat_func = self.jit(test_impl)
-        hpat_func()
+        hpat_func1 = self.jit(test_impl1)
+        hpat_func1()
+
+        def test_impl2():
+            r = sdc.concurrent_hash.test_funcptr(funcptr, 2, 3)
+            print('res', r)
+
+        hpat_func2 = self.jit(test_impl2)
+        hpat_func2()
 
 
 if __name__ == "__main__":

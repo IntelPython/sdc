@@ -28,8 +28,7 @@ import numba
 import sdc
 
 from numba import types, typing, generated_jit
-from numba.extending import models, register_model
-from numba.extending import lower_builtin, overload_method, overload, intrinsic
+from numba.extending import lower_builtin, overload_method, overload, intrinsic, register_jitable
 
 from llvmlite import ir as lir
 import llvmlite.binding as ll
@@ -44,6 +43,8 @@ ll.add_symbol('nextiter_int_hashmap', hconcurrent_hash.nextiter_int_hashmap)
 ll.add_symbol('iterkey_int_hashmap', hconcurrent_hash.iterkey_int_hashmap)
 ll.add_symbol('iterval_int_hashmap', hconcurrent_hash.iterval_int_hashmap)
 ll.add_symbol('deleteiter_int_hashmap', hconcurrent_hash.deleteiter_int_hashmap)
+
+ll.add_symbol('test_funcptr', hconcurrent_hash.test_funcptr)
 
 _create_int_hashmap = types.ExternalFunction("create_int_hashmap",
                                              types.voidptr())
@@ -64,6 +65,9 @@ _iterval_int_hashmap = types.ExternalFunction("iterval_int_hashmap",
                                               types.intp(types.voidptr))
 _deleteiter_int_hashmap = types.ExternalFunction("deleteiter_int_hashmap",
                                                  types.void(types.voidptr))
+
+_test_funcptr = types.ExternalFunction("test_funcptr",
+                                       types.int32(types.voidptr,types.int32,types.int32))
 
 
 def create_int_hashmap():
@@ -99,6 +103,10 @@ def iterval_int_hashmap():
 
 
 def deleteiter_int_hashmap():
+    pass
+
+
+def test_funcptr():
     pass
 
 
@@ -145,3 +153,18 @@ def iterval_int_hashmap_overload(h):
 @overload(deleteiter_int_hashmap)
 def deleteiter_int_hashmap_overload(h):
     return lambda h: _deleteiter_int_hashmap(h)
+
+
+
+@register_jitable
+def sink(*args):
+    args[0]
+
+@overload(test_funcptr)
+def test_funcptr_overload(a,b,c):
+    def func(a,b,c):
+        res = _test_funcptr(a,b,c)
+        sink(a,b,c)
+        return res
+
+    return func
