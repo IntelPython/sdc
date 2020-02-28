@@ -109,12 +109,6 @@ def arr_corr(x, y):
 
 
 @sdc_register_jitable
-def arr_nonnan_count(arr):
-    """Count non-NaN values"""
-    return len(arr) - numpy.isnan(arr).sum()
-
-
-@sdc_register_jitable
 def arr_max(arr):
     """Calculate maximum of values"""
     if len(arr) == 0:
@@ -532,12 +526,11 @@ def gen_sdc_pandas_series_rolling_minmax_impl(pop, put, init_result=numpy.nan):
     return impl
 
 
+sdc_pandas_series_rolling_count_impl = gen_sdc_pandas_series_rolling_impl(
+    pop_count, put_count, get_result=result, init_result=0.)
 sdc_pandas_series_rolling_kurt_impl = gen_sdc_pandas_series_rolling_impl(
     pop_kurt, put_kurt, get_result=kurt_result_or_nan,
     init_result=(0., 0., 0., 0.))
-
-sdc_pandas_series_rolling_count_impl = gen_sdc_pandas_series_rolling_impl(
-    pop_count, put_count, get_result=result, init_result=0.)
 sdc_pandas_series_rolling_mean_impl = gen_sdc_pandas_series_rolling_impl(
     pop_sum, put_sum, get_result=mean_result_or_nan, init_result=0.)
 sdc_pandas_series_rolling_min_impl = gen_sdc_pandas_series_rolling_minmax_impl(
