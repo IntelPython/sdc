@@ -1,0 +1,40 @@
+From 8648302e55382286db9299876eecc8bf318ab4b6 Mon Sep 17 00:00:00 2001
+From: "Todd A. Anderson" <drtodd13@comcast.net>
+Date: Wed, 19 Feb 2020 08:53:04 -0800
+Subject: [PATCH 2/3] Add test for prange side effect.
+
+---
+ numba/tests/test_parfors.py | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/numba/tests/test_parfors.py b/numba/tests/test_parfors.py
+index f17e37932..76c339c2f 100644
+--- a/numba/tests/test_parfors.py
++++ b/numba/tests/test_parfors.py
+@@ -1558,6 +1558,23 @@ class TestParfors(TestParforsBase):
+         x = np.ones(20)
+         self.check(test_impl, x, True, check_scheduling=False)
+ 
++    @skip_parfors_unsupported
++    def test_prange_side_effects(self):
++        def test_impl(a, b):
++            data = np.empty(len(a), dtype=np.float64)
++            size = len(data)
++            for i in numba.prange(size):
++                data[i] = a[i]
++            for i in numba.prange(size):
++                data[i] = data[i] + b[i]
++            return data
++
++        x = np.arange(10 ** 2, dtype=float)
++        y = np.arange(10 ** 2, dtype=float)
++
++        self.check(test_impl, x, y)
++        self.assertTrue(countParfors(test_impl, (types.Array(types.float64, 1, 'C'), types.Array(types.float64, 1, 'C'))) == 1)
++
+ 
+ class TestParforsLeaks(MemoryLeakMixin, TestParforsBase):
+     def check(self, pyfunc, *args, **kwargs):
+-- 
+2.14.3
+
