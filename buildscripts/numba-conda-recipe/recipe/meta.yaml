@@ -9,6 +9,10 @@ package:
 source:
   git_url: https://github.com/numba/numba
   git_tag: 0.48.0
+  patches:
+    - 0001-Add-prange-variant-to-has_no_side_effect.patch
+    - 0002-Add-test-for-prange-side-effect.patch
+    - 0003-Line-length.patch
 
 build:
   number: 0
