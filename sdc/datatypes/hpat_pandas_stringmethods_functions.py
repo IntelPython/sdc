@@ -750,6 +750,8 @@ def hpat_pandas_stringmethods_zfill(self, width):
     Limitations
     -----------
     Series elements are expected to be Unicode strings. Elements cannot be NaN.
+    A leading sign prefix ('+'/'-') is handled by inserting the padding after
+    the sign character rather than before.
 
     Examples
     --------
