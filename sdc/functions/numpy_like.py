@@ -95,7 +95,7 @@ def nansum(self):
     pass
 
 
-@sdc_overload(astype)
+@sdc_overload(astype, inline='always')
 def sdc_astype_overload(self, dtype):
     """
     Intel Scalable Dataframe Compiler Developer Guide
