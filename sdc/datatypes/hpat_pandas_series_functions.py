@@ -2553,7 +2553,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
         ty_checker.raise_exc(axis, 'int', 'axis')
     # specializations for numeric series only
     if not operands_are_series:
-        def _series_operator_add_scalar_impl(self, other, level=None, fill_value=None, axis=0):
+        def _series_add_scalar_impl(self, other, level=None, fill_value=None, axis=0):
             if fill_value is None:
                 fill_value = numpy.nan
             numpy_like.fillna(self._data, inplace=True, value=fill_value)
@@ -2567,12 +2567,12 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
                 result_data[:] = numpy.float64(self) + other._data
                 return pandas.Series(result_data, index=other._index, name=other._name)
 
-        return _series_operator_add_scalar_impl
+        return _series_add_scalar_impl
 
     else:   # both operands are numeric series
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
-            def _series_operator_add_none_indexes_impl(self, other, level=None, fill_value=None, axis=0):
+            def _series_add_none_indexes_impl(self, other, level=None, fill_value=None, axis=0):
                 if fill_value is None:
                     fill_value = numpy.nan
                 numpy_like.fillna(self._data, inplace=True, value=fill_value)
@@ -2600,7 +2600,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
                     return pandas.Series(result_data)
 
-            return _series_operator_add_none_indexes_impl
+            return _series_add_none_indexes_impl
         else:
             # for numeric indexes find common dtype to be used when creating joined index
             if none_or_numeric_indexes:
@@ -2609,7 +2609,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
                 numba_index_common_dtype = find_common_dtype_from_numpy_dtypes(
                     [ty_left_index_dtype, ty_right_index_dtype], [])
 
-            def _series_operator_add_common_impl(self, other, level=None, fill_value=None, axis=0):
+            def _series_add_common_impl(self, other, level=None, fill_value=None, axis=0):
                 left_index, right_index = self.index, other.index
                 if fill_value is None:
                     fill_value = numpy.nan
@@ -2640,7 +2640,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
                 result_data = left_values + right_values
                 return pandas.Series(result_data, joined_index)
 
-            return _series_operator_add_common_impl
+            return _series_add_common_impl
 
     return None
 
@@ -4119,11 +4119,6 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
     if not (isinstance(axis, types.Omitted) or axis == 0):
         ty_checker.raise_exc(axis, 'int', 'axis')
 
-    # if isinstance(other, SeriesType):
-    #     def hpat_pandas_series_le_impl(self, other, level=None, fill_value=None, axis=0):
-    #         return pandas.Series(self._data <= other._data)
-
-    #     return hpat_pandas_series_le_impl
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
     if not (self_is_series or other_is_series):
         return None
