@@ -28,6 +28,12 @@
 #include <daal.h>
 
 
+using namespace daal;
+using namespace daal::algorithms;
+using namespace daal::data_management;
+using namespace daal::services;
+
+
 extern "C"
 {
 
@@ -46,23 +52,31 @@ double sum(double *p, int c)
     return result;
 }
 
-double quantile(int c, double *p, double q)
+double median(int nRows, double *ptr)
 {
-    using namespace daal;
-    using namespace daal::algorithms;
-    using namespace daal::data_management;
+    quantiles::Batch<double> algorithm;
+    algorithm.input.set(quantiles::data, HomogenNumericTable<double>::create(ptr, 1, nRows));
+    algorithm.compute();
+    return algorithm.getResult()->get(quantiles::quantiles)->getValue<double>(0, 0);
+}
 
-    quantiles::Batch<> algorithm;
+void quantile(const double * data, const __int64_t nFeatures, const __int64_t nVectors,
+              const __int64_t quantOrderN, const double * quantOrder,
+              double * quants)
+{
+    Environment::getInstance()->setNumberOfThreads(4);  // does not affect
 
-    auto in_table = HomogenNumericTable<double>::create(p, 1, c);
-    algorithm.input.set(quantiles::data, in_table);
+    // quantiles::Batch<> algorithm;
+    quantiles::Batch<double> algorithm;  // 2 times faster
+    algorithm.parameter.quantileOrders = HomogenNumericTable<double>::create(quantOrder, 1, quantOrderN);
 
-    algorithm.parameter.quantileOrders->assign(q);
+    algorithm.input.set(quantiles::data, HomogenNumericTable<double>::create(data, nFeatures, nVectors));
 
     algorithm.compute();
 
     auto out_table = algorithm.getResult()->get(quantiles::quantiles);
-    return out_table->getValue<double>(0, 0);
+    for (int i = 0; i < quantOrderN; ++i)
+        quants[i] = out_table->getValue<double>(0, i);
 }
 
 PyMODINIT_FUNC PyInit_daal()
@@ -83,6 +97,7 @@ PyMODINIT_FUNC PyInit_daal()
 #define REGISTER(func) PyObject_SetAttrString(m, #func, PyLong_FromVoidPtr((void*)(&func)));
     REGISTER(test)
     REGISTER(sum)
+    REGISTER(median)
     REGISTER(quantile)
 #undef REGISTER
     return m;

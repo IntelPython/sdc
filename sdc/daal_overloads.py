@@ -25,6 +25,7 @@
 # *****************************************************************************
 
 import numba
+import ctypes as ct
 
 from numba import types
 from numba.extending import overload
@@ -56,14 +57,13 @@ def test_overload(x):
     return lambda x: _test(x)
 
 
-import ctypes
-
-functype_test = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_int)
+functype_test = ct.CFUNCTYPE(ct.c_int, ct.c_int)
 ctypes_test = functype_test(daal.test)
 
-# functype_sum = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.POINTER(ctypes.c_double), ctypes.c_int)
-functype_sum = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_void_p, ctypes.c_int)
+# functype_sum = ct.CFUNCTYPE(ct.c_double, ct.POINTER(ct.c_double), ct.c_int)
+functype_sum = ct.CFUNCTYPE(ct.c_double, ct.c_void_p, ct.c_int)
 ctypes_sum = functype_sum(daal.sum)
 
 
-quantile = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_int, ctypes.c_void_p, ctypes.c_double)(daal.quantile)
+median = ct.CFUNCTYPE(ct.c_double, ct.c_int, ct.c_void_p)(daal.median)
+quantile = ct.CFUNCTYPE(ct.c_double, ct.c_int, ct.c_void_p, ct.c_double)(daal.quantile)
