@@ -132,7 +132,7 @@ html_show_sourcelink = False
 
 # -- Todo extension configuration  ----------------------------------------------
 todo_include_todos = True
-todo_link_only = False
+todo_link_only = True
 
 # -- InterSphinx configuration: looks for objects in external projects -----
 # Add here external classes you want to link from Intel SDC documentation
