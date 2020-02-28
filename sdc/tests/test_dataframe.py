@@ -951,9 +951,9 @@ class TestDataFrame(TestCase):
         sdc_func = sdc.jit(test_impl)
         for n in [-3, 0, 3, 5, None]:
             for idx in [[3, 4, 2, 6, 1], None]:
-                df = pd.DataFrame({"FLOAT": [3.2, 4.4, 7.0, 3.3, 1.0],
-                                   "INT": [3, 4, 1, 0, 222],
-                                   "STRING": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
+                df = pd.DataFrame({"float": [3.2, 4.4, 7.0, 3.3, 1.0],
+                                   "int": [3, 4, 1, 0, 222],
+                                   "string": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
                 with self.subTest(n=n, index=idx):
                     pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
 
