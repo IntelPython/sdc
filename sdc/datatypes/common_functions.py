@@ -712,3 +712,8 @@ def _sdc_take_overload(data, indexes):
         return _sdc_take_str_arr_impl
 
     return None
+
+@sdc_register_jitable
+def almost_equal(x, y):
+    """Check if floats are almost equal based on float epsilon"""
+    return abs(x - y) <= numpy.finfo(numpy.float64).eps

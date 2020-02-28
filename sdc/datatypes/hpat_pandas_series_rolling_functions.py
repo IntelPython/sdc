@@ -35,7 +35,8 @@ from numba.types import (float64, Boolean, Integer, NoneType, Number,
                          Omitted, StringLiteral, UnicodeType)
 
 from sdc.datatypes.common_functions import (_sdc_pandas_arr_align,
-                                            _sdc_pandas_series_align)
+                                            _sdc_pandas_series_align,
+                                            almost_equal)
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.prange_utils import parallel_chunks
@@ -392,14 +393,11 @@ def corr_result_or_nan(nfinite, minp, result):
     sum_x, sum_y, sum_xy, sum_xx, sum_yy = result
 
     var_x = sum_xx - sum_x * sum_x / nfinite
-    # handle floating point arithmetic limitations
-    abs_tol = 1e-17
-    if abs(var_x) <= abs_tol:
+    if almost_equal(var_x, 0):
         return numpy.nan
 
     var_y = sum_yy - sum_y * sum_y / nfinite
-    # handle floating point arithmetic limitations
-    if abs(var_y) <= abs_tol:
+    if almost_equal(var_y, 0):
         return numpy.nan
 
     cov_xy = sum_xy - sum_x * sum_y / nfinite
