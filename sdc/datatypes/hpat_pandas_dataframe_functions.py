@@ -43,7 +43,7 @@ from numba.typed import List, Dict
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric,
-                                            check_types_comparable,
+                                            check_types_comparable, kwsparams2list,
                                             gen_df_impl_generator, find_common_dtype_from_numpy_dtypes)
 from sdc.str_arr_ext import StringArrayType
 
@@ -462,13 +462,26 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
 
 
 def _dataframe_reduce_columns_codegen_head(func_name, func_params, series_params, columns, df):
+    """
+    Example func_text for func_name='head' columns=('float', 'int', 'string'):
+
+        def _df_head_impl(df, n=5):
+            series_float = pandas.Series(get_dataframe_data(df, 0))
+            result_float = series_float.head(n=n)
+            series_int = pandas.Series(get_dataframe_data(df, 1))
+            result_int = series_int.head(n=n)
+            series_string = pandas.Series(get_dataframe_data(df, 2))
+            result_string = series_string.head(n=n)
+            return pandas.DataFrame({"float": result_float, "int": result_int, "string": result_string},
+                                    index = df._index[:n])
+    """
     results = []
     joined = ', '.join(func_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     ind = df_index_codegen(df)
     for i, c in enumerate(columns):
         result_c = f'result_{c}'
-        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({func_params[0]}, {i}))',
+        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data(df, {i}))',
                        f'  {result_c} = series_{c}.{func_name}({series_params})']
         results.append((columns[i], result_c))
 
@@ -481,31 +494,10 @@ def _dataframe_reduce_columns_codegen_head(func_name, func_params, series_params
     return func_text, global_vars
 
 
-"""
-Example func_text for func_name='head' columns=('FLOAT', 'INT', 'STRING'):
-
-    def _df_head_impl(df, n=5):
-        series_FLOAT = pandas.Series(get_dataframe_data(df, 0))
-        result_FLOAT = series_FLOAT.head(n=n)
-        series_INT = pandas.Series(get_dataframe_data(df, 1))
-        result_INT = series_INT.head(n=n)
-        series_STRING = pandas.Series(get_dataframe_data(df, 2))
-        result_STRING = series_STRING.head(n=n)
-        return pandas.DataFrame({"FLOAT": result_FLOAT, "INT": result_INT, "STRING": result_STRING},
-                                index = df._index[:n])
-"""
-
-
 def sdc_pandas_dataframe_head_codegen(df, func_name, params, ser_params):
-    all_params = ['df']
-    ser_par = []
-
-    for key, value in params.items():
-        all_params.append('{}={}'.format(key, value))
-    for key, value in ser_params.items():
-        ser_par.append('{}={}'.format(key, value))
-
-    s_par = '{}'.format(', '.join(ser_par[:]))
+    all_params = ['df'] + kwsparams2list(params)
+    ser_par = kwsparams2list(ser_params)
+    s_par = ', '.join(ser_par)
 
     df_func_name = f'_df_{func_name}_impl'
     func_text, global_vars = _dataframe_reduce_columns_codegen_head(func_name, all_params, s_par, df.columns, df)

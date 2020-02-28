@@ -964,16 +964,18 @@ class TestDataFrame(TestCase):
 
             return impl
 
-        for n in [-3, 0, 3, 5, None]:
-            for idx in [[3, 4, 2, 6, 1], None]:
+        cases_n = [-3, 0, 3, 5, None]
+        cases_index = [[3, 4, 2, 6, 1], None]
+        for n in cases_n:
+            for idx in cases_index:
                 ref_impl = get_func(n)
                 sdc_impl = get_func(n)
                 sdc_func = self.jit(sdc_impl)
-                with self.subTest(n=n):
+                with self.subTest(n=n, index=idx):
                     df = pd.DataFrame(
-                        {"FLOAT": [3.2, 4.4, 7.0, 3.3, 1.0],
-                         "INT": [3, 4, 1, 0, 222],
-                         "STRING": ['a', 'dd', 'c', '12', 'ddf']},
+                        {"float": [3.2, 4.4, 7.0, 3.3, 1.0],
+                         "int": [3, 4, 1, 0, 222],
+                         "string": ['a', 'dd', 'c', '12', 'ddf']},
                         index=[3, 4, 2, 6, 1]
                     )
                     pd.testing.assert_frame_equal(sdc_func(df), ref_impl(df))
