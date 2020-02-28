@@ -813,13 +813,16 @@ class TestDataFrame(TestCase):
     def test_df_isna(self):
         def test_impl(df):
             return df.isna()
+
         sdc_func = sdc.jit(test_impl)
-        for idx in [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e'], None]:
-            df = pd.DataFrame({"FLOAT": [3.2, np.nan, 7.0, 3.3, np.nan],
-                                "INT": [3, 4, 1, 0, 222],
-                                "BOOL": [True, True, False, False, True],
-                                "STRING": ['a', 'dd', 'c', '12', None]
-                                }, index=idx)
+        indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e'], None]
+
+        for idx in indexes:
+            df = pd.DataFrame({"float": [3.2, np.nan, 7.0, 3.3, np.nan],
+                               "int": [3, 4, 1, 0, 222],
+                            #    "bool": [True, True, False, False, True],
+                               "string": ['a', 'dd', 'c', '12', None]
+                              }, index=idx)
             with self.subTest(index=idx):
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 

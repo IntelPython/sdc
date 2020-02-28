@@ -935,19 +935,31 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
     return func_def, global_vars
 
 
-def _dataframe_reduce_columns_codegen_isna(func_name, func_params, columns, df):
+def _dataframe_reduce_columns_codegen_isna(func_name, columns, df):
+    """
+    Example func_text for func_name='isna' columns=('float', 'int', 'string'):
+
+        def _df_isna_impl(df):
+            series_float = pandas.Series(get_dataframe_data(df, 0))
+            result_float = series_float.isna()
+            series_int = pandas.Series(get_dataframe_data(df, 1))
+            result_int = series_int.isna()
+            series_string = pandas.Series(get_dataframe_data(df, 2))
+            result_string = series_string.isna()
+            return pandas.DataFrame({"float": result_float, "int": result_int, "string": result_string},
+                                    index = df._index)
+    """
     results = []
-    joined = ', '.join(func_params)
-    func_lines = [f'def _df_{func_name}_impl({joined}):']
-    ind = df_index_codegen_all(df)
+    func_lines = [f'def _df_{func_name}_impl(df):']
+    index = df_index_codegen_all(df)
     for i, c in enumerate(columns):
         result_c = f'result_{c}'
-        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({func_params[0]}, {i}))',
+        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data(df, {i}))',
                        f'  {result_c} = series_{c}.{func_name}()']
         results.append((columns[i], result_c))
 
     data = ', '.join(f'"{col}": {data}' for col, data in results)
-    func_lines += [f'  return pandas.DataFrame({{{data}}}{ind})']
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, {index})']
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
@@ -955,25 +967,9 @@ def _dataframe_reduce_columns_codegen_isna(func_name, func_params, columns, df):
     return func_text, global_vars
 
 
-"""
-Example func_text for func_name='isna' columns=('FLOAT', 'INT', 'STRING'):
-
-    def _df_isna_impl(df):
-        series_FLOAT = pandas.Series(get_dataframe_data(df, 0))
-        result_FLOAT = series_FLOAT.isna()
-        series_INT = pandas.Series(get_dataframe_data(df, 1))
-        result_INT = series_INT.isna()
-        series_STRING = pandas.Series(get_dataframe_data(df, 2))
-        result_STRING = series_STRING.isna()
-        return pandas.DataFrame({"FLOAT": result_FLOAT, "INT": result_INT, "STRING": result_STRING},
-                                index = df._index)
-"""
-
-
-def sdc_pandas_dataframe_isna_codegen(df, func_name, params, ser_params):
-    all_params = ['df']
+def sdc_pandas_dataframe_isna_codegen(df, func_name):
     df_func_name = f'_df_{func_name}_impl'
-    func_text, global_vars = _dataframe_reduce_columns_codegen_isna(func_name, all_params, df.columns, df)
+    func_text, global_vars = _dataframe_reduce_columns_codegen_isna(func_name, df.columns, df)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
@@ -983,11 +979,8 @@ def sdc_pandas_dataframe_isna_codegen(df, func_name, params, ser_params):
 
 def df_index_codegen_all(self):
     if isinstance(self.index, types.NoneType):
-        func_lines = ''
-    else:
-        func_lines = ', index = df._index'
-
-    return func_lines
+        return ''
+    return 'index=df._index'
 
 
 @sdc_overload_method(DataFrameType, 'isna')
@@ -1031,7 +1024,7 @@ def isna_overload(df):
         Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_isna*
     """
 
-    return sdc_pandas_dataframe_isna_codegen(df, 'isna', {}, {})
+    return sdc_pandas_dataframe_isna_codegen(df, 'isna')
 
 
 @sdc_overload_method(DataFrameType, 'drop')
