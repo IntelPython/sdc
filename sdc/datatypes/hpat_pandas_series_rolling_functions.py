@@ -551,7 +551,7 @@ def gen_sdc_pandas_series_rolling_ddof_impl(pop, put, get_result=ddof_result,
             prelude_stop = chunk.start
 
             interlude_start = prelude_stop
-            interlude_stop = min(prelude_start + win, chunk.stop)
+            interlude_stop = min(interlude_start + win, chunk.stop)
 
             for idx in range(prelude_start, prelude_stop):
                 value = input_arr[idx]
