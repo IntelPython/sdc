@@ -1423,3 +1423,40 @@ def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=Tru
         return init_dataframe_groupby(self, column_id, grouped, sort)
 
     return sdc_pandas_dataframe_groupby_impl
+
+
+@sdc_overload_method(DataFrameType, 'reset_index')
+def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, name=None, inplace=False):
+    """
+           Pandas DataFrame method :meth:`pandas.DataFrame.median` implementation.
+
+           .. only:: developer
+
+               Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_median*
+
+           Parameters
+           -----------
+           self: :class:`pandas.DataFrame`
+               input arg
+           level:
+               *unsupported*
+           drop: :obj:
+           level:
+               *unsupported*
+           numeric_only:
+               *unsupported*
+
+           Returns
+           -------
+           :obj:`pandas.Series` or `pandas.DataFrame`
+                   return the median of the values for the requested axis.
+           """
+
+    name = 'median'
+
+    check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
+
+    params = {'axis': None, 'skipna': None, 'level': None, 'numeric_only': None}
+    ser_par = {'skipna': 'skipna', 'level': 'level'}
+
+    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
