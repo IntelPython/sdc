@@ -5292,7 +5292,7 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
     return None
 
 
-@sdc_overload(operator.add)
+@sdc_overload(operator.add, parallel=False)
 def sdc_pandas_str_series_operator_add(self, other):
     """
     Additional overload of operator.add for Series of strings.
@@ -5420,7 +5420,7 @@ def sdc_pandas_str_series_operator_add(self, other):
     return None
 
 
-@sdc_overload(operator.mul)
+@sdc_overload(operator.mul, parallel=False)
 def sdc_pandas_str_series_operator_mul(self, other):
     """
     Additional overload of operator.add for Series of strings.
