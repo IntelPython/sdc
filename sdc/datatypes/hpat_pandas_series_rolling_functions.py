@@ -115,15 +115,6 @@ def arr_nonnan_count(arr):
 
 
 @sdc_register_jitable
-def arr_max(arr):
-    """Calculate maximum of values"""
-    if len(arr) == 0:
-        return numpy.nan
-
-    return arr.max()
-
-
-@sdc_register_jitable
 def arr_mean(arr):
     """Calculate mean of values"""
     if len(arr) == 0:
@@ -214,8 +205,6 @@ def gen_hpat_pandas_series_rolling_ddof_impl(rolling_func):
     return impl
 
 
-hpat_pandas_rolling_series_max_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_max))
 hpat_pandas_rolling_series_median_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_median))
 
@@ -246,6 +235,44 @@ def pop_kurt(value, nfinite, result):
         fourth_degree_sum -= value * value * value * value
 
     return nfinite, (_sum, square_sum, cube_sum, fourth_degree_sum)
+
+
+@sdc_register_jitable
+def calc_max(arr, idx, win_size):
+    """Recalculate the window max based on data, index and window size."""
+    start = max(0, idx - win_size + 1)
+    nfinite = 0
+    result = numpy.nan
+    for i in range(start, idx + 1):
+        value = arr[i]
+        nfinite, result = put_max(value, nfinite, result)
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def pop_max(value, nfinite, result, arr, idx, win_size):
+    """Calculate the window max without old value."""
+    if numpy.isfinite(value):
+        nfinite -= 1
+        if nfinite:
+            if value == result:
+                return calc_max(arr, idx, win_size)
+        else:
+            result = numpy.nan
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def put_max(value, nfinite, result):
+    """Calculate the window max with new value."""
+    if numpy.isfinite(value):
+        nfinite += 1
+        if numpy.isnan(result) or value > result:
+            result = value
+
+    return nfinite, result
 
 
 @sdc_register_jitable
@@ -592,6 +619,8 @@ def gen_sdc_pandas_series_rolling_ddof_impl(pop, put, get_result=ddof_result,
 sdc_pandas_series_rolling_kurt_impl = gen_sdc_pandas_series_rolling_impl(
     pop_kurt, put_kurt, get_result=kurt_result_or_nan,
     init_result=(0., 0., 0., 0.))
+sdc_pandas_series_rolling_max_impl = gen_sdc_pandas_series_rolling_minmax_impl(
+    pop_max, put_max)
 sdc_pandas_series_rolling_mean_impl = gen_sdc_pandas_series_rolling_impl(
     pop_sum, put_sum, get_result=mean_result_or_nan, init_result=0.)
 sdc_pandas_series_rolling_min_impl = gen_sdc_pandas_series_rolling_minmax_impl(
@@ -829,13 +858,13 @@ def hpat_pandas_series_rolling_kurt(self):
     return sdc_pandas_series_rolling_kurt_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'max')
+@sdc_overload_method(SeriesRollingType, 'max')
 def hpat_pandas_series_rolling_max(self):
 
     ty_checker = TypeChecker('Method rolling.max().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_max_impl
+    return sdc_pandas_series_rolling_max_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'mean')
