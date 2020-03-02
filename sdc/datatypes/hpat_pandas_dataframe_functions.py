@@ -44,7 +44,7 @@ from numba.typed import List, Dict
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric,
-                                            check_types_comparable,
+                                            check_types_comparable, kwsparams2list,
                                             gen_df_impl_generator, find_common_dtype_from_numpy_dtypes)
 from sdc.str_arr_ext import StringArrayType
 
@@ -455,12 +455,106 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
     df_func_name = f'_df_{func_name}_impl'
 
     func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, s_par, df.columns)
-
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
 
     return _reduce_impl
+
+
+def _dataframe_reduce_columns_codegen_head(func_name, func_params, series_params, columns, df):
+    """
+    Example func_text for func_name='head' columns=('float', 'int', 'string'):
+
+        def _df_head_impl(df, n=5):
+            series_float = pandas.Series(get_dataframe_data(df, 0))
+            result_float = series_float.head(n=n)
+            series_int = pandas.Series(get_dataframe_data(df, 1))
+            result_int = series_int.head(n=n)
+            series_string = pandas.Series(get_dataframe_data(df, 2))
+            result_string = series_string.head(n=n)
+            return pandas.DataFrame({"float": result_float, "int": result_int, "string": result_string},
+                                    index = df._index[:n])
+    """
+    results = []
+    joined = ', '.join(func_params)
+    func_lines = [f'def _df_{func_name}_impl(df, {joined}):']
+    ind = df_index_codegen_head(df)
+    for i, c in enumerate(columns):
+        result_c = f'result_{c}'
+        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data(df, {i}))',
+                       f'  {result_c} = series_{c}.{func_name}({series_params})']
+        results.append((columns[i], result_c))
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, {ind})']
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_head_codegen(df, func_name, params, ser_params):
+    all_params = kwsparams2list(params)
+    ser_par = kwsparams2list(ser_params)
+    s_par = ', '.join(ser_par)
+
+    df_func_name = f'_df_{func_name}_impl'
+    func_text, global_vars = _dataframe_reduce_columns_codegen_head(func_name, all_params, s_par, df.columns, df)
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _reduce_impl = loc_vars[df_func_name]
+
+    return _reduce_impl
+
+
+def df_index_codegen_head(self):
+    # TODO: Rewrite when DF constructor will be fixed with index=None
+    if isinstance(self.index, types.NoneType):
+        return ''
+
+    return 'index=df._index[:n]'
+
+
+@sdc_overload_method(DataFrameType, 'head')
+def head_overload(df, n=5):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.DataFrame.head
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_head.py
+       :language: python
+       :lines: 37-
+       :caption: Return the first n rows.
+       :name: ex_dataframe_head
+
+    .. command-output:: python ./dataframe/dataframe_head.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.tail <pandas.DataFrame.tail>`
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas Series method :meth:`pandas.Series.head` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_head*
+    """
+    name = 'head'
+
+    if isinstance(n, types.Omitted):
+        n = n.value
+
+    params = {'n': 5}
+    ser_par = {'n': 'n'}
+    return sdc_pandas_dataframe_head_codegen(df, name, params, ser_par)
 
 
 def _dataframe_apply_columns_codegen(func_name, func_params, series_params, columns):
@@ -1190,7 +1284,6 @@ def df_getitem_slice_idx_codegen(self, idx):
     else:
         # raise KeyError if input DF is empty
         func_lines += df_getitem_key_error_codelines()
-
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas, 'numpy': numpy,
                    'get_dataframe_data': get_dataframe_data}
