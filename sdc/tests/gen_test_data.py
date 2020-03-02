@@ -84,6 +84,41 @@ def generate_spark_data():
     tar.close()
 
 
+def generate_csv_data():
+    # CSV reader test
+    data = ("0,2.3,4.6,A\n"
+            "1,2.3,4.6,B\n"
+            "2,2.3,4.6,\n"
+            "4,2.3,4.6,D\n")
+
+    with open("csv_data1.csv", "w") as f:
+        f.write(data)
+
+    with open("csv_data_infer1.csv", "w") as f:
+        f.write('A,B,C,D\n' + data)
+
+    with open("csv_data_infer_sep.csv", "w") as f:
+        f.write(('A,B,C,D\n' + data).replace(',', ';'))
+
+    data = ("0,2.3,2015-01-03,47736\n"
+            "1,2.3,1966-11-13,47736\n"
+            "2,2.3,1998-05-21,47736\n"
+            "4,2.3,2018-07-11,47736\n")
+
+    with open("csv_data_date1.csv", "w") as f:
+        f.write(data)
+
+    # generated data for parallel merge_asof testing
+    df1 = pd.DataFrame({'time': pd.DatetimeIndex(
+        ['2017-01-03', '2017-01-06', '2017-02-15', '2017-02-21']),
+        'B': [4, 5, 9, 6]})
+    df2 = pd.DataFrame({'time': pd.DatetimeIndex(
+        ['2017-01-01', '2017-01-14', '2017-01-16', '2017-02-23', '2017-02-23',
+         '2017-02-25']), 'A': [2, 3, 7, 8, 9, 10]})
+    df1.to_parquet("asof1.pq")
+    df2.to_parquet("asof2.pq")
+
+
 def generate_other_data():
     df = pd.DataFrame({'A': ['bc'] + ["a"] * 3 + ["bc"] * 3 + ['a'], 'B': [-8, 1, 2, 3, 1, 5, 6, 7]})
     df.to_parquet("groupby3.pq")
@@ -99,24 +134,7 @@ def generate_other_data():
     df.to_parquet("pivot2.pq")
 
     # CSV reader test
-    data = ("0,2.3,4.6,A\n"
-            "1,2.3,4.6,B\n"
-            "2,2.3,4.6,\n"
-            "4,2.3,4.6,D\n")
-
-    with open("csv_data1.csv", "w") as f:
-        f.write(data)
-
-    with open("csv_data_infer1.csv", "w") as f:
-        f.write('A,B,C,D\n' + data)
-
-    data = ("0,2.3,2015-01-03,47736\n"
-            "1,2.3,1966-11-13,47736\n"
-            "2,2.3,1998-05-21,47736\n"
-            "4,2.3,2018-07-11,47736\n")
-
-    with open("csv_data_date1.csv", "w") as f:
-        f.write(data)
+    generate_csv_data()
 
     # generated data for parallel merge_asof testing
     df1 = pd.DataFrame({'time': pd.DatetimeIndex(
