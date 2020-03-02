@@ -57,13 +57,15 @@ def infer_usecols(col_names):
 
 
 @overload(pandas.read_csv)
-def sdc_pandas_read_csv(fname, skiprows=0):
-    signature =        "fname, skiprows=0"  # nopep8
+def sdc_pandas_read_csv(fname, sep=',', skiprows=0):
+    signature =        "fname, sep=',', skiprows=0"  # nopep8
 
     assert isinstance(fname, numba.types.Literal)
+    assert isinstance(sep, numba.types.Literal) or sep == ','
     assert isinstance(skiprows, numba.types.Literal) or skiprows == 0
 
-    sep = ','
+    if isinstance(sep, numba.types.Literal):
+        sep = sep.literal_value
 
     fname_const = fname.literal_value
     if isinstance(skiprows, numba.types.Literal):
@@ -71,7 +73,7 @@ def sdc_pandas_read_csv(fname, skiprows=0):
     col_names = 0
     skiprows, col_names, dtype_map = \
         HiFramesPassImpl.infer_column_names_and_types_from_constant_filename(
-            fname_const, skiprows, col_names)
+            fname_const, skiprows, col_names, sep=sep)
 
     usecols = infer_usecols(col_names)
 
