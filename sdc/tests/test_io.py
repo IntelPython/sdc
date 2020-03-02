@@ -357,6 +357,19 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    def pd_csv_infer_sep(self, use_pyarrow=False):
+        read_csv = self._read_csv(use_pyarrow)
+
+        def test_impl():
+            return read_csv("csv_data_infer_sep.csv", sep=';')
+
+        return test_impl
+
+    def test_csv_infer_sep(self):
+        test_impl = self.pd_csv_infer_sep()
+        hpat_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
     def pd_csv_infer_parallel1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
