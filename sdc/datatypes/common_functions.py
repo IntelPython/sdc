@@ -548,58 +548,6 @@ def _sdc_pandas_series_check_axis_overload(axis):
     return None
 
 
-def _sdc_pandas_series_align(series, other, size='max', finiteness=False):
-    """
-    Align series and other series by
-        size where size of output series is max/min size of input series
-        finiteness where all the infinite and matched finite values are replaced with nans, e.g.
-        series: [1., inf, inf, -1.,   0.] -> [1., nan, nan, -1.,   0.]
-        other:  [1., -1.,  0., 0.1, -0.1] -> [1., nan, nan, 0.1, -0.1]
-    """
-    pass
-
-
-@sdc_overload(_sdc_pandas_series_align, jit_options={'parallel': False})
-def _sdc_pandas_series_align_overload(series, other, size='max', finiteness=False):
-    ty_checker = TypeChecker('Function sdc.common_functions._sdc_pandas_series_align().')
-    ty_checker.check(series, SeriesType)
-    ty_checker.check(other, SeriesType)
-
-    str_types = (str, types.StringLiteral, types.UnicodeType, types.Omitted)
-    if not isinstance(size, str_types):
-        ty_checker.raise_exc(size, 'str', 'size')
-
-    if not isinstance(finiteness, (bool, types.Boolean, types.Omitted)):
-        ty_checker.raise_exc(finiteness, 'bool', 'finiteness')
-
-    def _sdc_pandas_series_align_impl(series, other, size='max', finiteness=False):
-        if size != 'max' and size != 'min':
-            raise ValueError("Function sdc.common_functions._sdc_pandas_series_align(). "
-                             "The object size\n expected: 'max' or 'min'")
-
-        arr, other_arr = series._data, other._data
-        arr_len, other_arr_len = len(arr), len(other_arr)
-        min_length = min(arr_len, other_arr_len)
-        length = max(arr_len, other_arr_len) if size == 'max' else min_length
-
-        aligned_arr = numpy.repeat([numpy.nan], length)
-        aligned_other_arr = numpy.repeat([numpy.nan], length)
-
-        for i in numba.prange(min_length):
-            if not finiteness or (numpy.isfinite(arr[i]) and numpy.isfinite(other_arr[i])):
-                aligned_arr[i] = arr[i]
-                aligned_other_arr[i] = other_arr[i]
-            else:
-                aligned_arr[i] = aligned_other_arr[i] = numpy.nan
-
-        aligned = pandas.Series(aligned_arr, name=series._name)
-        aligned_other = pandas.Series(aligned_other_arr, name=other._name)
-
-        return aligned, aligned_other
-
-    return _sdc_pandas_series_align_impl
-
-
 def _sdc_asarray(data):
     pass
 
