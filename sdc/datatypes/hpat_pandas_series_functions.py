@@ -2562,7 +2562,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
                 fill_value = numpy.nan
             if not fill_value_is_none == True:  # noqa
                 fill_value_is_nan = numpy.isnan(fill_value)
-            if not (fill_value_is_nan or fill_value_is_none == True):
+            if not (fill_value_is_nan or fill_value_is_none == True):  # noqa
                 numpy_like.fillna(self._data, inplace=True, value=fill_value)
 
             if self_is_series == True:  # noqa
@@ -2585,7 +2585,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
                     fill_value = numpy.nan
                 if not fill_value_is_none == True:  # noqa
                     fill_value_is_nan = numpy.isnan(fill_value)
-                if not (fill_value_is_nan or fill_value_is_none == True):
+                if not (fill_value_is_nan or fill_value_is_none == True):  # noqa
                     numpy_like.fillna(self._data, inplace=True, value=fill_value)
                     numpy_like.fillna(other._data, inplace=True, value=fill_value)
 
@@ -2627,7 +2627,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
                     fill_value = numpy.nan
                 if not fill_value_is_none == True:  # noqa
                     fill_value_is_nan = numpy.isnan(fill_value)
-                if not (fill_value_is_nan or fill_value_is_none == True):
+                if not (fill_value_is_nan or fill_value_is_none == True):  # noqa
                     numpy_like.fillna(self._data, inplace=True, value=fill_value)
                     numpy_like.fillna(other._data, inplace=True, value=fill_value)
                 # check if indexes are equal and series don't have to be aligned
@@ -4167,7 +4167,7 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
                 fill_value = numpy.nan
             if not fill_value_is_none == True:  # noqa
                 fill_value_is_nan = numpy.isnan(fill_value)
-            if not (fill_value_is_nan or fill_value_is_none == True):
+            if not (fill_value_is_nan or fill_value_is_none == True):  # noqa
                 numpy_like.fillna(self._data, inplace=True, value=fill_value)
             if self_is_series == True:  # noqa
                 return pandas.Series(self._data < other, index=self._index, name=self._name)
@@ -4186,7 +4186,7 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
                     fill_value = numpy.nan
                 if not fill_value_is_none == True:  # noqa
                     fill_value_is_nan = numpy.isnan(fill_value)
-                if not (fill_value_is_nan or fill_value_is_none == True):
+                if not (fill_value_is_nan or fill_value_is_none == True):  # noqa
                     numpy_like.fillna(self._data, inplace=True, value=fill_value)
                     numpy_like.fillna(other._data, inplace=True, value=fill_value)
                 left_size, right_size = len(self._data), len(other._data)
@@ -4210,7 +4210,7 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
                     fill_value = numpy.nan
                 if not fill_value_is_none == True:  # noqa
                     fill_value_is_nan = numpy.isnan(fill_value)
-                if not (fill_value_is_nan or fill_value_is_none == True):
+                if not (fill_value_is_nan or fill_value_is_none == True):  # noqa
                     numpy_like.fillna(self._data, inplace=True, value=fill_value)
                     numpy_like.fillna(other._data, inplace=True, value=fill_value)
                 left_index, right_index = self.index, other.index
