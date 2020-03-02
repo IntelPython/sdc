@@ -115,40 +115,6 @@ def arr_nonnan_count(arr):
 
 
 @sdc_register_jitable
-def _moment(arr, moment):
-    mn = numpy.mean(arr)
-    s = numpy.power((arr - mn), moment)
-
-    return numpy.mean(s)
-
-
-@sdc_register_jitable
-def arr_kurt(arr):
-    """Calculate unbiased kurtosis of values"""
-    n = len(arr)
-    if n < 4:
-        return numpy.nan
-
-    m2 = _moment(arr, 2)
-    m4 = _moment(arr, 4)
-    val = 0 if m2 == 0 else m4 / m2 ** 2.0
-
-    if (n > 2) & (m2 > 0):
-        val = 1.0/(n-2)/(n-3) * ((n**2-1.0)*m4/m2**2.0 - 3*(n-1)**2.0)
-
-    return val
-
-
-@sdc_register_jitable
-def arr_max(arr):
-    """Calculate maximum of values"""
-    if len(arr) == 0:
-        return numpy.nan
-
-    return arr.max()
-
-
-@sdc_register_jitable
 def arr_mean(arr):
     """Calculate mean of values"""
     if len(arr) == 0:
@@ -167,62 +133,12 @@ def arr_median(arr):
 
 
 @sdc_register_jitable
-def arr_min(arr):
-    """Calculate minimum of values"""
-    if len(arr) == 0:
-        return numpy.nan
-
-    return arr.min()
-
-
-@sdc_register_jitable
 def arr_quantile(arr, q):
     """Calculate quantile of values"""
     if len(arr) == 0:
         return numpy.nan
 
     return numpy.quantile(arr, q)
-
-
-@sdc_register_jitable
-def _moment(arr, moment):
-    mn = numpy.mean(arr)
-    s = numpy.power((arr - mn), moment)
-
-    return numpy.mean(s)
-
-
-@sdc_register_jitable
-def arr_skew(arr):
-    """Calculate unbiased skewness of values"""
-    n = len(arr)
-    if n < 3:
-        return numpy.nan
-
-    m2 = _moment(arr, 2)
-    m3 = _moment(arr, 3)
-    val = 0 if m2 == 0 else m3 / m2 ** 1.5
-
-    if (n > 2) & (m2 > 0):
-        val = numpy.sqrt((n - 1.0) * n) / (n - 2.0) * m3 / m2 ** 1.5
-
-    return val
-
-
-@sdc_register_jitable
-def arr_std(arr, ddof):
-    """Calculate standard deviation of values"""
-    return arr_var(arr, ddof) ** 0.5
-
-
-@sdc_register_jitable
-def arr_var(arr, ddof):
-    """Calculate unbiased variance of values"""
-    length = len(arr)
-    if length in [0, ddof]:
-        return numpy.nan
-
-    return numpy.var(arr) * length / (length - ddof)
 
 
 def gen_hpat_pandas_series_rolling_impl(rolling_func):
@@ -289,20 +205,138 @@ def gen_hpat_pandas_series_rolling_ddof_impl(rolling_func):
     return impl
 
 
-hpat_pandas_rolling_series_kurt_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_kurt))
-hpat_pandas_rolling_series_max_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_max))
 hpat_pandas_rolling_series_median_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_median))
-hpat_pandas_rolling_series_min_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_min))
-hpat_pandas_rolling_series_skew_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_impl(arr_skew))
-hpat_pandas_rolling_series_std_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_ddof_impl(arr_std))
-hpat_pandas_rolling_series_var_impl = register_jitable(
-    gen_hpat_pandas_series_rolling_ddof_impl(arr_var))
+
+
+@sdc_register_jitable
+def put_kurt(value, nfinite, result):
+    """Calculate the window sums for kurt with new value."""
+    _sum, square_sum, cube_sum, fourth_degree_sum = result
+    if numpy.isfinite(value):
+        nfinite += 1
+        _sum += value
+        square_sum += value * value
+        cube_sum += value * value * value
+        fourth_degree_sum += value * value * value * value
+
+    return nfinite, (_sum, square_sum, cube_sum, fourth_degree_sum)
+
+
+@sdc_register_jitable
+def pop_kurt(value, nfinite, result):
+    """Calculate the window sums for kurt without old value."""
+    _sum, square_sum, cube_sum, fourth_degree_sum = result
+    if numpy.isfinite(value):
+        nfinite -= 1
+        _sum -= value
+        square_sum -= value * value
+        cube_sum -= value * value * value
+        fourth_degree_sum -= value * value * value * value
+
+    return nfinite, (_sum, square_sum, cube_sum, fourth_degree_sum)
+
+
+@sdc_register_jitable
+def calc_max(arr, idx, win_size):
+    """Recalculate the window max based on data, index and window size."""
+    start = max(0, idx - win_size + 1)
+    nfinite = 0
+    result = numpy.nan
+    for i in range(start, idx + 1):
+        value = arr[i]
+        nfinite, result = put_max(value, nfinite, result)
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def pop_max(value, nfinite, result, arr, idx, win_size):
+    """Calculate the window max without old value."""
+    if numpy.isfinite(value):
+        nfinite -= 1
+        if nfinite:
+            if value == result:
+                return calc_max(arr, idx, win_size)
+        else:
+            result = numpy.nan
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def put_max(value, nfinite, result):
+    """Calculate the window max with new value."""
+    if numpy.isfinite(value):
+        nfinite += 1
+        if numpy.isnan(result) or value > result:
+            result = value
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def calc_min(arr, idx, win_size):
+    """Recalculate the window min based on data, index and window size."""
+    start = max(0, idx - win_size + 1)
+    nfinite = 0
+    result = numpy.nan
+    for i in range(start, idx + 1):
+        value = arr[i]
+        nfinite, result = put_min(value, nfinite, result)
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def pop_min(value, nfinite, result, arr, idx, win_size):
+    """Calculate the window min without old value."""
+    if numpy.isfinite(value):
+        nfinite -= 1
+        if nfinite:
+            if value == result:
+                return calc_min(arr, idx, win_size)
+        else:
+            result = numpy.nan
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def put_min(value, nfinite, result):
+    """Calculate the window min with new value."""
+    if numpy.isfinite(value):
+        nfinite += 1
+        if numpy.isnan(result) or value < result:
+            result = value
+
+    return nfinite, result
+
+
+@sdc_register_jitable
+def put_skew(value, nfinite, result):
+    """Calculate the window sums for skew with new value."""
+    _sum, square_sum, cube_sum = result
+    if numpy.isfinite(value):
+        nfinite += 1
+        _sum += value
+        square_sum += value * value
+        cube_sum += value * value * value
+
+    return nfinite, (_sum, square_sum, cube_sum)
+
+
+@sdc_register_jitable
+def pop_skew(value, nfinite, result):
+    """Calculate the window sums for skew without old value."""
+    _sum, square_sum, cube_sum = result
+    if numpy.isfinite(value):
+        nfinite -= 1
+        _sum -= value
+        square_sum -= value * value
+        cube_sum -= value * value * value
+
+    return nfinite, (_sum, square_sum, cube_sum)
 
 
 @sdc_register_jitable
@@ -326,6 +360,30 @@ def put_sum(value, nfinite, result):
 
 
 @sdc_register_jitable
+def pop_sum2(value, nfinite, result):
+    """Calculate the window sums of first/second degree without old value."""
+    _sum, square_sum = result
+    if numpy.isfinite(value):
+        nfinite -= 1
+        _sum -= value
+        square_sum -= value * value
+
+    return nfinite, (_sum, square_sum)
+
+
+@sdc_register_jitable
+def put_sum2(value, nfinite, result):
+    """Calculate the window sums of first/second degree with new value."""
+    _sum, square_sum = result
+    if numpy.isfinite(value):
+        nfinite += 1
+        _sum += value
+        square_sum += value * value
+
+    return nfinite, (_sum, square_sum)
+
+
+@sdc_register_jitable
 def result_or_nan(nfinite, minp, result):
     """Get result taking into account min periods."""
     if nfinite < minp:
@@ -335,12 +393,77 @@ def result_or_nan(nfinite, minp, result):
 
 
 @sdc_register_jitable
+def kurt_result_or_nan(nfinite, minp, result):
+    """Get result kurt taking into account min periods."""
+    if nfinite < max(4, minp):
+        return numpy.nan
+
+    _sum, square_sum, cube_sum, fourth_degree_sum = result
+
+    n = nfinite
+    m2 = (square_sum - _sum * _sum / n) / n
+    m4 = (fourth_degree_sum - 4*_sum*cube_sum/n + 6*_sum*_sum*square_sum/n/n - 3*_sum*_sum*_sum*_sum/n/n/n) / n
+    res = 0 if m2 == 0 else m4 / m2 ** 2.0
+
+    if (n > 2) & (m2 > 0):
+        res = 1.0/(n-2)/(n-3) * ((n**2-1.0)*m4/m2**2.0 - 3*(n-1)**2.0)
+
+    return res
+
+
+@sdc_register_jitable
 def mean_result_or_nan(nfinite, minp, result):
     """Get result mean taking into account min periods."""
     if nfinite == 0 or nfinite < minp:
         return numpy.nan
 
     return result / nfinite
+
+
+@sdc_register_jitable
+def skew_result_or_nan(nfinite, minp, result):
+    """Get result skew taking into account min periods."""
+    if nfinite < max(3, minp):
+        return numpy.nan
+
+    _sum, square_sum, cube_sum = result
+
+    n = nfinite
+    m2 = (square_sum - _sum * _sum / n) / n
+    m3 = (cube_sum - 3.*_sum*square_sum/n + 2.*_sum*_sum*_sum/n/n) / n
+    res = 0 if m2 == 0 else m3 / m2 ** 1.5
+
+    if (n > 2) & (m2 > 0):
+        res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
+
+    return res
+
+
+@sdc_register_jitable
+def ddof_result(nfinite, minp, result, ddof):
+    """Get result taking into account ddof."""
+    if nfinite - ddof < 1:
+        return numpy.nan
+
+    return result * nfinite / (nfinite - ddof)
+
+
+@sdc_register_jitable
+def var_result_or_nan(nfinite, minp, result, ddof):
+    """Get result var taking into account min periods."""
+    if nfinite < max(1, minp):
+        return numpy.nan
+
+    _sum, square_sum = result
+    res = (square_sum - _sum * _sum / nfinite) / nfinite
+
+    return ddof_result(nfinite, minp, res, ddof)
+
+
+@sdc_register_jitable
+def std_result_or_nan(nfinite, minp, result, ddof):
+    """Get result std taking into account min periods."""
+    return var_result_or_nan(nfinite, minp, result, ddof) ** 0.5
 
 
 def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
@@ -361,8 +484,13 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
             nfinite = 0
             result = init_result
 
+            if win == 0:
+                for idx in range(chunk.start, chunk.stop):
+                    output_arr[idx] = get_result(nfinite, minp, result)
+                continue
+
             prelude_start = max(0, chunk.start - win + 1)
-            prelude_stop = min(chunk.start, prelude_start + win)
+            prelude_stop = chunk.start
 
             interlude_start = prelude_stop
             interlude_stop = min(prelude_start + win, chunk.stop)
@@ -388,10 +516,123 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
     return impl
 
 
+def gen_sdc_pandas_series_rolling_minmax_impl(pop, put, init_result=numpy.nan):
+    """Generate series rolling min/max implementations based on pop/put funcs"""
+    def impl(self):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        chunks = parallel_chunks(length)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            nfinite = 0
+            result = init_result
+
+            if win == 0:
+                for idx in range(chunk.start, chunk.stop):
+                    output_arr[idx] = result_or_nan(nfinite, minp, result)
+                continue
+
+            prelude_start = max(0, chunk.start - win + 1)
+            prelude_stop = chunk.start
+
+            interlude_start = prelude_stop
+            interlude_stop = min(prelude_start + win, chunk.stop)
+
+            for idx in range(prelude_start, prelude_stop):
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+
+            for idx in range(interlude_start, interlude_stop):
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+                output_arr[idx] = result_or_nan(nfinite, minp, result)
+
+            for idx in range(interlude_stop, chunk.stop):
+                put_value = input_arr[idx]
+                pop_value = input_arr[idx - win]
+                nfinite, result = put(put_value, nfinite, result)
+                nfinite, result = pop(pop_value, nfinite, result,
+                                      input_arr, idx, win)
+                output_arr[idx] = result_or_nan(nfinite, minp, result)
+
+        return pandas.Series(output_arr, input_series._index,
+                             name=input_series._name)
+    return impl
+
+
+def gen_sdc_pandas_series_rolling_ddof_impl(pop, put, get_result=ddof_result,
+                                            init_result=numpy.nan):
+    """Generate series rolling ddof implementations based on pop/put funcs"""
+    def impl(self, ddof=1):
+        win = self._window
+        minp = self._min_periods
+
+        input_series = self._data
+        input_arr = input_series._data
+        length = len(input_arr)
+        output_arr = numpy.empty(length, dtype=float64)
+
+        chunks = parallel_chunks(length)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            nfinite = 0
+            result = init_result
+
+            if win == 0:
+                for idx in range(chunk.start, chunk.stop):
+                    output_arr[idx] = get_result(nfinite, minp, result, ddof)
+                continue
+
+            prelude_start = max(0, chunk.start - win + 1)
+            prelude_stop = chunk.start
+
+            interlude_start = prelude_stop
+            interlude_stop = min(prelude_start + win, chunk.stop)
+
+            for idx in range(prelude_start, prelude_stop):
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+
+            for idx in range(interlude_start, interlude_stop):
+                value = input_arr[idx]
+                nfinite, result = put(value, nfinite, result)
+                output_arr[idx] = get_result(nfinite, minp, result, ddof)
+
+            for idx in range(interlude_stop, chunk.stop):
+                put_value = input_arr[idx]
+                pop_value = input_arr[idx - win]
+                nfinite, result = put(put_value, nfinite, result)
+                nfinite, result = pop(pop_value, nfinite, result)
+                output_arr[idx] = get_result(nfinite, minp, result, ddof)
+
+        return pandas.Series(output_arr, input_series._index,
+                             name=input_series._name)
+    return impl
+
+
+sdc_pandas_series_rolling_kurt_impl = gen_sdc_pandas_series_rolling_impl(
+    pop_kurt, put_kurt, get_result=kurt_result_or_nan,
+    init_result=(0., 0., 0., 0.))
+sdc_pandas_series_rolling_max_impl = gen_sdc_pandas_series_rolling_minmax_impl(
+    pop_max, put_max)
 sdc_pandas_series_rolling_mean_impl = gen_sdc_pandas_series_rolling_impl(
     pop_sum, put_sum, get_result=mean_result_or_nan, init_result=0.)
+sdc_pandas_series_rolling_min_impl = gen_sdc_pandas_series_rolling_minmax_impl(
+    pop_min, put_min)
+sdc_pandas_series_rolling_skew_impl = gen_sdc_pandas_series_rolling_impl(
+    pop_skew, put_skew, get_result=skew_result_or_nan, init_result=(0., 0., 0.))
 sdc_pandas_series_rolling_sum_impl = gen_sdc_pandas_series_rolling_impl(
     pop_sum, put_sum, init_result=0.)
+sdc_pandas_series_rolling_var_impl = gen_sdc_pandas_series_rolling_ddof_impl(
+    pop_sum2, put_sum2, get_result=var_result_or_nan, init_result=(0., 0.))
+sdc_pandas_series_rolling_std_impl = gen_sdc_pandas_series_rolling_ddof_impl(
+    pop_sum2, put_sum2, get_result=std_result_or_nan, init_result=(0., 0.))
 
 
 @sdc_rolling_overload(SeriesRollingType, 'apply')
@@ -608,22 +849,22 @@ def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
     return _gen_hpat_pandas_rolling_series_cov_impl(other)
 
 
-@sdc_rolling_overload(SeriesRollingType, 'kurt')
+@sdc_overload_method(SeriesRollingType, 'kurt')
 def hpat_pandas_series_rolling_kurt(self):
 
     ty_checker = TypeChecker('Method rolling.kurt().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_kurt_impl
+    return sdc_pandas_series_rolling_kurt_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'max')
+@sdc_overload_method(SeriesRollingType, 'max')
 def hpat_pandas_series_rolling_max(self):
 
     ty_checker = TypeChecker('Method rolling.max().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_max_impl
+    return sdc_pandas_series_rolling_max_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'mean')
@@ -644,14 +885,13 @@ def hpat_pandas_series_rolling_median(self):
     return hpat_pandas_rolling_series_median_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'min')
+@sdc_overload_method(SeriesRollingType, 'min')
 def hpat_pandas_series_rolling_min(self):
 
     ty_checker = TypeChecker('Method rolling.min().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_min_impl
-
+    return sdc_pandas_series_rolling_min_impl
 
 @sdc_rolling_overload(SeriesRollingType, 'quantile')
 def hpat_pandas_series_rolling_quantile(self, quantile, interpolation='linear'):
@@ -701,16 +941,16 @@ def hpat_pandas_series_rolling_quantile(self, quantile, interpolation='linear'):
     return hpat_pandas_rolling_series_quantile_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'skew')
+@sdc_overload_method(SeriesRollingType, 'skew')
 def hpat_pandas_series_rolling_skew(self):
 
     ty_checker = TypeChecker('Method rolling.skew().')
     ty_checker.check(self, SeriesRollingType)
 
-    return hpat_pandas_rolling_series_skew_impl
+    return sdc_pandas_series_rolling_skew_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'std')
+@sdc_overload_method(SeriesRollingType, 'std')
 def hpat_pandas_series_rolling_std(self, ddof=1):
 
     ty_checker = TypeChecker('Method rolling.std().')
@@ -719,7 +959,7 @@ def hpat_pandas_series_rolling_std(self, ddof=1):
     if not isinstance(ddof, (int, Integer, Omitted)):
         ty_checker.raise_exc(ddof, 'int', 'ddof')
 
-    return hpat_pandas_rolling_series_std_impl
+    return sdc_pandas_series_rolling_std_impl
 
 
 @sdc_overload_method(SeriesRollingType, 'sum')
@@ -731,7 +971,7 @@ def hpat_pandas_series_rolling_sum(self):
     return sdc_pandas_series_rolling_sum_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'var')
+@sdc_overload_method(SeriesRollingType, 'var')
 def hpat_pandas_series_rolling_var(self, ddof=1):
 
     ty_checker = TypeChecker('Method rolling.var().')
@@ -740,7 +980,7 @@ def hpat_pandas_series_rolling_var(self, ddof=1):
     if not isinstance(ddof, (int, Integer, Omitted)):
         ty_checker.raise_exc(ddof, 'int', 'ddof')
 
-    return hpat_pandas_rolling_series_var_impl
+    return sdc_pandas_series_rolling_var_impl
 
 
 hpat_pandas_series_rolling_apply.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{

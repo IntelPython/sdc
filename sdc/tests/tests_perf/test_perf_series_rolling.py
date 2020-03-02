@@ -85,8 +85,13 @@ class TestSeriesRollingMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
         cls.map_ncalls_dlength = {
+            'kurt': (100, [8 * 10 ** 5]),
             'mean': (100, [8 * 10 ** 5]),
+            'min': (100, [4 * 10 ** 5]),
+            'skew': (100, [8 * 10 ** 5]),
             'sum': (100, [8 * 10 ** 5]),
+            'std': (100, [8 * 10 ** 5]),
+            'var': (100, [8 * 10 ** 5]),
         }
 
     def _test_case(self, pyfunc, name, total_data_length, data_num=1,
@@ -125,11 +130,26 @@ class TestSeriesRollingMethods(TestBase):
             data_num += len(extra_usecase_params.split(', '))
         self._test_case(usecase, name, total_data_length, data_num=data_num)
 
+    def test_series_rolling_kurt(self):
+        self._test_series_rolling_method('kurt')
+
     def test_series_rolling_mean(self):
         self._test_series_rolling_method('mean')
 
+    def test_series_rolling_min(self):
+        self._test_series_rolling_method('min')
+
+    def test_series_rolling_skew(self):
+        self._test_series_rolling_method('skew')
+
     def test_series_rolling_sum(self):
         self._test_series_rolling_method('sum')
+
+    def test_series_rolling_std(self):
+        self._test_series_rolling_method('std')
+
+    def test_series_rolling_var(self):
+        self._test_series_rolling_method('var')
 
 
 cases = [
@@ -137,14 +157,10 @@ cases = [
     TC(name='corr', size=[10 ** 7]),
     TC(name='count', size=[10 ** 7]),
     TC(name='cov', size=[10 ** 7]),
-    TC(name='kurt', size=[10 ** 7]),
     TC(name='max', size=[10 ** 7]),
     TC(name='median', size=[10 ** 7]),
-    TC(name='min', size=[10 ** 7]),
     TC(name='quantile', size=[10 ** 7], params='0.2'),
-    TC(name='skew', size=[10 ** 7]),
     TC(name='std', size=[10 ** 7]),
-    TC(name='var', size=[10 ** 7]),
 ]
 
 
