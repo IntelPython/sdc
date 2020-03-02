@@ -1491,18 +1491,6 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     return sdc_pandas_dataframe_apply_columns(df, name, params, ser_par)
 
 
-def sdc_pandas_dataframe_isin_iter_codegen(df, values, func_name, ser_param):
-    all_params = ['df', 'values']
-
-    df_func_name = f'_df_{func_name}_impl'
-    func_text, global_vars = _dataframe_apply_columns_codegen(func_name, all_params, ser_param, df.columns)
-
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _apply_impl = loc_vars[df_func_name]
-    return _apply_impl
-
-
 def sdc_pandas_dataframe_isin_dict_codegen(func_name, df_type, values, all_params, columns):
     result_name = []
     joined = ', '.join(all_params)
@@ -1532,18 +1520,6 @@ def sdc_pandas_dataframe_isin_dict_codegen(func_name, df_type, values, all_param
                    'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
-
-
-def sdc_pandas_dataframe_isin_dict(df, values, func_name):
-    all_params = ['df', 'values']
-
-    df_func_name = f'_df_{func_name}_impl'
-    func_text, global_vars = sdc_pandas_dataframe_isin_dict_codegen(func_name, df, values, all_params, df.columns)
-
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _apply_impl = loc_vars[df_func_name]
-    return _apply_impl
 
 
 def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params, columns):
@@ -1601,26 +1577,13 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params
     return func_text, global_vars
 
 
-def sdc_pandas_dataframe_isin_ser(df, values, func_name):
-    all_params = ['df', 'values']
-    df_func_name = f'_df_{func_name}_impl'
-
-    func_text, global_vars = sdc_pandas_dataframe_isin_ser_codegen(func_name, df, values, all_params, df.columns)
-
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _apply_impl = loc_vars[df_func_name]
-
-    return _apply_impl
-
-
-def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params, columns):
+def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params):
     result_name = []
     joined = ', '.join(all_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     df = all_params[0]
     val = all_params[1]
-    for i, c in enumerate(columns):
+    for i, c in enumerate(df_type.columns):
         result_c = f'result_{c}'
         func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({df}, {i}))']
         if c in in_df.columns:
@@ -1672,19 +1635,6 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params, 
     return func_text, global_vars
 
 
-def sdc_pandas_dataframe_isin_df(df, values, func_name):
-    all_params = ['df', 'values']
-    df_func_name = f'_df_{func_name}_impl'
-
-    func_text, global_vars = sdc_pandas_dataframe_isin_df_codegen(func_name, df, values, all_params, df.columns)
-
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _apply_impl = loc_vars[df_func_name]
-
-    return _apply_impl
-
-
 @sdc_overload_method(DataFrameType, 'isin')
 def isin_overload(df, values):
     """
@@ -1714,18 +1664,27 @@ def isin_overload(df, values):
     if not isinstance(values, (SeriesType, types.List, types.Set, DataFrameType, types.DictType)):
         ty_checker.raise_exc(values, 'iterable, Series, DataFrame', 'values')
 
+    all_params = ['df', 'values']
+    df_func_name = f'_df_{name}_impl'
+
     if isinstance(values, (types.List, types.Set)):
         ser_par = 'values=values'
-        return sdc_pandas_dataframe_isin_iter_codegen(df, values, name, ser_par)
+        func_text, global_vars = _dataframe_apply_columns_codegen(name, all_params, ser_par, df.columns)
 
     if isinstance(values, types.DictType):
-        return sdc_pandas_dataframe_isin_dict(df, values, name)
+        func_text, global_vars = sdc_pandas_dataframe_isin_dict_codegen(name, df, values, all_params, df.columns)
 
     if isinstance(values, SeriesType):
-        return sdc_pandas_dataframe_isin_ser(df, values, name)
+        func_text, global_vars = sdc_pandas_dataframe_isin_ser_codegen(name, df, values, all_params, df.columns)
 
     if isinstance(values, DataFrameType):
-        return sdc_pandas_dataframe_isin_df(df, values, name)
+        func_text, global_vars = sdc_pandas_dataframe_isin_df_codegen(name, df, values, all_params)
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _apply_impl = loc_vars[df_func_name]
+
+    return _apply_impl
 
 
 @sdc_overload_method(DataFrameType, 'groupby')
