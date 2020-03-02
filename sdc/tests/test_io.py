@@ -281,10 +281,7 @@ class TestCSV(TestIO):
             return np.int
 
     def _int_type_str(self):
-        if platform.system() == 'Windows' and not IS_32BITS:
-            return 'int64'
-        else:
-            return 'int'
+        return np.dtype(self._int_type()).name
 
     def _read_csv(self, use_pyarrow=False):
         return pd_read_csv if use_pyarrow else pd.read_csv
