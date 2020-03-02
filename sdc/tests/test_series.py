@@ -1482,7 +1482,7 @@ class TestSeries(
 
     @skip_parallel
     def test_series_op5_integer_scalar(self):
-        arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
+        arithmetic_methods = ('sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
 
         for method in arithmetic_methods:
             test_impl = _make_func_use_method_arg1(method)

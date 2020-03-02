@@ -2551,12 +2551,19 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     if not isinstance(axis, types.Omitted) and axis != 0:
         ty_checker.raise_exc(axis, 'int', 'axis')
+    fill_value_is_none = False
+    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
+        fill_value_is_none = True
     # specializations for numeric series only
     if not operands_are_series:
         def _series_add_scalar_impl(self, other, level=None, fill_value=None, axis=0):
+            fill_value_is_nan = False
             if fill_value is None:
                 fill_value = numpy.nan
-            numpy_like.fillna(self._data, inplace=True, value=fill_value)
+            if not fill_value_is_none == True:  # noqa
+                fill_value_is_nan = numpy.isnan(fill_value)
+            if not (fill_value_is_nan or fill_value_is_none == True):
+                numpy_like.fillna(self._data, inplace=True, value=fill_value)
 
             if self_is_series == True:  # noqa
                 result_data = numpy.empty(len(self._data), dtype=numpy.float64)
@@ -2573,10 +2580,14 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
             def _series_add_none_indexes_impl(self, other, level=None, fill_value=None, axis=0):
+                fill_value_is_nan = False
                 if fill_value is None:
                     fill_value = numpy.nan
-                numpy_like.fillna(self._data, inplace=True, value=fill_value)
-                numpy_like.fillna(other._data, inplace=True, value=fill_value)
+                if not fill_value_is_none == True:  # noqa
+                    fill_value_is_nan = numpy.isnan(fill_value)
+                if not (fill_value_is_nan or fill_value_is_none == True):
+                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
 
                 if (len(self._data) == len(other._data)):
                     result_data = numpy_like.astype(self._data, numpy.float64)
@@ -2611,11 +2622,14 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
             def _series_add_common_impl(self, other, level=None, fill_value=None, axis=0):
                 left_index, right_index = self.index, other.index
+                fill_value_is_nan = False
                 if fill_value is None:
                     fill_value = numpy.nan
-                numpy_like.fillna(self._data, inplace=True, value=fill_value)
-                numpy_like.fillna(other._data, inplace=True, value=fill_value)
-
+                if not fill_value_is_none == True:  # noqa
+                    fill_value_is_nan = numpy.isnan(fill_value)
+                if not (fill_value_is_nan or fill_value_is_none == True):
+                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
                     result_data = numpy.empty(len(self._data), dtype=numpy.float64)
@@ -4143,11 +4157,18 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
+    fill_value_is_none = False
+    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
+        fill_value_is_none = True
     if not operands_are_series:
         def _series_lt_scalar_impl(self, other, level=None, fill_value=None, axis=0):
+            fill_value_is_nan = False
             if fill_value is None:
                 fill_value = numpy.nan
-            numpy_like.fillna(self._data, inplace=True, value=fill_value)
+            if not fill_value_is_none == True:  # noqa
+                fill_value_is_nan = numpy.isnan(fill_value)
+            if not (fill_value_is_nan or fill_value_is_none == True):
+                numpy_like.fillna(self._data, inplace=True, value=fill_value)
             if self_is_series == True:  # noqa
                 return pandas.Series(self._data < other, index=self._index, name=self._name)
             else:
@@ -4160,10 +4181,14 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
             def _series_lt_none_indexes_impl(self, other, level=None, fill_value=None, axis=0):
+                fill_value_is_nan = False
                 if fill_value is None:
                     fill_value = numpy.nan
-                numpy_like.fillna(self._data, inplace=True, value=fill_value)
-                numpy_like.fillna(other._data, inplace=True, value=fill_value)
+                if not fill_value_is_none == True:  # noqa
+                    fill_value_is_nan = numpy.isnan(fill_value)
+                if not (fill_value_is_nan or fill_value_is_none == True):
+                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
                 left_size, right_size = len(self._data), len(other._data)
                 if (left_size == right_size):
                     return pandas.Series(self._data < other._data)
@@ -4180,10 +4205,14 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
                     [ty_left_index_dtype, ty_right_index_dtype], [])
 
             def _series_lt_common_impl(self, other, level=None, fill_value=None, axis=0):
+                fill_value_is_nan = False
                 if fill_value is None:
                     fill_value = numpy.nan
-                numpy_like.fillna(self._data, inplace=True, value=fill_value)
-                numpy_like.fillna(other._data, inplace=True, value=fill_value)
+                if not fill_value_is_none == True:  # noqa
+                    fill_value_is_nan = numpy.isnan(fill_value)
+                if not (fill_value_is_nan or fill_value_is_none == True):
+                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
                 left_index, right_index = self.index, other.index
 
                 if sdc_check_indexes_equal(left_index, right_index):
