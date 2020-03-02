@@ -2072,7 +2072,7 @@ def hpat_pandas_series_copy(self, deep=True):
 
     Limitations
     -----------
-    - Parameter deep except 'True' is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter deep=False is currently unsupported for indexes by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -2099,7 +2099,7 @@ def hpat_pandas_series_copy(self, deep=True):
     ty_checker.check(self, SeriesType)
 
     if not isinstance(deep, (types.Omitted, types.Boolean)) and not deep:
-        ty_checker.raise_exc(self.data, 'boolean', 'deep')
+        ty_checker.raise_exc(deep, 'boolean', 'deep')
 
     if isinstance(self.index, types.NoneType):
         def hpat_pandas_series_copy_impl(self, deep=True):

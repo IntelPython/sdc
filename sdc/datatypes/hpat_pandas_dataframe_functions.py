@@ -556,6 +556,98 @@ def head_overload(df, n=5):
     return sdc_pandas_dataframe_head_codegen(df, name, params, ser_par)
 
 
+def _dataframe_codegen_copy(func_name, func_params, series_params, columns, df):
+    """
+    Example func_text for func_name='copy' columns=('A', 'B', 'C'):
+
+        def _df_copy_impl(df, deep=True):
+            series_A = pandas.Series(get_dataframe_data(df, 0))
+            result_A = series_A.copy(deep=deep)
+            series_B = pandas.Series(get_dataframe_data(df, 1))
+            result_B = series_B.copy(deep=deep)
+            series_C = pandas.Series(get_dataframe_data(df, 2))
+            result_C = series_C.copy(deep=deep)
+            return pandas.DataFrame({"A": result_A, "B": result_B, "C": result_C}, index=df._index)
+    """
+    results = []
+    joined = ', '.join(func_params)
+    func_lines = [f'def _df_{func_name}_impl(df, {joined}):']
+    ind = df_index_codegen_all(df)
+    for i, c in enumerate(columns):
+        result_c = f'result_{c}'
+        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data(df, {i}))',
+                       f'  {result_c} = series_{c}.{func_name}({series_params})']
+        results.append((columns[i], result_c))
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, {ind})']
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_copy_codegen(df, func_name, params, ser_params):
+    all_params = kwsparams2list(params)
+    ser_par = kwsparams2list(ser_params)
+    s_par = ', '.join(ser_par)
+
+    df_func_name = f'_df_{func_name}_impl'
+    func_text, global_vars = _dataframe_codegen_copy(func_name, all_params, s_par, df.columns, df)
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _reduce_impl = loc_vars[df_func_name]
+
+    return _reduce_impl
+
+
+def df_index_codegen_all(self):
+    if isinstance(self.index, types.NoneType):
+        return ''
+    return 'index=df._index'
+
+
+@sdc_overload_method(DataFrameType, 'copy')
+def copy_overload(df, deep=True):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.DataFrame.copy
+
+    Limitations
+    -----------
+    - Parameter deep=False is currently unsupported for indexes by Intel Scalable Dataframe Compiler
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_copy.py
+       :language: python
+       :lines: 35-
+       :caption: Make a copy of this object’s indices and data.
+       :name: ex_dataframe_copy
+
+    .. command-output:: python ./dataframe/dataframe_copy.py
+       :cwd: ../../../examples
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.Series.copy` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_copy*
+    """
+    name = 'copy'
+
+    if not isinstance(deep, (types.Omitted, types.Boolean)) and not deep:
+        ty_checker.raise_exc(deep, 'boolean', 'deep')
+
+    params = {'deep': True}
+    ser_par = {'deep': 'deep'}
+    return sdc_pandas_dataframe_copy_codegen(df, name, params, ser_par)
+
+
 def _dataframe_apply_columns_codegen(func_name, func_params, series_params, columns):
     result_name = []
     joined = ', '.join(func_params)
