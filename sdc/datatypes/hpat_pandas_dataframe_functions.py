@@ -1611,7 +1611,7 @@ def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False
     if not isinstance(drop, (types.Omitted, types.Boolean)):
         ty_checker.raise_exc(drop, 'bool', 'drop')
 
-    if not (isinstance(inplace, (types.Omitted, types.Boolean)) or inplace == False):
+    if not (isinstance(inplace, (types.Omitted, types.Boolean)) or inplace is False):
         ty_checker.raise_exc(inplace, 'False', 'inplace')
 
     if not (isinstance(col_level, (types.Omitted, types.Integer)) or col_level == 0):
