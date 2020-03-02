@@ -95,7 +95,7 @@ def nansum(self):
     pass
 
 
-@sdc_overload(astype)
+@sdc_overload(astype, inline='always')
 def sdc_astype_overload(self, dtype):
     """
     Intel Scalable Dataframe Compiler Developer Guide
@@ -802,3 +802,86 @@ def np_nanvar(a):
         return np.divide(ssd, count)
 
     return nanvar_impl
+
+
+def cumsum(a):
+    pass
+
+
+def nancumsum(a):
+    pass
+
+
+@sdc_overload(cumsum)
+def np_cumsum(arr):
+    if not isinstance(arr, types.Array):
+        return
+
+    retty = arr.dtype
+    zero = retty(0)
+
+    def cumsum_impl(arr):
+        chunks = parallel_chunks(len(arr))
+        partial_sum = numpy.zeros(len(chunks), dtype=retty)
+        result = numpy.empty_like(arr)
+
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            partial = zero
+            for j in range(chunk.start, chunk.stop):
+                result[j] = partial + arr[j]
+                partial = result[j]
+            partial_sum[i] = partial
+
+        for i in prange(len(chunks)):
+            prefix = sum(partial_sum[0:i])
+            chunk = chunks[i]
+            for j in range(chunk.start, chunk.stop):
+                result[j] += prefix
+
+        return result
+
+    return cumsum_impl
+
+
+@sdc_overload(nancumsum)
+def np_nancumsum(arr, like_pandas=False):
+    if not isinstance(arr, types.Array):
+        return
+
+    if isinstance(arr.dtype, (types.Boolean, types.Integer)):
+        # dtype cannot possibly contain NaN
+        return lambda arr, like_pandas=False: cumsum(arr)
+    else:
+        retty = arr.dtype
+        is_nan = get_isnan(retty)
+        zero = retty(0)
+
+        def nancumsum_impl(arr, like_pandas=False):
+            chunks = parallel_chunks(len(arr))
+            partial_sum = numpy.zeros(len(chunks), dtype=retty)
+            result = numpy.empty_like(arr)
+
+            for i in prange(len(chunks)):
+                chunk = chunks[i]
+                partial = zero
+                for j in range(chunk.start, chunk.stop):
+                    if like_pandas:
+                        result[j] = partial + arr[j]
+                        if ~is_nan(arr[j]):
+                            partial = result[j]
+                    else:
+                        if ~is_nan(arr[j]):
+                            partial += arr[j]
+                        result[j] = partial
+                partial_sum[i] = partial
+
+            for i in prange(len(chunks)):
+                prefix = sum(partial_sum[0:i])
+                chunk = chunks[i]
+                for j in range(chunk.start, chunk.stop):
+                    result[j] += prefix
+
+            return result
+
+        return nancumsum_impl
