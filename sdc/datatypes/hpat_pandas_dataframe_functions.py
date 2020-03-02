@@ -488,11 +488,11 @@ def sdc_pandas_dataframe_apply_columns(df, func_name, params, ser_params):
     all_params = ['df']
     ser_par = []
 
-    def params2list(params):
+    def kwsparams2list(params):
         return ['{}={}'.format(k, v) for k, v in params.items()]
 
-    all_params = ['df'] + params2list(params)
-    ser_par = params2list(ser_params)
+    all_params = ['df'] + kwsparams2list(params)
+    ser_par = kwsparams2list(ser_params)
 
     s_par = ', '.join(ser_par)
 

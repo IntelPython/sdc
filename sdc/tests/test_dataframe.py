@@ -1528,7 +1528,7 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2}, index=np.arange(n) + 1)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    def test_isin(self):
+    def test_isin_iter(self):
         def test_impl(df, vals):
             return df.isin(vals)
 
@@ -1537,7 +1537,21 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2})
         df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n) ** 2})
         df2.A[n // 2:] = n
-        values = [{1, 2, 5, 7, 8}, [2, 3, 4], pd.DataFrame({}), df2]
+        values = [{1, 2, 5, 7, 8}, [2, 3, 4]]
+        for val in values:
+            with self.subTest(val=val):
+                pd.testing.assert_frame_equal(hpat_func(df, val), test_impl(df, val))
+
+    def test_isin_df(self):
+        def test_impl(df, vals):
+            return df.isin(vals)
+
+        hpat_func = self.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2})
+        df2 = pd.DataFrame({'A': np.arange(n), 'C': np.arange(n) ** 2})
+        df2.A[n // 2:] = n
+        values = [pd.DataFrame({}), df2]
         for val in values:
             with self.subTest(val=val):
                 pd.testing.assert_frame_equal(hpat_func(df, val), test_impl(df, val))
