@@ -1611,13 +1611,13 @@ def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False
     if not isinstance(drop, (types.Omitted, types.Boolean)):
         ty_checker.raise_exc(drop, 'bool', 'drop')
 
-    if not (isinstance(inplace, (types.Omitted, types.Boolean)) or inplace==False):
+    if not (isinstance(inplace, (types.Omitted, types.Boolean)) or inplace == False):
         ty_checker.raise_exc(inplace, 'False', 'inplace')
 
-    if not (isinstance(col_level, (types.Omitted, types.Integer)) or col_level==0):
+    if not (isinstance(col_level, (types.Omitted, types.Integer)) or col_level == 0):
         ty_checker.raise_exc(col_level, '0', 'col_level')
 
-    if not (isinstance(col_fill, (types.Omitted, types.StringLiteral)) or col_fill==""):
+    if not (isinstance(col_fill, (types.Omitted, types.StringLiteral)) or col_fill == ""):
         ty_checker.raise_exc(col_fill, '""', 'col_fill')
 
     return sdc_pandas_dataframe_reset_index_impl(self, level=level, drop=drop, inplace=inplace,
