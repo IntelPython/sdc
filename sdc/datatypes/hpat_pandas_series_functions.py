@@ -2211,7 +2211,7 @@ def hpat_pandas_series_head(self, n=5):
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if not isinstance(n, (types.Integer, types.Omitted)) and n != 5:
+    if not isinstance(n, (types.Integer, types.Omitted, types.NoneType)) and n != 5:
         ty_checker.raise_exc(n, 'int', 'n')
 
     if isinstance(self.index, types.NoneType):
@@ -5292,7 +5292,7 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
     return None
 
 
-@sdc_overload(operator.add)
+@sdc_overload(operator.add, parallel=False)
 def sdc_pandas_str_series_operator_add(self, other):
     """
     Additional overload of operator.add for Series of strings.
@@ -5420,7 +5420,7 @@ def sdc_pandas_str_series_operator_add(self, other):
     return None
 
 
-@sdc_overload(operator.mul)
+@sdc_overload(operator.mul, parallel=False)
 def sdc_pandas_str_series_operator_mul(self, other):
     """
     Additional overload of operator.add for Series of strings.
