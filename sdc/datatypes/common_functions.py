@@ -726,6 +726,7 @@ def _almost_equal_overload(x, y):
     ty_checker.check(x, types.Float)
 
     common_dtype = numpy.find_common_type([], [x.name, y.name])
+
     def _almost_equal_impl(x, y):
         return abs(x - y) <= numpy.finfo(common_dtype).eps
 
