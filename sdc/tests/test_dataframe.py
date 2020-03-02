@@ -818,13 +818,14 @@ class TestDataFrame(TestCase):
         indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e'], None]
 
         for idx in indexes:
-            df = pd.DataFrame({"float": [3.2, np.nan, 7.0, 3.3, np.nan],
-                               "int": [3, 4, 1, 0, 222],
-                               "string": ['a', 'dd', 'c', '12', None]}, index=idx)
+            df = pd.DataFrame({"A": [3.2, np.nan, 7.0, 3.3, np.nan],
+                               "B": [3, 4, 1, 0, 222],
+                               "C": [True, True, False, False, True],
+                               "D": ['a', 'dd', 'c', '12', None]}, index=idx)
             with self.subTest(index=idx):
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    @unittest.skip('DF with bool data Segmentation fault')
+    @unittest.skip('DF with column named "bool" Segmentation fault')
     def test_df_bool(self):
         def test_impl(df):
             return df.isna()

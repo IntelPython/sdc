@@ -935,7 +935,7 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
     return func_def, global_vars
 
 
-def _dataframe_reduce_columns_codegen_isna(func_name, columns, df):
+def _dataframe_codegen_isna(func_name, columns, df):
     """
     Example func_text for func_name='isna' columns=('float', 'int', 'string'):
 
@@ -969,7 +969,7 @@ def _dataframe_reduce_columns_codegen_isna(func_name, columns, df):
 
 def sdc_pandas_dataframe_isna_codegen(df, func_name):
     df_func_name = f'_df_{func_name}_impl'
-    func_text, global_vars = _dataframe_reduce_columns_codegen_isna(func_name, df.columns, df)
+    func_text, global_vars = _dataframe_codegen_isna(func_name, df.columns, df)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
