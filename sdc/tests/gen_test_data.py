@@ -24,6 +24,7 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import os
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -129,7 +130,7 @@ def generate_other_data():
 
 
 if __name__ == "__main__":
-    print('generation phase')
+    print(f'generation phase in {os.getcwd()}')
     ParquetGenerator.gen_kde_pq()
     ParquetGenerator.gen_pq_test()
     generate_spark_data()
