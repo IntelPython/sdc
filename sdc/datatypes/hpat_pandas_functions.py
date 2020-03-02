@@ -57,15 +57,23 @@ def infer_usecols(col_names):
 
 
 @overload(pandas.read_csv)
-def sdc_pandas_read_csv(fname, sep=',', skiprows=0):
-    signature =        "fname, sep=',', skiprows=0"  # nopep8
+def sdc_pandas_read_csv(fname, sep=',', delimiter=None, skiprows=0):
+    signature =        "fname, sep=',', delimiter=None, skiprows=0"  # nopep8
 
     assert isinstance(fname, numba.types.Literal)
     assert isinstance(sep, numba.types.Literal) or sep == ','
+    assert isinstance(delimiter, numba.types.Literal) or delimiter is None
     assert isinstance(skiprows, numba.types.Literal) or skiprows == 0
 
     if isinstance(sep, numba.types.Literal):
         sep = sep.literal_value
+
+    if isinstance(delimiter, numba.types.Literal):
+        delimiter = delimiter.literal_value
+
+    # Alias sep -> delimiter.
+    if delimiter is None:
+        delimiter = sep
 
     fname_const = fname.literal_value
     if isinstance(skiprows, numba.types.Literal):
@@ -73,7 +81,7 @@ def sdc_pandas_read_csv(fname, sep=',', skiprows=0):
     col_names = 0
     skiprows, col_names, dtype_map = \
         HiFramesPassImpl.infer_column_names_and_types_from_constant_filename(
-            fname_const, skiprows, col_names, sep=sep)
+            fname_const, skiprows, col_names, sep=delimiter)
 
     usecols = infer_usecols(col_names)
 
@@ -82,7 +90,7 @@ def sdc_pandas_read_csv(fname, sep=',', skiprows=0):
 
     # generate function text with signature and returning DataFrame
     func_text, func_name = _gen_csv_reader_py_pyarrow_func_text_dataframe(
-        columns, out_types, usecols, sep, skiprows, signature)
+        columns, out_types, usecols, delimiter, skiprows, signature)
     # print(func_text)
 
     # compile with Python
