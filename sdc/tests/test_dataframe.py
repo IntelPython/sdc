@@ -1082,7 +1082,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
 
-    @skip_numba_jit
     def test_df_reset_index1(self):
         def test_impl(df):
             return df.reset_index(drop=True)

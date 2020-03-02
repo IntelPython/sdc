@@ -1425,38 +1425,107 @@ def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=Tru
     return sdc_pandas_dataframe_groupby_impl
 
 
+def sdc_pandas_dataframe_reset_index_codegen(df_type, all_params, columns, result_name, func_line):
+    joined = ', '.join(all_params)
+    func_lines = [f'def _df_reset_index_impl({joined}):']
+    df = all_params[0]
+    func_lines += func_line
+    for i, c in enumerate(columns):
+        result_c = f'result_{c}'
+        func_lines += [
+            f'  series_{c} = pandas.Series(get_dataframe_data({df}, {i}))',
+            f'  result_{c} = series_{c}._data'
+        ]
+        result_name.append((result_c, c))
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=numpy.arange(len(result_{c})))']
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas,
+                   'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_reset_index_drop_False(df_type, result_name, func_lines):
+    codegen_ind = df_index_codelines(df_type, True)
+    result_ind = f'res_index'
+    for i in codegen_ind:
+        func_lines += [f'{i}']
+    result_name.append((result_ind, 'index'))
+
+    return result_name, func_lines
+
+
+def sdc_pandas_dataframe_reset_index_impl(self, level=None, drop=False, inplace=False, col_level=0, col_fill=''):
+    all_params = ['self', 'level=None', 'drop=False', 'inplace=False', 'col_level=0', 'col_fill=""']
+    df_func_name = f'_df_reset_index_impl'
+
+    result_name = []
+    func_lines = []
+    drop_val = str(drop)[14:-1]
+    if drop_val == 'False':
+        result_name, func_lines = sdc_pandas_dataframe_reset_index_drop_False(self, result_name, func_lines)
+
+    func_text, global_vars = sdc_pandas_dataframe_reset_index_codegen(self, all_params, self.columns,
+                                                                      result_name, func_lines)
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _apply_impl = loc_vars[df_func_name]
+
+    return _apply_impl
+
+
 @sdc_overload_method(DataFrameType, 'reset_index')
-def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, name=None, inplace=False):
+def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False, col_level=0, col_fill=''):
     """
-           Pandas DataFrame method :meth:`pandas.DataFrame.median` implementation.
+           Pandas DataFrame method :meth:`pandas.DataFrame.reset_index` implementation.
 
            .. only:: developer
 
-               Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_median*
+               Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_reset_index*
 
            Parameters
            -----------
            self: :class:`pandas.DataFrame`
                input arg
-           level:
+           level: :obj:`int`, `str`, `tuple`, or `list`, default None
                *unsupported*
-           drop: :obj:
-           level:
+           drop: :obj:`bool`, default False
+               Just reset the index, without inserting it as a column in the new DataFrame.
+           inplace: :obj:`bool`, default False
                *unsupported*
-           numeric_only:
+           col_level: :obj:`int`, `str`, default 0
+               *unsupported*
+           col_fill: :obj, default ''
                *unsupported*
 
            Returns
            -------
-           :obj:`pandas.Series` or `pandas.DataFrame`
-                   return the median of the values for the requested axis.
+           :obj:`pandas.DataFrame`
+                DataFrame with the new index or None if inplace=True.
            """
 
-    name = 'median'
+    func_name = 'reset_index'
 
-    check_type(name, df, axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
+    ty_checker = TypeChecker('Method {}().'.format(func_name))
+    ty_checker.check(self, DataFrameType)
 
-    params = {'axis': None, 'skipna': None, 'level': None, 'numeric_only': None}
-    ser_par = {'skipna': 'skipna', 'level': 'level'}
+    if not (isinstance(level, (types.Omitted, types.NoneType)) or level is None):
+        ty_checker.raise_exc(level, 'None', 'level')
 
-    return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
+    if not isinstance(drop, (types.Omitted, types.Boolean)):
+        ty_checker.raise_exc(drop, 'bool', 'drop')
+
+    if not (isinstance(inplace, (types.Omitted, types.Boolean)) or inplace==False):
+        ty_checker.raise_exc(inplace, 'False', 'inplace')
+
+    if not (isinstance(col_level, (types.Omitted, types.Integer)) or col_level==0):
+        ty_checker.raise_exc(col_level, '0', 'col_level')
+
+    if not (isinstance(col_fill, (types.Omitted, types.StringLiteral)) or col_fill==""):
+        ty_checker.raise_exc(col_fill, '""', 'col_fill')
+
+    return sdc_pandas_dataframe_reset_index_impl(self, level=level, drop=drop, inplace=inplace,
+                                                 col_level=col_level, col_fill=col_fill)
