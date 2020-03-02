@@ -133,9 +133,6 @@ def generate_other_data():
                        "D": [1, 2, 2, 6, 3, 4, 5, 6, 9]})
     df.to_parquet("pivot2.pq")
 
-    # CSV reader test
-    generate_csv_data()
-
     # generated data for parallel merge_asof testing
     df1 = pd.DataFrame({'time': pd.DatetimeIndex(
         ['2017-01-03', '2017-01-06', '2017-02-15', '2017-02-21']),
@@ -152,4 +149,5 @@ if __name__ == "__main__":
     ParquetGenerator.gen_kde_pq()
     ParquetGenerator.gen_pq_test()
     generate_spark_data()
+    generate_csv_data()
     generate_other_data()
