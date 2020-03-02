@@ -91,6 +91,8 @@ class TestSeriesRollingMethods(TestBase):
             'min': (100, [4 * 10 ** 5]),
             'skew': (100, [8 * 10 ** 5]),
             'sum': (100, [8 * 10 ** 5]),
+            'std': (100, [8 * 10 ** 5]),
+            'var': (100, [8 * 10 ** 5]),
         }
 
     def _test_case(self, pyfunc, name, total_data_length, data_num=1,
@@ -147,6 +149,12 @@ class TestSeriesRollingMethods(TestBase):
     def test_series_rolling_sum(self):
         self._test_series_rolling_method('sum')
 
+    def test_series_rolling_std(self):
+        self._test_series_rolling_method('std')
+
+    def test_series_rolling_var(self):
+        self._test_series_rolling_method('var')
+
 
 cases = [
     TC(name='apply', size=[10 ** 7], params='func=lambda x: np.nan if len(x) == 0 else x.mean()'),
@@ -156,7 +164,6 @@ cases = [
     TC(name='median', size=[10 ** 7]),
     TC(name='quantile', size=[10 ** 7], params='0.2'),
     TC(name='std', size=[10 ** 7]),
-    TC(name='var', size=[10 ** 7]),
 ]
 
 
