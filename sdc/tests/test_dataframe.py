@@ -1515,8 +1515,9 @@ class TestDataFrame(TestCase):
             return df.isin(df2)
 
         hpat_func = self.jit(test_impl)
-        df = pd.DataFrame({'num_legs': [2, 4], 'num_wings': [2, 0]}, index=['falcon', 'dog'])
+        df = pd.DataFrame({'num_legs': [2, 4], 'num_wings': [4, 0]}, index=['falcon', 'dog'])
         df2 = pd.DataFrame({'num_legs': [8, 2], 'num_wings': [0, 2]}, index=['spider', 'falcon'])
+        print(hpat_func(df, df2))
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
     @skip_sdc_jit
