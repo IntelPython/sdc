@@ -478,10 +478,10 @@ def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, usecols, sep,
     pd_dtype_strs = ", ".join(["'{}':{}".format(cname, _get_pd_dtype_str(t)) for cname, t in zip(col_names, col_typs)])
 
     if signature is None:
-        signature = "fname"
+        signature = "filepath_or_buffer"
     func_text = "def csv_reader_py({}):\n".format(signature)
     func_text += "  with objmode({}):\n".format(typ_strs)
-    func_text += "    df = pandas_read_csv(fname, names={},\n".format(col_names)
+    func_text += "    df = pandas_read_csv(filepath_or_buffer, names={},\n".format(col_names)
     func_text += "       parse_dates=[{}],\n".format(date_inds)
     func_text += "       dtype={{{}}},\n".format(pd_dtype_strs)
     func_text += "       skiprows={},\n".format(skiprows)

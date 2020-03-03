@@ -57,13 +57,129 @@ def infer_usecols(col_names):
 
 
 @overload(pandas.read_csv)
-def sdc_pandas_read_csv(fname, sep=',', delimiter=None, skiprows=0):
-    signature =        "fname, sep=',', delimiter=None, skiprows=0"  # nopep8
+def sdc_pandas_read_csv(
+    filepath_or_buffer,
+    sep=',',
+    delimiter=None,
+    # Column and Index Locations and Names
+    header="infer",
+    names=None,
+    index_col=None,
+    usecols=None,
+    squeeze=False,
+    prefix=None,
+    mangle_dupe_cols=True,
+    # General Parsing Configuration
+    dtype=None,
+    engine=None,
+    converters=None,
+    true_values=None,
+    false_values=None,
+    skipinitialspace=False,
+    skiprows=None,
+    skipfooter=0,
+    nrows=None,
+    # NA and Missing Data Handling
+    na_values=None,
+    keep_default_na=True,
+    na_filter=True,
+    verbose=False,
+    skip_blank_lines=True,
+    # Datetime Handling
+    parse_dates=False,
+    infer_datetime_format=False,
+    keep_date_col=False,
+    date_parser=None,
+    dayfirst=False,
+    cache_dates=True,
+    # Iteration
+    iterator=False,
+    chunksize=None,
+    # Quoting, Compression, and File Format
+    compression="infer",
+    thousands=None,
+    decimal=b".",
+    lineterminator=None,
+    quotechar='"',
+    # quoting=csv.QUOTE_MINIMAL,  # not supported
+    doublequote=True,
+    escapechar=None,
+    comment=None,
+    encoding=None,
+    dialect=None,
+    # Error Handling
+    error_bad_lines=True,
+    warn_bad_lines=True,
+    # Internal
+    delim_whitespace=False,
+    # low_memory=_c_parser_defaults["low_memory"],  # not supported
+    memory_map=False,
+    float_precision=None,
+):
+    signature = """
+        filepath_or_buffer,
+        sep=',',
+        delimiter=None,
+        # Column and Index Locations and Names
+        header="infer",
+        names=None,
+        index_col=None,
+        usecols=None,
+        squeeze=False,
+        prefix=None,
+        mangle_dupe_cols=True,
+        # General Parsing Configuration
+        dtype=None,
+        engine=None,
+        converters=None,
+        true_values=None,
+        false_values=None,
+        skipinitialspace=False,
+        skiprows=None,
+        skipfooter=0,
+        nrows=None,
+        # NA and Missing Data Handling
+        na_values=None,
+        keep_default_na=True,
+        na_filter=True,
+        verbose=False,
+        skip_blank_lines=True,
+        # Datetime Handling
+        parse_dates=False,
+        infer_datetime_format=False,
+        keep_date_col=False,
+        date_parser=None,
+        dayfirst=False,
+        cache_dates=True,
+        # Iteration
+        iterator=False,
+        chunksize=None,
+        # Quoting, Compression, and File Format
+        compression="infer",
+        thousands=None,
+        decimal=b".",
+        lineterminator=None,
+        quotechar='"',
+        # quoting=csv.QUOTE_MINIMAL,  # not supported
+        doublequote=True,
+        escapechar=None,
+        comment=None,
+        encoding=None,
+        dialect=None,
+        # Error Handling
+        error_bad_lines=True,
+        warn_bad_lines=True,
+        # Internal
+        delim_whitespace=False,
+        # low_memory=_c_parser_defaults["low_memory"],  # not supported
+        memory_map=False,
+        float_precision=None,
+    """
 
-    assert isinstance(fname, numba.types.Literal)
+    assert isinstance(filepath_or_buffer, numba.types.Literal)
     assert isinstance(sep, numba.types.Literal) or sep == ','
     assert isinstance(delimiter, numba.types.Literal) or delimiter is None
-    assert isinstance(skiprows, numba.types.Literal) or skiprows == 0
+    assert isinstance(skiprows, numba.types.Literal) or skiprows is None
 
     if isinstance(sep, numba.types.Literal):
         sep = sep.literal_value
@@ -75,7 +191,9 @@ def sdc_pandas_read_csv(fname, sep=',', delimiter=None, skiprows=0):
     if delimiter is None:
         delimiter = sep
 
-    fname_const = fname.literal_value
+    fname_const = filepath_or_buffer.literal_value
+    if skiprows is None:
+        skiprows = 0
     if isinstance(skiprows, numba.types.Literal):
         skiprows = skiprows.literal_value
     col_names = 0
