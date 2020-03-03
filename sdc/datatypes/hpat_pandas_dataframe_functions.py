@@ -1499,12 +1499,13 @@ def sdc_pandas_dataframe_isin_dict_codegen(func_name, df_type, values, all_param
     for i, c in enumerate(df_type.columns):
         result_c = f'result_{c}'
         func_lines += [
-            f'  series_{c} = pandas.Series(get_dataframe_data({df}, {i}))',
+            f'  result_len=len({df})',
             f'  if "{c}" in list(values.keys()):',
+            f'    series_{c} = pandas.Series(get_dataframe_data({df}, {i}))',
             f'    val = list(values["{c}"])',
             f'    result_{c} = series_{c}.{func_name}(val)',
             f'  else:',
-            f'    result = [False] * len(series_{c}._data)',
+            f'    result = numpy.repeat(False, result_len)',
             f'    result_{c} = pandas.Series(result)'
         ]
         result_name.append((result_c, c))
