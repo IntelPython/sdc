@@ -434,7 +434,9 @@ def pandas_read_csv(
         need_categorical |= any(isinstance(v, pd.CategoricalDtype) for v in dtype.values())
     except: pass
 
-    if need_categorical:
+    fallback_to_pandas = need_categorical
+
+    if fallback_to_pandas:
         return pd.read_csv(
             filepath_or_buffer=filepath_or_buffer,
             sep=sep,
