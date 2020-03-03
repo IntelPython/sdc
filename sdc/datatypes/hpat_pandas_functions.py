@@ -192,10 +192,13 @@ def sdc_pandas_read_csv(
         delimiter = sep
 
     fname_const = filepath_or_buffer.literal_value
-    if skiprows is None:
-        skiprows = 0
+
     if isinstance(skiprows, numba.types.Literal):
         skiprows = skiprows.literal_value
+
+    if skiprows is None:
+        skiprows = 0
+
     col_names = 0
     skiprows, col_names, dtype_map = \
         HiFramesPassImpl.infer_column_names_and_types_from_constant_filename(
