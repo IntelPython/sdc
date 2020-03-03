@@ -810,6 +810,30 @@ class TestDataFrame(TestCase):
                            'D': [None, 'dd', '', None]})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_df_isna(self):
+        def test_impl(df):
+            return df.isna()
+
+        sdc_func = sdc.jit(test_impl)
+        indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e'], None]
+
+        for idx in indexes:
+            df = pd.DataFrame({"A": [3.2, np.nan, 7.0, 3.3, np.nan],
+                               "B": [3, 4, 1, 0, 222],
+                               "C": [True, True, False, False, True],
+                               "D": ['a', 'dd', 'c', '12', None]}, index=idx)
+            with self.subTest(index=idx):
+                pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    @unittest.skip('DF with column named "bool" Segmentation fault')
+    def test_df_bool(self):
+        def test_impl(df):
+            return df.isna()
+
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"bool": [True, True, False, False, True]}, index=None)
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
     @skip_numba_jit
     def test_df_astype_str1(self):
         '''Verifies DataFrame.astype implementation converting various types to string'''
