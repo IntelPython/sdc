@@ -1963,10 +1963,9 @@ def hpat_pandas_series_isin(self, values):
     if not isinstance(values, (types.Set, types.List)):
         ty_checker.raise_exc(values, 'set or list', 'values')
 
-    if isinstance(values[0], (types.UnicodeType, types.StringLiteral)):
+    if isinstance(values.dtype, (types.UnicodeType, types.StringLiteral)):
         def hpat_pandas_series_isin_impl(self, values):
             # TODO: replace with below line when Numba supports np.isin in nopython mode
-            # return pandas.Series(np.isin(self._data, values))
 
             values = str_list_to_array(list(values))
             values = set(values)
@@ -1979,7 +1978,6 @@ def hpat_pandas_series_isin(self, values):
     else:
         def hpat_pandas_series_isin_impl(self, values):
             # TODO: replace with below line when Numba supports np.isin in nopython mode
-            # return pandas.Series(np.isin(self._data, values))
 
             values = set(values)
             data_len = len(self._data)
