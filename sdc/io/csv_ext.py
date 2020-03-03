@@ -366,16 +366,63 @@ def pyarrow_cpu_count_equal_numba_num_treads(func):
 
 @pyarrow_cpu_count_equal_numba_num_treads
 def pandas_read_csv(
-    filepath_or_buffer,
-    sep=",",
-    # Column and Index Locations and Names
-    names=None,
-    usecols=None,
-    # General Parsing Configuration
-    dtype=None,
-    skiprows=None,
-    # Datetime Handling
-    parse_dates=False,
+        filepath_or_buffer,
+        sep=',',
+        delimiter=None,
+        # Column and Index Locations and Names
+        header="infer",
+        names=None,
+        index_col=None,
+        usecols=None,
+        squeeze=False,
+        prefix=None,
+        mangle_dupe_cols=True,
+        # General Parsing Configuration
+        dtype=None,
+        engine=None,
+        converters=None,
+        true_values=None,
+        false_values=None,
+        skipinitialspace=False,
+        skiprows=None,
+        skipfooter=0,
+        nrows=None,
+        # NA and Missing Data Handling
+        na_values=None,
+        keep_default_na=True,
+        na_filter=True,
+        verbose=False,
+        skip_blank_lines=True,
+        # Datetime Handling
+        parse_dates=False,
+        infer_datetime_format=False,
+        keep_date_col=False,
+        date_parser=None,
+        dayfirst=False,
+        cache_dates=True,
+        # Iteration
+        iterator=False,
+        chunksize=None,
+        # Quoting, Compression, and File Format
+        compression="infer",
+        thousands=None,
+        decimal=b".",
+        lineterminator=None,
+        quotechar='"',
+        # quoting=csv.QUOTE_MINIMAL,  # not supported
+        doublequote=True,
+        escapechar=None,
+        comment=None,
+        encoding=None,
+        dialect=None,
+        # Error Handling
+        error_bad_lines=True,
+        warn_bad_lines=True,
+        # Internal
+        delim_whitespace=False,
+        # low_memory=_c_parser_defaults["low_memory"],  # not supported
+        memory_map=False,
+        float_precision=None,
 ):
     """Implements pandas.read_csv via pyarrow.csv.read_csv.
     This function has the same interface as pandas.read_csv.
@@ -389,13 +436,63 @@ def pandas_read_csv(
 
     if need_categorical:
         return pd.read_csv(
-            filepath_or_buffer,
+            filepath_or_buffer=filepath_or_buffer,
             sep=sep,
+            delimiter=delimiter,
+            # Column and Index Locations and Names
+            header=header,
             names=names,
+            index_col=index_col,
             usecols=usecols,
+            squeeze=squeeze,
+            prefix=prefix,
+            mangle_dupe_cols=mangle_dupe_cols,
+            # General Parsing Configuration
             dtype=dtype,
+            engine=engine,
+            converters=converters,
+            true_values=true_values,
+            false_values=false_values,
+            skipinitialspace=skipinitialspace,
             skiprows=skiprows,
-            parse_dates=parse_dates
+            skipfooter=skipfooter,
+            nrows=nrows,
+            # NA and Missing Data Handling
+            na_values=na_values,
+            keep_default_na=keep_default_na,
+            na_filter=na_filter,
+            verbose=verbose,
+            skip_blank_lines=skip_blank_lines,
+            # Datetime Handling
+            parse_dates=parse_dates,
+            infer_datetime_format=infer_datetime_format,
+            keep_date_col=keep_date_col,
+            date_parser=date_parser,
+            dayfirst=dayfirst,
+            cache_dates=cache_dates,
+            # Iteration
+            iterator=iterator,
+            chunksize=chunksize,
+            # Quoting, Compression, and File Format
+            compression=compression,
+            thousands=thousands,
+            decimal=decimal,
+            lineterminator=lineterminator,
+            quotechar=quotechar,
+            # quoting=csv.QUOTE_MINIMAL,  # not supported
+            doublequote=doublequote,
+            escapechar=escapechar,
+            comment=comment,
+            encoding=encoding,
+            dialect=dialect,
+            # Error Handling
+            error_bad_lines=error_bad_lines,
+            warn_bad_lines=warn_bad_lines,
+            # Internal
+            delim_whitespace=delim_whitespace,
+            # low_memory=_c_parser_defaults["low_memory"],  # not supported
+            memory_map=memory_map,
+            float_precision=float_precision,
         )
 
     autogenerate_column_names = bool(names)
