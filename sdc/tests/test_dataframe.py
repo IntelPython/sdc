@@ -1489,16 +1489,6 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
-    @unittest.skip('DF.getitem unsupported idx as a tuple')
-    def test_df_getitem_unicode_tuple_idx(self):
-        def test_impl(df):
-            return df[['A', 'B']]
-
-        sdc_func = self.jit(lambda df: df[('A', 'B')])
-        df = gen_df(test_global_input_data_float64)
-
-        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
-
     def test_df_getitem_attr(self):
         def test_impl(df):
             return df.A
