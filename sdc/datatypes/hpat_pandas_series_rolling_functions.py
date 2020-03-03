@@ -35,7 +35,6 @@ from numba.types import (float64, Boolean, Integer, NoneType, Number,
                          Omitted, StringLiteral, UnicodeType)
 
 from sdc.datatypes.common_functions import (_almost_equal,
-                                            _sdc_pandas_arr_align,
                                             _sdc_pandas_series_align)
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.hiframes.pd_series_type import SeriesType
@@ -748,8 +747,10 @@ def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
         else:
             other_arr = other._data
 
-        main_arr_aligned, other_arr_aligned = _sdc_pandas_arr_align(main_arr, other_arr)
-        length = len(main_arr_aligned)
+        main_arr_length = len(main_arr)
+        other_arr_length = len(other_arr)
+        min_length = min(main_arr_length, other_arr_length)
+        length = max(main_arr_length, other_arr_length)
         output_arr = numpy.empty(length, dtype=float64)
 
         chunks = parallel_chunks(length)
@@ -764,29 +765,38 @@ def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
                 continue
 
             prelude_start = max(0, chunk.start - win + 1)
-            prelude_stop = chunk.start
+            prelude_stop = min(chunk.start, min_length)
 
-            interlude_start = prelude_stop
-            interlude_stop = min(prelude_start + win, chunk.stop)
+            interlude_start = chunk.start
+            interlude_stop = min(prelude_start + win, chunk.stop, min_length)
+
+            postlude_start = min(prelude_start + win, chunk.stop)
+            postlude_stop = min(chunk.stop, min_length)
 
             for idx in range(prelude_start, prelude_stop):
-                x = main_arr_aligned[idx]
-                y = other_arr_aligned[idx]
+                x, y = main_arr[idx], other_arr[idx]
                 nfinite, result = put_corr(x, y, nfinite, result)
 
             for idx in range(interlude_start, interlude_stop):
-                x = main_arr_aligned[idx]
-                y = other_arr_aligned[idx]
+                x, y = main_arr[idx], other_arr[idx]
                 nfinite, result = put_corr(x, y, nfinite, result)
                 output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
 
-            for idx in range(interlude_stop, chunk.stop):
-                put_x = main_arr_aligned[idx]
-                put_y = other_arr_aligned[idx]
-                pop_x = main_arr_aligned[idx - win]
-                pop_y = other_arr_aligned[idx - win]
+            for idx in range(postlude_start, postlude_stop):
+                put_x, put_y = main_arr[idx], other_arr[idx]
+                pop_x, pop_y = main_arr[idx - win], other_arr[idx - win]
                 nfinite, result = put_corr(put_x, put_y, nfinite, result)
                 nfinite, result = pop_corr(pop_x, pop_y, nfinite, result)
+                output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
+
+            last_start = max(min_length, interlude_start)
+            for idx in range(last_start, postlude_start):
+                output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
+
+            last_stop = max(min_length, postlude_start)
+            for idx in range(last_stop, chunk.stop):
+                x, y = main_arr[idx - win], other_arr[idx - win]
+                nfinite, result = pop_corr(x, y, nfinite, result)
                 output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
 
         return pandas.Series(output_arr)
