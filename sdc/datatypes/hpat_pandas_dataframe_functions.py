@@ -1491,12 +1491,12 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     return sdc_pandas_dataframe_apply_columns(df, name, params, ser_par)
 
 
-def sdc_pandas_dataframe_isin_dict_codegen(func_name, df_type, values, all_params, columns):
+def sdc_pandas_dataframe_isin_dict_codegen(func_name, df_type, values, all_params):
     result_name = []
     joined = ', '.join(all_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     df = all_params[0]
-    for i, c in enumerate(columns):
+    for i, c in enumerate(df_type.columns):
         result_c = f'result_{c}'
         func_lines += [
             f'  series_{c} = pandas.Series(get_dataframe_data({df}, {i}))',
@@ -1522,20 +1522,21 @@ def sdc_pandas_dataframe_isin_dict_codegen(func_name, df_type, values, all_param
     return func_text, global_vars
 
 
-def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params, columns):
+def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params):
     result_name = []
     joined = ', '.join(all_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     df = all_params[0]
-    for i, c in enumerate(columns):
+    for i, c in enumerate(df_type.columns):
         result_c = f'result_{c}'
         func_lines += [
             f'  series_{c} = pandas.Series(get_dataframe_data({df}, {i}))',
-            f'  result = numpy.empty(len(series_{c}._data), numpy.bool_)'
+            f'  result = numpy.empty(len(series_{c}._data), numpy.bool_)',
+            f'  result_len = len(series_{c}._data)'
         ]
         if isinstance(values.index, types.NoneType):
             func_lines += [
-                f'  for i in range(len(series_{c}._data)):',
+                f'  for i in range(result_len):',
                 f'    if series_{c}._data[i] == values._data[i]:',
                 f'      result[i] = True',
                 f'    else:',
@@ -1543,20 +1544,19 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params
             ]
         else:
             func_lines += [
-                f'  for i in range(len(series_{c})):',
+                f'  for i in range(result_len):',
                 f'    idx = {df}._index[i]',
                 f'    value = series_{c}._data[i]',
+                f'    result[i] = False',
                 f'    for j in numba.prange(len(values)):',
                 f'      idx_val = values._index[j]',
                 f'      if idx == idx_val:',
                 f'        value_val = values._data[j]',
                 f'        if value == value_val:',
                 f'          result[i] = True',
-                f'          break',
                 f'        else:',
                 f'          result[i] = False',
-                f'      else:',
-                f'        result[i] = False'
+                f'        break'
             ]
 
         func_lines += [f'  {result_c} = pandas.Series(result)']
@@ -1590,30 +1590,30 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params):
             func_lines += [
                 f'  series_{c}_values = pandas.Series(get_dataframe_data({val}, {i}))',
                 f'  result = numpy.empty(len(series_{c}_values._data), numpy.bool_)',
+                f'  result_len = len(series_{c}._data)'
             ]
             if isinstance(in_df.index, types.NoneType):
                 func_lines += [
-                    f'  for i in range(len(series_{c}._data)):',
+                    f'  for i in range(result_len):',
                     f'    if series_{c}._data[i] == series_{c}_values._data[i]:',
                     f'      result[i] = True',
                     f'    else:',
                     f'      result[i] = False']
             else:
                 func_lines += [
-                    f'  for i in range(len(series_{c})):',
+                    f'  for i in range(result_len):',
                     f'    idx = {df}._index[i]',
                     f'    value = series_{c}._data[i]',
+                    f'    result[i] = False',
                     f'    for j in numba.prange(len(series_{c}_values)):',
                     f'      idx_val = {val}._index[j]',
                     f'      if idx == idx_val:',
                     f'        value_val = series_{c}_values._data[j]',
                     f'        if value == value_val:',
                     f'          result[i] = True',
-                    f'          break',
                     f'        else:',
                     f'          result[i] = False',
-                    f'      else:',
-                    f'        result[i] = False'
+                    f'        break',
                     ]
         else:
             func_lines += [
@@ -1633,6 +1633,36 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params):
                    'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
+
+
+def gen_codegen(func, name, df, values, all_params):
+    func_text, global_vars = func(name, df, values, all_params)
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _apply_impl = loc_vars[f'_df_{name}_impl']
+
+    return _apply_impl
+
+
+def sdc_pandas_dataframe_isin_df(name, df, values, all_params):
+    return gen_codegen(sdc_pandas_dataframe_isin_df_codegen, name, df, values, all_params)
+
+
+def sdc_pandas_dataframe_isin_ser(name, df, values, all_params):
+    return gen_codegen(sdc_pandas_dataframe_isin_ser_codegen, name, df, values, all_params)
+
+
+def sdc_pandas_dataframe_isin_dict(name, df, values, all_params):
+    return gen_codegen(sdc_pandas_dataframe_isin_dict_codegen, name, df, values, all_params)
+
+
+def sdc_pandas_dataframe_isin_iter(name, all_params, ser_par, columns):
+    func_text, global_vars = _dataframe_apply_columns_codegen(name, all_params, ser_par, columns)
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _apply_impl = loc_vars[f'_df_{name}_impl']
+
+    return _apply_impl
 
 
 @sdc_overload_method(DataFrameType, 'isin')
@@ -1665,26 +1695,19 @@ def isin_overload(df, values):
         ty_checker.raise_exc(values, 'iterable, Series, DataFrame', 'values')
 
     all_params = ['df', 'values']
-    df_func_name = f'_df_{name}_impl'
 
     if isinstance(values, (types.List, types.Set)):
         ser_par = 'values=values'
-        func_text, global_vars = _dataframe_apply_columns_codegen(name, all_params, ser_par, df.columns)
+        return sdc_pandas_dataframe_isin_iter(name, all_params, ser_par, df.columns)
 
     if isinstance(values, types.DictType):
-        func_text, global_vars = sdc_pandas_dataframe_isin_dict_codegen(name, df, values, all_params, df.columns)
+        return sdc_pandas_dataframe_isin_dict(name, df, values, all_params)
 
     if isinstance(values, SeriesType):
-        func_text, global_vars = sdc_pandas_dataframe_isin_ser_codegen(name, df, values, all_params, df.columns)
+        return sdc_pandas_dataframe_isin_ser(name, df, values, all_params)
 
     if isinstance(values, DataFrameType):
-        func_text, global_vars = sdc_pandas_dataframe_isin_df_codegen(name, df, values, all_params)
-
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _apply_impl = loc_vars[df_func_name]
-
-    return _apply_impl
+        return sdc_pandas_dataframe_isin_df(name, df, values, all_params)
 
 
 @sdc_overload_method(DataFrameType, 'groupby')
