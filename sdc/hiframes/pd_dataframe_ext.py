@@ -52,14 +52,14 @@ class DataFrameAttribute(AttributeTemplate):
     def resolve_shape(self, ary):
         return types.UniTuple(types.intp, 2)
 
-    def resolve_iat(self, ary):
-        return DataFrameIatType(ary)
+    # def resolve_iat(self, ary):
+    #     return DataFrameIatType(ary)
 
-    def resolve_iloc(self, ary):
-        return DataFrameILocType(ary)
+    # def resolve_iloc(self, ary):
+    #     return DataFrameILocType(ary)
 
-    def resolve_loc(self, ary):
-        return DataFrameLocType(ary)
+    # def resolve_loc(self, ary):
+    #     return DataFrameLocType(ary)
 
     if sdc.config.config_pipeline_hpat_default:
         def resolve_values(self, ary):
