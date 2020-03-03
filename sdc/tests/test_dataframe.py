@@ -1931,6 +1931,28 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    def test_df_iterate_over_columns2(self):
+        """ Verifies iteration over unboxed df columns using literal unroll. """
+        from sdc.hiframes.api import get_nan_mask
+
+        @self.jit
+        def jitted_func(df):
+            res_nan_mask = np.zeros(len(df), dtype=np.bool_)
+            for col in literal_unroll(df._data):
+                res_nan_mask += get_nan_mask(col)
+            return res_nan_mask
+
+        df = pd.DataFrame({
+                    'A': ['a', 'b', None, 'a', '', None, 'b'],
+                    'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
+                    'C': [np.nan, 1, 2, 1, np.nan, 2, 1],
+                    'D': [1, 2, 9, 5, 2, 1, 0]
+        })
+        # expected is a boolean mask of df rows that have None values
+        expected = np.asarray([True, False, True, False, True, True, False])
+        result = jitted_func(df)
+        np.testing.assert_array_equal(result, expected)
+
 
 if __name__ == "__main__":
     unittest.main()

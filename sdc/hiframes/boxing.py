@@ -100,9 +100,21 @@ def unbox_dataframe(typ, val, c):
 
     column_tup = c.context.make_tuple(
         c.builder, types.UniTuple(string_type, n_cols), column_strs)
-    zero = c.context.get_constant(types.int8, 0)
-    unboxed_tup = c.context.make_tuple(
-        c.builder, types.UniTuple(types.int8, n_cols + 1), [zero] * (n_cols + 1))
+
+    # this unboxes all DF columns so that no column unboxing occurs later
+    for col_ind in range(n_cols):
+        series_obj = c.pyapi.object_getattr_string(val, typ.columns[col_ind])
+        arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
+        ty_series = typ.data[col_ind]
+        if isinstance(ty_series, types.Array):
+            native_val = unbox_array(typ.data[col_ind], arr_obj, c)
+        elif ty_series == string_array_type:
+            native_val = unbox_str_series(string_array_type, series_obj, c)
+
+        dataframe.data = c.builder.insert_value(
+            dataframe.data, native_val.value, col_ind)
+        dataframe.unboxed = c.builder.insert_value(
+            dataframe.unboxed, c.context.get_constant(types.int8, 1), col_ind)
 
     # TODO: support unboxing index
     if typ.index == types.none:
@@ -116,7 +128,6 @@ def unbox_dataframe(typ, val, c):
         dataframe.index = unbox_array(typ.index, index_data, c).value
 
     dataframe.columns = column_tup
-    dataframe.unboxed = unboxed_tup
     dataframe.parent = val
 
     # increase refcount of stored values
