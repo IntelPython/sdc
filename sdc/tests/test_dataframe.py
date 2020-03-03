@@ -810,6 +810,30 @@ class TestDataFrame(TestCase):
                            'D': [None, 'dd', '', None]})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_df_isna(self):
+        def test_impl(df):
+            return df.isna()
+
+        sdc_func = sdc.jit(test_impl)
+        indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e'], None]
+
+        for idx in indexes:
+            df = pd.DataFrame({"A": [3.2, np.nan, 7.0, 3.3, np.nan],
+                               "B": [3, 4, 1, 0, 222],
+                               "C": [True, True, False, False, True],
+                               "D": ['a', 'dd', 'c', '12', None]}, index=idx)
+            with self.subTest(index=idx):
+                pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    @unittest.skip('DF with column named "bool" Segmentation fault')
+    def test_df_bool(self):
+        def test_impl(df):
+            return df.isna()
+
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"bool": [True, True, False, False, True]}, index=None)
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
     @skip_numba_jit
     def test_df_astype_str1(self):
         '''Verifies DataFrame.astype implementation converting various types to string'''
@@ -944,6 +968,41 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
+
+    def test_df_head_unbox(self):
+        def test_impl(df, n):
+            return df.head(n)
+        sdc_func = sdc.jit(test_impl)
+        for n in [-3, 0, 3, 5, None]:
+            for idx in [[3, 4, 2, 6, 1], None]:
+                df = pd.DataFrame({"float": [3.2, 4.4, 7.0, 3.3, 1.0],
+                                   "int": [3, 4, 1, 0, 222],
+                                   "string": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
+                with self.subTest(n=n, index=idx):
+                    pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
+
+    def test_df_head(self):
+        def get_func(n):
+            def impl(a):
+                return a.head(n)
+
+            return impl
+
+        cases_n = [-3, 0, 3, 5, None]
+        cases_index = [[3, 4, 2, 6, 1], None]
+        for n in cases_n:
+            for idx in cases_index:
+                ref_impl = get_func(n)
+                sdc_impl = get_func(n)
+                sdc_func = self.jit(sdc_impl)
+                with self.subTest(n=n, index=idx):
+                    df = pd.DataFrame(
+                        {"float": [3.2, 4.4, 7.0, 3.3, 1.0],
+                         "int": [3, 4, 1, 0, 222],
+                         "string": ['a', 'dd', 'c', '12', 'ddf']},
+                        index=[3, 4, 2, 6, 1]
+                    )
+                    pd.testing.assert_frame_equal(sdc_func(df), ref_impl(df))
 
     def test_pct_change1(self):
         def test_impl(n):
