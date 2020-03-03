@@ -1491,6 +1491,14 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     return sdc_pandas_dataframe_apply_columns(df, name, params, ser_par)
 
 
+def df_index_codegen_isin(df_type, df, data):
+    if isinstance(df_type.index, types.NoneType):
+        func_lines = [f'  return pandas.DataFrame({{{data}}})']
+    else:
+        func_lines = [f'  return pandas.DataFrame({{{data}}}, index={df}._index)']
+    return func_lines
+
+
 def sdc_pandas_dataframe_isin_dict_codegen(func_name, df_type, values, all_params):
     result_name = []
     joined = ', '.join(all_params)
@@ -1510,10 +1518,7 @@ def sdc_pandas_dataframe_isin_dict_codegen(func_name, df_type, values, all_param
         ]
         result_name.append((result_c, c))
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
-    if isinstance(df_type.index, types.NoneType):
-        func_lines += [f'  return pandas.DataFrame({{{data}}})']
-    else:
-        func_lines += [f'  return pandas.DataFrame({{{data}}}, index={df}._index)']
+    func_lines += df_index_codegen_isin(df_type, df, data)
     func_text = '\n'.join(func_lines)
 
     global_vars = {'pandas': pandas,
@@ -1564,10 +1569,7 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params
         result_name.append((result_c, c))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
-    if isinstance(df_type.index, types.NoneType):
-        func_lines += [f'  return pandas.DataFrame({{{data}}})']
-    else:
-        func_lines += [f'  return pandas.DataFrame({{{data}}}, index={df}._index)']
+    func_lines += df_index_codegen_isin(df_type, df, data)
     func_text = '\n'.join(func_lines)
 
     global_vars = {'pandas': pandas,
@@ -1622,10 +1624,7 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params):
         func_lines += [f'  {result_c} = pandas.Series(result)']
         result_name.append((result_c, c))
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
-    if isinstance(df_type.index, types.NoneType):
-        func_lines += [f'  return pandas.DataFrame({{{data}}})']
-    else:
-        func_lines += [f'  return pandas.DataFrame({{{data}}}, index={df}._index)']
+    func_lines += df_index_codegen_isin(df_type, df, data)
     func_text = '\n'.join(func_lines)
 
     global_vars = {'pandas': pandas,
