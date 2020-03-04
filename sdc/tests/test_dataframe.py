@@ -63,6 +63,8 @@ COL_IND = 0
 
 class TestDataFrame(TestCase):
 
+    # TODO: Data generator for DataFrames
+
     def test_create1(self):
         def test_impl(A, B):
             df = pd.DataFrame({'A': A, 'B': B})
@@ -588,7 +590,7 @@ class TestDataFrame(TestCase):
 
         for values in values_to_test:
             with self.subTest(values=values):
-                df = pd.DataFrame({'A': A, 'B': B, 'C': values})
+                df = pd.DataFrame({'A': A, 'B': B, 'C D E': values})
                 self._test_df_values_unboxing(df)
 
     def test_df_values(self):
@@ -1026,7 +1028,7 @@ class TestDataFrame(TestCase):
     def test_median1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
-            df = pd.DataFrame({'A': 2 ** np.arange(n), 'B': np.arange(n) + 1.0})
+            df = pd.DataFrame({'A': 2 ** np.arange(n), 'B D': np.arange(n) + 1.0})
             return df.median()
 
         hpat_func = self.jit(test_impl)
@@ -1209,7 +1211,7 @@ class TestDataFrame(TestCase):
 
     def test_df_drop_one_column_unboxing(self):
         def test_impl(df):
-            return df.drop(columns='A')
+            return df.drop(columns='C D')
 
         index_to_test = [[1, 2, 3, 4],
                          [.1, .2, .3, .4],
@@ -1220,7 +1222,7 @@ class TestDataFrame(TestCase):
 
         for index in index_to_test:
             with self.subTest(index=index):
-                df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
+                df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C D': [1.0, 2.0, np.nan, 1.0]},
                                   index=index)
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
@@ -1575,7 +1577,7 @@ class TestDataFrame(TestCase):
         n1 = 11
         n2 = n1 * 2
         df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1)**2})
-        df2 = pd.DataFrame({'C': np.arange(n2), 'D': np.arange(n2)**2, 'E': np.arange(n2) + 100})
+        df2 = pd.DataFrame({'C': np.arange(n2), 'D': np.arange(n2)**2, 'E S D': np.arange(n2) + 100})
 
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
@@ -1587,7 +1589,7 @@ class TestDataFrame(TestCase):
         n1 = 11
         n2 = n1 * 2
         df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1)**2})
-        df2 = pd.DataFrame({'A': np.arange(n2), 'D': np.arange(n2)**2, 'E': np.arange(n2) + 100})
+        df2 = pd.DataFrame({'A': np.arange(n2), 'D': np.arange(n2)**2, 'E S D': np.arange(n2) + 100})
 
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
@@ -1739,7 +1741,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     def test_std_default(self):
@@ -1752,7 +1754,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     def test_var_default(self):
@@ -1765,7 +1767,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     def test_max_default(self):
@@ -1778,7 +1780,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     @skip_sdc_jit
@@ -1792,7 +1794,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     def test_sum_default(self):
@@ -1805,7 +1807,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     def test_prod_default(self):
@@ -1818,7 +1820,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     def test_count2_default(self):
@@ -1831,7 +1833,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     @skip_sdc_jit
