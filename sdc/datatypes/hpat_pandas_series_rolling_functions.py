@@ -101,12 +101,6 @@ def arr_apply(arr, func):
 
 
 @sdc_register_jitable
-def arr_nonnan_count(arr):
-    """Count non-NaN values"""
-    return len(arr) - numpy.isnan(arr).sum()
-
-
-@sdc_register_jitable
 def arr_mean(arr):
     """Calculate mean of values"""
     if len(arr) == 0:
@@ -229,6 +223,30 @@ def put_corr(x, y, nfinite, result):
         sum_yy += y * y
 
     return nfinite, (sum_x, sum_y, sum_xy, sum_xx, sum_yy)
+
+
+@sdc_register_jitable
+def pop_count(value, nfinite, result):
+    """Calculate the window count without old value."""
+    if numpy.isnan(value):
+        return nfinite, result
+
+    return nfinite, result - 1
+
+
+@sdc_register_jitable
+def put_count(value, nfinite, result):
+    """Calculate the window count with new value."""
+    if numpy.isnan(value):
+        return nfinite, result
+
+    return nfinite, result + 1
+
+
+@sdc_register_jitable
+def result(nfinite, minp, result):
+    """Get result."""
+    return result
 
 
 @sdc_register_jitable
@@ -659,6 +677,8 @@ def gen_sdc_pandas_series_rolling_ddof_impl(pop, put, get_result=ddof_result,
     return impl
 
 
+sdc_pandas_series_rolling_count_impl = gen_sdc_pandas_series_rolling_impl(
+    pop_count, put_count, get_result=result, init_result=0.)
 sdc_pandas_series_rolling_kurt_impl = gen_sdc_pandas_series_rolling_impl(
     pop_kurt, put_kurt, get_result=kurt_result_or_nan,
     init_result=(0., 0., 0., 0.))
@@ -804,32 +824,13 @@ def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
     return hpat_pandas_rolling_series_corr_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'count')
+@sdc_overload_method(SeriesRollingType, 'count')
 def hpat_pandas_series_rolling_count(self):
 
     ty_checker = TypeChecker('Method rolling.count().')
     ty_checker.check(self, SeriesRollingType)
 
-    def hpat_pandas_rolling_series_count_impl(self):
-        win = self._window
-
-        input_series = self._data
-        input_arr = input_series._data
-        length = len(input_arr)
-        output_arr = numpy.empty(length, dtype=float64)
-
-        boundary = min(win, length)
-        for i in prange(boundary):
-            arr_range = input_arr[:i + 1]
-            output_arr[i] = arr_nonnan_count(arr_range)
-
-        for i in prange(boundary, length):
-            arr_range = input_arr[i + 1 - win:i + 1]
-            output_arr[i] = arr_nonnan_count(arr_range)
-
-        return pandas.Series(output_arr, input_series._index, name=input_series._name)
-
-    return hpat_pandas_rolling_series_count_impl
+    return sdc_pandas_series_rolling_count_impl
 
 
 def _hpat_pandas_series_rolling_cov_check_types(self, other=None,

@@ -86,6 +86,7 @@ class TestSeriesRollingMethods(TestBase):
         super().setUpClass()
         cls.map_ncalls_dlength = {
             'corr': (100, [4 * 10 ** 5]),
+            'count': (100, [8 * 10 ** 5]),
             'kurt': (100, [8 * 10 ** 5]),
             'mean': (100, [8 * 10 ** 5]),
             'min': (100, [4 * 10 ** 5]),
@@ -135,6 +136,9 @@ class TestSeriesRollingMethods(TestBase):
         self._test_series_rolling_method('corr', extra_usecase_params='other',
                                          method_params='other=other')
 
+    def test_series_rolling_count(self):
+        self._test_series_rolling_method('count')
+
     def test_series_rolling_kurt(self):
         self._test_series_rolling_method('kurt')
 
@@ -159,7 +163,6 @@ class TestSeriesRollingMethods(TestBase):
 
 cases = [
     TC(name='apply', size=[10 ** 7], params='func=lambda x: np.nan if len(x) == 0 else x.mean()'),
-    TC(name='count', size=[10 ** 7]),
     TC(name='cov', size=[10 ** 7]),
     TC(name='max', size=[10 ** 7]),
     TC(name='median', size=[10 ** 7]),
