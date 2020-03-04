@@ -24,6 +24,13 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+Expected result:
+   A  B  C
+1  1  2  3
+4  4  5  6
+"""
+
 import pandas as pd
 import numpy as np
 from numba import njit
@@ -34,10 +41,9 @@ def dataframe_getitem():
     df = pd.DataFrame({'A': [0, 1, 2, 3, 4],
                        'B': [1, 2, 3, 4, 5],
                        'C': [2, 3, 4, 5, 6]})
-    arr = np.array([i % 2 for i in range(len(df))], dtype=np.bool_)
-    result = df[arr]
+    arr = np.array([False, True, False, False, True])
 
-    return result
+    return df[arr]
 
 
 print(dataframe_getitem())

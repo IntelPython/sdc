@@ -15,32 +15,32 @@ Supported ``key`` can be one of the following:
     - A tuple of string, e.g. :obj:`df[('A', 'B')]`
     - An array of booleans, e.g. :obj:`df[True,False]`
     - A series of booleans, e.g. :obj:`df(series([True,False]))`
-Column through getting attribute.
+Supported getting a column through getting attribute.
 
 Examples
 --------
-.. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem_key.py
+.. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem_attr.py
    :language: python
-   :lines: 27-
+   :lines: 37-
    :caption: Getting Pandas DataFrame column through getting attribute.
    :name: ex_dataframe_getitem
 
-.. command-output:: python ./dataframe/df_getitem/df_getitem_key.py
+.. command-output:: python ./dataframe/df_getitem/df_getitem_attr.py
    :cwd: ../../../examples
 
-.. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem_column.py
+.. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem.py
    :language: python
-   :lines: 27-
-   :caption: Getting Pandas DataFrame elements. Key is string.
+   :lines: 37-
+   :caption: Getting Pandas DataFrame column where key is a string.
    :name: ex_dataframe_getitem
 
-.. command-output:: python ./dataframe/df_getitem/df_getitem_column.py
+.. command-output:: python ./dataframe/df_getitem/df_getitem.py
    :cwd: ../../../examples
 
 .. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem_slice.py
    :language: python
-   :lines: 27-
-   :caption: Getting Pandas DataFrame elements. Key is slice of integer.
+   :lines: 34-
+   :caption: Getting slice of Pandas DataFrame.
    :name: ex_dataframe_getitem
 
 .. command-output:: python ./dataframe/df_getitem/df_getitem_slice.py
@@ -48,8 +48,8 @@ Examples
 
 .. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem_tuple.py
    :language: python
-   :lines: 27-
-   :caption: Getting Pandas DataFrame elements. Key is tuple of string.
+   :lines: 37-
+   :caption: Getting Pandas DataFrame elements where key is a tuple of strings.
    :name: ex_dataframe_getitem
 
 .. command-output:: python ./dataframe/df_getitem/df_getitem_tuple.py
@@ -57,8 +57,8 @@ Examples
 
 .. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem_array.py
    :language: python
-   :lines: 27-
-   :caption: Getting Pandas DataFrame elements. Key is array of boolean.
+   :lines: 34-
+   :caption: Getting Pandas DataFrame elements where key is an array of booleans.
    :name: ex_dataframe_getitem
 
 .. command-output:: python ./dataframe/df_getitem/df_getitem_array.py
@@ -66,8 +66,8 @@ Examples
 
 .. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem_series.py
    :language: python
-   :lines: 27-
-   :caption: Getting Pandas DataFrame elements. Key is series of boolean.
+   :lines: 34-
+   :caption: Getting Pandas DataFrame elements where key is series of booleans.
    :name: ex_dataframe_getitem
 
 .. command-output:: python ./dataframe/df_getitem/df_getitem_series.py

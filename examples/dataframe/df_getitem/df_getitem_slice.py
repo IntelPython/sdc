@@ -24,6 +24,13 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+Expected result:
+   A  B  C
+1  1  2  3
+2  2  3  4
+"""
+
 import pandas as pd
 from numba import njit
 
@@ -33,9 +40,8 @@ def dataframe_getitem():
     df = pd.DataFrame({'A': [0, 1, 2, 3, 4],
                        'B': [1, 2, 3, 4, 5],
                        'C': [2, 3, 4, 5, 6]})
-    result = df[1:3]
 
-    return result
+    return df[1:3]
 
 
 print(dataframe_getitem())

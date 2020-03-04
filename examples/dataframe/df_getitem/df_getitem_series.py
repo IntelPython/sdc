@@ -24,6 +24,13 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+Expected result:
+   A  B  C
+0  0  1  2
+2  2  3  4
+"""
+
 import pandas as pd
 from numba import njit
 
@@ -34,9 +41,8 @@ def dataframe_getitem():
                        'B': [1, 2, 3, 4, 5],
                        'C': [2, 3, 4, 5, 6]})
     val = pd.Series([True, False, True])
-    result = df[val]
 
-    return result
+    return df[val]
 
 
 print(dataframe_getitem())
