@@ -5,7 +5,7 @@
 pandas.DataFrame.getitem
 ***************
 
-Evaluation obj[key]
+Evaluation of `obj[key]`
 
 Limitations
 -----------
