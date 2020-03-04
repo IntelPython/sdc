@@ -1534,6 +1534,24 @@ def sdc_pandas_dataframe_getitem(self, idx):
 @sdc_overload_method(DataFrameType, 'pct_change')
 def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.pct_change
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_pct_change.py
+        :language: python
+        :lines: 36-
+        :caption: Percentage change between the current and a prior element.
+        :name: ex_dataframe_pct_change
+
+    .. command-output:: python ./dataframe/dataframe_pct_change.py
+        :cwd: ../../../examples
+
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas DataFrame method :meth:`pandas.DataFrame.pct_change` implementation.
 
     .. only:: developer
