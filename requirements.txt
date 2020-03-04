@@ -1,5 +1,5 @@
 scipy
-numpy>=1.16
+numpy>=1.16,<1.18
 pandas==0.25.3
 pyarrow==0.15.1
 numba==0.48
