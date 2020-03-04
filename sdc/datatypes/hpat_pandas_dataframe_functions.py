@@ -141,8 +141,8 @@ def sdc_pandas_dataframe_values_codegen(df, numba_common_dtype):
     func_text.append(f'row_len = len(get_dataframe_data(df, 0))')
 
     for index, column_name in enumerate(df.columns):
-        func_text.append(f'df_col_{column_name} = get_dataframe_data(df, {index})')
-        column_list.append(f'df_col_{column_name}')
+        func_text.append(f'df_col_{index} = get_dataframe_data(df, {index})')
+        column_list.append(f'df_col_{index}')
 
     func_text.append(f'df_values = numpy.empty(row_len*{column_len}, numpy.dtype("{numba_common_dtype}"))')
     func_text.append('for i in range(row_len):')
@@ -284,34 +284,35 @@ def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
     func_text.append(f'len_df = len(get_dataframe_data(df, 0))')
     func_text.append(f'len_other = len(get_dataframe_data(other, 0))')
 
-    for col_name, i in df_columns_indx.items():
-        func_text.append(f'new_col_{col_name}_data_{"df"} = get_dataframe_data({"df"}, {i})')
+    for col_name, col_id in df_columns_indx.items():
+        func_text.append(f'new_col_{col_id}_data_{"df"} = get_dataframe_data({"df"}, {col_id})')
         if col_name in other_columns_indx:
-            func_text.append(f'new_col_{col_name}_data_{"other"} = '
+            other_col_id = other_columns_indx.get(col_name)
+            func_text.append(f'new_col_{col_id}_data_{"other"} = '
                              f'get_dataframe_data({"other"}, {other_columns_indx.get(col_name)})')
-            s1 = f'init_series(new_col_{col_name}_data_{"df"})'
-            s2 = f'init_series(new_col_{col_name}_data_{"other"})'
-            func_text.append(f'new_col_{col_name} = {s1}.append({s2})._data')
+            s1 = f'init_series(new_col_{col_id}_data_{"df"})'
+            s2 = f'init_series(new_col_{col_id}_data_{"other"})'
+            func_text.append(f'new_col_{col_id} = {s1}.append({s2})._data')
         else:
-            func_text.append(f'new_col_{col_name}_data = init_series(new_col_{col_name}_data_df)._data')
+            func_text.append(f'new_col_{col_id}_data = init_series(new_col_{col_id}_data_df)._data')
             if col_name in string_type_columns:
-                func_text.append(f'new_col_{col_name} = fill_str_array(new_col_{col_name}_data, len_df+len_other)')
+                func_text.append(f'new_col_{col_id} = fill_str_array(new_col_{col_id}_data, len_df+len_other)')
             else:
-                func_text.append(f'new_col_{col_name} = fill_array(new_col_{col_name}_data, len_df+len_other)')
-        column_list.append((f'new_col_{col_name}', col_name))
+                func_text.append(f'new_col_{col_id} = fill_array(new_col_{col_id}_data, len_df+len_other)')
+        column_list.append((f'new_col_{col_id}', col_name))
 
-    for col_name, i in other_columns_indx.items():
+    for col_name, col_id in other_columns_indx.items():
         if col_name not in df_columns_indx:
-            func_text.append(f'new_col_{col_name}_data_{"other"} = get_dataframe_data({"other"}, {i})')
-            func_text.append(f'new_col_{col_name}_data = init_series(new_col_{col_name}_data_other)._data')
+            func_text.append(f'new_col_{col_id}_data_{"other"} = get_dataframe_data({"other"}, {col_id})')
+            func_text.append(f'new_col_{col_id}_data = init_series(new_col_{col_id}_data_other)._data')
             if col_name in string_type_columns:
                 func_text.append(
-                    f'new_col_{col_name} = '
-                    f'fill_str_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
+                    f'new_col_{col_id}_other = '
+                    f'fill_str_array(new_col_{col_id}_data, len_df+len_other, push_back=False)')
             else:
-                func_text.append(f'new_col_{col_name} = '
-                                 f'fill_array(new_col_{col_name}_data, len_df+len_other, push_back=False)')
-            column_list.append((f'new_col_{col_name}', col_name))
+                func_text.append(f'new_col_{col_id}_other = '
+                                 f'fill_array(new_col_{col_id}_data, len_df+len_other, push_back=False)')
+            column_list.append((f'new_col_{col_id}_other', col_name))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
     # TODO: Handle index
@@ -423,9 +424,9 @@ def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, col
     joined = ', '.join(func_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     for i, c in enumerate(columns):
-        result_c = f'result_{c}'
-        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({func_params[0]}, {i}))',
-                       f'  {result_c} = series_{c}.{func_name}({series_params})']
+        result_c = f'result_{i}'
+        func_lines += [f'  series_{i} = pandas.Series(get_dataframe_data({func_params[0]}, {i}))',
+                       f'  {result_c} = series_{i}.{func_name}({series_params})']
         result_name_list.append(result_c)
     all_results = ', '.join(result_name_list)
     all_columns = ', '.join([f"'{c}'" for c in columns])
@@ -451,7 +452,6 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
     s_par = '{}'.format(', '.join(ser_par[:]))
 
     df_func_name = f'_df_{func_name}_impl'
-
 
     func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, s_par, df.columns)
     loc_vars = {}
@@ -561,9 +561,9 @@ def _dataframe_apply_columns_codegen(func_name, func_params, series_params, colu
     joined = ', '.join(func_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     for i, c in enumerate(columns):
-        result_c = f'result_{c}'
-        func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({func_params[0]}, {i}))',
-                       f'  {result_c} = series_{c}.{func_name}({series_params})']
+        result_c = f'result_{i}'
+        func_lines += [f'  series_{i} = pandas.Series(get_dataframe_data({func_params[0]}, {i}))',
+                       f'  {result_c} = series_{i}.{func_name}({series_params})']
         result_name.append((result_c, c))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
@@ -1014,9 +1014,10 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
             func_text.append(indent + f'raise ValueError("The label {label} is not found in the selected axis")')
             break
 
-    for column in saved_df_columns:
-        func_text.append(f'new_col_{column}_data_{"df"} = get_dataframe_data({"df"}, {df_columns_indx[column]})')
-        column_list.append((f'new_col_{column}_data_df', column))
+    for column_id, column_name in enumerate(saved_df_columns):
+        func_text.append(f'new_col_{column_id}_data_{"df"} = get_dataframe_data({"df"}, '
+                         f'{df_columns_indx[column_name]})')
+        column_list.append((f'new_col_{column_id}_data_df', column_name))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
     index = 'df.index'
