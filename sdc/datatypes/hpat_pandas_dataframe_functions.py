@@ -1627,3 +1627,49 @@ def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=Tru
         return init_dataframe_groupby(self, column_id, grouped, sort)
 
     return sdc_pandas_dataframe_groupby_impl
+
+
+def gen_add_column_impl(self, idx):
+    func_text, global_vars = codegen(self, idx)
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _impl = loc_vars[impl_name]
+
+    return _impl
+
+
+def set_column(self, key, value):
+    pass
+
+
+@sdc_overload(set_column)
+def set_column_overload(self, key, value):
+    if not isinstance(self, DataFrameType):
+        return None
+
+    if isinstance(key, types.StringLiteral):
+        try:
+            col_idx = self.columns.index(key.literal_value)
+            key_error = False
+        except ValueError:
+            key_error = True
+
+        def set_column_str_literal_key_impl(self, key, value):
+            if key_error == False:  # noqa
+                return self
+            else:
+                return gen_add_column_impl(self, key, value)
+
+        return set_column_str_literal_key_impl
+
+    if isinstance(key, types.UnicodeType):
+        def _set_column_unicode_key_impl(self, key, value):
+            # http://numba.pydata.org/numba-doc/dev/developer/literal.html#specifying-for-literal-typing
+            # literally raises special exception to call setitem with literal idx value got from unicode
+            return literally(key)
+
+        return _set_column_unicode_key_impl
+
+    ty_checker = TypeChecker('Function sdc.datatypes.hpat_pandas_dataframe_functions.set_column().')
+    ty_checker.raise_exc(key, 'str', 'key')
