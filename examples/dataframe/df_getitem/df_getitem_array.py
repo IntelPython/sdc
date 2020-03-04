@@ -33,9 +33,7 @@ from numba import njit
 def dataframe_getitem():
     df = pd.DataFrame({'A': [0, 1, 2, 3, 4],
                        'B': [1, 2, 3, 4, 5],
-                       'C': [2, 3, 4, 5, 6],
-                       'D': [3, 4, 5, 6, 7],
-                       'E': [4, 5, 6, 7, 8]})
+                       'C': [2, 3, 4, 5, 6]})
     arr = np.array([i % 2 for i in range(len(df))], dtype=np.bool_)
     result = df[arr]
 
