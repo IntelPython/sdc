@@ -176,9 +176,6 @@ def has_parent(typingctx, df=None):
 def get_dataframe_data(df, i):
 
     def _impl(df, i):
-        if has_parent(df) and df._unboxed[i] == 0:
-            # TODO: make df refcounted to avoid repeated unboxing
-            df = sdc.hiframes.boxing.unbox_dataframe_column(df, i)
         return df._data[i]
 
     return _impl

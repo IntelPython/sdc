@@ -113,8 +113,6 @@ def unbox_dataframe(typ, val, c):
 
         dataframe.data = c.builder.insert_value(
             dataframe.data, native_val.value, col_ind)
-        dataframe.unboxed = c.builder.insert_value(
-            dataframe.unboxed, c.context.get_constant(types.int8, 1), col_ind)
 
     # TODO: support unboxing index
     if typ.index == types.none:
@@ -312,8 +310,6 @@ def unbox_dataframe_column(typingctx, df, i=None):
         # assign array and set unboxed flag
         dataframe.data = builder.insert_value(
             dataframe.data, native_val.value, col_ind)
-        dataframe.unboxed = builder.insert_value(
-            dataframe.unboxed, context.get_constant(types.int8, 1), col_ind)
         return dataframe._getvalue()
 
     return signature(df, df, i), codegen
