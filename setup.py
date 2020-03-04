@@ -346,7 +346,7 @@ setup(name=SDC_NAME_STR,
       package_data={'sdc.tests': ['*.bz2'], },
       install_requires=[
           'scipy',
-          'numpy>=1.16,<1.18',
+          'numpy>=1.16',
           'pandas==0.25.3',
           'pyarrow==0.15.1',
           'numba==0.48'
