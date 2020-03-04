@@ -813,11 +813,15 @@ def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
             for idx in range(last_start, postlude_start):
                 output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
 
-            last_stop = max(min_length, postlude_start)
-            for idx in range(last_stop, chunk.stop):
+            last_start = max(min_length, postlude_start)
+            last_stop = min(min_length + win, chunk.stop)
+            for idx in range(last_start, last_stop):
                 x, y = main_arr[idx - win], other_arr[idx - win]
                 nfinite, result = pop_corr(x, y, nfinite, result)
                 output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
+
+            for idx in range(last_stop, chunk.stop):
+                output_arr[idx] = numpy.nan
 
         return pandas.Series(output_arr)
 
