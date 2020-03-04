@@ -38,6 +38,7 @@ import pandas as pd
 from numba.errors import TypingError
 from sdc.hiframes.rolling import supported_rolling_funcs
 from sdc.tests.test_base import TestCase
+from sdc.tests.test_series import gen_frand_array
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                   skip_numba_jit, skip_sdc_jit,
                                   test_global_input_data_float64)
@@ -1315,6 +1316,20 @@ class TestRolling(TestCase):
             series = pd.Series(main_data)
             other = pd.Series(other_data)
             self._test_rolling_corr(series, other)
+
+    @skip_sdc_jit('Series.rolling.corr() unsupported Series index')
+    def test_series_rolling_corr_diff_length(self):
+        def test_impl(series, window, other):
+            return series.rolling(window).corr(other)
+
+        hpat_func = self.jit(test_impl)
+
+        series = pd.Series([1., -1., 0., 0.1, -0.1])
+        other = pd.Series(gen_frand_array(40))
+        window = 5
+        jit_result = hpat_func(series, window, other)
+        ref_result = test_impl(series, window, other)
+        pd.testing.assert_series_equal(jit_result, ref_result)
 
     @skip_sdc_jit('Series.rolling.corr() unsupported Series index')
     def test_series_rolling_corr_with_no_other(self):
