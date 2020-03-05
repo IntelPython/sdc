@@ -1644,7 +1644,8 @@ def df_getitem_list_iloc_codegen(self, idx):
             result_B = data_B.iloc[numpy.array(idx)]
             data_C = pandas.Series(get_dataframe_data(self._dataframe, 2))
             result_C = data_C.iloc[numpy.array(idx)]
-            return pandas.DataFrame(data={"A": result_A, "B": result_B, "C": result_C}, index=[self._dataframe._index[i] for i in idx])
+            return pandas.DataFrame(data={"A": result_A, "B": result_B, "C": result_C},
+                index=[self._dataframe._index[i] for i in idx])
     """
     func_lines = ['def _df_getitem_list_iloc_impl(self, idx):']
     results = []
