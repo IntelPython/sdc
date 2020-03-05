@@ -1442,20 +1442,20 @@ def df_getitem_tuple_iat_codegen(self, row, col):
     """
     Example of generated implementation:
         def _df_getitem_tuple_iat_impl(self, idx):
-            data = get_dataframe_data(self._dataframe, 2)
+            data = get_dataframe_data(self._dataframe, 1)
             res_data = pandas.Series(data)
-            return res_data.iat[1]
+            return res_data.iat[idx[0]]
     """
     func_lines = ['def _df_getitem_tuple_iat_impl(self, idx):']
     if self.columns:
         func_lines += [
-            f'  data = get_dataframe_data(self._dataframe, {col})',
-            f'  res_data = pandas.Series(data)',
-            f'  return res_data.iat[{row}]',
+            f"  data = get_dataframe_data(self._dataframe, {col})",
+            f"  res_data = pandas.Series(data)",
+            f"  return res_data.iat[idx[0]]",
         ]
 
     func_text = '\n'.join(func_lines)
-    print(func_text)
+
     global_vars = {'pandas': pandas, 'numpy': numpy,
                    'get_dataframe_data': get_dataframe_data}
 
@@ -1474,8 +1474,6 @@ def gen_df_getitem_iat_impl(self, row, col):
 
 @sdc_overload(operator.getitem)
 def sdc_pandas_dataframe_accessor_getitem(self, idx):
-    ty_checker = TypeChecker('Operator getitem().')
-
     if not isinstance(self, DataFrameGetitemAccessorType):
         return None
 
@@ -1500,7 +1498,7 @@ def sdc_pandas_dataframe_iat(self):
     --------
     .. literalinclude:: ../../../examples/dataframe_iat.py
        :language: python
-       :lines: 27-
+       :lines: 28-
        :caption: Get value at specified index position.
        :name: ex_dataframe_iat
 
@@ -1528,8 +1526,8 @@ def sdc_pandas_dataframe_iat(self):
 
     _func_name = 'Attribute iat().'
 
-    if not isinstance(self, DataFrameType):
-        raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker('{}'.format(_func_name))
+    ty_checker.check(self, DataFrameType)
 
     def sdc_pandas_dataframe_iat_impl(self):
         return sdc.datatypes.hpat_pandas_dataframe_getitem_types.dataframe_getitem_accessor_init(self, 'iat')

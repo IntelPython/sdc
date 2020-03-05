@@ -28,8 +28,8 @@
 import pandas
 
 from numba import types, cgutils
-from numba.extending import (models, overload, register_model, make_attribute_wrapper, intrinsic)
-from numba.datamodel import (register_default, StructModel)
+from numba.extending import models, overload, register_model, make_attribute_wrapper, intrinsic
+from numba.datamodel import register_default, StructModel
 from numba.typing.templates import signature
 
 
