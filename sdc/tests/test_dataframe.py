@@ -1881,6 +1881,15 @@ class TestDataFrame(TestCase):
         self.assertTrue(isinstance(two, np.ndarray))
         self.assertTrue(isinstance(three, np.ndarray))
 
+    def test_df_len(self):
+        def test_impl(df):
+            return len(df)
+
+        hpat_func = self.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2})
+        self.assertEqual(hpat_func(df), test_impl(df))
+
     def test_df_iterate_over_columns1(self):
         """ Verifies iteration over df columns using literal tuple of column indices. """
         from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
