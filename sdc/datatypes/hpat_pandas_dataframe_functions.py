@@ -1594,6 +1594,28 @@ def df_index_codegen_isin(df_type, df, data):
 
 
 def sdc_pandas_dataframe_isin_dict_codegen(func_name, df_type, values, all_params):
+    """
+    Example of generated implementation:
+
+    def _df_isin_impl(df, values):
+      result_len=len(df)
+      if "A" in list(values.keys()):
+        series_A = pandas.Series(get_dataframe_data(df, 0))
+        val = list(values["A"])
+        result_A = series_A.isin(val)
+      else:
+        result = numpy.repeat(False, result_len)
+        result_A = pandas.Series(result)
+      result_len=len(df)
+      if "B" in list(values.keys()):
+        series_B = pandas.Series(get_dataframe_data(df, 1))
+        val = list(values["B"])
+        result_B = series_B.isin(val)
+      else:
+        result = numpy.repeat(False, result_len)
+        result_B = pandas.Series(result)
+      return pandas.DataFrame({"A": result_A, "B": result_B})
+    """
     result_name = []
     joined = ', '.join(all_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
@@ -1623,6 +1645,30 @@ def sdc_pandas_dataframe_isin_dict_codegen(func_name, df_type, values, all_param
 
 
 def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params):
+    """
+    Example of generated implementation:
+
+    def _df_isin_impl(df, values):
+      series_A = pandas.Series(get_dataframe_data(df, 0))
+      result = numpy.empty(len(series_A._data), numpy.bool_)
+      result_len = len(series_A._data)
+      for i in range(result_len):
+        if series_A._data[i] == values._data[i]:
+          result[i] = True
+        else:
+          result[i] = False
+      result_A = pandas.Series(result)
+      series_B = pandas.Series(get_dataframe_data(df, 1))
+      result = numpy.empty(len(series_B._data), numpy.bool_)
+      result_len = len(series_B._data)
+      for i in range(result_len):
+        if series_B._data[i] == values._data[i]:
+          result[i] = True
+        else:
+          result[i] = False
+      result_B = pandas.Series(result)
+      return pandas.DataFrame({"A": result_A, "B": result_B})
+    """
     result_name = []
     joined = ', '.join(all_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
@@ -1705,6 +1751,25 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params
 
 
 def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params):
+    """
+    Example of generated implementation:
+
+    def _df_isin_impl(df, values):
+      series_A = pandas.Series(get_dataframe_data(df, 0))
+      series_A_values = pandas.Series(get_dataframe_data(values, 0))
+      result = numpy.empty(len(series_A_values._data), numpy.bool_)
+      result_len = len(series_A._data)
+      for i in range(result_len):
+        if series_A._data[i] == series_A_values._data[i]:
+          result[i] = True
+        else:
+          result[i] = False
+      result_A = pandas.Series(result)
+      series_B = pandas.Series(get_dataframe_data(df, 1))
+      result = [False] * len(series_B._data)
+      result_B = pandas.Series(result)
+      return pandas.DataFrame({"A": result_A, "B": result_B})
+    """
     result_name = []
     joined = ', '.join(all_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
