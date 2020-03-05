@@ -25,15 +25,23 @@
 # *****************************************************************************
 
 
+"""
+   Expected result:
+    A    2.0
+    B    5.0
+    Name: 1, dtype: float64
+"""
+
+
 import pandas as pd
 from numba import njit
 
 
 @njit
-def dataframe_iat():
-    df = pd.DataFrame({'A': [1.0, 2.0, 3.0, 1.0], 'B': [4, 5, 6, 7], 'C': ['a', 'b', 'c', 'd']})
+def dataframe_iloc():
+    df = pd.DataFrame({'A': [1.0, 2.0, 3.0, 1.0], 'B': [4, 5, 6, 7]})
 
-    return df.iat[1, 2]  # value b
+    return df.iloc[1]
 
 
-print(dataframe_iat())
+print(dataframe_iloc())

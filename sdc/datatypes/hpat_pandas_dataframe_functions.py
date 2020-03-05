@@ -1442,20 +1442,20 @@ def df_getitem_tuple_iat_codegen(self, row, col):
     """
     Example of generated implementation:
         def _df_getitem_tuple_iat_impl(self, idx):
-            data = get_dataframe_data(self._dataframe, 2)
+            data = get_dataframe_data(self._dataframe, 1)
             res_data = pandas.Series(data)
-            return res_data.iat[1]
+            return res_data.iat[idx[0]]
     """
     func_lines = ['def _df_getitem_tuple_iat_impl(self, idx):']
     if self.columns:
         func_lines += [
-            f'  data = get_dataframe_data(self._dataframe, {col})',
-            f'  res_data = pandas.Series(data)',
-            f'  return res_data.iat[{row}]',
+            f"  data = get_dataframe_data(self._dataframe, {col})",
+            f"  res_data = pandas.Series(data)",
+            f"  return res_data.iat[idx[0]]",
         ]
 
     func_text = '\n'.join(func_lines)
-    print(func_text)
+
     global_vars = {'pandas': pandas, 'numpy': numpy,
                    'get_dataframe_data': get_dataframe_data}
 
@@ -1472,6 +1472,139 @@ def gen_df_getitem_iat_impl(self, row, col):
     return _reduce_impl
 
 
+def df_getitem_int_iloc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_int_iloc_impl(self, idx):
+            data_A = pandas.Series(get_dataframe_data(self._dataframe, 0))
+            result_A = data_A.iat[idx]
+            data_B = pandas.Series(get_dataframe_data(self._dataframe, 1))
+            result_B = data_B.iat[idx]
+            data_C = pandas.Series(get_dataframe_data(self._dataframe, 2))
+            result_C = data_C.iat[idx]
+            return pandas.Series(data=[result_A, result_B, result_C], index=['A', 'B', 'C'],
+                name=str(self._dataframe._index[idx]))
+    """
+    func_lines = ['def _df_getitem_int_iloc_impl(self, idx):']
+    results = []
+    if self.columns:
+        index = []
+        name = df_name_codegen_iloc(self)
+        for i, c in enumerate(self.columns):
+            result_c = f"result_{c}"
+            func_lines += [f"  data_{c} = pandas.Series(get_dataframe_data(self._dataframe, {i}))",
+                           f"  {result_c} = data_{c}.iat[idx]"]
+            results.append(result_c)
+            index.append(c)
+        data = ', '.join(col for col in results)
+        func_lines += [f"  return pandas.Series(data=[{data}], index={index}, name=str({name}))"]
+
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def df_getitem_slice_iloc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_slice_iloc_impl(self, idx):
+            data_A = pandas.Series(get_dataframe_data(self._dataframe, 0))
+            result_A = data_A.iloc[idx]
+            data_B = pandas.Series(get_dataframe_data(self._dataframe, 1))
+            result_B = data_B.iloc[idx]
+            data_C = pandas.Series(get_dataframe_data(self._dataframe, 2))
+            result_C = data_C.iloc[idx]
+            return pandas.DataFrame(data={"A": result_A, "B": result_B, "C": result_C},
+                index=numpy.arange(len(get_dataframe_data(self._dataframe, 0)))[idx])
+    """
+    func_lines = ['def _df_getitem_slice_iloc_impl(self, idx):']
+    results = []
+    if self.columns:
+        index = df_index_codegen_iloc(self)
+        name = df_name_codegen_iloc(self)
+        for i, c in enumerate(self.columns):
+            result_c = f"result_{c}"
+            func_lines += [f"  data_{c} = pandas.Series(get_dataframe_data(self._dataframe, {i}))",
+                           f"  {result_c} = data_{c}.iloc[idx]"]
+            results.append((self.columns[i], result_c))
+        data = ', '.join(f'"{col}": {data}' for col, data in results)
+        func_lines += [f"  return pandas.DataFrame(data={{{data}}}, index={index})"]
+
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def df_getitem_list_iloc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_list_iloc_impl(self, idx):
+            data_A = pandas.Series(get_dataframe_data(self._dataframe, 0))
+            result_A = data_A.iloc[numpy.array(idx)]
+            data_B = pandas.Series(get_dataframe_data(self._dataframe, 1))
+            result_B = data_B.iloc[numpy.array(idx)]
+            data_C = pandas.Series(get_dataframe_data(self._dataframe, 2))
+            result_C = data_C.iloc[numpy.array(idx)]
+            return pandas.DataFrame(data={"A": result_A, "B": result_B, "C": result_C}, index=[self._dataframe._index[i] for i in idx])
+    """
+    func_lines = ['def _df_getitem_list_iloc_impl(self, idx):']
+    results = []
+    if self.columns:
+        index = df_index_list_codegen_iloc(self)
+        name = df_name_codegen_iloc(self)
+        for i, c in enumerate(self.columns):
+            result_c = f"result_{c}"
+            func_lines += [f"  data_{c} = pandas.Series(get_dataframe_data(self._dataframe, {i}))",
+                           f"  {result_c} = data_{c}.iloc[numpy.array(idx)]"]
+            results.append((self.columns[i], result_c))
+        data = ', '.join(f'"{col}": {data}' for col, data in results)
+        func_lines += [f"  return pandas.DataFrame(data={{{data}}}, index={index})"]
+
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def df_index_list_codegen_iloc(self):
+    if isinstance(self.index, types.NoneType):
+        return 'idx'
+
+    return '[self._dataframe._index[i] for i in idx]'
+
+
+def df_index_codegen_iloc(self):
+    if isinstance(self.index, types.NoneType):
+        return 'numpy.arange(len(get_dataframe_data(self._dataframe, 0)))[idx]'
+
+    return 'self._dataframe._index[idx]'
+
+
+def df_name_codegen_iloc(self):
+    if isinstance(self.index, types.NoneType):
+        return 'idx'
+
+    return 'self._dataframe._index[idx]'
+
+
+gen_df_getitem_iloc_int_impl = gen_df_impl_generator(
+    df_getitem_int_iloc_codegen, '_df_getitem_int_iloc_impl')
+
+gen_df_getitem_iloc_slice_impl = gen_df_impl_generator(
+    df_getitem_slice_iloc_codegen, '_df_getitem_slice_iloc_impl')
+
+gen_df_getitem_iloc_list_impl = gen_df_impl_generator(
+    df_getitem_list_iloc_codegen, '_df_getitem_list_iloc_impl')
+
+
 @sdc_overload(operator.getitem)
 def sdc_pandas_dataframe_accessor_getitem(self, idx):
     ty_checker = TypeChecker('Operator getitem().')
@@ -1481,60 +1614,74 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
 
     accessor = self.accessor.literal_value
 
-    if accessor == 'iat':
-        if isinstance(idx, types.Tuple):
-            row = idx[0].literal_value
+    if accessor == 'iloc':
+        if isinstance(idx, types.SliceType):
+            return gen_df_getitem_iloc_slice_impl(self.dataframe, idx)
+
+        if isinstance(idx, types.List):
+            return gen_df_getitem_iloc_list_impl(self.dataframe, idx)
+
+        if isinstance(idx, types.Integer):
+            return gen_df_getitem_iloc_int_impl(self.dataframe, idx)
+
+        if isinstance(idx, (types.Tuple, types.UniTuple)):
+            row = idx[0]
             col = idx[1].literal_value
             return gen_df_getitem_iat_impl(self.dataframe, row, col)
 
 
-@sdc_overload_attribute(DataFrameType, 'iat')
-def sdc_pandas_dataframe_iat(self):
+@sdc_overload_attribute(DataFrameType, 'iloc')
+def sdc_pandas_dataframe_iloc(self):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
 
-    Pandas API: pandas.DataFrame.iat
+    Pandas API: pandas.DataFrame.iloc
+
+    Limitations
+    -----------
+    - Parameter 'name' in new DF can be str only
+    - Col can be only literal value, in DF.iloc[idx] with [row, col] values
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/dataframe_iat.py
+    .. literalinclude:: ../../../examples/dataframe_iloc.py
        :language: python
        :lines: 27-
        :caption: Get value at specified index position.
-       :name: ex_dataframe_iat
+       :name: ex_dataframe_iloc
 
-    .. command-output:: python ./dataframe_iat.py
+    .. command-output:: python ./dataframe_iloc.py
        :cwd: ../../../examples
 
     .. seealso::
 
-        :ref:`DataFrame.at <pandas.DataFrame.at>`
-            Access a single value for a row/column label pair.
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Fast integer location scalar accessor.
 
         :ref:`DataFrame.loc <pandas.DataFrame.loc>`
             Purely label-location based indexer for selection by label.
 
-        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
-            Access group of rows and columns by integer position(s).
+        :ref:`Series.iloc <pandas.Series.iloc>`
+            Purely integer-location based indexing for selection by position.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
-    Pandas DataFrame method :meth:`pandas.DataFrame.iat` implementation.
+    Pandas DataFrame method :meth:`pandas.DataFrame.iloc` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_dataframe_iat*
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_iloc*
     """
 
-    _func_name = 'Attribute iat().'
+    _func_name = 'Attribute iloc().'
 
     if not isinstance(self, DataFrameType):
         raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(_func_name, self))
 
-    def sdc_pandas_dataframe_iat_impl(self):
-        return sdc.datatypes.hpat_pandas_dataframe_getitem_types.dataframe_getitem_accessor_init(self, 'iat')
+    def sdc_pandas_dataframe_iloc_impl(self):
+        return sdc.datatypes.hpat_pandas_dataframe_getitem_types.dataframe_getitem_accessor_init(self, 'iloc')
 
-    return sdc_pandas_dataframe_iat_impl
+    return sdc_pandas_dataframe_iloc_impl
 
 
 @sdc_overload_method(DataFrameType, 'pct_change')
