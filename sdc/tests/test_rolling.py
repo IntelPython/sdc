@@ -1308,6 +1308,7 @@ class TestRolling(TestCase):
     def test_series_rolling_corr(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
+            [-1., 1., 0., -0.1, 0.1, 0.],
             [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
             [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO]
         ]
@@ -1315,6 +1316,20 @@ class TestRolling(TestCase):
             series = pd.Series(main_data)
             other = pd.Series(other_data)
             self._test_rolling_corr(series, other)
+
+    @skip_sdc_jit('Series.rolling.corr() unsupported Series index')
+    def test_series_rolling_corr_diff_length(self):
+        def test_impl(series, window, other):
+            return series.rolling(window).corr(other)
+
+        hpat_func = self.jit(test_impl)
+
+        series = pd.Series([1., -1., 0., 0.1, -0.1])
+        other = pd.Series(gen_frand_array(40))
+        window = 5
+        jit_result = hpat_func(series, window, other)
+        ref_result = test_impl(series, window, other)
+        pd.testing.assert_series_equal(jit_result, ref_result)
 
     @skip_sdc_jit('Series.rolling.corr() unsupported Series index')
     def test_series_rolling_corr_with_no_other(self):

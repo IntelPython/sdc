@@ -47,6 +47,7 @@ from sdc.str_arr_type import string_array_type
 from sdc.str_arr_ext import (num_total_chars, append_string_array_to,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na, string_array_type,
                              cp_str_list_to_array, create_str_arr_from_list, get_utf8_size)
+from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 from sdc.utilities.sdc_typing_utils import (find_common_dtype_from_numpy_dtypes,
                                             TypeChecker)
@@ -621,3 +622,22 @@ def _sdc_take_overload(data, indexes):
         return _sdc_take_str_arr_impl
 
     return None
+
+
+def _almost_equal(x, y):
+    """Check if floats are almost equal based on the float epsilon"""
+    pass
+
+
+@sdc_overload(_almost_equal)
+def _almost_equal_overload(x, y):
+    ty_checker = TypeChecker('Function sdc.common_functions._almost_equal_overload().')
+    ty_checker.check(x, types.Float)
+    ty_checker.check(x, types.Float)
+
+    common_dtype = numpy.find_common_type([], [x.name, y.name])
+
+    def _almost_equal_impl(x, y):
+        return abs(x - y) <= numpy.finfo(common_dtype).eps
+
+    return _almost_equal_impl
