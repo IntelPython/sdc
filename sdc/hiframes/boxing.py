@@ -240,33 +240,23 @@ def box_dataframe(typ, val, c):
         # TODO: datetime.date, DatetimeIndex?
         name_str = context.insert_const_string(c.builder.module, cname)
         cname_obj = pyapi.string_from_string(name_str)
-        # if column not unboxed, just used the boxed version from parent
-        unboxed_val = builder.extract_value(dataframe.unboxed, i)
-        not_unboxed = builder.icmp(lc.ICMP_EQ, unboxed_val, context.get_constant(types.int8, 0))
-        use_parent = builder.and_(has_parent, not_unboxed)
 
-        with builder.if_else(use_parent) as (then, orelse):
-            with then:
-                arr_obj = pyapi.object_getattr_string(dataframe.parent, cname)
-                pyapi.object_setitem(df_obj, cname_obj, arr_obj)
-
-            with orelse:
-                if dtype == string_type:
-                    arr_obj = box_str_arr(arr_typ, arr, c)
-                elif isinstance(dtype, PDCategoricalDtype):
-                    arr_obj = box_categorical_array(arr_typ, arr, c)
-                    # context.nrt.incref(builder, arr_typ, arr)
-                elif arr_typ == string_array_split_view_type:
-                    arr_obj = box_str_arr_split_view(arr_typ, arr, c)
-                elif dtype == types.List(string_type):
-                    arr_obj = box_list(list_string_array_type, arr, c)
-                    # context.nrt.incref(builder, arr_typ, arr)  # TODO required?
-                    # pyapi.print_object(arr_obj)
-                else:
-                    arr_obj = box_array(arr_typ, arr, c)
-                    # TODO: is incref required?
-                    # context.nrt.incref(builder, arr_typ, arr)
-                pyapi.object_setitem(df_obj, cname_obj, arr_obj)
+        if dtype == string_type:
+            arr_obj = box_str_arr(arr_typ, arr, c)
+        elif isinstance(dtype, PDCategoricalDtype):
+            arr_obj = box_categorical_array(arr_typ, arr, c)
+            # context.nrt.incref(builder, arr_typ, arr)
+        elif arr_typ == string_array_split_view_type:
+            arr_obj = box_str_arr_split_view(arr_typ, arr, c)
+        elif dtype == types.List(string_type):
+            arr_obj = box_list(list_string_array_type, arr, c)
+            # context.nrt.incref(builder, arr_typ, arr)  # TODO required?
+            # pyapi.print_object(arr_obj)
+        else:
+            arr_obj = box_array(arr_typ, arr, c)
+            # TODO: is incref required?
+            # context.nrt.incref(builder, arr_typ, arr)
+        pyapi.object_setitem(df_obj, cname_obj, arr_obj)
 
         # pyapi.decref(arr_obj)
         pyapi.decref(cname_obj)

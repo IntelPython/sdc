@@ -136,13 +136,10 @@ def init_dataframe(typingctx, *args):
         column_tup = context.make_tuple(
             builder, types.UniTuple(string_type, n_cols), column_strs)
         zero = context.get_constant(types.int8, 0)
-        unboxed_tup = context.make_tuple(
-            builder, types.UniTuple(types.int8, n_cols + 1), [zero] * (n_cols + 1))
 
         dataframe.data = data_tup
         dataframe.index = index
         dataframe.columns = column_tup
-        dataframe.unboxed = unboxed_tup
         dataframe.parent = context.get_constant_null(types.pyobject)
 
         # increase refcount of stored values
