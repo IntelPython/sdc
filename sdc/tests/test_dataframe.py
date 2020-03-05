@@ -1931,6 +1931,46 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    def test_tbb(self):
+        import sdc.concurrent_hash
+
+        @numba.cfunc("int32(int32, int32, int32)")
+        def callback(x, y, z):
+            return x + y + z
+
+        global funcptr
+        funcptr = callback.address
+
+        def test_impl1():
+            h = sdc.concurrent_hash.create_int_hashmap()
+
+            sdc.concurrent_hash.addelem_int_hashmap(h, 1, 2)
+            sdc.concurrent_hash.addelem_int_hashmap(h, 1, 3)
+            sdc.concurrent_hash.addelem_int_hashmap(h, 1, 4)
+            sdc.concurrent_hash.addelem_int_hashmap(h, 1, 5)
+            sdc.concurrent_hash.addelem_int_hashmap(h, 2, 6)
+
+            it = sdc.concurrent_hash.createiter_int_hashmap(h)
+            while 0 == sdc.concurrent_hash.enditer_int_hashmap(it):
+                key = sdc.concurrent_hash.iterkey_int_hashmap(it)
+                val = sdc.concurrent_hash.iterval_int_hashmap(it)
+                print(key, val)
+
+                sdc.concurrent_hash.nextiter_int_hashmap(it)
+
+            sdc.concurrent_hash.deleteiter_int_hashmap(it)
+            sdc.concurrent_hash.delete_int_hashmap(h)
+
+        hpat_func1 = self.jit(test_impl1)
+        hpat_func1()
+
+        def test_impl2():
+            r = sdc.concurrent_hash.test_funcptr(funcptr, 2, 3)
+            print('res', r)
+
+        hpat_func2 = self.jit(test_impl2)
+        hpat_func2()
+
 
 if __name__ == "__main__":
     unittest.main()
