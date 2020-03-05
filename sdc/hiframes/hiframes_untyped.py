@@ -757,9 +757,9 @@ class HiFramesPassImpl(object):
         return dtypes
 
     @staticmethod
-    def infer_column_names_and_types_from_constant_filename(fname_const, skiprows, col_names):
+    def infer_column_names_and_types_from_constant_filename(fname_const, skiprows, col_names, sep=','):
         rows_to_read = 100  # TODO: tune this
-        df = pd.read_csv(fname_const, nrows=rows_to_read, skiprows=skiprows)
+        df = pd.read_csv(fname_const, sep=sep, skiprows=skiprows, nrows=rows_to_read)
         # TODO: string_array, categorical, etc.
         dtypes = HiFramesPassImpl.get_dtypes(df)
         cols = df.columns.to_list()
