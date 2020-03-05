@@ -41,7 +41,7 @@ from numba import njit
 def dataframe_copy():
     df = pd.DataFrame({'A': [1.0, 2.0, 3.0, 1.0], 'B': [4, 5, 6, 7]})
     new_df = df.copy(deep=True)
-    return new_df, df.values is new_df.values or df.index is new_df.index
+    return new_df
 
 
 print(dataframe_copy())
