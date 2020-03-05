@@ -336,15 +336,15 @@ class ReadParallelParquetInfer(AbstractTemplate):
         return signature(types.int32, *unliteral_all(args))
 
 
-if _has_pyarrow:
-    from .. import parquet_cpp
-    ll.add_symbol('get_arrow_readers', parquet_cpp.get_arrow_readers)
-    ll.add_symbol('del_arrow_readers', parquet_cpp.del_arrow_readers)
-    ll.add_symbol('pq_read', parquet_cpp.read)
-    ll.add_symbol('pq_read_parallel', parquet_cpp.read_parallel)
-    ll.add_symbol('pq_get_size', parquet_cpp.get_size)
-    ll.add_symbol('pq_read_string', parquet_cpp.read_string)
-    ll.add_symbol('pq_read_string_parallel', parquet_cpp.read_string_parallel)
+# if _has_pyarrow:
+#     from .. import parquet_cpp
+#     ll.add_symbol('get_arrow_readers', parquet_cpp.get_arrow_readers)
+#     ll.add_symbol('del_arrow_readers', parquet_cpp.del_arrow_readers)
+#     ll.add_symbol('pq_read', parquet_cpp.read)
+#     ll.add_symbol('pq_read_parallel', parquet_cpp.read_parallel)
+#     ll.add_symbol('pq_get_size', parquet_cpp.get_size)
+#     ll.add_symbol('pq_read_string', parquet_cpp.read_string)
+#     ll.add_symbol('pq_read_string_parallel', parquet_cpp.read_string_parallel)
 
 
 @lower_builtin(get_column_size_parquet, types.Opaque('arrow_reader'), types.intp)

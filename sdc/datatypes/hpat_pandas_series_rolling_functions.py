@@ -34,7 +34,8 @@ from numba.extending import register_jitable
 from numba.types import (float64, Boolean, Integer, NoneType, Number,
                          Omitted, StringLiteral, UnicodeType)
 
-from sdc.datatypes.common_functions import _sdc_pandas_series_align
+from sdc.datatypes.common_functions import (_almost_equal,
+                                            _sdc_pandas_series_align)
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.prange_utils import parallel_chunks
@@ -97,21 +98,6 @@ hpat_pandas_series_rolling_docstring_tmpl = """
 def arr_apply(arr, func):
     """Apply function for values"""
     return func(arr)
-
-
-@sdc_register_jitable
-def arr_corr(x, y):
-    """Calculate correlation of values"""
-    if len(x) == 0:
-        return numpy.nan
-
-    return numpy.corrcoef(x, y)[0, 1]
-
-
-@sdc_register_jitable
-def arr_nonnan_count(arr):
-    """Count non-NaN values"""
-    return len(arr) - numpy.isnan(arr).sum()
 
 
 @sdc_register_jitable
@@ -207,6 +193,60 @@ def gen_hpat_pandas_series_rolling_ddof_impl(rolling_func):
 
 hpat_pandas_rolling_series_median_impl = register_jitable(
     gen_hpat_pandas_series_rolling_impl(arr_median))
+
+
+@sdc_register_jitable
+def pop_corr(x, y, nfinite, result):
+    """Calculate the window sums for corr without old value."""
+    sum_x, sum_y, sum_xy, sum_xx, sum_yy = result
+    if numpy.isfinite(x) and numpy.isfinite(y):
+        nfinite -= 1
+        sum_x -= x
+        sum_y -= y
+        sum_xy -= x * y
+        sum_xx -= x * x
+        sum_yy -= y * y
+
+    return nfinite, (sum_x, sum_y, sum_xy, sum_xx, sum_yy)
+
+
+@sdc_register_jitable
+def put_corr(x, y, nfinite, result):
+    """Calculate the window sums for corr with new value."""
+    sum_x, sum_y, sum_xy, sum_xx, sum_yy = result
+    if numpy.isfinite(x) and numpy.isfinite(y):
+        nfinite += 1
+        sum_x += x
+        sum_y += y
+        sum_xy += x * y
+        sum_xx += x * x
+        sum_yy += y * y
+
+    return nfinite, (sum_x, sum_y, sum_xy, sum_xx, sum_yy)
+
+
+@sdc_register_jitable
+def pop_count(value, nfinite, result):
+    """Calculate the window count without old value."""
+    if numpy.isnan(value):
+        return nfinite, result
+
+    return nfinite, result - 1
+
+
+@sdc_register_jitable
+def put_count(value, nfinite, result):
+    """Calculate the window count with new value."""
+    if numpy.isnan(value):
+        return nfinite, result
+
+    return nfinite, result + 1
+
+
+@sdc_register_jitable
+def result(nfinite, minp, result):
+    """Get result."""
+    return result
 
 
 @sdc_register_jitable
@@ -390,6 +430,27 @@ def result_or_nan(nfinite, minp, result):
         return numpy.nan
 
     return result
+
+
+@sdc_register_jitable
+def corr_result_or_nan(nfinite, minp, result):
+    """Get result corr taking into account min periods."""
+    if nfinite < max(1, minp):
+        return numpy.nan
+
+    sum_x, sum_y, sum_xy, sum_xx, sum_yy = result
+
+    var_x = sum_xx - sum_x * sum_x / nfinite
+    if _almost_equal(var_x, 0.):
+        return numpy.nan
+
+    var_y = sum_yy - sum_y * sum_y / nfinite
+    if _almost_equal(var_y, 0.):
+        return numpy.nan
+
+    cov_xy = sum_xy - sum_x * sum_y / nfinite
+
+    return cov_xy / numpy.sqrt(var_x * var_y)
 
 
 @sdc_register_jitable
@@ -616,6 +677,8 @@ def gen_sdc_pandas_series_rolling_ddof_impl(pop, put, get_result=ddof_result,
     return impl
 
 
+sdc_pandas_series_rolling_count_impl = gen_sdc_pandas_series_rolling_impl(
+    pop_count, put_count, get_result=result, init_result=0.)
 sdc_pandas_series_rolling_kurt_impl = gen_sdc_pandas_series_rolling_impl(
     pop_kurt, put_kurt, get_result=kurt_result_or_nan,
     init_result=(0., 0., 0., 0.))
@@ -676,16 +739,15 @@ def hpat_pandas_series_rolling_apply(self, func, raw=None):
     return hpat_pandas_rolling_series_apply_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'corr')
+@sdc_overload_method(SeriesRollingType, 'corr')
 def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
 
     ty_checker = TypeChecker('Method rolling.corr().')
     ty_checker.check(self, SeriesRollingType)
 
-    # TODO: check `other` is Series after a circular import of SeriesType fixed
-    # accepted_other = (bool, Omitted, NoneType, SeriesType)
-    # if not isinstance(other, accepted_other) and other is not None:
-    #     ty_checker.raise_exc(other, 'Series', 'other')
+    accepted_other = (bool, Omitted, NoneType, SeriesType)
+    if not isinstance(other, accepted_other) and other is not None:
+        ty_checker.raise_exc(other, 'Series', 'other')
 
     accepted_pairwise = (bool, Boolean, Omitted, NoneType)
     if not isinstance(pairwise, accepted_pairwise) and pairwise is not None:
@@ -699,70 +761,80 @@ def hpat_pandas_series_rolling_corr(self, other=None, pairwise=None):
 
         main_series = self._data
         main_arr = main_series._data
-        main_arr_length = len(main_arr)
 
         if nan_other == True:  # noqa
             other_arr = main_arr
         else:
             other_arr = other._data
 
+        main_arr_length = len(main_arr)
         other_arr_length = len(other_arr)
+        min_length = min(main_arr_length, other_arr_length)
         length = max(main_arr_length, other_arr_length)
         output_arr = numpy.empty(length, dtype=float64)
 
-        def calc_corr(main, other, minp):
-            # align arrays `main` and `other` by size and finiteness
-            min_length = min(len(main), len(other))
-            main_valid_indices = numpy.isfinite(main[:min_length])
-            other_valid_indices = numpy.isfinite(other[:min_length])
-            valid = main_valid_indices & other_valid_indices
+        chunks = parallel_chunks(length)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            nfinite = 0
+            result = (0., 0., 0., 0., 0.)
 
-            if len(main[valid]) < minp:
-                return numpy.nan
-            else:
-                return arr_corr(main[valid], other[valid])
+            if win == 0:
+                for idx in range(chunk.start, chunk.stop):
+                    output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
+                continue
 
-        for i in prange(min(win, length)):
-            main_arr_range = main_arr[:i + 1]
-            other_arr_range = other_arr[:i + 1]
-            output_arr[i] = calc_corr(main_arr_range, other_arr_range, minp)
+            prelude_start = max(0, chunk.start - win + 1)
+            prelude_stop = min(chunk.start, min_length)
 
-        for i in prange(win, length):
-            main_arr_range = main_arr[i + 1 - win:i + 1]
-            other_arr_range = other_arr[i + 1 - win:i + 1]
-            output_arr[i] = calc_corr(main_arr_range, other_arr_range, minp)
+            interlude_start = chunk.start
+            interlude_stop = min(prelude_start + win, chunk.stop, min_length)
+
+            postlude_start = min(prelude_start + win, chunk.stop)
+            postlude_stop = min(chunk.stop, min_length)
+
+            for idx in range(prelude_start, prelude_stop):
+                x, y = main_arr[idx], other_arr[idx]
+                nfinite, result = put_corr(x, y, nfinite, result)
+
+            for idx in range(interlude_start, interlude_stop):
+                x, y = main_arr[idx], other_arr[idx]
+                nfinite, result = put_corr(x, y, nfinite, result)
+                output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
+
+            for idx in range(postlude_start, postlude_stop):
+                put_x, put_y = main_arr[idx], other_arr[idx]
+                pop_x, pop_y = main_arr[idx - win], other_arr[idx - win]
+                nfinite, result = put_corr(put_x, put_y, nfinite, result)
+                nfinite, result = pop_corr(pop_x, pop_y, nfinite, result)
+                output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
+
+            last_start = max(min_length, interlude_start)
+            for idx in range(last_start, postlude_start):
+                output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
+
+            last_start = max(min_length, postlude_start)
+            last_stop = min(min_length + win, chunk.stop)
+            for idx in range(last_start, last_stop):
+                x, y = main_arr[idx - win], other_arr[idx - win]
+                nfinite, result = pop_corr(x, y, nfinite, result)
+                output_arr[idx] = corr_result_or_nan(nfinite, minp, result)
+
+            for idx in range(last_stop, chunk.stop):
+                output_arr[idx] = numpy.nan
 
         return pandas.Series(output_arr)
 
     return hpat_pandas_rolling_series_corr_impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'count')
+@sdc_overload_method(SeriesRollingType, 'count')
 def hpat_pandas_series_rolling_count(self):
 
     ty_checker = TypeChecker('Method rolling.count().')
     ty_checker.check(self, SeriesRollingType)
 
-    def hpat_pandas_rolling_series_count_impl(self):
-        win = self._window
-
-        input_series = self._data
-        input_arr = input_series._data
-        length = len(input_arr)
-        output_arr = numpy.empty(length, dtype=float64)
-
-        boundary = min(win, length)
-        for i in prange(boundary):
-            arr_range = input_arr[:i + 1]
-            output_arr[i] = arr_nonnan_count(arr_range)
-
-        for i in prange(boundary, length):
-            arr_range = input_arr[i + 1 - win:i + 1]
-            output_arr[i] = arr_nonnan_count(arr_range)
-
-        return pandas.Series(output_arr, input_series._index, name=input_series._name)
-
-    return hpat_pandas_rolling_series_count_impl
+    return sdc_pandas_series_rolling_count_impl
 
 
 def _hpat_pandas_series_rolling_cov_check_types(self, other=None,
