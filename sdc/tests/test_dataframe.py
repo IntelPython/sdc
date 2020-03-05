@@ -1546,6 +1546,26 @@ class TestDataFrame(TestCase):
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
     @skip_sdc_jit
+    def test_isin_df_without_index(self):
+        def test_impl(df, df2):
+            return df.isin(df2)
+
+        hpat_func = self.jit(test_impl)
+        df = pd.DataFrame({'num_legs': [2, 4], 'num_wings': [4, 0]})
+        df2 = pd.DataFrame({'num_legs': [8, 2], 'num_wings': [0, 2]}, index=['spider', 'falcon'])
+        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+
+    @skip_sdc_jit
+    def test_isin_df_without_val_index(self):
+        def test_impl(df, df2):
+            return df.isin(df2)
+
+        hpat_func = self.jit(test_impl)
+        df = pd.DataFrame({'num_legs': [2, 4], 'num_wings': [4, 0]}, index=['falcon', 'dog'])
+        df2 = pd.DataFrame({'num_legs': [8, 2], 'num_wings': [0, 2]})
+        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+
+    @skip_sdc_jit
     def test_isin_dict1(self):
         def test_impl(df):
             vals = {'A': (2., 3., 4.), 'C': (4., 5., 6.)}
@@ -1570,7 +1590,29 @@ class TestDataFrame(TestCase):
     @skip_sdc_jit
     def test_isin_ser2(self):
         def test_impl(df):
-            vals = pd.Series ([2, 3, 4, 3, 4, 5, 8, 49], index=[3, 4, 5, 6, 7, 8, 11, 0])
+            vals = pd.Series([2, 3, 4, 3, 4, 5, 8, 49], index=[3, 4, 5, 6, 7, 8, 11, 0])
+            return df.isin(vals)
+
+        hpat_func = self.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2}, index=np.arange(n) + 1)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    @skip_sdc_jit
+    def test_isin_ser_without_index(self):
+        def test_impl(df):
+            vals = pd.Series([2, 3, 4, 3, 4, 5, 8, 49], index=[3, 4, 5, 6, 7, 8, 11, 0])
+            return df.isin(vals)
+
+        hpat_func = self.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2})
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    @skip_sdc_jit
+    def test_isin_ser3(self):
+        def test_impl(df):
+            vals = pd.Series([2, 3, 4, 3, 4, 5, 8, 49])
             return df.isin(vals)
 
         hpat_func = self.jit(test_impl)

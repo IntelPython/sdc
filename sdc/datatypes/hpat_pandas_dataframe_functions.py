@@ -1634,13 +1634,43 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params
             f'  result = numpy.empty(len(series_{c}._data), numpy.bool_)',
             f'  result_len = len(series_{c}._data)'
         ]
-        if isinstance(values.index, types.NoneType):
+        if isinstance(values.index, types.NoneType) and isinstance(df_type.index, types.NoneType):
             func_lines += [
                 f'  for i in range(result_len):',
                 f'    if series_{c}._data[i] == values._data[i]:',
                 f'      result[i] = True',
                 f'    else:',
                 f'      result[i] = False',
+            ]
+        elif isinstance(values.index, types.NoneType):
+            func_lines += [
+                f'  for i in range(result_len):',
+                f'    idx = {df}._index[i]',
+                f'    value = series_{c}._data[i]',
+                f'    result[i] = False',
+                f'    for j in numba.prange(len(values)):',
+                f'      if idx == j:',
+                f'        value_val = values._data[j]',
+                f'        if value == value_val:',
+                f'          result[i] = True',
+                f'        else:',
+                f'          result[i] = False',
+                f'        break'
+            ]
+        elif isinstance(df_type.index, types.NoneType):
+            func_lines += [
+                f'  for i in range(result_len):',
+                f'    value = series_{c}._data[i]',
+                f'    result[i] = False',
+                f'    for j in numba.prange(len(values)):',
+                f'      idx_val = values._index[j]',
+                f'      if i == idx_val:',
+                f'        value_val = values._data[j]',
+                f'        if value == value_val:',
+                f'          result[i] = True',
+                f'        else:',
+                f'          result[i] = False',
+                f'        break'
             ]
         else:
             func_lines += [
@@ -1689,13 +1719,43 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params):
                 f'  result = numpy.empty(len(series_{c}_values._data), numpy.bool_)',
                 f'  result_len = len(series_{c}._data)'
             ]
-            if isinstance(in_df.index, types.NoneType):
+            if isinstance(in_df.index, types.NoneType) and isinstance(df_type.index, types.NoneType):
                 func_lines += [
                     f'  for i in range(result_len):',
                     f'    if series_{c}._data[i] == series_{c}_values._data[i]:',
                     f'      result[i] = True',
                     f'    else:',
                     f'      result[i] = False']
+            elif isinstance(df_type.index, types.NoneType):
+                func_lines += [
+                    f'  for i in range(result_len):',
+                    f'    value = series_{c}._data[i]',
+                    f'    result[i] = False',
+                    f'    for j in numba.prange(len(series_{c}_values)):',
+                    f'      idx_val = {val}._index[j]',
+                    f'      if i == idx_val:',
+                    f'        value_val = series_{c}_values._data[j]',
+                    f'        if value == value_val:',
+                    f'          result[i] = True',
+                    f'        else:',
+                    f'          result[i] = False',
+                    f'        break',
+                ]
+            elif isinstance(in_df.index, types.NoneType):
+                func_lines += [
+                    f'  for i in range(result_len):',
+                    f'    idx = {df}._index[i]',
+                    f'    value = series_{c}._data[i]',
+                    f'    result[i] = False',
+                    f'    for j in numba.prange(len(series_{c}_values)):',
+                    f'      if idx == j:',
+                    f'        value_val = series_{c}_values._data[j]',
+                    f'        if value == value_val:',
+                    f'          result[i] = True',
+                    f'        else:',
+                    f'          result[i] = False',
+                    f'        break',
+                    ]
             else:
                 func_lines += [
                     f'  for i in range(result_len):',
