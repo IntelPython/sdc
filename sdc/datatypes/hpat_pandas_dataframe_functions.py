@@ -1653,8 +1653,11 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params
       result = numpy.empty(len(series_A._data), numpy.bool_)
       result_len = len(series_A._data)
       for i in range(result_len):
-        if series_A._data[i] == values._data[i]:
-          result[i] = True
+        if i <= len(values._data):
+          if series_A._data[i] == values._data[i]:
+            result[i] = True
+          else:
+            result[i] = False
         else:
           result[i] = False
       result_A = pandas.Series(result)
@@ -1662,8 +1665,11 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params
       result = numpy.empty(len(series_B._data), numpy.bool_)
       result_len = len(series_B._data)
       for i in range(result_len):
-        if series_B._data[i] == values._data[i]:
-          result[i] = True
+        if i <= len(values._data):
+          if series_B._data[i] == values._data[i]:
+            result[i] = True
+          else:
+            result[i] = False
         else:
           result[i] = False
       result_B = pandas.Series(result)
@@ -1683,10 +1689,13 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params
         if isinstance(values.index, types.NoneType) and isinstance(df_type.index, types.NoneType):
             func_lines += [
                 f'  for i in range(result_len):',
-                f'    if series_{c}._data[i] == values._data[i]:',
-                f'      result[i] = True',
+                f'    if i <= len(values._data):',
+                f'      if series_{c}._data[i] == values._data[i]:',
+                f'        result[i] = True',
+                f'      else:',
+                f'        result[i] = False',
                 f'    else:',
-                f'      result[i] = False',
+                f'      result[i] = False'
             ]
         elif isinstance(values.index, types.NoneType):
             func_lines += [
@@ -1756,19 +1765,32 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params):
 
     def _df_isin_impl(df, values):
       series_A = pandas.Series(get_dataframe_data(df, 0))
-      series_A_values = pandas.Series(get_dataframe_data(values, 0))
-      result = numpy.empty(len(series_A_values._data), numpy.bool_)
+      series_A_values = pandas.Series(values.A)
+      result = numpy.empty(len(series_A._data), numpy.bool_)
       result_len = len(series_A._data)
       for i in range(result_len):
-        if series_A._data[i] == series_A_values._data[i]:
-          result[i] = True
+        if i <= len(series_A_values):
+          if series_A._data[i] == series_A_values._data[i]:
+            result[i] = True
+          else:
+            result[i] = False
         else:
           result[i] = False
       result_A = pandas.Series(result)
-      series_B = pandas.Series(get_dataframe_data(df, 1))
-      result = [False] * len(series_B._data)
-      result_B = pandas.Series(result)
-      return pandas.DataFrame({"A": result_A, "B": result_B})
+      series_C = pandas.Series(get_dataframe_data(df, 1))
+      series_C_values = pandas.Series(values.C)
+      result = numpy.empty(len(series_C._data), numpy.bool_)
+      result_len = len(series_C._data)
+      for i in range(result_len):
+        if i <= len(series_C_values):
+          if series_C._data[i] == series_C_values._data[i]:
+            result[i] = True
+          else:
+            result[i] = False
+        else:
+          result[i] = False
+      result_C = pandas.Series(result)
+      return pandas.DataFrame({"A": result_A, "C": result_C})
     """
     result_name = []
     joined = ', '.join(all_params)
@@ -1780,15 +1802,18 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params):
         func_lines += [f'  series_{c} = pandas.Series(get_dataframe_data({df}, {i}))']
         if c in in_df.columns:
             func_lines += [
-                f'  series_{c}_values = pandas.Series(get_dataframe_data({val}, {i}))',
-                f'  result = numpy.empty(len(series_{c}_values._data), numpy.bool_)',
+                f'  series_{c}_values = pandas.Series({val}.{c})',
+                f'  result = numpy.empty(len(series_{c}._data), numpy.bool_)',
                 f'  result_len = len(series_{c}._data)'
             ]
             if isinstance(in_df.index, types.NoneType) and isinstance(df_type.index, types.NoneType):
                 func_lines += [
                     f'  for i in range(result_len):',
-                    f'    if series_{c}._data[i] == series_{c}_values._data[i]:',
-                    f'      result[i] = True',
+                    f'    if i <= len(series_{c}_values):',
+                    f'      if series_{c}._data[i] == series_{c}_values._data[i]:',
+                    f'        result[i] = True',
+                    f'      else:',
+                    f'        result[i] = False',
                     f'    else:',
                     f'      result[i] = False']
             elif isinstance(df_type.index, types.NoneType):
@@ -1887,6 +1912,54 @@ def sdc_pandas_dataframe_isin_iter(name, all_params, ser_par, columns):
 @sdc_overload_method(DataFrameType, 'isin')
 def isin_overload(df, values):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.isin
+
+    Limitations
+    -----------
+    Whether each element in the DataFrame is contained in values.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_isin_df.py
+        :language: python
+        :lines: 36-
+        :caption: Whether each element in the DataFrame is contained in values of another DataFrame.
+        :name: ex_dataframe_isin
+
+    .. command-output:: python ./dataframe/dataframe_isin_df.py
+        :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/dataframe_isin_ser.py
+        :language: python
+        :lines: 36-
+        :caption: Whether each element in the DataFrame is contained in values of Series.
+        :name: ex_dataframe_isin
+
+    .. command-output:: python ./dataframe/dataframe_isin_ser.py
+        :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/dataframe_isin_dict.py
+        :language: python
+        :lines: 36-
+        :caption: Whether each element in the DataFrame is contained in values of Dictionary.
+        :name: ex_dataframe_isin
+
+    .. command-output:: python ./dataframe/dataframe_isin_dict.py
+        :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/dataframe_isin.py
+        :language: python
+        :lines: 36-
+        :caption: Whether each element in the DataFrame is contained in values of List.
+        :name: ex_dataframe_isin
+
+    .. command-output:: python ./dataframe/dataframe_isin.py
+        :cwd: ../../../examples
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas DataFrame method :meth:`pandas.DataFrame.isin` implementation.
 
     .. only:: developer

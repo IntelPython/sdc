@@ -1648,6 +1648,32 @@ class TestDataFrame(TestCase):
             with self.subTest(val=val):
                 pd.testing.assert_frame_equal(hpat_func(df, val), test_impl(df, val))
 
+    def test_isin_df_different_size(self):
+        def test_impl():
+            df = pd.DataFrame({'A': [0, 1, 2, 3],
+                               'B': [4, 5, 6, 7],
+                               'C': [8, 9, 10, 11]})
+
+            val = pd.DataFrame({'A': [0, 2], 'C': [9, 11]})
+
+            return df.isin(val)
+
+        hpat_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    def test_isin_df_different_size2(self):
+        def test_impl():
+            val = pd.DataFrame({'A': [0, 1, 2, 3],
+                                'B': [4, 5, 6, 7],
+                                'C': [8, 9, 10, 11]})
+
+            df = pd.DataFrame({'A': [0, 2], 'C': [9, 11]})
+
+            return df.isin(val)
+
+        hpat_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
     @skip_numba_jit
     def test_append_df_same_cols_no_index(self):
         def test_impl(df, df2):
