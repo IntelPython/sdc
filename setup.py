@@ -38,7 +38,8 @@ import numpy.distutils.misc_util as np_misc
 import versioneer
 
 # String constants for Intel SDC project configuration
-SDC_NAME_STR = 'Intel® Scalable Dataframe Compiler'
+# This name is used for wheel package build
+SDC_NAME_STR = 'sdc'
 
 # Inject required options for extensions compiled against the Numpy
 # C API (include dirs, library dirs etc.)
@@ -334,7 +335,7 @@ setup(name=SDC_NAME_STR,
           "Intended Audience :: Developers",
           "Operating System :: POSIX :: Linux",
           "Programming Language :: Python",
-          "Programming Language :: Python :: 3.6",
+          "Programming Language :: Python :: 3.7",
           "Topic :: Software Development :: Compilers",
           "Topic :: System :: Distributed Computing",
       ],
@@ -343,7 +344,13 @@ setup(name=SDC_NAME_STR,
       author='Intel Corporation',
       packages=find_packages(),
       package_data={'sdc.tests': ['*.bz2'], },
-      install_requires=['numba'],
+      install_requires=[
+          'scipy',
+          'numpy>=1.16',
+          'pandas==0.25.3',
+          'pyarrow==0.15.1',
+          'numba==0.48'
+          ],
       extras_require={'Parquet': ["pyarrow"], },
       cmdclass=sdc_build_commands,
       ext_modules=_ext_mods,
