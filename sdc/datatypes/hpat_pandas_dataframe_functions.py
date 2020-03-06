@@ -590,12 +590,10 @@ def _dataframe_codegen_copy(func_name, func_params, series_params, df):
     return func_text, global_vars
 
 
-def sdc_pandas_dataframe_copy_codegen(df, func_name, params, series_params):
+def sdc_pandas_dataframe_copy_codegen(df, func_name, params, series_params, df_func_name):
     func_params = kwsparams2list(params)
     series_params_list = kwsparams2list(series_params)
     series_params_str = ', '.join(series_params_list)
-
-    df_func_name = '_df_copy_impl'
     func_text, global_vars = _dataframe_codegen_copy(func_name, func_params, series_params_str, df)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
@@ -648,7 +646,7 @@ def copy_overload(df, deep=True):
 
     params = {'deep': True}
     series_params = {'deep': 'deep'}
-    return sdc_pandas_dataframe_copy_codegen(df, name, params, series_params)
+    return sdc_pandas_dataframe_copy_codegen(df, name, params, series_params, '_df_copy_impl')
 
 
 def _dataframe_apply_columns_codegen(func_name, func_params, series_params, columns):
