@@ -1998,6 +1998,16 @@ class TestDataFrame(TestCase):
         self.assertTrue(isinstance(two, np.ndarray))
         self.assertTrue(isinstance(three, np.ndarray))
 
+    def test_df_len(self):
+        def test_impl(df):
+            return len(df)
+
+        hpat_func = self.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2})
+        self.assertEqual(hpat_func(df), test_impl(df))
+
+    @unittest.skip("Literal unrol is broken by inline get_dataframe_data")
     def test_df_iterate_over_columns1(self):
         """ Verifies iteration over df columns using literal tuple of column indices. """
         from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
@@ -2038,6 +2048,28 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_df_iterate_over_columns2(self):
+        """ Verifies iteration over unboxed df columns using literal unroll. """
+        from sdc.hiframes.api import get_nan_mask
+
+        @self.jit
+        def jitted_func(df):
+            res_nan_mask = np.zeros(len(df), dtype=np.bool_)
+            for col in literal_unroll(df._data):
+                res_nan_mask += get_nan_mask(col)
+            return res_nan_mask
+
+        df = pd.DataFrame({
+                    'A': ['a', 'b', None, 'a', '', None, 'b'],
+                    'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
+                    'C': [np.nan, 1, 2, 1, np.nan, 2, 1],
+                    'D': [1, 2, 9, 5, 2, 1, 0]
+        })
+        # expected is a boolean mask of df rows that have None values
+        expected = np.asarray([True, False, True, False, True, True, False])
+        result = jitted_func(df)
+        np.testing.assert_array_equal(result, expected)
 
 
 if __name__ == "__main__":
