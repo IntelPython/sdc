@@ -36,7 +36,7 @@ from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import *
 from .generator import generate_test_cases
 from .generator import TestCase as TC
-from .data_generator import gen_series_str
+from .data_generator import gen_series_fixed_str
 
 
 test_global_input_data_unicode_kind1 = [
@@ -56,7 +56,7 @@ class TestSeriesStringMethods(TestBase):
         super().setUpClass()
         cls.width = [16, 64, 512, 1024]
 
-    def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
+    def _test_case(self, pyfunc, name, total_data_length, input_data=None, data_num=1, data_gens=None):
         test_name = 'Series.str.{}'.format(name)
 
         input_data = input_data or test_global_input_data_unicode_kind4
@@ -68,8 +68,7 @@ class TestSeriesStringMethods(TestBase):
                 "data_width": data_width,
             }
 
-            args = gen_series_str(data_num, data_length, input_data, data_width)
-
+            args = gen_series_fixed_str(data_num, data_length, input_data, data_width)
             self._test_jit(pyfunc, base, *args)
             self._test_py(pyfunc, base, *args)
 

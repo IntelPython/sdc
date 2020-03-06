@@ -25,11 +25,11 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import pandas
 import numpy as np
-
-import time
+import pandas as pd
 import random
+import time
+from functools import partial
 
 import sdc
 
@@ -40,6 +40,7 @@ from .generator import generate_test_cases
 from .generator import TestCase as TC
 from .generator import CallExpression as CE
 from sdc.functions import numpy_like
+from .data_generator import gen_arr_of_dtype
 
 
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_numpy.TestFunctions.test_function_{name}
@@ -48,27 +49,25 @@ class TestFunctions(TestBase):
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_case(self, cases, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
+    def _test_case(self, cases, name, total_data_length, input_data=None, data_num=1, data_gens=None):
         test_name = '{}'.format(name)
 
         if input_data is None:
-            input_data = test_global_input_data_float64
+            input_data = [np.asarray(test_global_input_data_float64).flatten()]
 
-        full_input_data_length = sum(len(i) for i in input_data)
+        data_num = len(data_gens) if data_gens is not None else data_num
+        default_data_gens = [gen_arr_of_dtype] * data_num
+        data_gens = data_gens if data_gens is not None else default_data_gens
+        default_input_data = [np.asarray(test_global_input_data_float64).flatten()] + [None] * (data_num - 1)
+        input_data = input_data if input_data is not None else default_input_data
+
         for data_length in total_data_length:
             base = {
                 "test_name": test_name,
                 "data_size": data_length,
             }
-            data = perf_data_gen_fixed_len(input_data, full_input_data_length,
-                                           data_length)
-            test_data = np.array(data)
 
-            args = [test_data]
-            for i in range(data_num - 1):
-                np.random.seed(i)
-                extra_data = np.random.ranf(data_length)
-                args.append(np.array(extra_data))
+            args = tuple(gen(data_length, input_data=input_data[i]) for i, gen in enumerate(data_gens))
 
             for case in cases:
                 record = base.copy()
@@ -78,6 +77,7 @@ class TestFunctions(TestBase):
                 else:
                     self._test_python(case['func'], record, *args)
                 self.test_results.add(**record)
+
 
 cases = [
     TC(name='astype', size=[10 ** 7], call_expr=[
