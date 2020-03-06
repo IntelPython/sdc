@@ -556,31 +556,33 @@ def head_overload(df, n=5):
     return sdc_pandas_dataframe_head_codegen(df, name, params, ser_par)
 
 
-def _dataframe_codegen_copy(func_name, func_params, series_params, columns, df):
+def _dataframe_codegen_copy(func_name, func_params, series_params, df):
     """
     Example func_text for func_name='copy' columns=('A', 'B', 'C'):
-
         def _df_copy_impl(df, deep=True):
-            series_A = pandas.Series(get_dataframe_data(df, 0))
-            result_A = series_A.copy(deep=deep)
-            series_B = pandas.Series(get_dataframe_data(df, 1))
-            result_B = series_B.copy(deep=deep)
-            series_C = pandas.Series(get_dataframe_data(df, 2))
-            result_C = series_C.copy(deep=deep)
-            return pandas.DataFrame({"A": result_A, "B": result_B, "C": result_C}, index=df._index)
+            series_0 = pandas.Series(get_dataframe_data(df, 0))
+            result_0 = series_0.copy(deep=deep)
+            series_1 = pandas.Series(get_dataframe_data(df, 1))
+            result_1 = series_1.copy(deep=deep)
+            series_2 = pandas.Series(get_dataframe_data(df, 2))
+            result_2 = series_2.copy(deep=deep)
+            series_3 = pandas.Series(get_dataframe_data(df, 3))
+            result_3 = series_3.copy(deep=deep)
+            return pandas.DataFrame({"A": result_0, "B": result_1, "C": result_2},
+                index=df._index)
     """
     results = []
     joined = ', '.join(func_params)
     func_lines = [f"def _df_{func_name}_impl(df, {joined}):"]
-    ind = df_index_codegen_all(df)
-    for i, c in enumerate(columns):
-        result_c = f"result_{c}"
-        func_lines += [f"  series_{c} = pandas.Series(get_dataframe_data(df, {i}))",
-                       f"  {result_c} = series_{c}.{func_name}({series_params})"]
-        results.append((columns[i], result_c))
+    index = df_index_codegen_all(df)
+    for i, c in enumerate(df.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"  series_{i} = pandas.Series(get_dataframe_data(df, {i}))",
+                       f"  {result_c} = series_{i}.{func_name}({series_params})"]
+        results.append((df.columns[i], result_c))
 
     data = ', '.join(f'"{col}": {data}' for col, data in results)
-    func_lines += [f"  return pandas.DataFrame({{{data}}}, {ind})"]
+    func_lines += [f"  return pandas.DataFrame({{{data}}}, {index})"]
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
@@ -589,12 +591,12 @@ def _dataframe_codegen_copy(func_name, func_params, series_params, columns, df):
 
 
 def sdc_pandas_dataframe_copy_codegen(df, func_name, params, series_params):
-    all_params = kwsparams2list(params)
-    all_series_params = kwsparams2list(series_params)
-    s_params = ', '.join(all_series_params)
+    func_params = kwsparams2list(params)
+    series_params_list = kwsparams2list(series_params)
+    series_params_str = ', '.join(series_params_list)
 
-    df_func_name = f'_df_{func_name}_impl'
-    func_text, global_vars = _dataframe_codegen_copy(func_name, all_params, s_params, df.columns, df)
+    df_func_name = '_df_copy_impl'
+    func_text, global_vars = _dataframe_codegen_copy(func_name, func_params, series_params_str, df)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
