@@ -1526,8 +1526,7 @@ def sdc_pandas_dataframe_reset_index_codegen(df_type, all_params, columns, resul
     for i, c in enumerate(columns):
         result_c = f'result_{c}'
         func_lines += [
-            f'  series_{c} = pandas.Series(get_dataframe_data({df}, {i}))',
-            f'  result_{c} = series_{c}._data'
+            f'  result_{c} = get_dataframe_data({df}, {i})'
         ]
         result_name.append((result_c, c))
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
@@ -1573,32 +1572,32 @@ def sdc_pandas_dataframe_reset_index_impl(self, level=None, drop=False, inplace=
 @sdc_overload_method(DataFrameType, 'reset_index')
 def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False, col_level=0, col_fill=''):
     """
-           Pandas DataFrame method :meth:`pandas.DataFrame.reset_index` implementation.
+   Pandas DataFrame method :meth:`pandas.DataFrame.reset_index` implementation.
 
-           .. only:: developer
+   .. only:: developer
 
-               Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_reset_index*
+       Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_reset_index*
 
-           Parameters
-           -----------
-           self: :class:`pandas.DataFrame`
-               input arg
-           level: :obj:`int`, `str`, `tuple`, or `list`, default None
-               *unsupported*
-           drop: :obj:`bool`, default False
-               Just reset the index, without inserting it as a column in the new DataFrame.
-           inplace: :obj:`bool`, default False
-               *unsupported*
-           col_level: :obj:`int`, `str`, default 0
-               *unsupported*
-           col_fill: :obj, default ''
-               *unsupported*
+   Parameters
+   -----------
+   self: :class:`pandas.DataFrame`
+       input arg
+   level: :obj:`int`, `str`, `tuple`, or `list`, default None
+       *unsupported*
+   drop: :obj:`bool`, default False
+       Just reset the index, without inserting it as a column in the new DataFrame.
+   inplace: :obj:`bool`, default False
+       *unsupported*
+   col_level: :obj:`int`, `str`, default 0
+       *unsupported*
+   col_fill: :obj, default ''
+       *unsupported*
 
-           Returns
-           -------
-           :obj:`pandas.DataFrame`
-                DataFrame with the new index or None if inplace=True.
-           """
+   Returns
+   -------
+   :obj:`pandas.DataFrame`
+        DataFrame with the new index or None if inplace=True.
+   """
 
     func_name = 'reset_index'
 
