@@ -49,6 +49,7 @@ from sdc.str_arr_ext import StringArrayType
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
 
+from sdc.datatypes.common_functions import SDCLimitation
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
@@ -1629,47 +1630,106 @@ def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=Tru
     return sdc_pandas_dataframe_groupby_impl
 
 
-def gen_add_column_impl(self, idx):
-    func_text, global_vars = codegen(self, idx)
+def df_add_column_codelines(self, key):
+    """Generate code lines for DF add_column"""
+    func_lines = []
+    if self.columns:
+        func_lines += df_length_codelines(self)
+        func_lines += [
+            '  if length == 0:',
+            '    raise SDCLimitation("Could not set item for DataFrame with empty columns")',
+            '  elif length != len(value):',
+            '    raise ValueError("Length of values does not match length of index")',
+        ]
+    else:
+        func_lines += ['  length = len(value)']
+    func_lines += df_index_codelines(self)
+
+    results = []
+    for i, col in enumerate(self.columns):
+        res_data = f'res_data_{i}'
+        func_lines += [
+            f'  data_{i} = get_dataframe_data(self, {i})',
+            f'  {res_data} = pandas.Series(data_{i}, index=res_index, name="{col}")',
+        ]
+        results.append((col, res_data))
+
+    res_data = 'new_res_data'
+    literal_key = key.literal_value
+    func_lines += [f'  {res_data} = pandas.Series(value, index=res_index, name="{literal_key}")']
+    results.append((literal_key, res_data))
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index)']
+
+    return func_lines
+
+
+def df_add_column_codegen(self, key):
+    """
+    Example of generated implementation:
+    def _df_add_column_impl(self, key, value):
+      length = len(get_dataframe_data(self, 0))
+      if length == 0:
+        raise SDCLimitation("Could not set item for empty DataFrame")
+      elif length != len(value):
+        raise ValueError("Length of values does not match length of index")
+      res_index = numpy.arange(length)
+      data_0 = get_dataframe_data(self, 0)
+      res_data_0 = pandas.Series(data_0, index=res_index, name="A")
+      data_1 = get_dataframe_data(self, 1)
+      res_data_1 = pandas.Series(data_1, index=res_index, name="C")
+      new_res_data = pandas.Series(value, index=res_index, name="B")
+      return pandas.DataFrame({"A": res_data_0, "C": res_data_1, "B": new_res_data}, index=res_index)
+    """
+    func_lines = [f'def _df_add_column_impl(self, key, value):']
+    func_lines += df_add_column_codelines(self, key)
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data,
+                   'SDCLimitation': SDCLimitation}
+
+    return func_text, global_vars
+
+
+def gen_df_add_column_impl(self, key):
+    func_text, global_vars = df_add_column_codegen(self, key)
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _impl = loc_vars[impl_name]
+    _impl = loc_vars['_df_add_column_impl']
 
     return _impl
 
 
-def set_column(self, key, value):
-    pass
+@sdc_overload_method(DataFrameType, '_set_column')
+def df_set_column_overload(self, key, value):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-
-@sdc_overload(set_column)
-def set_column_overload(self, key, value):
+    Limitations
+    -----------
+    - Supported setting item only for non-empty DataFrame.
+    - Unsupported change of the Parent DataFrame, returned new DataFrame.
+    """
     if not isinstance(self, DataFrameType):
         return None
 
     if isinstance(key, types.StringLiteral):
         try:
-            col_idx = self.columns.index(key.literal_value)
-            key_error = False
+            self.columns.index(key.literal_value)
         except ValueError:
-            key_error = True
-
-        def set_column_str_literal_key_impl(self, key, value):
-            if key_error == False:  # noqa
-                return self
-            else:
-                return gen_add_column_impl(self, key, value)
-
-        return set_column_str_literal_key_impl
+            return gen_df_add_column_impl(self, key)
 
     if isinstance(key, types.UnicodeType):
-        def _set_column_unicode_key_impl(self, key, value):
+        def _df_set_column_unicode_key_impl(self, key, value):
             # http://numba.pydata.org/numba-doc/dev/developer/literal.html#specifying-for-literal-typing
-            # literally raises special exception to call setitem with literal idx value got from unicode
+            # literally raises special exception to call df._set_column with literal idx value got from unicode
             return literally(key)
 
-        return _set_column_unicode_key_impl
+        return _df_set_column_unicode_key_impl
 
-    ty_checker = TypeChecker('Function sdc.datatypes.hpat_pandas_dataframe_functions.set_column().')
+    ty_checker = TypeChecker('Method _set_column().')
     ty_checker.raise_exc(key, 'str', 'key')

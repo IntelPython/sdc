@@ -53,6 +53,11 @@ from sdc.utilities.sdc_typing_utils import (find_common_dtype_from_numpy_dtypes,
                                             TypeChecker)
 
 
+class SDCLimitation(Exception):
+    """Exception to be raised in case of SDC limitation"""
+    pass
+
+
 def hpat_arrays_append(A, B):
     pass
 

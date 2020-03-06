@@ -36,6 +36,7 @@ from numba.config import IS_32BITS
 from numba.special import literal_unroll
 
 import sdc
+from sdc.datatypes.common_functions import SDCLimitation
 from sdc.tests.gen_test_data import ParquetGenerator
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (check_numba_version,
@@ -571,6 +572,52 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
         df2 = df.copy()
         np.testing.assert_almost_equal(hpat_func(df, arr), test_impl(df2, arr))
+
+    def test_add_column(self):
+        def gen_test_impl(do_jit=False):
+            def test_impl(df, key, value):
+                if do_jit == True:  # noqa
+                    return df._set_column(key, value)
+                else:
+                    df[key] = value
+
+            return test_impl
+
+        test_impl = gen_test_impl()
+        sdc_func = self.jit(gen_test_impl(do_jit=True))
+
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
+        key, value = 'B', np.array([1., -1., 0.])
+
+        for data in all_data:
+            with self.subTest(data=data):
+                df_ref = pd.DataFrame(data)
+                df_jit = df_ref.copy(deep=True)
+                df_jit = sdc_func(df_jit, key, value)
+                test_impl(df_ref, key, value)
+                pd.testing.assert_frame_equal(df_jit, df_ref)
+
+    def test_add_column_exception_invalid_length(self):
+        def test_impl(df, key, value):
+            return df._set_column(key, value)
+
+        sdc_func = self.jit(test_impl)
+
+        df = pd.DataFrame({'A': [0, 1, 2], 'C': [3., 4., 5.]})
+        key, value = 'B', np.array([1., np.nan, -1., 0.])
+
+        with self.assertRaises(ValueError) as raises:
+            sdc_func(df, key, value)
+        msg = 'Length of values does not match length of index'
+        self.assertIn(msg, str(raises.exception))
+
+        df = pd.DataFrame({'A': []})
+
+        with self.assertRaises(SDCLimitation) as raises:
+            sdc_func(df, key, value)
+        msg = 'Could not set item for DataFrame with empty columns'
+        self.assertIn(msg, str(raises.exception))
+
 
     def _test_df_values_unboxing(self, df):
         def test_impl(df):
