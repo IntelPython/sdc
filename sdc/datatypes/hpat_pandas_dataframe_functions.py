@@ -1442,32 +1442,33 @@ def df_getitem_tuple_iat_codegen(self, row, col):
     """
     Example of generated implementation:
         def _df_getitem_tuple_iat_impl(self, idx):
+            row, _ = idx
             data = get_dataframe_data(self._dataframe, 1)
             res_data = pandas.Series(data)
-            return res_data.iat[idx[0]]
+            return res_data.iat[row]
     """
     func_lines = ['def _df_getitem_tuple_iat_impl(self, idx):']
+    func_lines += ['  row, _ = idx']
     if self.columns:
         func_lines += [
             f"  data = get_dataframe_data(self._dataframe, {col})",
             f"  res_data = pandas.Series(data)",
-            f"  return res_data.iat[idx[0]]",
+            f"  return res_data.iat[row]",
         ]
 
     func_text = '\n'.join(func_lines)
 
-    global_vars = {'pandas': pandas, 'numpy': numpy,
+    global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
 
 
-def gen_df_getitem_iat_impl(self, row, col):
-    df_func_name = f'_df_getitem_tuple_iat_impl'
+def gen_df_getitem_iat_impl(self, row, col, func_name):
     func_text, global_vars = df_getitem_tuple_iat_codegen(self, row, col)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _reduce_impl = loc_vars[df_func_name]
+    _reduce_impl = loc_vars[func_name]
 
     return _reduce_impl
 
@@ -1483,7 +1484,7 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
         if isinstance(idx, types.Tuple):
             row = idx[0].literal_value
             col = idx[1].literal_value
-            return gen_df_getitem_iat_impl(self.dataframe, row, col)
+            return gen_df_getitem_iat_impl(self.dataframe, row, col, '_df_getitem_tuple_iat_impl')
 
 
 @sdc_overload_attribute(DataFrameType, 'iat')
@@ -1524,9 +1525,7 @@ def sdc_pandas_dataframe_iat(self):
         Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_dataframe_iat*
     """
 
-    _func_name = 'Attribute iat().'
-
-    ty_checker = TypeChecker('{}'.format(_func_name))
+    ty_checker = TypeChecker('Attribute iat().')
     ty_checker.check(self, DataFrameType)
 
     def sdc_pandas_dataframe_iat_impl(self):
