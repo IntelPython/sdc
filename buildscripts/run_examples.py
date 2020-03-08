@@ -55,7 +55,7 @@ def run_examples(sdc_utils):
         else:
             passed += 1
             sdc_utils.log_info(f'{sdc_example} PASSED')
-            
+
         sdc_utils.log_info(f'SDC examples summary: {total} RUN, {passed} PASSED, {failed} FAILED', separate=True)
         for failed_example in failed_examples:
             sdc_utils.log_info(f'FAILED: {failed_example}')
@@ -66,6 +66,7 @@ def run_examples(sdc_utils):
     sdc_utils.log_info('Intel SDC examples PASSED', separate=True)
 
     return
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
