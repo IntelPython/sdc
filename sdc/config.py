@@ -39,14 +39,6 @@ except ImportError:
 else:
     _has_pyarrow = True
 
-try:
-    from . import cv_wrapper
-except ImportError:
-    _has_opencv = False
-else:
-    _has_opencv = True
-    import sdc.cv_ext
-
 
 def strtobool(val):
     '''Convert string to True or False'''

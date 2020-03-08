@@ -70,17 +70,6 @@ except ImportError:
 else:
     _has_pyarrow = True
 
-_has_opencv = False
-OPENCV_DIR = ""
-
-if 'OPENCV_DIR' in os.environ:
-    _has_opencv = True
-    OPENCV_DIR = os.environ['OPENCV_DIR'].replace('"', '')
-    # TODO: fix opencv link
-    # import subprocess
-    # p_cvconf = subprocess.run(["pkg-config", "--libs", "--static","opencv"], stdout=subprocess.PIPE)
-    # cv_link_args = p_cvconf.stdout.decode().split()
-
 ind = [PREFIX_DIR + '/include', ]
 lid = [PREFIX_DIR + '/lib', ]
 eca = ['-std=c++11', ]  # '-g', '-O0']
@@ -161,12 +150,6 @@ ext_dt = Extension(name="sdc.hdatetime_ext",
 
 pq_libs = ['arrow', 'parquet']
 
-# if is_win:
-#     pq_libs += ['arrow', 'parquet']
-# else:
-#     # seperate parquet reader used due to ABI incompatibility of arrow
-#     pq_libs += ['hpat_parquet_reader']
-
 ext_parquet = Extension(name="sdc.parquet_cpp",
                         sources=["sdc/io/_parquet.cpp"],
                         libraries=pq_libs,
@@ -177,26 +160,10 @@ ext_parquet = Extension(name="sdc.parquet_cpp",
                         library_dirs=lid,
                         )
 
-cv_libs = ['opencv_core', 'opencv_imgproc', 'opencv_imgcodecs', 'opencv_highgui']
-# XXX cv lib file name needs version on Windows
-if is_win:
-    cv_libs = [l + '331' for l in cv_libs]
-
-ext_cv_wrapper = Extension(name="sdc.cv_wrapper",
-                           sources=["sdc/_cv.cpp"],
-                           include_dirs=[OPENCV_DIR + '/include'] + ind,
-                           library_dirs=[os.path.join(OPENCV_DIR, 'lib')] + lid,
-                           libraries=cv_libs,
-                           language="c++",
-                           )
-
 _ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq]
 
 if _has_pyarrow:
     _ext_mods.append(ext_parquet)
-
-if _has_opencv:
-    _ext_mods.append(ext_cv_wrapper)
 
 
 class style(Command):

@@ -14,29 +14,29 @@ Limitations
 
 Examples
 --------
-.. literalinclude:: ../../../examples/series_setitem_int.py
+.. literalinclude:: ../../../examples/series/series_setitem_int.py
    :language: python
    :lines: 27-
    :caption: Setting Pandas Series elements
    :name: ex_series_setitem
 
-.. command-output:: python ./series_setitem_int.py
+.. command-output:: python ./series/series_setitem_int.py
    :cwd: ../../../examples
 
-.. literalinclude:: ../../../examples/series_setitem_slice.py
+.. literalinclude:: ../../../examples/series/series_setitem_slice.py
    :language: python
    :lines: 27-
    :caption: Setting Pandas Series elements by slice
    :name: ex_series_setitem
 
-.. command-output:: python ./series_setitem_slice.py
+.. command-output:: python ./series/series_setitem_slice.py
    :cwd: ../../../examples
 
-.. literalinclude:: ../../../examples/series_setitem_series.py
+.. literalinclude:: ../../../examples/series/series_setitem_series.py
    :language: python
    :lines: 27-
    :caption: Setting Pandas Series elements by series
    :name: ex_series_setitem
 
-.. command-output:: python ./series_setitem_series.py
+.. command-output:: python ./series/series_setitem_series.py
    :cwd: ../../../examples
