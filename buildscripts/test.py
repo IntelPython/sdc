@@ -203,4 +203,4 @@ if __name__ == '__main__':
                 for num_threads in benchmark_num_threads_list:
                     os.environ['NUMBA_NUM_THREADS'] = str(num_threads)
                     format_print(f'NUMBA_NUM_THREADS is : {num_threads}')
-                    run_command(f'{test_env_activate} && python -W ignore -m pytest --timeout=300 --timeout-method=signal --pyargs {benchmark_test_module}')
+                    run_command(f'{test_env_activate} && python -W ignore -m pytest --timeout=600 --timeout-method=thread --pyargs {benchmark_test_module}')
