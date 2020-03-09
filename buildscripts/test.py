@@ -197,10 +197,10 @@ if __name__ == '__main__':
         for package in sdc_packages:
             if '.tar.bz2' in package:
                 format_print(f'Run benchmark tests for sdc conda package: {package}')
-                create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['openpyxl', 'xlrd'],
+                create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['openpyxl', 'xlrd', 'pytest-xdist'],
                                  conda_channels)
                 run_command(f'{test_env_activate} && conda install -y {package}')
                 for num_threads in benchmark_num_threads_list:
                     os.environ['NUMBA_NUM_THREADS'] = str(num_threads)
                     format_print(f'NUMBA_NUM_THREADS is : {num_threads}')
-                    run_command(f'{test_env_activate} && python -W ignore -m sdc.runtests {benchmark_test_module}')
+                    run_command(f'{test_env_activate} && python -W ignore -m pytest --forked --pyargs {benchmark_test_module}')
