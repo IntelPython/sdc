@@ -44,6 +44,8 @@ class SDC_Build_Utilities:
         self.src_path = Path(__file__).resolve().parent.parent
         self.env_name = 'sdc_env'
         self.python = python
+        self.output_folder = self.src_path / 'sdc-build'
+        self.recipe = self.src_path / 'buildscripts' / 'sdc-conda-recipe'
 
         self.line_double = '='*80
         self.line_single = '-'*80
@@ -55,10 +57,12 @@ class SDC_Build_Utilities:
             self.channel_list = ['-c', sdc_local_channel] + self.channel_list
         self.channels = ' '.join(self.channel_list)
 
-        # Conda activate command
+        # Conda activate command and conda croot (build) folder
         if platform.system() == 'Windows':
+            self.croot_folder = 'C:\\cb'
             self.env_activate = f'activate {self.env_name}'
         else:
+            self.croot_folder = '/cb'
             self.env_activate = f'source activate {self.env_name}'
 
         # build_doc vars
