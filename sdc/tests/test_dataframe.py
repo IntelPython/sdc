@@ -1143,7 +1143,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
 
-    def test_df_reset_index1(self):
+    def test_df_reset_index_drop_True(self):
         def test_impl(df):
             return df.reset_index(drop=True)
 
@@ -1151,11 +1151,34 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    def test_df_reset_index2(self):
+    def test_df_reset_index_drop_False(self):
         def test_impl(df):
             return df.reset_index(drop=False)
 
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        hpat_func = self.jit(test_impl)
+
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_reset_index_df_different_data(self):
+        def test_impl(df):
+            return df.reset_index(drop=False)
+
+        df = pd.DataFrame({
+            'A': ['a', 'b', None, 'a', '', None, 'b'],
+            'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
+            'C': [np.nan, 1, 2, 1, np.nan, 2, 1],
+            'D': [1, 2, 9, 5, 2, 1, 0]
+        })
+        hpat_func = self.jit(test_impl)
+
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_reset_index_with_index(self):
+        def test_impl(df):
+            return df.reset_index(drop=False)
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]}, index=[5, 8, 4, 6])
         hpat_func = self.jit(test_impl)
 
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))

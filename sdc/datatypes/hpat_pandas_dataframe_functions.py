@@ -1630,18 +1630,26 @@ def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=Tru
 
 
 def sdc_pandas_dataframe_reset_index_codegen(df_type, all_params, columns, result_name, func_line):
+    """
+    Example of generated implementation:
+        def _df_reset_index_impl(self, level=None, drop=False, inplace=False, col_level=0, col_fill=""):
+          length = len(get_dataframe_data(self, 0))
+          res_index = numpy.arange(length)
+          result_0 = get_dataframe_data(self, 0)
+          return pandas.DataFrame({"index": res_index, "A": result_0}, index=numpy.arange(len(self)))
+   """
     joined = ', '.join(all_params)
     func_lines = [f'def _df_reset_index_impl({joined}):']
     df = all_params[0]
     func_lines += func_line
     for i, c in enumerate(columns):
-        result_c = f'result_{c}'
+        result_c = f'result_{i}'
         func_lines += [
-            f'  result_{c} = get_dataframe_data({df}, {i})'
+            f'  result_{i} = get_dataframe_data({df}, {i})'
         ]
         result_name.append((result_c, c))
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
-    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=numpy.arange(len(result_{c})))']
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=numpy.arange(len(self)))']
     func_text = '\n'.join(func_lines)
 
     global_vars = {'pandas': pandas,
@@ -1683,7 +1691,40 @@ def sdc_pandas_dataframe_reset_index_impl(self, level=None, drop=False, inplace=
 @sdc_overload_method(DataFrameType, 'reset_index')
 def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False, col_level=0, col_fill=''):
     """
-   Pandas DataFrame method :meth:`pandas.DataFrame.reset_index` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.reset_index
+
+    Limitations
+    -----------
+    Reset the index of the DataFrame, and use the default one instead.
+    Parameters level, inplacem col_level, col_fill unsupported.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_reset_index_drop_False.py
+        :language: python
+        :lines: 29-
+        :caption: Reset the index of the DataFrame, and use the default one instead.
+                  The old index becomes the first column.
+        :name: ex_dataframe_reset_index
+
+    .. command-output:: python ./dataframe/dataframe_reset_index_drop_False.py
+        :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/dataframe_reset_index_drop_True.py
+        :language: python
+        :lines: 29-
+        :caption: Reset the index of the DataFrame, and use the default one instead.
+        :name: ex_dataframe_reset_index
+
+    .. command-output:: python ./dataframe/dataframe_reset_index_drop_True.py
+        :cwd: ../../../examples
+
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.DataFrame.reset_index` implementation.
 
    .. only:: developer
 
