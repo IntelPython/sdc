@@ -1676,6 +1676,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @skip_sdc_jit
     def test_isin_dict_different_size(self):
         def test_impl():
             df = pd.DataFrame({'A': [0, 1, 2, 3],
@@ -1688,6 +1689,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+    @skip_sdc_jit
     def test_isin_dict_different_size2(self):
         def test_impl():
             val = {'A': (0, 1, 2, 3),
