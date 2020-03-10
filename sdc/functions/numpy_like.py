@@ -24,6 +24,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
+from sdc.hiframes.api import isna
 
 """
 
@@ -46,7 +47,8 @@ from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
                                  max_dtype_float_val)
-from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size, str_arr_is_na)
+from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size, str_arr_is_na,
+    string_array_type, create_str_arr_from_list, str_arr_set_na_by_mask)
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 from sdc.utilities.prange_utils import parallel_chunks
 
@@ -885,3 +887,53 @@ def np_nancumsum(arr, like_pandas=False):
             return result
 
         return nancumsum_impl
+
+
+def getitem_by_mask(arr, idx):
+    pass
+
+
+@sdc_overload(getitem_by_mask)
+def getitem_by_mask_overload(arr, idx):
+    dtype = arr.dtype
+    is_str_arr = arr == string_array_type
+
+    def getitem_by_mask_impl(arr, idx):
+        chunks = parallel_chunks(len(arr))
+        arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
+        length = 0
+
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            res = 0
+            for j in range(chunk.start, chunk.stop):
+                if idx[j]:
+                    res += 1
+            length += res
+            arr_len[i] = res
+
+        if is_str_arr == True:  # noqa
+            result_data = [''] * length
+            result_nan_mask = numpy.empty(shape=length, dtype=types.bool_)
+        else:
+            result_data = numpy.empty(shape=length, dtype=dtype)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            new_start = int(sum(arr_len[0:i]))
+            current_pos = new_start
+
+            for j in range(chunk.start, chunk.stop):
+                if idx[j]:
+                    result_data[current_pos] = arr[j]
+                    if is_str_arr == True:  # noqa
+                        result_nan_mask[current_pos] = isna(arr, j)
+                    current_pos += 1
+
+        if is_str_arr == True:  # noqa
+            result_data_as_str_arr = create_str_arr_from_list(result_data)
+            str_arr_set_na_by_mask(result_data_as_str_arr, result_nan_mask)
+            return result_data_as_str_arr
+        else:
+            return result_data
+
+    return getitem_by_mask_impl
