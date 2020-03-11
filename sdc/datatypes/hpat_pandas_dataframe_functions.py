@@ -1557,11 +1557,11 @@ def df_getitem_tuple_iat_codegen(self, row, col):
     return func_text, global_vars
 
 
-def gen_df_getitem_iat_impl(self, row, col, func_name):
+def gen_df_getitem_tuple_iat_impl(self, row, col):
     func_text, global_vars = df_getitem_tuple_iat_codegen(self, row, col)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _reduce_impl = loc_vars[func_name]
+    _reduce_impl = loc_vars['_df_getitem_tuple_iat_impl']
 
     return _reduce_impl
 
@@ -1577,7 +1577,7 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
         if isinstance(idx, types.Tuple):
             row = idx[0].literal_value
             col = idx[1].literal_value
-            return gen_df_getitem_iat_impl(self.dataframe, row, col, '_df_getitem_tuple_iat_impl')
+            return gen_df_getitem_tuple_iat_impl(self.dataframe, row, col)
 
 
 @sdc_overload_attribute(DataFrameType, 'iat')
