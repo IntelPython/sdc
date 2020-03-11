@@ -567,8 +567,8 @@ def _dataframe_codegen_copy(func_name, func_params, series_params, df):
             return pandas.DataFrame({"A": result_0, "B": result_1}, index=df._index)
     """
     results = []
-    joined = ', '.join(func_params)
-    func_lines = [f"def _df_{func_name}_impl(df, {joined}):"]
+    func_params_str = ', '.join(func_params)
+    func_lines = [f"def _df_{func_name}_impl(df, {func_params_str}):"]
     index = df_index_codegen_all(df)
     for i, c in enumerate(df.columns):
         result_c = f"result_{i}"
@@ -587,9 +587,8 @@ def _dataframe_codegen_copy(func_name, func_params, series_params, df):
 
 def sdc_pandas_dataframe_copy_codegen(df, func_name, params, series_params):
     func_params = kwsparams2list(params)
-    series_params_list = kwsparams2list(series_params)
-    series_params_str = ', '.join(series_params_list)
-    func_text, global_vars = _dataframe_codegen_copy(func_name, func_params, series_params_str, df)
+    series_params = ', '.join(kwsparams2list(series_params))
+    func_text, global_vars = _dataframe_codegen_copy(func_name, func_params, series_params, df)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[f'_df_{func_name}_impl']
@@ -635,6 +634,9 @@ def copy_overload(df, deep=True):
         Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_copy*
     """
     name = 'copy'
+
+    ty_checker = TypeChecker('Method {}().'.format(name))
+    ty_checker.check(df, DataFrameType)
 
     if not isinstance(deep, (types.Omitted, types.Boolean)) and not deep:
         ty_checker.raise_exc(deep, 'boolean', 'deep')
