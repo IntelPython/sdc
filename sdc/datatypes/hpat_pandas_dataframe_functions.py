@@ -1540,8 +1540,8 @@ def df_getitem_tuple_iat_codegen(self, row, col):
             res_data = pandas.Series(data)
             return res_data.iat[row]
     """
-    func_lines = ['def _df_getitem_tuple_iat_impl(self, idx):']
-    func_lines += ['  row, _ = idx']
+    func_lines = ['def _df_getitem_tuple_iat_impl(self, idx):',
+                  '  row, _ = idx']
     if self.columns:
         func_lines += [
             f"  data = get_dataframe_data(self._dataframe, {col})",
@@ -1550,7 +1550,6 @@ def df_getitem_tuple_iat_codegen(self, row, col):
         ]
 
     func_text = '\n'.join(func_lines)
-
     global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
 
@@ -1575,7 +1574,7 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
 
     if accessor == 'iat':
         if isinstance(idx, types.Tuple):
-            row = idx[0].literal_value
+            row = idx[0]
             col = idx[1].literal_value
             return gen_df_getitem_tuple_iat_impl(self.dataframe, row, col)
 
