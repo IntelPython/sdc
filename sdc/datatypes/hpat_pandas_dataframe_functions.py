@@ -1370,8 +1370,7 @@ def df_getitem_slice_idx_main_codelines(self, idx):
     for i, col in enumerate(self.columns):
         res_data = f'res_data_{i}'
         func_lines += [
-            f'  data_{i} = get_dataframe_data(self, {i})',
-            f'  {res_data} = pandas.Series(data_{i}[idx], index=res_index[idx], name="{col}")'
+            f'  {res_data} = pandas.Series((self._data[{i}])[idx], index=res_index[idx], name="{col}")'
         ]
         results.append((col, res_data))
 
