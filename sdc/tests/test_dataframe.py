@@ -618,7 +618,6 @@ class TestDataFrame(TestCase):
         msg = 'Could not set item for DataFrame with empty columns'
         self.assertIn(msg, str(raises.exception))
 
-
     def _test_df_values_unboxing(self, df):
         def test_impl(df):
             return df.values

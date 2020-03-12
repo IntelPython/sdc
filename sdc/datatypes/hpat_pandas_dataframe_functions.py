@@ -1643,7 +1643,7 @@ def df_add_column_codelines(self, key):
         ]
     else:
         func_lines += ['  length = len(value)']
-    func_lines += df_index_codelines(self)
+    func_lines += df_index_codelines(self)  # provide res_index = ...
 
     results = []
     for i, col in enumerate(self.columns):
