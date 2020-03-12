@@ -590,7 +590,7 @@ def sdc_pandas_dataframe_copy_codegen(df, params, series_params):
     func_text, global_vars = _dataframe_codegen_copy(params, series_params, df)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _reduce_impl = loc_vars[f'_df_copy_impl']
+    _reduce_impl = loc_vars['_df_copy_impl']
 
     return _reduce_impl
 
@@ -632,7 +632,7 @@ def copy_overload(df, deep=True):
     .. only:: developer
         Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_copy*
     """
-    ty_checker = TypeChecker("Method 'copy'().")
+    ty_checker = TypeChecker("Method copy().")
     ty_checker.check(df, DataFrameType)
 
     if not isinstance(deep, (types.Omitted, types.Boolean)) and not deep:
