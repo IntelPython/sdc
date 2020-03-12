@@ -1531,23 +1531,28 @@ def sdc_pandas_dataframe_getitem(self, idx):
     ty_checker.raise_exc(idx, expected_types, 'idx')
 
 
-def df_getitem_tuple_iat_codegen(self, row, col):
+def df_getitem_tuple_at_codegen(self, row, col):
     """
     Example of generated implementation:
-        def _df_getitem_tuple_iat_impl(self, idx):
+        def _df_getitem_tuple_at_impl(self, idx):
             row, _ = idx
-            data = get_dataframe_data(self._dataframe, 1)
-            res_data = pandas.Series(data)
-            return res_data.iat[row]
+            data = get_dataframe_data(self._dataframe, 2)
+            res_data = pandas.Series(data, index=self._dataframe.index)
+            return res_data.at[row]
     """
-    func_lines = ['def _df_getitem_tuple_iat_impl(self, idx):']
+    func_lines = ['def _df_getitem_tuple_at_impl(self, idx):']
     func_lines += ['  row, _ = idx']
-    if self.columns:
-        func_lines += [
-            f"  data = get_dataframe_data(self._dataframe, {col})",
-            f"  res_data = pandas.Series(data)",
-            f"  return res_data.iat[row]",
-        ]
+    insert_row = "row"
+    if isinstance(row, str):
+        insert_row = "'row'"
+
+    for i, c in enumerate(self.columns):
+        if c == col:
+            func_lines += [
+                f"  data = get_dataframe_data(self._dataframe, {i})",
+                f"  res_data = pandas.Series(data, index=self._dataframe.index)",
+                f"  return res_data.at[{insert_row}]",
+            ]
 
     func_text = '\n'.join(func_lines)
 
@@ -1557,11 +1562,11 @@ def df_getitem_tuple_iat_codegen(self, row, col):
     return func_text, global_vars
 
 
-def gen_df_getitem_tuple_iat_impl(self, row, col):
-    func_text, global_vars = df_getitem_tuple_iat_codegen(self, row, col)
+def gen_df_getitem_tuple_at_impl(self, row, col):
+    func_text, global_vars = df_getitem_tuple_at_codegen(self, row, col)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _reduce_impl = loc_vars['_df_getitem_tuple_iat_impl']
+    _reduce_impl = loc_vars['_df_getitem_tuple_at_impl']
 
     return _reduce_impl
 
@@ -1573,58 +1578,58 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
 
     accessor = self.accessor.literal_value
 
-    if accessor == 'iat':
+    if accessor == 'at':
         if isinstance(idx, types.Tuple):
-            row = idx[0].literal_value
+            row = idx[0]
             col = idx[1].literal_value
-            return gen_df_getitem_tuple_iat_impl(self.dataframe, row, col)
+            return gen_df_getitem_tuple_at_impl(self.dataframe, row, col)
 
 
-@sdc_overload_attribute(DataFrameType, 'iat')
-def sdc_pandas_dataframe_iat(self):
+@sdc_overload_attribute(DataFrameType, 'at')
+def sdc_pandas_dataframe_at(self):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
 
-    Pandas API: pandas.DataFrame.iat
+    Pandas API: pandas.DataFrame.at
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/dataframe_iat.py
+    .. literalinclude:: ../../../examples/dataframe_at.py
        :language: python
        :lines: 28-
-       :caption: Get value at specified index position.
-       :name: ex_dataframe_iat
+       :caption: Access a single value for a row/column label pair.
+       :name: ex_dataframe_at
 
-    .. command-output:: python ./dataframe_iat.py
+    .. command-output:: python ./dataframe_at.py
        :cwd: ../../../examples
 
     .. seealso::
 
-        :ref:`DataFrame.at <pandas.DataFrame.at>`
-            Access a single value for a row/column label pair.
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Access a single value for a row/column pair by integer position.
 
         :ref:`DataFrame.loc <pandas.DataFrame.loc>`
-            Purely label-location based indexer for selection by label.
+            Access a group of rows and columns by label(s).
 
-        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
-            Access group of rows and columns by integer position(s).
+        :ref:`Series.at <pandas.Series.at>`
+            Access a single value using a label.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
-    Pandas DataFrame method :meth:`pandas.DataFrame.iat` implementation.
+    Pandas DataFrame method :meth:`pandas.DataFrame.at` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_dataframe_iat*
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_at*
     """
 
-    ty_checker = TypeChecker('Attribute iat().')
+    ty_checker = TypeChecker('Attribute at().')
     ty_checker.check(self, DataFrameType)
 
-    def sdc_pandas_dataframe_iat_impl(self):
-        return sdc.datatypes.hpat_pandas_dataframe_getitem_types.dataframe_getitem_accessor_init(self, 'iat')
+    def sdc_pandas_dataframe_at_impl(self):
+        return sdc.datatypes.hpat_pandas_dataframe_getitem_types.dataframe_getitem_accessor_init(self, 'at')
 
-    return sdc_pandas_dataframe_iat_impl
+    return sdc_pandas_dataframe_at_impl
 
 
 @sdc_overload_method(DataFrameType, 'pct_change')

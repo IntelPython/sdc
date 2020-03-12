@@ -983,15 +983,18 @@ class TestDataFrame(TestCase):
                 with self.subTest(n=n, index=idx):
                     pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
 
-    def test_df_iat(self):
-        def test_impl(df):
-            return df.iat[0, 1]
+    def test_df_at(self):
+        def test_impl(df, n):
+            return df.at[n, 'C']
+
         sdc_func = sdc.jit(test_impl)
-        idx = [3, 4, 2, 6, 1]
+        idx = [3, 4, 1, 2, 0]
+        n_cases = [0, 2]
         df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
                            "B": [3, 4, 1, 0, 222],
                            "C": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
-        self.assertEqual(sdc_func(df), test_impl(df))
+        for n in n_cases:
+            self.assertEqual(sdc_func(df, n), test_impl(df, n))
 
     def test_df_head(self):
         def get_func(n):
