@@ -49,7 +49,8 @@ from sdc.tests.test_utils import (check_numba_version,
                                   get_start_end,
                                   skip_numba_jit,
                                   skip_sdc_jit,
-                                  test_global_input_data_float64,)
+                                  test_global_input_data_float64,
+                                  test_global_input_data_unicode_kind4)
 
 
 @sdc.jit
@@ -573,31 +574,48 @@ class TestDataFrame(TestCase):
         df2 = df.copy()
         np.testing.assert_almost_equal(hpat_func(df, arr), test_impl(df2, arr))
 
-    def test_add_column(self):
-        def gen_test_impl(do_jit=False):
-            def test_impl(df, key, value):
-                if do_jit == True:  # noqa
-                    return df._set_column(key, value)
-                else:
-                    df[key] = value
+    def _test_df_add_column(self, all_data, key, value):
+        def gen_test_impl(value, do_jit=False):
+            if isinstance(value, pd.Series):
+                def test_impl(df, key, value):
+                    if do_jit == True:  # noqa
+                        return df._set_column(key, value.values)
+                    else:
+                        df[key] = value.values
+            else:
+                def test_impl(df, key, value):
+                    if do_jit == True:  # noqa
+                        return df._set_column(key, value)
+                    else:
+                        df[key] = value
 
             return test_impl
 
-        test_impl = gen_test_impl()
-        sdc_func = self.jit(gen_test_impl(do_jit=True))
-
-        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
-        key, value = 'B', np.array([1., -1., 0.])
+        test_impl = gen_test_impl(value)
+        sdc_func = self.jit(gen_test_impl(value, do_jit=True))
 
         for data in all_data:
             with self.subTest(data=data):
-                df_ref = pd.DataFrame(data)
-                df_jit = df_ref.copy(deep=True)
-                df_jit = sdc_func(df_jit, key, value)
-                test_impl(df_ref, key, value)
-                pd.testing.assert_frame_equal(df_jit, df_ref)
+                df1 = pd.DataFrame(data)
+                df2 = df1.copy(deep=True)
+                test_impl(df1, key, value)
+                result_ref = df1  # in pandas setitem modifies original DF
+                result_jit = sdc_func(df2, key, value)
+                pd.testing.assert_frame_equal(result_jit, result_ref)
 
-    def test_add_column_exception_invalid_length(self):
+    def test_df_add_column(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
+        key, value = 'B', np.array([1., -1., 0.])
+
+        self._test_df_add_column(all_data, key, value)
+
+    def test_df_add_column_str(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
+        key, value = 'B', pd.Series(test_global_input_data_unicode_kind4)
+
+        self._test_df_add_column(all_data, key, value)
+
+    def test_df_add_column_exception_invalid_length(self):
         def test_impl(df, key, value):
             return df._set_column(key, value)
 

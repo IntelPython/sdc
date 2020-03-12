@@ -1251,32 +1251,29 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
     return sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns)
 
 
-def df_length_codelines(self):
-    """Generate code lines to get length of DF"""
+def df_length_expr(self):
+    """Generate expression to get length of DF"""
     if self.columns:
-        return ['  length = len(get_dataframe_data(self, 0))']
+        return 'len(get_dataframe_data(self, 0))'
 
-    return ['  length = 0']
+    return '0'
 
 
-def df_index_codelines(self, with_length=False):
-    """Generate code lines to get or create index of DF"""
-    func_lines = []
+def df_index_expr(self, length_expr=None):
+    """Generate expression to get or create index of DF"""
     if isinstance(self.index, types.NoneType):
-        if with_length:
-            func_lines += df_length_codelines(self)
+        if length_expr is None:
+            length_expr = df_length_expr(self)
 
-        func_lines += ['  res_index = numpy.arange(length)']
-    else:
-        func_lines += ['  res_index = self._index']
+        return f'numpy.arange({length_expr})'
 
-    return func_lines
+    return 'self._index'
 
 
 def df_getitem_slice_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem with idx of slice"""
     results = []
-    func_lines = df_index_codelines(self, with_length=True)
+    func_lines = [f'  res_index = {df_index_expr(self)}']
     for i, col in enumerate(self.columns):
         res_data = f'res_data_{i}'
         func_lines += [
@@ -1294,7 +1291,7 @@ def df_getitem_slice_idx_main_codelines(self, idx):
 def df_getitem_tuple_idx_main_codelines(self, literal_idx):
     """Generate main code lines for df.getitem with idx of tuple"""
     results = []
-    func_lines = df_index_codelines(self, with_length=True)
+    func_lines = [f'  res_index = {df_index_expr(self)}']
     needed_cols = {col: i for i, col in enumerate(self.columns) if col in literal_idx}
     for col, i in needed_cols.items():
         res_data = f'res_data_{i}'
@@ -1312,9 +1309,9 @@ def df_getitem_tuple_idx_main_codelines(self, literal_idx):
 
 def df_getitem_bool_series_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem"""
-    func_lines = df_length_codelines(self)
-    func_lines += ['  _idx_data = idx._data[:length]']
-    func_lines += df_index_codelines(self)
+    func_lines = [f'  length = {df_length_expr(self)}',
+                  f'  _idx_data = idx._data[:length]',
+                  f'  res_index = {df_index_expr(self, length_expr="length")}']
 
     results = []
     for i, col in enumerate(self.columns):
@@ -1334,10 +1331,10 @@ def df_getitem_bool_series_idx_main_codelines(self, idx):
 
 def df_getitem_bool_array_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem"""
-    func_lines = df_length_codelines(self)
-    func_lines += ['  if length != len(idx):',
-                   '    raise ValueError("Item wrong length.")']
-    func_lines += df_index_codelines(self)
+    func_lines = [f'  length = {df_length_expr(self)}',
+                  f'  if length != len(idx):',
+                  f'    raise ValueError("Item wrong length.")',
+                  f'  res_index = {df_index_expr(self, length_expr="length")}']
 
     results = []
     for i, col in enumerate(self.columns):
@@ -1634,16 +1631,16 @@ def df_add_column_codelines(self, key):
     """Generate code lines for DF add_column"""
     func_lines = []
     if self.columns:
-        func_lines += df_length_codelines(self)
         func_lines += [
-            '  if length == 0:',
-            '    raise SDCLimitation("Could not set item for DataFrame with empty columns")',
-            '  elif length != len(value):',
-            '    raise ValueError("Length of values does not match length of index")',
+            f'  length = {df_length_expr(self)}',
+            f'  if length == 0:',
+            f'    raise SDCLimitation("Could not set item for DataFrame with empty columns")',
+            f'  elif length != len(value):',
+            f'    raise ValueError("Length of values does not match length of index")',
         ]
     else:
         func_lines += ['  length = len(value)']
-    func_lines += df_index_codelines(self)  # provide res_index = ...
+    func_lines += [f'  res_index = {df_index_expr(self, length_expr="length")}']
 
     results = []
     for i, col in enumerate(self.columns):
@@ -1711,8 +1708,13 @@ def df_set_column_overload(self, key, value):
 
     Limitations
     -----------
-    - Supported setting item only for non-empty DataFrame.
+    - Supported setting a columns in a non-empty DataFrame as a 1D array only.
     - Unsupported change of the Parent DataFrame, returned new DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_add_column
     """
     if not isinstance(self, DataFrameType):
         return None
