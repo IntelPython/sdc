@@ -68,6 +68,9 @@ class SDC_Build_Utilities:
         self.doc_repo_link = 'https://github.com/IntelPython/sdc-doc.git'
         self.doc_repo_branch = 'gh-pages'
 
+        # run_examples vars
+        self.examples_path = self.src_path / 'examples'
+
     def create_environment(self, packages_list=[]):
         assert type(packages_list) == list, 'Argument should be a list'
 
