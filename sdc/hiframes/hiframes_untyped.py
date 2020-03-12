@@ -770,7 +770,7 @@ class HiFramesPassImpl(object):
             # a row is used for names if not provided
             skiprows += 1
         col_names = cols
-        dtype_map = {c: d for c, d in zip(col_names, dtypes)}
+        dtype_map = dict(zip(col_names, dtypes))
         return skiprows, col_names, dtype_map
 
     def _handle_pd_read_csv(self, assign, lhs, rhs, label):
