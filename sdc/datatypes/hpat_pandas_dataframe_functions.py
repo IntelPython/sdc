@@ -1542,12 +1542,14 @@ def df_getitem_tuple_iat_codegen(self, row, col):
     """
     func_lines = ['def _df_getitem_tuple_iat_impl(self, idx):',
                   '  row, _ = idx']
-    if self.columns:
+    if col in self.columns:
         func_lines += [
             f"  data = get_dataframe_data(self._dataframe, {col})",
             f"  res_data = pandas.Series(data)",
             f"  return res_data.iat[row]",
         ]
+    else:
+        raise ValueError('Index is out of bounds for axis')
 
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas,
