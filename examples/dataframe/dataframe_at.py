@@ -30,10 +30,10 @@ from numba import njit
 
 
 @njit
-def dataframe_iat():
+def dataframe_at():
     df = pd.DataFrame({'A': [1.0, 2.0, 3.0, 1.0], 'B': [4, 5, 6, 7], 'C': ['a', 'b', 'c', 'd']})
 
-    return df.iat[1, 2]  # value b
+    return df.at[1, 'C']  # ['b']
 
 
-print(dataframe_iat())
+print(dataframe_at())
