@@ -1474,8 +1474,6 @@ def sdc_pandas_dataframe_getitem(self, idx):
 
         Evaluation of `obj[key]`
 
-
-
         Limitations
         -----------
         Supported ``key`` can be one of the following:
