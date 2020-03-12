@@ -1109,8 +1109,8 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
             break
 
     for column_id, column_name in enumerate(saved_df_columns):
-        func_text.append(f'new_col_{column_id}_data_{"df"} = get_dataframe_data({"df"}, '
-                         f'{df_columns_indx[column_name]})')
+        func_text.append(f'new_col_{column_id}_data_{"df"} = {"df"}._data['
+                         f'{df_columns_indx[column_name]}]')
         column_list.append((f'new_col_{column_id}_data_df', column_name))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
@@ -1119,7 +1119,7 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
     func_definition.extend([indent + func_line for func_line in func_text])
     func_def = '\n'.join(func_definition)
 
-    global_vars = {'pandas': pandas, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
+    global_vars = {'pandas': pandas}
 
     return func_def, global_vars
 
