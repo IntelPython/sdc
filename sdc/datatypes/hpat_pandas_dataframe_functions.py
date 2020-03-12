@@ -1549,7 +1549,7 @@ def df_getitem_tuple_iat_codegen(self, row, col):
             f"  return res_data.iat[row]",
         ]
     else:
-        raise ValueError('Index is out of bounds for axis')
+        func_lines += ["  raise ValueError('Index is out of bounds for axis')"]
 
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas,
