@@ -1595,13 +1595,13 @@ def sdc_pandas_dataframe_at(self):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/dataframe_at.py
+    .. literalinclude:: ../../../examples/dataframe/dataframe_at.py
        :language: python
        :lines: 28-
        :caption: Access a single value for a row/column label pair.
        :name: ex_dataframe_at
 
-    .. command-output:: python ./dataframe_at.py
+    .. command-output:: python ./dataframe/dataframe_at.py
        :cwd: ../../../examples
 
     .. seealso::
