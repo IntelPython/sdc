@@ -38,6 +38,8 @@ from numba.extending import overload
 from sdc.hiframes.api import fix_df_array
 
 import pandas as pd
+import numpy as np
+
 from numba import types
 
 from sdc.io.csv_ext import (
@@ -215,6 +217,7 @@ def sdc_pandas_read_csv(
 
         values = dtype[1::2]
         values = [v.typing_key if isinstance(v, types.Function) else v for v in values]
+        values = [types.Array(numba.from_dtype(np.dtype(v.literal_value)), 1, 'C') if isinstance(v, types.Literal) else v for v in values]
         values = [types.Array(types.int_, 1, 'C') if v == int else v for v in values]
         values = [types.Array(types.float64, 1, 'C') if v == float else v for v in values]
         values = [string_array_type if v == str else v for v in values]

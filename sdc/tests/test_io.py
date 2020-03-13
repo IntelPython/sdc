@@ -292,7 +292,7 @@ class TestCSV(TestIO):
 
         def pyfunc(fname):
             names = ['A', 'B', 'C', 'D']
-            dtype = {'A': int_type, 'B': np.float, 'C': np.float, 'D': str}
+            dtype = {'A': int_type, 'B': np.float, 'C': 'float', 'D': str}
             return read_csv(fname, names=names, dtype=dtype)
 
         cfunc = self.jit(pyfunc)
