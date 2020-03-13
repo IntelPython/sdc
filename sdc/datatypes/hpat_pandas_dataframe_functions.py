@@ -1534,7 +1534,12 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
+
     Pandas API: pandas.DataFrame.pct_change
+
+    Limitations
+    -----------
+    Parameters limit, freq unsupported.
 
     Examples
     --------
@@ -1547,6 +1552,19 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     .. command-output:: python ./dataframe/dataframe_pct_change.py
         :cwd: ../../../examples
 
+    .. seealso::
+
+        :ref:`Series.diff <pandas.Series.diff>`
+            Compute the difference of two elements in a Series.
+
+        :ref:`DataFrame.diff <pandas.DataFrame.diff>`
+            Compute the difference of two elements in a DataFrame.
+
+        :ref:`Series.shift <pandas.Series.shift>`
+            Shift the index by some number of periods.
+
+        :ref:`DataFrame.shift <pandas.DataFrame.shift>`
+            Shift the index by some number of periods.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
