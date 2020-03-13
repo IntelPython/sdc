@@ -251,15 +251,15 @@ def sdc_pandas_read_csv(
         col_typs = [dtype[n] for n in col_names]
 
     elif infer_from_file:
-    col_names = 0
-    skiprows, col_names, dtype_map = \
-        HiFramesPassImpl.infer_column_names_and_types_from_constant_filename(
+        col_names = 0
+        skiprows, col_names, dtype_map = \
+            HiFramesPassImpl.infer_column_names_and_types_from_constant_filename(
                 filepath_or_buffer, skiprows, col_names, sep=delimiter)
 
-    usecols = infer_usecols(col_names)
+        usecols = infer_usecols(col_names)
 
-    date_cols = []
-    columns, out_types = HiFramesPassImpl._get_csv_col_info_core(dtype_map, date_cols, col_names)
+        date_cols = []
+        columns, out_types = HiFramesPassImpl._get_csv_col_info_core(dtype_map, date_cols, col_names)
         col_names, col_typs = columns, out_types
 
     else:
