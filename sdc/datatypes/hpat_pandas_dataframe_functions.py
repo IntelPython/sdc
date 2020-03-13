@@ -944,6 +944,40 @@ def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min
 @sdc_overload_method(DataFrameType, 'count')
 def count_overload(df, axis=0, level=None, numeric_only=False):
     """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.DataFrame.count
+
+    Limitations
+    -----------
+    Parameters axis, level, numeric_only unsupported.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_count.py
+       :language: python
+       :lines: 36-
+       :caption: Count non-NA cells for each column or row.
+       :name: ex_dataframe_count
+
+    .. command-output:: python ./dataframe/dataframe_count.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`Series.count <pandas.Series.count>`
+            Number of non-NA elements in a Series.
+
+        :ref:`DataFrame.shape <pandas.DataFrame.shape>`
+            Number of DataFrame rows and columns (including NA elements).
+
+        :ref:`DataFrame.isna <pandas.DataFrame.isna>`
+            Boolean same-sized DataFrame showing places of NA elements.
+
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
     Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.
     .. only:: developer
 
