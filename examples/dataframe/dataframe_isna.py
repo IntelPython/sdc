@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,16 +24,25 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+   Expected result:
+        A      B      C
+    0  False  False   True
+    1   True  False  False
+    2  False  False  False
+    3  False  False  False
+"""
+
 import pandas as pd
+import numpy as np
 from numba import njit
 
 
 @njit
-def series_abs():
-    s = pd.Series([-1.10, 2, -3.33])
-    out_series = s.abs()
+def dataframe_isna():
+    df = pd.DataFrame({'A': [1.0, np.nan, 3.0, 1.0], 'B': [4, 5, 6, 7], 'C': [None, 'b', 'c', 'd']})
 
-    return out_series  # Expect series of 1.10, 2.00, 3.33
+    return df.isna()
 
 
-print(series_abs())
+print(dataframe_isna())

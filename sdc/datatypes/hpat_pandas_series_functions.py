@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -274,49 +274,49 @@ def hpat_pandas_series_getitem(self, idx):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_getitem/series_getitem_scalar_single_result.py
+    .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_scalar_single_result.py
        :language: python
        :lines: 32-
        :caption: Getting Pandas Series elements. Returns single value.
        :name: ex_series_getitem
 
-    .. command-output:: python ./series_getitem/series_getitem_scalar_single_result.py
+    .. command-output:: python ./series/series_getitem/series_getitem_scalar_single_result.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_getitem/series_getitem_scalar_multiple_result.py
+    .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_scalar_multiple_result.py
        :language: python
        :lines: 34-
        :caption: Getting Pandas Series elements. Returns multiple value.
        :name: ex_series_getitem
 
-    .. command-output:: python ./series_getitem/series_getitem_scalar_multiple_result.py
+    .. command-output:: python ./series/series_getitem/series_getitem_scalar_multiple_result.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_getitem/series_getitem_slice.py
+    .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_slice.py
        :language: python
        :lines: 35-
        :caption: Getting Pandas Series elements by slice.
        :name: ex_series_getitem
 
-    .. command-output:: python ./series_getitem/series_getitem_slice.py
+    .. command-output:: python ./series/series_getitem/series_getitem_slice.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_getitem/series_getitem_bool_array.py
+    .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_bool_array.py
        :language: python
        :lines: 37-
        :caption: Getting Pandas Series elements by array of booleans.
        :name: ex_series_getitem
 
-    .. command-output:: python ./series_getitem/series_getitem_bool_array.py
+    .. command-output:: python ./series/series_getitem/series_getitem_bool_array.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_getitem/series_getitem_series.py
+    .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_series.py
        :language: python
        :lines: 36-
        :caption: Getting Pandas Series elements by another Series.
        :name: ex_series_getitem
 
-    .. command-output:: python ./series_getitem/series_getitem_series.py
+    .. command-output:: python ./series/series_getitem/series_getitem_series.py
        :cwd: ../../../examples
 
     .. todo:: Fix SDC behavior and add the expected output of the > python ./series_getitem.py to the docstring
@@ -439,7 +439,7 @@ def sdc_pandas_series_setitem(self, idx, value):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_setitem_int.py
+    .. literalinclude:: ../../../examples/series/series_setitem_int.py
        :language: python
        :lines: 27-
        :caption: Setting Pandas Series elements
@@ -447,7 +447,7 @@ def sdc_pandas_series_setitem(self, idx, value):
 
     .. code-block:: console
 
-        > python ./series_setitem_int.py
+        > python ./series/series_setitem_int.py
 
             0    0
             1    4
@@ -456,7 +456,7 @@ def sdc_pandas_series_setitem(self, idx, value):
             4    1
             dtype: int64
 
-        > python ./series_setitem_slice.py
+        > python ./series/series_setitem_slice.py
 
             0    5
             1    4
@@ -465,7 +465,7 @@ def sdc_pandas_series_setitem(self, idx, value):
             4    0
             dtype: int64
 
-        > python ./series_setitem_series.py
+        > python ./series/series_setitem_series.py
 
             0    5
             1    0
@@ -746,22 +746,22 @@ def hpat_pandas_series_iloc(self):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_iloc/series_iloc_value.py
+    .. literalinclude:: ../../../examples/series/series_iloc/series_iloc_value.py
        :language: python
        :lines: 27-
        :caption: With a scalar integer.
        :name: ex_series_iloc
 
-    .. command-output:: python ./series_iloc/series_iloc_value.py
+    .. command-output:: python ./series/series_iloc/series_iloc_value.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_iloc/series_iloc_slice.py
+    .. literalinclude:: ../../../examples/series/series_iloc/series_iloc_slice.py
        :language: python
        :lines: 33-
        :caption: With a slice object.
        :name: ex_series_iloc
 
-    .. command-output:: python ./series_iloc/series_iloc_slice.py
+    .. command-output:: python ./series/series_iloc/series_iloc_slice.py
        :cwd: ../../../examples
 
     .. seealso::
@@ -811,31 +811,31 @@ def hpat_pandas_series_loc(self):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_loc/series_loc_single_result.py
+    .. literalinclude:: ../../../examples/series/series_loc/series_loc_single_result.py
        :language: python
        :lines: 32-
        :caption: With a scalar integer. Returns single value.
        :name: ex_series_loc
 
-    .. command-output:: python ./series_loc/series_loc_single_result.py
+    .. command-output:: python ./series/series_loc/series_loc_single_result.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_loc/series_loc_multiple_result.py
+    .. literalinclude:: ../../../examples/series/series_loc/series_loc_multiple_result.py
        :language: python
        :lines: 34-
        :caption: With a scalar integer. Returns multiple value.
        :name: ex_series_loc
 
-    .. command-output:: python ./series_loc/series_loc_multiple_result.py
+    .. command-output:: python ./series/series_loc/series_loc_multiple_result.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_loc/series_loc_slice.py
+    .. literalinclude:: ../../../examples/series/series_loc/series_loc_slice.py
        :language: python
        :lines: 34-
        :caption: With a slice object. Returns multiple value.
        :name: ex_series_loc
 
-    .. command-output:: python ./series_loc/series_loc_slice.py
+    .. command-output:: python ./series/series_loc/series_loc_slice.py
        :cwd: ../../../examples
 
     .. seealso::
@@ -881,13 +881,13 @@ def hpat_pandas_series_iat(self):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_iat.py
+    .. literalinclude:: ../../../examples/series/series_iat.py
        :language: python
        :lines: 27-
        :caption: Get value at specified index position.
        :name: ex_series_iat
 
-    .. command-output:: python ./series_iat.py
+    .. command-output:: python ./series/series_iat.py
        :cwd: ../../../examples
 
     .. seealso::
@@ -930,22 +930,22 @@ def hpat_pandas_series_at(self):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_at/series_at_single_result.py
+    .. literalinclude:: ../../../examples/series/series_at/series_at_single_result.py
        :language: python
        :lines: 27-
        :caption: With a scalar integer. Returns single value.
        :name: ex_series_at
 
-    .. command-output:: python ./series_at/series_at_single_result.py
+    .. command-output:: python ./series/series_at/series_at_single_result.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_at/series_at_multiple_result.py
+    .. literalinclude:: ../../../examples/series/series_at/series_at_multiple_result.py
        :language: python
        :lines: 27-
        :caption: With a scalar integer. Returns multiple value.
        :name: ex_series_at
 
-    .. command-output:: python ./series_at/series_at_multiple_result.py
+    .. command-output:: python ./series/series_at/series_at_multiple_result.py
        :cwd: ../../../examples
 
     .. seealso::
@@ -1782,7 +1782,7 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
     # Return npytypes.Array from npytypes.Array for astype(types.functions.NumberClass), example - astype(np.int64)
     # Return npytypes.Array from npytypes.Array for astype(types.StringLiteral), example - astype('int64')
     def hpat_pandas_series_astype_numba_impl(self, dtype, copy=True, errors='raise'):
-        return pandas.Series(data=numpy_like.astype(self._data, dtype), index=self._index, name=self._name)
+        return pandas.Series(data=numpy_like.astype_no_inline(self._data, dtype), index=self._index, name=self._name)
 
     # Return self
     def hpat_pandas_series_astype_no_modify_impl(self, dtype, copy=True, errors='raise'):
