@@ -49,10 +49,8 @@ class TestDataFrameMethods(TestBase):
         test_name = 'DataFrame.{}'.format(name)
 
         data_num = len(data_gens) if data_gens is not None else data_num
-        default_data_gens = [gen_df] * data_num
-        data_gens = data_gens if data_gens is not None else default_data_gens
-        default_input_data = [None] * data_num
-        input_data = input_data if input_data is not None else default_input_data
+        data_gens = data_gens or [gen_df] * data_num
+        input_data = input_data or [None] * data_num
 
         for data_length in total_data_length:
             base = {
@@ -79,9 +77,9 @@ cases = [
     TC(name='std', size=[10 ** 7], check_skipna=True),
     TC(name='sum', size=[10 ** 7], check_skipna=True),
     TC(name='var', size=[10 ** 7], check_skipna=True),
-    TC(name='getitem_idx_bool_series', size=[10 ** 1], call_expr='df[idx]', usecase_params='df, idx',
+    TC(name='getitem_idx_bool_series', size=[10 ** 7], call_expr='df[idx]', usecase_params='df, idx',
        data_gens=(gen_df, partial(gen_series, dtype='bool'))),
-    TC(name='getitem_idx_bool_array', size=[10 ** 1], call_expr='df[idx]', usecase_params='df, idx',
+    TC(name='getitem_idx_bool_array', size=[10 ** 7], call_expr='df[idx]', usecase_params='df, idx',
        data_gens=(gen_df, partial(gen_arr_of_dtype, dtype='bool'))),
 ]
 

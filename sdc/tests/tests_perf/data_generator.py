@@ -49,7 +49,7 @@ def gen_arr_of_dtype(data_length, dtype='float', limits=None, nunique=1000, inpu
         return np.random.ranf(data_length)
     if dtype == 'int':
         default_limits = (np.iinfo(dtype).min, np.iinfo(dtype).max)
-        min_value, max_value = limits if limits is not None else default_limits
+        min_value, max_value = limits or default_limits
         return np.random.randint(min_value, max_value, data_length)
     if dtype == 'str':
         default_strings = gen_strlist(nunique)

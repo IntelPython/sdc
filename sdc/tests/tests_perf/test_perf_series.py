@@ -52,9 +52,9 @@ class TestSeriesMethods(TestBase):
 
         data_num = len(data_gens) if data_gens is not None else data_num
         default_data_gens = [gen_series] * data_num
-        data_gens = data_gens if data_gens is not None else default_data_gens
+        data_gens = data_gens or default_data_gens
         default_input_data = [np.asarray(test_global_input_data_float64).flatten()] + [None] * (data_num - 1)
-        input_data = input_data if input_data is not None else default_input_data
+        input_data = input_data or default_input_data
 
         for data_length in total_data_length:
             base = {
@@ -90,7 +90,13 @@ cases = [
     TC(name='fillna', size=[10 ** 7], params='-1'),
     TC(name='floordiv', size=[10 ** 7], params='other', data_num=2),
     TC(name='ge', size=[10 ** 7], params='other', data_num=2),
-    TC(name='getitem', size=[10 ** 7], call_expr='data[100000]', usecase_params='data'),
+    TC(name='getitem_idx_scalar', size=[10 ** 7], call_expr='data[100000]', usecase_params='data'),
+    TC(name='getitem_idx_bool_series', size=[10 ** 7], call_expr='A[B]', usecase_params='A, B',
+       data_gens=(gen_series, partial(gen_series, dtype='bool'))),
+    TC(name='getitem_idx_bool_array', size=[10 ** 7], call_expr='A[B]', usecase_params='A, B',
+       data_gens=(gen_series, partial(gen_arr_of_dtype, dtype='bool'))),
+    TC(name='getitem_idx_int_series', size=[10 ** 7], call_expr='A[B]', usecase_params='A, B',
+       data_gens=(gen_series, partial(gen_series, dtype='int', limits=(0, 10 ** 7)))),
     TC(name='gt',  size=[10 ** 7],params='other', data_num=2),
     TC(name='head', size=[10 ** 8]),
     TC(name='iat', size=[10 ** 7], call_expr='data.iat[100000]', usecase_params='data'),

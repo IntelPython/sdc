@@ -103,9 +103,9 @@ class TestSeriesRollingMethods(TestBase):
 
         data_num = len(data_gens) if data_gens is not None else data_num
         default_data_gens = [gen_series] * data_num
-        data_gens = data_gens if data_gens is not None else default_data_gens
+        data_gens = data_gens or default_data_gens
         default_input_data = [np.asarray(test_global_input_data_float64).flatten()] + [None] * (data_num - 1)
-        input_data = input_data if input_data is not None else default_input_data
+        input_data = input_data or default_input_data
 
         for data_length in total_data_length:
             base = {
