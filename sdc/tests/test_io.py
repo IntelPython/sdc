@@ -275,6 +275,8 @@ class TestCSV(TestIO):
                     self.fail(f"Unknown Pandas type: {type(pd_val)}")
 
     def _int_type(self):
+        # TODO: w/a for Numba issue with int typing rules infering intp for integers literals
+        # unlike NumPy which uses int32 by default - causes dtype mismatch on Windows 64 bit
         if platform.system() == 'Windows' and not IS_32BITS:
             return np.intp
         else:
@@ -302,8 +304,6 @@ class TestCSV(TestIO):
                 pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
 
     def pd_csv1(self, use_pyarrow=False):
-        # TODO: w/a for Numba issue with int typing rules infering intp for integers literals
-        # unlike NumPy which uses int32 by default - causes dtype mismatch on Windows 64 bit
         read_csv = self._read_csv(use_pyarrow)
         int_type = self._int_type()
 
