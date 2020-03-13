@@ -1480,9 +1480,10 @@ class TestSeries(
             S2 = pd.Series(np.ones(n - 1), name='B')
             pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
+    # SDC operator methods returns only float Series
     @skip_parallel
     def test_series_op5_integer_scalar(self):
-        arithmetic_methods = ('sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
+        arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
 
         for method in arithmetic_methods:
             test_impl = _make_func_use_method_arg1(method)
@@ -1497,7 +1498,7 @@ class TestSeries(
             pd.testing.assert_series_equal(
                 hpat_func(operand_series, operand_scalar),
                 test_impl(operand_series, operand_scalar),
-                check_names=False)
+                check_names=False, check_dtype=False)
 
     @skip_parallel
     def test_series_op5_float_scalar(self):
@@ -3495,9 +3496,6 @@ class TestSeries(
         pd.testing.assert_series_equal(hpat_func(S1, S2, S3),
                                        test_impl(S1, S2, S3))
 
-    # sdc.datatypes.common_functions.sdc_join_series_indexes work uncorrectly
-    # different indexes
-    @unittest.expectedFailure
     def sdc_join_series_indexes(self):
         def test_impl(S1, S2):
             return S1.add(S2)
@@ -3511,7 +3509,7 @@ class TestSeries(
         S2 = pd.Series(data, index2)
         pd.testing.assert_series_equal(sdc_func(S1, S2), test_impl(S1, S2))
 
-    @unittest.skip('SDC returns only float Series')
+    # SDC operator methods returns only float Series
     def test_series_add(self):
         def test_impl(S1, S2, value):
             return S1.add(S2, fill_value=value)
@@ -3521,15 +3519,13 @@ class TestSeries(
         cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
         cases_index = [[0, 1, 2, 3, 4], [3, 4, 3, 9, 2], None]
         cases_value = [None, 4, 5.5]
-        for data in cases_data:
-            for index in cases_index:
-                for value in cases_value:
-                    with self.subTest(data=data, index=index, value=value):
-                        S1 = pd.Series(data, index)
-                        S2 = pd.Series(index, data)
-                        pd.testing.assert_series_equal(sdc_func(S1, S2, value), test_impl(S1, S2, value))
+        for data, index, value in product(cases_data, cases_index, cases_value):
+            with self.subTest(data=data, index=index, value=value):
+                S1 = pd.Series(data, index)
+                S2 = pd.Series(index, data)
+                pd.testing.assert_series_equal(sdc_func(S1, S2, value), test_impl(S1, S2, value), check_dtype=False)
 
-    @unittest.skip('SDC returns only float Series')
+    # SDC operator methods returns only float Series
     def test_series_add_scalar(self):
         def test_impl(S1, S2, value):
             return S1.add(S2, fill_value=value)
@@ -3540,15 +3536,13 @@ class TestSeries(
         cases_index = [[0, 1, 2, 3, 4], [3, 4, 3, 9, 2], None]
         cases_scalar = [0, 1, 5.5, np.nan]
         cases_value = [None, 4, 5.5]
-        for data in cases_data:
-            for index in cases_index:
-                for scalar in cases_scalar:
-                    for value in cases_value:
-                        with self.subTest(data=data, index=index, scalar=scalar, value=value):
-                            S1 = pd.Series(data, index)
-                            pd.testing.assert_series_equal(sdc_func(S1, scalar, value), test_impl(S1, scalar, value))
+        for data, index, scalar, value in product(cases_data, cases_index, cases_scalar, cases_value):
+            with self.subTest(data=data, index=index, scalar=scalar, value=value):
+                S1 = pd.Series(data, index)
+                pd.testing.assert_series_equal(sdc_func(S1, scalar, value), test_impl(S1, scalar, value),
+                                               check_dtype=False)
 
-    def test_series_lt(self):
+    def test_series_lt_fill_value(self):
         def test_impl(S1, S2, value):
             return S1.lt(S2, fill_value=value)
 
@@ -3557,15 +3551,13 @@ class TestSeries(
         cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
         cases_index = [[3, 4, 3, 9, 2], None]
         cases_value = [None, 4, 5.5]
-        for data in cases_data:
-            for index in cases_index:
-                for value in cases_value:
-                    with self.subTest(data=data, index=index, value=value):
-                        S1 = pd.Series(data, index)
-                        S2 = pd.Series(data[::-1], index)
-                        pd.testing.assert_series_equal(sdc_func(S1, S2, value), test_impl(S1, S2, value))
+        for data, index, value in product(cases_data, cases_index, cases_value):
+            with self.subTest(data=data, index=index, value=value):
+                S1 = pd.Series(data, index)
+                S2 = pd.Series(data[::-1], index)
+                pd.testing.assert_series_equal(sdc_func(S1, S2, value), test_impl(S1, S2, value))
 
-    def test_series_lt_scalar(self):
+    def test_series_lt_scalar_fill_value(self):
         def test_impl(S1, S2, value):
             return S1.lt(S2, fill_value=value)
 
@@ -3575,13 +3567,10 @@ class TestSeries(
         cases_index = [[0, 1, 2, 3, 4], [3, 4, 3, 9, 2], None]
         cases_scalar = [0, 1, 5.5, np.nan]
         cases_value = [None, 4, 5.5]
-        for data in cases_data:
-            for index in cases_index:
-                for scalar in cases_scalar:
-                    for value in cases_value:
-                        with self.subTest(data=data, index=index, scalar=scalar, value=value):
-                            S1 = pd.Series(data, index)
-                            pd.testing.assert_series_equal(sdc_func(S1, scalar, value), test_impl(S1, scalar, value))
+        for data, index, scalar, value in product(cases_data, cases_index, cases_scalar, cases_value):
+            with self.subTest(data=data, index=index, scalar=scalar, value=value):
+                S1 = pd.Series(data, index)
+                pd.testing.assert_series_equal(sdc_func(S1, scalar, value), test_impl(S1, scalar, value))
 
     def test_series_isin_list1(self):
         def test_impl(S, values):

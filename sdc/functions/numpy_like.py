@@ -531,7 +531,7 @@ def sdc_fillna_overload(self, inplace=False, value=None):
 
         def sdc_fillna_inplace_float_impl(self, inplace=False, value=None):
             length = len(self)
-            for i in range(length):
+            for i in prange(length):
                 if isnan(self[i]):
                     self[i] = value
             return None
