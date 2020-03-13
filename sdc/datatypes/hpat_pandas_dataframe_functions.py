@@ -1621,7 +1621,7 @@ def df_getitem_slice_iloc_codegen(self, idx):
     for i, c in enumerate(self.columns):
         result_c = f"result_{i}"
         func_lines += [f"  data_{i} = pandas.Series(get_dataframe_data(self._dataframe, {i}))",
-                        f"  {result_c} = data_{i}.iloc[idx]"]
+                       f"  {result_c} = data_{i}.iloc[idx]"]
         results.append((c, result_c))
     data = ', '.join(f'"{col}": {data}' for col, data in results)
     func_lines += [f"  return pandas.DataFrame(data={{{data}}}, index={index})"]
@@ -1668,12 +1668,12 @@ def df_getitem_list_iloc_codegen(self, idx):
     for i, c in enumerate(self.columns):
         result_c = f"result_{i}"
         func_lines += [f"    data_{i} = pandas.Series(get_dataframe_data(self._dataframe, {i}))",
-                        f"    {result_c} = data_{i}.iloc[numpy.array(idx)]"]
+                       f"    {result_c} = data_{i}.iloc[numpy.array(idx)]"]
         results.append((c, result_c))
     data = ', '.join(f'"{col}": {data}' for col, data in results)
     func_lines += [f"    return pandas.DataFrame(data={{{data}}}, index={index})",
-                    f"  else:",
-                    f"    raise ValueError('Index is out of bounds for axis')"]
+                   f"  else:",
+                   f"    raise ValueError('Index is out of bounds for axis')"]
 
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas, 'numpy': numpy,
@@ -1706,7 +1706,7 @@ def df_getitem_list_bool_iloc_codegen(self, idx):
     for i, c in enumerate(self.columns):
         result_c = f"result_{i}"
         func_lines += [f"    data_{i} = get_dataframe_data(self._dataframe, {i})",
-                        f"    {result_c} = pandas.Series(data_{i}[numpy.array(idx)])"]
+                       f"    {result_c} = pandas.Series(data_{i}[numpy.array(idx)])"]
         results.append((c, result_c))
     data = ', '.join(f'"{col}": {data}' for col, data in results)
     func_lines += [f"    return pandas.DataFrame(data={{{data}}}, index={index})",
