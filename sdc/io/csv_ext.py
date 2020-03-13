@@ -572,7 +572,7 @@ def _gen_csv_reader_py_pyarrow(col_names, col_typs, usecols, sep, typingctx, tar
 def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, usecols, sep, skiprows, signature=None):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs) if t.dtype == types.NPDatetime('ns'))
-    typ_strs = ", ".join(["{}='{}'".format(to_varname(cname), _get_dtype_str(t))
+    nb_objmode_vars = ", ".join(["{}='{}'".format(to_varname(cname), _get_dtype_str(t))
                           for cname, t in zip(col_names, col_typs)])
     pd_dtype_strs = ", ".join(["'{}':{}".format(cname, _get_pd_dtype_str(t)) for cname, t in zip(col_names, col_typs)])
 
