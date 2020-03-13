@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -1387,6 +1387,20 @@ class TestRolling(TestCase):
             series = pd.Series(main_data)
             other = pd.Series(other_data)
             self._test_rolling_cov(series, other)
+
+    @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
+    def test_series_rolling_cov_diff_length(self):
+        def test_impl(series, window, other):
+            return series.rolling(window).cov(other)
+
+        hpat_func = self.jit(test_impl)
+
+        series = pd.Series([1., -1., 0., 0.1, -0.1])
+        other = pd.Series(gen_frand_array(40))
+        window = 5
+        jit_result = hpat_func(series, window, other)
+        ref_result = test_impl(series, window, other)
+        pd.testing.assert_series_equal(jit_result, ref_result)
 
     @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
     def test_series_rolling_cov_no_other(self):

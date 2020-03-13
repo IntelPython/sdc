@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -49,6 +49,7 @@ from sdc.str_arr_ext import StringArrayType
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.datatypes.hpat_pandas_dataframe_getitem_types import DataFrameGetitemAccessorType
+from sdc.datatypes.common_functions import SDCLimitation
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
@@ -1250,32 +1251,29 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
     return sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns)
 
 
-def df_length_codelines(self):
-    """Generate code lines to get length of DF"""
+def df_length_expr(self):
+    """Generate expression to get length of DF"""
     if self.columns:
-        return ['  length = len(get_dataframe_data(self, 0))']
+        return 'len(get_dataframe_data(self, 0))'
 
-    return ['  length = 0']
+    return '0'
 
 
-def df_index_codelines(self, with_length=False):
-    """Generate code lines to get or create index of DF"""
-    func_lines = []
+def df_index_expr(self, length_expr=None):
+    """Generate expression to get or create index of DF"""
     if isinstance(self.index, types.NoneType):
-        if with_length:
-            func_lines += df_length_codelines(self)
+        if length_expr is None:
+            length_expr = df_length_expr(self)
 
-        func_lines += ['  res_index = numpy.arange(length)']
-    else:
-        func_lines += ['  res_index = self._index']
+        return f'numpy.arange({length_expr})'
 
-    return func_lines
+    return 'self._index'
 
 
 def df_getitem_slice_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem with idx of slice"""
     results = []
-    func_lines = df_index_codelines(self, with_length=True)
+    func_lines = [f'  res_index = {df_index_expr(self)}']
     for i, col in enumerate(self.columns):
         res_data = f'res_data_{i}'
         func_lines += [
@@ -1293,7 +1291,7 @@ def df_getitem_slice_idx_main_codelines(self, idx):
 def df_getitem_tuple_idx_main_codelines(self, literal_idx):
     """Generate main code lines for df.getitem with idx of tuple"""
     results = []
-    func_lines = df_index_codelines(self, with_length=True)
+    func_lines = [f'  res_index = {df_index_expr(self)}']
     needed_cols = {col: i for i, col in enumerate(self.columns) if col in literal_idx}
     for col, i in needed_cols.items():
         res_data = f'res_data_{i}'
@@ -1311,9 +1309,9 @@ def df_getitem_tuple_idx_main_codelines(self, literal_idx):
 
 def df_getitem_bool_series_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem"""
-    func_lines = df_length_codelines(self)
-    func_lines += ['  _idx_data = idx._data[:length]']
-    func_lines += df_index_codelines(self)
+    func_lines = [f'  length = {df_length_expr(self)}',
+                  f'  _idx_data = idx._data[:length]',
+                  f'  res_index = {df_index_expr(self, length_expr="length")}']
 
     results = []
     for i, col in enumerate(self.columns):
@@ -1333,10 +1331,10 @@ def df_getitem_bool_series_idx_main_codelines(self, idx):
 
 def df_getitem_bool_array_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem"""
-    func_lines = df_length_codelines(self)
-    func_lines += ['  if length != len(idx):',
-                   '    raise ValueError("Item wrong length.")']
-    func_lines += df_index_codelines(self)
+    func_lines = [f'  length = {df_length_expr(self)}',
+                  f'  if length != len(idx):',
+                  f'    raise ValueError("Item wrong length.")',
+                  f'  res_index = {df_index_expr(self, length_expr="length")}']
 
     results = []
     for i, col in enumerate(self.columns):
@@ -1925,3 +1923,113 @@ def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=Tru
         return init_dataframe_groupby(self, column_id, grouped, sort)
 
     return sdc_pandas_dataframe_groupby_impl
+
+
+def df_add_column_codelines(self, key):
+    """Generate code lines for DF add_column"""
+    func_lines = []
+    if self.columns:
+        func_lines += [
+            f'  length = {df_length_expr(self)}',
+            f'  if length == 0:',
+            f'    raise SDCLimitation("Could not set item for DataFrame with empty columns")',
+            f'  elif length != len(value):',
+            f'    raise ValueError("Length of values does not match length of index")',
+        ]
+    else:
+        func_lines += ['  length = len(value)']
+    func_lines += [f'  res_index = {df_index_expr(self, length_expr="length")}']
+
+    results = []
+    for i, col in enumerate(self.columns):
+        res_data = f'res_data_{i}'
+        func_lines += [
+            f'  data_{i} = get_dataframe_data(self, {i})',
+            f'  {res_data} = pandas.Series(data_{i}, index=res_index, name="{col}")',
+        ]
+        results.append((col, res_data))
+
+    res_data = 'new_res_data'
+    literal_key = key.literal_value
+    func_lines += [f'  {res_data} = pandas.Series(value, index=res_index, name="{literal_key}")']
+    results.append((literal_key, res_data))
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index)']
+
+    return func_lines
+
+
+def df_add_column_codegen(self, key):
+    """
+    Example of generated implementation:
+    def _df_add_column_impl(self, key, value):
+      length = len(get_dataframe_data(self, 0))
+      if length == 0:
+        raise SDCLimitation("Could not set item for empty DataFrame")
+      elif length != len(value):
+        raise ValueError("Length of values does not match length of index")
+      res_index = numpy.arange(length)
+      data_0 = get_dataframe_data(self, 0)
+      res_data_0 = pandas.Series(data_0, index=res_index, name="A")
+      data_1 = get_dataframe_data(self, 1)
+      res_data_1 = pandas.Series(data_1, index=res_index, name="C")
+      new_res_data = pandas.Series(value, index=res_index, name="B")
+      return pandas.DataFrame({"A": res_data_0, "C": res_data_1, "B": new_res_data}, index=res_index)
+    """
+    func_lines = [f'def _df_add_column_impl(self, key, value):']
+    func_lines += df_add_column_codelines(self, key)
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data,
+                   'SDCLimitation': SDCLimitation}
+
+    return func_text, global_vars
+
+
+def gen_df_add_column_impl(self, key):
+    func_text, global_vars = df_add_column_codegen(self, key)
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _impl = loc_vars['_df_add_column_impl']
+
+    return _impl
+
+
+@sdc_overload_method(DataFrameType, '_set_column')
+def df_set_column_overload(self, key, value):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Limitations
+    -----------
+    - Supported setting a columns in a non-empty DataFrame as a 1D array only.
+    - Unsupported change of the Parent DataFrame, returned new DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_add_column
+    """
+    if not isinstance(self, DataFrameType):
+        return None
+
+    if isinstance(key, types.StringLiteral):
+        try:
+            self.columns.index(key.literal_value)
+        except ValueError:
+            return gen_df_add_column_impl(self, key)
+
+    if isinstance(key, types.UnicodeType):
+        def _df_set_column_unicode_key_impl(self, key, value):
+            # http://numba.pydata.org/numba-doc/dev/developer/literal.html#specifying-for-literal-typing
+            # literally raises special exception to call df._set_column with literal idx value got from unicode
+            return literally(key)
+
+        return _df_set_column_unicode_key_impl
+
+    ty_checker = TypeChecker('Method _set_column().')
+    ty_checker.raise_exc(key, 'str', 'key')
