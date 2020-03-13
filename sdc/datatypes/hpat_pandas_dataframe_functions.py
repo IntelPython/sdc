@@ -917,7 +917,7 @@ def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min
     --------
     .. literalinclude:: ../../../examples/dataframe/dataframe_prod.py
        :language: python
-       :lines: 36-
+       :lines: 35-
        :caption: Return the product of the values for the requested axis.
        :name: ex_dataframe_prod
 
