@@ -299,7 +299,6 @@ class TestCSV(TestIO):
 
         for fname in ["csv_data1.csv", "csv_data2.csv"]:
             with self.subTest(fname=fname):
-                print(pyfunc(fname))
                 pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
 
     def pd_csv1(self, use_pyarrow=False):
