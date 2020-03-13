@@ -579,12 +579,15 @@ def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, usecols, sep,
     if signature is None:
         signature = "filepath_or_buffer"
     func_text = "def csv_reader_py({}):\n".format(signature)
-    func_text += "  with objmode({}):\n".format(typ_strs)
-    func_text += "    df = pandas_read_csv(filepath_or_buffer, names={},\n".format(col_names)
-    func_text += "       parse_dates=[{}],\n".format(date_inds)
-    func_text += "       dtype={{{}}},\n".format(pd_dtype_strs)
-    func_text += "       skiprows={},\n".format(skiprows)
-    func_text += "       usecols={}, sep='{}')\n".format(usecols, sep)
+    func_text += "  with objmode({}):\n".format(nb_objmode_vars)
+    func_text += "    df = pandas_read_csv(filepath_or_buffer,\n"
+    func_text += "        names={},\n".format(col_names)
+    func_text += "        parse_dates=[{}],\n".format(date_inds)
+    func_text += "        dtype={{{}}},\n".format(pd_dtype_strs)
+    func_text += "        skiprows={},\n".format(skiprows)
+    func_text += "        usecols={},\n".format(usecols)
+    func_text += "        sep='{}',\n".format(sep)
+    func_text += "    )\n"
     for cname in col_names:
         func_text += "    {} = df['{}'].values\n".format(to_varname(cname), cname)
         # func_text += "    print({})\n".format(cname)
