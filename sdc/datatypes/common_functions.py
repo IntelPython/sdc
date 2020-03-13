@@ -663,12 +663,11 @@ def sdc_reindex_series_overload(arr, index, name, by_index):
     data_is_str_arr = isinstance(arr.dtype, types.UnicodeType)
 
     def sdc_reindex_series_impl(arr, index, name, by_index):
-        res_index = by_index.copy()
         if data_is_str_arr == True:  # noqa
-            res_data_as_list = [''] * len(by_index)
+            _res_data = [''] * len(by_index)
             res_data_nan_mask = numpy.zeros(len(by_index), dtype=types.bool_)
         else:
-            res_data = numpy.empty(len(by_index), dtype=data_dtype)
+            _res_data = numpy.empty(len(by_index), dtype=data_dtype)
 
         # build a dict of self.index values to their positions:
         map_index_to_position = Dict.empty(
@@ -686,7 +685,7 @@ def sdc_reindex_series_overload(arr, index, name, by_index):
         for i in numba.prange(len(by_index)):
             if by_index[i] in map_index_to_position:
                 pos_in_self = map_index_to_position[by_index[i]]
-                res_data[i] = arr[pos_in_self]
+                _res_data[i] = arr[pos_in_self]
                 if data_is_str_arr == True:  # noqa
                     res_data_nan_mask[i] = isna(arr, i)
             else:
@@ -697,10 +696,12 @@ def sdc_reindex_series_overload(arr, index, name, by_index):
             raise IndexingError(msg)
 
         if data_is_str_arr == True:  # noqa
-            res_data = create_str_arr_from_list(res_data_as_list)
+            res_data = create_str_arr_from_list(_res_data)
             str_arr_set_na_by_mask(res_data, res_data_nan_mask)
+        else:
+            res_data = _res_data
 
-        return pandas.Series(data=res_data, index=res_index, name=name)
+        return pandas.Series(data=res_data, index=by_index, name=name)
 
     return sdc_reindex_series_impl
 

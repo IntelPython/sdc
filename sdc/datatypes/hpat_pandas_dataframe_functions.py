@@ -1314,15 +1314,14 @@ def df_getitem_bool_series_idx_main_codelines(self, idx):
 
     # optimization for default indexes in df and idx when index alignment is trivial
     if (isinstance(self.index, types.NoneType) and isinstance(idx.index, types.NoneType)):
-        func_lines = ['  lenght = {df_length_expr(self)}']
-        func_lines += ['  if length > len(idx):']
-        func_lines += ['    msg = "Unalignable boolean Series provided as indexer " + \\']
-        func_lines += ['          "(index of the boolean Series and of the indexed object do not match)."']
-        func_lines += ['    raise IndexingError(msg)']
-        func_lines += ['  # do not trim idx._data to length as getitem_by_mask handles such case']
-        func_lines += ['  res_index = getitem_by_mask(self.index, idx._data)']
-
-        func_lines += ['  # df index is default, same as positions so it can be used in take']
+        func_lines = [f'  length = {df_length_expr(self)}',
+                      f'  if length > len(idx):',
+                      f'    msg = "Unalignable boolean Series provided as indexer " + \\',
+                      f'          "(index of the boolean Series and of the indexed object do not match)."',
+                      f'    raise IndexingError(msg)',
+                      f'  # do not trim idx._data to length as getitem_by_mask handles such case',
+                      f'  res_index = getitem_by_mask(self.index, idx._data)',
+                      f'  # df index is default, same as positions so it can be used in take']
         results = []
         for i, col in enumerate(self.columns):
             res_data = f'res_data_{i}'
@@ -1337,11 +1336,11 @@ def df_getitem_bool_series_idx_main_codelines(self, idx):
             f'  return pandas.DataFrame({{{data}}}, index=res_index)'
         ]
     else:
-        func_lines = ['  lenght = {df_length_expr(self)}']
-        func_lines += ['  self_index = self.index']
-        func_lines += ['  idx_reindexed = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)']
-        func_lines += ['  res_index = getitem_by_mask(self_index, idx_reindexed._data)']
-        func_lines += ['  selected_pos = getitem_by_mask(numpy.arange(length), idx_reindexed._data)']
+        func_lines = [f'  length = {df_length_expr(self)}',
+                      f'  self_index = self.index',
+                      f'  idx_reindexed = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)',
+                      f'  res_index = getitem_by_mask(self_index, idx_reindexed._data)',
+                      f'  selected_pos = getitem_by_mask(numpy.arange(length), idx_reindexed._data)']
 
         results = []
         for i, col in enumerate(self.columns):
@@ -1362,10 +1361,10 @@ def df_getitem_bool_series_idx_main_codelines(self, idx):
 
 def df_getitem_bool_array_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem"""
-    func_lines = ['  lenght = {df_length_expr(self)}']
-    func_lines += ['  if length != len(idx):',
-                   '    raise ValueError("Item wrong length.")']
-    func_lines += ['  res_index = getitem_by_mask(self.index, idx)']
+    func_lines = [f'  length = {df_length_expr(self)}',
+                  f'  if length != len(idx):',
+                  f'    raise ValueError("Item wrong length.")',
+                  f'  res_index = getitem_by_mask(self.index, idx)']
     results = []
     for i, col in enumerate(self.columns):
         res_data = f'res_data_{i}'
@@ -1495,13 +1494,13 @@ def df_getitem_bool_array_idx_codegen(self, idx):
     return func_text, global_vars
 
 
-gen_df_getitem_slice_idx_impl = gen_df_impl_generator(
+gen_df_getitem_slice_idx_impl = gen_impl_generator(
     df_getitem_slice_idx_codegen, '_df_getitem_slice_idx_impl')
-gen_df_getitem_tuple_idx_impl = gen_df_impl_generator(
+gen_df_getitem_tuple_idx_impl = gen_impl_generator(
     df_getitem_tuple_idx_codegen, '_df_getitem_tuple_idx_impl')
-gen_df_getitem_bool_series_idx_impl = gen_df_impl_generator(
+gen_df_getitem_bool_series_idx_impl = gen_impl_generator(
     df_getitem_bool_series_idx_codegen, '_df_getitem_bool_series_idx_impl')
-gen_df_getitem_bool_array_idx_impl = gen_df_impl_generator(
+gen_df_getitem_bool_array_idx_impl = gen_impl_generator(
     df_getitem_bool_array_idx_codegen, '_df_getitem_bool_array_idx_impl')
 
 

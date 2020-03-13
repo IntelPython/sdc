@@ -47,8 +47,8 @@ from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
                                  max_dtype_float_val)
-from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size, str_arr_is_na,
-    string_array_type, create_str_arr_from_list, str_arr_set_na_by_mask)
+from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size,
+                             string_array_type, create_str_arr_from_list, str_arr_set_na_by_mask)
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 from sdc.utilities.prange_utils import parallel_chunks
 
