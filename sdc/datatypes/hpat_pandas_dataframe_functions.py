@@ -1535,32 +1535,34 @@ def df_getitem_tuple_iat_codegen(self, row, col):
     """
     Example of generated implementation:
         def _df_getitem_tuple_iat_impl(self, idx):
+            row, _ = idx
             data = get_dataframe_data(self._dataframe, 1)
             res_data = pandas.Series(data)
-            return res_data.iat[idx[0]]
+            return res_data.iat[row]
     """
-    func_lines = ['def _df_getitem_tuple_iat_impl(self, idx):']
-    if self.columns:
+    func_lines = ['def _df_getitem_tuple_iat_impl(self, idx):',
+                  '  row, _ = idx']
+    if col in range(len(self.columns)):
         func_lines += [
             f"  data = get_dataframe_data(self._dataframe, {col})",
             f"  res_data = pandas.Series(data)",
-            f"  return res_data.iat[idx[0]]",
+            f"  return res_data.iat[row]",
         ]
+    else:
+        func_lines += ["  raise ValueError('Index is out of bounds for axis')"]
 
     func_text = '\n'.join(func_lines)
-
-    global_vars = {'pandas': pandas, 'numpy': numpy,
+    global_vars = {'pandas': pandas,
                    'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
 
 
-def gen_df_getitem_iat_impl(self, row, col):
-    df_func_name = f'_df_getitem_tuple_iat_impl'
+def gen_df_getitem_tuple_iat_impl(self, row, col):
     func_text, global_vars = df_getitem_tuple_iat_codegen(self, row, col)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _reduce_impl = loc_vars[df_func_name]
+    _reduce_impl = loc_vars['_df_getitem_tuple_iat_impl']
 
     return _reduce_impl
 
@@ -1569,31 +1571,32 @@ def df_getitem_int_iloc_codegen(self, idx):
     """
     Example of generated implementation:
         def _df_getitem_int_iloc_impl(self, idx):
-            data_A = pandas.Series(get_dataframe_data(self._dataframe, 0))
-            result_A = data_A.iat[idx]
-            data_B = pandas.Series(get_dataframe_data(self._dataframe, 1))
-            result_B = data_B.iat[idx]
-            data_C = pandas.Series(get_dataframe_data(self._dataframe, 2))
-            result_C = data_C.iat[idx]
-            return pandas.Series(data=[result_A, result_B, result_C], index=['A', 'B', 'C'],
-                name=str(self._dataframe._index[idx]))
+            if idx in range(len(self._dataframe._columns)):
+                data_0 = pandas.Series(get_dataframe_data(self._dataframe, 0))
+                result_0 = data_0.iat[idx]
+                data_1 = pandas.Series(get_dataframe_data(self._dataframe, 1))
+                result_1 = data_1.iat[idx]
+                return pandas.Series(data=[result_0, result_1], index=['A', 'B'], name=str(idx))
+            else:
+                raise ValueError('Index is out of bounds for axis')
     """
-    func_lines = ['def _df_getitem_int_iloc_impl(self, idx):']
+    func_lines = ['def _df_getitem_int_iloc_impl(self, idx):',
+                  '  if idx in range(len(self._dataframe._columns)):']
     results = []
-    if self.columns:
-        index = []
-        name = df_name_codegen_iloc(self)
-        for i, c in enumerate(self.columns):
-            result_c = f"result_{c}"
-            func_lines += [f"  data_{c} = pandas.Series(get_dataframe_data(self._dataframe, {i}))",
-                           f"  {result_c} = data_{c}.iat[idx]"]
-            results.append(result_c)
-            index.append(c)
-        data = ', '.join(col for col in results)
-        func_lines += [f"  return pandas.Series(data=[{data}], index={index}, name=str({name}))"]
+    index = []
+    name = df_name_codegen_iloc(self)
+    for i, c in enumerate(self.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"    data_{i} = pandas.Series(get_dataframe_data(self._dataframe, {i}))",
+                       f"    {result_c} = data_{i}.iat[idx]"]
+        results.append(result_c)
+        index.append(c)
+    data = ', '.join(col for col in results)
+    func_lines += [f"    return pandas.Series(data=[{data}], index={index}, name=str({name}))",
+                   f"  else:",
+                   f"    raise ValueError('Index is out of bounds for axis')"]
 
     func_text = '\n'.join(func_lines)
-
     global_vars = {'pandas': pandas, 'numpy': numpy,
                    'get_dataframe_data': get_dataframe_data}
 
@@ -1604,30 +1607,28 @@ def df_getitem_slice_iloc_codegen(self, idx):
     """
     Example of generated implementation:
         def _df_getitem_slice_iloc_impl(self, idx):
-            data_A = pandas.Series(get_dataframe_data(self._dataframe, 0))
-            result_A = data_A.iloc[idx]
-            data_B = pandas.Series(get_dataframe_data(self._dataframe, 1))
-            result_B = data_B.iloc[idx]
-            data_C = pandas.Series(get_dataframe_data(self._dataframe, 2))
-            result_C = data_C.iloc[idx]
-            return pandas.DataFrame(data={"A": result_A, "B": result_B, "C": result_C},
+            data_0 = pandas.Series(get_dataframe_data(self._dataframe, 0))
+            result_0 = data_0.iloc[idx]
+            data_1 = pandas.Series(get_dataframe_data(self._dataframe, 1))
+            result_1 = data_1.iloc[idx]
+            return pandas.DataFrame(data={"A": result_0, "B": result_1},
                 index=numpy.arange(len(get_dataframe_data(self._dataframe, 0)))[idx])
     """
     func_lines = ['def _df_getitem_slice_iloc_impl(self, idx):']
     results = []
-    if self.columns:
-        index = df_index_codegen_iloc(self)
-        name = df_name_codegen_iloc(self)
-        for i, c in enumerate(self.columns):
-            result_c = f"result_{c}"
-            func_lines += [f"  data_{c} = pandas.Series(get_dataframe_data(self._dataframe, {i}))",
-                           f"  {result_c} = data_{c}.iloc[idx]"]
-            results.append((self.columns[i], result_c))
-        data = ', '.join(f'"{col}": {data}' for col, data in results)
-        func_lines += [f"  return pandas.DataFrame(data={{{data}}}, index={index})"]
+    index = 'self._dataframe._index[idx]'
+    if isinstance(self.index, types.NoneType):
+        index = 'numpy.arange(len(get_dataframe_data(self._dataframe, 0)))[idx]'
+    name = df_name_codegen_iloc(self)
+    for i, c in enumerate(self.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"  data_{i} = pandas.Series(get_dataframe_data(self._dataframe, {i}))",
+                        f"  {result_c} = data_{i}.iloc[idx]"]
+        results.append((c, result_c))
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f"  return pandas.DataFrame(data={{{data}}}, index={index})"]
 
     func_text = '\n'.join(func_lines)
-
     global_vars = {'pandas': pandas, 'numpy': numpy,
                    'get_dataframe_data': get_dataframe_data}
 
@@ -1638,48 +1639,87 @@ def df_getitem_list_iloc_codegen(self, idx):
     """
     Example of generated implementation:
         def _df_getitem_list_iloc_impl(self, idx):
-            data_A = pandas.Series(get_dataframe_data(self._dataframe, 0))
-            result_A = data_A.iloc[numpy.array(idx)]
-            data_B = pandas.Series(get_dataframe_data(self._dataframe, 1))
-            result_B = data_B.iloc[numpy.array(idx)]
-            data_C = pandas.Series(get_dataframe_data(self._dataframe, 2))
-            result_C = data_C.iloc[numpy.array(idx)]
-            return pandas.DataFrame(data={"A": result_A, "B": result_B, "C": result_C},
-                index=[self._dataframe._index[i] for i in idx])
+            check_idx = True
+            for i in idx:
+                if i in range(len(self._dataframe._columns)):
+                    pass
+                else:
+                    check_idx = False
+            if check_idx == True:
+                data_0 = pandas.Series(get_dataframe_data(self._dataframe, 0))
+                result_0 = data_0.iloc[numpy.array(idx)]
+                data_1 = pandas.Series(get_dataframe_data(self._dataframe, 1))
+                result_1 = data_1.iloc[numpy.array(idx)]
+                return pandas.DataFrame(data={"A": result_0, "B": result_1}, index=idx)
+            else:
+                raise ValueError('Index is out of bounds for axis')
     """
-    func_lines = ['def _df_getitem_list_iloc_impl(self, idx):']
+    func_lines = ['def _df_getitem_list_iloc_impl(self, idx):',
+                  '  check_idx = True',
+                  '  for i in idx:',
+                  '    if i in range(len(self._dataframe._columns)):',
+                  '      pass',
+                  '    else:',
+                  '      check_idx = False',
+                  '  if check_idx == True:']
     results = []
-    if self.columns:
-        index = df_index_list_codegen_iloc(self)
-        name = df_name_codegen_iloc(self)
-        for i, c in enumerate(self.columns):
-            result_c = f"result_{c}"
-            func_lines += [f"  data_{c} = pandas.Series(get_dataframe_data(self._dataframe, {i}))",
-                           f"  {result_c} = data_{c}.iloc[numpy.array(idx)]"]
-            results.append((self.columns[i], result_c))
-        data = ', '.join(f'"{col}": {data}' for col, data in results)
-        func_lines += [f"  return pandas.DataFrame(data={{{data}}}, index={index})"]
+    index = '[self._dataframe._index[i] for i in idx]'
+    if isinstance(self.index, types.NoneType):
+        index = 'idx'
+    name = df_name_codegen_iloc(self)
+    for i, c in enumerate(self.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"    data_{i} = pandas.Series(get_dataframe_data(self._dataframe, {i}))",
+                        f"    {result_c} = data_{i}.iloc[numpy.array(idx)]"]
+        results.append((c, result_c))
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f"    return pandas.DataFrame(data={{{data}}}, index={index})",
+                    f"  else:",
+                    f"    raise ValueError('Index is out of bounds for axis')"]
 
     func_text = '\n'.join(func_lines)
-
     global_vars = {'pandas': pandas, 'numpy': numpy,
                    'get_dataframe_data': get_dataframe_data}
 
     return func_text, global_vars
 
 
-def df_index_list_codegen_iloc(self):
+def df_getitem_list_bool_iloc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_list_bool_iloc_impl(self, idx):
+            if len(self._dataframe.index) == len(idx):
+                data_0 = get_dataframe_data(self._dataframe, 0)
+                result_0 = pandas.Series(data_0[numpy.array(idx)])
+                data_1 = get_dataframe_data(self._dataframe, 1)
+                result_1 = pandas.Series(data_1[numpy.array(idx)])
+                return pandas.DataFrame(data={"A": result_0, "B": result_1},
+                    index=numpy.arange(len(get_dataframe_data(self._dataframe, 0)))[numpy.array(idx)])
+            else:
+                raise ValueError('Item wrong length')
+    """
+    func_lines = ['def _df_getitem_list_bool_iloc_impl(self, idx):']
+    results = []
+    index = 'self._dataframe._index[numpy.array(idx)]'
     if isinstance(self.index, types.NoneType):
-        return 'idx'
+        index = 'numpy.arange(len(get_dataframe_data(self._dataframe, 0)))[numpy.array(idx)]'
+    func_lines += ['  if len(self._dataframe.index) == len(idx):']
+    name = df_name_codegen_iloc(self)
+    for i, c in enumerate(self.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"    data_{i} = get_dataframe_data(self._dataframe, {i})",
+                        f"    {result_c} = pandas.Series(data_{i}[numpy.array(idx)])"]
+        results.append((c, result_c))
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f"    return pandas.DataFrame(data={{{data}}}, index={index})",
+                   f"  else:",
+                   f"    raise ValueError('Item wrong length')"]
 
-    return '[self._dataframe._index[i] for i in idx]'
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
 
-
-def df_index_codegen_iloc(self):
-    if isinstance(self.index, types.NoneType):
-        return 'numpy.arange(len(get_dataframe_data(self._dataframe, 0)))[idx]'
-
-    return 'self._dataframe._index[idx]'
+    return func_text, global_vars
 
 
 def df_name_codegen_iloc(self):
@@ -1698,6 +1738,9 @@ gen_df_getitem_iloc_slice_impl = gen_df_impl_generator(
 gen_df_getitem_iloc_list_impl = gen_df_impl_generator(
     df_getitem_list_iloc_codegen, '_df_getitem_list_iloc_impl')
 
+gen_df_getitem_iloc_list_bool_impl = gen_df_impl_generator(
+    df_getitem_list_bool_iloc_codegen, '_df_getitem_list_bool_iloc_impl')
+
 
 @sdc_overload(operator.getitem)
 def sdc_pandas_dataframe_accessor_getitem(self, idx):
@@ -1712,6 +1755,12 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
         if isinstance(idx, types.SliceType):
             return gen_df_getitem_iloc_slice_impl(self.dataframe, idx)
 
+        if (
+            isinstance(idx, (types.List, types.Array)) and
+            isinstance(idx.dtype, (types.Boolean, bool))
+        ):
+            return gen_df_getitem_iloc_list_bool_impl(self.dataframe, idx)
+
         if isinstance(idx, types.List):
             return gen_df_getitem_iloc_list_impl(self.dataframe, idx)
 
@@ -1721,7 +1770,7 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
         if isinstance(idx, (types.Tuple, types.UniTuple)):
             row = idx[0]
             col = idx[1].literal_value
-            return gen_df_getitem_iat_impl(self.dataframe, row, col)
+            return gen_df_getitem_tuple_iat_impl(self.dataframe, row, col)
 
 
 @sdc_overload_attribute(DataFrameType, 'iloc')
@@ -1734,18 +1783,20 @@ def sdc_pandas_dataframe_iloc(self):
 
     Limitations
     -----------
-    - Parameter 'name' in new DF can be str only
-    - Col can be only literal value, in DF.iloc[idx] with [row, col] values
+    - Parameter 'name' in new DataFrame can be String only
+    - Column can be literal value only, in DataFrame.iloc[row, column]
+    - Iloc works with basic cases only: an integer, a list or array of integers,
+        a slice object with ints, a boolean array
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/dataframe_iloc.py
+    .. literalinclude:: ../../../examples/dataframe/dataframe_iloc.py
        :language: python
        :lines: 27-
        :caption: Get value at specified index position.
        :name: ex_dataframe_iloc
 
-    .. command-output:: python ./dataframe_iloc.py
+    .. command-output:: python ./dataframe/dataframe_iloc.py
        :cwd: ../../../examples
 
     .. seealso::
