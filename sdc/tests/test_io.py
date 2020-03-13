@@ -286,6 +286,22 @@ class TestCSV(TestIO):
     def _read_csv(self, use_pyarrow=False):
         return pd_read_csv if use_pyarrow else pd.read_csv
 
+    def test_csv_infer_params_default(self):
+        read_csv = self._read_csv()
+        int_type = self._int_type()
+
+        def pyfunc(fname):
+            names = ['A', 'B', 'C', 'D']
+            dtype = {'A': int_type, 'B': np.float, 'C': np.float, 'D': str}
+            return read_csv(fname, names=names, dtype=dtype)
+
+        cfunc = self.jit(pyfunc)
+
+        for fname in ["csv_data1.csv", "csv_data2.csv"]:
+            with self.subTest(fname=fname):
+                print(pyfunc(fname))
+                pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
+
     def pd_csv1(self, use_pyarrow=False):
         # TODO: w/a for Numba issue with int typing rules infering intp for integers literals
         # unlike NumPy which uses int32 by default - causes dtype mismatch on Windows 64 bit
