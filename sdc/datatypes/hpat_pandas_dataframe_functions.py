@@ -975,9 +975,9 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
         :ref:`DataFrame.isna <pandas.DataFrame.isna>`
             Boolean same-sized DataFrame showing places of NA elements.
 
-
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.
     .. only:: developer
 

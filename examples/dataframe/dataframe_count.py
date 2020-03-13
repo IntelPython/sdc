@@ -27,10 +27,7 @@
 # result
 # A    4
 # B    4
-# C    4
-# D    3
-# E    3
-# F    1
+# C    3
 # dtype: int64
 
 import pandas as pd
@@ -41,14 +38,10 @@ from numba import njit
 @njit
 def dataframe_count():
     df = pd.DataFrame({"A": [.2, .0, .6, .2],
-                       "B": [.5, .6, .7, .8],
-                       "C": [2, 0, 6, 2],
-                       "D": [.2, .1, np.nan, .5],
-                       "E": [-1, np.nan, 1, np.inf],
-                       "F": [np.nan, np.nan, np.inf, np.nan]})
-    out_df = df.count()
+                       "B": [2, 0, 6, 2],
+                       "C": [-1, np.nan, 1, np.inf]})
 
-    return out_df
+    return df.count()
 
 
 print(dataframe_count())
