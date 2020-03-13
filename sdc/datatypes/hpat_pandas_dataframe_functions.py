@@ -748,32 +748,55 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 @sdc_overload_method(DataFrameType, 'var')
 def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.var` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.var
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_var*
+    Limitations
+    -----------
+    Parameters axis, skipna, level, ddof, numeric_only unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       ddof:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_var.py
+       :language: python
+       :lines: 35-
+       :caption: Return unbiased variance over requested axis.
+       :name: ex_dataframe_var
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return sample standard deviation over requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_var.py
+       :cwd: ../../../examples
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.var` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_var*
+
+    Parameters
+    -----------
+    df: :class:`pandas.DataFrame`
+        input arg
+    axis:
+        *unsupported*
+    skipna:
+        *unsupported*
+    level:
+        *unsupported*
+    ddof:
+        *unsupported*
+    numeric_only:
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series` or `pandas.DataFrame`
+            return sample standard deviation over requested axis.
+    """
 
     name = 'var'
 
