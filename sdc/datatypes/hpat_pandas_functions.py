@@ -44,6 +44,7 @@ from sdc.io.csv_ext import (
     _gen_csv_reader_py_pyarrow_py_func,
     _gen_csv_reader_py_pyarrow_func_text_dataframe,
 )
+from sdc.str_arr_ext import string_array_type
 from sdc.hiframes.hiframes_untyped import HiFramesPassImpl
 
 
@@ -176,43 +177,97 @@ def sdc_pandas_read_csv(
         float_precision=None,
     """
 
-    assert isinstance(filepath_or_buffer, numba.types.Literal)
-    assert isinstance(sep, numba.types.Literal) or sep == ','
-    assert isinstance(delimiter, numba.types.Literal) or delimiter is None
-    assert isinstance(skiprows, numba.types.Literal) or skiprows is None
+    infer_from_params = isinstance(dtype, types.Tuple)
+    infer_from_file = isinstance(filepath_or_buffer, types.Literal)
 
-    if isinstance(sep, numba.types.Literal):
+    # assert isinstance(filepath_or_buffer, types.Literal)
+    assert isinstance(sep, types.Literal) or sep == ','
+    assert isinstance(delimiter, types.Literal) or delimiter is None
+    assert isinstance(skiprows, types.Literal) or skiprows is None
+
+    if isinstance(filepath_or_buffer, types.Literal):
+        filepath_or_buffer = filepath_or_buffer.literal_value
+
+    if isinstance(sep, types.Literal):
         sep = sep.literal_value
 
-    if isinstance(delimiter, numba.types.Literal):
+    if isinstance(delimiter, types.Literal):
         delimiter = delimiter.literal_value
 
     # Alias sep -> delimiter.
     if delimiter is None:
         delimiter = sep
 
-    fname_const = filepath_or_buffer.literal_value
+    if isinstance(header, types.Literal):
+        header = header.literal_value
 
-    if isinstance(skiprows, numba.types.Literal):
-        skiprows = skiprows.literal_value
+    if isinstance(names, types.Tuple):
+        assert all(isinstance(name, types.Literal) for name in names)
+        names = [name.literal_value for name in names]
+
+    if isinstance(usecols, types.Tuple):
+        assert all(isinstance(col, types.Literal) for col in usecols)
+        usecols = [col.literal_value for col in usecols]
+
+    if isinstance(dtype, types.Tuple):
+        assert all(isinstance(key, types.Literal) for key in dtype[::2])
+        keys = (k.literal_value for k in dtype[::2])
+
+        values = dtype[1::2]
+        values = [v.typing_key if isinstance(v, types.Function) else v for v in values]
+        values = [types.Array(types.int_, 1, 'C') if v == int else v for v in values]
+        values = [types.Array(types.float64, 1, 'C') if v == float else v for v in values]
+        values = [string_array_type if v == str else v for v in values]
+
+        dtype = dict(zip(keys, values))
 
     if skiprows is None:
         skiprows = 0
 
+    if infer_from_params:
+        if header == 'infer':
+            if names is None:
+                header = 0
+                # require infer from file -> file should be constant
+                assert infer_from_file
+            else:
+                header = None
+                col_names = names
+        elif header is None:
+            if names is None:
+                # list of integers
+                # infer from file number of columns -> file should be const
+                assert infer_from_file
+            else:
+                col_names = names
+        else:  # Integer
+            # names does not metter
+            # infer from file -> file shoudl be const
+            assert infer_from_file
+        # [int] not supported
+
+        # all names should be in dtype
+        assert all(n in dtype for n in col_names)
+        col_typs = [dtype[n] for n in col_names]
+
+    elif infer_from_file:
     col_names = 0
     skiprows, col_names, dtype_map = \
         HiFramesPassImpl.infer_column_names_and_types_from_constant_filename(
-            fname_const, skiprows, col_names, sep=delimiter)
+                filepath_or_buffer, skiprows, col_names, sep=delimiter)
 
     usecols = infer_usecols(col_names)
 
     date_cols = []
     columns, out_types = HiFramesPassImpl._get_csv_col_info_core(dtype_map, date_cols, col_names)
+        col_names, col_typs = columns, out_types
+
+    else:
+        return None
 
     # generate function text with signature and returning DataFrame
     func_text, func_name = _gen_csv_reader_py_pyarrow_func_text_dataframe(
-        columns, out_types, usecols, delimiter, skiprows, signature)
-    # print(func_text)
+        col_names, col_typs, usecols, delimiter, skiprows, signature)
 
     # compile with Python
     csv_reader_py = _gen_csv_reader_py_pyarrow_py_func(func_text, func_name)
