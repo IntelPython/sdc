@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -1782,7 +1782,7 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
     # Return npytypes.Array from npytypes.Array for astype(types.functions.NumberClass), example - astype(np.int64)
     # Return npytypes.Array from npytypes.Array for astype(types.StringLiteral), example - astype('int64')
     def hpat_pandas_series_astype_numba_impl(self, dtype, copy=True, errors='raise'):
-        return pandas.Series(data=numpy_like.astype(self._data, dtype), index=self._index, name=self._name)
+        return pandas.Series(data=numpy_like.astype_no_inline(self._data, dtype), index=self._index, name=self._name)
 
     # Return self
     def hpat_pandas_series_astype_no_modify_impl(self, dtype, copy=True, errors='raise'):
