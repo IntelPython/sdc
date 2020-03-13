@@ -44,7 +44,7 @@ from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric,
                                             check_types_comparable, kwsparams2list,
-                                            gen_df_impl_generator, find_common_dtype_from_numpy_dtypes)
+                                            gen_impl_generator, find_common_dtype_from_numpy_dtypes)
 from sdc.str_arr_ext import StringArrayType
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
@@ -1489,13 +1489,13 @@ def df_getitem_bool_array_idx_codegen(self, idx):
     return func_text, global_vars
 
 
-gen_df_getitem_slice_idx_impl = gen_df_impl_generator(
+gen_df_getitem_slice_idx_impl = gen_impl_generator(
     df_getitem_slice_idx_codegen, '_df_getitem_slice_idx_impl')
-gen_df_getitem_tuple_idx_impl = gen_df_impl_generator(
+gen_df_getitem_tuple_idx_impl = gen_impl_generator(
     df_getitem_tuple_idx_codegen, '_df_getitem_tuple_idx_impl')
-gen_df_getitem_bool_series_idx_impl = gen_df_impl_generator(
+gen_df_getitem_bool_series_idx_impl = gen_impl_generator(
     df_getitem_bool_series_idx_codegen, '_df_getitem_bool_series_idx_impl')
-gen_df_getitem_bool_array_idx_impl = gen_df_impl_generator(
+gen_df_getitem_bool_array_idx_impl = gen_impl_generator(
     df_getitem_bool_array_idx_codegen, '_df_getitem_bool_array_idx_impl')
 
 
@@ -1661,8 +1661,8 @@ def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=Tru
     return sdc_pandas_dataframe_groupby_impl
 
 
-def df_add_column_codelines(self, key):
-    """Generate code lines for DF add_column"""
+def df_set_column_index_codelines(self):
+    """Generate code lines with definition of resulting index for DF set_column"""
     func_lines = []
     if self.columns:
         func_lines += [
@@ -1675,6 +1675,13 @@ def df_add_column_codelines(self, key):
     else:
         func_lines += ['  length = len(value)']
     func_lines += [f'  res_index = {df_index_expr(self, length_expr="length")}']
+
+    return func_lines
+
+
+def df_add_column_codelines(self, key):
+    """Generate code lines to add new column to DF"""
+    func_lines = df_set_column_index_codelines(self)  # provide res_index = ...
 
     results = []
     for i, col in enumerate(self.columns):
@@ -1689,6 +1696,30 @@ def df_add_column_codelines(self, key):
     literal_key = key.literal_value
     func_lines += [f'  {res_data} = pandas.Series(value, index=res_index, name="{literal_key}")']
     results.append((literal_key, res_data))
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index)']
+
+    return func_lines
+
+
+def df_replace_column_codelines(self, key):
+    """Generate code lines to replace existing column in DF"""
+    func_lines = df_set_column_index_codelines(self)  # provide res_index = ...
+
+    results = []
+    literal_key = key.literal_value
+    for i, col in enumerate(self.columns):
+        if literal_key == col:
+            func_lines += [f'  data_{i} = value']
+        else:
+            func_lines += [f'  data_{i} = get_dataframe_data(self, {i})']
+
+        res_data = f'res_data_{i}'
+        func_lines += [
+            f'  {res_data} = pandas.Series(data_{i}, index=res_index, name="{col}")',
+        ]
+        results.append((col, res_data))
 
     data = ', '.join(f'"{col}": {data}' for col, data in results)
     func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index)']
@@ -1724,14 +1755,37 @@ def df_add_column_codegen(self, key):
     return func_text, global_vars
 
 
-def gen_df_add_column_impl(self, key):
-    func_text, global_vars = df_add_column_codegen(self, key)
+def df_replace_column_codegen(self, key):
+    """
+    Example of generated implementation:
+    def _df_replace_column_impl(self, key, value):
+      length = len(get_dataframe_data(self, 0))
+      if length == 0:
+        raise SDCLimitation("Could not set item for DataFrame with empty columns")
+      elif length != len(value):
+        raise ValueError("Length of values does not match length of index")
+      res_index = numpy.arange(length)
+      data_0 = value
+      res_data_0 = pandas.Series(data_0, index=res_index, name="A")
+      data_1 = get_dataframe_data(self, 1)
+      res_data_1 = pandas.Series(data_1, index=res_index, name="C")
+      return pandas.DataFrame({"A": res_data_0, "C": res_data_1}, index=res_index)
+    """
+    func_lines = [f'def _df_replace_column_impl(self, key, value):']
+    func_lines += df_replace_column_codelines(self, key)
 
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _impl = loc_vars['_df_add_column_impl']
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data,
+                   'SDCLimitation': SDCLimitation}
 
-    return _impl
+    return func_text, global_vars
+
+
+gen_df_add_column_impl = gen_impl_generator(
+    df_add_column_codegen, '_df_add_column_impl')
+gen_df_replace_column_impl = gen_impl_generator(
+    df_replace_column_codegen, '_df_replace_column_impl')
 
 
 @sdc_overload_method(DataFrameType, '_set_column')
@@ -1749,6 +1803,7 @@ def df_set_column_overload(self, key, value):
     *************************************************
 
     Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_add_column
+    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_replace_column
     """
     if not isinstance(self, DataFrameType):
         return None
@@ -1758,6 +1813,8 @@ def df_set_column_overload(self, key, value):
             self.columns.index(key.literal_value)
         except ValueError:
             return gen_df_add_column_impl(self, key)
+        else:
+            return gen_df_replace_column_impl(self, key)
 
     if isinstance(key, types.UnicodeType):
         def _df_set_column_unicode_key_impl(self, key, value):
