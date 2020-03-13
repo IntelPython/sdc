@@ -36,6 +36,7 @@ from numba.config import IS_32BITS
 from numba.special import literal_unroll
 
 import sdc
+from sdc.datatypes.common_functions import SDCLimitation
 from sdc.tests.gen_test_data import ParquetGenerator
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (check_numba_version,
@@ -48,7 +49,8 @@ from sdc.tests.test_utils import (check_numba_version,
                                   get_start_end,
                                   skip_numba_jit,
                                   skip_sdc_jit,
-                                  test_global_input_data_float64,)
+                                  test_global_input_data_float64,
+                                  test_global_input_data_unicode_kind4)
 
 
 @sdc.jit
@@ -571,6 +573,68 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
         df2 = df.copy()
         np.testing.assert_almost_equal(hpat_func(df, arr), test_impl(df2, arr))
+
+    def _test_df_add_column(self, all_data, key, value):
+        def gen_test_impl(value, do_jit=False):
+            if isinstance(value, pd.Series):
+                def test_impl(df, key, value):
+                    if do_jit == True:  # noqa
+                        return df._set_column(key, value.values)
+                    else:
+                        df[key] = value.values
+            else:
+                def test_impl(df, key, value):
+                    if do_jit == True:  # noqa
+                        return df._set_column(key, value)
+                    else:
+                        df[key] = value
+
+            return test_impl
+
+        test_impl = gen_test_impl(value)
+        sdc_func = self.jit(gen_test_impl(value, do_jit=True))
+
+        for data in all_data:
+            with self.subTest(data=data):
+                df1 = pd.DataFrame(data)
+                df2 = df1.copy(deep=True)
+                test_impl(df1, key, value)
+                result_ref = df1  # in pandas setitem modifies original DF
+                result_jit = sdc_func(df2, key, value)
+                pd.testing.assert_frame_equal(result_jit, result_ref)
+
+    def test_df_add_column(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
+        key, value = 'B', np.array([1., -1., 0.])
+
+        self._test_df_add_column(all_data, key, value)
+
+    def test_df_add_column_str(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
+        key, value = 'B', pd.Series(test_global_input_data_unicode_kind4)
+
+        self._test_df_add_column(all_data, key, value)
+
+    def test_df_add_column_exception_invalid_length(self):
+        def test_impl(df, key, value):
+            return df._set_column(key, value)
+
+        sdc_func = self.jit(test_impl)
+
+        df = pd.DataFrame({'A': [0, 1, 2], 'C': [3., 4., 5.]})
+        key, value = 'B', np.array([1., np.nan, -1., 0.])
+
+        with self.assertRaises(ValueError) as raises:
+            sdc_func(df, key, value)
+        msg = 'Length of values does not match length of index'
+        self.assertIn(msg, str(raises.exception))
+
+        df = pd.DataFrame({'A': []})
+
+        with self.assertRaises(SDCLimitation) as raises:
+            sdc_func(df, key, value)
+        msg = 'Could not set item for DataFrame with empty columns'
+        self.assertIn(msg, str(raises.exception))
 
     def _test_df_values_unboxing(self, df):
         def test_impl(df):
@@ -1913,6 +1977,7 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2})
         self.assertEqual(hpat_func(df), test_impl(df))
 
+    @unittest.skip("Literal unrol is broken by inline get_dataframe_data")
     def test_df_iterate_over_columns1(self):
         """ Verifies iteration over df columns using literal tuple of column indices. """
         from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
@@ -1953,6 +2018,28 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_df_iterate_over_columns2(self):
+        """ Verifies iteration over unboxed df columns using literal unroll. """
+        from sdc.hiframes.api import get_nan_mask
+
+        @self.jit
+        def jitted_func(df):
+            res_nan_mask = np.zeros(len(df), dtype=np.bool_)
+            for col in literal_unroll(df._data):
+                res_nan_mask += get_nan_mask(col)
+            return res_nan_mask
+
+        df = pd.DataFrame({
+                    'A': ['a', 'b', None, 'a', '', None, 'b'],
+                    'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
+                    'C': [np.nan, 1, 2, 1, np.nan, 2, 1],
+                    'D': [1, 2, 9, 5, 2, 1, 0]
+        })
+        # expected is a boolean mask of df rows that have None values
+        expected = np.asarray([True, False, True, False, True, True, False])
+        result = jitted_func(df)
+        np.testing.assert_array_equal(result, expected)
 
 
 if __name__ == "__main__":
