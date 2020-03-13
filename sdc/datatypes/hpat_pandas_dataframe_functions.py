@@ -826,30 +826,85 @@ def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 @sdc_overload_method(DataFrameType, 'min')
 def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.min` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.min
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_min*
+    Limitations
+    -----------
+    Parameters axis, skipna, level, numeric_only unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_min.py
+       :language: python
+       :lines: 35-
+       :caption: Return the minimum of the values for the requested axis.
+       :name: ex_dataframe_min
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               returns: the minimum of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_min.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`Series.sum <pandas.Series.sum>`
+            Return the sum.
+
+        :ref:`Series.min <pandas.Series.min>`
+            Return the minimum.
+
+        :ref:`Series.max <pandas.Series.max>`
+            Return the maximum.
+
+        :ref:`Series.idxmin <pandas.Series.idxmin>`
+            Return the index of the minimum.
+
+        :ref:`Series.idxmax <pandas.Series.idxmax>`
+            Return the index of the maximum.
+
+        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
+            Return the sum over the requested axis.
+
+        :ref:`DataFrame.min <pandas.DataFrame.min>`
+            Return the minimum over the requested axis.
+
+        :ref:`DataFrame.max <pandas.DataFrame.max>`
+            Return the maximum over the requested axis.
+
+        :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
+            Return the index of the minimum over the requested axis.
+
+        :ref:`DataFrame.idxmax <pandas.DataFrame.idxmax>`
+            Return the index of the maximum over the requested axis.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.min` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_min*
+
+    Parameters
+    -----------
+    df: :class:`pandas.DataFrame`
+        input arg
+    axis:
+        *unsupported*
+    skipna:
+        *unsupported*
+    level:
+        *unsupported*
+    numeric_only:
+        *unsupported*
+
+    Returns
+    -------
+    :obj:`pandas.Series` or `pandas.DataFrame`
+            returns: the minimum of the values for the requested axis.
+    """
 
     name = 'min'
 
