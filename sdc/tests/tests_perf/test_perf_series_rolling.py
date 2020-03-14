@@ -97,7 +97,6 @@ class TestSeriesRollingMethods(TestBase):
             'var': (100, [8 * 10 ** 5]),
         }
 
-
     def _test_case(self, pyfunc, name, total_data_length, input_data=None, data_num=1, data_gens=None):
         test_name = 'Series.rolling.{}'.format(name)
 

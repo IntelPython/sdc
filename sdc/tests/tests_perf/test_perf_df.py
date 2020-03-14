@@ -49,8 +49,10 @@ class TestDataFrameMethods(TestBase):
         test_name = 'DataFrame.{}'.format(name)
 
         data_num = len(data_gens) if data_gens is not None else data_num
-        data_gens = data_gens or [gen_df] * data_num
-        input_data = input_data or [None] * data_num
+        default_data_gens = [gen_df] * data_num
+        data_gens = data_gens or default_data_gens
+        default_input_data = [None] * data_num
+        input_data = input_data or default_input_data
 
         for data_length in total_data_length:
             base = {

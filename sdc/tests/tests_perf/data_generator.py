@@ -83,7 +83,14 @@ def gen_series(data_length, dtype='float', limits=None, nunique=1000, input_data
     return pd.Series(series_data)
 
 
-def gen_df(data_length, columns=3, col_names=None, dtype='float', limits=None, nunique=1000, input_data=None, seed=None):
+def gen_df(data_length,
+           columns=3,
+           col_names=None,
+           dtype='float',
+           limits=None,
+           nunique=1000,
+           input_data=None,
+           seed=None):
     """
     data_length: result series length,
     dtype: dtype of generated series,
