@@ -80,9 +80,11 @@ cases = [
     TC(name='sum', size=[10 ** 7], check_skipna=True),
     TC(name='var', size=[10 ** 7], check_skipna=True),
     TC(name='getitem_idx_bool_series', size=[10 ** 7], call_expr='df[idx]', usecase_params='df, idx',
-       data_gens=(gen_df, partial(gen_series, dtype='bool'))),
+       data_gens=(gen_df, partial(gen_series, dtype='bool', random=False)),
+       input_data=[None, [True, False, False, True, False, True]]),
     TC(name='getitem_idx_bool_array', size=[10 ** 7], call_expr='df[idx]', usecase_params='df, idx',
-       data_gens=(gen_df, partial(gen_arr_of_dtype, dtype='bool'))),
+       data_gens=(gen_df, partial(gen_arr_of_dtype, dtype='bool', random=False)),
+       input_data=[None, [True, False, False, True, False, True]]),
 ]
 
 generate_test_cases(cases, TestDataFrameMethods, 'df')

@@ -28,7 +28,14 @@ def gen_series_fixed_str(data_num, data_length, input_data, data_width):
     return results
 
 
-def gen_arr_of_dtype(data_length, dtype='float', limits=None, nunique=1000, input_data=None, seed=None):
+def gen_arr_from_input(input_data, data_length, random=True):
+    if random:
+        return np.random.choice(input_data, data_length)
+    else:
+        return np.asarray(multiply_oneds_data(input_data, data_length))
+
+
+def gen_arr_of_dtype(data_length, dtype='float', random=True, limits=None, nunique=1000, input_data=None, seed=None):
     """
     data_length: result array length,
     dtype: dtype of generated array,
@@ -43,7 +50,7 @@ def gen_arr_of_dtype(data_length, dtype='float', limits=None, nunique=1000, inpu
 
     # prefer generation based on input data if it's provided
     if input_data is not None:
-        return np.random.choice(input_data, data_length)
+        return gen_arr_from_input(input_data, data_length, random=random)
 
     if dtype == 'float':
         return np.random.ranf(data_length)
@@ -60,7 +67,7 @@ def gen_arr_of_dtype(data_length, dtype='float', limits=None, nunique=1000, inpu
     return None
 
 
-def gen_series(data_length, dtype='float', limits=None, nunique=1000, input_data=None, seed=None):
+def gen_series(data_length, dtype='float', random=True, limits=None, nunique=1000, input_data=None, seed=None):
     """
     data_length: result series length,
     dtype: dtype of generated series,
@@ -75,7 +82,7 @@ def gen_series(data_length, dtype='float', limits=None, nunique=1000, input_data
 
     # prefer generation based on input data if it's provided
     if input_data is not None:
-        series_data = np.random.choice(input_data, data_length)
+        series_data = gen_arr_from_input(input_data, data_length, random=random)
     else:
         series_data = gen_arr_of_dtype(data_length, dtype=dtype, limits=limits, nunique=nunique)
 
@@ -87,6 +94,7 @@ def gen_df(data_length,
            columns=3,
            col_names=None,
            dtype='float',
+           random=True,
            limits=None,
            nunique=1000,
            input_data=None,
@@ -108,7 +116,7 @@ def gen_df(data_length,
     for i in range(columns):
         # prefer generation based on input data if it's provided
         if (input_data is not None and i < len(input_data)):
-            col_data = np.random.choice(input_data[i], data_length)
+            col_data = gen_arr_from_input(input_data[i], data_length, random=random)
         else:
             col_data = gen_arr_of_dtype(data_length, dtype=dtype, limits=limits, nunique=nunique)
         all_data.append(col_data)
