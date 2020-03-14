@@ -1364,13 +1364,14 @@ def df_getitem_bool_array_idx_main_codelines(self, idx):
     func_lines = [f'  length = {df_length_expr(self)}',
                   f'  if length != len(idx):',
                   f'    raise ValueError("Item wrong length.")',
-                  f'  res_index = getitem_by_mask(self.index, idx)']
+                  f'  taken_pos = getitem_by_mask(numpy.arange(length), idx)',
+                  f'  res_index = sdc_take(self.index, taken_pos)']
     results = []
     for i, col in enumerate(self.columns):
         res_data = f'res_data_{i}'
         func_lines += [
             f'  data_{i} = get_dataframe_data(self, {i})',
-            f'  {res_data} = getitem_by_mask(data_{i}, idx)'
+            f'  {res_data} = sdc_take(data_{i}, taken_pos)'
         ]
         results.append((col, res_data))
 
@@ -1477,11 +1478,12 @@ def df_getitem_bool_array_idx_codegen(self, idx):
           length = len(get_dataframe_data(self, 0))
           if length != len(idx):
             raise ValueError("Item wrong length.")
-          res_index = getitem_by_mask(self.index, idx)
+          taken_pos = getitem_by_mask(numpy.arange(length), idx)
+          res_index = sdc_take(self.index, taken_pos)
           data_0 = get_dataframe_data(self, 0)
-          res_data_0 = getitem_by_mask(data_0, idx)
+          res_data_0 = sdc_take(data_0, taken_pos)
           data_1 = get_dataframe_data(self, 1)
-          res_data_1 = getitem_by_mask(data_1, idx)
+          res_data_1 = sdc_take(data_1, taken_pos)
           return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index)
     """
     func_lines = ['def _df_getitem_bool_array_idx_impl(self, idx):']
@@ -1489,7 +1491,8 @@ def df_getitem_bool_array_idx_codegen(self, idx):
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas, 'numpy': numpy,
                    'get_dataframe_data': get_dataframe_data,
-                   'getitem_by_mask': getitem_by_mask}
+                   'getitem_by_mask': getitem_by_mask,
+                   'sdc_take': _sdc_take}
 
     return func_text, global_vars
 
