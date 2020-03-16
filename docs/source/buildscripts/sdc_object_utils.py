@@ -176,10 +176,7 @@ def get_obj(obj_name):
 
     split_name.pop(0)
     for name in split_name:
-        if name in dir(split_obj):
-            split_obj = getattr(split_obj, name)
-        else:
-            split_obj = 0
+        split_obj = getattr(split_obj, name, 0)
 
     return split_obj
 
