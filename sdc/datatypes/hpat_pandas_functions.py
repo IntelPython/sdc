@@ -224,6 +224,9 @@ def sdc_pandas_read_csv(
 
         dtype = dict(zip(keys, values))
 
+    if isinstance(skiprows, types.Literal):
+        skiprows = skiprows.literal_value
+
     if skiprows is None:
         skiprows = 0
 
