@@ -32,6 +32,7 @@ import random
 import string
 import unittest
 from itertools import permutations, product
+from numba import types
 from numba.config import IS_32BITS
 from numba.special import literal_unroll
 
@@ -1236,7 +1237,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
 
-    def test_df_reset_index_drop_False(self):
+    def test_df_reset_index_drop(self):
         def test_impl(df, drop):
             return df.reset_index(drop=drop)
 
@@ -1245,9 +1246,10 @@ class TestDataFrame(TestCase):
 
         for drop in [True, False]:
             with self.subTest(drop=drop):
-                jit_result = hpat_func(df, drop)
-                ref_result = test_impl(df, drop)
-                pd.testing.assert_frame_equal(jit_result, ref_result)
+                with self.assertRaises(Exception) as raises:
+                    hpat_func(df, drop)
+                msg = 'reset_index Supported only literally drop.'
+                self.assertIn(msg.format(types.bool_), str(raises.exception))
 
     def test_df_reset_index_drop_false_index_int(self):
         def test_impl(df):

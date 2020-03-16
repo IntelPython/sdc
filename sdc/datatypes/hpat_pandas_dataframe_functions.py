@@ -1802,17 +1802,17 @@ def sdc_pandas_dataframe_reset_index_codegen(drop, all_params, columns):
           return pandas.DataFrame({"index": res_index, "A": result_0}, index=numpy.arange(len(self)))
     """
     result_name = []
-    joined = ', '.join(all_params)
-    func_lines = [f'def _df_reset_index_impl({joined}):']
+    all_params_str = ', '.join(all_params)
+    func_lines = [f'def _df_reset_index_impl({all_params_str}):']
     df = all_params[0]
     if not drop.literal_value:
-        old_index = f'old_index'
-        func_lines += [f'  old_index = {df}.index']
+        old_index = 'old_index'
+        func_lines += [f'  {old_index} = {df}.index']
         result_name.append((old_index, 'index'))
     for i, c in enumerate(columns):
-        result_c = f'result_{i}'
+        result_c = 'result_c'
         func_lines += [
-            f'  result_{i} = get_dataframe_data({df}, {i})'
+            f'  {result_c} = get_dataframe_data({df}, {i})'
         ]
         result_name.append((result_c, c))
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
@@ -1828,12 +1828,11 @@ def sdc_pandas_dataframe_reset_index_codegen(drop, all_params, columns):
 
 def sdc_pandas_dataframe_reset_index_impl(self, level=None, drop=False, inplace=False, col_level=0, col_fill=''):
     all_params = ['self', 'level=None', 'drop=False', 'inplace=False', 'col_level=0', 'col_fill=""']
-    df_func_name = f'_df_reset_index_impl'
 
     func_text, global_vars = sdc_pandas_dataframe_reset_index_codegen(drop, all_params, self.columns)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _apply_impl = loc_vars[df_func_name]
+    _apply_impl = loc_vars[f'_df_reset_index_impl']
 
     return _apply_impl
 
@@ -1922,10 +1921,7 @@ def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False
         raise TypingError('{} Unsupported parameter col_fill. Given: {}'.format(func_name, col_fill))
 
     if not isinstance(drop, types.Literal):
-        def _df_reset_index_bool_drop_impl(self, level=None, drop=False, inplace=False, col_level=0, col_fill=''):
-            return literally(drop)
-
-        return _df_reset_index_bool_drop_impl
+        raise Exception('{} Supported only literally drop.'.format(func_name))
 
     return sdc_pandas_dataframe_reset_index_impl(self, level=level, drop=drop, inplace=inplace,
                                                  col_level=col_level, col_fill=col_fill)
