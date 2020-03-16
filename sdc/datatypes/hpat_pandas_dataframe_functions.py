@@ -635,7 +635,7 @@ def copy_overload(df, deep=True):
     ty_checker = TypeChecker("Method copy().")
     ty_checker.check(df, DataFrameType)
 
-    if not isinstance(deep, (types.Omitted, types.Boolean)) and not deep:
+    if not (isinstance(deep, (types.Omitted, types.Boolean, types.NoneType)) or deep is True):
         ty_checker.raise_exc(deep, 'boolean', 'deep')
 
     params = {'deep': True}
