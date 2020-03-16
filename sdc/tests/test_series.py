@@ -274,6 +274,10 @@ def isupper_usecase(series):
     return series.str.isupper()
 
 
+def upper_usecase(series):
+    return series.str.upper()
+
+
 class TestSeries(
     TestSeries_apply,
     TestSeries_map,
@@ -3234,6 +3238,15 @@ class TestSeries(
             with self.subTest(data=data):
                 s = pd.Series(data)
                 pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_upper_str(self):
+        sdc_func = self.jit(upper_usecase)
+        test_data = [test_global_input_data_unicode_kind4,
+                     ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
+        for data in test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), upper_usecase(s))
 
     def test_series_swapcase_str(self):
         def test_impl(S):

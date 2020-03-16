@@ -1120,15 +1120,19 @@ def hpat_pandas_stringmethods_upper(self):
     ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_upper_impl(self):
+        mask = get_nan_mask(self._data._data)
         item_count = len(self._data)
         result = [''] * item_count
 
-        for it in range(item_count):
+        for it in numba.prange(item_count):
             item = self._data._data[it]
             if len(item) > 0:
                 result[it] = item.upper()
             else:
                 result[it] = item
+
+        str_arr = create_str_arr_from_list(result)
+        result = str_arr_set_na_by_mask(str_arr, mask)
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
