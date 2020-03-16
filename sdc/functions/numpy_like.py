@@ -55,6 +55,10 @@ def astype(self, dtype):
     pass
 
 
+def astype_no_inline(self, dtype):
+    pass
+
+
 def argmin(self):
     pass
 
@@ -96,6 +100,7 @@ def nansum(self):
 
 
 @sdc_overload(astype, inline='always')
+@sdc_overload(astype_no_inline)
 def sdc_astype_overload(self, dtype):
     """
     Intel Scalable Dataframe Compiler Developer Guide

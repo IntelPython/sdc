@@ -574,7 +574,7 @@ class TestDataFrame(TestCase):
         df2 = df.copy()
         np.testing.assert_almost_equal(hpat_func(df, arr), test_impl(df2, arr))
 
-    def _test_df_add_column(self, all_data, key, value):
+    def _test_df_set_column(self, all_data, key, value):
         def gen_test_impl(value, do_jit=False):
             if isinstance(value, pd.Series):
                 def test_impl(df, key, value):
@@ -603,38 +603,67 @@ class TestDataFrame(TestCase):
                 result_jit = sdc_func(df2, key, value)
                 pd.testing.assert_frame_equal(result_jit, result_ref)
 
-    def test_df_add_column(self):
-        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
-        key, value = 'B', np.array([1., -1., 0.])
-
-        self._test_df_add_column(all_data, key, value)
-
-    def test_df_add_column_str(self):
-        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
-        key, value = 'B', pd.Series(test_global_input_data_unicode_kind4)
-
-        self._test_df_add_column(all_data, key, value)
-
-    def test_df_add_column_exception_invalid_length(self):
+    def _test_df_set_column_exception_invalid_length(self, df, key, value):
         def test_impl(df, key, value):
             return df._set_column(key, value)
 
         sdc_func = self.jit(test_impl)
-
-        df = pd.DataFrame({'A': [0, 1, 2], 'C': [3., 4., 5.]})
-        key, value = 'B', np.array([1., np.nan, -1., 0.])
 
         with self.assertRaises(ValueError) as raises:
             sdc_func(df, key, value)
         msg = 'Length of values does not match length of index'
         self.assertIn(msg, str(raises.exception))
 
-        df = pd.DataFrame({'A': []})
+    def _test_df_set_column_exception_empty_columns(self, df, key, value):
+        def test_impl(df, key, value):
+            return df._set_column(key, value)
+
+        sdc_func = self.jit(test_impl)
 
         with self.assertRaises(SDCLimitation) as raises:
             sdc_func(df, key, value)
         msg = 'Could not set item for DataFrame with empty columns'
         self.assertIn(msg, str(raises.exception))
+
+    def test_df_add_column(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
+        key, value = 'B', np.array([1., -1., 0.])
+
+        self._test_df_set_column(all_data, key, value)
+
+    def test_df_add_column_str(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
+        key, value = 'B', pd.Series(test_global_input_data_unicode_kind4)
+
+        self._test_df_set_column(all_data, key, value)
+
+    def test_df_add_column_exception_invalid_length(self):
+        df = pd.DataFrame({'A': [0, 1, 2], 'C': [3., 4., 5.]})
+        key, value = 'B', np.array([1., np.nan, -1., 0.])
+        self._test_df_set_column_exception_invalid_length(df, key, value)
+
+        df = pd.DataFrame({'A': []})
+        self._test_df_set_column_exception_empty_columns(df, key, value)
+
+    def test_df_replace_column(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}]
+        key, value = 'A', np.array([1., -1., 0.])
+
+        self._test_df_set_column(all_data, key, value)
+
+    def test_df_replace_column_str(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}]
+        key, value = 'A', pd.Series(test_global_input_data_unicode_kind4)
+
+        self._test_df_set_column(all_data, key, value)
+
+    def test_df_replace_column_exception_invalid_length(self):
+        df = pd.DataFrame({'A': [0, 1, 2], 'C': [3., 4., 5.]})
+        key, value = 'A', np.array([1., np.nan, -1., 0.])
+        self._test_df_set_column_exception_invalid_length(df, key, value)
+
+        df = pd.DataFrame({'A': []})
+        self._test_df_set_column_exception_empty_columns(df, key, value)
 
     def _test_df_values_unboxing(self, df):
         def test_impl(df):
