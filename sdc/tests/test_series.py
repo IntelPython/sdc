@@ -274,6 +274,18 @@ def isupper_usecase(series):
     return series.str.isupper()
 
 
+def strip_usecase(series, to_strip=None):
+    return series.str.strip(to_strip)
+
+
+def lstrip_usecase(series, to_strip=None):
+    return series.str.lstrip(to_strip)
+
+
+def rstrip_usecase(series, to_strip=None):
+    return series.str.rstrip(to_strip)
+
+
 class TestSeries(
     TestSeries_apply,
     TestSeries_map,
@@ -5993,6 +6005,27 @@ class TestSeries(
         for ser in series:
             S = pd.Series(ser)
             pd.testing.assert_series_equal(cfunc(S), islower_usecase(S))
+
+    def test_series_strip_str(self):
+        S = pd.Series(['1. Ant.  ', '2. Bee!\n', '3. Cat?\t'])
+        tostrip = [None, '123.', '.!? \n\t', '123.!? \n\t']
+        cfunc = self.jit(strip_usecase)
+        for to_strip in tostrip:
+            pd.testing.assert_series_equal(cfunc(S, to_strip), strip_usecase(S, to_strip))
+
+    def test_series_lstrip_str(self):
+        S = pd.Series(['1. Ant.  ', '2. Bee!\n', '3. Cat?\t'])
+        tostrip = [None, '123.', '.!? \n\t', '123.!? \n\t']
+        cfunc = self.jit(lstrip_usecase)
+        for to_strip in tostrip:
+            pd.testing.assert_series_equal(cfunc(S, to_strip), lstrip_usecase(S, to_strip))
+
+    def test_series_rstrip_str(self):
+        S = pd.Series(['1. Ant.  ', '2. Bee!\n', '3. Cat?\t'])
+        tostrip = [None, '123.', '.!? \n\t', '123.!? \n\t']
+        cfunc = self.jit(rstrip_usecase)
+        for to_strip in tostrip:
+            pd.testing.assert_series_equal(cfunc(S, to_strip), rstrip_usecase(S, to_strip))
 
     @skip_sdc_jit("Series.str.isalnum is not supported yet")
     def test_series_isalnum_str(self):

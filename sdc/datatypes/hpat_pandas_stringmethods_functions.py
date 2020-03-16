@@ -115,7 +115,6 @@ _hpat_pandas_stringmethods_functions_params = {
     'index': ', sub, start=0, end=None',
     'join': ', sep',
     'ljust': ', width, fillchar=" "',
-    'lstrip': ', to_strip=None',
     'match': ', pat, case=True, flags=0, na=numpy.nan',
     'normalize': ', form',
     'pad': ', width, side="left", fillchar=" "',
@@ -127,12 +126,10 @@ _hpat_pandas_stringmethods_functions_params = {
     'rjust': ', width, fillchar=" "',
     'rpartition': ', sep=" ", expand=True',
     'rsplit': ', pat=None, n=-1, expand=False',
-    'rstrip': ', to_strip=None',
     'slice_replace': ', start=None, stop=None, repl=None',
     'slice': ', start=None, stop=None, step=None',
     'split': ', pat=None, n=-1, expand=False',
     'startswith': ', pat, na=numpy.nan',
-    'strip': ', to_strip=None',
     'translate': ', table',
     'wrap': ', width',
     'zfill': ', width',
@@ -1114,6 +1111,69 @@ def hpat_pandas_stringmethods_casefold(self):
     return hpat_pandas_stringmethods_casefold_impl
 
 
+@sdc_overload_method(StringMethodsType, 'strip')
+def hpat_pandas_stringmethods_strip(self, to_strip=None):
+    ty_checker = TypeChecker('Method strip().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_strip_impl(self, to_strip=None):
+        item_count = len(self._data)
+        result = [''] * item_count
+
+        for it in range(item_count):
+            item = self._data._data[it]
+            if len(item) > 0:
+                result[it] = item.strip(to_strip)
+            else:
+                result[it] = item
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_strip_impl
+
+
+@sdc_overload_method(StringMethodsType, 'lstrip')
+def hpat_pandas_stringmethods_lstrip(self, to_strip=None):
+    ty_checker = TypeChecker('Method lstrip().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_lstrip_impl(self, to_strip=None):
+        item_count = len(self._data)
+        result = [''] * item_count
+
+        for it in range(item_count):
+            item = self._data._data[it]
+            if len(item) > 0:
+                result[it] = item.lstrip(to_strip)
+            else:
+                result[it] = item
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_lstrip_impl
+
+
+@sdc_overload_method(StringMethodsType, 'rstrip')
+def hpat_pandas_stringmethods_rstrip(self, to_strip=None):
+    ty_checker = TypeChecker('Method rstrip().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_rstrip_impl(self, to_strip=None):
+        item_count = len(self._data)
+        result = [''] * item_count
+
+        for it in range(item_count):
+            item = self._data._data[it]
+            if len(item) > 0:
+                result[it] = item.rstrip(to_strip)
+            else:
+                result[it] = item
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_rstrip_impl
+
+
 seealso_check_methods = """
                         :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
                             Check whether all characters are alphabetic.
@@ -1150,6 +1210,16 @@ seealso_transform_methods = """
                             :ref:`Series.str.casefold <pandas.Series.str.casefold>`
                                 Removes all case distinctions in the string.
                            """
+
+
+seealso_strip_methods = """
+                        :ref:`Series.str.strip <pandas.Series.str.strip>`
+                            Remove leading and trailing characters in Series/Index.
+                        :ref:`Series.str.lstrip <pandas.Series.str.lstrip>`
+                            Remove leading characters in Series/Index.
+                        :ref:`Series.str.strip <pandas.Series.str.strip>`
+                            Remove trailing characters in Series/Index.
+"""
 
 
 stringmethods_funcs = {
@@ -1192,6 +1262,15 @@ stringmethods_funcs = {
     'casefold': {'method': hpat_pandas_stringmethods_casefold,
                  'caption': 'Convert strings in the Series/Index to be casefolded.',
                  'seealso': seealso_transform_methods},
+    'strip': {'method': hpat_pandas_stringmethods_strip,
+              'caption': 'Remove leading and trailing characters.',
+              'seealso': seealso_strip_methods},
+    'lstrip': {'method': hpat_pandas_stringmethods_lstrip,
+               'caption': 'Remove leading and trailing characters.',
+               'seealso': seealso_strip_methods},
+    'rstrip': {'method': hpat_pandas_stringmethods_rstrip,
+               'caption': 'Remove leading and trailing characters.',
+               'seealso': seealso_strip_methods}
 }
 
 
@@ -1202,7 +1281,7 @@ for name, data in stringmethods_funcs.items():
 
 
 # _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))
-_hpat_pandas_stringmethods_autogen_methods = ['upper', 'lower', 'lstrip', 'rstrip', 'strip']
+_hpat_pandas_stringmethods_autogen_methods = ['upper', 'lower']
 """
     This is the list of function which are autogenerated to be used from Numba directly.
 """
