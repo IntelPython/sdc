@@ -3878,6 +3878,10 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
 
     Pandas API: pandas.Series.idxmin
 
+    Limitations
+    -----------
+    Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_idxmin.py
