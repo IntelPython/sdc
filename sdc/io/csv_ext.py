@@ -591,13 +591,15 @@ def _gen_csv_reader_py_pyarrow(col_names, col_typs, usecols, sep, typingctx, tar
 def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, usecols, sep, skiprows, signature=None):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs) if t.dtype == types.NPDatetime('ns'))
-    return_columns = usecols if usecols else col_names
+    return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
     nb_objmode_vars = ", ".join([
         "{}='{}'".format(to_varname(cname), _get_dtype_str(t))
-        for cname, t in zip(col_names, col_typs)
-        if cname in return_columns
+        for cname, t in zip(return_columns, col_typs)
     ])
-    pd_dtype_strs = ", ".join(["'{}':{}".format(cname, _get_pd_dtype_str(t)) for cname, t in zip(col_names, col_typs)])
+    pd_dtype_strs = ", ".join([
+        "'{}':{}".format(cname, _get_pd_dtype_str(t))
+        for cname, t in zip(return_columns, col_typs)
+    ])
 
     if signature is None:
         signature = "filepath_or_buffer"
@@ -628,7 +630,7 @@ def _gen_csv_reader_py_pyarrow_func_text(col_names, col_typs, usecols, sep, skip
 def _gen_csv_reader_py_pyarrow_func_text_dataframe(col_names, col_typs, usecols, sep, skiprows, signature):
     func_text, func_name = _gen_csv_reader_py_pyarrow_func_text_core(
         col_names, col_typs, usecols, sep, skiprows, signature)
-    return_columns = usecols if usecols else col_names
+    return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
 
     func_text += "  return sdc.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
         ", ".join(to_varname(c) for c in return_columns),

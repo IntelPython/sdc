@@ -231,8 +231,11 @@ def sdc_pandas_read_csv(
         if header == 'infer':
             if names is None:
                 header = 0
-                # require infer from file -> file should be constant
-                assert infer_from_file
+                if usecols:
+                    col_names = None
+                else:
+                    # require infer from file -> file should be constant
+                    assert infer_from_file
             else:
                 header = None
                 col_names = names
@@ -250,8 +253,9 @@ def sdc_pandas_read_csv(
         # [int] not supported
 
         # all names should be in dtype
-        assert all(n in dtype for n in col_names)
-        col_typs = [dtype[n] for n in col_names]
+        return_columns = usecols if usecols else col_names
+        assert all(n in dtype for n in return_columns)
+        col_typs = [dtype[n] for n in return_columns]
 
     elif infer_from_file:
         col_names = names if names else 0
