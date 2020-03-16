@@ -497,6 +497,9 @@ def pandas_read_csv(
             float_precision=float_precision,
         )
 
+    if delimiter is None:
+        delimiter = sep
+
     autogenerate_column_names = bool(names)
 
     include_columns = None
