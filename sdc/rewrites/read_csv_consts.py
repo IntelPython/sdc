@@ -95,7 +95,10 @@ class RewriteReadCsv(Rewrite):
             if isinstance(inst.value, ir.Expr) and inst.value.op == 'call':
                 expr = inst.value
                 call = guard(find_callname, func_ir, inst.value)
-                if call is not None and call == ('read_csv', 'pandas.io.parsers'):
+                if call is not None and call in [
+                        ('read_csv', 'pandas.io.parsers'),
+                        ('read_csv', 'pandas'),
+                ]:
                     if hasattr(inst, 'consts'):
                         # Already rewritten
                         continue
