@@ -503,10 +503,13 @@ def pandas_read_csv(
 
     # categories = None
 
-    if usecols is not None:
+    if usecols:
         if type(usecols[0]) == str:
-            usecols = [names.index(col) for col in usecols]
-            include_columns = [f'f{i}' for i in usecols]
+            if names:
+                usecols = [names.index(col) for col in usecols]
+                include_columns = [f'f{i}' for i in usecols]
+            else:
+                include_columns = usecols
         elif type(usecols[0]) == int:
             include_columns = [f'f{i}' for i in usecols]
         else:
@@ -522,12 +525,18 @@ def pandas_read_csv(
     #         categories = [f"f{names_list.index(k)}" for k in keys]
     # except: pass
 
-    if dtype is not None:
-        names_list = list(names)
-        if not hasattr(dtype, 'items'):
-            dtype = { f"f{names_list.index(k)}": pyarrow.from_numpy_dtype(dtype) for k in names }
-        else:
-            dtype = { f"f{names_list.index(k)}": pyarrow.from_numpy_dtype(v) for k, v in dtype.items() }
+    if dtype:
+        if names:
+            names_list = list(names)
+            if isinstance(dtype, dict):
+                dtype = {f"f{names_list.index(k)}": pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
+            else:
+                dtype = {f"f{names_list.index(k)}": pyarrow.from_numpy_dtype(dtype) for k in names}
+        elif usecols:
+            if isinstance(dtype, dict):
+                dtype = {k: pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
+            else:
+                dtype = {k: pyarrow.from_numpy_dtype(dtype) for k in usecols}
 
     try:
         for column in parse_dates:
