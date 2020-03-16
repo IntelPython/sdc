@@ -3893,10 +3893,6 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
     .. command-output:: python ./series/series_idxmin.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
         :ref:`Series.idxmax <pandas.Series.idxmax>`
