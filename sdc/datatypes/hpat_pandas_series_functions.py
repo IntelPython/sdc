@@ -3322,6 +3322,10 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
 
     Pandas API: pandas.Series.quantile
 
+    Limitations
+    -----------
+    Parameter interpolation is currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_quantile.py
