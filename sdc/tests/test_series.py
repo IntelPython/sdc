@@ -274,6 +274,10 @@ def isupper_usecase(series):
     return series.str.isupper()
 
 
+def lower_usecase(series):
+    return series.str.lower()
+
+
 class TestSeries(
     TestSeries_apply,
     TestSeries_map,
@@ -5993,6 +5997,16 @@ class TestSeries(
         for ser in series:
             S = pd.Series(ser)
             pd.testing.assert_series_equal(cfunc(S), islower_usecase(S))
+
+    def test_series_lower_str(self):
+        series = [['leopard', 'Golden Eagle', 'SNAKE', ''],
+                  ['Hello world!', 'hello 123', 'mynameisPeter']
+                  ]
+
+        cfunc = self.jit(lower_usecase)
+        for ser in series:
+            S = pd.Series(ser)
+            pd.testing.assert_series_equal(cfunc(S), lower_usecase(S))
 
     @skip_sdc_jit("Series.str.isalnum is not supported yet")
     def test_series_isalnum_str(self):
