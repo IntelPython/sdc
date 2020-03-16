@@ -572,8 +572,12 @@ def _gen_csv_reader_py_pyarrow(col_names, col_typs, usecols, sep, typingctx, tar
 def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, usecols, sep, skiprows, signature=None):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs) if t.dtype == types.NPDatetime('ns'))
-    nb_objmode_vars = ", ".join(["{}='{}'".format(to_varname(cname), _get_dtype_str(t))
-                          for cname, t in zip(col_names, col_typs)])
+    return_columns = usecols if usecols else col_names
+    nb_objmode_vars = ", ".join([
+        "{}='{}'".format(to_varname(cname), _get_dtype_str(t))
+        for cname, t in zip(col_names, col_typs)
+        if cname in return_columns
+    ])
     pd_dtype_strs = ", ".join(["'{}':{}".format(cname, _get_pd_dtype_str(t)) for cname, t in zip(col_names, col_typs)])
 
     if signature is None:
@@ -588,7 +592,7 @@ def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, usecols, sep,
     func_text += "        usecols={},\n".format(usecols)
     func_text += "        sep='{}',\n".format(sep)
     func_text += "    )\n"
-    for cname in col_names:
+    for cname in return_columns:
         func_text += "    {} = df['{}'].values\n".format(to_varname(cname), cname)
         # func_text += "    print({})\n".format(cname)
     return func_text, 'csv_reader_py'
@@ -605,10 +609,11 @@ def _gen_csv_reader_py_pyarrow_func_text(col_names, col_typs, usecols, sep, skip
 def _gen_csv_reader_py_pyarrow_func_text_dataframe(col_names, col_typs, usecols, sep, skiprows, signature):
     func_text, func_name = _gen_csv_reader_py_pyarrow_func_text_core(
         col_names, col_typs, usecols, sep, skiprows, signature)
+    return_columns = usecols if usecols else col_names
 
     func_text += "  return sdc.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
-        ", ".join(to_varname(c) for c in col_names),
-        ", ".join("'{}'".format(c) for c in col_names)
+        ", ".join(to_varname(c) for c in return_columns),
+        ", ".join("'{}'".format(c) for c in return_columns)
     )
 
     return func_text, func_name

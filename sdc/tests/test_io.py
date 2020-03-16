@@ -288,6 +288,9 @@ class TestCSV(TestIO):
     def _read_csv(self, use_pyarrow=False):
         return pd_read_csv if use_pyarrow else pd.read_csv
 
+
+    # inference from parameters
+
     def test_csv_infer_params_default(self):
         read_csv = self._read_csv()
         int_type = self._int_type()
@@ -302,6 +305,20 @@ class TestCSV(TestIO):
         for fname in ["csv_data1.csv", "csv_data2.csv"]:
             with self.subTest(fname=fname):
                 pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
+
+    def test_csv_infer_params_usecols(self):
+        read_csv = self._read_csv()
+        int_type = self._int_type()
+
+        def pyfunc(fname):
+            names = ['A', 'B', 'C', 'D']
+            dtype = {'A': int_type, 'B': np.float, 'C': np.float, 'D': str}
+            usecols = ['B', 'D']
+            return read_csv(fname, names=names, dtype=dtype, usecols=usecols)
+
+        fname = "csv_data1.csv"
+        cfunc = self.jit(pyfunc)
+        pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
 
     def pd_csv1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
@@ -383,7 +400,7 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    def test_csv_infer_sep(self):
+    def test_csv_infer_file_sep(self):
         test_impl = self.pd_csv_infer_file_sep()
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
@@ -396,7 +413,7 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    def test_csv_infer_delimiter(self):
+    def test_csv_infer_file_delimiter(self):
         test_impl = self.pd_csv_infer_file_delimiter()
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
