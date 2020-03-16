@@ -3337,10 +3337,6 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     .. command-output:: python ./series/series_quantile.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter interpolation is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
         `numpy.absolute <https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html#numpy.percentile>`_
