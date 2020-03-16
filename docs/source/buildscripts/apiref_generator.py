@@ -426,6 +426,7 @@ def generate_simple_object_doc(pandas_name, short_doc_flag=False, doc_from_panda
     sdc_obj = get_sdc_object_by_pandas_name(pandas_name)
 
     if pandas_obj == 0:
+        # there is no Pandas documentation, documentation is fully generated from SDC docstring
         doc_from_pandas_flag = False
         if short_doc_flag:
             doc = get_short_description(sdc_obj, sdc_header_flag=True)
