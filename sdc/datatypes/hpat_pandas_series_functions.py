@@ -4273,6 +4273,10 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True):
 
     Pandas API: pandas.Series.cumsum
 
+    Limitations
+    -----------
+    Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_cumsum.py
