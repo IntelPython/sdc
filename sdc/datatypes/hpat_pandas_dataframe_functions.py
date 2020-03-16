@@ -337,6 +337,12 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
 
     Pandas API: pandas.DataFrame.append
 
+    Limitations
+    -----------
+    Parameter ignore_index, verify_integrity, sort are currently unsupported
+    by Intel Scalable Dataframe Compiler
+    Currently only pandas.DataFrame is supported as "other" parameter
+
     Examples
     --------
     .. literalinclude:: ../../../examples/dataframe/dataframe_append.py
