@@ -422,8 +422,14 @@ def generate_simple_object_doc(pandas_name, short_doc_flag=False, doc_from_panda
     if pandas_obj is None:
         return doc  # Empty documentation for no-object
 
+    # Here if additional sections from Intel SDC object needs to be added to pandas_obj docstring
+    sdc_obj = get_sdc_object_by_pandas_name(pandas_name)
+
     if pandas_obj == 0:
         doc_from_pandas_flag = False
+        if short_doc_flag:
+            doc = get_short_description(sdc_obj, sdc_header_flag=True)
+            return reformat(doc)
 
     if doc_from_pandas_flag:  # Check if documentation needs to be generated from Pandas docstring
         if short_doc_flag:  # Check if only short description is needed
@@ -461,12 +467,6 @@ def generate_simple_object_doc(pandas_name, short_doc_flag=False, doc_from_panda
             return reformat(doc)
         else:
             return doc
-
-    # Here if additional sections from Intel SDC object needs to be added to pandas_obj docstring
-    sdc_obj = get_sdc_object_by_pandas_name(pandas_name)
-    if pandas_obj == 0 and short_doc_flag:
-        doc = get_short_description(sdc_obj, sdc_header_flag=True)
-        return reformat(doc)
 
     if sdc_obj is None:
         if unsupported_warning:
