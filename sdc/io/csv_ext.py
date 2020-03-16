@@ -504,17 +504,14 @@ def pandas_read_csv(
     # categories = None
 
     if usecols is not None:
-        include_columns = [f'f{i}' for i in usecols]
-
-    read_options = pyarrow.csv.ReadOptions(
-        skip_rows=skiprows,
-        # column_names=column_names,
-        autogenerate_column_names=autogenerate_column_names,
-    )
-
-    parse_options = pyarrow.csv.ParseOptions(
-        delimiter=sep,
-    )
+        if type(usecols[0]) == str:
+            usecols = [names.index(col) for col in usecols]
+            include_columns = [f'f{i}' for i in usecols]
+        elif type(usecols[0]) == int:
+            include_columns = [f'f{i}' for i in usecols]
+        else:
+            # usecols should be all str or int
+            assert False
 
     # try:
     #     keys = [k for k, v in dtype.items() if isinstance(v, pd.CategoricalDtype)]
@@ -540,6 +537,16 @@ def pandas_read_csv(
             del dtype[name]
     except: pass
 
+    parse_options = pyarrow.csv.ParseOptions(
+        delimiter=sep,
+    )
+
+    read_options = pyarrow.csv.ReadOptions(
+        skip_rows=skiprows,
+        # column_names=column_names,
+        autogenerate_column_names=autogenerate_column_names,
+    )
+
     convert_options = pyarrow.csv.ConvertOptions(
         column_types=dtype,
         strings_can_be_null=True,
@@ -558,7 +565,10 @@ def pandas_read_csv(
     )
 
     if names is not None:
-        dataframe.columns = names
+        if usecols:
+            dataframe.columns = [names[col] for col in usecols]
+        else:
+            dataframe.columns = names
 
     return dataframe
 
