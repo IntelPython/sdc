@@ -359,7 +359,10 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    def pd_csv_infer1(self, use_pyarrow=False):
+
+    # inference from file
+
+    def pd_csv_infer_file_default(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
         def test_impl():
@@ -367,12 +370,12 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    def test_csv_infer1(self):
-        test_impl = self.pd_csv_infer1()
+    def test_csv_infer_file_default(self):
+        test_impl = self.pd_csv_infer_file_default()
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    def pd_csv_infer_sep(self, use_pyarrow=False):
+    def pd_csv_infer_file_sep(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
         def test_impl():
@@ -381,11 +384,11 @@ class TestCSV(TestIO):
         return test_impl
 
     def test_csv_infer_sep(self):
-        test_impl = self.pd_csv_infer_sep()
+        test_impl = self.pd_csv_infer_file_sep()
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    def pd_csv_infer_delimiter(self, use_pyarrow=False):
+    def pd_csv_infer_file_delimiter(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
         def test_impl():
