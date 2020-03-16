@@ -117,32 +117,33 @@ class RewriteReadCsv(Rewrite):
                 # mark that inst is processed
                 inst.consts = self.consts[inst]
 
-                # create names tuple
-                names_var = [val for name, val in inst.value.kws if name == 'names'][0]
-                loc = names_var.loc
+                if 'names' in dict(inst.value.kws):
+                    # create names tuple
+                    names_var = [val for name, val in inst.value.kws if name == 'names'][0]
+                    loc = names_var.loc
 
-                seq, _ = guard(find_build_sequence, self.func_ir, names_var)
-                names_tuple_var = ir.Var(new_block.scope, mk_unique_var("names_tuple"), loc)
+                    seq, _ = guard(find_build_sequence, self.func_ir, names_var)
+                    names_tuple_var = ir.Var(new_block.scope, mk_unique_var("names_tuple"), loc)
 
-                new_block.append(_new_definition(self.func_ir, names_tuple_var,
-                        ir.Expr.build_tuple(items=seq, loc=loc), loc))
+                    new_block.append(_new_definition(self.func_ir, names_tuple_var,
+                            ir.Expr.build_tuple(items=seq, loc=loc), loc))
 
-                # replace names in call
-                inst.value.kws = [(kw[0], names_tuple_var) if kw[0] == "names" else kw for kw in inst.value.kws]
+                    # replace names in call
+                    inst.value.kws = [(kw[0], names_tuple_var) if kw[0] == "names" else kw for kw in inst.value.kws]
 
+                if 'dtype' in dict(inst.value.kws):
+                    # create dtype typle
+                    dtype_var = [val for name, val in inst.value.kws if name == 'dtype'][0]
+                    loc = dtype_var.loc
 
-                # create dtype typle
-                dtype_var = [val for name, val in inst.value.kws if name == 'dtype'][0]
-                loc = dtype_var.loc
+                    seq, _ = guard(find_build_sequence, self.func_ir, dtype_var)
+                    dtype_tuple_var = ir.Var(new_block.scope, mk_unique_var("dtype_tuple"), loc)
 
-                seq, _ = guard(find_build_sequence, self.func_ir, dtype_var)
-                dtype_tuple_var = ir.Var(new_block.scope, mk_unique_var("dtype_tuple"), loc)
+                    new_block.append(_new_definition(self.func_ir, dtype_tuple_var,
+                            ir.Expr.build_tuple(items=sum(map(list, seq), []), loc=loc), loc))
 
-                new_block.append(_new_definition(self.func_ir, dtype_tuple_var,
-                        ir.Expr.build_tuple(items=sum(map(list, seq), []), loc=loc), loc))
-
-                # replace dtype in call
-                inst.value.kws = [(kw[0], dtype_tuple_var) if kw[0] == "dtype" else kw for kw in inst.value.kws]
+                    # replace dtype in call
+                    inst.value.kws = [(kw[0], dtype_tuple_var) if kw[0] == "dtype" else kw for kw in inst.value.kws]
 
                 if 'usecols' in dict(inst.value.kws):
                     # create usecols typle
