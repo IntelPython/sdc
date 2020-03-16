@@ -24,16 +24,23 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+"""
+   Expected result:
+    A    3.0
+    B    6.0
+    C    2.0
+    Name: 2, dtype: float64
+"""
 
 import pandas as pd
 from numba import njit
 
 
 @njit
-def dataframe_at():
-    df = pd.DataFrame({'A': [1.0, 2.0, 3.0, 1.0], 'B': [4, 5, 6, 7], 'C': ['a', 'b', 'c', 'd']})
+def dataframe_loc():
+    df = pd.DataFrame({'A': [1.0, 2.0, 3.0, 1.0], 'B': [4, 5, 6, 7], 'C': [4, 5, 2, 1]})
 
-    return df.at[1, 'C']  # ['b']
+    return df.loc[2]  # ['b']
 
 
-print(dataframe_at())
+print(dataframe_loc())
