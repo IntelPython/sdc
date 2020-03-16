@@ -1760,12 +1760,15 @@ def df_set_column_overload(self, key, value):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
+
     Limitations
     -----------
     - Supported setting a columns in a non-empty DataFrame as a 1D array only.
     - Unsupported change of the Parent DataFrame, returned new DataFrame.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_add_column
     Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_replace_column
     """
