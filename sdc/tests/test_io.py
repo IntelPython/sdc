@@ -407,11 +407,14 @@ class TestCSV(TestIO):
         return test_impl
 
     def test_csv_infer_file_names(self):
+        def test(file_name):
+            test_impl = self.pd_csv_infer_file_names(file_name)
+            hpat_func = self.jit(test_impl)
+            pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
         for file_name in ["csv_data1.csv", "csv_data_infer1.csv"]:
             with self.subTest(file_name=file_name):
-                test_impl = self.pd_csv_infer_file_names(file_name)
-                hpat_func = self.jit(test_impl)
-                pd.testing.assert_frame_equal(hpat_func(), test_impl())
+                test(file_name)
 
     def pd_csv_infer_parallel1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
