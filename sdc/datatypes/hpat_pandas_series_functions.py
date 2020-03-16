@@ -4288,10 +4288,6 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True):
     .. command-output:: python ./series/series_cumsum.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
         `pandas.absolute
