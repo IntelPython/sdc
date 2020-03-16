@@ -355,11 +355,6 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     .. command-output:: python ./dataframe/dataframe_append.py
         :cwd: ../../../examples
 
-    .. note::
-        Parameter ignore_index, verify_integrity, sort are currently unsupported
-        by Intel Scalable Dataframe Compiler
-        Currently only pandas.DataFrame is supported as "other" parameter
-
     .. seealso::
         `pandas.concat <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.concat.html>`_
             General function to concatenate DataFrame or Series objects.
