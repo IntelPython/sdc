@@ -394,7 +394,20 @@ class TestCSV(TestIO):
         return test_impl
 
     def test_csv_infer_delimiter(self):
-        test_impl = self.pd_csv_infer_delimiter()
+        test_impl = self.pd_csv_infer_file_delimiter()
+        hpat_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    def pd_csv_infer_file_names(self, use_pyarrow=False):
+        read_csv = self._read_csv(use_pyarrow)
+
+        def test_impl():
+            return read_csv("csv_data1.csv", names=['A', 'B', 'C', 'D'])
+
+        return test_impl
+
+    def test_csv_infer_file_names(self):
+        test_impl = self.pd_csv_infer_file_names()
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 

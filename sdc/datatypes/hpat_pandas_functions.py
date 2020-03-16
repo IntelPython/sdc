@@ -254,7 +254,7 @@ def sdc_pandas_read_csv(
         col_typs = [dtype[n] for n in col_names]
 
     elif infer_from_file:
-        col_names = 0
+        col_names = names if names else 0
         skiprows, col_names, dtype_map = \
             HiFramesPassImpl.infer_column_names_and_types_from_constant_filename(
                 filepath_or_buffer, skiprows, col_names, sep=delimiter)
