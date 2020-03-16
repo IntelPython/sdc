@@ -1813,9 +1813,9 @@ def sdc_pandas_dataframe_reset_index_codegen(drop, all_params, columns):
         func_lines += [f'  {old_index} = {df}.index']
         result_name.append((old_index, 'index'))
     for i, c in enumerate(columns):
-        result_c = 'result_c'
+        result_c = f'result_{i}'
         func_lines += [
-            f'  {result_c} = get_dataframe_data({df}, {i})'
+            f'  result_{i} = get_dataframe_data({df}, {i})'
         ]
         result_name.append((result_c, c))
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
@@ -1829,7 +1829,7 @@ def sdc_pandas_dataframe_reset_index_codegen(drop, all_params, columns):
     return func_text, global_vars
 
 
-def sdc_pandas_dataframe_reset_index_impl(self, level=None, drop=False, inplace=False, col_level=0, col_fill=''):
+def sdc_pandas_dataframe_reset_index_impl(self, drop=False):
     all_params = ['self', 'level=None', 'drop=False', 'inplace=False', 'col_level=0', 'col_fill=""']
 
     func_text, global_vars = sdc_pandas_dataframe_reset_index_codegen(drop, all_params, self.columns)
@@ -1924,7 +1924,6 @@ def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False
         raise TypingError('{} Unsupported parameter col_fill. Given: {}'.format(func_name, col_fill))
 
     if not isinstance(drop, types.Literal):
-        raise Exception('{} Supported only literally drop.'.format(func_name))
+        raise SDCLimitation('{} only work with Boolean literals drop.'.format(func_name))
 
-    return sdc_pandas_dataframe_reset_index_impl(self, level=level, drop=drop, inplace=inplace,
-                                                 col_level=col_level, col_fill=col_fill)
+    return sdc_pandas_dataframe_reset_index_impl(self, drop=drop)
