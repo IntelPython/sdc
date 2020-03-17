@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -43,13 +43,15 @@ from numba import (types, numpy_support, cgutils)
 from numba.typed import List, Dict
 from numba import prange
 from numba.targets.arraymath import get_isnan
+from pandas.core.indexing import IndexingError
 
 import sdc
 import sdc.datatypes.common_functions as common_functions
 from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric, check_types_comparable,
                                             find_common_dtype_from_numpy_dtypes, has_literal_value,
                                             has_python_value)
-from sdc.datatypes.common_functions import (sdc_join_series_indexes, sdc_arrays_argsort, sdc_check_indexes_equal)
+from sdc.datatypes.common_functions import (sdc_join_series_indexes, sdc_arrays_argsort, sdc_check_indexes_equal,
+                                            sdc_reindex_series)
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
 from sdc.datatypes.hpat_pandas_series_rolling_types import _hpat_pandas_series_rolling_init
@@ -274,49 +276,49 @@ def hpat_pandas_series_getitem(self, idx):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_getitem/series_getitem_scalar_single_result.py
+    .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_scalar_single_result.py
        :language: python
        :lines: 32-
        :caption: Getting Pandas Series elements. Returns single value.
        :name: ex_series_getitem
 
-    .. command-output:: python ./series_getitem/series_getitem_scalar_single_result.py
+    .. command-output:: python ./series/series_getitem/series_getitem_scalar_single_result.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_getitem/series_getitem_scalar_multiple_result.py
+    .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_scalar_multiple_result.py
        :language: python
        :lines: 34-
        :caption: Getting Pandas Series elements. Returns multiple value.
        :name: ex_series_getitem
 
-    .. command-output:: python ./series_getitem/series_getitem_scalar_multiple_result.py
+    .. command-output:: python ./series/series_getitem/series_getitem_scalar_multiple_result.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_getitem/series_getitem_slice.py
+    .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_slice.py
        :language: python
        :lines: 35-
        :caption: Getting Pandas Series elements by slice.
        :name: ex_series_getitem
 
-    .. command-output:: python ./series_getitem/series_getitem_slice.py
+    .. command-output:: python ./series/series_getitem/series_getitem_slice.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_getitem/series_getitem_bool_array.py
+    .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_bool_array.py
        :language: python
        :lines: 37-
        :caption: Getting Pandas Series elements by array of booleans.
        :name: ex_series_getitem
 
-    .. command-output:: python ./series_getitem/series_getitem_bool_array.py
+    .. command-output:: python ./series/series_getitem/series_getitem_bool_array.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_getitem/series_getitem_series.py
+    .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_series.py
        :language: python
        :lines: 36-
        :caption: Getting Pandas Series elements by another Series.
        :name: ex_series_getitem
 
-    .. command-output:: python ./series_getitem/series_getitem_series.py
+    .. command-output:: python ./series/series_getitem/series_getitem_series.py
        :cwd: ../../../examples
 
     .. todo:: Fix SDC behavior and add the expected output of the > python ./series_getitem.py to the docstring
@@ -326,7 +328,7 @@ def hpat_pandas_series_getitem(self, idx):
     Pandas Series operator :attr:`pandas.Series.__getitem__` implementation
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_getitem_series*
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_getitem*
     """
 
     _func_name = 'Operator getitem().'
@@ -365,23 +367,60 @@ def hpat_pandas_series_getitem(self, idx):
 
         return hpat_pandas_series_getitem_idx_slice_impl
 
-    if (
-        isinstance(idx, (types.List, types.Array)) and
-        isinstance(idx.dtype, (types.Boolean, bool))
-    ):
+    if (isinstance(idx, (types.List, types.Array))
+            and isinstance(idx.dtype, (types.Boolean, bool))):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
-            return pandas.Series(data=self._data[idx], index=self.index[idx], name=self._name)
+
+            if len(self) != len(idx):
+                raise IndexError("Item wrong length")
+
+            return pandas.Series(
+                data=numpy_like.getitem_by_mask(self._data, idx),
+                index=numpy_like.getitem_by_mask(self.index, idx),
+                name=self._name
+            )
+
         return hpat_pandas_series_getitem_idx_list_impl
 
-    if (index_is_none and isinstance(idx, SeriesType)):
-        if isinstance(idx.data.dtype, (types.Boolean, bool)):
-            def hpat_pandas_series_getitem_idx_list_impl(self, idx):
-                index = numpy.arange(len(self._data))
-                if (index != idx.index).sum() == 0:
-                    return pandas.Series(data=self._data[idx._data], index=index[idx._data], name=self._name)
+    # idx is Series and it's index is any, idx.dtype is Boolean
+    if (isinstance(idx, SeriesType) and isinstance(idx.dtype, types.Boolean)):
 
-            return hpat_pandas_series_getitem_idx_list_impl
+        none_indexes = isinstance(self.index, types.NoneType) and isinstance(idx.index, types.NoneType)
+        none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
+                                   and (isinstance(idx.index, types.NoneType) or check_index_is_numeric(idx)))
+        if not (none_or_numeric_indexes
+                or check_types_comparable(self.index, idx.index)):
+            msg = '{} The index of boolean indexer is not comparable to Series index.' + \
+                  ' Given: self.index={}, idx.index={}'
+            raise TypingError(msg.format(_func_name, self.index, idx.index))
 
+        def hpat_pandas_series_getitem_idx_bool_indexer_impl(self, idx):
+
+            if none_indexes == True:  # noqa
+                if len(self) > len(idx):
+                    msg = "Unalignable boolean Series provided as indexer " + \
+                          "(index of the boolean Series and of the indexed object do not match)."
+                    raise IndexingError(msg)
+
+                return pandas.Series(
+                    data=numpy_like.getitem_by_mask(self._data, idx._data),
+                    index=numpy_like.getitem_by_mask(self.index, idx._data),
+                    name=self._name
+                )
+            else:
+                self_index = self.index
+                idx_reindexed = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)
+                return pandas.Series(
+                    data=numpy_like.getitem_by_mask(self._data, idx_reindexed._data),
+                    index=numpy_like.getitem_by_mask(self_index, idx_reindexed._data),
+                    name=self._name
+                )
+
+        return hpat_pandas_series_getitem_idx_bool_indexer_impl
+
+    # idx is Series and it's index is None, idx.dtype is not Boolean
+    if (isinstance(idx, SeriesType) and index_is_none
+            and not isinstance(idx.data.dtype, (types.Boolean, bool))):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
             res = numpy.copy(self._data[:len(idx._data)])
             index = numpy.arange(len(self._data))
@@ -392,15 +431,9 @@ def hpat_pandas_series_getitem(self, idx):
             return pandas.Series(data=res, index=index[idx._data], name=self._name)
         return hpat_pandas_series_getitem_idx_list_impl
 
-    if (isinstance(idx, SeriesType) and not isinstance(self.index, types.NoneType)):
-        if isinstance(idx.data.dtype, (types.Boolean, bool)):
-            # Series with str index not implement
-            def hpat_pandas_series_getitem_idx_series_impl(self, idx):
-                if (self._index != idx._index).sum() == 0:
-                    return pandas.Series(data=self._data[idx._data], index=self._index[idx._data], name=self._name)
-
-            return hpat_pandas_series_getitem_idx_series_impl
-
+    # idx is Series and it's index is not None, idx.dtype is not Boolean
+    if (isinstance(idx, SeriesType) and not isinstance(self.index, types.NoneType)
+            and not isinstance(idx.data.dtype, (types.Boolean, bool))):
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
             index = self.index
             data = self._data
@@ -418,6 +451,7 @@ def hpat_pandas_series_getitem(self, idx):
             return pandas.Series(data=data_res, index=index_res, name=self._name)
 
         return hpat_pandas_series_getitem_idx_series_impl
+
 
     raise TypingError('{} The index must be an Number, Slice, String, Boolean Array or a Series.\
                     Given: {}'.format(_func_name, idx))
@@ -439,7 +473,7 @@ def sdc_pandas_series_setitem(self, idx, value):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_setitem_int.py
+    .. literalinclude:: ../../../examples/series/series_setitem_int.py
        :language: python
        :lines: 27-
        :caption: Setting Pandas Series elements
@@ -447,7 +481,7 @@ def sdc_pandas_series_setitem(self, idx, value):
 
     .. code-block:: console
 
-        > python ./series_setitem_int.py
+        > python ./series/series_setitem_int.py
 
             0    0
             1    4
@@ -456,7 +490,7 @@ def sdc_pandas_series_setitem(self, idx, value):
             4    1
             dtype: int64
 
-        > python ./series_setitem_slice.py
+        > python ./series/series_setitem_slice.py
 
             0    5
             1    4
@@ -465,7 +499,7 @@ def sdc_pandas_series_setitem(self, idx, value):
             4    0
             dtype: int64
 
-        > python ./series_setitem_series.py
+        > python ./series/series_setitem_series.py
 
             0    5
             1    0
@@ -746,22 +780,22 @@ def hpat_pandas_series_iloc(self):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_iloc/series_iloc_value.py
+    .. literalinclude:: ../../../examples/series/series_iloc/series_iloc_value.py
        :language: python
        :lines: 27-
        :caption: With a scalar integer.
        :name: ex_series_iloc
 
-    .. command-output:: python ./series_iloc/series_iloc_value.py
+    .. command-output:: python ./series/series_iloc/series_iloc_value.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_iloc/series_iloc_slice.py
+    .. literalinclude:: ../../../examples/series/series_iloc/series_iloc_slice.py
        :language: python
        :lines: 33-
        :caption: With a slice object.
        :name: ex_series_iloc
 
-    .. command-output:: python ./series_iloc/series_iloc_slice.py
+    .. command-output:: python ./series/series_iloc/series_iloc_slice.py
        :cwd: ../../../examples
 
     .. seealso::
@@ -811,31 +845,31 @@ def hpat_pandas_series_loc(self):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_loc/series_loc_single_result.py
+    .. literalinclude:: ../../../examples/series/series_loc/series_loc_single_result.py
        :language: python
        :lines: 32-
        :caption: With a scalar integer. Returns single value.
        :name: ex_series_loc
 
-    .. command-output:: python ./series_loc/series_loc_single_result.py
+    .. command-output:: python ./series/series_loc/series_loc_single_result.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_loc/series_loc_multiple_result.py
+    .. literalinclude:: ../../../examples/series/series_loc/series_loc_multiple_result.py
        :language: python
        :lines: 34-
        :caption: With a scalar integer. Returns multiple value.
        :name: ex_series_loc
 
-    .. command-output:: python ./series_loc/series_loc_multiple_result.py
+    .. command-output:: python ./series/series_loc/series_loc_multiple_result.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_loc/series_loc_slice.py
+    .. literalinclude:: ../../../examples/series/series_loc/series_loc_slice.py
        :language: python
        :lines: 34-
        :caption: With a slice object. Returns multiple value.
        :name: ex_series_loc
 
-    .. command-output:: python ./series_loc/series_loc_slice.py
+    .. command-output:: python ./series/series_loc/series_loc_slice.py
        :cwd: ../../../examples
 
     .. seealso::
@@ -881,13 +915,13 @@ def hpat_pandas_series_iat(self):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_iat.py
+    .. literalinclude:: ../../../examples/series/series_iat.py
        :language: python
        :lines: 27-
        :caption: Get value at specified index position.
        :name: ex_series_iat
 
-    .. command-output:: python ./series_iat.py
+    .. command-output:: python ./series/series_iat.py
        :cwd: ../../../examples
 
     .. seealso::
@@ -930,22 +964,22 @@ def hpat_pandas_series_at(self):
 
     Examples
     --------
-    .. literalinclude:: ../../../examples/series_at/series_at_single_result.py
+    .. literalinclude:: ../../../examples/series/series_at/series_at_single_result.py
        :language: python
        :lines: 27-
        :caption: With a scalar integer. Returns single value.
        :name: ex_series_at
 
-    .. command-output:: python ./series_at/series_at_single_result.py
+    .. command-output:: python ./series/series_at/series_at_single_result.py
        :cwd: ../../../examples
 
-    .. literalinclude:: ../../../examples/series_at/series_at_multiple_result.py
+    .. literalinclude:: ../../../examples/series/series_at/series_at_multiple_result.py
        :language: python
        :lines: 27-
        :caption: With a scalar integer. Returns multiple value.
        :name: ex_series_at
 
-    .. command-output:: python ./series_at/series_at_multiple_result.py
+    .. command-output:: python ./series/series_at/series_at_multiple_result.py
        :cwd: ../../../examples
 
     .. seealso::
@@ -1782,7 +1816,7 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
     # Return npytypes.Array from npytypes.Array for astype(types.functions.NumberClass), example - astype(np.int64)
     # Return npytypes.Array from npytypes.Array for astype(types.StringLiteral), example - astype('int64')
     def hpat_pandas_series_astype_numba_impl(self, dtype, copy=True, errors='raise'):
-        return pandas.Series(data=numpy_like.astype(self._data, dtype), index=self._index, name=self._name)
+        return pandas.Series(data=numpy_like.astype_no_inline(self._data, dtype), index=self._index, name=self._name)
 
     # Return self
     def hpat_pandas_series_astype_no_modify_impl(self, dtype, copy=True, errors='raise'):
@@ -3459,7 +3493,7 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if not isinstance(interpolation, types.Omitted) and interpolation is not 'linear':
+    if not isinstance(interpolation, types.Omitted) and interpolation != 'linear':
         ty_checker.raise_exc(interpolation, 'str', 'interpolation')
 
     if not isinstance(q, (int, float, list, types.Number, types.Omitted, types.List)):
