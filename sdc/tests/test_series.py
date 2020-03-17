@@ -5999,13 +5999,13 @@ class TestSeries(
             pd.testing.assert_series_equal(cfunc(S), islower_usecase(S))
 
     def test_series_lower_str(self):
-        series = [['leopard', 'Golden Eagle', 'SNAKE', ''],
+        all_data = [['leopard', 'Golden Eagle', 'SNAKE', ''],
                   ['Hello world!', 'hello 123', 'mynameisPeter']
                   ]
 
         cfunc = self.jit(lower_usecase)
-        for ser in series:
-            S = pd.Series(ser)
+        for data in all_data:
+            S = pd.Series(data)
             pd.testing.assert_series_equal(cfunc(S), lower_usecase(S))
 
     @skip_sdc_jit("Series.str.isalnum is not supported yet")
