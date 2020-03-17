@@ -3880,8 +3880,8 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
 
     Limitations
     -----------
-    Parameters axis, skipna are currently unsupported by Intel Scalable Dataframe Compiler.
-    Parameter skipna unsupported with str data.
+    Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler.
+    Parameter skipna is unsupported with str data.
 
     Examples
     --------
