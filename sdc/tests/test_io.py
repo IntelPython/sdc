@@ -336,24 +336,6 @@ class TestCSV(TestIO):
         cfunc = self.jit(pyfunc)
         pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
 
-    def pd_csv1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
-        int_type = self._int_type()
-
-        def test_impl():
-            return read_csv("csv_data1.csv",
-                            names=['A', 'B', 'C', 'D'],
-                            dtype={'A': int_type, 'B': np.float, 'C': np.float, 'D': str},
-                            )
-
-        return test_impl
-
-    @skip_numba_jit
-    def test_csv1(self):
-        test_impl = self.pd_csv1()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
-
     def pd_csv_keys1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
         int_type = self._int_type()
