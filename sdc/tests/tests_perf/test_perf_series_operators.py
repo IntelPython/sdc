@@ -25,6 +25,7 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy as np
 import time
 import random
 
@@ -49,11 +50,14 @@ class TestSeriesOperatorMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
+    def _test_case(self, pyfunc, name, total_data_length, input_data=None, data_num=1, data_gens=None):
         test_name = 'Series.{}'.format(name)
 
-        if input_data is None:
-            input_data = test_global_input_data_float64
+        data_num = len(data_gens) if data_gens is not None else data_num
+        default_data_gens = [gen_series] * data_num
+        data_gens = data_gens or default_data_gens
+        default_input_data = [np.asarray(test_global_input_data_float64).flatten()] + [None] * (data_num - 1)
+        input_data = input_data or default_input_data
 
         for data_length in total_data_length:
             base = {
@@ -61,8 +65,7 @@ class TestSeriesOperatorMethods(TestBase):
                 "data_size": data_length,
             }
 
-            args = gen_series(data_num, data_length, input_data)
-
+            args = tuple(gen(data_length, input_data=input_data[i]) for i, gen in enumerate(data_gens))
             self._test_jit(pyfunc, base, *args)
             self._test_py(pyfunc, base, *args)
 
