@@ -142,7 +142,8 @@ class RewriteReadCsv(Rewrite):
                 for key, value in consts.items():
                     if key not in dict(inst.value.kws):
                         continue
-                    # create tuple variable
+
+                    # collecting data from current variable
                     current_var = [val for name, val in inst.value.kws if name == key][0]
                     loc = current_var.loc
 
@@ -156,6 +157,7 @@ class RewriteReadCsv(Rewrite):
                     else:
                         continue
 
+                    # create tuple variable
                     tuple_var = ir.Var(new_block.scope, mk_unique_var(f"{key}_tuple"), loc)
                     new_block.append(_new_definition(self.func_ir, tuple_var,
                                      ir.Expr.build_tuple(items=items, loc=loc), loc))
