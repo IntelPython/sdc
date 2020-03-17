@@ -98,6 +98,10 @@ class RewriteReadCsv(Rewrite):
     _read_csv_const_args = ('names', 'dtype', 'usecols')
 
     def match(self, func_ir, block, typemap, calltypes):
+        # TODO: 1. save instructions of build_map, build_list for read_csv params
+        # 2. check that vars are used only in read_csv
+        # 3. replace vars with build_tuple inplace
+
         self.func_ir = func_ir
         self.block = block
         self.consts = consts = {}
