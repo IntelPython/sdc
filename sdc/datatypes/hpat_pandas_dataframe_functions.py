@@ -795,14 +795,14 @@ def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     Limitations
     -----------
-    Parameters axis, skipna, level, numeric_only unsupported.
+    Parameters axis, skipna, level, numeric_only are unsupported.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/dataframe/dataframe_max.py
        :language: python
        :lines: 35-
-       :caption: Return the maximum of the values for the requested axis.
+       :caption: Return the maximum of the values for the columns.
        :name: ex_dataframe_max
 
     .. command-output:: python ./dataframe/dataframe_max.py
