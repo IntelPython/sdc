@@ -1562,6 +1562,7 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
     raise TypingError('Operator getitem(). Unknown accessor. Only "loc", "iloc", "at", "iat" are supported.\
                       Given: {}'.format(accessor))
 
+
 @sdc_overload_attribute(DataFrameType, 'iat')
 def sdc_pandas_dataframe_iat(self):
     """
