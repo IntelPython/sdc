@@ -114,9 +114,7 @@ def sdc_pandas_series_binop(self, other, level=None, fill_value=None, axis=0):
 
     if not isinstance(axis, types.Omitted) and axis != 0:
         ty_checker.raise_exc(axis, 'int', 'axis')
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     # specializations for numeric series only
     if not operands_are_series:
         def _series_binop_scalar_impl(self, other, level=None, fill_value=None, axis=0):
@@ -281,9 +279,7 @@ def sdc_pandas_series_comp_binop(self, other, level=None, fill_value=None, axis=
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     if not operands_are_series:
         def _series_comp_binop_scalar_impl(self, other, level=None, fill_value=None, axis=0):
             if not (fill_value is None or numpy.isnan(fill_value)):

@@ -122,9 +122,7 @@ def sdc_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     if not isinstance(axis, types.Omitted) and axis != 0:
         ty_checker.raise_exc(axis, 'int', 'axis')
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     # specializations for numeric series only
     if not operands_are_series:
         def _series_add_scalar_impl(self, other, level=None, fill_value=None, axis=0):
@@ -291,9 +289,7 @@ def sdc_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
 
     if not isinstance(axis, types.Omitted) and axis != 0:
         ty_checker.raise_exc(axis, 'int', 'axis')
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     # specializations for numeric series only
     if not operands_are_series:
         def _series_sub_scalar_impl(self, other, level=None, fill_value=None, axis=0):
@@ -460,9 +456,7 @@ def sdc_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     if not isinstance(axis, types.Omitted) and axis != 0:
         ty_checker.raise_exc(axis, 'int', 'axis')
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     # specializations for numeric series only
     if not operands_are_series:
         def _series_mul_scalar_impl(self, other, level=None, fill_value=None, axis=0):
@@ -629,9 +623,7 @@ def sdc_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0):
 
     if not isinstance(axis, types.Omitted) and axis != 0:
         ty_checker.raise_exc(axis, 'int', 'axis')
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     # specializations for numeric series only
     if not operands_are_series:
         def _series_truediv_scalar_impl(self, other, level=None, fill_value=None, axis=0):
@@ -798,9 +790,7 @@ def sdc_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0)
 
     if not isinstance(axis, types.Omitted) and axis != 0:
         ty_checker.raise_exc(axis, 'int', 'axis')
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     # specializations for numeric series only
     if not operands_are_series:
         def _series_floordiv_scalar_impl(self, other, level=None, fill_value=None, axis=0):
@@ -967,9 +957,7 @@ def sdc_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
 
     if not isinstance(axis, types.Omitted) and axis != 0:
         ty_checker.raise_exc(axis, 'int', 'axis')
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     # specializations for numeric series only
     if not operands_are_series:
         def _series_mod_scalar_impl(self, other, level=None, fill_value=None, axis=0):
@@ -1136,9 +1124,7 @@ def sdc_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
 
     if not isinstance(axis, types.Omitted) and axis != 0:
         ty_checker.raise_exc(axis, 'int', 'axis')
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     # specializations for numeric series only
     if not operands_are_series:
         def _series_pow_scalar_impl(self, other, level=None, fill_value=None, axis=0):
@@ -1304,9 +1290,7 @@ def sdc_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     if not operands_are_series:
         def _series_lt_scalar_impl(self, other, level=None, fill_value=None, axis=0):
             if not (fill_value is None or numpy.isnan(fill_value)):
@@ -1435,9 +1419,7 @@ def sdc_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     if not operands_are_series:
         def _series_gt_scalar_impl(self, other, level=None, fill_value=None, axis=0):
             if not (fill_value is None or numpy.isnan(fill_value)):
@@ -1566,9 +1548,7 @@ def sdc_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     if not operands_are_series:
         def _series_le_scalar_impl(self, other, level=None, fill_value=None, axis=0):
             if not (fill_value is None or numpy.isnan(fill_value)):
@@ -1697,9 +1677,7 @@ def sdc_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     if not operands_are_series:
         def _series_ge_scalar_impl(self, other, level=None, fill_value=None, axis=0):
             if not (fill_value is None or numpy.isnan(fill_value)):
@@ -1828,9 +1806,7 @@ def sdc_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     if not operands_are_series:
         def _series_ne_scalar_impl(self, other, level=None, fill_value=None, axis=0):
             if not (fill_value is None or numpy.isnan(fill_value)):
@@ -1959,9 +1935,7 @@ def sdc_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    fill_value_is_none = False
-    if isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None:
-        fill_value_is_none = True
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     if not operands_are_series:
         def _series_eq_scalar_impl(self, other, level=None, fill_value=None, axis=0):
             if not (fill_value is None or numpy.isnan(fill_value)):
