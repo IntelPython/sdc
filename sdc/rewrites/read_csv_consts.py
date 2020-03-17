@@ -87,6 +87,8 @@ class RewriteReadCsv(Rewrite):
         ('read_csv', 'pandas.io.parsers'),  # for calls like read_csv = pandas.read_csv, read_csv()
     ]
 
+    _read_csv_const_args = ('names', 'dtype', 'usecols')
+
     def match(self, func_ir, block, typemap, calltypes):
         self.func_ir = func_ir
         self.block = block
@@ -107,6 +109,8 @@ class RewriteReadCsv(Rewrite):
                 continue
             # collect constant parameters
             for key, var in expr.kws:
+                if key not in self._read_csv_const_args:
+                    continue
                 try:
                     const = func_ir.infer_constant(var)
                 except errors.ConstantInferenceError:
@@ -132,7 +136,7 @@ class RewriteReadCsv(Rewrite):
                     names_tuple_var = ir.Var(new_block.scope, mk_unique_var("names_tuple"), loc)
 
                     new_block.append(_new_definition(self.func_ir, names_tuple_var,
-                            ir.Expr.build_tuple(items=seq, loc=loc), loc))
+                                     ir.Expr.build_tuple(items=seq, loc=loc), loc))
 
                     # replace names in call
                     inst.value.kws = [(kw[0], names_tuple_var) if kw[0] == "names" else kw for kw in inst.value.kws]
