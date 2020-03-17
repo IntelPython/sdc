@@ -26,12 +26,9 @@
 
 from numba.rewrites import (register_rewrite, Rewrite)
 from numba.ir_utils import (
-    find_build_sequence,
     find_callname,
-    get_definition,
     guard,
     mk_unique_var,
-    require,
 )
 from numba.ir import (Expr)
 from numba import ir, errors
@@ -59,11 +56,11 @@ from sdc.config import config_pipeline_hpat_default
 
 
 def find_build_sequence(func_ir, var):
-    """Check if a variable is constructed via build_tuple or
-    build_list or build_set, and return the sequence and the
-    operator, or raise GuardException otherwise.
-    Note: only build_tuple is immutable, so use with care.
+    """Reimplemented from numba.ir_utils.find_build_sequence
+    Added 'build_map' to build_ops list.
     """
+    from numba.ir_utils import (require, get_definition)
+
     require(isinstance(var, ir.Var))
     var_def = get_definition(func_ir, var)
     require(isinstance(var_def, ir.Expr))
