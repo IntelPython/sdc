@@ -81,9 +81,9 @@ class ConstantInference(consts.ConstantInference):
 
     def _infer_expr(self, expr):
         if expr.op == 'build_map':
-            const = {self.infer_constant(k.name, loc=expr.loc): self.infer_constant(v.name, loc=expr.loc) for k, v in
-                     expr.items}
-            return const
+            def inf_const(value):
+                return self.infer_constant(value.name, loc=expr.loc)
+            return {inf_const(k): inf_const(v) for k, v in expr.items}
         return super()._infer_expr(expr)
 
 
