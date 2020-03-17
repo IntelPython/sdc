@@ -1123,6 +1123,23 @@ class TestDataFrame(TestCase):
                     )
                     pd.testing.assert_frame_equal(sdc_func(df), ref_impl(df))
 
+    def test_df_copy(self):
+        def test_impl(df, deep):
+            return df.copy(deep=deep)
+
+        sdc_func = sdc.jit(test_impl)
+        indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e'], None]
+        cases_deep = [None, True, False]
+
+        for idx in indexes:
+            df = pd.DataFrame({"A": [3.2, np.nan, 7.0, 3.3, np.nan],
+                               "B": [3, 4, 1, 0, 222],
+                               "C": [True, True, False, False, True],
+                               "D": ['a', 'dd', 'c', '12', None]}, index=idx)
+            for deep in cases_deep:
+                with self.subTest(index=idx, deep=deep):
+                    pd.testing.assert_frame_equal(sdc_func(df, deep), test_impl(df, deep))
+
     def test_pct_change1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
