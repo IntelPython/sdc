@@ -82,8 +82,10 @@ class RewriteReadCsv(Rewrite):
     Searches for calls of pandas.read_csv() and replace it with calls of read_csv.
     """
 
-    _pandas_read_csv = ('read_csv', 'pandas.io.parsers')
-    _read_csv_arg_list = ('dtype', 'names')
+    _pandas_read_csv_calls = [
+        ('read_csv', 'pandas'),             # for calls like pandas.read_csv()
+        ('read_csv', 'pandas.io.parsers'),  # for calls like read_csv = pandas.read_csv, read_csv()
+    ]
 
     def match(self, func_ir, block, typemap, calltypes):
         self.func_ir = func_ir
@@ -92,23 +94,24 @@ class RewriteReadCsv(Rewrite):
 
         # Find all assignments with a right-hand read_csv() call
         for inst in block.find_insts(ir.Assign):
-            if isinstance(inst.value, ir.Expr) and inst.value.op == 'call':
-                expr = inst.value
-                call = guard(find_callname, func_ir, inst.value)
-                if call is not None and call in [
-                        ('read_csv', 'pandas.io.parsers'),
-                        ('read_csv', 'pandas'),
-                ]:
-                    if hasattr(inst, 'consts'):
-                        # Already rewritten
-                        continue
-
-                    for key, var in expr.kws:
-                        try:
-                            const = func_ir.infer_constant(var)
-                        except errors.ConstantInferenceError:
-                            continue
-                        consts.setdefault(inst, {})[key] = const
+            if not isinstance(inst.value, ir.Expr):
+                continue
+            expr = inst.value
+            if expr.op != 'call':
+                continue
+            call = guard(find_callname, func_ir, expr)
+            if call not in self._pandas_read_csv_calls:
+                continue
+            # protect from repeat rewriting
+            if hasattr(inst, 'consts'):
+                continue
+            # collect constant parameters
+            for key, var in expr.kws:
+                try:
+                    const = func_ir.infer_constant(var)
+                except errors.ConstantInferenceError:
+                    continue
+                consts.setdefault(inst, {})[key] = const
 
         return len(consts) > 0
 
@@ -143,7 +146,7 @@ class RewriteReadCsv(Rewrite):
                     dtype_tuple_var = ir.Var(new_block.scope, mk_unique_var("dtype_tuple"), loc)
 
                     new_block.append(_new_definition(self.func_ir, dtype_tuple_var,
-                            ir.Expr.build_tuple(items=sum(map(list, seq), []), loc=loc), loc))
+                                     ir.Expr.build_tuple(items=sum(map(list, seq), []), loc=loc), loc))
 
                     # replace dtype in call
                     inst.value.kws = [(kw[0], dtype_tuple_var) if kw[0] == "dtype" else kw for kw in inst.value.kws]
@@ -157,7 +160,7 @@ class RewriteReadCsv(Rewrite):
                     usecols_tuple_var = ir.Var(new_block.scope, mk_unique_var("usecols_tuple"), loc)
 
                     new_block.append(_new_definition(self.func_ir, usecols_tuple_var,
-                            ir.Expr.build_tuple(items=seq, loc=loc), loc))
+                                     ir.Expr.build_tuple(items=seq, loc=loc), loc))
 
                     # replace usecols in call
                     inst.value.kws = [(kw[0], usecols_tuple_var) if kw[0] == "usecols" else kw for kw in inst.value.kws]
