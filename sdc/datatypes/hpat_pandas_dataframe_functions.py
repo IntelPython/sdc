@@ -36,9 +36,12 @@ import numpy
 import sdc
 
 
+from pandas.core.indexing import IndexingError
+
 from numba import types
 from numba.special import literally
 from numba.typed import List, Dict
+from numba.errors import TypingError
 from pandas.core.indexing import IndexingError
 
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
@@ -49,7 +52,8 @@ from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric,
 from sdc.str_arr_ext import StringArrayType
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
-
+from sdc.datatypes.hpat_pandas_dataframe_getitem_types import (DataFrameGetitemAccessorType,
+                                                               dataframe_getitem_accessor_init)
 from sdc.datatypes.common_functions import SDCLimitation
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
@@ -1569,6 +1573,83 @@ def sdc_pandas_dataframe_getitem(self, idx):
     ty_checker = TypeChecker('Operator getitem().')
     expected_types = 'str, tuple(str), slice, series(bool), array(bool)'
     ty_checker.raise_exc(idx, expected_types, 'idx')
+
+
+@sdc_overload(operator.getitem)
+def sdc_pandas_dataframe_accessor_getitem(self, idx):
+    if not isinstance(self, DataFrameGetitemAccessorType):
+        return None
+
+    accessor = self.accessor.literal_value
+
+    if accessor == 'iat':
+        if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
+            col = idx[1].literal_value
+            if -1 < col < len(self.dataframe.columns):
+                def df_getitem_iat_tuple_impl(self, idx):
+                    row, _ = idx
+                    if -1 < row < len(self._dataframe.index):
+                        data = get_dataframe_data(self._dataframe, col)
+                        res_data = pandas.Series(data)
+                        return res_data.iat[row]
+
+                    raise IndexingError('Index is out of bounds for axis')
+
+                return df_getitem_iat_tuple_impl
+
+            raise IndexingError('Index is out of bounds for axis')
+
+        raise TypingError('Operator getitem(). The index must be a row and literal column. Given: {}'.format(idx))
+
+    raise TypingError('Operator getitem(). Unknown accessor. Only "loc", "iloc", "at", "iat" are supported.\
+                      Given: {}'.format(accessor))
+
+
+@sdc_overload_attribute(DataFrameType, 'iat')
+def sdc_pandas_dataframe_iat(self):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.DataFrame.iat
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_iat.py
+       :language: python
+       :lines: 28-
+       :caption: Get value at specified index position.
+       :name: ex_dataframe_iat
+
+    .. command-output:: python ./dataframe/dataframe_iat.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.at <pandas.DataFrame.at>`
+            Access a single value for a row/column label pair.
+
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Purely label-location based indexer for selection by label.
+
+        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+            Access group of rows and columns by integer position(s).
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.DataFrame.iat` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_dataframe_iat*
+    """
+
+    ty_checker = TypeChecker('Attribute iat().')
+    ty_checker.check(self, DataFrameType)
+
+    def sdc_pandas_dataframe_iat_impl(self):
+        return dataframe_getitem_accessor_init(self, 'iat')
+
+    return sdc_pandas_dataframe_iat_impl
 
 
 @sdc_overload_method(DataFrameType, 'pct_change')

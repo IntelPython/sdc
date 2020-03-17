@@ -34,6 +34,7 @@ import unittest
 from itertools import permutations, product
 from numba.config import IS_32BITS
 from numba.special import literal_unroll
+from numba.errors import TypingError
 
 import sdc
 from sdc.datatypes.common_functions import SDCLimitation
@@ -1075,6 +1076,29 @@ class TestDataFrame(TestCase):
                                    "string": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
                 with self.subTest(n=n, index=idx):
                     pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
+
+    def test_df_iat(self):
+        def test_impl(df):
+            return df.iat[0, 1]
+        sdc_func = sdc.jit(test_impl)
+        idx = [3, 4, 2, 6, 1]
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
+        self.assertEqual(sdc_func(df), test_impl(df))
+
+    def test_df_iat_value_error(self):
+        def test_impl(df):
+            return df.iat[1, 22]
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": ['a', 'dd', 'c', '12', 'ddf']})
+
+        with self.assertRaises(TypingError) as raises:
+            sdc_func(df)
+        msg = 'Index is out of bounds for axis'
+        self.assertIn(msg, str(raises.exception))
 
     def test_df_head(self):
         def get_func(n):
