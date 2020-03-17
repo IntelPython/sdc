@@ -236,7 +236,6 @@ class TestCSV(TestIO):
 
     def test_pyarrow(self):
         tests = [
-            "csv1",
             "csv_keys1",
             "csv_const_dtype1",
             "csv_infer_file_default",
