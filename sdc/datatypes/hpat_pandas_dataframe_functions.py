@@ -1542,7 +1542,7 @@ def df_getitem_tuple_iat_codegen(self, row, col):
     """
     func_lines = ['def _df_getitem_tuple_iat_impl(self, idx):',
                   '  row, _ = idx']
-    if col in range(len(self.columns)):
+    if -1 < col < len(self.columns):
         func_lines += [
             f"  data = get_dataframe_data(self._dataframe, {col})",
             f"  res_data = pandas.Series(data)",
