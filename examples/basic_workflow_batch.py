@@ -27,10 +27,9 @@
 import pandas as pd
 from numba import njit
 import numpy as np
-import sdc
 
 
-# Dataset for analysis
+# Datasets for analysis
 file_names = [
     "employees_batch1.csv",
     "employees_batch2.csv",
@@ -41,7 +40,7 @@ file_names = [
 @njit(parallel=True)
 def get_analyzed_data(file_name):
     df = pd.read_csv(file_name,
-                     dtype={'Bonus %': np.float, 'First Name': str},
+                     dtype={'Bonus %': np.float64, 'First Name': str},
                      usecols=['Bonus %', 'First Name'])
     s_bonus = pd.Series(df['Bonus %'])
     s_first_name = pd.Series(df['First Name'])
