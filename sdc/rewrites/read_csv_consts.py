@@ -24,35 +24,11 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from numba.rewrites import (register_rewrite, Rewrite)
-from numba.ir_utils import (
-    find_callname,
-    guard,
-    mk_unique_var,
-)
-from numba.ir import (Expr)
-from numba import ir, errors
-from numba.extending import overload
-from numba import types
-from numba import consts
-from numba.types import (
-    literal
-)
+from numba.rewrites import register_rewrite, Rewrite
+from numba.ir_utils import find_callname, guard, mk_unique_var
+from numba import ir, errors, consts
 
-from pandas import DataFrame
-
-from sdc.rewrites.ir_utils import (find_operations, is_dict,
-                                   get_tuple_items, get_dict_items, remove_unused_recursively,
-                                   get_call_parameters,
-                                   declare_constant,
-                                   import_function, make_call,
-                                   insert_before)
-from sdc.hiframes.pd_dataframe_ext import (init_dataframe, DataFrameType)
-from sdc.io.csv_ext import (pandas_read_csv)
-
-from sdc.hiframes.api import fix_df_array
-
-from sdc.config import config_pipeline_hpat_default
+from sdc.rewrites.ir_utils import remove_unused_recursively
 
 
 def find_build_sequence(func_ir, var):
