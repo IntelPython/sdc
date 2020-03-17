@@ -6000,8 +6000,8 @@ class TestSeries(
 
     def test_series_lower_str(self):
         all_data = [['leopard', 'Golden Eagle', 'SNAKE', ''],
-                  ['Hello world!', 'hello 123', 'mynameisPeter']
-                  ]
+                    ['Hello world!', 'hello 123', 'mynameisPeter']
+                    ]
 
         cfunc = self.jit(lower_usecase)
         for data in all_data:
