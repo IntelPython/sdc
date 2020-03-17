@@ -36,9 +36,12 @@ import numpy
 import sdc
 
 
+from pandas.core.indexing import IndexingError
+
 from numba import types
 from numba.special import literally
 from numba.typed import List, Dict
+from numba.errors import TypingError
 
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.hiframes.pd_series_type import SeriesType
@@ -48,7 +51,8 @@ from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric,
 from sdc.str_arr_ext import StringArrayType
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
-from sdc.datatypes.hpat_pandas_dataframe_getitem_types import DataFrameGetitemAccessorType
+from sdc.datatypes.hpat_pandas_dataframe_getitem_types import (DataFrameGetitemAccessorType,
+                                                               dataframe_getitem_accessor_init)
 from sdc.datatypes.common_functions import SDCLimitation
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
@@ -1529,42 +1533,6 @@ def sdc_pandas_dataframe_getitem(self, idx):
     ty_checker.raise_exc(idx, expected_types, 'idx')
 
 
-def df_getitem_tuple_iat_codegen(self, row, col):
-    """
-    Example of generated implementation:
-        def _df_getitem_tuple_iat_impl(self, idx):
-            row, _ = idx
-            data = get_dataframe_data(self._dataframe, 1)
-            res_data = pandas.Series(data)
-            return res_data.iat[row]
-    """
-    func_lines = ['def _df_getitem_tuple_iat_impl(self, idx):',
-                  '  row, _ = idx']
-    if -1 < col < len(self.columns):
-        func_lines += [
-            f"  data = get_dataframe_data(self._dataframe, {col})",
-            f"  res_data = pandas.Series(data)",
-            f"  return res_data.iat[row]",
-        ]
-    else:
-        func_lines += ["  raise ValueError('Index is out of bounds for axis')"]
-
-    func_text = '\n'.join(func_lines)
-    global_vars = {'pandas': pandas,
-                   'get_dataframe_data': get_dataframe_data}
-
-    return func_text, global_vars
-
-
-def gen_df_getitem_tuple_iat_impl(self, row, col):
-    func_text, global_vars = df_getitem_tuple_iat_codegen(self, row, col)
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _reduce_impl = loc_vars['_df_getitem_tuple_iat_impl']
-
-    return _reduce_impl
-
-
 @sdc_overload(operator.getitem)
 def sdc_pandas_dataframe_accessor_getitem(self, idx):
     if not isinstance(self, DataFrameGetitemAccessorType):
@@ -1573,11 +1541,26 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
     accessor = self.accessor.literal_value
 
     if accessor == 'iat':
-        if isinstance(idx, types.Tuple):
-            row = idx[0]
+        if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
             col = idx[1].literal_value
-            return gen_df_getitem_tuple_iat_impl(self.dataframe, row, col)
+            if -1 < col < len(self.dataframe.columns):
+                def df_getitem_iat_tuple_impl(self, idx):
+                    row, _ = idx
+                    if -1 < row < len(self._dataframe.index):
+                        data = get_dataframe_data(self._dataframe, col)
+                        res_data = pandas.Series(data)
+                        return res_data.iat[row]
 
+                    raise IndexingError('Index is out of bounds for axis')
+
+                return df_getitem_iat_tuple_impl
+
+            raise IndexingError('Index is out of bounds for axis')
+
+        raise TypingError('Operator getitem(). The index must be a row and literal column. Given: {}'.format(idx))
+
+    raise TypingError('Operator getitem(). Unknown accessor. Only "loc", "iloc", "at", "iat" are supported.\
+                      Given: {}'.format(accessor))
 
 @sdc_overload_attribute(DataFrameType, 'iat')
 def sdc_pandas_dataframe_iat(self):
@@ -1621,7 +1604,7 @@ def sdc_pandas_dataframe_iat(self):
     ty_checker.check(self, DataFrameType)
 
     def sdc_pandas_dataframe_iat_impl(self):
-        return sdc.datatypes.hpat_pandas_dataframe_getitem_types.dataframe_getitem_accessor_init(self, 'iat')
+        return dataframe_getitem_accessor_init(self, 'iat')
 
     return sdc_pandas_dataframe_iat_impl
 

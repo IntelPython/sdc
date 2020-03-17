@@ -34,6 +34,7 @@ import unittest
 from itertools import permutations, product
 from numba.config import IS_32BITS
 from numba.special import literal_unroll
+from numba.errors import TypingError
 
 import sdc
 from sdc.datatypes.common_functions import SDCLimitation
@@ -1065,7 +1066,7 @@ class TestDataFrame(TestCase):
                            "B": [3, 4, 1, 0, 222],
                            "C": ['a', 'dd', 'c', '12', 'ddf']})
 
-        with self.assertRaises(ValueError) as raises:
+        with self.assertRaises(TypingError) as raises:
             sdc_func(df)
         msg = 'Index is out of bounds for axis'
         self.assertIn(msg, str(raises.exception))
