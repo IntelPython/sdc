@@ -1554,7 +1554,6 @@ class TestDataFrame(TestCase):
                     sdc_func(df, arr)
                 self.assertIn('Item wrong length', str(raises.exception))
 
-
     @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx(self):
         dfs = [gen_df(test_global_input_data_float64),
@@ -1593,7 +1592,6 @@ class TestDataFrame(TestCase):
                 self._test_df_getitem_bool_series_even_idx(df)
                 self._test_df_getitem_bool_array_even_idx(df)
 
-    @unittest.skip('DF.getitem df[bool_series] unsupported index')
     def test_df_getitem_bool_series_even_idx_with_index(self):
         df = gen_df(test_global_input_data_float64, with_index=True)
         self._test_df_getitem_bool_series_even_idx(df)

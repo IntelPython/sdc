@@ -39,6 +39,7 @@ import sdc
 from numba import types
 from numba.special import literally
 from numba.typed import List, Dict
+from pandas.core.indexing import IndexingError
 
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
 from sdc.hiframes.pd_series_type import SeriesType
@@ -57,7 +58,8 @@ from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
 from sdc.hiframes.api import isna
-
+from sdc.functions.numpy_like import getitem_by_mask
+from sdc.datatypes.common_functions import _sdc_take, sdc_reindex_series
 
 @sdc_overload_attribute(DataFrameType, 'index')
 def hpat_pandas_dataframe_index(df):
@@ -1309,22 +1311,50 @@ def df_getitem_tuple_idx_main_codelines(self, literal_idx):
 
 def df_getitem_bool_series_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem"""
-    func_lines = [f'  length = {df_length_expr(self)}',
-                  f'  _idx_data = idx._data[:length]',
-                  f'  res_index = {df_index_expr(self, length_expr="length")}']
 
-    results = []
-    for i, col in enumerate(self.columns):
-        res_data = f'res_data_{i}'
+    # optimization for default indexes in df and idx when index alignment is trivial
+    if (isinstance(self.index, types.NoneType) and isinstance(idx.index, types.NoneType)):
+        func_lines = [f'  length = {df_length_expr(self)}',
+                      f'  if length > len(idx):',
+                      f'    msg = "Unalignable boolean Series provided as indexer " + \\',
+                      f'          "(index of the boolean Series and of the indexed object do not match)."',
+                      f'    raise IndexingError(msg)',
+                      f'  # do not trim idx._data to length as getitem_by_mask handles such case',
+                      f'  res_index = getitem_by_mask(self.index, idx._data)',
+                      f'  # df index is default, same as positions so it can be used in take']
+        results = []
+        for i, col in enumerate(self.columns):
+            res_data = f'res_data_{i}'
+            func_lines += [
+                f'  data_{i} = get_dataframe_data(self, {i})',
+                f'  {res_data} = sdc_take(data_{i}, res_index)'
+            ]
+            results.append((col, res_data))
+
+        data = ', '.join(f'"{col}": {data}' for col, data in results)
         func_lines += [
-            f'  data_{i} = get_dataframe_data(self, {i})',
-            f'  series_{i} = pandas.Series(data_{i}, index=res_index, name="{col}")',
-            f'  {res_data} = series_{i}[_idx_data]'
+            f'  return pandas.DataFrame({{{data}}}, index=res_index)'
         ]
-        results.append((col, res_data))
+    else:
+        func_lines = [f'  length = {df_length_expr(self)}',
+                      f'  self_index = self.index',
+                      f'  idx_reindexed = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)',
+                      f'  res_index = getitem_by_mask(self_index, idx_reindexed._data)',
+                      f'  selected_pos = getitem_by_mask(numpy.arange(length), idx_reindexed._data)']
 
-    data = ', '.join(f'"{col}": {data}' for col, data in results)
-    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index[_idx_data])']
+        results = []
+        for i, col in enumerate(self.columns):
+            res_data = f'res_data_{i}'
+            func_lines += [
+                f'  data_{i} = get_dataframe_data(self, {i})',
+                f'  {res_data} = sdc_take(data_{i}, selected_pos)'
+            ]
+            results.append((col, res_data))
+
+        data = ', '.join(f'"{col}": {data}' for col, data in results)
+        func_lines += [
+            f'  return pandas.DataFrame({{{data}}}, index=res_index)'
+        ]
 
     return func_lines
 
@@ -1334,19 +1364,21 @@ def df_getitem_bool_array_idx_main_codelines(self, idx):
     func_lines = [f'  length = {df_length_expr(self)}',
                   f'  if length != len(idx):',
                   f'    raise ValueError("Item wrong length.")',
-                  f'  res_index = {df_index_expr(self, length_expr="length")}']
-
+                  f'  taken_pos = getitem_by_mask(numpy.arange(length), idx)',
+                  f'  res_index = sdc_take(self.index, taken_pos)']
     results = []
     for i, col in enumerate(self.columns):
         res_data = f'res_data_{i}'
         func_lines += [
             f'  data_{i} = get_dataframe_data(self, {i})',
-            f'  {res_data} = pandas.Series(data_{i}[idx], index=res_index[idx], name="{col}")'
+            f'  {res_data} = sdc_take(data_{i}, taken_pos)'
         ]
         results.append((col, res_data))
 
     data = ', '.join(f'"{col}": {data}' for col, data in results)
-    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index[idx])']
+    func_lines += [
+        f'  return pandas.DataFrame({{{data}}}, index=res_index)'
+    ]
 
     return func_lines
 
@@ -1413,21 +1445,28 @@ def df_getitem_bool_series_idx_codegen(self, idx):
     Example of generated implementation with provided index:
         def _df_getitem_bool_series_idx_impl(self, idx):
           length = len(get_dataframe_data(self, 0))
-          _idx_data = idx._data[:length]
-          res_index = self._index
+          if length > len(idx):
+            msg = "Unalignable boolean Series provided as indexer " + \
+                  "(index of the boolean Series and of the indexed object do not match)."
+            raise IndexingError(msg)
+          # do not trim idx._data to length as getitem_by_mask handles such case
+          res_index = getitem_by_mask(self.index, idx._data)
+          # df index is default, same as positions so it can be used in take
           data_0 = get_dataframe_data(self, 0)
-          series_0 = pandas.Series(data_0, index=res_index, name="A")
-          res_data_0 = series_0[_idx_data]
+          res_data_0 = sdc_take(data_0, res_index)
           data_1 = get_dataframe_data(self, 1)
-          series_1 = pandas.Series(data_1, index=res_index, name="B")
-          res_data_1 = series_1[_idx_data]
-          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index[_idx_data])
+          res_data_1 = sdc_take(data_1, res_index)
+          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index)
     """
     func_lines = ['def _df_getitem_bool_series_idx_impl(self, idx):']
     func_lines += df_getitem_bool_series_idx_main_codelines(self, idx)
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas, 'numpy': numpy,
-                   'get_dataframe_data': get_dataframe_data}
+                   'get_dataframe_data': get_dataframe_data,
+                   'getitem_by_mask': getitem_by_mask,
+                   'sdc_take': _sdc_take,
+                   'sdc_reindex_series': sdc_reindex_series,
+                   'IndexingError': IndexingError}
 
     return func_text, global_vars
 
@@ -1439,18 +1478,21 @@ def df_getitem_bool_array_idx_codegen(self, idx):
           length = len(get_dataframe_data(self, 0))
           if length != len(idx):
             raise ValueError("Item wrong length.")
-          res_index = numpy.arange(length)
+          taken_pos = getitem_by_mask(numpy.arange(length), idx)
+          res_index = sdc_take(self.index, taken_pos)
           data_0 = get_dataframe_data(self, 0)
-          res_data_0 = pandas.Series(data_0[idx], index=res_index[idx], name="A")
+          res_data_0 = sdc_take(data_0, taken_pos)
           data_1 = get_dataframe_data(self, 1)
-          res_data_1 = pandas.Series(data_1[idx], index=res_index[idx], name="B")
-          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index[idx])
+          res_data_1 = sdc_take(data_1, taken_pos)
+          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index)
     """
     func_lines = ['def _df_getitem_bool_array_idx_impl(self, idx):']
     func_lines += df_getitem_bool_array_idx_main_codelines(self, idx)
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas, 'numpy': numpy,
-                   'get_dataframe_data': get_dataframe_data}
+                   'get_dataframe_data': get_dataframe_data,
+                   'getitem_by_mask': getitem_by_mask,
+                   'sdc_take': _sdc_take}
 
     return func_text, global_vars
 
