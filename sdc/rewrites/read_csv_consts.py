@@ -120,7 +120,7 @@ class RewriteReadCsv(Rewrite):
         new_block.clear()
         for inst in self.block.body:
             if inst in self.consts:
-                # mark that inst is processed
+                # protect from repeat rewriting
                 inst.consts = self.consts[inst]
 
                 if 'names' in dict(inst.value.kws):
