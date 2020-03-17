@@ -174,6 +174,8 @@ class RewriteReadCsv(Rewrite):
 
         # remove old variables
         for var in vars_to_remove:
+            # unsused variables are removed after new block is created b/c
+            # remove_unused_recursively should see all del statements of variables
             remove_unused_recursively(var, new_block, self.func_ir)
 
         return new_block
