@@ -2557,7 +2557,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
     # specializations for numeric series only
     if not operands_are_series:
         def _series_add_scalar_impl(self, other, level=None, fill_value=None, axis=0):
-            if (fill_value is not None and not numpy.isnan(fill_value)):
+            if not (fill_value is None or numpy.isnan(fill_value)):
                 numpy_like.fillna(self._data, inplace=True, value=fill_value)
 
             if self_is_series == True:  # noqa
@@ -2576,7 +2576,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
             def _series_add_none_indexes_impl(self, other, level=None, fill_value=None, axis=0):
                 _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
-                if (fill_value is not None and not numpy.isnan(fill_value)):
+                if not (fill_value is None or numpy.isnan(fill_value)):
                     numpy_like.fillna(self._data, inplace=True, value=fill_value)
                     numpy_like.fillna(other._data, inplace=True, value=fill_value)
 
@@ -2614,7 +2614,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
             def _series_add_common_impl(self, other, level=None, fill_value=None, axis=0):
                 left_index, right_index = self.index, other.index
                 _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
-                if (fill_value is not None and not numpy.isnan(fill_value)):
+                if not (fill_value is None or numpy.isnan(fill_value)):
                     numpy_like.fillna(self._data, inplace=True, value=fill_value)
                     numpy_like.fillna(other._data, inplace=True, value=fill_value)
                 # check if indexes are equal and series don't have to be aligned
@@ -4149,7 +4149,7 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
         fill_value_is_none = True
     if not operands_are_series:
         def _series_lt_scalar_impl(self, other, level=None, fill_value=None, axis=0):
-            if (fill_value is not None and not numpy.isnan(fill_value)):
+            if not (fill_value is None or numpy.isnan(fill_value)):
                 numpy_like.fillna(self._data, inplace=True, value=fill_value)
             if self_is_series == True:  # noqa
                 return pandas.Series(self._data < other, index=self._index, name=self._name)
@@ -4163,7 +4163,7 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
             def _series_lt_none_indexes_impl(self, other, level=None, fill_value=None, axis=0):
-                if (fill_value is not None and not numpy.isnan(fill_value)):
+                if not (fill_value is None or numpy.isnan(fill_value)):
                     numpy_like.fillna(self._data, inplace=True, value=fill_value)
                     numpy_like.fillna(other._data, inplace=True, value=fill_value)
                 left_size, right_size = len(self._data), len(other._data)
@@ -4182,7 +4182,7 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
                     [ty_left_index_dtype, ty_right_index_dtype], [])
 
             def _series_lt_common_impl(self, other, level=None, fill_value=None, axis=0):
-                if (fill_value is not None and not numpy.isnan(fill_value)):
+                if not (fill_value is None or numpy.isnan(fill_value)):
                     numpy_like.fillna(self._data, inplace=True, value=fill_value)
                     numpy_like.fillna(other._data, inplace=True, value=fill_value)
                 left_index, right_index = self.index, other.index
