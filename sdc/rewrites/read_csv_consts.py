@@ -37,6 +37,7 @@ from numba.ir import (Expr)
 from numba import ir, errors
 from numba.extending import overload
 from numba import types
+from numba import consts
 from numba.types import (
     literal
 )
@@ -74,6 +75,16 @@ def find_build_sequence(func_ir, var):
 def _new_definition(func_ir, var, value, loc):
     func_ir._definitions[var.name] = [value]
     return ir.Assign(value=value, target=var, loc=loc)
+
+
+class ConstantInference(consts.ConstantInference):
+
+    def _infer_expr(self, expr):
+        if expr.op == 'build_map':
+            const = {self.infer_constant(k.name, loc=expr.loc): self.infer_constant(v.name, loc=expr.loc) for k, v in
+                     expr.items}
+            return const
+        return super()._infer_expr(expr)
 
 
 @register_rewrite('before-inference')
@@ -114,7 +125,10 @@ class RewriteReadCsv(Rewrite):
                 try:
                     const = func_ir.infer_constant(var)
                 except errors.ConstantInferenceError:
-                    continue
+                    try:
+                        const = ConstantInference(func_ir).infer_constant(var.name)
+                    except errors.ConstantInferenceError:
+                        continue
                 consts.setdefault(inst, {})[key] = const
 
         return len(consts) > 0
@@ -125,49 +139,32 @@ class RewriteReadCsv(Rewrite):
         for inst in self.block.body:
             if inst in self.consts:
                 # protect from repeat rewriting
-                inst.consts = self.consts[inst]
+                inst.consts = consts = self.consts[inst]
+                # inst is call for read_csv()
 
-                if 'names' in dict(inst.value.kws):
-                    # create names tuple
-                    names_var = [val for name, val in inst.value.kws if name == 'names'][0]
-                    loc = names_var.loc
+                for key, value in consts.items():
+                    if key not in dict(inst.value.kws):
+                        continue
+                    # create tuple variable
+                    current_var = [val for name, val in inst.value.kws if name == key][0]
+                    loc = current_var.loc
 
-                    seq, _ = guard(find_build_sequence, self.func_ir, names_var)
-                    names_tuple_var = ir.Var(new_block.scope, mk_unique_var("names_tuple"), loc)
+                    seq, _ = guard(find_build_sequence, self.func_ir, current_var)
+                    if not seq:
+                        continue
+                    if isinstance(value, list):
+                        items = seq
+                    elif isinstance(value, dict):
+                        items = sum(map(list, seq), [])
+                    else:
+                        continue
 
-                    new_block.append(_new_definition(self.func_ir, names_tuple_var,
-                                     ir.Expr.build_tuple(items=seq, loc=loc), loc))
+                    tuple_var = ir.Var(new_block.scope, mk_unique_var(f"{key}_tuple"), loc)
+                    new_block.append(_new_definition(self.func_ir, tuple_var,
+                                     ir.Expr.build_tuple(items=items, loc=loc), loc))
 
-                    # replace names in call
-                    inst.value.kws = [(kw[0], names_tuple_var) if kw[0] == "names" else kw for kw in inst.value.kws]
-
-                if 'dtype' in dict(inst.value.kws):
-                    # create dtype typle
-                    dtype_var = [val for name, val in inst.value.kws if name == 'dtype'][0]
-                    loc = dtype_var.loc
-
-                    seq, _ = guard(find_build_sequence, self.func_ir, dtype_var)
-                    dtype_tuple_var = ir.Var(new_block.scope, mk_unique_var("dtype_tuple"), loc)
-
-                    new_block.append(_new_definition(self.func_ir, dtype_tuple_var,
-                                     ir.Expr.build_tuple(items=sum(map(list, seq), []), loc=loc), loc))
-
-                    # replace dtype in call
-                    inst.value.kws = [(kw[0], dtype_tuple_var) if kw[0] == "dtype" else kw for kw in inst.value.kws]
-
-                if 'usecols' in dict(inst.value.kws):
-                    # create usecols typle
-                    usecols_var = [val for name, val in inst.value.kws if name == 'usecols'][0]
-                    loc = usecols_var.loc
-
-                    seq, _ = guard(find_build_sequence, self.func_ir, usecols_var)
-                    usecols_tuple_var = ir.Var(new_block.scope, mk_unique_var("usecols_tuple"), loc)
-
-                    new_block.append(_new_definition(self.func_ir, usecols_tuple_var,
-                                     ir.Expr.build_tuple(items=seq, loc=loc), loc))
-
-                    # replace usecols in call
-                    inst.value.kws = [(kw[0], usecols_tuple_var) if kw[0] == "usecols" else kw for kw in inst.value.kws]
+                    # replace variable in call
+                    inst.value.kws = [(kw[0], tuple_var) if kw[0] == key else kw for kw in inst.value.kws]
 
             new_block.append(inst)
         return new_block
