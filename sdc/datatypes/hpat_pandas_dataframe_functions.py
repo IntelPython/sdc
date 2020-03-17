@@ -833,14 +833,14 @@ def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     Limitations
     -----------
-    Parameters axis, skipna, level, numeric_only unsupported.
+    Parameters axis, skipna, level, numeric_only are unsupported.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/dataframe/dataframe_min.py
        :language: python
        :lines: 35-
-       :caption: Return the minimum of the values for the requested axis.
+       :caption: Return the minimum of the values for the columns.
        :name: ex_dataframe_min
 
     .. command-output:: python ./dataframe/dataframe_min.py
