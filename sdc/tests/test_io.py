@@ -239,7 +239,7 @@ class TestCSV(TestIO):
             "csv1",
             "csv_keys1",
             "csv_const_dtype1",
-            "csv_infer_file_defalult",
+            "csv_infer_file_default",
             "csv_infer_file_sep",
             "csv_infer_file_delimiter",
             "csv_infer_file_names",

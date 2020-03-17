@@ -509,8 +509,7 @@ def pandas_read_csv(
     if usecols:
         if type(usecols[0]) == str:
             if names:
-                usecols = [names.index(col) for col in usecols]
-                include_columns = [f'f{i}' for i in usecols]
+                include_columns = [f'f{names.index(col)}' for col in usecols]
             else:
                 include_columns = usecols
         elif type(usecols[0]) == int:
@@ -550,7 +549,7 @@ def pandas_read_csv(
     except: pass
 
     parse_options = pyarrow.csv.ParseOptions(
-        delimiter=sep,
+        delimiter=delimiter,
     )
 
     read_options = pyarrow.csv.ReadOptions(
@@ -576,9 +575,12 @@ def pandas_read_csv(
         # categories=categories,
     )
 
-    if names is not None:
-        if usecols:
-            dataframe.columns = [names[col] for col in usecols]
+    if names:
+        if usecols and len(names) != len(usecols):
+            if isinstance(usecols[0], int):
+                dataframe.columns = [names[col] for col in usecols]
+            elif isinstance(usecols[0], str):
+                dataframe.columns = [name for name in names if name in usecols]
         else:
             dataframe.columns = names
 
