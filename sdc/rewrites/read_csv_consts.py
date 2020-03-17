@@ -133,6 +133,8 @@ class RewriteReadCsv(Rewrite):
     def apply(self):
         new_block = self.block.copy()
         new_block.clear()
+        vars_to_remove = []
+
         for inst in self.block.body:
             if inst in self.consts:
                 # protect from repeat rewriting
@@ -144,7 +146,7 @@ class RewriteReadCsv(Rewrite):
                         continue
 
                     # collecting data from current variable
-                    current_var = [val for name, val in inst.value.kws if name == key][0]
+                    current_var = [var for name, var in inst.value.kws if name == key][0]
                     loc = current_var.loc
 
                     seq, _ = guard(find_build_sequence, self.func_ir, current_var)
@@ -165,5 +167,13 @@ class RewriteReadCsv(Rewrite):
                     # replace variable in call
                     inst.value.kws = [(kw[0], tuple_var) if kw[0] == key else kw for kw in inst.value.kws]
 
+                    # save old variable for removing
+                    vars_to_remove.append(current_var)
+
             new_block.append(inst)
+
+        # remove old variables
+        for var in vars_to_remove:
+            remove_unused_recursively(var, new_block, self.func_ir)
+
         return new_block
