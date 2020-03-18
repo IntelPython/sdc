@@ -37,7 +37,8 @@ file_names = [
 
 
 # This function gets compiled by Numba*
-@njit(parallel=True)
+# For scalability use @njit(parallel=True)
+@njit
 def get_analyzed_data(file_name):
     df = pd.read_csv(file_name,
                      dtype={'Bonus %': np.float64, 'First Name': str},
