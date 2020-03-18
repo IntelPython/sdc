@@ -46,6 +46,7 @@ def hpat_pandas_series_apply(self, func, convert_dtype=True, args=()):
     Limitations
     -----------
     - Parameters ``convert_dtype`` and ``args`` are currently unsupported by Intel Scalable Dataframe Compiler.
+    - ``function`` returning a Series object is currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
