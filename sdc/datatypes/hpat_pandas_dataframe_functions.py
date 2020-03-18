@@ -1610,11 +1610,13 @@ def sdc_pandas_dataframe_getitem(self, idx):
         Limitations
         -----------
         Supported ``key`` can be one of the following:
-            - String literal, e.g. :obj:`df['A']`
-            - A slice, e.g. :obj:`df[2:5]`
-            - A tuple of string, e.g. :obj:`df[('A', 'B')]`
-            - An array of booleans, e.g. :obj:`df[True,False]`
-            - A series of booleans, e.g. :obj:`df(series([True,False]))`
+
+        * String literal, e.g. :obj:`df['A']`
+        * A slice, e.g. :obj:`df[2:5]`
+        * A tuple of string, e.g. :obj:`df[('A', 'B')]`
+        * An array of booleans, e.g. :obj:`df[True,False]`
+        * A series of booleans, e.g. :obj:`df(series([True,False]))`
+
         Supported getting a column through getting attribute.
 
         Examples
