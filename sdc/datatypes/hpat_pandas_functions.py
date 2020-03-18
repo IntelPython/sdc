@@ -181,24 +181,27 @@ def sdc_pandas_read_csv(
 
     # read_csv can infer result DataFrame type from file or from params
 
-    infer_from_file = isinstance(filepath_or_buffer, types.Literal)
-    infer_from_params = isinstance(dtype, types.Tuple)
+    # for inferring from file this parameters should be literal or omitted
+    infer_from_file = all([
+        isinstance(filepath_or_buffer, types.Literal),
+        isinstance(sep, (types.Literal, types.Omitted)) or sep == ',',
+        isinstance(delimiter, (types.Literal, types.Omitted)) or delimiter is None,
+        isinstance(skiprows, (types.Literal, types.Omitted)) or skiprows is None,
+    ])
+
+    # for inference from params dtype and (names or usecols) shoud present
+    # names, dtype and usecols should be literal tuples after rewrite pass (see. RewriteReadCsv)
+    infer_from_params = all([
+        isinstance(dtype, types.Tuple),
+        any([
+            isinstance(names, types.Tuple) and isinstance(usecols, types.Tuple),
+            isinstance(names, types.Tuple) and isinstance(usecols, (types.Omitted, type(None))),
+            isinstance(names, (types.Omitted, type(None))) and isinstance(usecols, types.Tuple),
+        ]),
+    ])
 
     # cannot create function if parameters provide not enough info
     assert infer_from_file or infer_from_params
-
-    if not infer_from_file:
-        # for inference from params dtype and (names or usecols) shoud present
-        # names, dtype and usecols should be literal tuples after rewrite pass (see. RewriteReadCsv)
-        names_present = isinstance(names, types.Tuple)
-        usecols_present = isinstance(usecols, types.Tuple)
-        assert names_present or usecols_present
-
-    if not infer_from_params:
-        # for inferring from file this parameters should be literal or omitted
-        assert isinstance(sep, (types.Literal, types.Omitted)) or sep == ','
-        assert isinstance(delimiter, (types.Literal, types.Omitted)) or delimiter is None
-        assert isinstance(skiprows, (types.Literal, types.Omitted)) or skiprows is None
 
     if isinstance(filepath_or_buffer, types.Literal):
         filepath_or_buffer = filepath_or_buffer.literal_value
@@ -242,6 +245,9 @@ def sdc_pandas_read_csv(
 
     if skiprows is None:
         skiprows = 0
+
+    # inferencing from params has priority over inferencing from file
+    # in case of both are available
 
     if infer_from_params:
         if header == 'infer':
