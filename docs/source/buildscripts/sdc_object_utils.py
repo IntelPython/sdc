@@ -176,7 +176,7 @@ def get_obj(obj_name):
 
     split_name.pop(0)
     for name in split_name:
-        split_obj = getattr(split_obj, name, 0)
+        split_obj = getattr(split_obj, name)
 
     return split_obj
 
