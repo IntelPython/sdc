@@ -290,7 +290,6 @@ class TestCSV(TestIO):
     def _read_csv(self, use_pyarrow=False):
         return pd_read_csv if use_pyarrow else pd.read_csv
 
-
     # inference from parameters
 
     def test_csv_infer_params_default(self):
@@ -372,7 +371,6 @@ class TestCSV(TestIO):
         test_impl = self.pd_csv_const_dtype1()
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
-
 
     # inference from file
 
