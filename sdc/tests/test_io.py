@@ -433,6 +433,42 @@ class TestCSV(TestIO):
             with self.subTest(file_name=file_name):
                 test(file_name)
 
+    def pd_csv_infer_file_usecols(self, file_name="csv_data_infer1.csv", use_pyarrow=False):
+        read_csv = self._read_csv(use_pyarrow)
+
+        def test_impl():
+            return read_csv(file_name, usecols=['B', 'D'])
+
+        return test_impl
+
+    def test_csv_infer_file_usecols(self):
+        def test(file_name):
+            test_impl = self.pd_csv_infer_file_usecols(file_name)
+            hpat_func = self.jit(test_impl)
+            pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+        for file_name in ["csv_data_infer1.csv"]:
+            with self.subTest(file_name=file_name):
+                test(file_name)
+
+    def pd_csv_infer_file_names_usecols(self, file_name="csv_data1.csv", use_pyarrow=False):
+        read_csv = self._read_csv(use_pyarrow)
+
+        def test_impl():
+            return read_csv(file_name, names=['A', 'B', 'C', 'D'], usecols=['B', 'D'])
+
+        return test_impl
+
+    def test_csv_infer_file_names_usecols(self):
+        def test(file_name):
+            test_impl = self.pd_csv_infer_file_names_usecols(file_name)
+            hpat_func = self.jit(test_impl)
+            pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+        for file_name in ["csv_data1.csv", "csv_data_infer1.csv"]:
+            with self.subTest(file_name=file_name):
+                test(file_name)
+
     def pd_csv_infer_parallel1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
