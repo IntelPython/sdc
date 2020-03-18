@@ -35,6 +35,7 @@ import os
 
 
 APIREF_TEMPLATE_FNAMES = [
+    './_templates/_api_ref.pandas.io_templ.rst',
     './_templates/_api_ref.pandas.series_templ.rst',
     './_templates/_api_ref.pandas.dataframe_templ.rst',
     './_templates/_api_ref.pandas.window_templ.rst',
