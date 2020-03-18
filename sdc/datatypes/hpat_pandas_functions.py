@@ -73,9 +73,6 @@ def infer_column_names_and_types_from_constant_filename(fname_const, delimiter, 
     df = pd.read_csv(fname_const, delimiter=delimiter, names=names, usecols=usecols, skiprows=skiprows, nrows=rows_to_read)
     # TODO: string_array, categorical, etc.
     col_names = df.columns.to_list()
-    # overwrite column names like Pandas if explicitly provided
-    if names:
-        col_names[-len(names):] = names
     col_typs = get_numba_array_types_for_csv(df)
     return col_names, col_typs
 
