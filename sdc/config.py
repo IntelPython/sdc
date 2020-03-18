@@ -61,7 +61,7 @@ config_pipeline_hpat_default = strtobool(os.getenv('SDC_CONFIG_PIPELINE_SDC', 'F
 Default value used to select compiler pipeline in a function decorator
 '''
 
-config_use_parallel_overloads = strtobool(os.getenv('SDC_AUTO_PARALLEL', 'False'))
+config_use_parallel_overloads = strtobool(os.getenv('SDC_AUTO_PARALLEL', 'True'))
 '''
 Default value used to select whether auto parallel would be applied to sdc functions
 '''
