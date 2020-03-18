@@ -2125,9 +2125,7 @@ def hpat_pandas_series_copy(self, deep=True):
     Pandas Series method :meth:`pandas.Series.copy` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_str1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_int1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_deep
+        Test: python -m sdc.runtests sdc.tests.test_series -k series_copy
     """
 
     ty_checker = TypeChecker('Method Series.copy().')
