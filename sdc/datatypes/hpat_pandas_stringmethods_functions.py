@@ -1127,7 +1127,7 @@ def strip_usecase(s, to_strip):
 
 
 def gen_sdc_pandas_series_str_strip_impl(usecase):
-
+    """Generate series.str.lstrip/rstrip/strip implementations based on usecase func"""
     def impl(self, to_strip=None):
         item_count = len(self._data)
         result = [''] * item_count
