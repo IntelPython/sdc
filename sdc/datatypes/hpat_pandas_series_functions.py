@@ -2106,7 +2106,8 @@ def hpat_pandas_series_copy(self, deep=True):
 
     Limitations
     -----------
-    - Parameter deep=False is currently unsupported for indexes by Intel Scalable Dataframe Compiler
+    - When ``deep=False``, a new object will be created without copying the calling object’s data
+    and with a copy of the calling object’s indices.
 
     Examples
     --------
