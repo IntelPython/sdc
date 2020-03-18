@@ -4309,7 +4309,7 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True):
 
     Limitations
     -----------
-    Supported only parameter ``skipna``.
+    Parameter ``axis`` is supported only with default value ``None``.
 
     Examples
     --------
@@ -4323,16 +4323,12 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True):
        :cwd: ../../../examples
 
     .. seealso::
-
         :ref:`Series.sum <pandas.Series.sum>`
             Return the sum over Series.
-
         :ref:`Series.cummax <pandas.Series.cummax>`
             Return cumulative maximum over Series.
-
         :ref:`Series.cummin <pandas.Series.cummin>`
             Return cumulative minimum over Series.
-
         :ref:`Series.cumprod <pandas.Series.cumprod>`
             Return cumulative product over Series.
 
