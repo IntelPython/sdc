@@ -4558,7 +4558,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     Limitations
     -----------
-    - Parameters kind, order are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``kind``, ``order`` and ``axis`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -4570,10 +4570,6 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     .. command-output:: python ./series/series_argsort.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
