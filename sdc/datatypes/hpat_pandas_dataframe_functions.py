@@ -1679,34 +1679,24 @@ def sdc_pandas_dataframe_getitem(self, idx):
 
             :ref:`Series.getitem <pandas.Series.getitem>`
                 Get value(s) of Series by key.
-
             :ref:`Series.setitem <pandas.Series.setitem>`
                 Set value to Series by index
-
             :ref:`Series.loc <pandas.Series.loc>`
                 Access a group of rows and columns by label(s) or a boolean array.
-
             :ref:`Series.iloc <pandas.Series.iloc>`
                 Purely integer-location based indexing for selection by position.
-
             :ref:`Series.at <pandas.Series.at>`
                 Access a single value for a row/column label pair.
-
             :ref:`Series.iat <pandas.Series.iat>`
                 Access a single value for a row/column pair by integer position.
-
             :ref:`DataFrame.setitem <pandas.DataFrame.setitem>`
                 Set value to DataFrame by index
-
             :ref:`DataFrame.loc <pandas.DataFrame.loc>`
                 Access a group of rows and columns by label(s) or a boolean array.
-
             :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
                 Purely integer-location based indexing for selection by position.
-
             :ref:`DataFrame.at <pandas.DataFrame.at>`
                 Access a single value for a row/column label pair.
-
             :ref:`DataFrame.iat <pandas.DataFrame.iat>`
                 Access a single value for a row/column pair by integer position.
 
