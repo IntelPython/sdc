@@ -47,16 +47,50 @@ from sdc.io.csv_ext import (
     _gen_csv_reader_py_pyarrow_func_text_dataframe,
 )
 from sdc.str_arr_ext import string_array_type
-from sdc.hiframes.hiframes_untyped import HiFramesPassImpl
 
 
-def infer_usecols(col_names):
-    # usecols_var = self._get_arg('read_csv', rhs.args, kws, 6, 'usecols', '')
-    usecols = list(range(len(col_names)))
-    # if usecols_var != '':
-    #     err_msg = "pd.read_csv() usecols should be constant list of ints"
-    #     usecols = self._get_str_or_list(usecols_var, err_msg=err_msg, typ=int)
-    return usecols
+def get_dtypes(df):
+    dtypes = []
+    for d in df.dtypes.values:
+        try:
+            numba_type = numba.typeof(d).dtype
+            array_type = types.Array(numba_type, 1, 'C')
+        except:
+            array_type = string_array_type
+        dtypes.append(array_type)
+    return dtypes
+
+
+def infer_column_names_and_types_from_constant_filename(fname_const, skiprows, names, delimiter):
+    rows_to_read = 100  # TODO: tune this
+    df = pd.read_csv(fname_const, delimiter=delimiter, names=names, skiprows=skiprows, nrows=rows_to_read)
+    # TODO: string_array, categorical, etc.
+    dtypes = get_dtypes(df)
+    col_names = df.columns.to_list()
+    # overwrite column names like Pandas if explicitly provided
+    if names:
+        col_names[-len(names):] = names
+    else:
+        # a row is used for names if not provided
+        skiprows += 1
+    dtype_map = dict(zip(col_names, dtypes))
+    return skiprows, col_names, dtype_map
+
+
+def _get_csv_col_info_core(dtype_map, date_cols, col_names):
+    if isinstance(dtype_map, types.Type):
+        typ = dtype_map
+        return col_names, [typ] * len(col_names)
+
+    columns = []
+    out_types = []
+    for i, (col_name, typ) in enumerate(dtype_map.items()):
+        columns.append(col_name)
+        # get array dtype
+        if i in date_cols:
+            typ = types.Array(types.NPDatetime('ns'), 1, 'C')
+        out_types.append(typ)
+    return columns, out_types
 
 
 @overload(pandas.read_csv)
@@ -280,15 +314,16 @@ def sdc_pandas_read_csv(
         col_typs = [dtype[n] for n in return_columns]
 
     elif infer_from_file:
-        col_names = names if names else 0
-        skiprows, col_names, dtype_map = \
-            HiFramesPassImpl.infer_column_names_and_types_from_constant_filename(
-                filepath_or_buffer, skiprows, col_names, sep=delimiter)
+        # read file and get data types
+        skiprows, col_names, dtype_map = infer_column_names_and_types_from_constant_filename(
+            filepath_or_buffer, skiprows, names, delimiter)
 
-        usecols = infer_usecols(col_names)
+        # usecols should be constant list of ints
+        usecols = list(range(len(col_names)))
 
+        # convert type data
         date_cols = []
-        columns, out_types = HiFramesPassImpl._get_csv_col_info_core(dtype_map, date_cols, col_names)
+        columns, out_types = _get_csv_col_info_core(dtype_map, date_cols, col_names)
         col_names, col_typs = columns, out_types
 
     else:
