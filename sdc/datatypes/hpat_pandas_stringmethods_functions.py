@@ -86,7 +86,7 @@ from numba.types import (Boolean, Integer, NoneType,
 
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
-from sdc.utilities.utils import sdc_overload_method
+from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
 from sdc.hiframes.api import get_nan_mask
 from sdc.str_arr_ext import str_arr_set_na_by_mask, create_str_arr_from_list
 
@@ -1111,46 +1111,53 @@ def hpat_pandas_stringmethods_casefold(self):
     return hpat_pandas_stringmethods_casefold_impl
 
 
-@sdc_overload_method(StringMethodsType, 'strip')
-def hpat_pandas_stringmethods_strip(self, to_strip=None):
-    ty_checker = TypeChecker('Method strip().')
-    ty_checker.check(self, StringMethodsType)
+@sdc_register_jitable
+def lstrip_usecase(s, to_strip):
+    return s.lstrip(to_strip)
 
-    def hpat_pandas_stringmethods_strip_impl(self, to_strip=None):
+
+@sdc_register_jitable
+def rstrip_usecase(s, to_strip):
+    return s.rstrip(to_strip)
+
+
+@sdc_register_jitable
+def strip_usecase(s, to_strip):
+    return s.strip(to_strip)
+
+
+def gen_sdc_pandas_series_str_strip_impl(usecase):
+
+    def impl(self, to_strip=None):
         item_count = len(self._data)
         result = [''] * item_count
 
         for it in range(item_count):
             item = self._data._data[it]
             if len(item) > 0:
-                result[it] = item.strip(to_strip)
+                result[it] = usecase(item, to_strip)
             else:
                 result[it] = item
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
-    return hpat_pandas_stringmethods_strip_impl
+    return impl
+
+
+sdc_pandas_series_str_lstrip_impl = gen_sdc_pandas_series_str_strip_impl(lstrip_usecase)
+sdc_pandas_series_str_rstrip_impl = gen_sdc_pandas_series_str_strip_impl(rstrip_usecase)
+sdc_pandas_series_str_strip_impl = gen_sdc_pandas_series_str_strip_impl(strip_usecase)
 
 
 @sdc_overload_method(StringMethodsType, 'lstrip')
 def hpat_pandas_stringmethods_lstrip(self, to_strip=None):
-    ty_checker = TypeChecker('Method lstrip().')
+    ty_checker = TypeChecker('Method strip().')
     ty_checker.check(self, StringMethodsType)
 
-    def hpat_pandas_stringmethods_lstrip_impl(self, to_strip=None):
-        item_count = len(self._data)
-        result = [''] * item_count
+    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType)):
+        ty_checker.raise_exc(to_strip, 'str', 'to_strip')
 
-        for it in range(item_count):
-            item = self._data._data[it]
-            if len(item) > 0:
-                result[it] = item.lstrip(to_strip)
-            else:
-                result[it] = item
-
-        return pandas.Series(result, self._data._index, name=self._data._name)
-
-    return hpat_pandas_stringmethods_lstrip_impl
+    return sdc_pandas_series_str_lstrip_impl
 
 
 @sdc_overload_method(StringMethodsType, 'rstrip')
@@ -1158,20 +1165,21 @@ def hpat_pandas_stringmethods_rstrip(self, to_strip=None):
     ty_checker = TypeChecker('Method rstrip().')
     ty_checker.check(self, StringMethodsType)
 
-    def hpat_pandas_stringmethods_rstrip_impl(self, to_strip=None):
-        item_count = len(self._data)
-        result = [''] * item_count
+    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType)):
+        ty_checker.raise_exc(to_strip, 'str', 'to_strip')
 
-        for it in range(item_count):
-            item = self._data._data[it]
-            if len(item) > 0:
-                result[it] = item.rstrip(to_strip)
-            else:
-                result[it] = item
+    return sdc_pandas_series_str_rstrip_impl
 
-        return pandas.Series(result, self._data._index, name=self._data._name)
 
-    return hpat_pandas_stringmethods_rstrip_impl
+@sdc_overload_method(StringMethodsType, 'strip')
+def hpat_pandas_stringmethods_strip(self, to_strip=None):
+    ty_checker = TypeChecker('Method strip().')
+    ty_checker.check(self, StringMethodsType)
+
+    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType)):
+        ty_checker.raise_exc(to_strip, 'str', 'to_strip')
+
+    return sdc_pandas_series_str_strip_impl
 
 
 seealso_check_methods = """

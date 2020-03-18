@@ -32,7 +32,7 @@ from numba import njit
 def series_str_lstrip():
     series = pd.Series(['1. Ant.  ', '2. Bee!\n', '3. Cat?\t'])
 
-    return series.str.lstrip()
+    return series.str.lstrip('123.')
 
 
 print(series_str_lstrip())
