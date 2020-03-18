@@ -70,7 +70,8 @@ def get_numba_array_types_for_csv(df):
 
 def infer_column_names_and_types_from_constant_filename(fname_const, delimiter, names, usecols, skiprows):
     rows_to_read = 100  # TODO: tune this
-    df = pd.read_csv(fname_const, delimiter=delimiter, names=names, usecols=usecols, skiprows=skiprows, nrows=rows_to_read)
+    df = pd.read_csv(fname_const, delimiter=delimiter, names=names,
+                     usecols=usecols, skiprows=skiprows, nrows=rows_to_read)
     # TODO: string_array, categorical, etc.
     col_names = df.columns.to_list()
     col_typs = get_numba_array_types_for_csv(df)
@@ -261,7 +262,8 @@ def sdc_pandas_read_csv(
 
             values = dtype[1::2]
             values = [v.typing_key if isinstance(v, types.Function) else v for v in values]
-            values = [types.Array(numba.from_dtype(np.dtype(v.literal_value)), 1, 'C') if isinstance(v, types.Literal) else v for v in values]
+            values = [types.Array(numba.from_dtype(np.dtype(v.literal_value)), 1, 'C')
+                      if isinstance(v, types.Literal) else v for v in values]
             values = [types.Array(types.int_, 1, 'C') if v == int else v for v in values]
             values = [types.Array(types.float64, 1, 'C') if v == float else v for v in values]
             values = [string_array_type if v == str else v for v in values]
