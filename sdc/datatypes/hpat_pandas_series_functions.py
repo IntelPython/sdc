@@ -2516,7 +2516,16 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameter ``level`` is supported only with default value ``None``.
+
+    Parameter ``fill_value`` is supported only with default value ``None``.
+
+    Parameter ``axis`` is supported only with default value ``0``.
+
+    Parameter ``other`` can be one of the following:
+
+    * Series, e.g.:obj:`pandas.Series`
+    * Scalar value
 
     Examples
     --------
@@ -2529,10 +2538,6 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
     .. command-output:: python ./series/series_add.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
         :ref:`Series.radd <pandas.Series.radd>`
@@ -2543,6 +2548,21 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     .. only:: developer
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
+
+    Parameters
+    -----------
+    self: :obj:`pandas.Series`
+        input arg
+    other: :obj:`pandas.Series` or scalar value
+    fill_value: None or float value
+        *unsupported*
+    level: :obj:`int` or name
+        *unsupported*
+
+    Returns
+    -------
+    :obj: `pandas.Series`
+        The result of the operation.
     """
 
     _func_name = 'Method add().'
