@@ -1619,58 +1619,58 @@ def sdc_pandas_dataframe_getitem(self, idx):
 
         Examples
         --------
-        .. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem_attr.py
+        .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_attr.py
            :language: python
            :lines: 37-
            :caption: Getting Pandas DataFrame column through getting attribute.
            :name: ex_dataframe_getitem
 
-        .. command-output:: python ./dataframe/df_getitem/df_getitem_attr.py
+        .. command-output:: python ./dataframe/getitem/df_getitem_attr.py
            :cwd: ../../../examples
 
-        .. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem.py
+        .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem.py
            :language: python
            :lines: 37-
            :caption: Getting Pandas DataFrame column where key is a string.
            :name: ex_dataframe_getitem
 
-        .. command-output:: python ./dataframe/df_getitem/df_getitem.py
+        .. command-output:: python ./dataframe/getitem/df_getitem.py
            :cwd: ../../../examples
 
-        .. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem_slice.py
+        .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_slice.py
            :language: python
            :lines: 34-
            :caption: Getting slice of Pandas DataFrame.
            :name: ex_dataframe_getitem
 
-        .. command-output:: python ./dataframe/df_getitem/df_getitem_slice.py
+        .. command-output:: python ./dataframe/getitem/df_getitem_slice.py
            :cwd: ../../../examples
 
-        .. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem_tuple.py
+        .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_tuple.py
            :language: python
            :lines: 37-
            :caption: Getting Pandas DataFrame elements where key is a tuple of strings.
            :name: ex_dataframe_getitem
 
-        .. command-output:: python ./dataframe/df_getitem/df_getitem_tuple.py
+        .. command-output:: python ./dataframe/getitem/df_getitem_tuple.py
            :cwd: ../../../examples
 
-        .. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem_array.py
+        .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_array.py
            :language: python
            :lines: 34-
            :caption: Getting Pandas DataFrame elements where key is an array of booleans.
            :name: ex_dataframe_getitem
 
-        .. command-output:: python ./dataframe/df_getitem/df_getitem_array.py
+        .. command-output:: python ./dataframe/getitem/df_getitem_array.py
            :cwd: ../../../examples
 
-        .. literalinclude:: ../../../examples/dataframe/df_getitem/df_getitem_series.py
+        .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_series.py
            :language: python
            :lines: 34-
            :caption: Getting Pandas DataFrame elements where key is series of booleans.
            :name: ex_dataframe_getitem
 
-        .. command-output:: python ./dataframe/df_getitem/df_getitem_series.py
+        .. command-output:: python ./dataframe/getitem/df_getitem_series.py
            :cwd: ../../../examples
 
         Intel Scalable Dataframe Compiler Developer Guide
@@ -1684,12 +1684,12 @@ def sdc_pandas_dataframe_getitem(self, idx):
         -----------
         self: :obj:`pandas.DataFrame`
             input arg
-        idx: :obj:`pandas.Series`, :obj:`string`, :obj:`slice`, :obj:`tuple`, :obj:`array`, :obj:`tuple`
+        idx: :obj:`pandas.Series`, :obj:`string`, :obj:`slice`, :obj:`tuple`, :obj:`array`
             input arg
 
         Returns
         -------
-        :obj: `pandas.DataFrame`
+        :obj:`pandas.DataFrame`
             returns object
         """
     ty_checker = TypeChecker('Operator getitem().')
