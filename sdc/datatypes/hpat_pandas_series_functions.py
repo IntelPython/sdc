@@ -4448,7 +4448,7 @@ def hpat_pandas_series_count(self, level=None):
 
     Limitations
     -----------
-    - Parameter level is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameter ``level`` is supported only with default value ``None``.
 
     Examples
     --------
