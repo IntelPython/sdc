@@ -4275,14 +4275,14 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True):
 
     Limitations
     -----------
-    Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+    Supported only parameter ``skipna``.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_cumsum.py
        :language: python
        :lines: 27-
-       :caption: Return cumulative sum over a DataFrame or Series axis.
+       :caption: Returns cumulative sum over Series.
        :name: ex_series_cumsum
 
     .. command-output:: python ./series/series_cumsum.py
@@ -4290,24 +4290,21 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True):
 
     .. seealso::
 
-        `pandas.absolute
-        <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.core.window.Expanding.sum.html#pandas.core.window.Expanding.sum>`_
-            Similar functionality but ignores NaN values.
-
         :ref:`Series.sum <pandas.Series.sum>`
-            Return the sum over Series axis.
+            Return the sum over Series.
 
         :ref:`Series.cummax <pandas.Series.cummax>`
-            Return cumulative maximum over Series axis.
+            Return cumulative maximum over Series.
 
         :ref:`Series.cummin <pandas.Series.cummin>`
-            Return cumulative minimum over Series axis.
+            Return cumulative minimum over Series.
 
         :ref:`Series.cumprod <pandas.Series.cumprod>`
-            Return cumulative product over Series axis.
+            Return cumulative product over Series.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.cumsum` implementation.
 
     .. only:: developer
