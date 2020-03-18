@@ -1022,7 +1022,7 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
 
     Limitations
     -----------
-    Supported only parameter ``keep='first'``.
+    Parameter ``keep`` is supported only with default value ``'first'``.
 
     Examples
     --------
@@ -1088,7 +1088,7 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
 
     Limitations
     -----------
-    Supported only parameter ``keep='first'``.
+    Parameter ``keep`` is supported only with default value ``'first'``.
 
     Examples
     --------
