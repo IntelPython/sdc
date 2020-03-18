@@ -162,15 +162,19 @@ sdc_pandas_read_csv.__doc__ = r"""
 
     Examples
     --------
-    Inference from file. File name is constant.
+    Inference from file. File name is constant. \
+    Resulting DataFrame depends on CSV file content at the moment of compilation.
 
     >>> pd.read_csv('data.csv')  # doctest: +SKIP
 
-    Inference from file. File name, ``names``, ``usecols``, ``delimiter`` and ``skiprow`` are constants:
+    Inference from file. File name, ``names``, ``usecols``, ``delimiter`` and ``skiprow`` are constants. \
+    Resulting DataFrame contains one column ``A`` \
+    with type of column depending on CSV file content at the moment of compilation.
 
     >>> pd.read_csv('data.csv', names=['A','B'], usecols=['A'], delimiter=';', skiprows=2)  # doctest: +SKIP
 
     Inference from parameters. File name, ``delimiter`` and ``skiprow`` are variables. ``names``, ``usecols`` and ``dtype`` are constants.
+    Resulting DataFrame contains column ``A`` with type ``np.float64``.
 
     >>> pd.read_csv(file_name, names=['A','B'], usecols=['A'], dtype={'A': np.float64}, delimiter=some_char, skiprows=some_int)  # doctest: +SKIP
 """
