@@ -294,9 +294,11 @@ def sdc_pandas_read_csv(
     else:
         return None
 
+    dtype_present = not isinstance(dtype, (types.Omitted, type(None)))
+
     # generate function text with signature and returning DataFrame
     func_text, func_name = _gen_csv_reader_py_pyarrow_func_text_dataframe(
-        col_names, col_typs, usecols, delimiter, skiprows, signature)
+        col_names, col_typs, dtype_present, usecols, signature)
 
     # compile with Python
     csv_reader_py = _gen_csv_reader_py_pyarrow_py_func(func_text, func_name)
