@@ -31,7 +31,6 @@ Attributes/Operators
    DataFrame.shape
    DataFrame.memory_usage
    DataFrame.empty
-   DataFrame.getitem
 
 Type Conversions
 ----------------
