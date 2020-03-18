@@ -67,6 +67,8 @@ class TestDataFrameMethods(TestBase):
 
 cases = [
     TC(name='append', size=[10 ** 7], params='other', data_num=2),
+    TC(name='copy', size=[10 ** 7], params='deep=True'),
+    TC(name='copy', size=[10 ** 7], params='deep=False'),
     TC(name='count', size=[10 ** 7]),
     TC(name='drop', size=[10 ** 8], params='columns="A"'),
     TC(name='isna', size=[10 ** 6 * 6]),
