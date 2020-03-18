@@ -1046,6 +1046,15 @@ type_callable(operator.sub)(type_sub)
 
 @overload(pd.Series)
 def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series
+
+    Limitations
+    -----------
+    - Parameters `dtype` and `copy` are currently unsupported by Intel Scalable Dataframe Compiler.
+    """
 
     is_index_none = isinstance(index, types.NoneType) or index is None
 
