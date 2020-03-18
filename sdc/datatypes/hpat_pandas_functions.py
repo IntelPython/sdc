@@ -173,8 +173,10 @@ sdc_pandas_read_csv.__doc__ = r"""
 
     >>> pd.read_csv('data.csv', names=['A','B'], usecols=['A'], delimiter=';', skiprows=2)  # doctest: +SKIP
 
-    Inference from parameters. File name, ``delimiter`` and ``skiprow`` are variables. ``names``, ``usecols`` and ``dtype`` are constants.
+    Inference from parameters. File name, ``delimiter`` and ``skiprow`` are variables. \
+    ``names``, ``usecols`` and ``dtype`` are constants. \
     Resulting DataFrame contains column ``A`` with type ``np.float64``.
 
-    >>> pd.read_csv(file_name, names=['A','B'], usecols=['A'], dtype={'A': np.float64}, delimiter=some_char, skiprows=some_int)  # doctest: +SKIP
+    >>> pd.read_csv(file_name, names=['A','B'], usecols=['A'], dtype={'A': np.float64}, \
+                    delimiter=some_char, skiprows=some_int)  # doctest: +SKIP
 """
