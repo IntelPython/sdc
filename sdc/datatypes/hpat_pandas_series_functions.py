@@ -1282,7 +1282,7 @@ def hpat_pandas_series_values(self):
     Pandas Series attribute 'values' implementation.
 
     .. only:: developer
-        Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_values
+        Test:  python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_values*
     """
 
     _func_name = 'Attribute values.'
