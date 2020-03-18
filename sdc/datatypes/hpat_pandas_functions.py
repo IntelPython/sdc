@@ -68,7 +68,7 @@ def get_numba_array_types_for_csv(df):
     return result
 
 
-def infer_column_names_and_types_from_constant_filename(fname_const, skiprows, names, usecols, delimiter):
+def infer_column_names_and_types_from_constant_filename(fname_const, delimiter, names, usecols, skiprows):
     rows_to_read = 100  # TODO: tune this
     df = pd.read_csv(fname_const, delimiter=delimiter, names=names, usecols=usecols, skiprows=skiprows, nrows=rows_to_read)
     # TODO: string_array, categorical, etc.
@@ -281,7 +281,7 @@ def sdc_pandas_read_csv(
 
     elif infer_from_file:
         col_names, col_typs = infer_column_names_and_types_from_constant_filename(
-            filepath_or_buffer, skiprows, names, usecols, delimiter)
+            filepath_or_buffer, delimiter, names, usecols, skiprows)
 
     else:
         return None
