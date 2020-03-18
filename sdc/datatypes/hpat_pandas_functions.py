@@ -40,7 +40,7 @@ from sdc.hiframes.api import fix_df_array
 import pandas as pd
 import numpy as np
 
-from numba import types
+from numba import types, numpy_support
 
 from sdc.io.csv_ext import (
     _gen_csv_reader_py_pyarrow_py_func,
@@ -49,23 +49,29 @@ from sdc.io.csv_ext import (
 from sdc.str_arr_ext import string_array_type
 
 
-def get_dtypes(df):
-    dtypes = []
-    for d in df.dtypes.values:
+def get_numba_array_types_for_csv(df):
+    """Extracts Numba array types from the given DataFrame."""
+    result = []
+    for numpy_type in df.dtypes.values:
         try:
-            numba_type = numba.typeof(d).dtype
+            numba_type = numpy_support.from_dtype(numpy_type)
+        except NotImplementedError:
+            numba_type = None
+
+        if numba_type:
             array_type = types.Array(numba_type, 1, 'C')
-        except:
+        else:
+            # default type for CSV is string
             array_type = string_array_type
-        dtypes.append(array_type)
-    return dtypes
+
+        result.append(array_type)
+    return result
 
 
 def infer_column_names_and_types_from_constant_filename(fname_const, skiprows, names, delimiter):
     rows_to_read = 100  # TODO: tune this
     df = pd.read_csv(fname_const, delimiter=delimiter, names=names, skiprows=skiprows, nrows=rows_to_read)
     # TODO: string_array, categorical, etc.
-    dtypes = get_dtypes(df)
     col_names = df.columns.to_list()
     # overwrite column names like Pandas if explicitly provided
     if names:
@@ -73,24 +79,8 @@ def infer_column_names_and_types_from_constant_filename(fname_const, skiprows, n
     else:
         # a row is used for names if not provided
         skiprows += 1
-    dtype_map = dict(zip(col_names, dtypes))
-    return skiprows, col_names, dtype_map
-
-
-def _get_csv_col_info_core(dtype_map, date_cols, col_names):
-    if isinstance(dtype_map, types.Type):
-        typ = dtype_map
-        return col_names, [typ] * len(col_names)
-
-    columns = []
-    out_types = []
-    for i, (col_name, typ) in enumerate(dtype_map.items()):
-        columns.append(col_name)
-        # get array dtype
-        if i in date_cols:
-            typ = types.Array(types.NPDatetime('ns'), 1, 'C')
-        out_types.append(typ)
-    return columns, out_types
+    col_typs = get_numba_array_types_for_csv(df)
+    return skiprows, col_names, col_typs
 
 
 @overload(pandas.read_csv)
@@ -280,51 +270,17 @@ def sdc_pandas_read_csv(
     if skiprows is None:
         skiprows = 0
 
-    # inferencing from params has priority over inferencing from file
     # in case of both are available
-
+    # inferencing from params has priority over inferencing from file
     if infer_from_params:
-        if header == 'infer':
-            if names is None:
-                header = 0
-                if usecols:
-                    col_names = None
-                else:
-                    # require infer from file -> file should be constant
-                    assert infer_from_file
-            else:
-                header = None
-                col_names = names
-        elif header is None:
-            if names is None:
-                # list of integers
-                # infer from file number of columns -> file should be const
-                assert infer_from_file
-            else:
-                col_names = names
-        else:  # Integer
-            # names does not metter
-            # infer from file -> file shoudl be const
-            assert infer_from_file
-        # [int] not supported
-
+        col_names = names
         # all names should be in dtype
-        return_columns = usecols if usecols else col_names
-        assert all(n in dtype for n in return_columns)
+        return_columns = usecols if usecols else names
         col_typs = [dtype[n] for n in return_columns]
 
     elif infer_from_file:
-        # read file and get data types
-        skiprows, col_names, dtype_map = infer_column_names_and_types_from_constant_filename(
+        skiprows, col_names, col_typs = infer_column_names_and_types_from_constant_filename(
             filepath_or_buffer, skiprows, names, delimiter)
-
-        # usecols should be constant list of ints
-        usecols = list(range(len(col_names)))
-
-        # convert type data
-        date_cols = []
-        columns, out_types = _get_csv_col_info_core(dtype_map, date_cols, col_names)
-        col_names, col_typs = columns, out_types
 
     else:
         return None
