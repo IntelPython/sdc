@@ -179,13 +179,26 @@ def sdc_pandas_read_csv(
         float_precision=None,
     """
 
-    infer_from_params = isinstance(dtype, types.Tuple)
-    infer_from_file = isinstance(filepath_or_buffer, types.Literal)
+    # read_csv can infer result DataFrame type from file or from params
 
-    # assert isinstance(filepath_or_buffer, types.Literal)
-    assert isinstance(sep, types.Literal) or sep == ','
-    assert isinstance(delimiter, types.Literal) or delimiter is None
-    assert isinstance(skiprows, types.Literal) or skiprows is None
+    infer_from_file = isinstance(filepath_or_buffer, types.Literal)
+    infer_from_params = isinstance(dtype, types.Tuple)
+
+    # cannot create function if parameters provide not enough info
+    assert infer_from_file or infer_from_params
+
+    if not infer_from_file:
+        # for inference from params dtype and (names or usecols) shoud present
+        # names, dtype and usecols should be literal tuples after rewrite pass (see. RewriteReadCsv)
+        names_present = isinstance(names, types.Tuple)
+        usecols_present = isinstance(usecols, types.Tuple)
+        assert names_present or usecols_present
+
+    if not infer_from_params:
+        # for inferring from file this parameters should be literal or omitted
+        assert isinstance(sep, (types.Literal, types.Omitted)) or sep == ','
+        assert isinstance(delimiter, (types.Literal, types.Omitted)) or delimiter is None
+        assert isinstance(skiprows, (types.Literal, types.Omitted)) or skiprows is None
 
     if isinstance(filepath_or_buffer, types.Literal):
         filepath_or_buffer = filepath_or_buffer.literal_value
