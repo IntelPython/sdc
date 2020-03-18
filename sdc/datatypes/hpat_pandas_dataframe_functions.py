@@ -1079,51 +1079,6 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
 
 
-def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
-    """
-    Input:
-    df.drop(columns='M', errors='ignore')
-
-    Func generated:
-    def sdc_pandas_dataframe_drop_impl(df, labels=None, axis=0, index=None, columns=None, level=None, inplace=False,
-     errors="raise"):
-        if errors == "raise":
-          raise ValueError("The label M is not found in the selected axis")
-        new_col_A_data_df = get_dataframe_data(df, 0)
-        new_col_B_data_df = get_dataframe_data(df, 1)
-        new_col_C_data_df = get_dataframe_data(df, 2)
-        return pandas.DataFrame({"A": new_col_A_data_df, "B": new_col_B_data_df, "C": new_col_C_data_df})
-
-    """
-    indent = 4 * ' '
-    df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
-    saved_df_columns = [column for column in df.columns if column not in drop_cols]
-    func_definition = [f'def sdc_pandas_dataframe_{func_name}_impl({", ".join(func_args)}):']
-    func_text = []
-    column_list = []
-
-    for label in drop_cols:
-        if label not in df.columns:
-            func_text.append(f'if errors == "raise":')
-            func_text.append(indent + f'raise ValueError("The label {label} is not found in the selected axis")')
-            break
-
-    for column_id, column_name in enumerate(saved_df_columns):
-        func_text.append(f'new_col_{column_id}_data_{"df"} = get_dataframe_data({"df"}, '
-                         f'{df_columns_indx[column_name]})')
-        column_list.append((f'new_col_{column_id}_data_df', column_name))
-
-    data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
-    index = 'df.index'
-    func_text.append(f"return pandas.DataFrame({{{data}}}, index={index})\n")
-    func_definition.extend([indent + func_line for func_line in func_text])
-    func_def = '\n'.join(func_definition)
-
-    global_vars = {'pandas': pandas, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
-
-    return func_def, global_vars
-
-
 def _dataframe_codegen_isna(func_name, columns, df):
     """
     Example func_text for func_name='isna' columns=('float', 'int', 'string'):
@@ -1216,6 +1171,51 @@ def isna_overload(df):
     return sdc_pandas_dataframe_isna_codegen(df, 'isna')
 
 
+def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
+    """
+    Input:
+    df.drop(columns='M', errors='ignore')
+
+    Func generated:
+    def sdc_pandas_dataframe_drop_impl(df, labels=None, axis=0, index=None, columns=None, level=None, inplace=False,
+     errors="raise"):
+        if errors == "raise":
+          raise ValueError("The label M is not found in the selected axis")
+        new_col_A_data_df = get_dataframe_data(df, 0)
+        new_col_B_data_df = get_dataframe_data(df, 1)
+        new_col_C_data_df = get_dataframe_data(df, 2)
+        return pandas.DataFrame({"A": new_col_A_data_df, "B": new_col_B_data_df, "C": new_col_C_data_df})
+
+    """
+    indent = 4 * ' '
+    df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
+    saved_df_columns = [column for column in df.columns if column not in drop_cols]
+    func_definition = [f'def sdc_pandas_dataframe_{func_name}_impl({", ".join(func_args)}):']
+    func_text = []
+    column_list = []
+
+    for label in drop_cols:
+        if label not in df.columns:
+            func_text.append(f'if errors == "raise":')
+            func_text.append(indent + f'raise ValueError("The label {label} is not found in the selected axis")')
+            break
+
+    for column_id, column_name in enumerate(saved_df_columns):
+        func_text.append(f'new_col_{column_id}_data_{"df"} = get_dataframe_data({"df"}, '
+                         f'{df_columns_indx[column_name]})')
+        column_list.append((f'new_col_{column_id}_data_df', column_name))
+
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
+    index = 'df.index'
+    func_text.append(f"return pandas.DataFrame({{{data}}}, index={index})\n")
+    func_definition.extend([indent + func_line for func_line in func_text])
+    func_def = '\n'.join(func_definition)
+
+    global_vars = {'pandas': pandas, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
+
+    return func_def, global_vars
+
+
 @sdc_overload_method(DataFrameType, 'drop')
 def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None, level=None, inplace=False,
                               errors='raise'):
@@ -1226,7 +1226,10 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
 
     Limitations
     -----------
-    Parameter columns is expected to be a Literal value with one column name or Tuple with columns names.
+    Parameter ``columns`` is required and is expected to be a Literal value with one column name
+    or Tuple with columns names.
+    Supported ``errors`` can be {``raise``, ``ignore``}, default ``raise``. If ``ignore``, suppress error and only
+    existing labels are dropped.
 
     Examples
     --------
@@ -1238,11 +1241,6 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
 
     .. command-output:: python ./dataframe/dataframe_drop.py
         :cwd: ../../../examples
-
-     .. note::
-        Parameters axis, index, level, inplace, errors are currently unsupported
-        by Intel Scalable Dataframe Compiler
-        Currently multi-indexing is not supported.
 
     .. seealso::
         :ref:`DataFrame.loc <pandas.DataFrame.loc>`
@@ -1278,7 +1276,6 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
         *unsupported*
     errors: :obj:`str` default 'raise'
         If 'ignore', suppress error and only existing labels are dropped.
-        *unsupported*
 
     Returns
     -------
