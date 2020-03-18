@@ -1039,7 +1039,7 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
 
     Limitations
     -----------
-    Parameters axis, level, numeric_only unsupported.
+    Parameters axis, level, numeric_only are unsupported.
 
     Examples
     --------
