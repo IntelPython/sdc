@@ -43,13 +43,15 @@ from numba import (types, numpy_support, cgutils)
 from numba.typed import List, Dict
 from numba import prange
 from numba.targets.arraymath import get_isnan
+from pandas.core.indexing import IndexingError
 
 import sdc
 import sdc.datatypes.common_functions as common_functions
 from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric, check_types_comparable,
                                             find_common_dtype_from_numpy_dtypes, has_literal_value,
                                             has_python_value)
-from sdc.datatypes.common_functions import (sdc_join_series_indexes, sdc_arrays_argsort, sdc_check_indexes_equal)
+from sdc.datatypes.common_functions import (sdc_join_series_indexes, sdc_arrays_argsort, sdc_check_indexes_equal,
+                                            sdc_reindex_series)
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
 from sdc.datatypes.hpat_pandas_series_rolling_types import _hpat_pandas_series_rolling_init
@@ -326,7 +328,7 @@ def hpat_pandas_series_getitem(self, idx):
     Pandas Series operator :attr:`pandas.Series.__getitem__` implementation
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_getitem_series*
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_getitem*
     """
 
     _func_name = 'Operator getitem().'
@@ -365,23 +367,60 @@ def hpat_pandas_series_getitem(self, idx):
 
         return hpat_pandas_series_getitem_idx_slice_impl
 
-    if (
-        isinstance(idx, (types.List, types.Array)) and
-        isinstance(idx.dtype, (types.Boolean, bool))
-    ):
+    if (isinstance(idx, (types.List, types.Array))
+            and isinstance(idx.dtype, (types.Boolean, bool))):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
-            return pandas.Series(data=self._data[idx], index=self.index[idx], name=self._name)
+
+            if len(self) != len(idx):
+                raise IndexError("Item wrong length")
+
+            return pandas.Series(
+                data=numpy_like.getitem_by_mask(self._data, idx),
+                index=numpy_like.getitem_by_mask(self.index, idx),
+                name=self._name
+            )
+
         return hpat_pandas_series_getitem_idx_list_impl
 
-    if (index_is_none and isinstance(idx, SeriesType)):
-        if isinstance(idx.data.dtype, (types.Boolean, bool)):
-            def hpat_pandas_series_getitem_idx_list_impl(self, idx):
-                index = numpy.arange(len(self._data))
-                if (index != idx.index).sum() == 0:
-                    return pandas.Series(data=self._data[idx._data], index=index[idx._data], name=self._name)
+    # idx is Series and it's index is any, idx.dtype is Boolean
+    if (isinstance(idx, SeriesType) and isinstance(idx.dtype, types.Boolean)):
 
-            return hpat_pandas_series_getitem_idx_list_impl
+        none_indexes = isinstance(self.index, types.NoneType) and isinstance(idx.index, types.NoneType)
+        none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
+                                   and (isinstance(idx.index, types.NoneType) or check_index_is_numeric(idx)))
+        if not (none_or_numeric_indexes
+                or check_types_comparable(self.index, idx.index)):
+            msg = '{} The index of boolean indexer is not comparable to Series index.' + \
+                  ' Given: self.index={}, idx.index={}'
+            raise TypingError(msg.format(_func_name, self.index, idx.index))
 
+        def hpat_pandas_series_getitem_idx_bool_indexer_impl(self, idx):
+
+            if none_indexes == True:  # noqa
+                if len(self) > len(idx):
+                    msg = "Unalignable boolean Series provided as indexer " + \
+                          "(index of the boolean Series and of the indexed object do not match)."
+                    raise IndexingError(msg)
+
+                return pandas.Series(
+                    data=numpy_like.getitem_by_mask(self._data, idx._data),
+                    index=numpy_like.getitem_by_mask(self.index, idx._data),
+                    name=self._name
+                )
+            else:
+                self_index = self.index
+                idx_reindexed = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)
+                return pandas.Series(
+                    data=numpy_like.getitem_by_mask(self._data, idx_reindexed._data),
+                    index=numpy_like.getitem_by_mask(self_index, idx_reindexed._data),
+                    name=self._name
+                )
+
+        return hpat_pandas_series_getitem_idx_bool_indexer_impl
+
+    # idx is Series and it's index is None, idx.dtype is not Boolean
+    if (isinstance(idx, SeriesType) and index_is_none
+            and not isinstance(idx.data.dtype, (types.Boolean, bool))):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
             res = numpy.copy(self._data[:len(idx._data)])
             index = numpy.arange(len(self._data))
@@ -392,15 +431,9 @@ def hpat_pandas_series_getitem(self, idx):
             return pandas.Series(data=res, index=index[idx._data], name=self._name)
         return hpat_pandas_series_getitem_idx_list_impl
 
-    if (isinstance(idx, SeriesType) and not isinstance(self.index, types.NoneType)):
-        if isinstance(idx.data.dtype, (types.Boolean, bool)):
-            # Series with str index not implement
-            def hpat_pandas_series_getitem_idx_series_impl(self, idx):
-                if (self._index != idx._index).sum() == 0:
-                    return pandas.Series(data=self._data[idx._data], index=self._index[idx._data], name=self._name)
-
-            return hpat_pandas_series_getitem_idx_series_impl
-
+    # idx is Series and it's index is not None, idx.dtype is not Boolean
+    if (isinstance(idx, SeriesType) and not isinstance(self.index, types.NoneType)
+            and not isinstance(idx.data.dtype, (types.Boolean, bool))):
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
             index = self.index
             data = self._data
@@ -418,6 +451,7 @@ def hpat_pandas_series_getitem(self, idx):
             return pandas.Series(data=data_res, index=index_res, name=self._name)
 
         return hpat_pandas_series_getitem_idx_series_impl
+
 
     raise TypingError('{} The index must be an Number, Slice, String, Boolean Array or a Series.\
                     Given: {}'.format(_func_name, idx))
@@ -2072,7 +2106,7 @@ def hpat_pandas_series_copy(self, deep=True):
 
     Limitations
     -----------
-    - Parameter deep except 'True' is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter deep=False is currently unsupported for indexes by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -2099,7 +2133,7 @@ def hpat_pandas_series_copy(self, deep=True):
     ty_checker.check(self, SeriesType)
 
     if not isinstance(deep, (types.Omitted, types.Boolean)) and not deep:
-        ty_checker.raise_exc(self.data, 'boolean', 'deep')
+        ty_checker.raise_exc(deep, 'boolean', 'deep')
 
     if isinstance(self.index, types.NoneType):
         def hpat_pandas_series_copy_impl(self, deep=True):
@@ -3354,7 +3388,7 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if not isinstance(interpolation, types.Omitted) and interpolation is not 'linear':
+    if not isinstance(interpolation, types.Omitted) and interpolation != 'linear':
         ty_checker.raise_exc(interpolation, 'str', 'interpolation')
 
     if not isinstance(q, (int, float, list, types.Number, types.Omitted, types.List)):
