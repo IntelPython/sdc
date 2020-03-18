@@ -76,11 +76,8 @@ def infer_column_names_and_types_from_constant_filename(fname_const, skiprows, n
     # overwrite column names like Pandas if explicitly provided
     if names:
         col_names[-len(names):] = names
-    else:
-        # a row is used for names if not provided
-        skiprows += 1
     col_typs = get_numba_array_types_for_csv(df)
-    return skiprows, col_names, col_typs
+    return col_names, col_typs
 
 
 @overload(pandas.read_csv)
@@ -250,9 +247,6 @@ def sdc_pandas_read_csv(
         if isinstance(skiprows, types.Literal):
             skiprows = skiprows.literal_value
 
-        if skiprows is None:
-            skiprows = 0
-
     # names and usecols influence on both inferencing from file and from params
     if isinstance(names, types.Tuple):
         assert all(isinstance(name, types.Literal) for name in names)
@@ -286,7 +280,7 @@ def sdc_pandas_read_csv(
         col_typs = [dtype[n] for n in return_columns]
 
     elif infer_from_file:
-        skiprows, col_names, col_typs = infer_column_names_and_types_from_constant_filename(
+        col_names, col_typs = infer_column_names_and_types_from_constant_filename(
             filepath_or_buffer, skiprows, names, usecols, delimiter)
 
     else:
