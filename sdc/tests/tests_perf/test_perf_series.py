@@ -25,8 +25,11 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy as np
+import pandas as pd
 import time
 import random
+from functools import partial
 
 import sdc
 
@@ -35,7 +38,7 @@ from sdc.tests.test_utils import test_global_input_data_float64
 from .test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from .generator import generate_test_cases
 from .generator import TestCase as TC
-from .data_generator import gen_series
+from .data_generator import gen_series, gen_arr_of_dtype
 
 
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_series.TestSeriesMethods.test_series_{method_name}
@@ -44,11 +47,14 @@ class TestSeriesMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_case(self, pyfunc, name, total_data_length, data_num=1, input_data=test_global_input_data_float64):
+    def _test_case(self, pyfunc, name, total_data_length, input_data=None, data_num=1, data_gens=None):
         test_name = 'Series.{}'.format(name)
 
-        if input_data is None:
-            input_data = test_global_input_data_float64
+        data_num = len(data_gens) if data_gens is not None else data_num
+        default_data_gens = [gen_series] * data_num
+        data_gens = data_gens or default_data_gens
+        default_input_data = [np.asarray(test_global_input_data_float64).flatten()] + [None] * (data_num - 1)
+        input_data = input_data or default_input_data
 
         for data_length in total_data_length:
             base = {
@@ -56,8 +62,7 @@ class TestSeriesMethods(TestBase):
                 "data_size": data_length,
             }
 
-            args = gen_series(data_num, data_length, input_data)
-
+            args = tuple(gen(data_length, input_data=input_data[i]) for i, gen in enumerate(data_gens))
             self._test_jit(pyfunc, base, *args)
             self._test_py(pyfunc, base, *args)
 
@@ -86,12 +91,14 @@ cases = [
     TC(name='floordiv', size=[10 ** 7], params='other', data_num=2),
     TC(name='ge', size=[10 ** 7], params='other', data_num=2),
     TC(name='getitem_idx_scalar', size=[10 ** 7], call_expr='data[100000]', usecase_params='data'),
-    TC(name='getitem_idx_bool_series', size=[10 ** 7], call_expr='B[A]', usecase_params='A, B', data_num=2,
-       input_data=[[True, False, False, True, True, False]]),
-    TC(name='getitem_idx_bool_array', size=[10 ** 7], call_expr='B[A.values]', usecase_params='A, B', data_num=2,
-       input_data=[[True, False, False, True, True, False]]),
-    TC(name='getitem_idx_int_series', size=[10 ** 7], call_expr='B[A]', usecase_params='A, B', data_num=2,
-       input_data=[[5, 20, 12, 33, 41, 66, 8, 7, 500, 28]]),
+    TC(name='getitem_idx_bool_series', size=[10 ** 7], call_expr='A[B]', usecase_params='A, B',
+       data_gens=(gen_series, partial(gen_series, dtype='bool', random=False)),
+       input_data=[None, [True, False, False, True, False, True]]),
+    TC(name='getitem_idx_bool_array', size=[10 ** 7], call_expr='A[B]', usecase_params='A, B',
+       data_gens=(gen_series, partial(gen_arr_of_dtype, dtype='bool', random=False)),
+       input_data=[None, [True, False, False, True, False, True]]),
+    TC(name='getitem_idx_int_series', size=[10 ** 7], call_expr='A[B]', usecase_params='A, B',
+       data_gens=(gen_series, partial(gen_series, dtype='int', limits=(0, 10 ** 7)))),
     TC(name='gt',  size=[10 ** 7],params='other', data_num=2),
     TC(name='head', size=[10 ** 8]),
     TC(name='iat', size=[10 ** 7], call_expr='data.iat[100000]', usecase_params='data'),
