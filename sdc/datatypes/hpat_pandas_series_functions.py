@@ -3486,7 +3486,7 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level``, ``numeric_only``, ``axis`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -3498,10 +3498,6 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
 
     .. command-output:: python ./series/series_min.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
