@@ -210,11 +210,14 @@ def sdc_pandas_read_csv(
         isinstance(filepath_or_buffer, types.Literal),
         isinstance(sep, (types.Literal, types.Omitted)) or sep == ',',
         isinstance(delimiter, (types.Literal, types.Omitted)) or delimiter is None,
+        isinstance(names, (types.Tuple, types.Omitted, type(None))),
+        isinstance(usecols, (types.Tuple, types.Omitted, type(None))),
         isinstance(skiprows, (types.Literal, types.Omitted)) or skiprows is None,
     ])
 
     # for inference from params dtype and (names or usecols) shoud present
     # names, dtype and usecols should be literal tuples after rewrite pass (see. RewriteReadCsv)
+    # header not supported
     infer_from_params = all([
         isinstance(dtype, types.Tuple),
         any([
@@ -222,27 +225,35 @@ def sdc_pandas_read_csv(
             isinstance(names, types.Tuple) and isinstance(usecols, (types.Omitted, type(None))),
             isinstance(names, (types.Omitted, type(None))) and isinstance(usecols, types.Tuple),
         ]),
+        isinstance(header, types.Omitted) or header == 'infer',
     ])
 
     # cannot create function if parameters provide not enough info
     assert infer_from_file or infer_from_params
 
-    if isinstance(filepath_or_buffer, types.Literal):
-        filepath_or_buffer = filepath_or_buffer.literal_value
+    if infer_from_file:
+        # parameters should be constants and are important only for inference from file
 
-    if isinstance(sep, types.Literal):
-        sep = sep.literal_value
+        if isinstance(filepath_or_buffer, types.Literal):
+            filepath_or_buffer = filepath_or_buffer.literal_value
 
-    if isinstance(delimiter, types.Literal):
-        delimiter = delimiter.literal_value
+        if isinstance(sep, types.Literal):
+            sep = sep.literal_value
 
-    # Alias sep -> delimiter.
-    if delimiter is None:
-        delimiter = sep
+        if isinstance(delimiter, types.Literal):
+            delimiter = delimiter.literal_value
 
-    if isinstance(header, types.Literal):
-        header = header.literal_value
+        # Alias sep -> delimiter.
+        if delimiter is None:
+            delimiter = sep
 
+        if isinstance(skiprows, types.Literal):
+            skiprows = skiprows.literal_value
+
+        if skiprows is None:
+            skiprows = 0
+
+    # names and usecols influence on both inferencing from file and from params
     if isinstance(names, types.Tuple):
         assert all(isinstance(name, types.Literal) for name in names)
         names = [name.literal_value for name in names]
@@ -251,24 +262,20 @@ def sdc_pandas_read_csv(
         assert all(isinstance(col, types.Literal) for col in usecols)
         usecols = [col.literal_value for col in usecols]
 
-    if isinstance(dtype, types.Tuple):
-        assert all(isinstance(key, types.Literal) for key in dtype[::2])
-        keys = (k.literal_value for k in dtype[::2])
+    if infer_from_params:
+        # dtype should be constants and is important only for inference from params
+        if isinstance(dtype, types.Tuple):
+            assert all(isinstance(key, types.Literal) for key in dtype[::2])
+            keys = (k.literal_value for k in dtype[::2])
 
-        values = dtype[1::2]
-        values = [v.typing_key if isinstance(v, types.Function) else v for v in values]
-        values = [types.Array(numba.from_dtype(np.dtype(v.literal_value)), 1, 'C') if isinstance(v, types.Literal) else v for v in values]
-        values = [types.Array(types.int_, 1, 'C') if v == int else v for v in values]
-        values = [types.Array(types.float64, 1, 'C') if v == float else v for v in values]
-        values = [string_array_type if v == str else v for v in values]
+            values = dtype[1::2]
+            values = [v.typing_key if isinstance(v, types.Function) else v for v in values]
+            values = [types.Array(numba.from_dtype(np.dtype(v.literal_value)), 1, 'C') if isinstance(v, types.Literal) else v for v in values]
+            values = [types.Array(types.int_, 1, 'C') if v == int else v for v in values]
+            values = [types.Array(types.float64, 1, 'C') if v == float else v for v in values]
+            values = [string_array_type if v == str else v for v in values]
 
-        dtype = dict(zip(keys, values))
-
-    if isinstance(skiprows, types.Literal):
-        skiprows = skiprows.literal_value
-
-    if skiprows is None:
-        skiprows = 0
+            dtype = dict(zip(keys, values))
 
     # in case of both are available
     # inferencing from params has priority over inferencing from file

@@ -614,7 +614,7 @@ def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, dtype_present
     func_text += "        names=names,\n"
     func_text += "        parse_dates=[{}],\n".format(date_inds)
 
-    # Python objects could not be jitted and passed to objmode
+    # Python objects (e.g. str, np.float) could not be jitted and passed to objmode
     # so they are hardcoded to function
     func_text += "        dtype={{{}}},\n".format(pd_dtype_strs) if dtype_present else \
                  "        dtype=dtype,\n"
