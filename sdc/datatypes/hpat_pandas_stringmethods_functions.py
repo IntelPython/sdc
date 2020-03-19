@@ -86,7 +86,7 @@ from numba.types import (Boolean, Integer, NoneType,
 
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
-from sdc.utilities.utils import sdc_overload_method
+from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
 from sdc.hiframes.api import get_nan_mask
 from sdc.str_arr_ext import str_arr_set_na_by_mask, create_str_arr_from_list
 
@@ -115,7 +115,6 @@ _hpat_pandas_stringmethods_functions_params = {
     'index': ', sub, start=0, end=None',
     'join': ', sep',
     'ljust': ', width, fillchar=" "',
-    'lstrip': ', to_strip=None',
     'match': ', pat, case=True, flags=0, na=numpy.nan',
     'normalize': ', form',
     'pad': ', width, side="left", fillchar=" "',
@@ -127,12 +126,10 @@ _hpat_pandas_stringmethods_functions_params = {
     'rjust': ', width, fillchar=" "',
     'rpartition': ', sep=" ", expand=True',
     'rsplit': ', pat=None, n=-1, expand=False',
-    'rstrip': ', to_strip=None',
     'slice_replace': ', start=None, stop=None, repl=None',
     'slice': ', start=None, stop=None, step=None',
     'split': ', pat=None, n=-1, expand=False',
     'startswith': ', pat, na=numpy.nan',
-    'strip': ', to_strip=None',
     'translate': ', table',
     'wrap': ', width',
     'zfill': ', width',
@@ -199,7 +196,7 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
 
     Limitations
     -----------
-    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+    Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
 
     Examples
     --------
@@ -212,6 +209,12 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
     .. command-output:: python ./series/str/series_str_center.py
        :cwd: ../../../examples
 
+    .. seealso::
+        :ref:`Series.str.rjust <pandas.Series.str.rjust>`
+            Fills the left side of strings with an arbitrary character.
+        :ref:`Series.str.ljust <pandas.Series.str.ljust>`
+            Fills the right side of strings with an arbitrary character.
+
     .. todo:: Add support of 32-bit Unicode for `str.center()`
 
     Intel Scalable Dataframe Compiler Developer Guide
@@ -219,25 +222,9 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
 
     Pandas Series method :meth:`pandas.core.strings.StringMethods.center()` implementation.
 
-    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
     .. only:: developer
 
     Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_center
-
-    Parameters
-    ----------
-    self: :class:`pandas.core.strings.StringMethods`
-        input arg
-    width: :obj:`int`
-        Minimum width of resulting string
-    fillchar: :obj:`str`
-        Additional character for filling, default is whitespace
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
     """
 
     ty_checker = TypeChecker('Method center().')
@@ -270,7 +257,8 @@ def hpat_pandas_stringmethods_endswith(self, pat, na=None):
 
     Limitations
     -----------
-    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+    Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+    Parameter ``na`` is supported only with default value ``None``.
 
     Examples
     --------
@@ -283,10 +271,6 @@ def hpat_pandas_stringmethods_endswith(self, pat, na=None):
     .. command-output:: python ./series/str/series_str_endswith.py
        :cwd: ../../../examples
 
-    .. todo::
-        - Add support of matching the end of each string by a pattern
-        - Add support of parameter ``na``
-
     .. seealso::
         `str.endswith <https://docs.python.org/3/library/stdtypes.html#str.endswith>`_
             Python standard library string method.
@@ -295,31 +279,18 @@ def hpat_pandas_stringmethods_endswith(self, pat, na=None):
         :ref:`Series.str.contains <pandas.Series.str.contains>`
             Tests if string element contains a pattern.
 
+    .. todo::
+        - Add support of matching the end of each string by a pattern
+        - Add support of parameter ``na``
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
 
     Pandas Series method :meth:`pandas.core.strings.StringMethods.endswith()` implementation.
 
-    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
     .. only:: developer
 
     Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_endswith
-
-    Parameters
-    ----------
-    self: :class:`pandas.core.strings.StringMethods`
-        input arg
-    pat: :obj:`str`
-        Character sequence
-    na: :obj:`bool`
-        Object shown if element tested is not a string
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
     """
 
     ty_checker = TypeChecker('Method endswith().')
@@ -355,7 +326,8 @@ def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
 
     Limitations
     -----------
-    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+    Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+    Parameters ``start``, ``end`` are supported only with default value ``0`` and ``None`` respectively.
 
     Examples
     --------
@@ -368,40 +340,20 @@ def hpat_pandas_stringmethods_find(self, sub, start=0, end=None):
     .. command-output:: python ./series/str/series_str_find.py
        :cwd: ../../../examples
 
-    .. todo:: Add support of parameters ``start`` and ``end``
-
     .. seealso::
         :ref:`Series.str.rfind <pandas.Series.str.rfind>`
             Return highest indexes in each strings.
+
+    .. todo:: Add support of parameters ``start`` and ``end``
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
 
     Pandas Series method :meth:`pandas.core.strings.StringMethods.find()` implementation.
 
-    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
     .. only:: developer
 
     Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_find
-
-    Parameters
-    ----------
-    self: :class:`pandas.core.strings.StringMethods`
-        input arg
-    sub: :obj:`str`
-        Substring being searched
-    start: :obj:`int`
-        Left edge index
-        *unsupported*
-    end: :obj:`int`
-        Right edge index
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
     """
 
     ty_checker = TypeChecker('Method find().')
@@ -458,7 +410,7 @@ def hpat_pandas_stringmethods_len(self):
 
     Limitations
     -----------
-    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+    Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
 
     Examples
     --------
@@ -482,21 +434,9 @@ def hpat_pandas_stringmethods_len(self):
 
     Pandas Series method :meth:`pandas.core.strings.StringMethods.len()` implementation.
 
-    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
     .. only:: developer
 
     Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_str_len1
-
-    Parameters
-    ----------
-    self: :class:`pandas.core.strings.StringMethods`
-        input arg
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
     """
 
     ty_checker = TypeChecker('Method len().')
@@ -522,7 +462,7 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
 
     Limitations
     -----------
-    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+    Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
 
     Examples
     --------
@@ -535,6 +475,12 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
     .. command-output:: python ./series/str/series_str_ljust.py
        :cwd: ../../../examples
 
+    .. seealso::
+        :ref:`Series.str.rjust <pandas.Series.str.rjust>`
+            Fills the left side of strings with an arbitrary character.
+        :ref:`Series.str.center <pandas.Series.str.center>`
+            Fills boths sides of strings with an arbitrary character.
+
     .. todo:: Add support of 32-bit Unicode for `str.ljust()`
 
     Intel Scalable Dataframe Compiler Developer Guide
@@ -542,25 +488,9 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
 
     Pandas Series method :meth:`pandas.core.strings.StringMethods.ljust()` implementation.
 
-    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
     .. only:: developer
 
     Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_ljust
-
-    Parameters
-    ----------
-    self: :class:`pandas.core.strings.StringMethods`
-        input arg
-    width: :obj:`int`
-        Minimum width of resulting string
-    fillchar: :obj:`str`
-        Additional character for filling, default is whitespace
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
     """
 
     ty_checker = TypeChecker('Method ljust().')
@@ -593,7 +523,7 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
 
     Limitations
     -----------
-    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+    Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
 
     Examples
     --------
@@ -606,6 +536,12 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
     .. command-output:: python ./series/str/series_str_rjust.py
        :cwd: ../../../examples
 
+    .. seealso::
+        :ref:`Series.str.ljust <pandas.Series.str.ljust>`
+            Fills the right side of strings with an arbitrary character.
+        :ref:`Series.str.center <pandas.Series.str.center>`
+            Fills boths sides of strings with an arbitrary character.
+
     .. todo:: Add support of 32-bit Unicode for `str.rjust()`
 
     Intel Scalable Dataframe Compiler Developer Guide
@@ -613,25 +549,9 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
 
     Pandas Series method :meth:`pandas.core.strings.StringMethods.rjust()` implementation.
 
-    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
     .. only:: developer
 
     Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_rjust
-
-    Parameters
-    ----------
-    self: :class:`pandas.core.strings.StringMethods`
-        input arg
-    width: :obj:`int`
-        Minimum width of resulting string
-    fillchar: :obj:`str`
-        Additional character for filling, default is whitespace
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
     """
 
     ty_checker = TypeChecker('Method rjust().')
@@ -664,7 +584,8 @@ def hpat_pandas_stringmethods_startswith(self, pat, na=None):
 
     Limitations
     -----------
-    Series elements are expected to be Unicode strings. Elements cannot be NaN.
+    Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+    Parameter ``na`` is supported only with default value ``None``.
 
     Examples
     --------
@@ -677,10 +598,6 @@ def hpat_pandas_stringmethods_startswith(self, pat, na=None):
     .. command-output:: python ./series/str/series_str_startswith.py
        :cwd: ../../../examples
 
-    .. todo::
-        - Add support of matching the start of each string by a pattern
-        - Add support of parameter ``na``
-
     .. seealso::
         `str.startswith <https://docs.python.org/3/library/stdtypes.html#str.startswith>`_
             Python standard library string method.
@@ -689,31 +606,18 @@ def hpat_pandas_stringmethods_startswith(self, pat, na=None):
         :ref:`Series.str.contains <pandas.Series.str.contains>`
             Tests if string element contains a pattern.
 
+    .. todo::
+        - Add support of matching the start of each string by a pattern
+        - Add support of parameter ``na``
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
 
     Pandas Series method :meth:`pandas.core.strings.StringMethods.startswith()` implementation.
 
-    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
     .. only:: developer
 
     Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_startswith
-
-    Parameters
-    ----------
-    self: :class:`pandas.core.strings.StringMethods`
-        input arg
-    pat: :obj:`str`
-        Character sequence
-    na: :obj:`bool`
-        Object shown if element tested is not a string
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
     """
 
     ty_checker = TypeChecker('Method startswith().')
@@ -749,7 +653,6 @@ def hpat_pandas_stringmethods_zfill(self, width):
 
     Limitations
     -----------
-    Series elements are expected to be Unicode strings. Elements cannot be NaN.
     A leading sign prefix ('+'/'-') is handled by inserting the padding after
     the sign character rather than before.
 
@@ -764,8 +667,6 @@ def hpat_pandas_stringmethods_zfill(self, width):
     .. command-output:: python ./series/str/series_str_zfill.py
        :cwd: ../../../examples
 
-    .. todo:: Add support of 32-bit Unicode for `str.zfill()`
-
     .. seealso::
         :ref:`Series.str.rjust <pandas.Series.str.rjust>`
             Fills the left side of strings with an arbitrary character.
@@ -776,28 +677,16 @@ def hpat_pandas_stringmethods_zfill(self, width):
         :ref:`Series.str.center <pandas.Series.str.center>`
             Fills boths sides of strings with an arbitrary character.
 
+    .. todo:: Add support of 32-bit Unicode for `str.zfill()`
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
 
     Pandas Series method :meth:`pandas.core.strings.StringMethods.zfill()` implementation.
 
-    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
     .. only:: developer
 
     Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_zfill
-
-    Parameters
-    ----------
-    self: :class:`pandas.core.strings.StringMethods`
-        input arg
-    width: :obj:`int`
-        Minimum width of resulting string
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
     """
 
     ty_checker = TypeChecker('Method zfill().')
@@ -863,11 +752,7 @@ sdc_pandas_series_str_docstring_template = """
         Intel Scalable Dataframe Compiler User Guide
         ********************************************
         Pandas API: pandas.Series.str.{method_name}
-
-        Limitations
-        -----------
-        Series elements are expected to be Unicode strings. Elements cannot be NaN.
-
+        {limitations}
         Examples
         --------
         .. literalinclude:: ../../../examples/series/str/series_str_{method_name}.py
@@ -878,30 +763,15 @@ sdc_pandas_series_str_docstring_template = """
 
         .. command-output:: python ./series/str/series_str_{method_name}.py
            :cwd: ../../../examples
-
-        .. seealso::
-            {seealso}
-
+        {seealso}
         Intel Scalable Dataframe Compiler Developer Guide
         *************************************************
 
         Pandas Series method :meth:`pandas.core.strings.StringMethods.{method_name}()` implementation.
 
-        Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
         .. only:: developer
 
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_{method_name}_str
-
-        Parameters
-        ----------
-        self: :class:`pandas.core.strings.StringMethods`
-            input arg
-
-        Returns
-        -------
-        :obj:`pandas.Series`
-             returns :obj:`pandas.Series` object
 """
 
 
@@ -1161,76 +1031,246 @@ seealso_check_methods = """
                         """
 
 
+@sdc_register_jitable
+def lstrip_usecase(s, to_strip):
+    return s.lstrip(to_strip)
+
+
+@sdc_register_jitable
+def rstrip_usecase(s, to_strip):
+    return s.rstrip(to_strip)
+
+
+@sdc_register_jitable
+def strip_usecase(s, to_strip):
+    return s.strip(to_strip)
+
+
+def gen_sdc_pandas_series_str_strip_impl(usecase):
+    """Generate series.str.lstrip/rstrip/strip implementations based on usecase func"""
+    def impl(self, to_strip=None):
+        item_count = len(self._data)
+        result = [''] * item_count
+
+        for it in range(item_count):
+            item = self._data._data[it]
+            if len(item) > 0:
+                result[it] = usecase(item, to_strip)
+            else:
+                result[it] = item
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return impl
+
+
+sdc_pandas_series_str_lstrip_impl = gen_sdc_pandas_series_str_strip_impl(lstrip_usecase)
+sdc_pandas_series_str_rstrip_impl = gen_sdc_pandas_series_str_strip_impl(rstrip_usecase)
+sdc_pandas_series_str_strip_impl = gen_sdc_pandas_series_str_strip_impl(strip_usecase)
+
+
+@sdc_overload_method(StringMethodsType, 'lstrip')
+def hpat_pandas_stringmethods_lstrip(self, to_strip=None):
+    ty_checker = TypeChecker('Method strip().')
+    ty_checker.check(self, StringMethodsType)
+
+    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType)):
+        ty_checker.raise_exc(to_strip, 'str', 'to_strip')
+
+    return sdc_pandas_series_str_lstrip_impl
+
+
+@sdc_overload_method(StringMethodsType, 'rstrip')
+def hpat_pandas_stringmethods_rstrip(self, to_strip=None):
+    ty_checker = TypeChecker('Method rstrip().')
+    ty_checker.check(self, StringMethodsType)
+
+    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType)):
+        ty_checker.raise_exc(to_strip, 'str', 'to_strip')
+
+    return sdc_pandas_series_str_rstrip_impl
+
+
+@sdc_overload_method(StringMethodsType, 'strip')
+def hpat_pandas_stringmethods_strip(self, to_strip=None):
+    ty_checker = TypeChecker('Method strip().')
+    ty_checker.check(self, StringMethodsType)
+
+    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType)):
+        ty_checker.raise_exc(to_strip, 'str', 'to_strip')
+
+    return sdc_pandas_series_str_strip_impl
+
+
+seealso_check_methods = """
+        .. seealso::
+            :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
+                Checks whether all characters are alphabetic.
+            :ref:`Series.str.isnumeric <pandas.Series.str.isnumeric>`
+                Checks whether all characters are numeric.
+            :ref:`Series.str.isalnum <pandas.Series.str.isalnum>`
+                Checks whether all characters are alphanumeric.
+            :ref:`Series.str.isdigit <pandas.Series.str.isdigit>`
+                Checks whether all characters are digits.
+            :ref:`Series.str.isdecimal <pandas.Series.str.isdecimal>`
+                Checks whether all characters are decimal.
+            :ref:`Series.str.isspace <pandas.Series.str.isspace>`
+                Checks whether all characters are whitespace.
+            :ref:`Series.str.islower <pandas.Series.str.islower>`
+                Checks whether all characters are lowercase.
+            :ref:`Series.str.isupper <pandas.Series.str.isupper>`
+                Checks whether all characters are uppercase.
+            :ref:`Series.str.istitle <pandas.Series.str.istitle>`
+                Checks whether all characters are titlecase.
+"""
+
 seealso_transform_methods = """
-                            :ref:`Series.str.lower <pandas.Series.str.lower>`
-                                Converts all characters to lowercase.
-                            :ref:`Series.str.upper <pandas.Series.str.upper>`
-                                Converts all characters to uppercase.
-                            :ref:`Series.str.title <pandas.Series.str.title>`
-                                Converts first character of each word to uppercase and remaining to lowercase.
-                            :ref:`Series.str.capitalize <pandas.Series.str.capitalize>`
-                                Converts first character to uppercase and remaining to lowercase.
-                            :ref:`Series.str.swapcase <pandas.Series.str.swapcase>`
-                                Converts uppercase to lowercase and lowercase to uppercase.
-                            :ref:`Series.str.casefold <pandas.Series.str.casefold>`
-                                Removes all case distinctions in the string.
-                           """
+        .. seealso::
+            :ref:`Series.str.lower <pandas.Series.str.lower>`
+                Converts all characters to lowercase.
+            :ref:`Series.str.upper <pandas.Series.str.upper>`
+                Converts all characters to uppercase.
+            :ref:`Series.str.title <pandas.Series.str.title>`
+                Converts first character of each word to uppercase and remaining to lowercase.
+            :ref:`Series.str.capitalize <pandas.Series.str.capitalize>`
+                Converts first character to uppercase and remaining to lowercase.
+            :ref:`Series.str.swapcase <pandas.Series.str.swapcase>`
+                Converts uppercase to lowercase and lowercase to uppercase.
+            :ref:`Series.str.casefold <pandas.Series.str.casefold>`
+                Removes all case distinctions in the string.
+"""
+
+limitation_nans_unsupported = """
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+"""
+
+seealso_strip_methods = """
+                        :ref:`Series.str.strip <pandas.Series.str.strip>`
+                            Remove leading and trailing characters in Series/Index.
+                        :ref:`Series.str.lstrip <pandas.Series.str.lstrip>`
+                            Remove leading characters in Series/Index.
+                        :ref:`Series.str.strip <pandas.Series.str.strip>`
+                            Remove trailing characters in Series/Index.
+"""
 
 
 stringmethods_funcs = {
-    'istitle': {'method': hpat_pandas_stringmethods_istitle,
-                'caption': 'Check if each word start with an upper case letter',
-                'seealso': seealso_check_methods},
-    'isspace': {'method': hpat_pandas_stringmethods_isspace,
-                'caption': 'Check if all the characters in the text are whitespaces',
-                'seealso': seealso_check_methods},
-    'isalpha': {'method': hpat_pandas_stringmethods_isalpha,
-                'caption': 'Check whether all characters in each string are alphabetic',
-                'seealso': seealso_check_methods},
-    'islower': {'method': hpat_pandas_stringmethods_islower,
-                'caption': 'Check if all the characters in the text are alphanumeric',
-                'seealso': seealso_check_methods},
-    'isalnum': {'method': hpat_pandas_stringmethods_isalnum,
-                'caption': 'Check if all the characters in the text are alphanumeric',
-                'seealso': seealso_check_methods},
-    'isnumeric': {'method': hpat_pandas_stringmethods_isnumeric,
-                  'caption': 'Check whether all characters in each string are numeric.',
-                  'seealso': seealso_check_methods},
-    'isdigit': {'method': hpat_pandas_stringmethods_isdigit,
-                'caption': 'Check whether all characters in each string in the Series/Index are digits.',
-                'seealso': seealso_check_methods},
-    'isdecimal': {'method': hpat_pandas_stringmethods_isdecimal,
-                  'caption': 'Check whether all characters in each string are decimal.',
-                  'seealso': seealso_check_methods},
-    'isupper': {'method': hpat_pandas_stringmethods_isupper,
-                'caption': 'Check whether all characters in each string are uppercase.',
-                'seealso': seealso_check_methods},
-    'capitalize': {'method': hpat_pandas_stringmethods_capitalize,
-                   'caption': 'Convert strings in the Series/Index to be capitalized.',
-                   'seealso': seealso_transform_methods},
-    'title': {'method': hpat_pandas_stringmethods_title,
-              'caption': 'Convert strings in the Series/Index to titlecase.',
-              'seealso': seealso_transform_methods},
-    'swapcase': {'method': hpat_pandas_stringmethods_swapcase,
-                 'caption': 'Convert strings in the Series/Index to be swapcased.',
-                 'seealso': seealso_transform_methods},
-    'casefold': {'method': hpat_pandas_stringmethods_casefold,
-                 'caption': 'Convert strings in the Series/Index to be casefolded.',
-                 'seealso': seealso_transform_methods},
-    'upper': {'method': hpat_pandas_stringmethods_upper,
-              'caption': 'upper',
-              'seealso': seealso_transform_methods},
+    'istitle': {
+        'method': hpat_pandas_stringmethods_istitle,
+        'caption': 'Check if each word start with an upper case letter',
+        'seealso': seealso_check_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'isspace': {
+        'method': hpat_pandas_stringmethods_isspace,
+        'caption': 'Check if all the characters in the text are whitespaces',
+        'seealso': seealso_check_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'isalpha': {
+        'method': hpat_pandas_stringmethods_isalpha,
+        'caption': 'Check whether all characters in each string are alphabetic',
+        'seealso': seealso_check_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'islower': {
+        'method': hpat_pandas_stringmethods_islower,
+        'caption': 'Check if all the characters in the text are alphanumeric',
+        'seealso': seealso_check_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'isalnum': {
+        'method': hpat_pandas_stringmethods_isalnum,
+        'caption': 'Check if all the characters in the text are alphanumeric',
+        'seealso': seealso_check_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'isnumeric': {
+        'method': hpat_pandas_stringmethods_isnumeric,
+        'caption': 'Check whether all characters in each string are numeric.',
+        'seealso': seealso_check_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'isdigit': {
+        'method': hpat_pandas_stringmethods_isdigit,
+        'caption': 'Check whether all characters in each string in the Series are digits.',
+        'seealso': seealso_check_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'isdecimal': {
+        'method': hpat_pandas_stringmethods_isdecimal,
+        'caption': 'Check whether all characters in each string are decimal.',
+        'seealso': seealso_check_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'isupper': {
+        'method': hpat_pandas_stringmethods_isupper,
+        'caption': 'Check whether all characters in each string are uppercase.',
+        'seealso': seealso_check_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'capitalize': {
+        'method': hpat_pandas_stringmethods_capitalize,
+        'caption': 'Convert strings in the Series to be capitalized.',
+        'seealso': seealso_transform_methods,
+        'limitations': ''
+    },
+    'title': {
+        'method': hpat_pandas_stringmethods_title,
+        'caption': 'Convert strings in the Series to titlecase.',
+        'seealso': seealso_transform_methods,
+        'limitations': ''
+    },
+    'swapcase': {
+        'method': hpat_pandas_stringmethods_swapcase,
+        'caption': 'Convert strings in the Series to be swapcased.',
+        'seealso': seealso_transform_methods,
+        'limitations': ''
+    },
+    'casefold': {
+        'method': hpat_pandas_stringmethods_casefold,
+        'caption': 'Convert strings in the Series to be casefolded.',
+        'seealso': seealso_transform_methods,
+        'limitations': ''
+    },
+    'strip': {
+        'method': hpat_pandas_stringmethods_strip,
+        'caption': 'Remove leading and trailing characters.',
+        'seealso': seealso_strip_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'lstrip': {
+        'method': hpat_pandas_stringmethods_lstrip,
+        'caption': 'Remove leading and trailing characters.',
+        'seealso': seealso_strip_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'rstrip': {
+        'method': hpat_pandas_stringmethods_rstrip,
+        'caption': 'Remove leading and trailing characters.',
+        'seealso': seealso_strip_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'upper': {
+        'method': hpat_pandas_stringmethods_upper,
+        'caption': 'Convert strings in the Series to upper case.',
+        'seealso': seealso_transform_methods,
+        'limitations': ''
+    },
 }
 
-
 for name, data in stringmethods_funcs.items():
-    data['method'].__doc__ = sdc_pandas_series_str_docstring_template.format(**{'method_name': name,
-                                                                                'caption': data['caption'],
-                                                                                'seealso': data['seealso']})
+    data['method'].__doc__ = sdc_pandas_series_str_docstring_template.format(
+        **{'method_name': name,
+           'caption': data['caption'],
+           'seealso': data['seealso'],
+           'limitations': data['limitations']
+           }
+    )
 
-
-# _hpat_pandas_stringmethods_autogen_methods = sorted(dir(numba.types.misc.UnicodeType.__getattribute__.__qualname__))
-_hpat_pandas_stringmethods_autogen_methods = ['lower', 'lstrip', 'rstrip', 'strip']
+_hpat_pandas_stringmethods_autogen_methods = ['lower']
 """
     This is the list of function which are autogenerated to be used from Numba directly.
 """
