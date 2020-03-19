@@ -1054,6 +1054,7 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
     Limitations
     -----------
     - Parameters ``dtype`` and ``copy`` are currently unsupported by Intel Scalable Dataframe Compiler.
+    - Parameter ``dtype`` types iterable and dict are currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
