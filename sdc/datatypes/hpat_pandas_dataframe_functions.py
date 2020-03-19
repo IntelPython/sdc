@@ -633,14 +633,14 @@ def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     Limitations
     -----------
-    Parameters axis, skipna, level, numeric_only unsupported.
+    Parameters axis, skipna, level, numeric_only are unsupported.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/dataframe/dataframe_median.py
        :language: python
        :lines: 35-
-       :caption: Return the median of the values for the requested axis.
+       :caption: Return the median of the values for the columns.
        :name: ex_dataframe_median
 
     .. command-output:: python ./dataframe/dataframe_median.py
