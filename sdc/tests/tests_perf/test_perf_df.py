@@ -25,15 +25,18 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy as np
 import numba
 import sdc
+
+from functools import partial
 
 from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import calc_compilation, get_times, perf_data_gen_fixed_len
 from sdc.tests.test_utils import test_global_input_data_float64
 from .generator import generate_test_cases
 from .generator import TestCase as TC
-from .data_generator import gen_df
+from .data_generator import gen_df, gen_series, gen_arr_of_dtype
 
 
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_df.TestDataFrameMethods.test_df_{method_name}
@@ -42,11 +45,14 @@ class TestDataFrameMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
 
-    def _test_case(self, pyfunc, name, total_data_length, input_data, data_num=1):
+    def _test_case(self, pyfunc, name, total_data_length, input_data=None, data_num=1, data_gens=None):
         test_name = 'DataFrame.{}'.format(name)
 
-        if input_data is None:
-            input_data = test_global_input_data_float64
+        data_num = len(data_gens) if data_gens is not None else data_num
+        default_data_gens = [gen_df] * data_num
+        data_gens = data_gens or default_data_gens
+        default_input_data = [None] * data_num
+        input_data = input_data or default_input_data
 
         for data_length in total_data_length:
             base = {
@@ -54,16 +60,17 @@ class TestDataFrameMethods(TestBase):
                 "data_size": data_length,
             }
 
-            args = gen_df(data_num, data_length, input_data)
-
+            args = tuple(gen(data_length, input_data=input_data[i]) for i, gen in enumerate(data_gens))
             self._test_jit(pyfunc, base, *args)
             self._test_py(pyfunc, base, *args)
 
 
 cases = [
     TC(name='append', size=[10 ** 7], params='other', data_num=2),
+    TC(name='copy', size=[10 ** 7], params='deep=True'),
+    TC(name='copy', size=[10 ** 7], params='deep=False'),
     TC(name='count', size=[10 ** 7]),
-    TC(name='drop', size=[10 ** 8], params='columns="f0"'),
+    TC(name='drop', size=[10 ** 8], params='columns="A"'),
     TC(name='isna', size=[10 ** 6 * 6]),
     TC(name='max', size=[10 ** 7], check_skipna=True),
     TC(name='mean', size=[10 ** 7], check_skipna=True),
@@ -74,6 +81,12 @@ cases = [
     TC(name='std', size=[10 ** 7], check_skipna=True),
     TC(name='sum', size=[10 ** 7], check_skipna=True),
     TC(name='var', size=[10 ** 7], check_skipna=True),
+    TC(name='getitem_idx_bool_series', size=[10 ** 7], call_expr='df[idx]', usecase_params='df, idx',
+       data_gens=(gen_df, partial(gen_series, dtype='bool', random=False)),
+       input_data=[None, [True, False, False, True, False, True]]),
+    TC(name='getitem_idx_bool_array', size=[10 ** 7], call_expr='df[idx]', usecase_params='df, idx',
+       data_gens=(gen_df, partial(gen_arr_of_dtype, dtype='bool', random=False)),
+       input_data=[None, [True, False, False, True, False, True]]),
 ]
 
 generate_test_cases(cases, TestDataFrameMethods, 'df')
