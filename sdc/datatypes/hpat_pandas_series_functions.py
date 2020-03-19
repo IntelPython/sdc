@@ -2751,7 +2751,8 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
 
     Limitations
     -----------
-    - Parameter is_copy is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameter ``axis`` is supported only with default values ``0`` and ``'index'``.
+    Parameter ``is_copy`` is supported only with default value ``False``.
 
     Examples
     --------
@@ -2764,27 +2765,19 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
     .. command-output:: python ./series/series_take.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
-
         :ref:`DataFrame.loc <pandas.DataFrame.loc>`
             Select a subset of a DataFrame by labels.
-
         :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
             Select a subset of a DataFrame by positions.
 
-        `numpy.absolute
-        <https://docs.scipy.org/doc/numpy/reference/generated/numpy.take.html#numpy.take>`_
-            Take elements from an array along an axis.
-
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.take` implementation.
 
     .. only:: developer
+
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_take_index_*
     """
 
