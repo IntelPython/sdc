@@ -374,18 +374,23 @@ class TestCSV(TestIO):
 
     # inference from file
 
-    def pd_csv_infer_file_default(self, use_pyarrow=False):
+    def pd_csv_infer_file_default(self, file_name="csv_data_infer1.csv", use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
         def test_impl():
-            return read_csv("csv_data_infer1.csv")
+            return read_csv(file_name)
 
         return test_impl
 
     def test_csv_infer_file_default(self):
-        test_impl = self.pd_csv_infer_file_default()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+        def test(file_name):
+            test_impl = self.pd_csv_infer_file_default(file_name)
+            hpat_func = self.jit(test_impl)
+            pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+        for file_name in ["csv_data_infer1.csv", "csv_data_infer_no_column_name.csv"]:
+            with self.subTest(file_name=file_name):
+                test(file_name)
 
     def pd_csv_infer_file_sep(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)

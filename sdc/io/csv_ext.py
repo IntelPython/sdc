@@ -539,6 +539,11 @@ def pandas_read_csv(
                 dtype = {k: pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
             else:
                 dtype = {k: pyarrow.from_numpy_dtype(dtype) for k in usecols}
+        else:
+            if isinstance(dtype, dict):
+                dtype = {k: pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
+            else:
+                dtype = pyarrow.from_numpy_dtype(dtype)
 
     try:
         for column in parse_dates:
@@ -611,15 +616,26 @@ def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, dtype_present
     func_text = "def csv_reader_py({}):\n".format(signature)
     func_text += "  with objmode({}):\n".format(nb_objmode_vars)
     func_text += "    df = pandas_read_csv(filepath_or_buffer,\n"
-    func_text += "        names=names,\n"
+
+    # pyarrow reads unnamed header as " ", pandas reads it as "Unnamed: N"
+    # during inference from file names should be raplaced with "Unnamed: N"
+    # passing names to pyarrow means that one row is header and should be skipped
+    if col_names and any(map(lambda x: x.startswith('Unnamed: '), col_names)):
+        func_text += "        names={},\n".format(col_names)
+        func_text += "        skiprows=(skiprows and skiprows + 1) or 1,\n"
+    else:
+        func_text += "        names=names,\n"
+        func_text += "        skiprows=skiprows,\n"
+
     func_text += "        parse_dates=[{}],\n".format(date_inds)
 
     # Python objects (e.g. str, np.float) could not be jitted and passed to objmode
     # so they are hardcoded to function
-    func_text += "        dtype={{{}}},\n".format(pd_dtype_strs) if dtype_present else \
-                 "        dtype=dtype,\n"
+    # func_text += "        dtype={{{}}},\n".format(pd_dtype_strs) if dtype_present else \
+    #              "        dtype=dtype,\n"
+    # dtype is hardcoded because datetime should be read as string
+    func_text += "        dtype={{{}}},\n".format(pd_dtype_strs)
 
-    func_text += "        skiprows=skiprows,\n"
     func_text += "        usecols=usecols,\n"
     func_text += "        sep=sep,\n"
     func_text += "        delimiter=delimiter,\n"

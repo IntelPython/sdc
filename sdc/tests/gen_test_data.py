@@ -106,6 +106,9 @@ def generate_csv_data():
     with open("csv_data_infer1.csv", "w") as f:
         f.write('A,B,C,D\n' + data)
 
+    with open("csv_data_infer_no_column_name.csv", "w") as f:
+        f.write(',,C,D\n' + data)
+
     with open("csv_data_infer_sep.csv", "w") as f:
         f.write(('A,B,C,D\n' + data).replace(',', ';'))
 
