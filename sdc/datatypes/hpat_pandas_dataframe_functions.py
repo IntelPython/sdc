@@ -1539,7 +1539,7 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
 
     Limitations
     -----------
-    Parameters limit, freq unsupported.
+    Parameters limit, freq are unsupported.
 
     Examples
     --------
