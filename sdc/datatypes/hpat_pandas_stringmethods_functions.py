@@ -194,10 +194,6 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
     ********************************************
     Pandas API: pandas.Series.str.center
 
-    Limitations
-    -----------
-    Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
-
     Examples
     --------
     .. literalinclude:: ../../../examples/series/str/series_str_center.py
