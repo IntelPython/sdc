@@ -1229,7 +1229,7 @@ stringmethods_funcs = {
     },
     'lower': {
         'method': hpat_pandas_stringmethods_lower,
-        'caption': 'Convert strings in the Series/Index to lowercase.',
+        'caption': 'Convert strings in the Series to lowercase.',
         'seealso': seealso_transform_methods,
         'limitations': limitation_nans_unsupported
     },
