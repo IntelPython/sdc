@@ -33,6 +33,104 @@ import subprocess
 import time
 import traceback
 
+from pathlib import Path
+
+from conda.cli.python_api import Commands as Conda_Commands
+from conda.cli.python_api import run_command as exec_conda_command
+
+
+class SDC_Build_Utilities:
+    def __init__(self, python, sdc_local_channel=None):
+        self.src_path = Path(__file__).resolve().parent.parent
+        self.env_name = 'sdc_env'
+        self.python = python
+
+        self.line_double = '='*80
+        self.line_single = '-'*80
+
+        # Set channels
+        self.channel_list = ['-c', 'intel/label/beta', '-c', 'intel', '-c', 'defaults', '-c', 'conda-forge']
+        if sdc_local_channel:
+            sdc_local_channel = Path(sdc_local_channel).resolve().as_uri()
+            self.channel_list = ['-c', sdc_local_channel] + self.channel_list
+        self.channels = ' '.join(self.channel_list)
+
+        # Conda activate command
+        if platform.system() == 'Windows':
+            self.env_activate = f'activate {self.env_name}'
+        else:
+            self.env_activate = f'source activate {self.env_name}'
+
+        # build_doc vars
+        self.doc_path = self.src_path / 'docs'
+        self.doc_tag = 'dev'
+        self.doc_repo_name = 'sdc-doc'
+        self.doc_repo_link = 'https://github.com/IntelPython/sdc-doc.git'
+        self.doc_repo_branch = 'gh-pages'
+
+        # run_examples vars
+        self.examples_path = self.src_path / 'examples'
+
+    def create_environment(self, packages_list=[]):
+        assert type(packages_list) == list, 'Argument should be a list'
+
+        self.log_info(f'Create {self.env_name} conda environment')
+
+        # Clear Intel SDC environment
+        remove_args = ['-q', '-y', '--name', self.env_name, '--all']
+        self.__run_conda_command(Conda_Commands.REMOVE, remove_args)
+
+        # Create Intel SDC environment
+        create_args = ['-q', '-y', '-n', self.env_name, f'python={self.python}']
+        create_args += packages_list + self.channel_list + ['--override-channels']
+        self.__run_conda_command(Conda_Commands.CREATE, create_args)
+
+        return
+
+    def install_conda_package(self, packages_list):
+        assert type(packages_list) == list, 'Argument should be a list'
+
+        self.log_info(f'Install {" ".join(packages_list)} to {self.env_name} conda environment')
+        install_args = ['-n', self.env_name]
+        install_args += self.channel_list + ['--override-channels', '-q', '-y'] + packages_list
+        self.__run_conda_command(Conda_Commands.INSTALL, install_args)
+
+        return
+
+    def install_wheel_package(self, packages_list):
+        return
+
+    def __run_conda_command(self, conda_command, command_args):
+        self.log_info(f'conda {conda_command} {" ".join(command_args)}')
+        output, errors, return_code = exec_conda_command(conda_command, *command_args, use_exception_handler=True)
+        if return_code != 0:
+            raise Exception(output + errors + f'Return code: {str(return_code)}')
+        return output
+
+    def run_command(self, command):
+        self.log_info(command)
+        self.log_info(self.line_single)
+        if platform.system() == 'Windows':
+            subprocess.check_call(f'{self.env_activate} && {command}', stdout=None, stderr=None, shell=True)
+        else:
+            subprocess.check_call(f'{self.env_activate} && {command}', executable='/bin/bash',
+                                  stdout=None, stderr=None, shell=True)
+
+    def get_command_output(self, command):
+        self.log_info(command)
+        self.log_info(self.line_single)
+        if platform.system() == 'Windows':
+            output = subprocess.check_output(f'{self.env_activate} && {command}', universal_newlines=True, shell=True)
+        else:
+            output = subprocess.check_output(f'{self.env_activate} && {command}', executable='/bin/bash',
+                                             universal_newlines=True, shell=True)
+        print(output, flush=True)
+        return output
+
+    def log_info(self, msg, separate=False):
+        if separate:
+            print(f'{time.strftime("%d/%m/%Y %H:%M:%S")}: {self.line_double}', flush=True)
+        print(f'{time.strftime("%d/%m/%Y %H:%M:%S")}: {msg}', flush=True)
 
 """
 Create conda environment with desired python and packages
@@ -43,6 +141,7 @@ def create_conda_env(conda_activate, env_name, python, packages=[], channels='')
     format_print(f'Setup conda {env_name} environment')
     run_command(f'{conda_activate}conda remove -q -y --name {env_name} --all')
     run_command(f'{conda_activate}conda create -q -y -n {env_name} python={python} {packages_list} {channels}')
+    return
 
 
 """
