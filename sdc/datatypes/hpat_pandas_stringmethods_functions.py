@@ -86,7 +86,7 @@ from numba.types import (Boolean, Integer, NoneType,
 
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
-from sdc.utilities.utils import sdc_overload_method
+from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
 from sdc.hiframes.api import get_nan_mask
 from sdc.str_arr_ext import str_arr_set_na_by_mask, create_str_arr_from_list
 
@@ -115,7 +115,6 @@ _hpat_pandas_stringmethods_functions_params = {
     'index': ', sub, start=0, end=None',
     'join': ', sep',
     'ljust': ', width, fillchar=" "',
-    'lstrip': ', to_strip=None',
     'match': ', pat, case=True, flags=0, na=numpy.nan',
     'normalize': ', form',
     'pad': ', width, side="left", fillchar=" "',
@@ -127,12 +126,10 @@ _hpat_pandas_stringmethods_functions_params = {
     'rjust': ', width, fillchar=" "',
     'rpartition': ', sep=" ", expand=True',
     'rsplit': ', pat=None, n=-1, expand=False',
-    'rstrip': ', to_strip=None',
     'slice_replace': ', start=None, stop=None, repl=None',
     'slice': ', start=None, stop=None, step=None',
     'split': ', pat=None, n=-1, expand=False',
     'startswith': ', pat, na=numpy.nan',
-    'strip': ', to_strip=None',
     'translate': ', table',
     'wrap': ', width',
     'zfill': ', width',
@@ -987,6 +984,77 @@ def hpat_pandas_stringmethods_casefold(self):
     return hpat_pandas_stringmethods_casefold_impl
 
 
+@sdc_register_jitable
+def lstrip_usecase(s, to_strip):
+    return s.lstrip(to_strip)
+
+
+@sdc_register_jitable
+def rstrip_usecase(s, to_strip):
+    return s.rstrip(to_strip)
+
+
+@sdc_register_jitable
+def strip_usecase(s, to_strip):
+    return s.strip(to_strip)
+
+
+def gen_sdc_pandas_series_str_strip_impl(usecase):
+    """Generate series.str.lstrip/rstrip/strip implementations based on usecase func"""
+    def impl(self, to_strip=None):
+        item_count = len(self._data)
+        result = [''] * item_count
+
+        for it in range(item_count):
+            item = self._data._data[it]
+            if len(item) > 0:
+                result[it] = usecase(item, to_strip)
+            else:
+                result[it] = item
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return impl
+
+
+sdc_pandas_series_str_lstrip_impl = gen_sdc_pandas_series_str_strip_impl(lstrip_usecase)
+sdc_pandas_series_str_rstrip_impl = gen_sdc_pandas_series_str_strip_impl(rstrip_usecase)
+sdc_pandas_series_str_strip_impl = gen_sdc_pandas_series_str_strip_impl(strip_usecase)
+
+
+@sdc_overload_method(StringMethodsType, 'lstrip')
+def hpat_pandas_stringmethods_lstrip(self, to_strip=None):
+    ty_checker = TypeChecker('Method strip().')
+    ty_checker.check(self, StringMethodsType)
+
+    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType)):
+        ty_checker.raise_exc(to_strip, 'str', 'to_strip')
+
+    return sdc_pandas_series_str_lstrip_impl
+
+
+@sdc_overload_method(StringMethodsType, 'rstrip')
+def hpat_pandas_stringmethods_rstrip(self, to_strip=None):
+    ty_checker = TypeChecker('Method rstrip().')
+    ty_checker.check(self, StringMethodsType)
+
+    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType)):
+        ty_checker.raise_exc(to_strip, 'str', 'to_strip')
+
+    return sdc_pandas_series_str_rstrip_impl
+
+
+@sdc_overload_method(StringMethodsType, 'strip')
+def hpat_pandas_stringmethods_strip(self, to_strip=None):
+    ty_checker = TypeChecker('Method strip().')
+    ty_checker.check(self, StringMethodsType)
+
+    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType)):
+        ty_checker.raise_exc(to_strip, 'str', 'to_strip')
+
+    return sdc_pandas_series_str_strip_impl
+
+
 seealso_check_methods = """
         .. seealso::
             :ref:`Series.str.isalpha <pandas.Series.str.isalpha>`
@@ -1030,6 +1098,16 @@ limitation_nans_unsupported = """
         -----------
         Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
 """
+
+seealso_strip_methods = """
+                        :ref:`Series.str.strip <pandas.Series.str.strip>`
+                            Remove leading and trailing characters in Series/Index.
+                        :ref:`Series.str.lstrip <pandas.Series.str.lstrip>`
+                            Remove leading characters in Series/Index.
+                        :ref:`Series.str.strip <pandas.Series.str.strip>`
+                            Remove trailing characters in Series/Index.
+"""
+
 
 stringmethods_funcs = {
     'istitle': {
@@ -1110,6 +1188,24 @@ stringmethods_funcs = {
         'seealso': seealso_transform_methods,
         'limitations': ''
     },
+    'strip': {
+        'method': hpat_pandas_stringmethods_strip,
+        'caption': 'Remove leading and trailing characters.',
+        'seealso': seealso_strip_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'lstrip': {
+        'method': hpat_pandas_stringmethods_lstrip,
+        'caption': 'Remove leading and trailing characters.',
+        'seealso': seealso_strip_methods,
+        'limitations': limitation_nans_unsupported
+    },
+    'rstrip': {
+        'method': hpat_pandas_stringmethods_rstrip,
+        'caption': 'Remove leading and trailing characters.',
+        'seealso': seealso_strip_methods,
+        'limitations': limitation_nans_unsupported
+    }
 }
 
 for name, data in stringmethods_funcs.items():
@@ -1121,7 +1217,7 @@ for name, data in stringmethods_funcs.items():
            }
     )
 
-_hpat_pandas_stringmethods_autogen_methods = ['upper', 'lower', 'lstrip', 'rstrip', 'strip']
+_hpat_pandas_stringmethods_autogen_methods = ['upper', 'lower']
 """
     This is the list of function which are autogenerated to be used from Numba directly.
 """
