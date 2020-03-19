@@ -181,6 +181,10 @@ sdc_pandas_rolling_docstring_tmpl = """
     ********************************************
     Pandas API: pandas.{ty}.rolling
 
+    Limitations
+    -----------
+    Parameters ``center``, ``win_type``, ``on``, ``axis`` and ``closed`` are supported only with its default values.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/{ty_lower}/rolling/{ty_lower}_rolling_min.py
