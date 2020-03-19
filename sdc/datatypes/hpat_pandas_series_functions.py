@@ -4708,8 +4708,9 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
     Limitations
     -----------
-    - Parameter ``inplace`` is supported only with default value ``None``.
-    - Parameter ``kind`` currently only ``'mergesort'`` and ``'quicksort'`` are supported as literal values.
+    - Parameter ``inplace`` is supported only with default value ``False``.
+    - Parameter ``axis`` is currently unsupported by Intel Scalable Dataframe Compiler.
+    - Parameter ``kind`` is supported only with values ``'mergesort'`` and ``'quicksort'``.
 
     Examples
     --------
@@ -4721,10 +4722,6 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
     .. command-output:: python ./series/series_sort_values.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
