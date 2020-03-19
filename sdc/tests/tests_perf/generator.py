@@ -33,8 +33,9 @@ class TestCase(NamedTuple):
     params: str = ''
     call_expr: str = None
     usecase_params: str = None
-    data_num: int = 1
     input_data: list = None
+    data_num: int = 1
+    data_gens: tuple = None
     skip: bool = False
     check_skipna: bool = False
 
@@ -70,7 +71,10 @@ def generate_test_cases(cases, class_add, typ, prefix=''):
 
 def gen_params_wo_data(test_case):
     """Generate API item parameters without parameters with data, e.g. without parameter other"""
-    extra_data_num = test_case.data_num - 1
+    if test_case.data_gens is None:
+        extra_data_num = test_case.data_num - 1
+    else:
+        extra_data_num = len(test_case.data_gens)
     method_params = test_case.params.split(', ')[extra_data_num:]
 
     return ', '.join(method_params)
@@ -78,7 +82,10 @@ def gen_params_wo_data(test_case):
 
 def gen_usecase_params(test_case):
     """Generate usecase parameters based on method parameters and number of extra generated data"""
-    extra_data_num = test_case.data_num - 1
+    if test_case.data_gens is None:
+        extra_data_num = test_case.data_num - 1
+    else:
+        extra_data_num = len(test_case.data_gens)
     extra_usecase_params = test_case.params.split(', ')[:extra_data_num]
     usecase_params_parts = ['data'] + extra_usecase_params
 
@@ -102,7 +109,8 @@ def gen_test(test_case, prefix):
 
     def func(self):
         self._test_case(usecase, name=test_name, total_data_length=test_case.size,
-                        data_num=test_case.data_num, input_data=test_case.input_data)
+                        data_num=test_case.data_num, data_gens=test_case.data_gens,
+                        input_data=test_case.input_data)
 
     if test_case.skip:
         func = skip_numba_jit(func)
