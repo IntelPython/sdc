@@ -1605,7 +1605,7 @@ def sdc_pandas_dataframe_getitem(self, idx):
         ********************************************
         Pandas API: pandas.DataFrame.getitem
 
-        Get column(s) of DataFrame by key.
+        Get data from a DataFrame by indexer.
 
         Limitations
         -----------
