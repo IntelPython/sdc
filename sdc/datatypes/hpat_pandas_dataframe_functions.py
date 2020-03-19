@@ -721,7 +721,7 @@ def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     Limitations
     -----------
-    Parameters axis, skipna, level, numeric_only are unsupported.
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
     Examples
     --------
