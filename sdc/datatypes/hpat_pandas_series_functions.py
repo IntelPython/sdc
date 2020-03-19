@@ -2106,7 +2106,8 @@ def hpat_pandas_series_copy(self, deep=True):
 
     Limitations
     -----------
-    - Parameter deep=False is currently unsupported for indexes by Intel Scalable Dataframe Compiler
+    - When ``deep=False``, a new object will be created without copying the calling object’s data
+    and with a copy of the calling object’s indices.
 
     Examples
     --------
@@ -2124,9 +2125,7 @@ def hpat_pandas_series_copy(self, deep=True):
     Pandas Series method :meth:`pandas.Series.copy` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_str1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_int1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_deep
+        Test: python -m sdc.runtests sdc.tests.test_series -k series_copy
     """
 
     ty_checker = TypeChecker('Method Series.copy().')
@@ -2821,6 +2820,11 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
 
     Pandas API: pandas.Series.idxmax
 
+    Limitations
+    -----------
+    Parameter ``axis`` is supported only with default value ``None``.
+    Parameter ``skipna`` cannot be ``False`` with data of string type.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_idxmax.py
@@ -2831,10 +2835,6 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
 
     .. command-output:: python ./series/series_idxmax.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -2917,7 +2917,7 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
 
     Examples
     --------
@@ -2929,10 +2929,6 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     .. command-output:: python ./series/series_mul.py
        :cwd: ../../../examples
-
-     .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3067,7 +3063,7 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
 
     Examples
     --------
@@ -3079,10 +3075,6 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     .. command-output:: python ./series/series_truediv.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3562,7 +3554,7 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``axis``, ``level`` and ``numeric_only`` are currently unsupported.
 
     Examples
     --------
@@ -3574,10 +3566,6 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
 
     .. command-output:: python ./series/series_max.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3902,6 +3890,11 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
 
     Pandas API: pandas.Series.idxmin
 
+    Limitations
+    -----------
+    Parameter ``axis`` is supported only with default value ``None``.
+    Parameter ``skipna`` cannot be ``False`` with data of string type.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_idxmin.py
@@ -3912,10 +3905,6 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
 
     .. command-output:: python ./series/series_idxmin.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -4431,7 +4420,7 @@ def hpat_pandas_series_count(self, level=None):
 
     Limitations
     -----------
-    - Parameter level is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameter ``level`` is currently unsupported.
 
     Examples
     --------
@@ -4447,8 +4436,10 @@ def hpat_pandas_series_count(self, level=None):
     .. seealso::
 
         :ref:`Series.value_counts <pandas.Series.value_counts>`
-        :ref:`Series.value_counts <pandas.Series.value_counts>`
+            Return a Series containing counts of unique values.
+
         :ref:`Series.str.len <pandas.Series.str.len>`
+            Count the length of each element in the Series.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
