@@ -2658,7 +2658,8 @@ def hpat_pandas_series_sum(
 
     Limitations
     -----------
-    - Parameters level, numeric_only, min_count are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``axis``, ``level``, ``numeric_only`` and ``min_count`` \
+        are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -2670,10 +2671,6 @@ def hpat_pandas_series_sum(
 
     .. command-output:: python ./series/series_sum.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -2697,7 +2694,7 @@ def hpat_pandas_series_sum(
     Pandas Series method :meth:`pandas.Series.sum` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_sum*
+        Test: python -m sdc.runtests sdc.tests.test_series -k series_sum
     """
 
     _func_name = 'Method sum().'
