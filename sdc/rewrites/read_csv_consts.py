@@ -28,7 +28,7 @@ from numba.rewrites import register_rewrite, Rewrite
 from numba.ir_utils import find_callname, guard, mk_unique_var
 from numba import ir, errors, consts
 
-from sdc.rewrites.ir_utils import remove_unused_recursively, make_assign
+from sdc.rewrites.ir_utils import remove_unused_recursively, make_assign, find_operations
 
 
 def find_build_sequence(func_ir, var):
@@ -78,12 +78,8 @@ class RewriteReadCsv(Rewrite):
         self.consts = consts = {}
 
         # Find all assignments with a right-hand read_csv() call
-        for inst in block.find_insts(ir.Assign):
-            if not isinstance(inst.value, ir.Expr):
-                continue
+        for inst in find_operations(block=block, op_name='call'):
             expr = inst.value
-            if expr.op != 'call':
-                continue
             call = guard(find_callname, func_ir, expr)
             if call not in self._pandas_read_csv_calls:
                 continue
