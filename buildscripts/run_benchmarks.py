@@ -40,7 +40,7 @@ def run_benchmarks(sdc_utils, module_list, num_threads_list):
         for num_threads in num_threads_list:
             os.environ['NUMBA_NUM_THREADS'] = num_threads
             sdc_utils.log_info(f'Run Intel SDC benchmarks on {num_threads} threads', separate=True)
-            sdc_utils.run_command(f'python -W ignore -m sdc.runtests {module}')
+            sdc_utils.run_command(f'python -W ignore -m sdc.runtests -v {module}')
 
 
 if __name__ == '__main__':
