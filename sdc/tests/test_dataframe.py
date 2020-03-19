@@ -1890,8 +1890,8 @@ class TestDataFrame(TestCase):
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     def test_var_default(self):
-        def test_impl(df):
-            return df.var()
+        def test_impl(df, skipna):
+            return df.var(skipna=skipna)
 
         hpat_func = sdc.jit(test_impl)
         df = pd.DataFrame({"A": [.2, .0, .6, .2],
@@ -1900,7 +1900,8 @@ class TestDataFrame(TestCase):
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
                            "F H": [np.nan, np.nan, np.inf, np.nan]})
-        pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
+        for skipna in [None, True, False]:
+            pd.testing.assert_series_equal(hpat_func(df, skipna), test_impl(df, skipna))
 
     def test_max_default(self):
         def test_impl(df):
