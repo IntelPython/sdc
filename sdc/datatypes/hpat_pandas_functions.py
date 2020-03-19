@@ -97,3 +97,86 @@ def sdc_pandas_read_csv(fname, sep=',', delimiter=None, skiprows=0):
     csv_reader_py = _gen_csv_reader_py_pyarrow_py_func(func_text, func_name)
 
     return csv_reader_py
+
+
+sdc_pandas_read_csv.__doc__ = r"""
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.read_csv
+
+    Limitations
+    -----------
+    - Parameters \
+        ``header``, \
+        ``index_col``, \
+        ``squeeze``, \
+        ``prefix``, \
+        ``mangle_dupe_cols``, \
+        ``engine``, \
+        ``converters``, \
+        ``true_values``, \
+        ``false_values``, \
+        ``skipinitialspace``, \
+        ``skipfooter``, \
+        ``nrows``, \
+        ``na_values``, \
+        ``keep_default_na``, \
+        ``na_filter``, \
+        ``verbose``, \
+        ``skip_blank_lines``, \
+        ``parse_dates``, \
+        ``infer_datetime_format``, \
+        ``keep_date_col``, \
+        ``date_parser``, \
+        ``dayfirst``, \
+        ``cache_dates``, \
+        ``iterator``, \
+        ``chunksize``, \
+        ``compression``, \
+        ``thousands``, \
+        ``decimal``, \
+        ``lineterminator``, \
+        ``quotechar``, \
+        ``quoting``, \
+        ``doublequote``, \
+        ``escapechar``, \
+        ``comment``, \
+        ``encoding``, \
+        ``dialect``, \
+        ``error_bad_lines``, \
+        ``warn_bad_lines``, \
+        ``delim_whitespace``, \
+        ``low_memory``, \
+        ``memory_map`` and \
+        ``float_precision`` \
+        are currently unsupported by Intel Scalable Dataframe Compiler.
+    - Resulting DataFrame type could be inferred from constant file name of from parameters. \
+        ``filepath_or_buffer`` could be constant for inferencing from file. \
+        ``filepath_or_buffer`` could be variable for inferencing from parameters if ``dtype`` is constant. \
+        If both ``filepath_or_buffer`` and ``dtype`` are constants then default is inferencing from parameters.
+    - For inferring from parameters ``names`` or ``usecols`` should be provided additionally to ``dtype``.
+    - For inferring from file ``sep``, ``delimiter`` and ``skiprows`` should be constants or omitted.
+    - ``names`` and ``usecols`` should be constants or omitted for both types of inferrencing.
+    - ``usecols`` with list of ints is unsupported by Intel Scalable Dataframe Compiler.
+
+    Examples
+    --------
+    Inference from file. File name is constant. \
+    Resulting DataFrame depends on CSV file content at the moment of compilation.
+
+    >>> pd.read_csv('data.csv')  # doctest: +SKIP
+
+    Inference from file. File name, ``names``, ``usecols``, ``delimiter`` and ``skiprow`` are constants. \
+    Resulting DataFrame contains one column ``A`` \
+    with type of column depending on CSV file content at the moment of compilation.
+
+    >>> pd.read_csv('data.csv', names=['A','B'], usecols=['A'], delimiter=';', skiprows=2)  # doctest: +SKIP
+
+    Inference from parameters. File name, ``delimiter`` and ``skiprow`` are variables. \
+    ``names``, ``usecols`` and ``dtype`` are constants. \
+    Resulting DataFrame contains column ``A`` with type ``np.float64``.
+
+    >>> pd.read_csv(file_name, names=['A','B'], usecols=['A'], dtype={'A': np.float64}, \
+                    delimiter=some_char, skiprows=some_int)  # doctest: +SKIP
+"""
