@@ -3074,7 +3074,7 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported.
+    Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
 
     Examples
     --------
