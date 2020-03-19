@@ -242,13 +242,15 @@ def hpat_pandas_dataframe_values(df):
     return hpat_pandas_df_values_impl(df, numba_common_dtype)
 
 
-def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
+def sdc_pandas_dataframe_append_codegen(df, other, _func_name, ignore_index_value, indexes_comparable, args):
     """
     Input:
     df = pd.DataFrame({'A': ['cat', 'dog', np.nan], 'B': [.2, .3, np.nan]})
     other = pd.DataFrame({'A': ['bird', 'fox', 'mouse'], 'C': ['a', np.nan, '']})
+    ignore_index=True
+
     Func generated:
-    def sdc_pandas_dataframe_append_impl(df, other, ignore_index=True, verify_integrity=False, sort=None):
+    def sdc_pandas_dataframe_append_impl(df, other, ignore_index=False, verify_integrity=False, sort=None):
         len_df = len(df._data[0])
         len_other = len(other._data[0])
         new_col_A_data_df = df._data[0]
@@ -263,14 +265,8 @@ def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
         return pandas.DataFrame({"A": new_col_A, "B": new_col_B, "C": new_col_C)
     """
     indent = 4 * ' '
-    func_args = ['df', 'other']
 
-    for key, value in args:
-        # TODO: improve check
-        if key not in func_args:
-            if isinstance(value, types.Literal):
-                value = value.literal_value
-            func_args.append(f'{key}={value}')
+    func_args = ['df', 'other'] + kwsparams2list(args)
 
     df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
     other_columns_indx = {col_name: i for i, col_name in enumerate(other.columns)}
@@ -321,26 +317,43 @@ def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
             column_list.append((f'new_col_{col_id}_other', col_name))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
-    # TODO: Handle index
-    func_text.append(f"return pandas.DataFrame({{{data}}})\n")
+
+    if ignore_index_value == True:  # noqa
+        func_text.append(f'return pandas.DataFrame({{{data}}})\n')
+    else:
+        if indexes_comparable == False:  # noqa
+            func_text.append(f'raise SDCLimitation("Indexes of dataframes are expected to have comparable '
+                             f'(both Numeric or String) types if parameter ignore_index is set to False.")')
+        else:
+            func_text += [f'joined_index = hpat_arrays_append(df.index, other.index)\n',
+                          f'return pandas.DataFrame({{{data}}}, index=joined_index)\n']
+
     func_definition.extend([indent + func_line for func_line in func_text])
     func_def = '\n'.join(func_definition)
 
     global_vars = {'pandas': pandas,
                    'init_series': sdc.hiframes.api.init_series,
                    'fill_array': sdc.datatypes.common_functions.fill_array,
-                   'fill_str_array': sdc.datatypes.common_functions.fill_str_array}
+                   'fill_str_array': sdc.datatypes.common_functions.fill_str_array,
+                   'hpat_arrays_append': sdc.datatypes.common_functions.hpat_arrays_append,
+                   'SDCLimitation': SDCLimitation}
 
     return func_def, global_vars
 
 
 @sdc_overload_method(DataFrameType, 'append')
-def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=False, sort=None):
+def sdc_pandas_dataframe_append(df, other, ignore_index=False, verify_integrity=False, sort=None):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
 
     Pandas API: pandas.DataFrame.append
+
+    Limitations
+    -----------
+    Parameters verify_integrity, sort are unsupported.
+    Indexes of dataframes are expected to have comparable (both Numeric or String) types if parameter ignore_index
+    is set to False.
 
     Examples
     --------
@@ -353,11 +366,6 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
 
     .. command-output:: python ./dataframe/dataframe_append.py
         :cwd: ../../../examples
-
-    .. note::
-        Parameter ignore_index, verify_integrity, sort are currently unsupported
-        by Intel Scalable Dataframe Compiler
-        Currently only pandas.DataFrame is supported as "other" parameter
 
     .. seealso::
         `pandas.concat <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.concat.html>`_
@@ -392,9 +400,6 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     ty_checker.check(df, DataFrameType)
     # TODO: support other array-like types
     ty_checker.check(other, DataFrameType)
-    # TODO: support index in series from df-columns
-    if not isinstance(ignore_index, (bool, types.Boolean, types.Omitted)) and not ignore_index:
-        ty_checker.raise_exc(ignore_index, 'boolean', 'ignore_index')
 
     if not isinstance(verify_integrity, (bool, types.Boolean, types.Omitted)) and verify_integrity:
         ty_checker.raise_exc(verify_integrity, 'boolean', 'verify_integrity')
@@ -402,17 +407,29 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     if not isinstance(sort, (bool, types.Boolean, types.Omitted)) and sort is not None:
         ty_checker.raise_exc(sort, 'boolean, None', 'sort')
 
-    args = (('ignore_index', True), ('verify_integrity', False), ('sort', None))
+    if not isinstance(ignore_index, (bool, types.Boolean, types.Omitted)):
+        ty_checker.raise_exc(ignore_index, 'boolean', 'ignore_index')
 
-    def sdc_pandas_dataframe_append_impl(df, other, _func_name, args):
+    none_or_numeric_indexes = ((isinstance(df.index, types.NoneType) or isinstance(df.index, types.Number)) and
+                               (isinstance(other.index, types.NoneType) or isinstance(other.index, types.Number)))
+    indexes_comparable = check_types_comparable(df.index, other.index) or none_or_numeric_indexes
+
+    if isinstance(ignore_index, types.Literal):
+        ignore_index = ignore_index.literal_value
+    elif not (ignore_index is False or isinstance(ignore_index, types.Omitted)):
+        raise SDCLimitation("Parameter ignore_index should be Literal")
+
+    args = {'ignore_index': False, 'verify_integrity': False, 'sort': None}
+
+    def sdc_pandas_dataframe_append_impl(df, other, _func_name, ignore_index, indexes_comparable, args):
         loc_vars = {}
-        func_def, global_vars = sdc_pandas_dataframe_append_codegen(df, other, _func_name, args)
-
+        func_def, global_vars = sdc_pandas_dataframe_append_codegen(df, other, _func_name, ignore_index,
+                                                                    indexes_comparable, args)
         exec(func_def, global_vars, loc_vars)
         _append_impl = loc_vars['sdc_pandas_dataframe_append_impl']
         return _append_impl
 
-    return sdc_pandas_dataframe_append_impl(df, other, _func_name, args)
+    return sdc_pandas_dataframe_append_impl(df, other, _func_name, ignore_index, indexes_comparable, args)
 
 
 # Example func_text for func_name='count' columns=('A', 'B'):

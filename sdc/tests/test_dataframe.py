@@ -1763,6 +1763,25 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
 
+    def test_append_df_exception_incomparable_index_type(self):
+        def test_impl(df, df2):
+            return df.append(df2, ignore_index=False)
+
+        sdc_func = self.jit(test_impl)
+
+        n1 = 2
+        n2 = n1 * 2
+        df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1) ** 2}, index=['a', 'b'])
+        df2 = pd.DataFrame({'A': np.arange(n2), 'D': np.arange(n2) ** 2, 'E S D': np.arange(n2) + 100},
+                           index=np.arange(n2))
+
+        with self.assertRaises(SDCLimitation) as raises:
+            sdc_func(df, df2)
+
+        msg = "Indexes of dataframes are expected to have comparable (both Numeric or String) types " \
+              "if parameter ignore_index is set to False."
+        self.assertIn(msg, str(raises.exception))
+
     @skip_sdc_jit
     def test_append_df_diff_types_no_index(self):
         def test_impl(df, df2):
