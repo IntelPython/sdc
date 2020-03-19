@@ -803,7 +803,7 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
     Limitations
     -----------
-    Parameters axis, skipna, level, ddof, numeric_only are unsupported.
+    Parameters ``axis``, ``skipna``, ``level``, ``ddof`` and ``numeric_only`` are unsupported.
 
     Examples
     --------
