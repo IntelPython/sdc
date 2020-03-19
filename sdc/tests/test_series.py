@@ -5977,19 +5977,19 @@ class TestSeries(
             pd.testing.assert_series_equal(cfunc(S), islower_usecase(S))
 
     def test_series_strip_str(self):
-        s = pd.Series(['1. Ant.  ', '2. Bee!\n', '3. Cat?\t'])
+        s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
         cfunc = self.jit(strip_usecase)
         for to_strip in [None, '123.', '.!? \n\t', '123.!? \n\t']:
             pd.testing.assert_series_equal(cfunc(s, to_strip), strip_usecase(s, to_strip))
 
     def test_series_lstrip_str(self):
-        s = pd.Series(['1. Ant.  ', '2. Bee!\n', '3. Cat?\t'])
+        s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
         cfunc = self.jit(lstrip_usecase)
         for to_strip in [None, '123.', '.!? \n\t', '123.!? \n\t']:
             pd.testing.assert_series_equal(cfunc(s, to_strip), lstrip_usecase(s, to_strip))
 
     def test_series_rstrip_str(self):
-        s = pd.Series(['1. Ant.  ', '2. Bee!\n', '3. Cat?\t'])
+        s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
         cfunc = self.jit(rstrip_usecase)
         for to_strip in [None, '123.', '.!? \n\t', '123.!? \n\t']:
             pd.testing.assert_series_equal(cfunc(s, to_strip), rstrip_usecase(s, to_strip))
