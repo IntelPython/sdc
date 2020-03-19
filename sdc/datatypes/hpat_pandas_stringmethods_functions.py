@@ -521,10 +521,6 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
     ********************************************
     Pandas API: pandas.Series.str.rjust
 
-    Limitations
-    -----------
-    Series elements are expected to be Unicode strings.
-
     Examples
     --------
     .. literalinclude:: ../../../examples/series/str/series_str_rjust.py
