@@ -344,8 +344,8 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
 
     Limitations
     -----------
-    Parameters ``ignore_index``, ``verify_integrity`` and ``sort`` are unsupported.
-    Parameter ``other`` can be only :obj:`pandas.DataFrame`.
+     - Parameters ``ignore_index``, ``verify_integrity`` and ``sort`` are unsupported.
+     - Parameter ``other`` can be only :obj:`pandas.DataFrame`.
 
     Examples
     --------
