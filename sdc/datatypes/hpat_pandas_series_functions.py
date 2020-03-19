@@ -2820,6 +2820,11 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
 
     Pandas API: pandas.Series.idxmax
 
+    Limitations
+    -----------
+    Parameter ``axis`` is supported only with default value ``None``.
+    Parameter ``skipna`` cannot be ``False`` with data of string type.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_idxmax.py
@@ -2830,10 +2835,6 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
 
     .. command-output:: python ./series/series_idxmax.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
