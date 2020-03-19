@@ -3002,10 +3002,6 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
     .. command-output:: python ./series/series_div.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
         :ref:`Series.rdiv <pandas.Series.rdiv>`
