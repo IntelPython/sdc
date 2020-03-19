@@ -871,14 +871,14 @@ def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_
 
     Limitations
     -----------
-    Parameters axis, skipna, level, numeric_only, min_count unsupported.
+    Parameters axis, skipna, level, numeric_only, min_count are unsupported.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/dataframe/dataframe_sum.py
        :language: python
        :lines: 35-
-       :caption: Return the sum of the values for the requested axis.
+       :caption: Return the sum of the values for the columns.
        :name: ex_dataframe_sum
 
     .. command-output:: python ./dataframe/dataframe_sum.py
