@@ -4558,7 +4558,9 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     Limitations
     -----------
-    Parameters ``kind``, ``order`` and ``axis`` are supported only with default value ``None``.
+    - Parameter ``axis`` is supported only with default value ``0``.
+    - Parameter ``order`` is supported only with default value ``None``.
+    - Parameter ``kind`` is supported only with values ``'mergesort'`` and ``'quicksort'``.
 
     Examples
     --------
