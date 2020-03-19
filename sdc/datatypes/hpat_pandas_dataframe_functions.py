@@ -1020,26 +1020,6 @@ def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min
     .. only:: developer
 
         Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_prod*
-
-    Parameters
-    -----------
-    df: :class:`pandas.DataFrame`
-        input arg
-    axis:
-        *unsupported*
-    skipna:
-        *unsupported*
-    level:
-        *unsupported*
-    numeric_only:
-        *unsupported*
-    min_count:
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series` or `pandas.DataFrame`
-            return the product of the values for the requested axis.
     """
 
     name = 'prod'
