@@ -3286,29 +3286,26 @@ def hpat_pandas_series_prod(self, axis=None, skipna=None, level=None, numeric_on
 
     Limitations
     -----------
-    - Parameters level, numeric_only, min_count are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``axis``, ``level``, ``numeric_only`` and ``min_count`` \
+        are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_prod.py
        :language: python
        :lines: 27-
-       :caption: Return the product of the values for the requested axis.
+       :caption: Return the product of the values.
        :name: ex_series_prod
 
     .. command-output:: python ./series/series_prod.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.prod` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_prod*
+        Test: python -m sdc.runtests sdc.tests.test_series -k series_prod
     """
 
     _func_name = 'Method prod().'
