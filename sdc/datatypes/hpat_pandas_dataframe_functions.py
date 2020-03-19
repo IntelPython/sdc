@@ -1070,22 +1070,6 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     .. only:: developer
 
     Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_count*
-
-    Parameters
-    -----------
-    df: :class:`pandas.DataFrame`
-      input arg
-    axis:
-      *unsupported*
-    level:
-      *unsupported*
-    numeric_only:
-      *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series` or `pandas.DataFrame`
-      for each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
     """
 
     name = 'count'
