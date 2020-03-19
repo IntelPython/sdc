@@ -5987,7 +5987,7 @@ class TestSeries(
 
         cfunc = self.jit(lower_usecase)
         for data in all_data:
-            S = pd.Series(data)
+            s = pd.Series(data)
             pd.testing.assert_series_equal(cfunc(S), lower_usecase(S))
 
     def test_series_strip_str(self):
