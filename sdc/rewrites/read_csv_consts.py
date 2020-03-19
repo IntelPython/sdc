@@ -28,7 +28,7 @@ from numba.rewrites import register_rewrite, Rewrite
 from numba.ir_utils import find_callname, guard, mk_unique_var
 from numba import ir, errors, consts
 
-from sdc.rewrites.ir_utils import remove_unused_recursively
+from sdc.rewrites.ir_utils import remove_unused_recursively, make_assign
 
 
 def find_build_sequence(func_ir, var):
@@ -43,11 +43,6 @@ def find_build_sequence(func_ir, var):
     build_ops = ['build_tuple', 'build_list', 'build_set', 'build_map']
     require(var_def.op in build_ops)
     return var_def.items, var_def.op
-
-
-def _new_definition(func_ir, var, value, loc):
-    func_ir._definitions[var.name] = [value]
-    return ir.Assign(value=value, target=var, loc=loc)
 
 
 class ConstantInference(consts.ConstantInference):
@@ -140,12 +135,12 @@ class RewriteReadCsv(Rewrite):
                         continue
 
                     # create tuple variable
-                    tuple_var = ir.Var(new_block.scope, mk_unique_var(f"{key}_tuple"), loc)
-                    new_block.append(_new_definition(self.func_ir, tuple_var,
-                                     ir.Expr.build_tuple(items=items, loc=loc), loc))
+                    stmt = make_assign(ir.Expr.build_tuple(items=items, loc=loc), new_block.scope,
+                                       self.func_ir, loc, name=f"{key}_tuple")
+                    new_block.append(stmt)
 
                     # replace variable in call
-                    inst.value.kws = [(kw[0], tuple_var) if kw[0] == key else kw for kw in inst.value.kws]
+                    inst.value.kws = [(kw[0], stmt.target) if kw[0] == key else kw for kw in inst.value.kws]
 
                     # save old variable for removing
                     vars_to_remove.append(current_var)
