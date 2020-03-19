@@ -2796,8 +2796,8 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
 
     Limitations
     -----------
-    Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler.
-    Parameter skipna is unsupported with str data.
+    Parameter ``axis`` is supported only with default value ``None``.
+    Parameter ``skipna`` cannot be ``False`` with data of string type.
 
     Examples
     --------
