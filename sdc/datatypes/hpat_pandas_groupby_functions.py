@@ -141,10 +141,10 @@ def sdc_pandas_dataframe_getitem(self, idx):
             if idx_is_literal_str == True:  # noqa
                 # no need to pass index into this series, as we group by array
                 target_series = pandas.Series(
-                    data=get_dataframe_data(self._parent, target_col_id_literal),
+                    data=self._parent._data[target_col_id_literal],
                     name=self._parent._columns[target_col_id_literal]
                 )
-                by_arr_data = get_dataframe_data(self._parent, by_col_id_literal)
+                by_arr_data = self._parent._data[by_col_id_literal]
                 return init_series_groupby(target_series, by_arr_data, self._data, self._sort)
             else:
                 return init_dataframe_groupby(self._parent, by_col_id_literal, self._data, self._sort, idx)
@@ -182,8 +182,8 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, de
     # TODO: remove conversion from Numba typed.List to reflected one while creating group_arr_{i}
     func_lines.extend(['\n'.join([
         f'  result_data_{i} = numpy.empty(res_index_len, dtype=res_arrays_dtypes[{i}])',
-        f'  for j in numba.prange(res_index_len):',
-        f'    column_data_{i} = get_dataframe_data({df}, {column_ids[i]})',
+        f'  column_data_{i} = {df}._data[{column_ids[i]}]',
+        f'  for j in numpy.arange(res_index_len):',
         f'    group_arr_{i} = _sdc_take(column_data_{i}, list({groupby_dict}[group_keys[j]]))',
         f'    group_series_{i} = pandas.Series(group_arr_{i})',
         f'    idx = argsorted_index[j] if {groupby_param_sort} else j',
@@ -202,11 +202,9 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, de
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas,
                    'numpy': numpy,
-                   'numba': numba,
                    '_sdc_asarray': _sdc_asarray,
                    '_sdc_take': _sdc_take,
-                   'sdc_arrays_argsort': sdc_arrays_argsort,
-                   'get_dataframe_data': get_dataframe_data}
+                   'sdc_arrays_argsort': sdc_arrays_argsort}
 
     return func_text, global_vars
 
@@ -229,7 +227,7 @@ def _sdc_pandas_series_groupby_generic_func_codegen(func_name, func_params, defa
         f'  if {groupby_param_sort}:',
         f'    argsorted_index = sdc_arrays_argsort(group_keys, kind=\'mergesort\')',
         f'  result_data = numpy.empty(res_index_len, dtype=res_dtype)',
-        f'  for j in numba.prange(res_index_len):',
+        f'  for j in numpy.arange(res_index_len):',
         f'    group_arr = _sdc_take({series}._data, list({groupby_dict}[group_keys[j]]))',
         f'    group_series = pandas.Series(group_arr)',
         f'    idx = argsorted_index[j] if {groupby_param_sort} else j',
@@ -244,7 +242,6 @@ def _sdc_pandas_series_groupby_generic_func_codegen(func_name, func_params, defa
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas,
                    'numpy': numpy,
-                   'numba': numba,
                    '_sdc_asarray': _sdc_asarray,
                    '_sdc_take': _sdc_take,
                    'sdc_arrays_argsort': sdc_arrays_argsort}

@@ -35,7 +35,7 @@ from sdc.tests.tests_perf.test_perf_base import TestBase
 from sdc.tests.tests_perf.test_perf_utils import perf_data_gen_fixed_len
 from .generator import generate_test_cases
 from .generator import TestCase as TC
-
+from .data_generator import gen_series
 
 rolling_usecase_tmpl = """
 def series_rolling_{method_name}_usecase(data, {extra_usecase_params}):
@@ -85,32 +85,34 @@ class TestSeriesRollingMethods(TestBase):
     def setUpClass(cls):
         super().setUpClass()
         cls.map_ncalls_dlength = {
+            'corr': (100, [4 * 10 ** 5]),
+            'count': (100, [8 * 10 ** 5]),
+            'cov': (100, [4 * 10 ** 5]),
+            'kurt': (100, [8 * 10 ** 5]),
             'mean': (100, [8 * 10 ** 5]),
+            'min': (100, [4 * 10 ** 5]),
+            'skew': (100, [8 * 10 ** 5]),
             'sum': (100, [8 * 10 ** 5]),
+            'std': (100, [8 * 10 ** 5]),
+            'var': (100, [8 * 10 ** 5]),
         }
 
-    def _test_case(self, pyfunc, name, total_data_length, data_num=1,
-                   input_data=test_global_input_data_float64):
+    def _test_case(self, pyfunc, name, total_data_length, input_data=None, data_num=1, data_gens=None):
         test_name = 'Series.rolling.{}'.format(name)
 
-        if input_data is None:
-            input_data = test_global_input_data_float64
+        data_num = len(data_gens) if data_gens is not None else data_num
+        default_data_gens = [gen_series] * data_num
+        data_gens = data_gens or default_data_gens
+        default_input_data = [np.asarray(test_global_input_data_float64).flatten()] + [None] * (data_num - 1)
+        input_data = input_data or default_input_data
 
-        full_input_data_length = sum(len(i) for i in input_data)
         for data_length in total_data_length:
             base = {
                 'test_name': test_name,
                 'data_size': data_length,
             }
-            data = perf_data_gen_fixed_len(input_data, full_input_data_length, data_length)
-            test_data = pandas.Series(data)
 
-            args = [test_data]
-            for i in range(data_num - 1):
-                np.random.seed(i)
-                extra_data = np.random.ranf(data_length)
-                args.append(pandas.Series(extra_data))
-
+            args = tuple(gen(data_length, input_data=input_data[i]) for i, gen in enumerate(data_gens))
             self._test_jit(pyfunc, base, *args)
             self._test_py(pyfunc, base, *args)
 
@@ -125,26 +127,45 @@ class TestSeriesRollingMethods(TestBase):
             data_num += len(extra_usecase_params.split(', '))
         self._test_case(usecase, name, total_data_length, data_num=data_num)
 
+    def test_series_rolling_corr(self):
+        self._test_series_rolling_method('corr', extra_usecase_params='other',
+                                         method_params='other=other')
+
+    def test_series_rolling_count(self):
+        self._test_series_rolling_method('count')
+
+    def test_series_rolling_cov(self):
+        self._test_series_rolling_method('cov', extra_usecase_params='other',
+                                         method_params='other=other')
+
+    def test_series_rolling_kurt(self):
+        self._test_series_rolling_method('kurt')
+
     def test_series_rolling_mean(self):
         self._test_series_rolling_method('mean')
+
+    def test_series_rolling_min(self):
+        self._test_series_rolling_method('min')
+
+    def test_series_rolling_skew(self):
+        self._test_series_rolling_method('skew')
 
     def test_series_rolling_sum(self):
         self._test_series_rolling_method('sum')
 
+    def test_series_rolling_std(self):
+        self._test_series_rolling_method('std')
+
+    def test_series_rolling_var(self):
+        self._test_series_rolling_method('var')
+
 
 cases = [
     TC(name='apply', size=[10 ** 7], params='func=lambda x: np.nan if len(x) == 0 else x.mean()'),
-    TC(name='corr', size=[10 ** 7]),
-    TC(name='count', size=[10 ** 7]),
-    TC(name='cov', size=[10 ** 7]),
-    TC(name='kurt', size=[10 ** 7]),
     TC(name='max', size=[10 ** 7]),
     TC(name='median', size=[10 ** 7]),
-    TC(name='min', size=[10 ** 7]),
     TC(name='quantile', size=[10 ** 7], params='0.2'),
-    TC(name='skew', size=[10 ** 7]),
     TC(name='std', size=[10 ** 7]),
-    TC(name='var', size=[10 ** 7]),
 ]
 
 

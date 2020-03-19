@@ -34,8 +34,10 @@ import unittest
 from itertools import permutations, product
 from numba.config import IS_32BITS
 from numba.special import literal_unroll
+from numba.errors import TypingError
 
 import sdc
+from sdc.datatypes.common_functions import SDCLimitation
 from sdc.tests.gen_test_data import ParquetGenerator
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (check_numba_version,
@@ -48,7 +50,8 @@ from sdc.tests.test_utils import (check_numba_version,
                                   get_start_end,
                                   skip_numba_jit,
                                   skip_sdc_jit,
-                                  test_global_input_data_float64,)
+                                  test_global_input_data_float64,
+                                  test_global_input_data_unicode_kind4)
 
 
 @sdc.jit
@@ -62,6 +65,8 @@ COL_IND = 0
 
 
 class TestDataFrame(TestCase):
+
+    # TODO: Data generator for DataFrames
 
     def test_create1(self):
         def test_impl(A, B):
@@ -570,6 +575,97 @@ class TestDataFrame(TestCase):
         df2 = df.copy()
         np.testing.assert_almost_equal(hpat_func(df, arr), test_impl(df2, arr))
 
+    def _test_df_set_column(self, all_data, key, value):
+        def gen_test_impl(value, do_jit=False):
+            if isinstance(value, pd.Series):
+                def test_impl(df, key, value):
+                    if do_jit == True:  # noqa
+                        return df._set_column(key, value.values)
+                    else:
+                        df[key] = value.values
+            else:
+                def test_impl(df, key, value):
+                    if do_jit == True:  # noqa
+                        return df._set_column(key, value)
+                    else:
+                        df[key] = value
+
+            return test_impl
+
+        test_impl = gen_test_impl(value)
+        sdc_func = self.jit(gen_test_impl(value, do_jit=True))
+
+        for data in all_data:
+            with self.subTest(data=data):
+                df1 = pd.DataFrame(data)
+                df2 = df1.copy(deep=True)
+                test_impl(df1, key, value)
+                result_ref = df1  # in pandas setitem modifies original DF
+                result_jit = sdc_func(df2, key, value)
+                pd.testing.assert_frame_equal(result_jit, result_ref)
+
+    def _test_df_set_column_exception_invalid_length(self, df, key, value):
+        def test_impl(df, key, value):
+            return df._set_column(key, value)
+
+        sdc_func = self.jit(test_impl)
+
+        with self.assertRaises(ValueError) as raises:
+            sdc_func(df, key, value)
+        msg = 'Length of values does not match length of index'
+        self.assertIn(msg, str(raises.exception))
+
+    def _test_df_set_column_exception_empty_columns(self, df, key, value):
+        def test_impl(df, key, value):
+            return df._set_column(key, value)
+
+        sdc_func = self.jit(test_impl)
+
+        with self.assertRaises(SDCLimitation) as raises:
+            sdc_func(df, key, value)
+        msg = 'Could not set item for DataFrame with empty columns'
+        self.assertIn(msg, str(raises.exception))
+
+    def test_df_add_column(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
+        key, value = 'B', np.array([1., -1., 0.])
+
+        self._test_df_set_column(all_data, key, value)
+
+    def test_df_add_column_str(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
+        key, value = 'B', pd.Series(test_global_input_data_unicode_kind4)
+
+        self._test_df_set_column(all_data, key, value)
+
+    def test_df_add_column_exception_invalid_length(self):
+        df = pd.DataFrame({'A': [0, 1, 2], 'C': [3., 4., 5.]})
+        key, value = 'B', np.array([1., np.nan, -1., 0.])
+        self._test_df_set_column_exception_invalid_length(df, key, value)
+
+        df = pd.DataFrame({'A': []})
+        self._test_df_set_column_exception_empty_columns(df, key, value)
+
+    def test_df_replace_column(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}]
+        key, value = 'A', np.array([1., -1., 0.])
+
+        self._test_df_set_column(all_data, key, value)
+
+    def test_df_replace_column_str(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}]
+        key, value = 'A', pd.Series(test_global_input_data_unicode_kind4)
+
+        self._test_df_set_column(all_data, key, value)
+
+    def test_df_replace_column_exception_invalid_length(self):
+        df = pd.DataFrame({'A': [0, 1, 2], 'C': [3., 4., 5.]})
+        key, value = 'A', np.array([1., np.nan, -1., 0.])
+        self._test_df_set_column_exception_invalid_length(df, key, value)
+
+        df = pd.DataFrame({'A': []})
+        self._test_df_set_column_exception_empty_columns(df, key, value)
+
     def _test_df_values_unboxing(self, df):
         def test_impl(df):
             return df.values
@@ -588,7 +684,7 @@ class TestDataFrame(TestCase):
 
         for values in values_to_test:
             with self.subTest(values=values):
-                df = pd.DataFrame({'A': A, 'B': B, 'C': values})
+                df = pd.DataFrame({'A': A, 'B': B, 'C D E': values})
                 self._test_df_values_unboxing(df)
 
     def test_df_values(self):
@@ -810,6 +906,30 @@ class TestDataFrame(TestCase):
                            'D': [None, 'dd', '', None]})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_df_isna(self):
+        def test_impl(df):
+            return df.isna()
+
+        sdc_func = sdc.jit(test_impl)
+        indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e'], None]
+
+        for idx in indexes:
+            df = pd.DataFrame({"A": [3.2, np.nan, 7.0, 3.3, np.nan],
+                               "B": [3, 4, 1, 0, 222],
+                               "C": [True, True, False, False, True],
+                               "D": ['a', 'dd', 'c', '12', None]}, index=idx)
+            with self.subTest(index=idx):
+                pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    @unittest.skip('DF with column named "bool" Segmentation fault')
+    def test_df_bool(self):
+        def test_impl(df):
+            return df.isna()
+
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"bool": [True, True, False, False, True]}, index=None)
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
     @skip_numba_jit
     def test_df_astype_str1(self):
         '''Verifies DataFrame.astype implementation converting various types to string'''
@@ -945,6 +1065,81 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
+    def test_df_head_unbox(self):
+        def test_impl(df, n):
+            return df.head(n)
+        sdc_func = sdc.jit(test_impl)
+        for n in [-3, 0, 3, 5, None]:
+            for idx in [[3, 4, 2, 6, 1], None]:
+                df = pd.DataFrame({"float": [3.2, 4.4, 7.0, 3.3, 1.0],
+                                   "int": [3, 4, 1, 0, 222],
+                                   "string": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
+                with self.subTest(n=n, index=idx):
+                    pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
+
+    def test_df_iat(self):
+        def test_impl(df):
+            return df.iat[0, 1]
+        sdc_func = sdc.jit(test_impl)
+        idx = [3, 4, 2, 6, 1]
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
+        self.assertEqual(sdc_func(df), test_impl(df))
+
+    def test_df_iat_value_error(self):
+        def test_impl(df):
+            return df.iat[1, 22]
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": ['a', 'dd', 'c', '12', 'ddf']})
+
+        with self.assertRaises(TypingError) as raises:
+            sdc_func(df)
+        msg = 'Index is out of bounds for axis'
+        self.assertIn(msg, str(raises.exception))
+
+    def test_df_head(self):
+        def get_func(n):
+            def impl(a):
+                return a.head(n)
+
+            return impl
+
+        cases_n = [-3, 0, 3, 5, None]
+        cases_index = [[3, 4, 2, 6, 1], None]
+        for n in cases_n:
+            for idx in cases_index:
+                ref_impl = get_func(n)
+                sdc_impl = get_func(n)
+                sdc_func = self.jit(sdc_impl)
+                with self.subTest(n=n, index=idx):
+                    df = pd.DataFrame(
+                        {"float": [3.2, 4.4, 7.0, 3.3, 1.0],
+                         "int": [3, 4, 1, 0, 222],
+                         "string": ['a', 'dd', 'c', '12', 'ddf']},
+                        index=[3, 4, 2, 6, 1]
+                    )
+                    pd.testing.assert_frame_equal(sdc_func(df), ref_impl(df))
+
+    def test_df_copy(self):
+        def test_impl(df, deep):
+            return df.copy(deep=deep)
+
+        sdc_func = sdc.jit(test_impl)
+        indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e'], None]
+        cases_deep = [None, True, False]
+
+        for idx in indexes:
+            df = pd.DataFrame({"A": [3.2, np.nan, 7.0, 3.3, np.nan],
+                               "B": [3, 4, 1, 0, 222],
+                               "C": [True, True, False, False, True],
+                               "D": ['a', 'dd', 'c', '12', None]}, index=idx)
+            for deep in cases_deep:
+                with self.subTest(index=idx, deep=deep):
+                    pd.testing.assert_frame_equal(sdc_func(df, deep), test_impl(df, deep))
+
     def test_pct_change1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
@@ -967,7 +1162,7 @@ class TestDataFrame(TestCase):
     def test_median1(self):
         # TODO: non-numeric columns should be ignored automatically
         def test_impl(n):
-            df = pd.DataFrame({'A': 2 ** np.arange(n), 'B': np.arange(n) + 1.0})
+            df = pd.DataFrame({'A': 2 ** np.arange(n), 'B D': np.arange(n) + 1.0})
             return df.median()
 
         hpat_func = self.jit(test_impl)
@@ -1150,7 +1345,7 @@ class TestDataFrame(TestCase):
 
     def test_df_drop_one_column_unboxing(self):
         def test_impl(df):
-            return df.drop(columns='A')
+            return df.drop(columns='C D')
 
         index_to_test = [[1, 2, 3, 4],
                          [.1, .2, .3, .4],
@@ -1161,7 +1356,7 @@ class TestDataFrame(TestCase):
 
         for index in index_to_test:
             with self.subTest(index=index):
-                df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
+                df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C D': [1.0, 2.0, np.nan, 1.0]},
                                   index=index)
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
@@ -1400,7 +1595,6 @@ class TestDataFrame(TestCase):
                     sdc_func(df, arr)
                 self.assertIn('Item wrong length', str(raises.exception))
 
-
     @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx(self):
         dfs = [gen_df(test_global_input_data_float64),
@@ -1439,7 +1633,6 @@ class TestDataFrame(TestCase):
                 self._test_df_getitem_bool_series_even_idx(df)
                 self._test_df_getitem_bool_array_even_idx(df)
 
-    @unittest.skip('DF.getitem df[bool_series] unsupported index')
     def test_df_getitem_bool_series_even_idx_with_index(self):
         df = gen_df(test_global_input_data_float64, with_index=True)
         self._test_df_getitem_bool_series_even_idx(df)
@@ -1516,7 +1709,7 @@ class TestDataFrame(TestCase):
         n1 = 11
         n2 = n1 * 2
         df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1)**2})
-        df2 = pd.DataFrame({'C': np.arange(n2), 'D': np.arange(n2)**2, 'E': np.arange(n2) + 100})
+        df2 = pd.DataFrame({'C': np.arange(n2), 'D': np.arange(n2)**2, 'E S D': np.arange(n2) + 100})
 
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
@@ -1528,7 +1721,7 @@ class TestDataFrame(TestCase):
         n1 = 11
         n2 = n1 * 2
         df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1)**2})
-        df2 = pd.DataFrame({'A': np.arange(n2), 'D': np.arange(n2)**2, 'E': np.arange(n2) + 100})
+        df2 = pd.DataFrame({'A': np.arange(n2), 'D': np.arange(n2)**2, 'E S D': np.arange(n2) + 100})
 
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
@@ -1680,7 +1873,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     def test_std_default(self):
@@ -1693,7 +1886,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     def test_var_default(self):
@@ -1706,7 +1899,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     def test_max_default(self):
@@ -1719,7 +1912,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     @skip_sdc_jit
@@ -1733,7 +1926,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     def test_sum_default(self):
@@ -1746,7 +1939,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     def test_prod_default(self):
@@ -1759,7 +1952,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     def test_count2_default(self):
@@ -1772,7 +1965,7 @@ class TestDataFrame(TestCase):
                            "C": [2, 0, 6, 2],
                            "D": [.2, .1, np.nan, .5],
                            "E": [-1, np.nan, 1, np.inf],
-                           "F": [np.nan, np.nan, np.inf, np.nan]})
+                           "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     @skip_sdc_jit
@@ -1820,6 +2013,16 @@ class TestDataFrame(TestCase):
         self.assertTrue(isinstance(two, np.ndarray))
         self.assertTrue(isinstance(three, np.ndarray))
 
+    def test_df_len(self):
+        def test_impl(df):
+            return len(df)
+
+        hpat_func = self.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2})
+        self.assertEqual(hpat_func(df), test_impl(df))
+
+    @unittest.skip("Literal unrol is broken by inline get_dataframe_data")
     def test_df_iterate_over_columns1(self):
         """ Verifies iteration over df columns using literal tuple of column indices. """
         from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
@@ -1860,6 +2063,28 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_df_iterate_over_columns2(self):
+        """ Verifies iteration over unboxed df columns using literal unroll. """
+        from sdc.hiframes.api import get_nan_mask
+
+        @self.jit
+        def jitted_func(df):
+            res_nan_mask = np.zeros(len(df), dtype=np.bool_)
+            for col in literal_unroll(df._data):
+                res_nan_mask += get_nan_mask(col)
+            return res_nan_mask
+
+        df = pd.DataFrame({
+                    'A': ['a', 'b', None, 'a', '', None, 'b'],
+                    'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
+                    'C': [np.nan, 1, 2, 1, np.nan, 2, 1],
+                    'D': [1, 2, 9, 5, 2, 1, 0]
+        })
+        # expected is a boolean mask of df rows that have None values
+        expected = np.asarray([True, False, True, False, True, True, False])
+        result = jitted_func(df)
+        np.testing.assert_array_equal(result, expected)
 
 
 if __name__ == "__main__":
