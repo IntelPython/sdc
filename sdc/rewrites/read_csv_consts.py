@@ -87,10 +87,8 @@ class RewriteReadCsv(Rewrite):
             call = guard(find_callname, func_ir, expr)
             if call not in self._pandas_read_csv_calls:
                 continue
-            # protect from repeat rewriting
-            if hasattr(inst, 'consts'):
-                continue
-            # collect constant parameters
+            # collect constant parameters with type list and dict
+            # in order to replace with tuple
             for key, var in expr.kws:
                 if key not in self._read_csv_const_args:
                     continue
@@ -101,7 +99,8 @@ class RewriteReadCsv(Rewrite):
                         const = ConstantInference(func_ir).infer_constant(var.name)
                     except errors.ConstantInferenceError:
                         continue
-                consts.setdefault(inst, {})[key] = const
+                if isinstance(const, (list, dict)):
+                    consts.setdefault(inst, {})[key] = const
 
         return len(consts) > 0
 
@@ -112,9 +111,7 @@ class RewriteReadCsv(Rewrite):
 
         for inst in self.block.body:
             if inst in self.consts:
-                # protect from repeat rewriting
-                inst.consts = consts = self.consts[inst]
-                # inst is call for read_csv()
+                consts = self.consts[inst]
 
                 for key, value in consts.items():
                     if key not in dict(inst.value.kws):
