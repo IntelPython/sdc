@@ -462,7 +462,7 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
 
     Limitations
     -----------
-    Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+    Series elements are expected to be Unicode strings.
 
     Examples
     --------
