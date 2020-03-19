@@ -1100,6 +1100,33 @@ class TestDataFrame(TestCase):
         msg = 'Index is out of bounds for axis'
         self.assertIn(msg, str(raises.exception))
 
+    def test_df_at(self):
+        def test_impl(df, n):
+            return df.at[n, 'C']
+
+        sdc_func = sdc.jit(test_impl)
+        idx = [3, 4, 1, 2, 0]
+        n_cases = [0, 2]
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
+        for n in n_cases:
+            self.assertEqual(sdc_func(df, n), test_impl(df, n))
+
+    def test_df_at_value_error(self):
+        def test_impl(df):
+            return df.at[1, 'D']
+        sdc_func = sdc.jit(test_impl)
+        idx = [3, 4, 1, 2, 0]
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": [3, 4, 2, 6, 1]}, index=idx)
+
+        with self.assertRaises(TypingError) as raises:
+            sdc_func(df)
+        msg = 'Index is out of bounds for axis'
+        self.assertIn(msg, str(raises.exception))
+
     def test_df_head(self):
         def get_func(n):
             def impl(a):

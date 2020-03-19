@@ -38,7 +38,7 @@ import sdc
 
 from pandas.core.indexing import IndexingError
 
-from numba import types
+from numba import types, prange
 from numba.special import literally
 from numba.typed import List, Dict
 from numba.errors import TypingError
@@ -1759,12 +1759,74 @@ def sdc_pandas_dataframe_getitem(self, idx):
     ty_checker.raise_exc(idx, expected_types, 'idx')
 
 
+def df_getitem_tuple_at_codegen(self, row, col):
+    """
+    Example of generated implementation:
+        def _df_getitem_tuple_at_impl(self, idx):
+            row, _ = idx
+            check_row = False
+            for i in prange(len(self._dataframe.index)):
+                if self._dataframe.index[i] == row:
+                    check_row = True
+            if check_row:
+                data = self._dataframe._data[2]
+                res_data = pandas.Series(data, index=self._dataframe.index)
+                return res_data.at[row]
+            raise IndexingError('Index is out of bounds for axis')
+    """
+    func_lines = ['def _df_getitem_tuple_at_impl(self, idx):']
+    check_col = False
+    for i in range(len(self.columns)):
+        if self.columns[i] == col:
+            check_col = True
+            col_idx = i
+    if check_col == True:
+        func_lines += ['  row, _ = idx',
+                       '  check_row = False',
+                       '  for i in prange(len(self._dataframe.index)):',
+                       '    if self._dataframe.index[i] == row:',
+                       '      check_row = True',
+                       '  if check_row:',
+                       f'    data = self._dataframe._data[{col_idx}]',
+                       '    res_data = pandas.Series(data, index=self._dataframe.index)',
+                       '    return res_data.at[row]',
+                       "  raise IndexingError('Index is out of bounds for axis')"]
+
+    raise IndexingError('Index is out of bounds for axis')
+
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas,
+                   'get_dataframe_data': get_dataframe_data,
+                   'prange': prange,
+                   'IndexingError': IndexingError}
+
+    return func_text, global_vars
+
+
+def gen_df_getitem_tuple_at_impl(self, row, col):
+    func_text, global_vars = df_getitem_tuple_at_codegen(self, row, col)
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _reduce_impl = loc_vars['_df_getitem_tuple_at_impl']
+
+    return _reduce_impl
+
+
 @sdc_overload(operator.getitem)
 def sdc_pandas_dataframe_accessor_getitem(self, idx):
     if not isinstance(self, DataFrameGetitemAccessorType):
         return None
 
     accessor = self.accessor.literal_value
+
+    if accessor == 'at':
+        if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
+            row = idx[0]
+            col = idx[1].literal_value
+            return gen_df_getitem_tuple_at_impl(self.dataframe, row, col)
+
+        raise TypingError('Operator getitem(). The index must be a row and literal column. Given: {}'.format(idx))
 
     if accessor == 'iat':
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
@@ -1834,6 +1896,53 @@ def sdc_pandas_dataframe_iat(self):
         return dataframe_getitem_accessor_init(self, 'iat')
 
     return sdc_pandas_dataframe_iat_impl
+
+
+@sdc_overload_attribute(DataFrameType, 'at')
+def sdc_pandas_dataframe_at(self):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.DataFrame.at
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_at.py
+       :language: python
+       :lines: 28-
+       :caption: Access a single value for a row/column label pair.
+       :name: ex_dataframe_at
+
+    .. command-output:: python ./dataframe/dataframe_at.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Access a single value for a row/column pair by integer position.
+
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Access a group of rows and columns by label(s).
+
+        :ref:`Series.at <pandas.Series.at>`
+            Access a single value using a label.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.DataFrame.at` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_at*
+    """
+
+    ty_checker = TypeChecker('Attribute at().')
+    ty_checker.check(self, DataFrameType)
+
+    def sdc_pandas_dataframe_at_impl(self):
+        return dataframe_getitem_accessor_init(self, 'at')
+
+    return sdc_pandas_dataframe_at_impl
 
 
 @sdc_overload_method(DataFrameType, 'pct_change')
