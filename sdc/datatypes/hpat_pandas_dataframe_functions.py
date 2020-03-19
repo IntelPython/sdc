@@ -864,26 +864,6 @@ def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
     .. only:: developer
 
         Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_var*
-
-    Parameters
-    -----------
-    df: :class:`pandas.DataFrame`
-        input arg
-    axis:
-        *unsupported*
-    skipna:
-        *unsupported*
-    level:
-        *unsupported*
-    ddof:
-        *unsupported*
-    numeric_only:
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series` or `pandas.DataFrame`
-            return sample standard deviation over requested axis.
     """
 
     name = 'var'
