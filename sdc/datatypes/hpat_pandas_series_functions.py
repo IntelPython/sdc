@@ -4448,7 +4448,7 @@ def hpat_pandas_series_count(self, level=None):
 
     Limitations
     -----------
-    Parameter ``level`` is supported only with default value ``None``.
+    Parameter ``level`` is currently unsupported.
 
     Examples
     --------
@@ -4464,8 +4464,10 @@ def hpat_pandas_series_count(self, level=None):
     .. seealso::
 
         :ref:`Series.value_counts <pandas.Series.value_counts>`
-        :ref:`Series.value_counts <pandas.Series.value_counts>`
+            Return a Series containing counts of unique values.
+
         :ref:`Series.str.len <pandas.Series.str.len>`
+            Count the length of each element in the Series.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
