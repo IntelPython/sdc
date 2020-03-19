@@ -3066,7 +3066,7 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
 
     Examples
     --------
@@ -3078,10 +3078,6 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     .. command-output:: python ./series/series_truediv.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
