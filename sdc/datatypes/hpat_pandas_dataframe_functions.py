@@ -715,14 +715,14 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
     Limitations
     -----------
-    Parameters axis, skipna, level, ddof, numeric_only unsupported.
+    Parameters axis, skipna, level, ddof, numeric_only are unsupported.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/dataframe/dataframe_std.py
        :language: python
        :lines: 35-
-       :caption: Return sample standard deviation over requested axis.
+       :caption: Return sample standard deviation over columns.
        :name: ex_dataframe_std
 
     .. command-output:: python ./dataframe/dataframe_std.py
