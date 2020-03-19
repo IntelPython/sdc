@@ -1012,26 +1012,6 @@ def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_
     .. only:: developer
 
         Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_sum*
-
-    Parameters
-    -----------
-    df: :class:`pandas.DataFrame`
-        input arg
-    axis:
-        *unsupported*
-    skipna:
-        *unsupported*
-    level:
-        *unsupported*
-    numeric_only:
-        *unsupported*
-    min_count:
-        *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series` or `pandas.DataFrame`
-            return the sum of the values for the requested axis.
     """
 
     name = 'sum'
