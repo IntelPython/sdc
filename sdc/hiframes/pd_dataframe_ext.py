@@ -321,7 +321,7 @@ def df_len_overload(df):
 
     if len(df.columns) == 0:  # empty df
         return lambda df: 0
-    return lambda df: len(get_dataframe_data(df, 0))
+    return lambda df: len(df._data[0])
 
 if sdc.config.config_pipeline_hpat_default:
     @overload(operator.getitem)  # TODO: avoid lowering?
