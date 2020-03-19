@@ -3653,29 +3653,26 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``axis``, ``level`` and ``numeric_only`` \
+        are currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_mean.py
        :language: python
        :lines: 27-
-       :caption: Return the mean of the values for the requested axis.
+       :caption: Return the mean of the values.
        :name: ex_series_mean
 
     .. command-output:: python ./series/series_mean.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.mean` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_mean*
+        Test: python -m sdc.runtests sdc.tests.test_series -k series_mean
     """
 
     _func_name = 'Method mean().'
