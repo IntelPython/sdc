@@ -35,7 +35,6 @@ import numba
 import sdc
 
 from numba.extending import overload
-from sdc.hiframes.api import fix_df_array
 
 import pandas as pd
 import numpy as np
