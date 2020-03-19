@@ -1,5 +1,6 @@
 from sdc.tests.tests_perf.test_perf_df import *
 from sdc.tests.tests_perf.test_perf_df_rolling import *
+from sdc.tests.tests_perf.test_perf_df_groupby import *
 from sdc.tests.tests_perf.test_perf_numpy import *
 from sdc.tests.tests_perf.test_perf_read_csv import *
 from sdc.tests.tests_perf.test_perf_series import *

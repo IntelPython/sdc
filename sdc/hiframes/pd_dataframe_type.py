@@ -90,10 +90,6 @@ class DataFrameModel(models.StructModel):
             ('data', types.Tuple(fe_type.data)),
             ('index', fe_type.index),
             ('columns', types.UniTuple(string_type, n_cols)),
-            # for lazy unboxing of df coming from Python (usually argument)
-            # list of flags noting which columns and index are unboxed
-            # index flag is last
-            ('unboxed', types.UniTuple(types.int8, n_cols + 1)),
             ('parent', types.pyobject),
         ]
         super(DataFrameModel, self).__init__(dmm, fe_type, members)

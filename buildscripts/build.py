@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -43,12 +43,6 @@ from utilities import run_command
 from utilities import set_environment_variable
 
 
-def run_smoke_tests(sdc_src, test_env_activate):
-        sdc_pi_example = os.path.join(sdc_src, 'buildscripts', 'sdc_pi_example.py')
-        run_command(f'{test_env_activate} && python -c "import sdc"')
-        run_command(f'{test_env_activate} && python {sdc_pi_example}')
-
-
 if __name__ == '__main__':
     sdc_src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sdc_recipe = os.path.join(sdc_src, 'buildscripts', 'sdc-conda-recipe')
@@ -62,15 +56,13 @@ if __name__ == '__main__':
 
     # Parse input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--build-mode', default='develop', choices=['develop', 'install', 'package'],
+    parser.add_argument('--build-mode', default='package', choices=['package'],
                         help="""Build mode:
-                                develop: install package in source directory (default)
-                                install: build and install package in build environment
-                                package: build conda and wheel packages""")
+                                package: build conda and wheel packages (default)""")
     parser.add_argument('--python', default='3.7', choices=['3.6', '3.7', '3.8'],
                         help='Python version to build with, default = 3.7')
-    parser.add_argument('--numpy', default='1.16', choices=['1.15', '1.16', '1.17'],
-                        help='Numpy version to build with, default = 1.16')
+    parser.add_argument('--numpy', default='1.17', choices=['1.16', '1.17'],
+                        help='Numpy version to build with, default = 1.17')
     parser.add_argument('--output-folder', default=os.path.join(sdc_src, 'sdc-build'),
                         help='Output folder for build packages, default = sdc-build')
     parser.add_argument('--conda-prefix', default=None, help='Conda prefix')
@@ -84,8 +76,6 @@ if __name__ == '__main__':
 
     build_mode = args.build_mode
     python = args.python
-    if python == '3.7':
-        python = '3.7.3'
     numpy = args.numpy
     output_folder = args.output_folder
     conda_prefix = os.getenv('CONDA_PREFIX', args.conda_prefix)
@@ -99,10 +89,8 @@ if __name__ == '__main__':
     conda_activate = get_conda_activate_cmd(conda_prefix).replace('"', '')
     build_env = f'sdc-build-env-py{python}-numpy{numpy}'
     test_env = f'sdc-test-env-py{python}-numpy{numpy}'
-    develop_env = f'sdc-develop-env-py{python}-numpy{numpy}'
     build_env_activate = get_activate_env_cmd(conda_activate, build_env)
     test_env_activate = get_activate_env_cmd(conda_activate, test_env)
-    develop_env_activate = get_activate_env_cmd(conda_activate, develop_env)
 
     conda_channels = f'-c {numba_channel} -c defaults -c conda-forge --override-channels'
     # If numba is taken from custom channel, need to add numba channel to get dependencies
@@ -114,10 +102,6 @@ if __name__ == '__main__':
 
     conda_build_packages = ['conda-build']
     if platform.system() == 'Windows':
-        if build_mode != 'package':
-            set_environment_variable('INCLUDE', os.path.join('%CONDA_PREFIX%', 'Library', 'include'))
-            set_environment_variable('LIB', os.path.join('%CONDA_PREFIX%', 'Library', 'lib'))
-
         conda_build_packages.extend(['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64', 'pywin32=223'])
 
     # Build Numba from master
@@ -132,66 +116,16 @@ if __name__ == '__main__':
                                                 f'{numba_conda_channels} {numba_recipe}'])))
         format_print('NUMBA BUILD COMPETED')
 
-    # Get sdc build and test environment
-    sdc_env = get_sdc_env(conda_activate, sdc_src, sdc_recipe, python, numpy, conda_channels)
-
     # Set build command
-    if build_mode == 'package':
-        create_conda_env(conda_activate, build_env, python, conda_build_packages)
-        build_cmd = '{} && {}'.format(build_env_activate,
-                                      ' '.join(['conda build --no-test',
-                                                            f'--python {python}',
-                                                            f'--numpy {numpy}',
-                                                            f'--output-folder {output_folder}',
-                                                            f'{conda_channels} {sdc_recipe}']))
-    else:
-        create_conda_env(conda_activate, develop_env, python, sdc_env['build'], conda_channels)
-        build_cmd = f'{develop_env_activate} && python setup.py {build_mode}'
+    create_conda_env(conda_activate, build_env, python, conda_build_packages)
+    build_cmd = '{} && {}'.format(build_env_activate,
+                                  ' '.join(['conda build --no-test',
+                                            f'--python {python}',
+                                            f'--numpy {numpy}',
+                                            f'--output-folder {output_folder}',
+                                            f'{conda_channels} {sdc_recipe}']))
 
     # Start build
     format_print('START SDC BUILD')
     run_command(build_cmd)
     format_print('BUILD COMPETED')
-
-    # Check if smoke tests should be skipped
-    if skip_smoke_tests is True:
-        format_print('Smoke tests are skipped due to "--skip-smoke-tests" option')
-        sys.exit(0)
-
-    # Start smoke tests
-    format_print('Run Smoke tests')
-    """
-    os.chdir(../sdc_src) is a workaround for the following error:
-    Traceback (most recent call last):
-        File "<string>", line 1, in <module>
-        File "sdc/sdc/__init__.py", line 9, in <module>
-            import sdc.dict_ext
-        File "sdc/sdc/dict_ext.py", line 12, in <module>
-            from sdc.str_ext import string_type, gen_unicode_to_std_str, gen_std_str_to_unicode
-        File "sdc/sdc/str_ext.py", line 18, in <module>
-            from . import hstr_ext
-    ImportError: cannot import name 'hstr_ext' from 'sdc' (sdc/sdc/__init__.py)
-    """
-    os.chdir(os.path.dirname(sdc_src))
-
-    if build_mode == 'package':
-        # Get build packages
-        sdc_packages = get_sdc_build_packages(output_folder)
-        for package in sdc_packages:
-            if '.tar.bz2' in package:
-                # Start test for conda package
-                format_print(f'Run tests for sdc conda package: {package}')
-                create_conda_env(conda_activate, test_env, python, sdc_env['test'], conda_channels)
-                run_command(f'{test_env_activate} && conda install -y {package}')
-                run_smoke_tests(sdc_src, test_env_activate)
-            elif '.whl' in package:
-                # Start test for wheel package
-                format_print(f'Run tests for sdc wheel package: {package}')
-                create_conda_env(conda_activate, test_env, python, sdc_env['test'] + ['pip'], conda_channels)
-                run_command(f'{test_env_activate} && pip install {package}')
-                run_smoke_tests(sdc_src, test_env_activate)
-    else:
-        format_print('Run tests for installed sdc package')
-        run_smoke_tests(sdc_src, develop_env_activate)
-
-    format_print('SMOKE TESTS ARE PASSED')

@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -100,9 +100,19 @@ def unbox_dataframe(typ, val, c):
 
     column_tup = c.context.make_tuple(
         c.builder, types.UniTuple(string_type, n_cols), column_strs)
-    zero = c.context.get_constant(types.int8, 0)
-    unboxed_tup = c.context.make_tuple(
-        c.builder, types.UniTuple(types.int8, n_cols + 1), [zero] * (n_cols + 1))
+
+    # this unboxes all DF columns so that no column unboxing occurs later
+    for col_ind in range(n_cols):
+        series_obj = c.pyapi.object_getattr_string(val, typ.columns[col_ind])
+        arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
+        ty_series = typ.data[col_ind]
+        if isinstance(ty_series, types.Array):
+            native_val = unbox_array(typ.data[col_ind], arr_obj, c)
+        elif ty_series == string_array_type:
+            native_val = unbox_str_series(string_array_type, series_obj, c)
+
+        dataframe.data = c.builder.insert_value(
+            dataframe.data, native_val.value, col_ind)
 
     # TODO: support unboxing index
     if typ.index == types.none:
@@ -116,7 +126,6 @@ def unbox_dataframe(typ, val, c):
         dataframe.index = unbox_array(typ.index, index_data, c).value
 
     dataframe.columns = column_tup
-    dataframe.unboxed = unboxed_tup
     dataframe.parent = val
 
     # increase refcount of stored values
@@ -231,33 +240,23 @@ def box_dataframe(typ, val, c):
         # TODO: datetime.date, DatetimeIndex?
         name_str = context.insert_const_string(c.builder.module, cname)
         cname_obj = pyapi.string_from_string(name_str)
-        # if column not unboxed, just used the boxed version from parent
-        unboxed_val = builder.extract_value(dataframe.unboxed, i)
-        not_unboxed = builder.icmp(lc.ICMP_EQ, unboxed_val, context.get_constant(types.int8, 0))
-        use_parent = builder.and_(has_parent, not_unboxed)
 
-        with builder.if_else(use_parent) as (then, orelse):
-            with then:
-                arr_obj = pyapi.object_getattr_string(dataframe.parent, cname)
-                pyapi.object_setitem(df_obj, cname_obj, arr_obj)
-
-            with orelse:
-                if dtype == string_type:
-                    arr_obj = box_str_arr(arr_typ, arr, c)
-                elif isinstance(dtype, PDCategoricalDtype):
-                    arr_obj = box_categorical_array(arr_typ, arr, c)
-                    # context.nrt.incref(builder, arr_typ, arr)
-                elif arr_typ == string_array_split_view_type:
-                    arr_obj = box_str_arr_split_view(arr_typ, arr, c)
-                elif dtype == types.List(string_type):
-                    arr_obj = box_list(list_string_array_type, arr, c)
-                    # context.nrt.incref(builder, arr_typ, arr)  # TODO required?
-                    # pyapi.print_object(arr_obj)
-                else:
-                    arr_obj = box_array(arr_typ, arr, c)
-                    # TODO: is incref required?
-                    # context.nrt.incref(builder, arr_typ, arr)
-                pyapi.object_setitem(df_obj, cname_obj, arr_obj)
+        if dtype == string_type:
+            arr_obj = box_str_arr(arr_typ, arr, c)
+        elif isinstance(dtype, PDCategoricalDtype):
+            arr_obj = box_categorical_array(arr_typ, arr, c)
+            # context.nrt.incref(builder, arr_typ, arr)
+        elif arr_typ == string_array_split_view_type:
+            arr_obj = box_str_arr_split_view(arr_typ, arr, c)
+        elif dtype == types.List(string_type):
+            arr_obj = box_list(list_string_array_type, arr, c)
+            # context.nrt.incref(builder, arr_typ, arr)  # TODO required?
+            # pyapi.print_object(arr_obj)
+        else:
+            arr_obj = box_array(arr_typ, arr, c)
+            # TODO: is incref required?
+            # context.nrt.incref(builder, arr_typ, arr)
+        pyapi.object_setitem(df_obj, cname_obj, arr_obj)
 
         # pyapi.decref(arr_obj)
         pyapi.decref(cname_obj)
@@ -301,8 +300,6 @@ def unbox_dataframe_column(typingctx, df, i=None):
         # assign array and set unboxed flag
         dataframe.data = builder.insert_value(
             dataframe.data, native_val.value, col_ind)
-        dataframe.unboxed = builder.insert_value(
-            dataframe.unboxed, context.get_constant(types.int8, 1), col_ind)
         return dataframe._getvalue()
 
     return signature(df, df, i), codegen
