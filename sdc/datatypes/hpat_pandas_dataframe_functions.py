@@ -368,22 +368,6 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     Pandas DataFrame method :meth:`pandas.DataFrame.append` implementation.
     .. only:: developer
     Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_append*
-    Parameters
-    -----------
-    df: :obj:`pandas.DataFrame`
-        input arg
-    other: :obj:`pandas.DataFrame` object or :obj:`pandas.Series` or :obj:`dict`
-        The data to append
-    ignore_index: :obj:`bool`
-        *unsupported*
-    verify_integrity: :obj:`bool`
-        *unsupported*
-    sort: :obj:`bool`
-        *unsupported*
-    Returns
-    -------
-    :obj: `pandas.DataFrame`
-        return DataFrame with appended rows to the end
     """
 
     _func_name = 'append'
