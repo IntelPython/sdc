@@ -1676,7 +1676,6 @@ def sdc_pandas_dataframe_getitem(self, idx):
            :cwd: ../../../examples
 
         .. seealso::
-
             :ref:`Series.getitem <pandas.Series.getitem>`
                 Get value(s) of Series by key.
             :ref:`Series.setitem <pandas.Series.setitem>`
@@ -1702,22 +1701,12 @@ def sdc_pandas_dataframe_getitem(self, idx):
 
         Intel Scalable Dataframe Compiler Developer Guide
         *************************************************
+
         Pandas DataFrame method :meth:`pandas.DataFrame.getitem` implementation.
+
         .. only:: developer
 
         Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_getitem*
-
-        Parameters
-        -----------
-        self: :obj:`pandas.DataFrame`
-            input arg
-        idx: :obj:`pandas.Series`, :obj:`string`, :obj:`slice`, :obj:`tuple`, :obj:`array`
-            input arg
-
-        Returns
-        -------
-        :obj:`pandas.DataFrame`
-            returns object
         """
     ty_checker = TypeChecker('Operator getitem().')
 
