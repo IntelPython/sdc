@@ -1058,6 +1058,7 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
     Examples
     --------
     Create Series with data [1, 2, 3] and index ['A', 'B', 'C'].
+
     >>> pd.Series([1, 2, 3], ['A', 'B', 'C'])
 
     .. seealso::
