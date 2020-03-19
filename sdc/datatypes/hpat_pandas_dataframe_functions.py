@@ -1880,24 +1880,6 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     .. only:: developer
 
       Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_pct_change*
-
-    Parameters
-    -----------
-    df: :class:`pandas.DataFrame`
-      input arg
-    periods: :obj:`int`, default 1
-        Periods to shift for forming percent change.
-    fill_method: :obj:`str`, default 'pad'
-        How to handle NAs before computing percent changes.
-    limit:
-      *unsupported*
-    freq:
-      *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series` or `pandas.DataFrame`
-      Percentage change between the current and a prior element.
     """
 
     name = 'pct_change'
