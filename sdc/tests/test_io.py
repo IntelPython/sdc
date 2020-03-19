@@ -30,6 +30,7 @@ import pandas as pd
 import platform
 import pyarrow.parquet as pq
 import unittest
+import numba
 from numba.config import IS_32BITS
 from pandas.api.types import CategoricalDtype
 
@@ -289,6 +290,21 @@ class TestCSV(TestIO):
 
     def _read_csv(self, use_pyarrow=False):
         return pd_read_csv if use_pyarrow else pd.read_csv
+
+    # inference errors
+
+    def test_csv_infer_error(self):
+        read_csv = self._read_csv()
+
+        def pyfunc(fname):
+            return read_csv(fname)
+
+        cfunc = self.jit(pyfunc)
+
+        with self.assertRaises(numba.errors.TypingError) as cm:
+            cfunc("csv_data1.csv")
+
+        self.assertIn("Cannot infer resulting DataFrame", cm.exception.msg)
 
     # inference from parameters
 

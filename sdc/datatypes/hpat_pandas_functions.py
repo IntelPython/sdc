@@ -28,18 +28,13 @@
 | :module:`pandas` functions and operators implementations in Intel SDC
 '''
 
-import pandas
-import pyarrow.csv
-
-import numba
-import sdc
-
-from numba.extending import overload
-
 import pandas as pd
 import numpy as np
 
+import numba
 from numba import types, numpy_support
+from numba.errors import TypingError
+from numba.extending import overload
 
 from sdc.io.csv_ext import (
     _gen_csv_reader_py_pyarrow_py_func,
@@ -80,7 +75,7 @@ def infer_column_names_and_types_from_constant_filename(fname_const, delimiter, 
     return col_names, col_typs
 
 
-@overload(pandas.read_csv)
+@overload(pd.read_csv)
 def sdc_pandas_read_csv(
     filepath_or_buffer,
     sep=',',
@@ -226,7 +221,9 @@ def sdc_pandas_read_csv(
     ])
 
     # cannot create function if parameters provide not enough info
-    assert infer_from_file or infer_from_params
+    if not any([infer_from_file, infer_from_params]):
+        msg = "Cannot infer resulting DataFrame from constant file or parameters."
+        raise TypingError(msg)
 
     if infer_from_file:
         # parameters should be constants and are important only for inference from file
