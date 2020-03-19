@@ -460,10 +460,6 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
     ********************************************
     Pandas API: pandas.Series.str.ljust
 
-    Limitations
-    -----------
-    Series elements are expected to be Unicode strings.
-
     Examples
     --------
     .. literalinclude:: ../../../examples/series/str/series_str_ljust.py
