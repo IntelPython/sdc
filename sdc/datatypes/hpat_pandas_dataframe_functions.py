@@ -999,7 +999,7 @@ def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min
 
     Limitations
     -----------
-    Parameters axis, skipna, level, numeric_only, min_count are unsupported.
+    Parameters ``axis``, ``skipna``, ``level``, ``numeric_only`` and ``min_count`` are unsupported.
 
     Examples
     --------
