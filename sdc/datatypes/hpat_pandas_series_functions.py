@@ -3572,7 +3572,7 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
 
     Limitations
     -----------
-    Parameters axis, skipna, level, numeric_only are currently unsupported.
+    Parameters ``axis``, ``level`` and ``numeric_only`` are currently unsupported.
 
     Examples
     --------
