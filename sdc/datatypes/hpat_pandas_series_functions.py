@@ -1282,7 +1282,7 @@ def hpat_pandas_series_values(self):
     Pandas Series attribute 'values' implementation.
 
     .. only:: developer
-        Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_values
+        Test:  python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_values*
     """
 
     _func_name = 'Attribute values.'
@@ -2106,7 +2106,8 @@ def hpat_pandas_series_copy(self, deep=True):
 
     Limitations
     -----------
-    - Parameter deep=False is currently unsupported for indexes by Intel Scalable Dataframe Compiler
+    - When ``deep=False``, a new object will be created without copying the calling object’s data
+    and with a copy of the calling object’s indices.
 
     Examples
     --------
@@ -2124,9 +2125,7 @@ def hpat_pandas_series_copy(self, deep=True):
     Pandas Series method :meth:`pandas.Series.copy` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_str1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_int1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_deep
+        Test: python -m sdc.runtests sdc.tests.test_series -k series_copy
     """
 
     ty_checker = TypeChecker('Method Series.copy().')
@@ -2751,7 +2750,8 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
 
     Limitations
     -----------
-    - Parameter is_copy is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameter ``axis`` is supported only with default values ``0`` and ``'index'``.
+    Parameter ``is_copy`` is supported only with default value ``False``.
 
     Examples
     --------
@@ -2764,27 +2764,19 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
     .. command-output:: python ./series/series_take.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
-
         :ref:`DataFrame.loc <pandas.DataFrame.loc>`
             Select a subset of a DataFrame by labels.
-
         :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
             Select a subset of a DataFrame by positions.
 
-        `numpy.absolute
-        <https://docs.scipy.org/doc/numpy/reference/generated/numpy.take.html#numpy.take>`_
-            Take elements from an array along an axis.
-
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.take` implementation.
 
     .. only:: developer
+
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_take_index_*
     """
 
@@ -2828,6 +2820,11 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
 
     Pandas API: pandas.Series.idxmax
 
+    Limitations
+    -----------
+    Parameter ``axis`` is supported only with default value ``None``.
+    Parameter ``skipna`` cannot be ``False`` with data of string type.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_idxmax.py
@@ -2838,10 +2835,6 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
 
     .. command-output:: python ./series/series_idxmax.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -2924,7 +2917,7 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
 
     Examples
     --------
@@ -2936,10 +2929,6 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     .. command-output:: python ./series/series_mul.py
        :cwd: ../../../examples
-
-     .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3075,7 +3064,7 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
 
     Examples
     --------
@@ -3087,10 +3076,6 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     .. command-output:: python ./series/series_truediv.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3287,29 +3272,26 @@ def hpat_pandas_series_prod(self, axis=None, skipna=None, level=None, numeric_on
 
     Limitations
     -----------
-    - Parameters level, numeric_only, min_count are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``axis``, ``level``, ``numeric_only`` and ``min_count`` \
+        are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_prod.py
        :language: python
        :lines: 27-
-       :caption: Return the product of the values for the requested axis.
+       :caption: Return the product of the values.
        :name: ex_series_prod
 
     .. command-output:: python ./series/series_prod.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.prod` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_prod*
+        Test: python -m sdc.runtests sdc.tests.test_series -k series_prod
     """
 
     _func_name = 'Method prod().'
@@ -3573,7 +3555,7 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``axis``, ``level`` and ``numeric_only`` are currently unsupported.
 
     Examples
     --------
@@ -3585,10 +3567,6 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
 
     .. command-output:: python ./series/series_max.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3913,6 +3891,11 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
 
     Pandas API: pandas.Series.idxmin
 
+    Limitations
+    -----------
+    Parameter ``axis`` is supported only with default value ``None``.
+    Parameter ``skipna`` cannot be ``False`` with data of string type.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_idxmin.py
@@ -3923,10 +3906,6 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
 
     .. command-output:: python ./series/series_idxmin.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -4308,41 +4287,34 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True):
 
     Pandas API: pandas.Series.cumsum
 
+    Limitations
+    -----------
+    Parameter ``axis`` is supported only with default value ``None``.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_cumsum.py
        :language: python
        :lines: 27-
-       :caption: Return cumulative sum over a DataFrame or Series axis.
+       :caption: Returns cumulative sum over Series.
        :name: ex_series_cumsum
 
     .. command-output:: python ./series/series_cumsum.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
-
-        `pandas.absolute
-        <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.core.window.Expanding.sum.html#pandas.core.window.Expanding.sum>`_
-            Similar functionality but ignores NaN values.
-
         :ref:`Series.sum <pandas.Series.sum>`
-            Return the sum over Series axis.
-
+            Return the sum over Series.
         :ref:`Series.cummax <pandas.Series.cummax>`
-            Return cumulative maximum over Series axis.
-
+            Return cumulative maximum over Series.
         :ref:`Series.cummin <pandas.Series.cummin>`
-            Return cumulative minimum over Series axis.
-
+            Return cumulative minimum over Series.
         :ref:`Series.cumprod <pandas.Series.cumprod>`
-            Return cumulative product over Series axis.
+            Return cumulative product over Series.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.cumsum` implementation.
 
     .. only:: developer
@@ -4449,7 +4421,7 @@ def hpat_pandas_series_count(self, level=None):
 
     Limitations
     -----------
-    - Parameter level is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameter ``level`` is currently unsupported.
 
     Examples
     --------
@@ -4465,8 +4437,10 @@ def hpat_pandas_series_count(self, level=None):
     .. seealso::
 
         :ref:`Series.value_counts <pandas.Series.value_counts>`
-        :ref:`Series.value_counts <pandas.Series.value_counts>`
+            Return a Series containing counts of unique values.
+
         :ref:`Series.str.len <pandas.Series.str.len>`
+            Count the length of each element in the Series.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
