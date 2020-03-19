@@ -5981,8 +5981,8 @@ class TestSeries(
             pd.testing.assert_series_equal(cfunc(S), islower_usecase(S))
 
     def test_series_lower_str(self):
-        all_data = [['leopard', 'Golden Eagle', 'SNAKE', ''],
-                    ['Hello world!', 'hello 123', 'mynameisPeter']
+        all_data = [['leopard', None, 'Golden Eagle', np.nan, 'SNAKE', ''],
+                    ['Hello world!', np.nan, 'hello 123', None, 'mynameisPeter']
                     ]
 
         cfunc = self.jit(lower_usecase)

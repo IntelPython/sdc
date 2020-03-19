@@ -986,19 +986,23 @@ def hpat_pandas_stringmethods_casefold(self):
 
 @sdc_overload_method(StringMethodsType, 'lower')
 def hpat_pandas_stringmethods_lower(self):
-    ty_checker = TypeChecker('Method {methodname}().')
+    ty_checker = TypeChecker('Method lower().')
     ty_checker.check(self, StringMethodsType)
 
     def hpat_pandas_stringmethods_lower_impl(self):
+        mask = get_nan_mask(self._data._data)
         item_count = len(self._data)
-        result = [''] * item_count
+        res_list = [''] * item_count
 
         for it in range(item_count):
             item = self._data._data[it]
             if len(item) > 0:
-                result[it] = item.lower()
+                res_list[it] = item.lower()
             else:
-                result[it] = item
+                res_list[it] = item
+
+        str_arr = create_str_arr_from_list(res_list)
+        result = str_arr_set_na_by_mask(str_arr, mask)
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
@@ -1231,7 +1235,7 @@ stringmethods_funcs = {
         'method': hpat_pandas_stringmethods_lower,
         'caption': 'Convert strings in the Series to lowercase.',
         'seealso': seealso_transform_methods,
-        'limitations': limitation_nans_unsupported
+        'limitations': ''
     },
 }
 
