@@ -34,6 +34,7 @@ import unittest
 from itertools import permutations, product
 from numba.config import IS_32BITS
 from numba.special import literal_unroll
+from numba.errors import TypingError
 
 import sdc
 from sdc.datatypes.common_functions import SDCLimitation
@@ -1076,6 +1077,29 @@ class TestDataFrame(TestCase):
                 with self.subTest(n=n, index=idx):
                     pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
 
+    def test_df_iat(self):
+        def test_impl(df):
+            return df.iat[0, 1]
+        sdc_func = sdc.jit(test_impl)
+        idx = [3, 4, 2, 6, 1]
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
+        self.assertEqual(sdc_func(df), test_impl(df))
+
+    def test_df_iat_value_error(self):
+        def test_impl(df):
+            return df.iat[1, 22]
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": ['a', 'dd', 'c', '12', 'ddf']})
+
+        with self.assertRaises(TypingError) as raises:
+            sdc_func(df)
+        msg = 'Index is out of bounds for axis'
+        self.assertIn(msg, str(raises.exception))
+
     def test_df_head(self):
         def get_func(n):
             def impl(a):
@@ -1098,6 +1122,23 @@ class TestDataFrame(TestCase):
                         index=[3, 4, 2, 6, 1]
                     )
                     pd.testing.assert_frame_equal(sdc_func(df), ref_impl(df))
+
+    def test_df_copy(self):
+        def test_impl(df, deep):
+            return df.copy(deep=deep)
+
+        sdc_func = sdc.jit(test_impl)
+        indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e'], None]
+        cases_deep = [None, True, False]
+
+        for idx in indexes:
+            df = pd.DataFrame({"A": [3.2, np.nan, 7.0, 3.3, np.nan],
+                               "B": [3, 4, 1, 0, 222],
+                               "C": [True, True, False, False, True],
+                               "D": ['a', 'dd', 'c', '12', None]}, index=idx)
+            for deep in cases_deep:
+                with self.subTest(index=idx, deep=deep):
+                    pd.testing.assert_frame_equal(sdc_func(df, deep), test_impl(df, deep))
 
     def test_pct_change1(self):
         def test_impl(n):

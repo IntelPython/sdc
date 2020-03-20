@@ -52,15 +52,6 @@ class DataFrameAttribute(AttributeTemplate):
     def resolve_shape(self, ary):
         return types.UniTuple(types.intp, 2)
 
-    def resolve_iat(self, ary):
-        return DataFrameIatType(ary)
-
-    def resolve_iloc(self, ary):
-        return DataFrameILocType(ary)
-
-    def resolve_loc(self, ary):
-        return DataFrameLocType(ary)
-
     if sdc.config.config_pipeline_hpat_default:
         def resolve_values(self, ary):
             # using np.stack(data, 1) for both typing and implementation
@@ -330,7 +321,7 @@ def df_len_overload(df):
 
     if len(df.columns) == 0:  # empty df
         return lambda df: 0
-    return lambda df: len(get_dataframe_data(df, 0))
+    return lambda df: len(df._data[0])
 
 if sdc.config.config_pipeline_hpat_default:
     @overload(operator.getitem)  # TODO: avoid lowering?
