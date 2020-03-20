@@ -3373,7 +3373,8 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
         :ref:`core.window.Rolling.quantile <pandas.core.window.Rolling.quantile>`
             Calculate the rolling quantile.
 
-        `numpy.percentile <https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html#numpy.percentile>`_
+        `numpy.percentile
+        <https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html#numpy.percentile>`_
 
 
     Intel Scalable Dataframe Compiler Developer Guide
