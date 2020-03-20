@@ -462,14 +462,16 @@ def sdc_pandas_series_setitem(self, idx, value):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
-    Pandas API: pandas.Series.__setitem__
+    Pandas API: pandas.Series.setitem
+
+    Set value to Series by index
 
     Limitations
     -----------
-        Not supported for idx as a string slice, e.g. S['a':'f'] = value
-        Not supported for string series
-        Not supported for a case of setting value for non existing index
-        Not supported for cases when setting causes change of the Series dtype
+       - Not supported for idx as a string slice, e.g. S['a':'f'] = value
+       - Not supported for string series
+       - Not supported for a case of setting value for non existing index
+       - Not supported for cases when setting causes change of the Series dtype
 
     Examples
     --------
@@ -479,34 +481,50 @@ def sdc_pandas_series_setitem(self, idx, value):
        :caption: Setting Pandas Series elements
        :name: ex_series_setitem
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_setitem_int.py
+       :cwd: ../../../examples
 
-        > python ./series/series_setitem_int.py
+    .. literalinclude:: ../../../examples/series/series_setitem_slice.py
+       :language: python
+       :lines: 27-
+       :caption: Setting Pandas Series elements by slice
+       :name: ex_series_setitem
 
-            0    0
-            1    4
-            2    3
-            3    2
-            4    1
-            dtype: int64
+    .. command-output:: python ./series/series_setitem_slice.py
+       :cwd: ../../../examples
 
-        > python ./series/series_setitem_slice.py
+    .. literalinclude:: ../../../examples/series/series_setitem_series.py
+       :language: python
+       :lines: 27-
+       :caption: Setting Pandas Series elements by series
+       :name: ex_series_setitem
 
-            0    5
-            1    4
-            2    0
-            3    0
-            4    0
-            dtype: int64
+    .. command-output:: python ./series/series_setitem_series.py
+       :cwd: ../../../examples
 
-        > python ./series/series_setitem_series.py
-
-            0    5
-            1    0
-            2    3
-            3    0
-            4    1
-            dtype: int64
+    .. seealso::
+            :ref:`Series.getitem <pandas.Series.getitem>`
+                Get value(s) of Series by key.
+            :ref:`Series.loc <pandas.Series.loc>`
+                Access a group of rows and columns by label(s) or a boolean array.
+            :ref:`Series.iloc <pandas.Series.iloc>`
+                Purely integer-location based indexing for selection by position.
+            :ref:`Series.at <pandas.Series.at>`
+                Access a single value for a row/column label pair.
+            :ref:`Series.iat <pandas.Series.iat>`
+                Access a single value for a row/column pair by integer position.
+            :ref:`DataFrame.getitem <pandas.DataFrame.getitem>`
+                Get data from a DataFrame by indexer.
+            :ref:`DataFrame.setitem <pandas.DataFrame.setitem>`
+                Set value to DataFrame by index
+            :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+                Access a group of rows and columns by label(s) or a boolean array.
+            :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+                Purely integer-location based indexing for selection by position.
+            :ref:`DataFrame.at <pandas.DataFrame.at>`
+                Access a single value for a row/column label pair.
+            :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+                Access a single value for a row/column pair by integer position.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
