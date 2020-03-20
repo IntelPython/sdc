@@ -1043,14 +1043,14 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
 
     Limitations
     -----------
-    - Parameter 'keep' except 'first' is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameter ``keep`` is supported only with default value ``'first'``.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_nsmallest.py
        :language: python
        :lines: 27-
-       :caption: Return the smallest n elements.
+       :caption: Returns the smallest n elements.
        :name: ex_series_nsmallest
 
     .. command-output:: python ./series/series_nsmallest.py
@@ -1069,6 +1069,7 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.nsmallest` implementation.
 
     .. only:: developer
@@ -1108,14 +1109,14 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
 
     Limitations
     -----------
-    - Parameter 'keep' except 'first' is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameter ``keep`` is supported only with default value ``'first'``.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_nlargest.py
        :language: python
        :lines: 27-
-       :caption: Return the largest n elements.
+       :caption: Returns the largest n elements.
        :name: ex_series_nlargest
 
     .. command-output:: python ./series/series_nlargest.py
@@ -1134,6 +1135,7 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.nlargest` implementation.
 
     .. only:: developer
@@ -3003,7 +3005,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level``, ``fill_value`` and ``axis`` are unsupported.
 
     Examples
     --------
@@ -3016,13 +3018,10 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
     .. command-output:: python ./series/series_div.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
         :ref:`Series.rdiv <pandas.Series.rdiv>`
+            Return Floating division of series and other, element-wise (binary operator rtruediv).
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
