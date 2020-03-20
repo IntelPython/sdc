@@ -827,7 +827,7 @@ def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
     Limitations
     -----------
-    Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
     Examples
     --------
