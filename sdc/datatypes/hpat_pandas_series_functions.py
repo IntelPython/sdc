@@ -2516,16 +2516,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameter ``level`` is supported only with default value ``None``.
-
-    Parameter ``fill_value`` is supported only with default value ``None``.
-
-    Parameter ``axis`` is supported only with default value ``0``.
-
-    Parameter ``other`` can be one of the following:
-
-    * Series, e.g.:obj:`pandas.Series`
-    * Scalar value
+    Parameters ``level``, ``fill_value`` and ``axis`` are unsupported.
 
     Examples
     --------
