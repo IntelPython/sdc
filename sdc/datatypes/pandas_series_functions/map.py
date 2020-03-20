@@ -45,9 +45,11 @@ def hpat_pandas_series_map(self, arg, na_action=None):
 
     Limitations
     -----------
-    String data types are not supported by Intel Scalable Dataframe Compiler.
-    `arg` could be function or dict and could not be Series. The function should return scalar type.
-    `na_action` is unsupported by Intel Scalable Dataframe Compiler.
+    - Series data types String is currently unsupported by Intel Scalable Dataframe Compiler.
+    - ``arg`` as Series is currently unsupported by Intel Scalable Dataframe Compiler.
+    - ``arg`` as function should return scalar. Other types \
+        are currently unsupported by Intel Scalable Dataframe Compiler.
+    - ``na_action`` is currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
