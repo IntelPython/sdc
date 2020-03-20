@@ -94,8 +94,20 @@ def generate_csv_data():
     with open("csv_data1.csv", "w") as f:
         f.write(data)
 
+    with open("csv_data2.csv", "w") as f:
+        # the same types as csv_data1.csv
+        f.write((
+            "4,2.1,4.1,D\n"
+            "3,2.2,4.2,\n"
+            "2,2.3,4.3,B\n"
+            "1,2.4,4.4,A\n"
+        ))
+
     with open("csv_data_infer1.csv", "w") as f:
         f.write('A,B,C,D\n' + data)
+
+    with open("csv_data_infer_no_column_name.csv", "w") as f:
+        f.write(',,C,D\n' + data)
 
     with open("csv_data_infer_sep.csv", "w") as f:
         f.write(('A,B,C,D\n' + data).replace(',', ';'))
