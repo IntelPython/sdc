@@ -3001,8 +3001,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters ``level``, ``fill_value`` are supported only with default value ``None``.
-    Parameter ``axis`` is supported only with default value ``0``.
+    Parameters ``level``, ``fill_value`` and ``axis`` are unsupported.
 
     Examples
     --------
@@ -3018,6 +3017,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
     .. seealso::
 
         :ref:`Series.rdiv <pandas.Series.rdiv>`
+            Return Floating division of series and other, element-wise (binary operator rtruediv).
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
