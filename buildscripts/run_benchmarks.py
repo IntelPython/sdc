@@ -33,14 +33,14 @@ from pathlib import Path
 from utilities import SDC_Build_Utilities
 
 
-def run_benchmarks(sdc_utils, module_list, num_threads_list, extra_args):
+def run_benchmarks(sdc_utils, args_list, num_threads_list):
     os.chdir(str(sdc_utils.src_path.parent))
 
-    for module in module_list:
+    for args_set in args_list:
         for num_threads in num_threads_list:
             os.environ['NUMBA_NUM_THREADS'] = num_threads
             sdc_utils.log_info(f'Run Intel SDC benchmarks on {num_threads} threads', separate=True)
-            sdc_utils.run_command(f'python -W ignore -m sdc.runtests -v {module} {extra_args}')
+            sdc_utils.run_command(f'python -W ignore -m sdc.runtests {args_set}')
 
 
 if __name__ == '__main__':
@@ -48,10 +48,9 @@ if __name__ == '__main__':
     parser.add_argument('--python', default='3.7', choices=['3.6', '3.7', '3.8'],
                         help='Python version, default = 3.7')
     parser.add_argument('--sdc-channel', default=None, help='Intel SDC channel')
-    parser.add_argument('--module-list', required=True, nargs='+', help='List of performance modules to test')
+    parser.add_argument('--args-list', required=True, nargs='+', help='List of arguments sets for benchmarks')
     parser.add_argument('--num-threads-list', required=True, nargs='+',
                         help='List of values for NUMBA_NUM_THREADS env variable')
-    parser.add_argument('--extra-args', default='', help='Extra arguments')
 
     args = parser.parse_args()
 
@@ -61,4 +60,4 @@ if __name__ == '__main__':
     sdc_utils.create_environment(['scipy', 'openpyxl', 'xlrd'])
     sdc_utils.install_conda_package(['sdc'])
 
-    run_benchmarks(sdc_utils, args.module_list, args.num_threads_list, args.extra_args)
+    run_benchmarks(sdc_utils, args.args_list, args.num_threads_list)
