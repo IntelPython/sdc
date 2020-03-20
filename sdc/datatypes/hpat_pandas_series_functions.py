@@ -2539,7 +2539,6 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     .. only:: developer
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
-
     """
 
     _func_name = 'Method add().'
