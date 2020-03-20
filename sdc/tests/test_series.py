@@ -2929,6 +2929,15 @@ class TestSeries(
         ref_result = test_impl(series, width)
         pd.testing.assert_series_equal(jit_result, ref_result)
 
+    def test_series_str_center_with_none(self):
+        def test_impl(series, width, fillchar):
+            return series.str.center(width, fillchar)
+
+        cfunc = self.jit(test_impl)
+        idx = ['City 1', 'City 2', 'City 3', 'City 4', 'City 5', 'City 6', 'City 7', 'City 8']
+        s = pd.Series(['New_York', 'Lisbon', np.nan, 'Tokyo', 'Paris', None, 'Munich', None], index=idx)
+        pd.testing.assert_series_equal(cfunc(s, width=13, fillchar='*'), test_impl(s, width=13, fillchar='*'))
+
     def test_series_str_endswith(self):
         def test_impl(series, pat):
             return series.str.endswith(pat)
@@ -3082,6 +3091,16 @@ class TestSeries(
     def test_series_str_ljust_with_none(self):
         def test_impl(series, width, fillchar):
             return series.str.ljust(width, fillchar)
+
+        cfunc = self.jit(test_impl)
+        idx = ['City 1', 'City 2', 'City 3', 'City 4', 'City 5', 'City 6', 'City 7', 'City 8']
+        s = pd.Series(['New_York', 'Lisbon', np.nan, 'Tokyo', 'Paris', None, 'Munich', None], index=idx)
+        pd.testing.assert_series_equal(cfunc(s, width=13, fillchar='*'), test_impl(s, width=13, fillchar='*'))
+
+
+    def test_series_str_rjust_with_none(self):
+        def test_impl(series, width, fillchar):
+            return series.str.rjust(width, fillchar)
 
         cfunc = self.jit(test_impl)
         idx = ['City 1', 'City 2', 'City 3', 'City 4', 'City 5', 'City 6', 'City 7', 'City 8']
@@ -4177,52 +4196,52 @@ class TestSeries(
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
     def test_series_idxmin1(self):
-        def test_impl(A):
-            return A.idxmin()
+        def test_impl(a):
+            return a.idxmin()
         hpat_func = self.jit(test_impl)
 
         n = 11
         np.random.seed(0)
-        S = pd.Series(np.random.ranf(n))
-        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+        s = pd.Series(np.random.ranf(n))
+        np.testing.assert_array_equal(hpat_func(s), test_impl(s))
 
     def test_series_idxmin_str(self):
-        def test_impl(S):
-            return S.idxmin()
+        def test_impl(s):
+            return s.idxmin()
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        s = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
+        self.assertEqual(hpat_func(s), test_impl(s))
 
     @unittest.skip("Skipna is not implemented")
     def test_series_idxmin_str_idx(self):
-        def test_impl(S):
-            return S.idxmin(skipna=False)
+        def test_impl(s):
+            return s.idxmin(skipna=False)
 
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        s = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
+        self.assertEqual(hpat_func(s), test_impl(s))
 
     def test_series_idxmin_no(self):
-        def test_impl(S):
-            return S.idxmin()
+        def test_impl(s):
+            return s.idxmin()
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([8, 6, 34, np.nan])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        s = pd.Series([8, 6, 34, np.nan])
+        self.assertEqual(hpat_func(s), test_impl(s))
 
     def test_series_idxmin_int(self):
-        def test_impl(S):
-            return S.idxmin()
+        def test_impl(s):
+            return s.idxmin()
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([1, 2, 3], [4, 45, 14])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        s = pd.Series([1, 2, 3], [4, 45, 14])
+        self.assertEqual(hpat_func(s), test_impl(s))
 
     def test_series_idxmin_noidx(self):
-        def test_impl(S):
-            return S.idxmin()
+        def test_impl(s):
+            return s.idxmin()
 
         hpat_func = self.jit(test_impl)
 
@@ -4234,15 +4253,15 @@ class TestSeries(
                      ]
 
         for input_data in data_test:
-            S = pd.Series(input_data)
+            s = pd.Series(input_data)
 
-            result_ref = test_impl(S)
-            result = hpat_func(S)
+            result_ref = test_impl(s)
+            result = hpat_func(s)
             self.assertEqual(result, result_ref)
 
     def test_series_idxmin_idx(self):
-        def test_impl(S):
-            return S.idxmin()
+        def test_impl(s):
+            return s.idxmin()
 
         hpat_func = self.jit(test_impl)
 
@@ -4255,37 +4274,37 @@ class TestSeries(
 
         for input_data in data_test:
             for index_data in data_test:
-                S = pd.Series(input_data, index_data)
-                result_ref = test_impl(S)
-                result = hpat_func(S)
+                s = pd.Series(input_data, index_data)
+                result_ref = test_impl(s)
+                result = hpat_func(s)
                 if np.isnan(result) or np.isnan(result_ref):
                     self.assertEqual(np.isnan(result), np.isnan(result_ref))
                 else:
                     self.assertEqual(result, result_ref)
 
     def test_series_idxmax1(self):
-        def test_impl(A):
-            return A.idxmax()
+        def test_impl(a):
+            return a.idxmax()
         hpat_func = self.jit(test_impl)
 
         n = 11
         np.random.seed(0)
-        S = pd.Series(np.random.ranf(n))
-        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+        s = pd.Series(np.random.ranf(n))
+        np.testing.assert_array_equal(hpat_func(s), test_impl(s))
 
     @unittest.skip("Skipna is not implemented")
     def test_series_idxmax_str_idx(self):
-        def test_impl(S):
-            return S.idxmax(skipna=False)
+        def test_impl(s):
+            return s.idxmax(skipna=False)
 
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        s = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
+        self.assertEqual(hpat_func(s), test_impl(s))
 
     def test_series_idxmax_noidx(self):
-        def test_impl(S):
-            return S.idxmax()
+        def test_impl(s):
+            return s.idxmax()
 
         hpat_func = self.jit(test_impl)
 
@@ -4297,15 +4316,15 @@ class TestSeries(
                      ]
 
         for input_data in data_test:
-            S = pd.Series(input_data)
+            s = pd.Series(input_data)
 
-            result_ref = test_impl(S)
-            result = hpat_func(S)
+            result_ref = test_impl(s)
+            result = hpat_func(s)
             self.assertEqual(result, result_ref)
 
     def test_series_idxmax_idx(self):
-        def test_impl(S):
-            return S.idxmax()
+        def test_impl(s):
+            return s.idxmax()
 
         hpat_func = self.jit(test_impl)
 
@@ -4318,9 +4337,9 @@ class TestSeries(
 
         for input_data in data_test:
             for index_data in data_test:
-                S = pd.Series(input_data, index_data)
-                result_ref = test_impl(S)
-                result = hpat_func(S)
+                s = pd.Series(input_data, index_data)
+                result_ref = test_impl(s)
+                result = hpat_func(s)
                 if np.isnan(result) or np.isnan(result_ref):
                     self.assertEqual(np.isnan(result), np.isnan(result_ref))
                 else:
@@ -5986,19 +6005,19 @@ class TestSeries(
             pd.testing.assert_series_equal(cfunc(S), islower_usecase(S))
 
     def test_series_strip_str(self):
-        s = pd.Series(['1. Ant.  ', '2. Bee!\n', '3. Cat?\t'])
+        s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
         cfunc = self.jit(strip_usecase)
         for to_strip in [None, '123.', '.!? \n\t', '123.!? \n\t']:
             pd.testing.assert_series_equal(cfunc(s, to_strip), strip_usecase(s, to_strip))
 
     def test_series_lstrip_str(self):
-        s = pd.Series(['1. Ant.  ', '2. Bee!\n', '3. Cat?\t'])
+        s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
         cfunc = self.jit(lstrip_usecase)
         for to_strip in [None, '123.', '.!? \n\t', '123.!? \n\t']:
             pd.testing.assert_series_equal(cfunc(s, to_strip), lstrip_usecase(s, to_strip))
 
     def test_series_rstrip_str(self):
-        s = pd.Series(['1. Ant.  ', '2. Bee!\n', '3. Cat?\t'])
+        s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
         cfunc = self.jit(rstrip_usecase)
         for to_strip in [None, '123.', '.!? \n\t', '123.!? \n\t']:
             pd.testing.assert_series_equal(cfunc(s, to_strip), rstrip_usecase(s, to_strip))
