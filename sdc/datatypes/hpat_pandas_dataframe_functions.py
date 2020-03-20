@@ -718,6 +718,10 @@ def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     .. command-output:: python ./dataframe/dataframe_median.py
        :cwd: ../../../examples
 
+    .. seealso::
+        :ref:`Series.median <pandas.Series.median>`
+            Returns the median of the values for the Series.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
 
