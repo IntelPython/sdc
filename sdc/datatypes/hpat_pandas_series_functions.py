@@ -3516,6 +3516,21 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
         :ref:`Series.idxmax <pandas.Series.idxmax>`
             Return the index of the maximum.
 
+        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
+            Return the sum over the requested axis.
+
+        :ref:`DataFrame.min <pandas.DataFrame.min>`
+            Return the minimum over the requested axis.
+
+        :ref:`DataFrame.max <pandas.DataFrame.max>`
+            Return the maximum over the requested axis.
+
+        :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
+            Return the index of the minimum over the requested axis.
+
+        :ref:`DataFrame.idxmax <pandas.DataFrame.idxmax>`
+            Return the index of the maximum over the requested axis.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.min` implementation.
