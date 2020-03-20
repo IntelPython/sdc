@@ -34,8 +34,7 @@ from numba.extending import register_jitable
 from numba.types import (float64, Boolean, Integer, NoneType, Number,
                          Omitted, StringLiteral, UnicodeType)
 
-from sdc.datatypes.common_functions import (_almost_equal,
-                                            _sdc_pandas_series_align)
+from sdc.datatypes.common_functions import _almost_equal
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.prange_utils import parallel_chunks
@@ -61,6 +60,15 @@ hpat_pandas_series_rolling_docstring_tmpl = """
        :name: ex_series_rolling_{method_name}
 
     .. command-output:: python ./series/rolling/series_rolling_{method_name}.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/rolling/dataframe_rolling_{method_name}.py
+       :language: python
+       :lines: 27-
+       :caption: {example_caption}
+       :name: ex_dataframe_rolling_{method_name}
+
+    .. command-output:: python ./dataframe/rolling/dataframe_rolling_{method_name}.py
        :cwd: ../../../examples
 
     .. seealso::
@@ -247,6 +255,46 @@ def put_count(value, nfinite, result):
 def result(nfinite, minp, result):
     """Get result."""
     return result
+
+
+@sdc_register_jitable
+def pop_cov(x, y, nfinite, result, align_finiteness=False):
+    """Calculate the window sums for cov without old value."""
+    sum_x, sum_y, sum_xy, count = result
+    if numpy.isfinite(x) and numpy.isfinite(y):
+        nfinite -= 1
+        sum_x -= x
+        sum_y -= y
+        sum_xy -= x * y
+
+        return nfinite, (sum_x, sum_y, sum_xy, count - 1)
+
+    if align_finiteness or numpy.isnan(x) or numpy.isnan(y):
+        # alignment by finiteness means replacement of all the infinite values with nans
+        # count should NOT be recalculated in case of nans
+        return nfinite, result
+
+    return nfinite, (sum_x, sum_y, sum_xy, count - 1)
+
+
+@sdc_register_jitable
+def put_cov(x, y, nfinite, result, align_finiteness=False):
+    """Calculate the window sums for cov with new value."""
+    sum_x, sum_y, sum_xy, count = result
+    if numpy.isfinite(x) and numpy.isfinite(y):
+        nfinite += 1
+        sum_x += x
+        sum_y += y
+        sum_xy += x * y
+
+        return nfinite, (sum_x, sum_y, sum_xy, count + 1)
+
+    if align_finiteness or numpy.isnan(x) or numpy.isnan(y):
+        # alignment by finiteness means replacement of all the infinite values with nans
+        # count should NOT be recalculated in case of nans
+        return nfinite, result
+
+    return nfinite, (sum_x, sum_y, sum_xy, count + 1)
 
 
 @sdc_register_jitable
@@ -451,6 +499,18 @@ def corr_result_or_nan(nfinite, minp, result):
     cov_xy = sum_xy - sum_x * sum_y / nfinite
 
     return cov_xy / numpy.sqrt(var_x * var_y)
+
+
+@sdc_register_jitable
+def cov_result_or_nan(nfinite, minp, result, ddof):
+    """Get result of covariance taking into account min periods."""
+    if nfinite < max(1, minp):
+        return numpy.nan
+
+    sum_x, sum_y, sum_xy, count = result
+    res = (sum_xy - sum_x * sum_y / nfinite) / nfinite
+
+    return ddof_result(count, minp, res, ddof)
 
 
 @sdc_register_jitable
@@ -864,48 +924,80 @@ def _gen_hpat_pandas_rolling_series_cov_impl(other, align_finiteness=False):
         minp = self._min_periods
 
         main_series = self._data
+        main_arr = main_series._data
+
         if nan_other == True:  # noqa
-            other_series = main_series
+            other_arr = main_arr
         else:
-            other_series = other
+            other_arr = other._data
 
-        main_aligned, other_aligned = _sdc_pandas_series_align(main_series, other_series,
-                                                               finiteness=align_finiteness)
-        count = (main_aligned + other_aligned).rolling(win).count()
-        bias_adj = count / (count - ddof)
+        main_arr_length = len(main_arr)
+        other_arr_length = len(other_arr)
+        min_length = min(main_arr_length, other_arr_length)
+        length = max(main_arr_length, other_arr_length)
+        output_arr = numpy.empty(length, dtype=float64)
 
-        def mean(series):
-            # cannot call return series.rolling(win, min_periods=minp).mean()
-            # due to different float rounding in new and old implementations
-            # TODO: fix this during optimizing of covariance
-            input_arr = series._data
-            length = len(input_arr)
-            output_arr = numpy.empty(length, dtype=float64)
+        chunks = parallel_chunks(length)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            nfinite = 0
+            result = (0., 0., 0., 0.)
 
-            def apply_minp(arr, minp):
-                finite_arr = arr[numpy.isfinite(arr)]
-                if len(finite_arr) < minp:
-                    return numpy.nan
-                else:
-                    return arr_mean(finite_arr)
+            if win == 0:
+                for idx in range(chunk.start, chunk.stop):
+                    output_arr[idx] = cov_result_or_nan(nfinite, minp, result, ddof)
+                continue
 
-            boundary = min(win, length)
-            for i in prange(boundary):
-                arr_range = input_arr[:i + 1]
-                output_arr[i] = apply_minp(arr_range, minp)
+            prelude_start = max(0, chunk.start - win + 1)
+            prelude_stop = min(chunk.start, min_length)
 
-            for i in prange(boundary, length):
-                arr_range = input_arr[i + 1 - win:i + 1]
-                output_arr[i] = apply_minp(arr_range, minp)
+            interlude_start = chunk.start
+            interlude_stop = min(prelude_start + win, chunk.stop, min_length)
 
-            return pandas.Series(output_arr, series._index, name=series._name)
+            postlude_start = min(prelude_start + win, chunk.stop)
+            postlude_stop = min(chunk.stop, min_length)
 
-        return (mean(main_aligned * other_aligned) - mean(main_aligned) * mean(other_aligned)) * bias_adj
+            for idx in range(prelude_start, prelude_stop):
+                x, y = main_arr[idx], other_arr[idx]
+                nfinite, result = put_cov(x, y, nfinite, result,
+                                          align_finiteness=align_finiteness)
+
+            for idx in range(interlude_start, interlude_stop):
+                x, y = main_arr[idx], other_arr[idx]
+                nfinite, result = put_cov(x, y, nfinite, result,
+                                          align_finiteness=align_finiteness)
+                output_arr[idx] = cov_result_or_nan(nfinite, minp, result, ddof)
+
+            for idx in range(postlude_start, postlude_stop):
+                put_x, put_y = main_arr[idx], other_arr[idx]
+                pop_x, pop_y = main_arr[idx - win], other_arr[idx - win]
+                nfinite, result = put_cov(put_x, put_y, nfinite, result,
+                                          align_finiteness=align_finiteness)
+                nfinite, result = pop_cov(pop_x, pop_y, nfinite, result,
+                                          align_finiteness=align_finiteness)
+                output_arr[idx] = cov_result_or_nan(nfinite, minp, result, ddof)
+
+            last_start = max(min_length, interlude_start)
+            for idx in range(last_start, postlude_start):
+                output_arr[idx] = cov_result_or_nan(nfinite, minp, result, ddof)
+
+            last_start = max(min_length, postlude_start)
+            last_stop = min(min_length + win, chunk.stop)
+            for idx in range(last_start, last_stop):
+                x, y = main_arr[idx - win], other_arr[idx - win]
+                nfinite, result = pop_cov(x, y, nfinite, result,
+                                          align_finiteness=align_finiteness)
+                output_arr[idx] = cov_result_or_nan(nfinite, minp, result, ddof)
+
+            for idx in range(last_stop, chunk.stop):
+                output_arr[idx] = numpy.nan
+
+        return pandas.Series(output_arr)
 
     return _impl
 
 
-@sdc_rolling_overload(SeriesRollingType, 'cov')
+@sdc_overload_method(SeriesRollingType, 'cov')
 def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
     _hpat_pandas_series_rolling_cov_check_types(self, other=other,
                                                 pairwise=pairwise, ddof=ddof)
@@ -913,7 +1005,7 @@ def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
     return _gen_hpat_pandas_rolling_series_cov_impl(other, align_finiteness=True)
 
 
-@sdc_rolling_overload(SeriesRollingType, '_df_cov')
+@sdc_overload_method(SeriesRollingType, '_df_cov')
 def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
     _hpat_pandas_series_rolling_cov_check_types(self, other=other,
                                                 pairwise=pairwise, ddof=ddof)
@@ -1063,7 +1155,7 @@ hpat_pandas_series_rolling_apply.__doc__ = hpat_pandas_series_rolling_docstring_
     Limitations
     -----------
     Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """
@@ -1082,13 +1174,13 @@ hpat_pandas_series_rolling_corr.__doc__ = hpat_pandas_series_rolling_docstring_t
     """
     Limitations
     -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
-    Resulting Series has default index and name.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    Resulting DataFrame/Series has default index and name.
     """,
     'extra_params':
     """
-    other: :obj:`Series`
-        Other Series.
+    other: :obj:`DataFrame` or :obj:`Series`
+        Other DataFrame/Series.
     pairwise: :obj:`bool`
         Not relevant for Series.
     """
@@ -1108,13 +1200,13 @@ hpat_pandas_series_rolling_cov.__doc__ = hpat_pandas_series_rolling_docstring_tm
     """
     Limitations
     -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
-    Resulting Series has default index and name.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    Resulting DataFrame/Series has default index and name.
     """,
     'extra_params':
     """
-    other: :obj:`Series`
-        Other Series.
+    other: :obj:`DataFrame` or :obj:`Series`
+        Other DataFrame/Series.
     pairwise: :obj:`bool`
         Not relevant for Series.
     ddof: :obj:`int`
@@ -1143,7 +1235,7 @@ hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_t
     """
     Limitations
     -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params': ''
 })
@@ -1170,7 +1262,7 @@ hpat_pandas_series_rolling_quantile.__doc__ = hpat_pandas_series_rolling_docstri
     Limitations
     -----------
     Supported ``interpolation`` only can be `'linear'`.
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """
@@ -1195,7 +1287,7 @@ hpat_pandas_series_rolling_std.__doc__ = hpat_pandas_series_rolling_docstring_tm
     """
     Limitations
     -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """
@@ -1206,12 +1298,12 @@ hpat_pandas_series_rolling_std.__doc__ = hpat_pandas_series_rolling_docstring_tm
 
 hpat_pandas_series_rolling_sum.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'sum',
-    'example_caption': 'Calculate rolling sum of given Series.',
+    'example_caption': 'Calculate rolling sum',
     'limitations_block':
     """
     Limitations
     -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params': ''
 })
@@ -1223,7 +1315,7 @@ hpat_pandas_series_rolling_var.__doc__ = hpat_pandas_series_rolling_docstring_tm
     """
     Limitations
     -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """

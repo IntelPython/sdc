@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -43,13 +43,15 @@ from numba import (types, numpy_support, cgutils)
 from numba.typed import List, Dict
 from numba import prange
 from numba.targets.arraymath import get_isnan
+from pandas.core.indexing import IndexingError
 
 import sdc
 import sdc.datatypes.common_functions as common_functions
 from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric, check_types_comparable,
                                             find_common_dtype_from_numpy_dtypes, has_literal_value,
                                             has_python_value)
-from sdc.datatypes.common_functions import (sdc_join_series_indexes, sdc_arrays_argsort, sdc_check_indexes_equal)
+from sdc.datatypes.common_functions import (sdc_join_series_indexes, sdc_arrays_argsort, sdc_check_indexes_equal,
+                                            sdc_reindex_series)
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
 from sdc.datatypes.hpat_pandas_series_rolling_types import _hpat_pandas_series_rolling_init
@@ -326,7 +328,7 @@ def hpat_pandas_series_getitem(self, idx):
     Pandas Series operator :attr:`pandas.Series.__getitem__` implementation
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_getitem_series*
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_getitem*
     """
 
     _func_name = 'Operator getitem().'
@@ -365,23 +367,60 @@ def hpat_pandas_series_getitem(self, idx):
 
         return hpat_pandas_series_getitem_idx_slice_impl
 
-    if (
-        isinstance(idx, (types.List, types.Array)) and
-        isinstance(idx.dtype, (types.Boolean, bool))
-    ):
+    if (isinstance(idx, (types.List, types.Array))
+            and isinstance(idx.dtype, (types.Boolean, bool))):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
-            return pandas.Series(data=self._data[idx], index=self.index[idx], name=self._name)
+
+            if len(self) != len(idx):
+                raise IndexError("Item wrong length")
+
+            return pandas.Series(
+                data=numpy_like.getitem_by_mask(self._data, idx),
+                index=numpy_like.getitem_by_mask(self.index, idx),
+                name=self._name
+            )
+
         return hpat_pandas_series_getitem_idx_list_impl
 
-    if (index_is_none and isinstance(idx, SeriesType)):
-        if isinstance(idx.data.dtype, (types.Boolean, bool)):
-            def hpat_pandas_series_getitem_idx_list_impl(self, idx):
-                index = numpy.arange(len(self._data))
-                if (index != idx.index).sum() == 0:
-                    return pandas.Series(data=self._data[idx._data], index=index[idx._data], name=self._name)
+    # idx is Series and it's index is any, idx.dtype is Boolean
+    if (isinstance(idx, SeriesType) and isinstance(idx.dtype, types.Boolean)):
 
-            return hpat_pandas_series_getitem_idx_list_impl
+        none_indexes = isinstance(self.index, types.NoneType) and isinstance(idx.index, types.NoneType)
+        none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
+                                   and (isinstance(idx.index, types.NoneType) or check_index_is_numeric(idx)))
+        if not (none_or_numeric_indexes
+                or check_types_comparable(self.index, idx.index)):
+            msg = '{} The index of boolean indexer is not comparable to Series index.' + \
+                  ' Given: self.index={}, idx.index={}'
+            raise TypingError(msg.format(_func_name, self.index, idx.index))
 
+        def hpat_pandas_series_getitem_idx_bool_indexer_impl(self, idx):
+
+            if none_indexes == True:  # noqa
+                if len(self) > len(idx):
+                    msg = "Unalignable boolean Series provided as indexer " + \
+                          "(index of the boolean Series and of the indexed object do not match)."
+                    raise IndexingError(msg)
+
+                return pandas.Series(
+                    data=numpy_like.getitem_by_mask(self._data, idx._data),
+                    index=numpy_like.getitem_by_mask(self.index, idx._data),
+                    name=self._name
+                )
+            else:
+                self_index = self.index
+                idx_reindexed = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)
+                return pandas.Series(
+                    data=numpy_like.getitem_by_mask(self._data, idx_reindexed._data),
+                    index=numpy_like.getitem_by_mask(self_index, idx_reindexed._data),
+                    name=self._name
+                )
+
+        return hpat_pandas_series_getitem_idx_bool_indexer_impl
+
+    # idx is Series and it's index is None, idx.dtype is not Boolean
+    if (isinstance(idx, SeriesType) and index_is_none
+            and not isinstance(idx.data.dtype, (types.Boolean, bool))):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
             res = numpy.copy(self._data[:len(idx._data)])
             index = numpy.arange(len(self._data))
@@ -392,15 +431,9 @@ def hpat_pandas_series_getitem(self, idx):
             return pandas.Series(data=res, index=index[idx._data], name=self._name)
         return hpat_pandas_series_getitem_idx_list_impl
 
-    if (isinstance(idx, SeriesType) and not isinstance(self.index, types.NoneType)):
-        if isinstance(idx.data.dtype, (types.Boolean, bool)):
-            # Series with str index not implement
-            def hpat_pandas_series_getitem_idx_series_impl(self, idx):
-                if (self._index != idx._index).sum() == 0:
-                    return pandas.Series(data=self._data[idx._data], index=self._index[idx._data], name=self._name)
-
-            return hpat_pandas_series_getitem_idx_series_impl
-
+    # idx is Series and it's index is not None, idx.dtype is not Boolean
+    if (isinstance(idx, SeriesType) and not isinstance(self.index, types.NoneType)
+            and not isinstance(idx.data.dtype, (types.Boolean, bool))):
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
             index = self.index
             data = self._data
@@ -418,6 +451,7 @@ def hpat_pandas_series_getitem(self, idx):
             return pandas.Series(data=data_res, index=index_res, name=self._name)
 
         return hpat_pandas_series_getitem_idx_series_impl
+
 
     raise TypingError('{} The index must be an Number, Slice, String, Boolean Array or a Series.\
                     Given: {}'.format(_func_name, idx))
@@ -1248,7 +1282,7 @@ def hpat_pandas_series_values(self):
     Pandas Series attribute 'values' implementation.
 
     .. only:: developer
-        Test:  python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_values
+        Test:  python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_values*
     """
 
     _func_name = 'Attribute values.'
@@ -1270,6 +1304,12 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
 
     Pandas API: pandas.Series.value_counts
 
+    Limitations
+    -----------
+    - Parameters ``normalize`` and ``bins`` are currently unsupported.
+    - Parameter ``dropna`` is unsupported for String Series.
+    - Elements with the same count might appear in result in a different order than in Pandas.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_value_counts.py
@@ -1280,11 +1320,6 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
 
     .. command-output:: python ./series/series_value_counts.py
        :cwd: ../../../examples
-
-    Limitations
-    -----------
-    - Parameter bins and dropna for Strings are currently unsupported by Intel Scalable Dataframe Compiler
-    - Elements with the same count might appear in result in a different order than in Pandas
 
     .. seealso::
 
@@ -1782,7 +1817,7 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
     # Return npytypes.Array from npytypes.Array for astype(types.functions.NumberClass), example - astype(np.int64)
     # Return npytypes.Array from npytypes.Array for astype(types.StringLiteral), example - astype('int64')
     def hpat_pandas_series_astype_numba_impl(self, dtype, copy=True, errors='raise'):
-        return pandas.Series(data=numpy_like.astype(self._data, dtype), index=self._index, name=self._name)
+        return pandas.Series(data=numpy_like.astype_no_inline(self._data, dtype), index=self._index, name=self._name)
 
     # Return self
     def hpat_pandas_series_astype_no_modify_impl(self, dtype, copy=True, errors='raise'):
@@ -2072,7 +2107,8 @@ def hpat_pandas_series_copy(self, deep=True):
 
     Limitations
     -----------
-    - Parameter deep except 'True' is currently unsupported by Intel Scalable Dataframe Compiler
+    - When ``deep=False``, a new object will be created without copying the calling object’s data
+    and with a copy of the calling object’s indices.
 
     Examples
     --------
@@ -2090,16 +2126,14 @@ def hpat_pandas_series_copy(self, deep=True):
     Pandas Series method :meth:`pandas.Series.copy` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_str1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_int1
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_copy_deep
+        Test: python -m sdc.runtests sdc.tests.test_series -k series_copy
     """
 
     ty_checker = TypeChecker('Method Series.copy().')
     ty_checker.check(self, SeriesType)
 
     if not isinstance(deep, (types.Omitted, types.Boolean)) and not deep:
-        ty_checker.raise_exc(self.data, 'boolean', 'deep')
+        ty_checker.raise_exc(deep, 'boolean', 'deep')
 
     if isinstance(self.index, types.NoneType):
         def hpat_pandas_series_copy_impl(self, deep=True):
@@ -2624,7 +2658,8 @@ def hpat_pandas_series_sum(
 
     Limitations
     -----------
-    - Parameters level, numeric_only, min_count are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``axis``, ``level``, ``numeric_only`` and ``min_count`` \
+        are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -2637,10 +2672,6 @@ def hpat_pandas_series_sum(
     .. command-output:: python ./series/series_sum.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
         :ref:`Series.sum <pandas.Series.sum>`
@@ -2651,6 +2682,21 @@ def hpat_pandas_series_sum(
 
         :ref:`Series.max <pandas.Series.max>`
             Return the maximum.
+
+        :ref:`Series.idxmin <pandas.Series.idxmin>`
+            Return the index of the minimum.
+
+        :ref:`Series.idxmax <pandas.Series.idxmax>`
+            Return the index of the maximum.
+
+        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
+            Return the sum over the requested axis.
+
+        :ref:`DataFrame.min <pandas.DataFrame.min>`
+            Return the minimum over the requested axis.
+
+        :ref:`DataFrame.max <pandas.DataFrame.max>`
+            Return the maximum over the requested axis.
 
         :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
             Return the index of the minimum over the requested axis.
@@ -2663,7 +2709,7 @@ def hpat_pandas_series_sum(
     Pandas Series method :meth:`pandas.Series.sum` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_sum*
+        Test: python -m sdc.runtests sdc.tests.test_series -k series_sum
     """
 
     _func_name = 'Method sum().'
@@ -2717,7 +2763,8 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
 
     Limitations
     -----------
-    - Parameter is_copy is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameter ``axis`` is supported only with default values ``0`` and ``'index'``.
+    Parameter ``is_copy`` is supported only with default value ``False``.
 
     Examples
     --------
@@ -2730,27 +2777,19 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
     .. command-output:: python ./series/series_take.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
-
         :ref:`DataFrame.loc <pandas.DataFrame.loc>`
             Select a subset of a DataFrame by labels.
-
         :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
             Select a subset of a DataFrame by positions.
 
-        `numpy.absolute
-        <https://docs.scipy.org/doc/numpy/reference/generated/numpy.take.html#numpy.take>`_
-            Take elements from an array along an axis.
-
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.take` implementation.
 
     .. only:: developer
+
         Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_take_index_*
     """
 
@@ -2794,6 +2833,11 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
 
     Pandas API: pandas.Series.idxmax
 
+    Limitations
+    -----------
+    Parameter ``axis`` is supported only with default value ``None``.
+    Parameter ``skipna`` cannot be ``False`` with data of string type.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_idxmax.py
@@ -2804,10 +2848,6 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
 
     .. command-output:: python ./series/series_idxmax.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -2890,7 +2930,7 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
 
     Examples
     --------
@@ -2902,10 +2942,6 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     .. command-output:: python ./series/series_mul.py
        :cwd: ../../../examples
-
-     .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3040,7 +3076,7 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
 
     Examples
     --------
@@ -3052,10 +3088,6 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     .. command-output:: python ./series/series_truediv.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3252,29 +3284,26 @@ def hpat_pandas_series_prod(self, axis=None, skipna=None, level=None, numeric_on
 
     Limitations
     -----------
-    - Parameters level, numeric_only, min_count are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``axis``, ``level``, ``numeric_only`` and ``min_count`` \
+        are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_prod.py
        :language: python
        :lines: 27-
-       :caption: Return the product of the values for the requested axis.
+       :caption: Return the product of the values.
        :name: ex_series_prod
 
     .. command-output:: python ./series/series_prod.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.prod` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_prod*
+        Test: python -m sdc.runtests sdc.tests.test_series -k series_prod
     """
 
     _func_name = 'Method prod().'
@@ -3354,7 +3383,7 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if not isinstance(interpolation, types.Omitted) and interpolation is not 'linear':
+    if not isinstance(interpolation, types.Omitted) and interpolation != 'linear':
         ty_checker.raise_exc(interpolation, 'str', 'interpolation')
 
     if not isinstance(q, (int, float, list, types.Number, types.Omitted, types.List)):
@@ -3538,7 +3567,7 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``axis``, ``level`` and ``numeric_only`` are currently unsupported.
 
     Examples
     --------
@@ -3550,10 +3579,6 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
 
     .. command-output:: python ./series/series_max.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3619,29 +3644,26 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``axis``, ``level`` and ``numeric_only`` \
+        are currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_mean.py
        :language: python
        :lines: 27-
-       :caption: Return the mean of the values for the requested axis.
+       :caption: Return the mean of the values.
        :name: ex_series_mean
 
     .. command-output:: python ./series/series_mean.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.mean` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_mean*
+        Test: python -m sdc.runtests sdc.tests.test_series -k series_mean
     """
 
     _func_name = 'Method mean().'
@@ -3878,6 +3900,11 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
 
     Pandas API: pandas.Series.idxmin
 
+    Limitations
+    -----------
+    Parameter ``axis`` is supported only with default value ``None``.
+    Parameter ``skipna`` cannot be ``False`` with data of string type.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_idxmin.py
@@ -3888,10 +3915,6 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
 
     .. command-output:: python ./series/series_idxmin.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -4273,41 +4296,34 @@ def hpat_pandas_series_cumsum(self, axis=None, skipna=True):
 
     Pandas API: pandas.Series.cumsum
 
+    Limitations
+    -----------
+    Parameter ``axis`` is supported only with default value ``None``.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_cumsum.py
        :language: python
        :lines: 27-
-       :caption: Return cumulative sum over a DataFrame or Series axis.
+       :caption: Returns cumulative sum over Series.
        :name: ex_series_cumsum
 
     .. command-output:: python ./series/series_cumsum.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
-
-        `pandas.absolute
-        <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.core.window.Expanding.sum.html#pandas.core.window.Expanding.sum>`_
-            Similar functionality but ignores NaN values.
-
         :ref:`Series.sum <pandas.Series.sum>`
-            Return the sum over Series axis.
-
+            Return the sum over Series.
         :ref:`Series.cummax <pandas.Series.cummax>`
-            Return cumulative maximum over Series axis.
-
+            Return cumulative maximum over Series.
         :ref:`Series.cummin <pandas.Series.cummin>`
-            Return cumulative minimum over Series axis.
-
+            Return cumulative minimum over Series.
         :ref:`Series.cumprod <pandas.Series.cumprod>`
-            Return cumulative product over Series axis.
+            Return cumulative product over Series.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.cumsum` implementation.
 
     .. only:: developer
@@ -4414,7 +4430,7 @@ def hpat_pandas_series_count(self, level=None):
 
     Limitations
     -----------
-    - Parameter level is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameter ``level`` is currently unsupported.
 
     Examples
     --------
@@ -4430,8 +4446,10 @@ def hpat_pandas_series_count(self, level=None):
     .. seealso::
 
         :ref:`Series.value_counts <pandas.Series.value_counts>`
-        :ref:`Series.value_counts <pandas.Series.value_counts>`
+            Return a Series containing counts of unique values.
+
         :ref:`Series.str.len <pandas.Series.str.len>`
+            Count the length of each element in the Series.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************

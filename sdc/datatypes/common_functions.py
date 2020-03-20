@@ -32,6 +32,7 @@
 
 import numpy
 import pandas
+from pandas.core.indexing import IndexingError
 
 import numba
 from numba.targets import quicksort
@@ -39,6 +40,7 @@ from numba import types
 from numba.errors import TypingError
 from numba.extending import register_jitable
 from numba import numpy_support
+from numba.typed import Dict
 
 import sdc
 from sdc.hiframes.api import isna
@@ -46,11 +48,17 @@ from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_arr_type import string_array_type
 from sdc.str_arr_ext import (num_total_chars, append_string_array_to,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na, string_array_type,
-                             cp_str_list_to_array, create_str_arr_from_list, get_utf8_size)
+                             cp_str_list_to_array, create_str_arr_from_list, get_utf8_size,
+                             str_arr_set_na_by_mask)
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 from sdc.utilities.sdc_typing_utils import (find_common_dtype_from_numpy_dtypes,
                                             TypeChecker)
+
+
+class SDCLimitation(Exception):
+    """Exception to be raised in case of SDC limitation"""
+    pass
 
 
 def hpat_arrays_append(A, B):
@@ -549,96 +557,6 @@ def _sdc_pandas_series_check_axis_overload(axis):
     return None
 
 
-def _sdc_pandas_arr_align(arr, other_arr, size='max', finiteness=False):
-    """
-    Align array and other array by
-        size where size of output arrays is max/min size of input arrays
-        finiteness where all the infinite and matched finite values are replaced with nans, e.g.
-        arr:   [1., inf, inf, -1.,   0.] -> [1., nan, nan, -1.,   0.]
-        other: [1., -1.,  0., 0.1, -0.1] -> [1., nan, nan, 0.1, -0.1]
-    """
-    pass
-
-
-@sdc_overload(_sdc_pandas_arr_align)
-def _sdc_pandas_arr_align_overload(arr, other_arr, size='max', finiteness=False):
-    ty_checker = TypeChecker('Function sdc.common_functions._sdc_pandas_arr_align().')
-    ty_checker.check(arr, types.Array)
-    ty_checker.check(other_arr, types.Array)
-
-    str_types = (str, types.StringLiteral, types.UnicodeType, types.Omitted)
-    if not isinstance(size, str_types):
-        ty_checker.raise_exc(size, 'str', 'size')
-
-    if not isinstance(finiteness, (bool, types.Boolean, types.Omitted)):
-        ty_checker.raise_exc(finiteness, 'bool', 'finiteness')
-
-    def _sdc_pandas_series_align_impl(arr, other_arr, size='max', finiteness=False):
-        if size != 'max' and size != 'min':
-            raise ValueError("Function sdc.common_functions._sdc_pandas_arr_align(). "
-                             "The object size\n expected: 'max' or 'min'")
-
-        arr_len, other_arr_len = len(arr), len(other_arr)
-        min_length = min(arr_len, other_arr_len)
-        length = max(arr_len, other_arr_len) if size == 'max' else min_length
-
-        aligned_arr = numpy.repeat([numpy.nan], length)
-        aligned_other_arr = numpy.repeat([numpy.nan], length)
-
-        chunks = parallel_chunks(min_length)
-        for i in numba.prange(len(chunks)):
-            chunk = chunks[i]
-            for idx in range(chunk.start, chunk.stop):
-                if not finiteness or (numpy.isfinite(arr[idx]) and numpy.isfinite(other_arr[idx])):
-                    aligned_arr[idx] = arr[idx]
-                    aligned_other_arr[idx] = other_arr[idx]
-                else:
-                    aligned_arr[idx] = aligned_other_arr[idx] = numpy.nan
-
-        return aligned_arr, aligned_other_arr
-
-    return _sdc_pandas_series_align_impl
-
-
-def _sdc_pandas_series_align(series, other, size='max', finiteness=False):
-    """
-    Align series and other series by
-        size where size of output series is max/min size of input series
-        finiteness where all the infinite and matched finite values are replaced with nans, e.g.
-        series: [1., inf, inf, -1.,   0.] -> [1., nan, nan, -1.,   0.]
-        other:  [1., -1.,  0., 0.1, -0.1] -> [1., nan, nan, 0.1, -0.1]
-    """
-    pass
-
-
-@sdc_overload(_sdc_pandas_series_align)
-def _sdc_pandas_series_align_overload(series, other, size='max', finiteness=False):
-    ty_checker = TypeChecker('Function sdc.common_functions._sdc_pandas_series_align().')
-    ty_checker.check(series, SeriesType)
-    ty_checker.check(other, SeriesType)
-
-    str_types = (str, types.StringLiteral, types.UnicodeType, types.Omitted)
-    if not isinstance(size, str_types):
-        ty_checker.raise_exc(size, 'str', 'size')
-
-    if not isinstance(finiteness, (bool, types.Boolean, types.Omitted)):
-        ty_checker.raise_exc(finiteness, 'bool', 'finiteness')
-
-    def _sdc_pandas_series_align_impl(series, other, size='max', finiteness=False):
-        if size != 'max' and size != 'min':
-            raise ValueError("Function sdc.common_functions._sdc_pandas_series_align(). "
-                             "The object size\n expected: 'max' or 'min'")
-
-        aligned_arr, aligned_other_arr = _sdc_pandas_arr_align(series._data, other._data,
-                                                               size=size, finiteness=finiteness)
-        aligned = pandas.Series(aligned_arr, name=series._name)
-        aligned_other = pandas.Series(aligned_other_arr, name=other._name)
-
-        return aligned, aligned_other
-
-    return _sdc_pandas_series_align_impl
-
-
 def _sdc_asarray(data):
     pass
 
@@ -731,3 +649,60 @@ def _almost_equal_overload(x, y):
         return abs(x - y) <= numpy.finfo(common_dtype).eps
 
     return _almost_equal_impl
+
+
+def sdc_reindex_series(arr, index, name, by_index):
+    pass
+
+
+@sdc_overload(sdc_reindex_series, jit_options={'parallel': True})
+def sdc_reindex_series_overload(arr, index, name, by_index):
+    """ Reindexes series data by new index following the logic of pandas.core.indexing.check_bool_indexer """
+
+    data_dtype, index_dtype = arr.dtype, index.dtype
+    data_is_str_arr = isinstance(arr.dtype, types.UnicodeType)
+
+    def sdc_reindex_series_impl(arr, index, name, by_index):
+        if data_is_str_arr == True:  # noqa
+            _res_data = [''] * len(by_index)
+            res_data_nan_mask = numpy.zeros(len(by_index), dtype=types.bool_)
+        else:
+            _res_data = numpy.empty(len(by_index), dtype=data_dtype)
+
+        # build a dict of self.index values to their positions:
+        map_index_to_position = Dict.empty(
+            key_type=index_dtype,
+            value_type=types.int32
+        )
+
+        for i, value in enumerate(index):
+            if value in map_index_to_position:
+                raise ValueError("cannot reindex from a duplicate axis")
+            else:
+                map_index_to_position[value] = i
+
+        index_mismatch = 0
+        for i in numba.prange(len(by_index)):
+            if by_index[i] in map_index_to_position:
+                pos_in_self = map_index_to_position[by_index[i]]
+                _res_data[i] = arr[pos_in_self]
+                if data_is_str_arr == True:  # noqa
+                    res_data_nan_mask[i] = isna(arr, i)
+            else:
+                index_mismatch += 1
+        if index_mismatch:
+            msg = "Unalignable boolean Series provided as indexer " + \
+                  "(index of the boolean Series and of the indexed object do not match)."
+            raise IndexingError(msg)
+
+        if data_is_str_arr == True:  # noqa
+            res_data = create_str_arr_from_list(_res_data)
+            str_arr_set_na_by_mask(res_data, res_data_nan_mask)
+        else:
+            res_data = _res_data
+
+        return pandas.Series(data=res_data, index=by_index, name=name)
+
+    return sdc_reindex_series_impl
+
+    return None
