@@ -34,6 +34,7 @@ Attributes/Operators
    Series.name
    Series.put
    Series.getitem
+   Series.setitem
 
 Type Conversions
 ----------------
