@@ -160,32 +160,13 @@ if not config_pipeline_hpat_default:
     @overload(DataFrame)
     def pd_dataframe_overload(data, index=None, columns=None, dtype=None, copy=False):
         """
-        Two-dimensional size-mutable, potentially heterogeneous tabular data
-        structure with labeled axes (rows and columns). Arithmetic operations
-        align on both row and column labels. Can be thought of as a dict-like
-        container for Series objects. The primary pandas data structure.
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+        Pandas API: pandas.DataFrame
 
-        Parameters
-        ----------
-        data : dict
-            Dict can contain Series, arrays, constants, or list-like objects
-
-        index : array-like
-            Index to use for resulting frame. Will default to RangeIndex if
-            no indexing information part of input data and no index provided
-
-        columns : Index or array-like
-            Column labels to use for resulting frame. Will default to
-            RangeIndex (0, 1, 2, ..., n) if no column labels are provided
-            *unsupported*
-
-        dtype : dtype, default None
-            Data type to force. Only a single dtype is allowed. If None, infer
-            *unsupported*
-
-        copy : boolean, default False
-            Copy data from inputs. Only affects DataFrame / 2d ndarray input
-            *unsupported*
+        Limitations
+        -----------
+        - Parameters `dtype` and `copy` are currently unsupported by Intel Scalable Dataframe Compiler.
         """
 
         ty_checker = TypeChecker('Method DataFrame')
