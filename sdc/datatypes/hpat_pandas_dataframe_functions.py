@@ -1045,7 +1045,7 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     --------
     .. literalinclude:: ../../../examples/dataframe/dataframe_count.py
        :language: python
-       :lines: 36-
+       :lines: 38-
        :caption: Count non-NA cells for each column or row.
        :name: ex_dataframe_count
 
@@ -1053,13 +1053,10 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
        :cwd: ../../../examples
 
     .. seealso::
-
         :ref:`Series.count <pandas.Series.count>`
             Number of non-NA elements in a Series.
-
         :ref:`DataFrame.shape <pandas.DataFrame.shape>`
             Number of DataFrame rows and columns (including NA elements).
-
         :ref:`DataFrame.isna <pandas.DataFrame.isna>`
             Boolean same-sized DataFrame showing places of NA elements.
 
