@@ -298,11 +298,11 @@ def sdc_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
 
             if self_is_series == True:  # noqa
                 result_data = numpy.empty(len(self._data), dtype=numpy.float64)
-                result_data[:] = self._data + numpy.float64(other)
+                result_data[:] = self._data / numpy.float64(other)
                 return pandas.Series(result_data, index=self._index, name=self._name)
             else:
                 result_data = numpy.empty(len(other._data), dtype=numpy.float64)
-                result_data[:] = numpy.float64(self) + other._data
+                result_data[:] = numpy.float64(self) / other._data
                 return pandas.Series(result_data, index=other._index, name=other._name)
 
         return _series_div_scalar_impl
@@ -318,7 +318,7 @@ def sdc_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
 
                 if (len(self._data) == len(other._data)):
                     result_data = numpy_like.astype(self._data, numpy.float64)
-                    result_data = result_data + other._data
+                    result_data = result_data / other._data
                     return pandas.Series(result_data)
                 else:
                     left_size, right_size = len(self._data), len(other._data)
@@ -329,12 +329,12 @@ def sdc_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
                         result_data[:min_data_size] = self._data
                         for i in range(min_data_size, len(result_data)):
                             result_data[i] = _fill_value
-                        result_data = result_data + other._data
+                        result_data = result_data / other._data
                     else:
                         result_data[:min_data_size] = other._data
                         for i in range(min_data_size, len(result_data)):
                             result_data[i] = _fill_value
-                        result_data = self._data + result_data
+                        result_data = self._data / result_data
 
                     return pandas.Series(result_data)
 
@@ -356,7 +356,7 @@ def sdc_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
                     result_data = numpy.empty(len(self._data), dtype=numpy.float64)
-                    result_data[:] = self._data + other._data
+                    result_data[:] = self._data / other._data
 
                     if none_or_numeric_indexes == True:  # noqa
                         result_index = numpy_like.astype(left_index, numba_index_common_dtype)
@@ -374,7 +374,7 @@ def sdc_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
                     left_pos, right_pos = left_indexer[i], right_indexer[i]
                     left_values[i] = self._data[left_pos] if left_pos != -1 else _fill_value
                     right_values[i] = other._data[right_pos] if right_pos != -1 else _fill_value
-                result_data = left_values + right_values
+                result_data = left_values / right_values
                 return pandas.Series(result_data, joined_index)
 
             return _series_div_common_impl
@@ -2194,72 +2194,6 @@ def sdc_pandas_series_operator_add(self, other):
         return sdc_pandas_series_add(self, other)
 
     return sdc_pandas_series_operator_add_impl
-
-
-@sdc_overload(operator.div)
-def sdc_pandas_series_operator_div(self, other):
-    """
-    Pandas Series operator :attr:`pandas.Series.div` implementation
-
-    Note: Currently implemented for numeric Series only.
-        Differs from Pandas in returning Series with fixed dtype :obj:`float64`
-
-    .. only:: developer
-
-    **Test**: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op1*
-              python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op2*
-              python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_operator_div*
-
-    Parameters
-    ----------
-    series: :obj:`pandas.Series`
-        Input series
-    other: :obj:`pandas.Series` or :obj:`scalar`
-        Series or scalar value to be used as a second argument of binary operation
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-        The result of the operation
-    """
-
-    _func_name = 'Operator div().'
-
-    ty_checker = TypeChecker('Operator div().')
-    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
-    if not (self_is_series or other_is_series):
-        return None
-
-    # this overload is not for string series
-    self_is_string_series = self_is_series and isinstance(self.dtype, types.UnicodeType)
-    other_is_string_series = other_is_series and isinstance(other.dtype, types.UnicodeType)
-    if self_is_string_series or other_is_string_series:
-        return None
-
-    if not isinstance(self, (SeriesType, types.Number)):
-        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
-
-    if not isinstance(other, (SeriesType, types.Number)):
-        ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
-
-    operands_are_series = self_is_series and other_is_series
-    if operands_are_series:
-        none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
-                                   and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
-        if not series_indexes_comparable:
-            raise TypingError('{} Not implemented for series with not-comparable indexes. \
-            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
-
-    series_data_comparable = check_types_comparable(self, other)
-    if not series_data_comparable:
-        raise TypingError('{} Not supported for not-comparable operands. \
-        Given: self={}, other={}'.format(_func_name, self, other))
-
-    def sdc_pandas_series_operator_div_impl(self, other):
-        return sdc_pandas_series_div(self, other)
-
-    return sdc_pandas_series_operator_div_impl
 
 
 @sdc_overload(operator.sub)
