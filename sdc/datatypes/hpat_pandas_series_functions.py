@@ -1304,6 +1304,12 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
 
     Pandas API: pandas.Series.value_counts
 
+    Limitations
+    -----------
+    - Parameters ``normalize`` and ``bins`` are currently unsupported.
+    - Parameter ``dropna`` is unsupported for String Series.
+    - Elements with the same count might appear in result in a different order than in Pandas.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_value_counts.py
@@ -1314,11 +1320,6 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
 
     .. command-output:: python ./series/series_value_counts.py
        :cwd: ../../../examples
-
-    Limitations
-    -----------
-    - Parameter bins and dropna for Strings are currently unsupported by Intel Scalable Dataframe Compiler
-    - Elements with the same count might appear in result in a different order than in Pandas
 
     .. seealso::
 
