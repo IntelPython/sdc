@@ -1858,11 +1858,7 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
 
     Limitations
     -----------
-    - Parameter freq is currently unsupported by Intel Scalable Dataframe Compiler
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``freq`` and ``axis`` are supported only with default values ``None`` and ``0`` respectively.
 
     Examples
     --------
@@ -1875,18 +1871,9 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
     .. command-output:: python ./series/series_shift.py
        :cwd: ../../../examples
 
-    .. seealso::
-
-        `pandas.absolute
-        <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Index.shift.html#pandas.Index.shift>`_
-            Shift index by desired number of time frequency increments.
-
-        `pandas.absolute
-        <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.tshift.html#pandas.Series.tshift>`_
-            Shift the time index, using the index’s frequency if available.
-
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.shift` implementation.
 
     .. only:: developer
