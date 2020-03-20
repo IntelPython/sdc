@@ -3374,6 +3374,7 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
 
         `numpy.percentile
         <https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html#numpy.percentile>`_
+            Compute the q-th percentile of the data along the specified axis.
 
 
     Intel Scalable Dataframe Compiler Developer Guide
