@@ -1192,32 +1192,31 @@ def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, num
 
     Limitations
     -----------
-    - Parameters skipna, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_std.py
        :language: python
        :lines: 27-
-       :caption: Return sample standard deviation over requested axis.
+       :caption: Returns sample standard deviation over Series.
        :name: ex_series_std
 
     .. command-output:: python ./series/series_std.py
        :cwd: ../../../examples
 
+    .. seealso::
+
+        :ref:`Series.var <pandas.Series.var>`
+            Returns unbiased variance over Series.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.std` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_unboxing
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_str
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_unsupported_params
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_std
     """
 
     _func_name = 'Method std().'
@@ -1474,32 +1473,31 @@ def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_var.py
        :language: python
        :lines: 27-
-       :caption: Return unbiased variance over requested axis.
+       :caption: Returns unbiased variance over Series.
        :name: ex_series_var
 
     .. command-output:: python ./series/series_var.py
        :cwd: ../../../examples
 
+    .. seealso::
+
+        :ref:`Series.std <pandas.Series.std>`
+            Returns sample standard deviation over Series.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.var` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_unboxing
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_str
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_unsupported_params
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_var
     """
 
     _func_name = 'Method var().'
@@ -1860,11 +1858,7 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
 
     Limitations
     -----------
-    - Parameter freq is currently unsupported by Intel Scalable Dataframe Compiler
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``freq`` and ``axis`` are supported only with default values ``None`` and ``0`` respectively.
 
     Examples
     --------
@@ -1877,18 +1871,9 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
     .. command-output:: python ./series/series_shift.py
        :cwd: ../../../examples
 
-    .. seealso::
-
-        `pandas.absolute
-        <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Index.shift.html#pandas.Index.shift>`_
-            Shift index by desired number of time frequency increments.
-
-        `pandas.absolute
-        <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.tshift.html#pandas.Series.tshift>`_
-            Shift the time index, using the index’s frequency if available.
-
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.shift` implementation.
 
     .. only:: developer
@@ -3644,29 +3629,26 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``axis``, ``level`` and ``numeric_only`` \
+        are currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_mean.py
        :language: python
        :lines: 27-
-       :caption: Return the mean of the values for the requested axis.
+       :caption: Return the mean of the values.
        :name: ex_series_mean
 
     .. command-output:: python ./series/series_mean.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.mean` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_mean*
+        Test: python -m sdc.runtests sdc.tests.test_series -k series_mean
     """
 
     _func_name = 'Method mean().'
