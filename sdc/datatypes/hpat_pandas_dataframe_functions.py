@@ -1792,7 +1792,8 @@ def df_getitem_tuple_at_codegen(self, row, col):
                        '    return res_data.at[row]',
                        "  raise IndexingError('Index is out of bounds for axis')"]
 
-    raise IndexingError('Index is out of bounds for axis')
+    else:
+        raise IndexingError('Index is out of bounds for axis')
 
     func_text = '\n'.join(func_lines)
 
