@@ -1836,7 +1836,12 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
+
     Pandas API: pandas.DataFrame.pct_change
+
+    Limitations
+    -----------
+    Parameters ``limit`` and ``freq`` are unsupported.
 
     Examples
     --------
@@ -1849,6 +1854,19 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     .. command-output:: python ./dataframe/dataframe_pct_change.py
         :cwd: ../../../examples
 
+    .. seealso::
+
+        :ref:`Series.diff <pandas.Series.diff>`
+            Compute the difference of two elements in a Series.
+
+        :ref:`DataFrame.diff <pandas.DataFrame.diff>`
+            Compute the difference of two elements in a DataFrame.
+
+        :ref:`Series.shift <pandas.Series.shift>`
+            Shift the index by some number of periods.
+
+        :ref:`DataFrame.shift <pandas.DataFrame.shift>`
+            Shift the index by some number of periods.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -1857,24 +1875,6 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     .. only:: developer
 
       Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_pct_change*
-
-    Parameters
-    -----------
-    df: :class:`pandas.DataFrame`
-      input arg
-    periods: :obj:`int`, default 1
-        Periods to shift for forming percent change.
-    fill_method: :obj:`str`, default 'pad'
-        How to handle NAs before computing percent changes.
-    limit:
-      *unsupported*
-    freq:
-      *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series` or `pandas.DataFrame`
-      Percentage change between the current and a prior element.
     """
 
     name = 'pct_change'

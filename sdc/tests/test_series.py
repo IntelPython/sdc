@@ -274,6 +274,10 @@ def isupper_usecase(series):
     return series.str.isupper()
 
 
+def upper_usecase(series):
+    return series.str.upper()
+
+
 def strip_usecase(series, to_strip=None):
     return series.str.strip(to_strip)
 
@@ -2929,6 +2933,15 @@ class TestSeries(
         ref_result = test_impl(series, width)
         pd.testing.assert_series_equal(jit_result, ref_result)
 
+    def test_series_str_center_with_none(self):
+        def test_impl(series, width, fillchar):
+            return series.str.center(width, fillchar)
+
+        cfunc = self.jit(test_impl)
+        idx = ['City 1', 'City 2', 'City 3', 'City 4', 'City 5', 'City 6', 'City 7', 'City 8']
+        s = pd.Series(['New_York', 'Lisbon', np.nan, 'Tokyo', 'Paris', None, 'Munich', None], index=idx)
+        pd.testing.assert_series_equal(cfunc(s, width=13, fillchar='*'), test_impl(s, width=13, fillchar='*'))
+
     def test_series_str_endswith(self):
         def test_impl(series, pat):
             return series.str.endswith(pat)
@@ -3079,6 +3092,15 @@ class TestSeries(
             ref_result = pyfunc(series, width)
             pd.testing.assert_series_equal(jit_result, ref_result)
 
+    def test_series_str_rjust_with_none(self):
+        def test_impl(series, width, fillchar):
+            return series.str.rjust(width, fillchar)
+
+        cfunc = self.jit(test_impl)
+        idx = ['City 1', 'City 2', 'City 3', 'City 4', 'City 5', 'City 6', 'City 7', 'City 8']
+        s = pd.Series(['New_York', 'Lisbon', np.nan, 'Tokyo', 'Paris', None, 'Munich', None], index=idx)
+        pd.testing.assert_series_equal(cfunc(s, width=13, fillchar='*'), test_impl(s, width=13, fillchar='*'))
+
     def test_series_str_startswith(self):
         def test_impl(series, pat):
             return series.str.startswith(pat)
@@ -3216,6 +3238,15 @@ class TestSeries(
             with self.subTest(data=data):
                 s = pd.Series(data)
                 pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_upper_str(self):
+        sdc_func = self.jit(upper_usecase)
+        test_data = [test_global_input_data_unicode_kind4,
+                     ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
+        for data in test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), upper_usecase(s))
 
     def test_series_swapcase_str(self):
         def test_impl(S):
@@ -6031,8 +6062,8 @@ class TestSeries(
         cfunc = self.jit(isupper_usecase)
         test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
         for data in test_data:
-            S = pd.Series(data)
-            pd.testing.assert_series_equal(cfunc(S), isupper_usecase(S))
+            s = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(s), isupper_usecase(s))
 
     @skip_sdc_jit('Old-style implementation returns string, but not series')
     def test_series_describe_numeric(self):
