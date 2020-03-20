@@ -342,6 +342,11 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
 
     Pandas API: pandas.DataFrame.append
 
+    Limitations
+    -----------
+     - Parameters ``ignore_index``, ``verify_integrity`` and ``sort`` are unsupported.
+     - Parameter ``other`` can be only :obj:`pandas.DataFrame`.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/dataframe/dataframe_append.py
@@ -354,11 +359,6 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     .. command-output:: python ./dataframe/dataframe_append.py
         :cwd: ../../../examples
 
-    .. note::
-        Parameter ignore_index, verify_integrity, sort are currently unsupported
-        by Intel Scalable Dataframe Compiler
-        Currently only pandas.DataFrame is supported as "other" parameter
-
     .. seealso::
         `pandas.concat <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.concat.html>`_
             General function to concatenate DataFrame or Series objects.
@@ -368,22 +368,6 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     Pandas DataFrame method :meth:`pandas.DataFrame.append` implementation.
     .. only:: developer
     Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_append*
-    Parameters
-    -----------
-    df: :obj:`pandas.DataFrame`
-        input arg
-    other: :obj:`pandas.DataFrame` object or :obj:`pandas.Series` or :obj:`dict`
-        The data to append
-    ignore_index: :obj:`bool`
-        *unsupported*
-    verify_integrity: :obj:`bool`
-        *unsupported*
-    sort: :obj:`bool`
-        *unsupported*
-    Returns
-    -------
-    :obj: `pandas.DataFrame`
-        return DataFrame with appended rows to the end
     """
 
     _func_name = 'append'
