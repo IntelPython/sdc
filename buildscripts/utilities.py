@@ -129,10 +129,6 @@ class SDC_Build_Utilities:
             print(f'{time.strftime("%d/%m/%Y %H:%M:%S")}: {self.line_double}', flush=True)
         print(f'{time.strftime("%d/%m/%Y %H:%M:%S")}: {msg}', flush=True)
 
-    def get_built_package(self):
-        conda_package = list(self.src_path.glob('**/sdc*.tar.bz2'))[0]
-        return conda_package
-
 
 """
 Create conda environment with desired python and packages
