@@ -1780,7 +1780,7 @@ def df_getitem_tuple_at_codegen(self, row, col):
         if self.columns[i] == col:
             check_col = True
             col_idx = i
-    if check_col == True:
+    if check_col == True:  # noqa
         func_lines += ['  row, _ = idx',
                        '  check_row = False',
                        '  for i in prange(len(self._dataframe.index)):',
