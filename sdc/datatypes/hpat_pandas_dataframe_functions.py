@@ -1204,6 +1204,7 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
 
     Limitations
     -----------
+    - Parameters ``labels``, ``axis``, ``index``, ``level`` and ``inplace`` are currently unsupported.
     - Parameter ``columns`` is required and is expected to be a Literal value with one column name
     or Tuple with columns names.
     - Supported ``errors`` can be {``raise``, ``ignore``}, default ``raise``. If ``ignore``, suppress error and only
