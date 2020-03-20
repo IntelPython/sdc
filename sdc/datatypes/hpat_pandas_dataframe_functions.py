@@ -1759,6 +1759,162 @@ def sdc_pandas_dataframe_getitem(self, idx):
     ty_checker.raise_exc(idx, expected_types, 'idx')
 
 
+def df_getitem_int_iloc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_int_iloc_impl(self, idx):
+        if -1 < idx < len(self._dataframe.index):
+            data_0 = pandas.Series(self._dataframe._data[0])
+            result_0 = data_0.iat[idx]
+            data_1 = pandas.Series(self._dataframe._data[1])
+            result_1 = data_1.iat[idx]
+            return pandas.Series(data=[result_0, result_1], index=['A', 'B'], name=str(idx))
+        raise IndexingError('Index is out of bounds for axis')
+    """
+    func_lines = ['def _df_getitem_int_iloc_impl(self, idx):',
+                  '  if -1 < idx < len(self._dataframe.index):']
+    results = []
+    index = []
+    name = df_name_codegen_iloc(self)
+    for i, c in enumerate(self.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{i}])",
+                       f"    {result_c} = data_{i}.iat[idx]"]
+        results.append(result_c)
+        index.append(c)
+    data = ', '.join(col for col in results)
+    func_lines += [f"    return pandas.Series(data=[{data}], index={index}, name=str({name}))",
+                   f"  raise IndexingError('Index is out of bounds for axis')"]
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy, 'IndexingError': IndexingError}
+
+    return func_text, global_vars
+
+
+def df_getitem_slice_iloc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_slice_iloc_impl(self, idx):
+            data_0 = pandas.Series(self._dataframe._data[0])
+            result_0 = data_0.iloc[idx]
+            data_1 = pandas.Series(self._dataframe._data[1])
+            result_1 = data_1.iloc[idx]
+            return pandas.DataFrame(data={"A": result_0, "B": result_1}, index=self._dataframe.index[idx])                
+    """
+    func_lines = ['def _df_getitem_slice_iloc_impl(self, idx):']
+    results = []
+    index = 'self._dataframe.index[idx]'
+    name = df_name_codegen_iloc(self)
+    for i, c in enumerate(self.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"  data_{i} = pandas.Series(self._dataframe._data[{i}])",
+                       f"  {result_c} = data_{i}.iloc[idx]"]
+        results.append((c, result_c))
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f"  return pandas.DataFrame(data={{{data}}}, index={index})"]
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy}
+
+    return func_text, global_vars
+
+
+def df_getitem_list_iloc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_list_iloc_impl(self, idx):
+            check_idx = False
+            for i in idx:
+                if -1 < i < len(self._dataframe.index):
+                    check_idx = True
+            if check_idx == True:
+                data_0 = pandas.Series(self._dataframe._data[0])
+                result_0 = data_0.iloc[numpy.array(idx)]
+                data_1 = pandas.Series(self._dataframe._data[1])
+                result_1 = data_1.iloc[numpy.array(idx)]
+                return pandas.DataFrame(data={"A": result_0, "B": result_1}, index=idx)
+            raise IndexingError('Index is out of bounds for axis')
+    """
+    func_lines = ['def _df_getitem_list_iloc_impl(self, idx):',
+                  '  check_idx = False',
+                  '  for i in idx:',
+                  '    if -1 < i < len(self._dataframe.index):',
+                  '      check_idx = True',
+                  '  if check_idx == True:']
+    results = []
+    index = '[self._dataframe._index[i] for i in idx]'
+    if isinstance(self.index, types.NoneType):
+        index = 'idx'
+    name = df_name_codegen_iloc(self)
+    for i, c in enumerate(self.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{i}])",
+                       f"    {result_c} = data_{i}.iloc[numpy.array(idx)]"]
+        results.append((c, result_c))
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f"    return pandas.DataFrame(data={{{data}}}, index={index})",
+                   f"  raise IndexingError('Index is out of bounds for axis')"]
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy, 'IndexingError': IndexingError}
+
+    return func_text, global_vars
+
+
+def df_getitem_list_bool_iloc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_list_bool_iloc_impl(self, idx):
+            if len(self._dataframe.index) == len(idx):
+                data_0 = self._dataframe._data[0]
+                result_0 = pandas.Series(data_0[numpy.array(idx)])
+                data_1 = self._dataframe._data[1]
+                result_1 = pandas.Series(data_1[numpy.array(idx)])
+                return pandas.DataFrame(data={"A": result_0, "B": result_1},
+                    index=self._dataframe.index[numpy.array(idx)])
+            raise IndexingError('Item wrong length')
+    """
+    func_lines = ['def _df_getitem_list_bool_iloc_impl(self, idx):']
+    results = []
+    index = 'self._dataframe.index[numpy.array(idx)]'
+    func_lines += ['  if len(self._dataframe.index) == len(idx):']
+    name = df_name_codegen_iloc(self)
+    for i, c in enumerate(self.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"    data_{i} = self._dataframe._data[{i}]",
+                       f"    {result_c} = pandas.Series(data_{i}[numpy.array(idx)])"]
+        results.append((c, result_c))
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f"    return pandas.DataFrame(data={{{data}}}, index={index})",
+                   f"  raise IndexingError('Item wrong length')"]
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy, 'IndexingError': IndexingError}
+
+    return func_text, global_vars
+
+
+def df_name_codegen_iloc(self):
+    if isinstance(self.index, types.NoneType):
+        return 'idx'
+
+    return 'self._dataframe._index[idx]'
+
+
+gen_df_getitem_iloc_int_impl = gen_impl_generator(
+    df_getitem_int_iloc_codegen, '_df_getitem_int_iloc_impl')
+
+gen_df_getitem_iloc_slice_impl = gen_impl_generator(
+    df_getitem_slice_iloc_codegen, '_df_getitem_slice_iloc_impl')
+
+gen_df_getitem_iloc_list_impl = gen_impl_generator(
+    df_getitem_list_iloc_codegen, '_df_getitem_list_iloc_impl')
+
+gen_df_getitem_iloc_list_bool_impl = gen_impl_generator(
+    df_getitem_list_bool_iloc_codegen, '_df_getitem_list_bool_iloc_impl')
+
+
 @sdc_overload(operator.getitem)
 def sdc_pandas_dataframe_accessor_getitem(self, idx):
     if not isinstance(self, DataFrameGetitemAccessorType):
@@ -1785,8 +1941,86 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
 
         raise TypingError('Operator getitem(). The index must be a row and literal column. Given: {}'.format(idx))
 
+    if accessor == 'iloc':
+        if isinstance(idx, types.SliceType):
+            return gen_df_getitem_iloc_slice_impl(self.dataframe, idx)
+
+        if (
+            isinstance(idx, (types.List, types.Array)) and
+            isinstance(idx.dtype, (types.Boolean, bool))
+        ):
+            return gen_df_getitem_iloc_list_bool_impl(self.dataframe, idx)
+
+        if isinstance(idx, types.List):
+            return gen_df_getitem_iloc_list_impl(self.dataframe, idx)
+
+        if isinstance(idx, types.Integer):
+            return gen_df_getitem_iloc_int_impl(self.dataframe, idx)
+
+        if isinstance(idx, (types.Tuple, types.UniTuple)):
+            def df_getitem_tuple_iat_impl(self, idx):
+                return self._dataframe.iat[idx]
+
+            return df_getitem_tuple_iat_impl
+
     raise TypingError('Operator getitem(). Unknown accessor. Only "loc", "iloc", "at", "iat" are supported.\
                       Given: {}'.format(accessor))
+
+
+@sdc_overload_attribute(DataFrameType, 'iloc')
+def sdc_pandas_dataframe_iloc(self):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.DataFrame.iloc
+
+    Limitations
+    -----------
+    - Parameter 'name' in new DataFrame can be String only
+    - Column can be literal value only, in DataFrame.iloc[row, column]
+    - Iloc works with basic cases only: an integer, a list or array of integers,
+        a slice object with ints, a boolean array
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_iloc.py
+       :language: python
+       :lines: 27-
+       :caption: Get value at specified index position.
+       :name: ex_dataframe_iloc
+
+    .. command-output:: python ./dataframe/dataframe_iloc.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Fast integer location scalar accessor.
+
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Purely label-location based indexer for selection by label.
+
+        :ref:`Series.iloc <pandas.Series.iloc>`
+            Purely integer-location based indexing for selection by position.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.DataFrame.iloc` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_iloc*
+    """
+
+    _func_name = 'Attribute iloc().'
+
+    if not isinstance(self, DataFrameType):
+        raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(_func_name, self))
+
+    def sdc_pandas_dataframe_iloc_impl(self):
+        return dataframe_getitem_accessor_init(self, 'iloc')
+
+    return sdc_pandas_dataframe_iloc_impl
 
 
 @sdc_overload_attribute(DataFrameType, 'iat')
