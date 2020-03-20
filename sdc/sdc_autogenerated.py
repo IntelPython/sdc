@@ -2051,7 +2051,10 @@ def sdc_pandas_series_operator_add(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_add(self, other)
+    def sdc_pandas_series_operator_add_impl(self, other):
+        return sdc_pandas_series_add(self, other)
+
+    return sdc_pandas_series_operator_add_impl
 
 
 @sdc_overload(operator.sub)
@@ -2114,7 +2117,10 @@ def sdc_pandas_series_operator_sub(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_sub(self, other)
+    def sdc_pandas_series_operator_sub_impl(self, other):
+        return sdc_pandas_series_sub(self, other)
+
+    return sdc_pandas_series_operator_sub_impl
 
 
 @sdc_overload(operator.mul)
@@ -2177,7 +2183,10 @@ def sdc_pandas_series_operator_mul(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_mul(self, other)
+    def sdc_pandas_series_operator_mul_impl(self, other):
+        return sdc_pandas_series_mul(self, other)
+
+    return sdc_pandas_series_operator_mul_impl
 
 
 @sdc_overload(operator.truediv)
@@ -2240,7 +2249,10 @@ def sdc_pandas_series_operator_truediv(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_truediv(self, other)
+    def sdc_pandas_series_operator_truediv_impl(self, other):
+        return sdc_pandas_series_truediv(self, other)
+
+    return sdc_pandas_series_operator_truediv_impl
 
 
 @sdc_overload(operator.floordiv)
@@ -2303,7 +2315,10 @@ def sdc_pandas_series_operator_floordiv(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_floordiv(self, other)
+    def sdc_pandas_series_operator_floordiv_impl(self, other):
+        return sdc_pandas_series_floordiv(self, other)
+
+    return sdc_pandas_series_operator_floordiv_impl
 
 
 @sdc_overload(operator.mod)
@@ -2366,7 +2381,10 @@ def sdc_pandas_series_operator_mod(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_mod(self, other)
+    def sdc_pandas_series_operator_mod_impl(self, other):
+        return sdc_pandas_series_mod(self, other)
+
+    return sdc_pandas_series_operator_mod_impl
 
 
 @sdc_overload(operator.pow)
@@ -2429,7 +2447,10 @@ def sdc_pandas_series_operator_pow(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_pow(self, other)
+    def sdc_pandas_series_operator_pow_impl(self, other):
+        return sdc_pandas_series_pow(self, other)
+
+    return sdc_pandas_series_operator_pow_impl
 
 
 @sdc_overload(operator.lt)
@@ -2482,7 +2503,10 @@ def sdc_pandas_series_operator_lt(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_lt(self, other)
+    def sdc_pandas_series_operator_lt_impl(self, other):
+        return sdc_pandas_series_lt(self, other)
+
+    return sdc_pandas_series_operator_lt_impl
 
 
 @sdc_overload(operator.gt)
@@ -2535,7 +2559,10 @@ def sdc_pandas_series_operator_gt(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_gt(self, other)
+    def sdc_pandas_series_operator_gt_impl(self, other):
+        return sdc_pandas_series_gt(self, other)
+
+    return sdc_pandas_series_operator_gt_impl
 
 
 @sdc_overload(operator.le)
@@ -2588,7 +2615,10 @@ def sdc_pandas_series_operator_le(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_le(self, other)
+    def sdc_pandas_series_operator_le_impl(self, other):
+        return sdc_pandas_series_le(self, other)
+
+    return sdc_pandas_series_operator_le_impl
 
 
 @sdc_overload(operator.ge)
@@ -2641,7 +2671,10 @@ def sdc_pandas_series_operator_ge(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_ge(self, other)
+    def sdc_pandas_series_operator_ge_impl(self, other):
+        return sdc_pandas_series_ge(self, other)
+
+    return sdc_pandas_series_operator_ge_impl
 
 
 @sdc_overload(operator.ne)
@@ -2694,7 +2727,10 @@ def sdc_pandas_series_operator_ne(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_ne(self, other)
+    def sdc_pandas_series_operator_ne_impl(self, other):
+        return sdc_pandas_series_ne(self, other)
+
+    return sdc_pandas_series_operator_ne_impl
 
 
 @sdc_overload(operator.eq)
@@ -2747,7 +2783,10 @@ def sdc_pandas_series_operator_eq(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_eq(self, other)
+    def sdc_pandas_series_operator_eq_impl(self, other):
+        return sdc_pandas_series_eq(self, other)
+
+    return sdc_pandas_series_operator_eq_impl
 
 
 @sdc_overload(operator.lt)

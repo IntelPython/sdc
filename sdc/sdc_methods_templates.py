@@ -393,7 +393,10 @@ def sdc_pandas_series_operator_binop(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_binop(self, other)
+    def sdc_pandas_series_operator_binop_impl(self, other):
+        return sdc_pandas_series_binop(self, other)
+
+    return sdc_pandas_series_operator_binop_impl
 
 
 def sdc_pandas_series_operator_comp_binop(self, other):
@@ -445,7 +448,10 @@ def sdc_pandas_series_operator_comp_binop(self, other):
         raise TypingError('{} Not supported for not-comparable operands. \
         Given: self={}, other={}'.format(_func_name, self, other))
 
-    return sdc_pandas_series_comp_binop(self, other)
+    def sdc_pandas_series_operator_comp_binop_impl(self, other):
+        return sdc_pandas_series_comp_binop(self, other)
+
+    return sdc_pandas_series_operator_comp_binop_impl
 
 
 def sdc_str_arr_operator_comp_binop(self, other):

@@ -2442,7 +2442,7 @@ def hpat_pandas_series_notna(self):
         return hpat_pandas_series_notna_impl
 
 
-@sdc_overload_method(SeriesType, 'ne')
+# @sdc_overload_method(SeriesType, 'ne')
 def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -2506,7 +2506,7 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
-@sdc_overload_method(SeriesType, 'add')
+# @sdc_overload_method(SeriesType, 'add')
 def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -2678,7 +2678,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
     return None
 
 
-@sdc_overload_method(SeriesType, 'sub')
+# @sdc_overload_method(SeriesType, 'sub')
 def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -3019,7 +3019,7 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
     return hpat_pandas_series_idxmax_impl
 
 
-@sdc_overload_method(SeriesType, 'mul')
+# @sdc_overload_method(SeriesType, 'mul')
 def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -3169,7 +3169,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
     ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
-@sdc_overload_method(SeriesType, 'truediv')
+# @sdc_overload_method(SeriesType, 'truediv')
 def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -3245,7 +3245,7 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
     ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
-@sdc_overload_method(SeriesType, 'floordiv')
+# @sdc_overload_method(SeriesType, 'floordiv')
 def hpat_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -3313,7 +3313,7 @@ def hpat_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0
     ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
-@sdc_overload_method(SeriesType, 'pow')
+# @sdc_overload_method(SeriesType, 'pow')
 def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -3817,7 +3817,7 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
     return hpat_pandas_series_mean_impl
 
 
-@sdc_overload_method(SeriesType, 'mod')
+# @sdc_overload_method(SeriesType, 'mod')
 def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -3881,7 +3881,7 @@ def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
     ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
-@sdc_overload_method(SeriesType, 'eq')
+# @sdc_overload_method(SeriesType, 'eq')
 def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -3945,7 +3945,7 @@ def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
     ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
-@sdc_overload_method(SeriesType, 'ge')
+# @sdc_overload_method(SeriesType, 'ge')
 def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -4103,7 +4103,7 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
     return hpat_pandas_series_idxmin_impl
 
 
-@sdc_overload_method(SeriesType, 'lt')
+# @sdc_overload_method(SeriesType, 'lt')
 def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -4234,7 +4234,7 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
     return None
 
 
-@sdc_overload_method(SeriesType, 'gt')
+# @sdc_overload_method(SeriesType, 'gt')
 def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -4298,7 +4298,7 @@ def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
     ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
-@sdc_overload_method(SeriesType, 'le')
+# @sdc_overload_method(SeriesType, 'le')
 def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
     """
     Intel Scalable Dataframe Compiler User Guide
