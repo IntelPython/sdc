@@ -30,11 +30,11 @@
 '''
 
 
+import numba
+import numpy
 import operator
 import pandas
-import numpy
 import sdc
-
 
 from pandas.core.indexing import IndexingError
 
@@ -58,12 +58,13 @@ from sdc.datatypes.common_functions import SDCLimitation
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
-from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby
+from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby, merge_groupby_dicts
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
 from sdc.hiframes.api import isna
 from sdc.functions.numpy_like import getitem_by_mask
 from sdc.datatypes.common_functions import _sdc_take, sdc_reindex_series
+from sdc.utilities.prange_utils import parallel_chunks
 
 @sdc_overload_attribute(DataFrameType, 'index')
 def hpat_pandas_dataframe_index(df):
@@ -1903,17 +1904,32 @@ def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=Tru
     def sdc_pandas_dataframe_groupby_impl(self, by=None, axis=0, level=None, as_index=True, sort=True,
                                           group_keys=True, squeeze=False, observed=False):
 
-        grouped = Dict.empty(by_type, list_type)
         by_column_data = self._data[column_id]
-        for i in numpy.arange(len(by_column_data)):
-            if isna(by_column_data, i):
-                continue
-            value = by_column_data[i]
-            group_list = grouped.get(value, List.empty_list(types.int64))
-            group_list.append(i)
-            grouped[value] = group_list
+        chunks = parallel_chunks(len(by_column_data))
+        dict_parts = [Dict.empty(by_type, list_type) for _ in range(len(chunks))]
 
-        return init_dataframe_groupby(self, column_id, grouped, sort)
+        # filling separate dict of by_value -> positions for each chunk of initial array
+        for i in numba.prange(len(chunks)):
+            chunk = chunks[i]
+            res = dict_parts[i]
+            for j in range(chunk.start, chunk.stop):
+                if isna(by_column_data, j):
+                    continue
+                value = by_column_data[j]
+                group_list = res.get(value)
+                if group_list is None:
+                    new_group_list = List.empty_list(types.int64)
+                    new_group_list.append(j)
+                    res[value] = new_group_list
+                else:
+                    group_list.append(j)
+
+        # merging all dict parts into a single resulting dict
+        res_dict = dict_parts[0]
+        for i in range(1, len(chunks)):
+            res_dict = merge_groupby_dicts(res_dict, dict_parts[i])
+
+        return init_dataframe_groupby(self, column_id, res_dict, sort)
 
     return sdc_pandas_dataframe_groupby_impl
 
