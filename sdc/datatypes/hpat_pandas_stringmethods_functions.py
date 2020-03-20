@@ -1002,15 +1002,19 @@ def strip_usecase(s, to_strip):
 def gen_sdc_pandas_series_str_strip_impl(usecase):
     """Generate series.str.lstrip/rstrip/strip implementations based on usecase func"""
     def impl(self, to_strip=None):
+        mask = get_nan_mask(self._data._data)
         item_count = len(self._data)
-        result = [''] * item_count
+        res_list = [''] * item_count
 
         for it in range(item_count):
             item = self._data._data[it]
             if len(item) > 0:
-                result[it] = usecase(item, to_strip)
+                res_list[it] = usecase(item, to_strip)
             else:
-                result[it] = item
+                res_list[it] = item
+
+        str_arr = create_str_arr_from_list(res_list)
+        result = str_arr_set_na_by_mask(str_arr, mask)
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
@@ -1192,19 +1196,19 @@ stringmethods_funcs = {
         'method': hpat_pandas_stringmethods_strip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
-        'limitations': limitation_nans_unsupported
+        'limitations': ''
     },
     'lstrip': {
         'method': hpat_pandas_stringmethods_lstrip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
-        'limitations': limitation_nans_unsupported
+        'limitations': ''
     },
     'rstrip': {
         'method': hpat_pandas_stringmethods_rstrip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
-        'limitations': limitation_nans_unsupported
+        'limitations': ''
     }
 }
 
