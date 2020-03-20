@@ -89,6 +89,7 @@ class TestSeriesRollingMethods(TestBase):
             'count': (100, [8 * 10 ** 5]),
             'cov': (100, [4 * 10 ** 5]),
             'kurt': (100, [8 * 10 ** 5]),
+            'max': (100, [4 * 10 ** 5]),
             'mean': (100, [8 * 10 ** 5]),
             'min': (100, [4 * 10 ** 5]),
             'skew': (100, [8 * 10 ** 5]),
@@ -141,6 +142,9 @@ class TestSeriesRollingMethods(TestBase):
     def test_series_rolling_kurt(self):
         self._test_series_rolling_method('kurt')
 
+    def test_series_rolling_max(self):
+        self._test_series_rolling_method('max')
+
     def test_series_rolling_mean(self):
         self._test_series_rolling_method('mean')
 
@@ -162,7 +166,6 @@ class TestSeriesRollingMethods(TestBase):
 
 cases = [
     TC(name='apply', size=[10 ** 7], params='func=lambda x: np.nan if len(x) == 0 else x.mean()'),
-    TC(name='max', size=[10 ** 7]),
     TC(name='median', size=[10 ** 7]),
     TC(name='quantile', size=[10 ** 7], params='0.2'),
     TC(name='std', size=[10 ** 7]),
