@@ -688,8 +688,8 @@ def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, 
     if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
         ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-    if not (isinstance(ddof, types.Omitted) or ddof == 1):
-        ty_checker.raise_exc(ddof, 'unsupported', 'ddof')
+    if not (isinstance(ddof, (types.Omitted, types.Integer)) or ddof == 1):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
 
     if not (isinstance(min_count, types.Omitted) or min_count == 0):
         ty_checker.raise_exc(min_count, 'unsupported', 'min_count')
@@ -787,7 +787,7 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
     Limitations
     -----------
-    Parameters ``axis``, ``level``, ``ddof`` and ``numeric_only`` are unsupported.
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
     Examples
     --------
@@ -799,6 +799,14 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 
     .. command-output:: python ./dataframe/dataframe_std.py
        :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.std <pandas.Series.std>`
+            Returns sample standard deviation over Series.
+        :ref:`Series.var<pandas.Series.var>`
+            Returns unbiased variance over Series.
+        :ref:`DataFrame.var <pandas.DataFrame.var>`
+            Returns unbiased variance over DataFrame.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
