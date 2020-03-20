@@ -274,6 +274,10 @@ def isupper_usecase(series):
     return series.str.isupper()
 
 
+def upper_usecase(series):
+    return series.str.upper()
+
+
 def strip_usecase(series, to_strip=None):
     return series.str.strip(to_strip)
 
@@ -3235,6 +3239,15 @@ class TestSeries(
                 s = pd.Series(data)
                 pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
 
+    def test_series_upper_str(self):
+        sdc_func = self.jit(upper_usecase)
+        test_data = [test_global_input_data_unicode_kind4,
+                     ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
+        for data in test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), upper_usecase(s))
+
     def test_series_swapcase_str(self):
         def test_impl(S):
             return S.str.swapcase()
@@ -6049,8 +6062,8 @@ class TestSeries(
         cfunc = self.jit(isupper_usecase)
         test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
         for data in test_data:
-            S = pd.Series(data)
-            pd.testing.assert_series_equal(cfunc(S), isupper_usecase(S))
+            s = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(s), isupper_usecase(s))
 
     @skip_sdc_jit('Old-style implementation returns string, but not series')
     def test_series_describe_numeric(self):
