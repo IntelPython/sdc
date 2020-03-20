@@ -342,6 +342,11 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
 
     Pandas API: pandas.DataFrame.append
 
+    Limitations
+    -----------
+     - Parameters ``ignore_index``, ``verify_integrity`` and ``sort`` are unsupported.
+     - Parameter ``other`` can be only :obj:`pandas.DataFrame`.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/dataframe/dataframe_append.py
@@ -354,11 +359,6 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     .. command-output:: python ./dataframe/dataframe_append.py
         :cwd: ../../../examples
 
-    .. note::
-        Parameter ignore_index, verify_integrity, sort are currently unsupported
-        by Intel Scalable Dataframe Compiler
-        Currently only pandas.DataFrame is supported as "other" parameter
-
     .. seealso::
         `pandas.concat <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.concat.html>`_
             General function to concatenate DataFrame or Series objects.
@@ -368,22 +368,6 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     Pandas DataFrame method :meth:`pandas.DataFrame.append` implementation.
     .. only:: developer
     Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_append*
-    Parameters
-    -----------
-    df: :obj:`pandas.DataFrame`
-        input arg
-    other: :obj:`pandas.DataFrame` object or :obj:`pandas.Series` or :obj:`dict`
-        The data to append
-    ignore_index: :obj:`bool`
-        *unsupported*
-    verify_integrity: :obj:`bool`
-        *unsupported*
-    sort: :obj:`bool`
-        *unsupported*
-    Returns
-    -------
-    :obj: `pandas.DataFrame`
-        return DataFrame with appended rows to the end
     """
 
     _func_name = 'append'
@@ -1878,7 +1862,12 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
+
     Pandas API: pandas.DataFrame.pct_change
+
+    Limitations
+    -----------
+    Parameters ``limit`` and ``freq`` are unsupported.
 
     Examples
     --------
@@ -1891,6 +1880,19 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     .. command-output:: python ./dataframe/dataframe_pct_change.py
         :cwd: ../../../examples
 
+    .. seealso::
+
+        :ref:`Series.diff <pandas.Series.diff>`
+            Compute the difference of two elements in a Series.
+
+        :ref:`DataFrame.diff <pandas.DataFrame.diff>`
+            Compute the difference of two elements in a DataFrame.
+
+        :ref:`Series.shift <pandas.Series.shift>`
+            Shift the index by some number of periods.
+
+        :ref:`DataFrame.shift <pandas.DataFrame.shift>`
+            Shift the index by some number of periods.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -1899,24 +1901,6 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     .. only:: developer
 
       Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_pct_change*
-
-    Parameters
-    -----------
-    df: :class:`pandas.DataFrame`
-      input arg
-    periods: :obj:`int`, default 1
-        Periods to shift for forming percent change.
-    fill_method: :obj:`str`, default 'pad'
-        How to handle NAs before computing percent changes.
-    limit:
-      *unsupported*
-    freq:
-      *unsupported*
-
-    Returns
-    -------
-    :obj:`pandas.Series` or `pandas.DataFrame`
-      Percentage change between the current and a prior element.
     """
 
     name = 'pct_change'
