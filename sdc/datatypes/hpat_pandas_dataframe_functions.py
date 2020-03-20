@@ -743,7 +743,7 @@ def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     Limitations
     -----------
-    Parameters ``axis``, ``skipna``, ``level`` and ``numeric_only`` are unsupported.
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
     Examples
     --------
@@ -755,6 +755,10 @@ def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     .. command-output:: python ./dataframe/dataframe_mean.py
        :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.mean <pandas.Series.mean>`
+            Return the mean of the values for the Series.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
