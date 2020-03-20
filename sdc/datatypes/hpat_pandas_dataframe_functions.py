@@ -1204,9 +1204,9 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
 
     Limitations
     -----------
-    Parameter ``columns`` is required and is expected to be a Literal value with one column name
+    - Parameter ``columns`` is required and is expected to be a Literal value with one column name
     or Tuple with columns names.
-    Supported ``errors`` can be {``raise``, ``ignore``}, default ``raise``. If ``ignore``, suppress error and only
+    - Supported ``errors`` can be {``raise``, ``ignore``}, default ``raise``. If ``ignore``, suppress error and only
     existing labels are dropped.
 
     Examples
@@ -1235,35 +1235,7 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
     Pandas DataFrame method :meth:`pandas.DataFrame.drop` implementation.
     .. only:: developer
     Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_drop*
-    Parameters
-    -----------
-    df: :obj:`pandas.DataFrame`
-        input arg
-    labels: single label or list-like
-        Column labels to drop
-        *unsupported*
-    axis: :obj:`int` default 0
-        *unsupported*
-    index: single label or list-like
-        *unsupported*
-    columns: single label or list-like
-    level: :obj:`int` or :obj:`str`
-        For MultiIndex, level from which the labels will be removed.
-        *unsupported*
-    inplace: :obj:`bool` default False
-        *unsupported*
-    errors: :obj:`str` default 'raise'
-        If 'ignore', suppress error and only existing labels are dropped.
 
-    Returns
-    -------
-    :obj: `pandas.DataFrame`
-        DataFrame without the removed index or column labels.
-
-    Raises
-    -------
-    KeyError
-        If any of the labels is not found in the selected axis.
     """
 
     _func_name = 'drop'
