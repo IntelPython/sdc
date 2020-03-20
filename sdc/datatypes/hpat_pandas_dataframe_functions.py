@@ -2055,7 +2055,8 @@ def df_set_column_overload(self, key, value):
     Limitations
     -----------
     - Supported setting a column in a DataFrame through private method ``df._set_column(key, value)``.
-    - Unsupported change of the Parent DataFrame, returned new DataFrame.
+    - DataFrame passed into jit region as a parameter is not changed outside of the region.
+    New DataFrame should be returned from the region in this case.
     - Supported setting a column in a non-empty DataFrame as a 1D array only.
 
     .. literalinclude:: ../../../examples/dataframe/setitem/df_set_new_column.py
@@ -2070,7 +2071,7 @@ def df_set_column_overload(self, key, value):
     .. literalinclude:: ../../../examples/dataframe/setitem/df_set_existing_column.py
        :language: python
        :lines: 37-
-       :caption: Setting new column to the DataFrame.
+       :caption: Setting existing column to the DataFrame.
        :name: ex_dataframe_set_existing_column
 
     .. command-output:: python ./dataframe/setitem/df_set_existing_column.py
