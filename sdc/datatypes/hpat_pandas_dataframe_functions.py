@@ -943,7 +943,7 @@ def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_
 
     Limitations
     -----------
-    Parameters ``axis``, ``skipna``, ``level``, ``numeric_only`` and ``min_count`` are unsupported.
+    Parameters ``axis``, ``level``, ``numeric_only`` and ``min_count`` are unsupported.
 
     Examples
     --------
