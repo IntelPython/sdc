@@ -983,7 +983,7 @@ def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min
 
     Limitations
     -----------
-    Parameters ``axis``, ``skipna``, ``level``, ``numeric_only`` and ``min_count`` are unsupported.
+    Parameters ``axis``, ``level``, ``numeric_only`` and ``min_count`` are unsupported.
 
     Examples
     --------
@@ -995,6 +995,10 @@ def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min
 
     .. command-output:: python ./dataframe/dataframe_prod.py
        :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.prod <pandas.Series.prod>`
+            Returns the product of the values for the Series.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
