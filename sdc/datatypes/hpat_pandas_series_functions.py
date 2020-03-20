@@ -1192,32 +1192,31 @@ def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, num
 
     Limitations
     -----------
-    - Parameters skipna, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_std.py
        :language: python
        :lines: 27-
-       :caption: Return sample standard deviation over requested axis.
+       :caption: Returns sample standard deviation over Series.
        :name: ex_series_std
 
     .. command-output:: python ./series/series_std.py
        :cwd: ../../../examples
 
+    .. seealso::
+
+        :ref:`Series.var <pandas.Series.var>`
+            Returns unbiased variance over Series.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.std` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_unboxing
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_str
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_unsupported_params
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_std
     """
 
     _func_name = 'Method std().'
@@ -1474,32 +1473,31 @@ def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_var.py
        :language: python
        :lines: 27-
-       :caption: Return unbiased variance over requested axis.
+       :caption: Returns unbiased variance over Series.
        :name: ex_series_var
 
     .. command-output:: python ./series/series_var.py
        :cwd: ../../../examples
 
+    .. seealso::
+
+        :ref:`Series.std <pandas.Series.std>`
+            Returns sample standard deviation over Series.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.var` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_unboxing
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_str
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_unsupported_params
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_var
     """
 
     _func_name = 'Method var().'
