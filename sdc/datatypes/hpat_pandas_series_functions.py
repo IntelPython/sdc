@@ -263,7 +263,9 @@ def hpat_pandas_series_getitem(self, idx):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
-    Pandas API: pandas.Series.__getitem__
+    Pandas API: pandas.Series.getitem
+
+    Get value(s) of Series by key.
 
     Limitations
     -----------
@@ -277,49 +279,73 @@ def hpat_pandas_series_getitem(self, idx):
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_scalar_single_result.py
-       :language: python
-       :lines: 32-
-       :caption: Getting Pandas Series elements. Returns single value.
-       :name: ex_series_getitem
+        :language: python
+        :lines: 32-
+        :caption: Getting Pandas Series elements. Returns single value.
+        :name: ex_series_getitem
 
     .. command-output:: python ./series/series_getitem/series_getitem_scalar_single_result.py
        :cwd: ../../../examples
 
     .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_scalar_multiple_result.py
-       :language: python
-       :lines: 34-
-       :caption: Getting Pandas Series elements. Returns multiple value.
-       :name: ex_series_getitem
+        :language: python
+        :lines: 34-
+        :caption: Getting Pandas Series elements. Returns multiple value.
+        :name: ex_series_getitem
 
     .. command-output:: python ./series/series_getitem/series_getitem_scalar_multiple_result.py
        :cwd: ../../../examples
 
     .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_slice.py
-       :language: python
-       :lines: 35-
-       :caption: Getting Pandas Series elements by slice.
-       :name: ex_series_getitem
+        :language: python
+        :lines: 35-
+        :caption: Getting Pandas Series elements by slice.
+        :name: ex_series_getitem
 
     .. command-output:: python ./series/series_getitem/series_getitem_slice.py
        :cwd: ../../../examples
 
     .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_bool_array.py
-       :language: python
-       :lines: 37-
-       :caption: Getting Pandas Series elements by array of booleans.
-       :name: ex_series_getitem
+        :language: python
+        :lines: 37-
+        :caption: Getting Pandas Series elements by array of booleans.
+        :name: ex_series_getitem
 
     .. command-output:: python ./series/series_getitem/series_getitem_bool_array.py
        :cwd: ../../../examples
 
     .. literalinclude:: ../../../examples/series/series_getitem/series_getitem_series.py
-       :language: python
-       :lines: 36-
-       :caption: Getting Pandas Series elements by another Series.
-       :name: ex_series_getitem
+        :language: python
+        :lines: 36-
+        :caption: Getting Pandas Series elements by another Series.
+        :name: ex_series_getitem
 
     .. command-output:: python ./series/series_getitem/series_getitem_series.py
        :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.setitem <pandas.Series.setitem>`
+            Set value to Series by index
+        :ref:`Series.loc <pandas.Series.loc>`
+            Access a group of rows and columns by label(s) or a boolean array.
+        :ref:`Series.iloc <pandas.Series.iloc>`
+            Purely integer-location based indexing for selection by position.
+        :ref:`Series.at <pandas.Series.at>`
+            Access a single value for a row/column label pair.
+        :ref:`Series.iat <pandas.Series.iat>`
+            Access a single value for a row/column pair by integer position.
+        :ref:`DataFrame.getitem <pandas.DataFrame.getitem>`
+            Get data from a DataFrame by indexer.
+        :ref:`DataFrame.setitem <pandas.DataFrame.setitem>`
+            Set value to DataFrame by index
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Access a group of rows and columns by label(s) or a boolean array.
+        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+            Purely integer-location based indexing for selection by position.
+        :ref:`DataFrame.at <pandas.DataFrame.at>`
+            Access a single value for a row/column label pair.
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Access a single value for a row/column pair by integer position.
 
     .. todo:: Fix SDC behavior and add the expected output of the > python ./series_getitem.py to the docstring
 
