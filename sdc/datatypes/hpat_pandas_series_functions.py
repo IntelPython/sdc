@@ -3368,6 +3368,9 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
 
     .. seealso::
 
+        :ref:`core.window.Rolling.quantile <pandas.core.window.Rolling.quantile>`
+            Calculate the rolling quantile.
+
         `numpy.absolute <https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html#numpy.percentile>`_
 
 
