@@ -1067,9 +1067,10 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     *************************************************
 
     Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.
-    .. only:: developer
 
-    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_count*
+        .. only:: developer
+
+            Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_count*
     """
 
     name = 'count'
