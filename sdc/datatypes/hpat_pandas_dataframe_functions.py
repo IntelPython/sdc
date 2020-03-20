@@ -2071,7 +2071,7 @@ def df_set_column_overload(self, key, value):
     .. literalinclude:: ../../../examples/dataframe/setitem/df_set_existing_column.py
        :language: python
        :lines: 37-
-       :caption: Setting existing column to the DataFrame.
+       :caption: Setting data to existing column of the DataFrame.
        :name: ex_dataframe_set_existing_column
 
     .. command-output:: python ./dataframe/setitem/df_set_existing_column.py
