@@ -183,7 +183,7 @@ sdc_pandas_rolling_docstring_tmpl = """
 
     Limitations
     -----------
-    Parameters ``center``, ``win_type``, ``on``, ``axis`` and ``closed`` are supported only with its default values.
+    Parameters ``center``, ``win_type``, ``on``, ``axis`` and ``closed`` are supported only with default values.
 
     Examples
     --------
