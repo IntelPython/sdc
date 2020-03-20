@@ -194,10 +194,6 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
     ********************************************
     Pandas API: pandas.Series.str.center
 
-    Limitations
-    -----------
-    Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
-
     Examples
     --------
     .. literalinclude:: ../../../examples/series/str/series_str_center.py
@@ -238,10 +234,13 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
         ty_checker.raise_exc(fillchar, 'str', 'fillchar')
 
     def hpat_pandas_stringmethods_center_impl(self, width, fillchar=' '):
+        mask = get_nan_mask(self._data._data)
         item_count = len(self._data)
-        result = [''] * item_count
-        for idx, item in enumerate(self._data._data):
-            result[idx] = item.center(width, fillchar)
+        res_list = [''] * item_count
+        for idx in numba.prange(item_count):
+            res_list[idx] = self._data._data[idx].center(width, fillchar)
+        str_arr = create_str_arr_from_list(res_list)
+        result = str_arr_set_na_by_mask(str_arr, mask)
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
@@ -521,10 +520,6 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
     ********************************************
     Pandas API: pandas.Series.str.rjust
 
-    Limitations
-    -----------
-    Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
-
     Examples
     --------
     .. literalinclude:: ../../../examples/series/str/series_str_rjust.py
@@ -565,10 +560,13 @@ def hpat_pandas_stringmethods_rjust(self, width, fillchar=' '):
         ty_checker.raise_exc(fillchar, 'str', 'fillchar')
 
     def hpat_pandas_stringmethods_rjust_impl(self, width, fillchar=' '):
+        mask = get_nan_mask(self._data._data)
         item_count = len(self._data)
-        result = [''] * item_count
-        for idx, item in enumerate(self._data._data):
-            result[idx] = item.rjust(width, fillchar)
+        res_list = [''] * item_count
+        for idx in numba.prange(item_count):
+            res_list[idx] = self._data._data[idx].rjust(width, fillchar)
+        str_arr = create_str_arr_from_list(res_list)
+        result = str_arr_set_na_by_mask(str_arr, mask)
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
@@ -984,6 +982,31 @@ def hpat_pandas_stringmethods_casefold(self):
     return hpat_pandas_stringmethods_casefold_impl
 
 
+@sdc_overload_method(StringMethodsType, 'upper')
+def hpat_pandas_stringmethods_upper(self):
+    ty_checker = TypeChecker('Method upper().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_upper_impl(self):
+        mask = get_nan_mask(self._data._data)
+        item_count = len(self._data)
+        result = [''] * item_count
+
+        for it in numba.prange(item_count):
+            item = self._data._data[it]
+            if len(item) > 0:
+                result[it] = item.upper()
+            else:
+                result[it] = item
+
+        str_arr = create_str_arr_from_list(result)
+        result = str_arr_set_na_by_mask(str_arr, mask)
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_upper_impl
+
+
 @sdc_register_jitable
 def lstrip_usecase(s, to_strip):
     return s.lstrip(to_strip)
@@ -1002,15 +1025,19 @@ def strip_usecase(s, to_strip):
 def gen_sdc_pandas_series_str_strip_impl(usecase):
     """Generate series.str.lstrip/rstrip/strip implementations based on usecase func"""
     def impl(self, to_strip=None):
+        mask = get_nan_mask(self._data._data)
         item_count = len(self._data)
-        result = [''] * item_count
+        res_list = [''] * item_count
 
         for it in range(item_count):
             item = self._data._data[it]
             if len(item) > 0:
-                result[it] = usecase(item, to_strip)
+                res_list[it] = usecase(item, to_strip)
             else:
-                result[it] = item
+                res_list[it] = item
+
+        str_arr = create_str_arr_from_list(res_list)
+        result = str_arr_set_na_by_mask(str_arr, mask)
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
@@ -1192,20 +1219,26 @@ stringmethods_funcs = {
         'method': hpat_pandas_stringmethods_strip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
-        'limitations': limitation_nans_unsupported
+        'limitations': ''
     },
     'lstrip': {
         'method': hpat_pandas_stringmethods_lstrip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
-        'limitations': limitation_nans_unsupported
+        'limitations': ''
     },
     'rstrip': {
         'method': hpat_pandas_stringmethods_rstrip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
-        'limitations': limitation_nans_unsupported
-    }
+        'limitations': ''
+    },
+    'upper': {
+        'method': hpat_pandas_stringmethods_upper,
+        'caption': 'Convert strings in the Series to upper case.',
+        'seealso': seealso_transform_methods,
+        'limitations': ''
+    },
 }
 
 for name, data in stringmethods_funcs.items():
@@ -1217,7 +1250,7 @@ for name, data in stringmethods_funcs.items():
            }
     )
 
-_hpat_pandas_stringmethods_autogen_methods = ['upper', 'lower']
+_hpat_pandas_stringmethods_autogen_methods = ['lower']
 """
     This is the list of function which are autogenerated to be used from Numba directly.
 """
