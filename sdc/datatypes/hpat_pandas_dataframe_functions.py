@@ -265,6 +265,7 @@ def sdc_pandas_dataframe_append_codegen(df, other, _func_name, ignore_index_valu
         return pandas.DataFrame({"A": new_col_A, "B": new_col_B, "C": new_col_C)
     """
     indent = 4 * ' '
+    func_args = ['df', 'other']
 
     func_args = ['df', 'other'] + kwsparams2list(args)
 
@@ -351,8 +352,9 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=False, verify_integrity=
 
     Limitations
     -----------
-    Parameters verify_integrity, sort are unsupported.
-    Indexes of dataframes are expected to have comparable (both Numeric or String) types if parameter ignore_index
+    - Parameters ``verify_integrity`` and ``sort`` are unsupported.
+    - Parameter ``other`` can be only :obj:`pandas.DataFrame`.
+    - Indexes of dataframes are expected to have comparable (both Numeric or String) types if parameter ignore_index
     is set to False.
 
     Examples
@@ -376,22 +378,6 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=False, verify_integrity=
     Pandas DataFrame method :meth:`pandas.DataFrame.append` implementation.
     .. only:: developer
     Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_append*
-    Parameters
-    -----------
-    df: :obj:`pandas.DataFrame`
-        input arg
-    other: :obj:`pandas.DataFrame` object or :obj:`pandas.Series` or :obj:`dict`
-        The data to append
-    ignore_index: :obj:`bool`
-        *unsupported*
-    verify_integrity: :obj:`bool`
-        *unsupported*
-    sort: :obj:`bool`
-        *unsupported*
-    Returns
-    -------
-    :obj: `pandas.DataFrame`
-        return DataFrame with appended rows to the end
     """
 
     _func_name = 'append'
