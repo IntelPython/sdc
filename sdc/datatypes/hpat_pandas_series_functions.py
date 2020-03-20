@@ -4575,7 +4575,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     .. seealso::
 
-        `numpy.absolute
+        `numpy.ndarray.argsort
         <https://docs.scipy.org/doc/numpy/reference/generated/numpy.ndarray.argsort.html#numpy.ndarray.argsort>`_
             Return indices of the minimum values along the given axis.
 
