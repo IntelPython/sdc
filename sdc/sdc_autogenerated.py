@@ -58,22 +58,22 @@ def sdc_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_add.py
        :language: python
        :lines: 27-
-       :caption:
+       :caption: Getting the addition of Series and other
        :name: ex_series_add
 
     .. command-output:: python ./series/series_add.py
        :cwd: ../../../examples
 
-    .. note::
+    .. seealso::
 
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+        :ref:`Series.radd <pandas.Series.radd>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -215,6 +215,173 @@ def sdc_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
     return None
 
 
+@sdc_overload_method(SeriesType, 'div')
+def sdc_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.div
+
+    Limitations
+    -----------
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_div.py
+       :language: python
+       :lines: 27-
+       :caption: Element-wise division of one Series by another (binary operator div)
+       :name: ex_series_div
+
+    .. command-output:: python ./series/series_div.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`Series.rdiv <pandas.Series.rdiv>`
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas Series method :meth:`pandas.Series.div` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
+    """
+
+    ty_checker = TypeChecker('Method div().')
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
+        return None
+
+    # this overload is not for string series
+    self_is_string_series = self_is_series and isinstance(self.dtype, types.UnicodeType)
+    other_is_string_series = other_is_series and isinstance(other.dtype, types.UnicodeType)
+    if self_is_string_series or other_is_string_series:
+        return None
+
+    if not isinstance(self, (SeriesType, types.Number)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
+
+    if not isinstance(other, (SeriesType, types.Number)):
+        ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
+
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
+        none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
+                                   and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
+
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
+
+    if not isinstance(level, types.Omitted) and level is not None:
+        ty_checker.raise_exc(level, 'None', 'level')
+
+    if not isinstance(fill_value, (types.Omitted, types.Number, types.NoneType)) and fill_value is not None:
+        ty_checker.raise_exc(fill_value, 'number', 'fill_value')
+
+    if not isinstance(axis, types.Omitted) and axis != 0:
+        ty_checker.raise_exc(axis, 'int', 'axis')
+    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
+    # specializations for numeric series only
+    if not operands_are_series:
+        def _series_div_scalar_impl(self, other, level=None, fill_value=None, axis=0):
+            if not (fill_value is None or numpy.isnan(fill_value)):
+                numpy_like.fillna(self._data, inplace=True, value=fill_value)
+
+            if self_is_series == True:  # noqa
+                result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                result_data[:] = self._data + numpy.float64(other)
+                return pandas.Series(result_data, index=self._index, name=self._name)
+            else:
+                result_data = numpy.empty(len(other._data), dtype=numpy.float64)
+                result_data[:] = numpy.float64(self) + other._data
+                return pandas.Series(result_data, index=other._index, name=other._name)
+
+        return _series_div_scalar_impl
+
+    else:   # both operands are numeric series
+        # optimization for series with default indexes, that can be aligned differently
+        if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
+            def _series_div_none_indexes_impl(self, other, level=None, fill_value=None, axis=0):
+                _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
+                if not (fill_value is None or numpy.isnan(fill_value)):
+                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
+
+                if (len(self._data) == len(other._data)):
+                    result_data = numpy_like.astype(self._data, numpy.float64)
+                    result_data = result_data + other._data
+                    return pandas.Series(result_data)
+                else:
+                    left_size, right_size = len(self._data), len(other._data)
+                    min_data_size = min(left_size, right_size)
+                    max_data_size = max(left_size, right_size)
+                    result_data = numpy.empty(max_data_size, dtype=numpy.float64)
+                    if (left_size == min_data_size):
+                        result_data[:min_data_size] = self._data
+                        for i in range(min_data_size, len(result_data)):
+                            result_data[i] = _fill_value
+                        result_data = result_data + other._data
+                    else:
+                        result_data[:min_data_size] = other._data
+                        for i in range(min_data_size, len(result_data)):
+                            result_data[i] = _fill_value
+                        result_data = self._data + result_data
+
+                    return pandas.Series(result_data)
+
+            return _series_div_none_indexes_impl
+        else:
+            # for numeric indexes find common dtype to be used when creating joined index
+            if none_or_numeric_indexes:
+                ty_left_index_dtype = types.int64 if isinstance(self.index, types.NoneType) else self.index.dtype
+                ty_right_index_dtype = types.int64 if isinstance(other.index, types.NoneType) else other.index.dtype
+                numba_index_common_dtype = find_common_dtype_from_numpy_dtypes(
+                    [ty_left_index_dtype, ty_right_index_dtype], [])
+
+            def _series_div_common_impl(self, other, level=None, fill_value=None, axis=0):
+                left_index, right_index = self.index, other.index
+                _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
+                if not (fill_value is None or numpy.isnan(fill_value)):
+                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
+                # check if indexes are equal and series don't have to be aligned
+                if sdc_check_indexes_equal(left_index, right_index):
+                    result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+                    result_data[:] = self._data + other._data
+
+                    if none_or_numeric_indexes == True:  # noqa
+                        result_index = numpy_like.astype(left_index, numba_index_common_dtype)
+                    else:
+                        result_index = self._index
+
+                    return pandas.Series(result_data, index=result_index)
+
+                # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
+                joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
+                result_size = len(joined_index)
+                left_values = numpy.empty(result_size, dtype=numpy.float64)
+                right_values = numpy.empty(result_size, dtype=numpy.float64)
+                for i in numba.prange(result_size):
+                    left_pos, right_pos = left_indexer[i], right_indexer[i]
+                    left_values[i] = self._data[left_pos] if left_pos != -1 else _fill_value
+                    right_values[i] = other._data[right_pos] if right_pos != -1 else _fill_value
+                result_data = left_values + right_values
+                return pandas.Series(result_data, joined_index)
+
+            return _series_div_common_impl
+
+    return None
+
+
 @sdc_overload_method(SeriesType, 'sub')
 def sdc_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
     """
@@ -225,29 +392,29 @@ def sdc_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_sub.py
        :language: python
        :lines: 27-
-       :caption:
+       :caption: Return Subtraction of series and other, element-wise (binary operator sub).
        :name: ex_series_sub
 
     .. command-output:: python ./series/series_sub.py
        :cwd: ../../../examples
 
-    .. note::
+    .. seealso::
 
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+        :ref:`Series.rsub <pandas.Series.rsub>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.sub` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
     """
 
     ty_checker = TypeChecker('Method sub().')
@@ -392,29 +559,29 @@ def sdc_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_mul.py
        :language: python
        :lines: 27-
-       :caption:
+       :caption: Element-wise multiplication of two Series
        :name: ex_series_mul
 
     .. command-output:: python ./series/series_mul.py
        :cwd: ../../../examples
 
-    .. note::
+    .. seealso::
 
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+        :ref:`Series.rmul <pandas.Series.rmul>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.mul` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
     """
 
     ty_checker = TypeChecker('Method mul().')
@@ -559,29 +726,29 @@ def sdc_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_truediv.py
        :language: python
        :lines: 27-
-       :caption:
+       :caption: Element-wise division of one Series by another (binary operator truediv)
        :name: ex_series_truediv
 
     .. command-output:: python ./series/series_truediv.py
        :cwd: ../../../examples
 
-    .. note::
+    .. seealso::
 
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+        :ref:`Series.rtruediv <pandas.Series.rtruediv>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
-    Pandas Series method :meth:`pandas.Series.truediv` implementation.
+    Pandas Series :meth:`pandas.Series.truediv` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
     """
 
     ty_checker = TypeChecker('Method truediv().')
@@ -726,29 +893,29 @@ def sdc_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0)
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_floordiv.py
        :language: python
        :lines: 27-
-       :caption:
+       :caption: Return Integer division of series and other, element-wise (binary operator floordiv).
        :name: ex_series_floordiv
 
     .. command-output:: python ./series/series_floordiv.py
        :cwd: ../../../examples
 
-    .. note::
+    .. seealso::
 
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+        :ref:`Series.rfloordiv <pandas.Series.rfloordiv>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.floordiv` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
     """
 
     ty_checker = TypeChecker('Method floordiv().')
@@ -893,29 +1060,25 @@ def sdc_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_mod.py
        :language: python
        :lines: 27-
-       :caption:
+       :caption: Return Modulo of series and other, element-wise (binary operator mod).
        :name: ex_series_mod
 
     .. command-output:: python ./series/series_mod.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.mod` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
     """
 
     ty_checker = TypeChecker('Method mod().')
@@ -1060,29 +1223,29 @@ def sdc_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_pow.py
        :language: python
        :lines: 27-
-       :caption:
+       :caption: Element-wise power of one Series by another (binary operator pow)
        :name: ex_series_pow
 
     .. command-output:: python ./series/series_pow.py
        :cwd: ../../../examples
 
-    .. note::
+    .. seealso::
 
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+        :ref:`Series.rpow <pandas.Series.rpow>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.pow` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
     """
 
     ty_checker = TypeChecker('Method pow().')
@@ -1227,22 +1390,18 @@ def sdc_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_lt.py
        :language: python
        :lines: 27-
-       :caption:
+       :caption: Element-wise less than of one Series by another (binary operator lt)
        :name: ex_series_lt
 
     .. command-output:: python ./series/series_lt.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -1356,22 +1515,18 @@ def sdc_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_gt.py
        :language: python
        :lines: 27-
-       :caption:
+       :caption: Element-wise greater than of one Series by another (binary operator gt)
        :name: ex_series_gt
 
     .. command-output:: python ./series/series_gt.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -1485,22 +1640,18 @@ def sdc_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_le.py
        :language: python
        :lines: 27-
-       :caption:
+       :caption: Element-wise less than or equal of one Series by another (binary operator le)
        :name: ex_series_le
 
     .. command-output:: python ./series/series_le.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -1614,22 +1765,18 @@ def sdc_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_ge.py
        :language: python
        :lines: 27-
-       :caption:
+       :caption: Element-wise greater than or equal of one Series by another (binary operator ge)
        :name: ex_series_ge
 
     .. command-output:: python ./series/series_ge.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -1743,22 +1890,18 @@ def sdc_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_ne.py
        :language: python
        :lines: 27-
-       :caption:
+       :caption: Element-wise not equal of one Series by another (binary operator ne)
        :name: ex_series_ne
 
     .. command-output:: python ./series/series_ne.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -1872,22 +2015,18 @@ def sdc_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_eq.py
        :language: python
        :lines: 27-
-       :caption:
+       :caption: Element-wise equal of one Series by another (binary operator eq)
        :name: ex_series_eq
 
-    .. command-output:: python ./series/series_eq.py
+    .. command-output:: python ./series/series_mod.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -2055,6 +2194,72 @@ def sdc_pandas_series_operator_add(self, other):
         return sdc_pandas_series_add(self, other)
 
     return sdc_pandas_series_operator_add_impl
+
+
+@sdc_overload(operator.div)
+def sdc_pandas_series_operator_div(self, other):
+    """
+    Pandas Series operator :attr:`pandas.Series.div` implementation
+
+    Note: Currently implemented for numeric Series only.
+        Differs from Pandas in returning Series with fixed dtype :obj:`float64`
+
+    .. only:: developer
+
+    **Test**: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op1*
+              python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op2*
+              python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_operator_div*
+
+    Parameters
+    ----------
+    series: :obj:`pandas.Series`
+        Input series
+    other: :obj:`pandas.Series` or :obj:`scalar`
+        Series or scalar value to be used as a second argument of binary operation
+
+    Returns
+    -------
+    :obj:`pandas.Series`
+        The result of the operation
+    """
+
+    _func_name = 'Operator div().'
+
+    ty_checker = TypeChecker('Operator div().')
+    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
+    if not (self_is_series or other_is_series):
+        return None
+
+    # this overload is not for string series
+    self_is_string_series = self_is_series and isinstance(self.dtype, types.UnicodeType)
+    other_is_string_series = other_is_series and isinstance(other.dtype, types.UnicodeType)
+    if self_is_string_series or other_is_string_series:
+        return None
+
+    if not isinstance(self, (SeriesType, types.Number)):
+        ty_checker.raise_exc(self, 'pandas.series or scalar', 'self')
+
+    if not isinstance(other, (SeriesType, types.Number)):
+        ty_checker.raise_exc(other, 'pandas.series or scalar', 'other')
+
+    operands_are_series = self_is_series and other_is_series
+    if operands_are_series:
+        none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
+                                   and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
+        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        if not series_indexes_comparable:
+            raise TypingError('{} Not implemented for series with not-comparable indexes. \
+            Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
+
+    series_data_comparable = check_types_comparable(self, other)
+    if not series_data_comparable:
+        raise TypingError('{} Not supported for not-comparable operands. \
+        Given: self={}, other={}'.format(_func_name, self, other))
+
+    def sdc_pandas_series_operator_div_impl(self, other):
+        return sdc_pandas_series_div(self, other)
+
+    return sdc_pandas_series_operator_div_impl
 
 
 @sdc_overload(operator.sub)

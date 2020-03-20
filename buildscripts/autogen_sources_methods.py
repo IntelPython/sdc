@@ -77,6 +77,7 @@ docstring_header = '''\
 
 arithmetic_binops_symbols = {
     'add': '+',
+    'div': '/',
     'sub': '-',
     'mul': '*',
     'truediv': '/',
