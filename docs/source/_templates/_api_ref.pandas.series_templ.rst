@@ -33,6 +33,7 @@ Attributes/Operators
    Series.dtypes
    Series.name
    Series.put
+   Series.setitem
 
 Type Conversions
 ----------------

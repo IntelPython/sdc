@@ -462,14 +462,16 @@ def sdc_pandas_series_setitem(self, idx, value):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
-    Pandas API: pandas.Series.__setitem__
+    Pandas API: pandas.Series.setitem
+
+    Set value to Series by index
 
     Limitations
     -----------
-        Not supported for idx as a string slice, e.g. S['a':'f'] = value
-        Not supported for string series
-        Not supported for a case of setting value for non existing index
-        Not supported for cases when setting causes change of the Series dtype
+       - Not supported for idx as a string slice, e.g. S['a':'f'] = value
+       - Not supported for string series
+       - Not supported for a case of setting value for non existing index
+       - Not supported for cases when setting causes change of the Series dtype
 
     Examples
     --------
@@ -479,34 +481,50 @@ def sdc_pandas_series_setitem(self, idx, value):
        :caption: Setting Pandas Series elements
        :name: ex_series_setitem
 
-    .. code-block:: console
+    .. command-output:: python ./series/series_setitem_int.py
+       :cwd: ../../../examples
 
-        > python ./series/series_setitem_int.py
+    .. literalinclude:: ../../../examples/series/series_setitem_slice.py
+       :language: python
+       :lines: 27-
+       :caption: Setting Pandas Series elements by slice
+       :name: ex_series_setitem
 
-            0    0
-            1    4
-            2    3
-            3    2
-            4    1
-            dtype: int64
+    .. command-output:: python ./series/series_setitem_slice.py
+       :cwd: ../../../examples
 
-        > python ./series/series_setitem_slice.py
+    .. literalinclude:: ../../../examples/series/series_setitem_series.py
+       :language: python
+       :lines: 27-
+       :caption: Setting Pandas Series elements by series
+       :name: ex_series_setitem
 
-            0    5
-            1    4
-            2    0
-            3    0
-            4    0
-            dtype: int64
+    .. command-output:: python ./series/series_setitem_series.py
+       :cwd: ../../../examples
 
-        > python ./series/series_setitem_series.py
-
-            0    5
-            1    0
-            2    3
-            3    0
-            4    1
-            dtype: int64
+    .. seealso::
+            :ref:`Series.getitem <pandas.Series.getitem>`
+                Get value(s) of Series by key.
+            :ref:`Series.loc <pandas.Series.loc>`
+                Access a group of rows and columns by label(s) or a boolean array.
+            :ref:`Series.iloc <pandas.Series.iloc>`
+                Purely integer-location based indexing for selection by position.
+            :ref:`Series.at <pandas.Series.at>`
+                Access a single value for a row/column label pair.
+            :ref:`Series.iat <pandas.Series.iat>`
+                Access a single value for a row/column pair by integer position.
+            :ref:`DataFrame.getitem <pandas.DataFrame.getitem>`
+                Get data from a DataFrame by indexer.
+            :ref:`DataFrame.setitem <pandas.DataFrame.setitem>`
+                Set value to DataFrame by index
+            :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+                Access a group of rows and columns by label(s) or a boolean array.
+            :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+                Purely integer-location based indexing for selection by position.
+            :ref:`DataFrame.at <pandas.DataFrame.at>`
+                Access a single value for a row/column label pair.
+            :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+                Access a single value for a row/column pair by integer position.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -778,6 +796,10 @@ def hpat_pandas_series_iloc(self):
 
     Pandas API: pandas.Series.iloc
 
+    Limitations
+    -----------
+    Iloc always returns Series.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_iloc/series_iloc_value.py
@@ -838,10 +860,9 @@ def hpat_pandas_series_loc(self):
 
     Limitations
     -----------
-    - Loc returns Series
-    - Loc slice and callable with String is not implemented
-    - Loc slice without start is not supported
-    - Loc callable returns float Series
+    - Loc always returns Series.
+    - Loc slice is supported only with numeric values and specified ``start``.
+    - Loc callable is not supported yet.
 
     Examples
     --------
@@ -1022,14 +1043,14 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
 
     Limitations
     -----------
-    - Parameter 'keep' except 'first' is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameter ``keep`` is supported only with default value ``'first'``.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_nsmallest.py
        :language: python
        :lines: 27-
-       :caption: Return the smallest n elements.
+       :caption: Returns the smallest n elements.
        :name: ex_series_nsmallest
 
     .. command-output:: python ./series/series_nsmallest.py
@@ -1048,6 +1069,7 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.nsmallest` implementation.
 
     .. only:: developer
@@ -1087,14 +1109,14 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
 
     Limitations
     -----------
-    - Parameter 'keep' except 'first' is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameter ``keep`` is supported only with default value ``'first'``.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_nlargest.py
        :language: python
        :lines: 27-
-       :caption: Return the largest n elements.
+       :caption: Returns the largest n elements.
        :name: ex_series_nlargest
 
     .. command-output:: python ./series/series_nlargest.py
@@ -1113,6 +1135,7 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.nlargest` implementation.
 
     .. only:: developer
@@ -1192,32 +1215,31 @@ def hpat_pandas_series_std(self, axis=None, skipna=None, level=None, ddof=1, num
 
     Limitations
     -----------
-    - Parameters skipna, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_std.py
        :language: python
        :lines: 27-
-       :caption: Return sample standard deviation over requested axis.
+       :caption: Returns sample standard deviation over Series.
        :name: ex_series_std
 
     .. command-output:: python ./series/series_std.py
        :cwd: ../../../examples
 
+    .. seealso::
+
+        :ref:`Series.var <pandas.Series.var>`
+            Returns unbiased variance over Series.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.std` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_unboxing
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_str
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_std_unsupported_params
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_std
     """
 
     _func_name = 'Method std().'
@@ -1474,32 +1496,31 @@ def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_var.py
        :language: python
        :lines: 27-
-       :caption: Return unbiased variance over requested axis.
+       :caption: Returns unbiased variance over Series.
        :name: ex_series_var
 
     .. command-output:: python ./series/series_var.py
        :cwd: ../../../examples
 
+    .. seealso::
+
+        :ref:`Series.std <pandas.Series.std>`
+            Returns sample standard deviation over Series.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.var` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_unboxing
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_str
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_var_unsupported_params
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_var
     """
 
     _func_name = 'Method var().'
@@ -1860,11 +1881,7 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
 
     Limitations
     -----------
-    - Parameter freq is currently unsupported by Intel Scalable Dataframe Compiler
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``freq`` and ``axis`` are supported only with default values ``None`` and ``0`` respectively.
 
     Examples
     --------
@@ -1877,18 +1894,9 @@ def hpat_pandas_series_shift(self, periods=1, freq=None, axis=0, fill_value=None
     .. command-output:: python ./series/series_shift.py
        :cwd: ../../../examples
 
-    .. seealso::
-
-        `pandas.absolute
-        <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Index.shift.html#pandas.Index.shift>`_
-            Shift index by desired number of time frequency increments.
-
-        `pandas.absolute
-        <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.tshift.html#pandas.Series.tshift>`_
-            Shift the time index, using the index’s frequency if available.
-
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
+
     Pandas Series method :meth:`pandas.Series.shift` implementation.
 
     .. only:: developer
@@ -2516,7 +2524,7 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level``, ``fill_value`` and ``axis`` are unsupported.
 
     Examples
     --------
@@ -2528,10 +2536,6 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     .. command-output:: python ./series/series_add.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3001,7 +3005,7 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level``, ``fill_value`` and ``axis`` are unsupported.
 
     Examples
     --------
@@ -3014,13 +3018,10 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
     .. command-output:: python ./series/series_div.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
         :ref:`Series.rdiv <pandas.Series.rdiv>`
+            Return Floating division of series and other, element-wise (binary operator rtruediv).
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -4692,8 +4693,9 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
     Limitations
     -----------
-    - Parameter inplace is currently unsupported by Intel Scalable Dataframe Compiler
-    - Parameter kind currently only 'mergesort' and 'quicksort' are supported as literal values.
+    - Parameter ``inplace`` is supported only with default value ``False``.
+    - Parameter ``axis`` is currently unsupported by Intel Scalable Dataframe Compiler.
+    - Parameter ``kind`` is supported only with values ``'mergesort'`` and ``'quicksort'``.
 
     Examples
     --------
@@ -4705,10 +4707,6 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
 
     .. command-output:: python ./series/series_sort_values.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
