@@ -30,6 +30,7 @@ import pandas as pd
 import platform
 import pyarrow.parquet as pq
 import unittest
+import numba
 from numba.config import IS_32BITS
 from pandas.api.types import CategoricalDtype
 
@@ -236,10 +237,12 @@ class TestCSV(TestIO):
 
     def test_pyarrow(self):
         tests = [
-            "csv1",
             "csv_keys1",
             "csv_const_dtype1",
-            "csv_infer1",
+            "csv_infer_file_default",
+            "csv_infer_file_sep",
+            "csv_infer_file_delimiter",
+            "csv_infer_file_names",
             "csv_infer_parallel1",
             "csv_skip1",
             "csv_infer_skip1",
@@ -275,6 +278,8 @@ class TestCSV(TestIO):
                     self.fail(f"Unknown Pandas type: {type(pd_val)}")
 
     def _int_type(self):
+        # TODO: w/a for Numba issue with int typing rules infering intp for integers literals
+        # unlike NumPy which uses int32 by default - causes dtype mismatch on Windows 64 bit
         if platform.system() == 'Windows' and not IS_32BITS:
             return np.intp
         else:
@@ -286,25 +291,64 @@ class TestCSV(TestIO):
     def _read_csv(self, use_pyarrow=False):
         return pd_read_csv if use_pyarrow else pd.read_csv
 
-    def pd_csv1(self, use_pyarrow=False):
-        # TODO: w/a for Numba issue with int typing rules infering intp for integers literals
-        # unlike NumPy which uses int32 by default - causes dtype mismatch on Windows 64 bit
-        read_csv = self._read_csv(use_pyarrow)
+    # inference errors
+
+    def test_csv_infer_error(self):
+        read_csv = self._read_csv()
+
+        def pyfunc(fname):
+            return read_csv(fname)
+
+        cfunc = self.jit(pyfunc)
+
+        with self.assertRaises(numba.errors.TypingError) as cm:
+            cfunc("csv_data1.csv")
+
+        self.assertIn("Cannot infer resulting DataFrame", cm.exception.msg)
+
+    # inference from parameters
+
+    def test_csv_infer_params_default(self):
+        read_csv = self._read_csv()
         int_type = self._int_type()
 
-        def test_impl():
-            return read_csv("csv_data1.csv",
-                            names=['A', 'B', 'C', 'D'],
-                            dtype={'A': int_type, 'B': np.float, 'C': np.float, 'D': str},
-                            )
+        def pyfunc(fname):
+            names = ['A', 'B', 'C', 'D']
+            dtype = {'A': int_type, 'B': np.float, 'C': 'float', 'D': str}
+            return read_csv(fname, names=names, dtype=dtype)
 
-        return test_impl
+        cfunc = self.jit(pyfunc)
 
-    @skip_numba_jit
-    def test_csv1(self):
-        test_impl = self.pd_csv1()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+        for fname in ["csv_data1.csv", "csv_data2.csv"]:
+            with self.subTest(fname=fname):
+                pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
+
+    def test_csv_infer_params_usecols_names(self):
+        read_csv = self._read_csv()
+        int_type = self._int_type()
+
+        def pyfunc(fname):
+            names = ['A', 'B', 'C', 'D']
+            dtype = {'A': int_type, 'B': np.float, 'C': np.float, 'D': str}
+            usecols = ['B', 'D']
+            return read_csv(fname, names=names, dtype=dtype, usecols=usecols)
+
+        fname = "csv_data1.csv"
+        cfunc = self.jit(pyfunc)
+        pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
+
+    def test_csv_infer_params_usecols_no_names(self):
+        read_csv = self._read_csv()
+        int_type = self._int_type()
+
+        def pyfunc(fname):
+            dtype = {'B': np.float, 'D': str}
+            usecols = ['B', 'D']
+            return read_csv(fname, dtype=dtype, usecols=usecols)
+
+        fname = "csv_data_infer1.csv"
+        cfunc = self.jit(pyfunc)
+        pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
 
     def pd_csv_keys1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
@@ -344,20 +388,27 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    def pd_csv_infer1(self, use_pyarrow=False):
+    # inference from file
+
+    def pd_csv_infer_file_default(self, file_name="csv_data_infer1.csv", use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
         def test_impl():
-            return read_csv("csv_data_infer1.csv")
+            return read_csv(file_name)
 
         return test_impl
 
-    def test_csv_infer1(self):
-        test_impl = self.pd_csv_infer1()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+    def test_csv_infer_file_default(self):
+        def test(file_name):
+            test_impl = self.pd_csv_infer_file_default(file_name)
+            hpat_func = self.jit(test_impl)
+            pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    def pd_csv_infer_sep(self, use_pyarrow=False):
+        for file_name in ["csv_data_infer1.csv", "csv_data_infer_no_column_name.csv"]:
+            with self.subTest(file_name=file_name):
+                test(file_name)
+
+    def pd_csv_infer_file_sep(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
         def test_impl():
@@ -365,12 +416,12 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    def test_csv_infer_sep(self):
-        test_impl = self.pd_csv_infer_sep()
+    def test_csv_infer_file_sep(self):
+        test_impl = self.pd_csv_infer_file_sep()
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    def pd_csv_infer_delimiter(self, use_pyarrow=False):
+    def pd_csv_infer_file_delimiter(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
         def test_impl():
@@ -378,10 +429,64 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    def test_csv_infer_delimiter(self):
-        test_impl = self.pd_csv_infer_delimiter()
+    def test_csv_infer_file_delimiter(self):
+        test_impl = self.pd_csv_infer_file_delimiter()
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    def pd_csv_infer_file_names(self, file_name="csv_data1.csv", use_pyarrow=False):
+        read_csv = self._read_csv(use_pyarrow)
+
+        def test_impl():
+            return read_csv(file_name, names=['A', 'B', 'C', 'D'])
+
+        return test_impl
+
+    def test_csv_infer_file_names(self):
+        def test(file_name):
+            test_impl = self.pd_csv_infer_file_names(file_name)
+            hpat_func = self.jit(test_impl)
+            pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+        for file_name in ["csv_data1.csv", "csv_data_infer1.csv"]:
+            with self.subTest(file_name=file_name):
+                test(file_name)
+
+    def pd_csv_infer_file_usecols(self, file_name="csv_data_infer1.csv", use_pyarrow=False):
+        read_csv = self._read_csv(use_pyarrow)
+
+        def test_impl():
+            return read_csv(file_name, usecols=['B', 'D'])
+
+        return test_impl
+
+    def test_csv_infer_file_usecols(self):
+        def test(file_name):
+            test_impl = self.pd_csv_infer_file_usecols(file_name)
+            hpat_func = self.jit(test_impl)
+            pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+        for file_name in ["csv_data_infer1.csv"]:
+            with self.subTest(file_name=file_name):
+                test(file_name)
+
+    def pd_csv_infer_file_names_usecols(self, file_name="csv_data1.csv", use_pyarrow=False):
+        read_csv = self._read_csv(use_pyarrow)
+
+        def test_impl():
+            return read_csv(file_name, names=['A', 'B', 'C', 'D'], usecols=['B', 'D'])
+
+        return test_impl
+
+    def test_csv_infer_file_names_usecols(self):
+        def test(file_name):
+            test_impl = self.pd_csv_infer_file_names_usecols(file_name)
+            hpat_func = self.jit(test_impl)
+            pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+        for file_name in ["csv_data1.csv", "csv_data_infer1.csv"]:
+            with self.subTest(file_name=file_name):
+                test(file_name)
 
     def pd_csv_infer_parallel1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
