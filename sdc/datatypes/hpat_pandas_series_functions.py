@@ -2658,7 +2658,8 @@ def hpat_pandas_series_sum(
 
     Limitations
     -----------
-    - Parameters level, numeric_only, min_count are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``axis``, ``level``, ``numeric_only`` and ``min_count`` \
+        are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -2671,10 +2672,6 @@ def hpat_pandas_series_sum(
     .. command-output:: python ./series/series_sum.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
         :ref:`Series.sum <pandas.Series.sum>`
@@ -2685,6 +2682,21 @@ def hpat_pandas_series_sum(
 
         :ref:`Series.max <pandas.Series.max>`
             Return the maximum.
+
+        :ref:`Series.idxmin <pandas.Series.idxmin>`
+            Return the index of the minimum.
+
+        :ref:`Series.idxmax <pandas.Series.idxmax>`
+            Return the index of the maximum.
+
+        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
+            Return the sum over the requested axis.
+
+        :ref:`DataFrame.min <pandas.DataFrame.min>`
+            Return the minimum over the requested axis.
+
+        :ref:`DataFrame.max <pandas.DataFrame.max>`
+            Return the maximum over the requested axis.
 
         :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
             Return the index of the minimum over the requested axis.
@@ -2697,7 +2709,7 @@ def hpat_pandas_series_sum(
     Pandas Series method :meth:`pandas.Series.sum` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_sum*
+        Test: python -m sdc.runtests sdc.tests.test_series -k series_sum
     """
 
     _func_name = 'Method sum().'
