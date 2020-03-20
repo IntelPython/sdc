@@ -121,10 +121,13 @@ def gen_srand_array(size, nchars=8):
     return np.random.choice(rands_chars, size=nchars * size).view((np.str_, nchars))
 
 
-def gen_frand_array(size, min=-100, max=100):
+def gen_frand_array(size, min=-100, max=100, nancount=0):
     """Generate array of float of specified size based on [-100-100]"""
     np.random.seed(100)
-    return (max - min) * np.random.sample(size) + min
+    res = (max - min) * np.random.sample(size) + min
+    if nancount:
+        res[np.random.choice(np.arange(size), nancount)] = np.nan
+    return res
 
 
 def gen_strlist(size, nchars=8, accepted_chars=None):
