@@ -796,6 +796,10 @@ def hpat_pandas_series_iloc(self):
 
     Pandas API: pandas.Series.iloc
 
+    Limitations
+    -----------
+    Iloc always returns Series.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_iloc/series_iloc_value.py
@@ -856,10 +860,9 @@ def hpat_pandas_series_loc(self):
 
     Limitations
     -----------
-    - Loc returns Series
-    - Loc slice and callable with String is not implemented
-    - Loc slice without start is not supported
-    - Loc callable returns float Series
+    - Loc always returns Series.
+    - Loc slice is supported only with numeric values and specified ``start``.
+    - Loc callable is not supported yet.
 
     Examples
     --------
