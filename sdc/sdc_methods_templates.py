@@ -50,7 +50,7 @@ def sdc_pandas_series_binop(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -62,10 +62,6 @@ def sdc_pandas_series_binop(self, other, level=None, fill_value=None, axis=0):
 
     .. command-output:: python ./series/series_binop.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -216,7 +212,7 @@ def sdc_pandas_series_comp_binop(self, other, level=None, fill_value=None, axis=
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -394,7 +390,7 @@ def sdc_pandas_series_operator_binop(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_binop_impl(self, other):
-        return sdc_pandas_series_binop(self, other)
+        return self.binop(other)
 
     return sdc_pandas_series_operator_binop_impl
 
@@ -449,7 +445,7 @@ def sdc_pandas_series_operator_comp_binop(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_comp_binop_impl(self, other):
-        return sdc_pandas_series_comp_binop(self, other)
+        return self.comp_binop(other)
 
     return sdc_pandas_series_operator_comp_binop_impl
 

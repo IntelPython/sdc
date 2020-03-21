@@ -58,7 +58,7 @@ def sdc_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -225,7 +225,7 @@ def sdc_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -392,7 +392,7 @@ def sdc_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -559,7 +559,7 @@ def sdc_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -726,7 +726,7 @@ def sdc_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -893,7 +893,7 @@ def sdc_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0)
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -1060,7 +1060,7 @@ def sdc_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -1223,7 +1223,7 @@ def sdc_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -1390,7 +1390,7 @@ def sdc_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -1515,7 +1515,7 @@ def sdc_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -1640,7 +1640,7 @@ def sdc_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -1765,7 +1765,7 @@ def sdc_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -1890,7 +1890,7 @@ def sdc_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -2015,7 +2015,7 @@ def sdc_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters level, fill_value and axis are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -2191,7 +2191,7 @@ def sdc_pandas_series_operator_add(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_add_impl(self, other):
-        return sdc_pandas_series_add(self, other)
+        return self.add(other)
 
     return sdc_pandas_series_operator_add_impl
 
@@ -2257,7 +2257,7 @@ def sdc_pandas_series_operator_sub(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_sub_impl(self, other):
-        return sdc_pandas_series_sub(self, other)
+        return self.sub(other)
 
     return sdc_pandas_series_operator_sub_impl
 
@@ -2323,7 +2323,7 @@ def sdc_pandas_series_operator_mul(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_mul_impl(self, other):
-        return sdc_pandas_series_mul(self, other)
+        return self.mul(other)
 
     return sdc_pandas_series_operator_mul_impl
 
@@ -2389,7 +2389,7 @@ def sdc_pandas_series_operator_truediv(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_truediv_impl(self, other):
-        return sdc_pandas_series_truediv(self, other)
+        return self.truediv(other)
 
     return sdc_pandas_series_operator_truediv_impl
 
@@ -2455,7 +2455,7 @@ def sdc_pandas_series_operator_floordiv(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_floordiv_impl(self, other):
-        return sdc_pandas_series_floordiv(self, other)
+        return self.floordiv(other)
 
     return sdc_pandas_series_operator_floordiv_impl
 
@@ -2521,7 +2521,7 @@ def sdc_pandas_series_operator_mod(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_mod_impl(self, other):
-        return sdc_pandas_series_mod(self, other)
+        return self.mod(other)
 
     return sdc_pandas_series_operator_mod_impl
 
@@ -2587,7 +2587,7 @@ def sdc_pandas_series_operator_pow(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_pow_impl(self, other):
-        return sdc_pandas_series_pow(self, other)
+        return self.pow(other)
 
     return sdc_pandas_series_operator_pow_impl
 
@@ -2643,7 +2643,7 @@ def sdc_pandas_series_operator_lt(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_lt_impl(self, other):
-        return sdc_pandas_series_lt(self, other)
+        return self.lt(other)
 
     return sdc_pandas_series_operator_lt_impl
 
@@ -2699,7 +2699,7 @@ def sdc_pandas_series_operator_gt(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_gt_impl(self, other):
-        return sdc_pandas_series_gt(self, other)
+        return self.gt(other)
 
     return sdc_pandas_series_operator_gt_impl
 
@@ -2755,7 +2755,7 @@ def sdc_pandas_series_operator_le(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_le_impl(self, other):
-        return sdc_pandas_series_le(self, other)
+        return self.le(other)
 
     return sdc_pandas_series_operator_le_impl
 
@@ -2811,7 +2811,7 @@ def sdc_pandas_series_operator_ge(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_ge_impl(self, other):
-        return sdc_pandas_series_ge(self, other)
+        return self.ge(other)
 
     return sdc_pandas_series_operator_ge_impl
 
@@ -2867,7 +2867,7 @@ def sdc_pandas_series_operator_ne(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_ne_impl(self, other):
-        return sdc_pandas_series_ne(self, other)
+        return self.ne(other)
 
     return sdc_pandas_series_operator_ne_impl
 
@@ -2923,7 +2923,7 @@ def sdc_pandas_series_operator_eq(self, other):
         Given: self={}, other={}'.format(_func_name, self, other))
 
     def sdc_pandas_series_operator_eq_impl(self, other):
-        return sdc_pandas_series_eq(self, other)
+        return self.eq(other)
 
     return sdc_pandas_series_operator_eq_impl
 
