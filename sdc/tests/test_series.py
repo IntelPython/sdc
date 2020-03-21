@@ -274,6 +274,22 @@ def isupper_usecase(series):
     return series.str.isupper()
 
 
+def upper_usecase(series):
+    return series.str.upper()
+
+
+def strip_usecase(series, to_strip=None):
+    return series.str.strip(to_strip)
+
+
+def lstrip_usecase(series, to_strip=None):
+    return series.str.lstrip(to_strip)
+
+
+def rstrip_usecase(series, to_strip=None):
+    return series.str.rstrip(to_strip)
+
+
 class TestSeries(
     TestSeries_apply,
     TestSeries_map,
@@ -1044,36 +1060,6 @@ class TestSeries(
         n = 11
         S = pd.Series(np.arange(n)**2, name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
-
-    @skip_sdc_jit('Not impl in old style')
-    def test_series_getitem_idx_bool_arr(self):
-        def test_impl(A, B):
-            return A[B]
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([1, 2, 3, 4], [6, 7, 8, 9], name='A')
-        n = np.array([True, False, False, True])
-        pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
-
-    @skip_sdc_jit('Not impl in old style')
-    def test_series_getitem_idx_bool_series1(self):
-        def test_impl(A, B):
-            return A[B]
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([2, 3, 1, 5], [11, 2, 44, 5], name='A')
-        S2 = pd.Series([True, False, False, True], [11, 2, 44, 5])
-        pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
-
-    @skip_sdc_jit('Not impl in old style')
-    def test_series_getitem_idx_bool_series2(self):
-        def test_impl(A, B):
-            return A[B]
-        hpat_func = self.jit(test_impl)
-
-        S = pd.Series([2, 3, 1, 5], name='A')
-        S2 = pd.Series([True, False, False, True])
-        pd.testing.assert_series_equal(hpat_func(S, S2), test_impl(S, S2))
 
     @skip_sdc_jit('Not impl in old style')
     def test_series_getitem_idx_series(self):
@@ -2947,6 +2933,15 @@ class TestSeries(
         ref_result = test_impl(series, width)
         pd.testing.assert_series_equal(jit_result, ref_result)
 
+    def test_series_str_center_with_none(self):
+        def test_impl(series, width, fillchar):
+            return series.str.center(width, fillchar)
+
+        cfunc = self.jit(test_impl)
+        idx = ['City 1', 'City 2', 'City 3', 'City 4', 'City 5', 'City 6', 'City 7', 'City 8']
+        s = pd.Series(['New_York', 'Lisbon', np.nan, 'Tokyo', 'Paris', None, 'Munich', None], index=idx)
+        pd.testing.assert_series_equal(cfunc(s, width=13, fillchar='*'), test_impl(s, width=13, fillchar='*'))
+
     def test_series_str_endswith(self):
         def test_impl(series, pat):
             return series.str.endswith(pat)
@@ -3097,6 +3092,15 @@ class TestSeries(
             ref_result = pyfunc(series, width)
             pd.testing.assert_series_equal(jit_result, ref_result)
 
+    def test_series_str_rjust_with_none(self):
+        def test_impl(series, width, fillchar):
+            return series.str.rjust(width, fillchar)
+
+        cfunc = self.jit(test_impl)
+        idx = ['City 1', 'City 2', 'City 3', 'City 4', 'City 5', 'City 6', 'City 7', 'City 8']
+        s = pd.Series(['New_York', 'Lisbon', np.nan, 'Tokyo', 'Paris', None, 'Munich', None], index=idx)
+        pd.testing.assert_series_equal(cfunc(s, width=13, fillchar='*'), test_impl(s, width=13, fillchar='*'))
+
     def test_series_str_startswith(self):
         def test_impl(series, pat):
             return series.str.startswith(pat)
@@ -3234,6 +3238,15 @@ class TestSeries(
             with self.subTest(data=data):
                 s = pd.Series(data)
                 pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_upper_str(self):
+        sdc_func = self.jit(upper_usecase)
+        test_data = [test_global_input_data_unicode_kind4,
+                     ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
+        for data in test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), upper_usecase(s))
 
     def test_series_swapcase_str(self):
         def test_impl(S):
@@ -4186,52 +4199,52 @@ class TestSeries(
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
     def test_series_idxmin1(self):
-        def test_impl(A):
-            return A.idxmin()
+        def test_impl(a):
+            return a.idxmin()
         hpat_func = self.jit(test_impl)
 
         n = 11
         np.random.seed(0)
-        S = pd.Series(np.random.ranf(n))
-        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+        s = pd.Series(np.random.ranf(n))
+        np.testing.assert_array_equal(hpat_func(s), test_impl(s))
 
     def test_series_idxmin_str(self):
-        def test_impl(S):
-            return S.idxmin()
+        def test_impl(s):
+            return s.idxmin()
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        s = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
+        self.assertEqual(hpat_func(s), test_impl(s))
 
     @unittest.skip("Skipna is not implemented")
     def test_series_idxmin_str_idx(self):
-        def test_impl(S):
-            return S.idxmin(skipna=False)
+        def test_impl(s):
+            return s.idxmin(skipna=False)
 
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        s = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
+        self.assertEqual(hpat_func(s), test_impl(s))
 
     def test_series_idxmin_no(self):
-        def test_impl(S):
-            return S.idxmin()
+        def test_impl(s):
+            return s.idxmin()
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([8, 6, 34, np.nan])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        s = pd.Series([8, 6, 34, np.nan])
+        self.assertEqual(hpat_func(s), test_impl(s))
 
     def test_series_idxmin_int(self):
-        def test_impl(S):
-            return S.idxmin()
+        def test_impl(s):
+            return s.idxmin()
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([1, 2, 3], [4, 45, 14])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        s = pd.Series([1, 2, 3], [4, 45, 14])
+        self.assertEqual(hpat_func(s), test_impl(s))
 
     def test_series_idxmin_noidx(self):
-        def test_impl(S):
-            return S.idxmin()
+        def test_impl(s):
+            return s.idxmin()
 
         hpat_func = self.jit(test_impl)
 
@@ -4243,15 +4256,15 @@ class TestSeries(
                      ]
 
         for input_data in data_test:
-            S = pd.Series(input_data)
+            s = pd.Series(input_data)
 
-            result_ref = test_impl(S)
-            result = hpat_func(S)
+            result_ref = test_impl(s)
+            result = hpat_func(s)
             self.assertEqual(result, result_ref)
 
     def test_series_idxmin_idx(self):
-        def test_impl(S):
-            return S.idxmin()
+        def test_impl(s):
+            return s.idxmin()
 
         hpat_func = self.jit(test_impl)
 
@@ -4264,37 +4277,37 @@ class TestSeries(
 
         for input_data in data_test:
             for index_data in data_test:
-                S = pd.Series(input_data, index_data)
-                result_ref = test_impl(S)
-                result = hpat_func(S)
+                s = pd.Series(input_data, index_data)
+                result_ref = test_impl(s)
+                result = hpat_func(s)
                 if np.isnan(result) or np.isnan(result_ref):
                     self.assertEqual(np.isnan(result), np.isnan(result_ref))
                 else:
                     self.assertEqual(result, result_ref)
 
     def test_series_idxmax1(self):
-        def test_impl(A):
-            return A.idxmax()
+        def test_impl(a):
+            return a.idxmax()
         hpat_func = self.jit(test_impl)
 
         n = 11
         np.random.seed(0)
-        S = pd.Series(np.random.ranf(n))
-        np.testing.assert_array_equal(hpat_func(S), test_impl(S))
+        s = pd.Series(np.random.ranf(n))
+        np.testing.assert_array_equal(hpat_func(s), test_impl(s))
 
     @unittest.skip("Skipna is not implemented")
     def test_series_idxmax_str_idx(self):
-        def test_impl(S):
-            return S.idxmax(skipna=False)
+        def test_impl(s):
+            return s.idxmax(skipna=False)
 
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        s = pd.Series([8, 6, 34, np.nan], ['a', 'ab', 'abc', 'c'])
+        self.assertEqual(hpat_func(s), test_impl(s))
 
     def test_series_idxmax_noidx(self):
-        def test_impl(S):
-            return S.idxmax()
+        def test_impl(s):
+            return s.idxmax()
 
         hpat_func = self.jit(test_impl)
 
@@ -4306,15 +4319,15 @@ class TestSeries(
                      ]
 
         for input_data in data_test:
-            S = pd.Series(input_data)
+            s = pd.Series(input_data)
 
-            result_ref = test_impl(S)
-            result = hpat_func(S)
+            result_ref = test_impl(s)
+            result = hpat_func(s)
             self.assertEqual(result, result_ref)
 
     def test_series_idxmax_idx(self):
-        def test_impl(S):
-            return S.idxmax()
+        def test_impl(s):
+            return s.idxmax()
 
         hpat_func = self.jit(test_impl)
 
@@ -4327,9 +4340,9 @@ class TestSeries(
 
         for input_data in data_test:
             for index_data in data_test:
-                S = pd.Series(input_data, index_data)
-                result_ref = test_impl(S)
-                result = hpat_func(S)
+                s = pd.Series(input_data, index_data)
+                result_ref = test_impl(s)
+                result = hpat_func(s)
                 if np.isnan(result) or np.isnan(result_ref):
                     self.assertEqual(np.isnan(result), np.isnan(result_ref))
                 else:
@@ -5994,6 +6007,24 @@ class TestSeries(
             S = pd.Series(ser)
             pd.testing.assert_series_equal(cfunc(S), islower_usecase(S))
 
+    def test_series_strip_str(self):
+        s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
+        cfunc = self.jit(strip_usecase)
+        for to_strip in [None, '123.', '.!? \n\t', '123.!? \n\t']:
+            pd.testing.assert_series_equal(cfunc(s, to_strip), strip_usecase(s, to_strip))
+
+    def test_series_lstrip_str(self):
+        s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
+        cfunc = self.jit(lstrip_usecase)
+        for to_strip in [None, '123.', '.!? \n\t', '123.!? \n\t']:
+            pd.testing.assert_series_equal(cfunc(s, to_strip), lstrip_usecase(s, to_strip))
+
+    def test_series_rstrip_str(self):
+        s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
+        cfunc = self.jit(rstrip_usecase)
+        for to_strip in [None, '123.', '.!? \n\t', '123.!? \n\t']:
+            pd.testing.assert_series_equal(cfunc(s, to_strip), rstrip_usecase(s, to_strip))
+
     @skip_sdc_jit("Series.str.isalnum is not supported yet")
     def test_series_isalnum_str(self):
         cfunc = self.jit(isalnum_usecase)
@@ -6031,8 +6062,8 @@ class TestSeries(
         cfunc = self.jit(isupper_usecase)
         test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
         for data in test_data:
-            S = pd.Series(data)
-            pd.testing.assert_series_equal(cfunc(S), isupper_usecase(S))
+            s = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(s), isupper_usecase(s))
 
     @skip_sdc_jit('Old-style implementation returns string, but not series')
     def test_series_describe_numeric(self):
@@ -6306,7 +6337,7 @@ class TestSeries(
 
         for series_data in all_data:
             for series_index in indexes:
-                S = pd.Series(series_data, series_index, dtype=dtype)
+                S = pd.Series(series_data, series_index, dtype=dtype, name='A')
                 for idx, value in product(idxs, values):
                     with self.subTest(series=S, idx=idx, value=value):
                         S1 = S.copy(deep=True)
@@ -6750,6 +6781,242 @@ class TestSeries(
                             pd.Series(assigned_values, index=values_index)
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
+
+    def _test_series_getitem(self, all_data, indexes, idxs, dtype=None):
+        """ Common function used by getitem tests to compile and run getitem on provided data"""
+        def test_impl(A, idx):
+            return A[idx]
+        hpat_func = self.jit(test_impl)
+
+        for series_data in all_data:
+            for series_index in indexes:
+                S = pd.Series(series_data, series_index, dtype=dtype, name='A')
+                for idx in idxs:
+                    with self.subTest(series=S, idx=idx):
+                        result = hpat_func(S, idx)
+                        result_ref = test_impl(S, idx)
+                        pd.testing.assert_series_equal(result, result_ref)
+
+    @skip_sdc_jit('Not implemented in old-pipeline')
+    def test_series_getitem_idx_bool_array1(self):
+        """ Verifies Series.getitem by mask indicated by a Boolean array on Series of various dtypes and indexes """
+
+        n = 11
+        np.random.seed(0)
+        data_to_test = [
+            np.arange(n),
+            np.arange(n, dtype='float'),
+            np.random.choice([True, False], n),
+            gen_strlist(n, 2, 'abcd123 ')
+        ]
+        idxs_to_test = [
+            None,
+            np.arange(n),
+            np.arange(n, dtype='float'),
+            gen_strlist(n, 2, 'abcd123 ')
+        ]
+
+        idx = np.random.choice([True, False], n)
+        self._test_series_getitem(data_to_test, idxs_to_test, [idx])
+
+    @skip_sdc_jit('Not implemented in old-pipeline')
+    def test_series_getitem_idx_bool_array2(self):
+        """ Verifies negative case of using Series.getitem by Boolean array indexer
+        on a Series with different length than the indexer """
+        def test_impl(A, idx):
+            return A[idx]
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        np.random.seed(0)
+        S = pd.Series(np.arange(n))
+        idxs_to_test = [
+            np.random.choice([True, False], n - 3),
+            np.random.choice([True, False], n + 3)
+        ]
+
+        for idx in idxs_to_test:
+            with self.subTest(idx=idx):
+                with self.assertRaises(Exception) as context:
+                    test_impl(S, idx)
+                pandas_exception = context.exception
+
+                with self.assertRaises(type(pandas_exception)) as context:
+                    hpat_func(S, idx)
+                sdc_exception = context.exception
+                self.assertIn(str(sdc_exception), str(pandas_exception))
+
+    @skip_sdc_jit('Not implemented in old-pipeline')
+    def test_series_getitem_idx_bool_list(self):
+        """ Verifies Series.getitem by mask indicated by a Boolean list on Series of various dtypes and indexes """
+
+        n = 11
+        np.random.seed(0)
+
+        data_to_test = [
+            np.arange(n),
+            np.arange(n, dtype='float'),
+            np.random.choice([True, False], n),
+            gen_strlist(n, 2, 'abcd123 ')
+        ]
+        idxs_to_test = [
+            None,
+            np.arange(n),
+            np.arange(n, dtype='float'),
+            gen_strlist(n, 2, 'abcd123 ')
+        ]
+
+        idx = list(np.random.choice([True, False], n))
+        self._test_series_getitem(data_to_test, idxs_to_test, [idx])
+
+    @skip_sdc_jit('Not implemented in old-pipeline')
+    def test_series_getitem_idx_bool_series1(self):
+        """ Verifies Series.getitem by mask indicated by a Boolean Series on Series of various dtypes
+        when both Series and indexer have default indexes """
+
+        n, k = 21, 13
+        np.random.seed(0)
+
+        data_to_test = [
+            np.arange(n),
+            np.arange(n, dtype='float'),
+            np.random.choice([True, False], n),
+            gen_strlist(n, 2, 'abcd123 ')
+        ]
+
+        idxs_to_test = []
+        for s in (n, 2*n):
+            idx = pd.Series(np.zeros(s, dtype=np.bool), index=None)
+            idx[take_k_elements(k, np.arange(s))] = True
+            idxs_to_test.append(idx)
+
+        self._test_series_getitem(data_to_test, [None], idxs_to_test)
+
+    @skip_sdc_jit('Not implemented in old-pipeline')
+    def test_series_getitem_idx_bool_series2(self):
+        """ Verifies negative case of using Series.getitem with Boolean Series indexer idx with default index
+        on a Series with default index but wider range of index values """
+        def test_impl(A, idx):
+            return A[idx]
+        hpat_func = self.jit(test_impl)
+
+        n, k = 21, 13
+        np.random.seed(0)
+
+        S = pd.Series(np.arange(n))
+        idx = pd.Series(np.zeros(n - 3, dtype=np.bool), index=None)
+        idx[take_k_elements(k, np.arange(k))] = True
+
+        with self.assertRaises(Exception) as context:
+            test_impl(S, idx)
+        pandas_exception = context.exception
+
+        with self.assertRaises(type(pandas_exception)) as context:
+            hpat_func(S, idx)
+        sdc_exception = context.exception
+        self.assertIn(str(sdc_exception), str(pandas_exception))
+
+    @skip_sdc_jit('Not implemented in old-pipeline')
+    def test_series_getitem_idx_bool_series_reindex(self):
+        """ Verifies Series.getitem with reindexing by mask indicated by a Boolean Series
+        on Series with various types of indexes """
+
+        def test_impl(A, idx):
+            return A[idx]
+        hpat_func = self.jit(test_impl)
+
+        n, k = 21, 13
+        np.random.seed(0)
+
+        idx_indexes_to_test = {
+            'default': None,
+            'int': np.arange(n),
+            'float': np.arange(n, dtype='float'),
+            'str': gen_strlist(n, 2, 'abcd123 ')
+        }
+
+        idx_data = np.random.choice([True, False], n)
+        for idx_index in idx_indexes_to_test.values():
+            idx = pd.Series(idx_data, idx_index)
+            # create a series with index values in idx_index
+            idx_values = idx_index if idx_index is not None else np.arange(k)
+            series_index = np.random.choice(idx_values, k)
+            S = pd.Series(np.arange(k), index=series_index)
+            with self.subTest(series=S, idx=idx):
+                result = hpat_func(S, idx)
+                result_ref = test_impl(S, idx)
+                pd.testing.assert_series_equal(result, result_ref)
+
+    @skip_sdc_jit('Not implemented in old-pipeline')
+    def test_series_getitem_idx_bool_series_restrictions1(self):
+        """ Verifies negative case of using Series.getitem with Boolean indexer with duplicate index values """
+        def test_impl(A, idx):
+            return A[idx]
+        hpat_func = self.jit(test_impl)
+
+        n = 7
+        np.random.seed(0)
+
+        S = pd.Series(np.arange(n))
+        idx_data = [True, False, False, True, False, False, True]
+        idx = pd.Series(idx_data, index=[0, 1, 2, 3, 4, 5, 0])
+
+        with self.assertRaises(Exception) as context:
+            test_impl(S, idx)
+        pandas_exception = context.exception
+
+        with self.assertRaises(type(pandas_exception)) as context:
+            hpat_func(S, idx)
+        sdc_exception = context.exception
+        self.assertIn(str(sdc_exception), str(pandas_exception))
+
+    @skip_sdc_jit('Not implemented in old-pipeline')
+    def test_series_getitem_idx_bool_series_restrictions2(self):
+        """ Verifies negative case of using Series.getitem with Boolean indexer
+        on a Series with some indices not present in the indexer (reindexing failure) """
+        def test_impl(A, idx):
+            return A[idx]
+        hpat_func = self.jit(test_impl)
+
+        n = 7
+        np.random.seed(0)
+
+        S = pd.Series(np.arange(n), index=[5, 3, 1, 2, 6, 4, 0])
+        idx_data = [True, False, True, True, False]
+        idx = pd.Series(idx_data, index=[4, 3, 2, 1, 0])
+
+        with self.assertRaises(Exception) as context:
+            test_impl(S, idx)
+        pandas_exception = context.exception
+
+        with self.assertRaises(type(pandas_exception)) as context:
+            hpat_func(S, idx)
+        sdc_exception = context.exception
+        self.assertIn(str(sdc_exception), str(pandas_exception))
+
+    @skip_sdc_jit('Not implemented in old-pipeline')
+    def test_series_getitem_idx_bool_series_restrictions3(self):
+        """ Verifies negative case of using Series.getitem with Boolean indexer
+        on a Series with index of different type that in the indexer """
+        def test_impl(A, idx):
+            return A[idx]
+        hpat_func = self.jit(test_impl)
+
+        n = 7
+        np.random.seed(0)
+
+        incompatible_indexes = [
+            np.arange(n),
+            gen_strlist(n, 2, 'abcd123 ')
+        ]
+        for index1, index2 in combinations(incompatible_indexes, 2):
+            S = pd.Series(np.arange(n), index=index1)
+            idx = pd.Series(np.random.choice([True, False], n), index=index2)
+            with self.subTest(series_index=index1, idx_index=index2):
+                with self.assertRaises(TypingError) as raises:
+                    hpat_func(S, idx)
+                msg = 'The index of boolean indexer is not comparable to Series index.'
+                self.assertIn(msg, str(raises.exception))
 
 
 if __name__ == "__main__":

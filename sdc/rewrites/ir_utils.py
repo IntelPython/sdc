@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -97,6 +97,11 @@ def make_var_name(prefix=None, name=None):
     return var_name
 
 
+def _new_definition(func_ir, var, value, loc):
+    func_ir._definitions[var.name] = [value]
+    return Assign(value=value, target=var, loc=loc)
+
+
 def make_assign(expr, scope, func_ir, loc=unknown_loc, prefix=None, name=None):
     """
     Creates variable, assign statement and add variable to the function definition section
@@ -104,11 +109,7 @@ def make_assign(expr, scope, func_ir, loc=unknown_loc, prefix=None, name=None):
 
     var_name = make_var_name(prefix=prefix, name=name)
     var = Var(scope, var_name, loc)
-    stmt = Assign(expr, var, loc)
-
-    func_ir._definitions[var.name] = [expr]
-
-    return stmt
+    return _new_definition(func_ir, var, expr, loc)
 
 
 def declare_constant(value, block, func_ir, loc=unknown_loc, prefix=None, name=None):

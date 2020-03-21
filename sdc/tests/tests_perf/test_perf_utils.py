@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -101,9 +101,9 @@ def multiply_oneds_data(tmpl, max_len):
 
 def multiply_data(tmpl, max_item_len):
     """Multiply specified 2D like data."""
-    result = []
-    for item in tmpl:
-        result += multiply_oneds_data(item, max_item_len)
+    result = copy(tmpl)
+    for i, item in enumerate(result):
+        result[i] = multiply_oneds_data(item, max_item_len)
 
     return result
 

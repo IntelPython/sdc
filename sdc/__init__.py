@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -62,6 +62,7 @@ if not sdc.config.config_pipeline_hpat_default:
     # sdc.datatypes.hpat_pandas_dataframe_pass.sdc_nopython_pipeline_lite_register
 
     import sdc.rewrites.dataframe_constructor
+    import sdc.rewrites.read_csv_consts
     import sdc.rewrites.dataframe_getitem_attribute
     import sdc.datatypes.hpat_pandas_functions
     import sdc.datatypes.hpat_pandas_dataframe_functions

@@ -34,8 +34,10 @@ import unittest
 from itertools import permutations, product
 from numba.config import IS_32BITS
 from numba.special import literal_unroll
+from numba.errors import TypingError
 
 import sdc
+from sdc.datatypes.common_functions import SDCLimitation
 from sdc.tests.gen_test_data import ParquetGenerator
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (check_numba_version,
@@ -48,7 +50,8 @@ from sdc.tests.test_utils import (check_numba_version,
                                   get_start_end,
                                   skip_numba_jit,
                                   skip_sdc_jit,
-                                  test_global_input_data_float64,)
+                                  test_global_input_data_float64,
+                                  test_global_input_data_unicode_kind4)
 
 
 @sdc.jit
@@ -572,6 +575,97 @@ class TestDataFrame(TestCase):
         df2 = df.copy()
         np.testing.assert_almost_equal(hpat_func(df, arr), test_impl(df2, arr))
 
+    def _test_df_set_column(self, all_data, key, value):
+        def gen_test_impl(value, do_jit=False):
+            if isinstance(value, pd.Series):
+                def test_impl(df, key, value):
+                    if do_jit == True:  # noqa
+                        return df._set_column(key, value.values)
+                    else:
+                        df[key] = value.values
+            else:
+                def test_impl(df, key, value):
+                    if do_jit == True:  # noqa
+                        return df._set_column(key, value)
+                    else:
+                        df[key] = value
+
+            return test_impl
+
+        test_impl = gen_test_impl(value)
+        sdc_func = self.jit(gen_test_impl(value, do_jit=True))
+
+        for data in all_data:
+            with self.subTest(data=data):
+                df1 = pd.DataFrame(data)
+                df2 = df1.copy(deep=True)
+                test_impl(df1, key, value)
+                result_ref = df1  # in pandas setitem modifies original DF
+                result_jit = sdc_func(df2, key, value)
+                pd.testing.assert_frame_equal(result_jit, result_ref)
+
+    def _test_df_set_column_exception_invalid_length(self, df, key, value):
+        def test_impl(df, key, value):
+            return df._set_column(key, value)
+
+        sdc_func = self.jit(test_impl)
+
+        with self.assertRaises(ValueError) as raises:
+            sdc_func(df, key, value)
+        msg = 'Length of values does not match length of index'
+        self.assertIn(msg, str(raises.exception))
+
+    def _test_df_set_column_exception_empty_columns(self, df, key, value):
+        def test_impl(df, key, value):
+            return df._set_column(key, value)
+
+        sdc_func = self.jit(test_impl)
+
+        with self.assertRaises(SDCLimitation) as raises:
+            sdc_func(df, key, value)
+        msg = 'Could not set item for DataFrame with empty columns'
+        self.assertIn(msg, str(raises.exception))
+
+    def test_df_add_column(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
+        key, value = 'B', np.array([1., -1., 0.])
+
+        self._test_df_set_column(all_data, key, value)
+
+    def test_df_add_column_str(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
+        key, value = 'B', pd.Series(test_global_input_data_unicode_kind4)
+
+        self._test_df_set_column(all_data, key, value)
+
+    def test_df_add_column_exception_invalid_length(self):
+        df = pd.DataFrame({'A': [0, 1, 2], 'C': [3., 4., 5.]})
+        key, value = 'B', np.array([1., np.nan, -1., 0.])
+        self._test_df_set_column_exception_invalid_length(df, key, value)
+
+        df = pd.DataFrame({'A': []})
+        self._test_df_set_column_exception_empty_columns(df, key, value)
+
+    def test_df_replace_column(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}]
+        key, value = 'A', np.array([1., -1., 0.])
+
+        self._test_df_set_column(all_data, key, value)
+
+    def test_df_replace_column_str(self):
+        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}]
+        key, value = 'A', pd.Series(test_global_input_data_unicode_kind4)
+
+        self._test_df_set_column(all_data, key, value)
+
+    def test_df_replace_column_exception_invalid_length(self):
+        df = pd.DataFrame({'A': [0, 1, 2], 'C': [3., 4., 5.]})
+        key, value = 'A', np.array([1., np.nan, -1., 0.])
+        self._test_df_set_column_exception_invalid_length(df, key, value)
+
+        df = pd.DataFrame({'A': []})
+        self._test_df_set_column_exception_empty_columns(df, key, value)
+
     def _test_df_values_unboxing(self, df):
         def test_impl(df):
             return df.values
@@ -983,6 +1077,29 @@ class TestDataFrame(TestCase):
                 with self.subTest(n=n, index=idx):
                     pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
 
+    def test_df_iat(self):
+        def test_impl(df):
+            return df.iat[0, 1]
+        sdc_func = sdc.jit(test_impl)
+        idx = [3, 4, 2, 6, 1]
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
+        self.assertEqual(sdc_func(df), test_impl(df))
+
+    def test_df_iat_value_error(self):
+        def test_impl(df):
+            return df.iat[1, 22]
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": ['a', 'dd', 'c', '12', 'ddf']})
+
+        with self.assertRaises(TypingError) as raises:
+            sdc_func(df)
+        msg = 'Index is out of bounds for axis'
+        self.assertIn(msg, str(raises.exception))
+
     def test_df_head(self):
         def get_func(n):
             def impl(a):
@@ -1005,6 +1122,23 @@ class TestDataFrame(TestCase):
                         index=[3, 4, 2, 6, 1]
                     )
                     pd.testing.assert_frame_equal(sdc_func(df), ref_impl(df))
+
+    def test_df_copy(self):
+        def test_impl(df, deep):
+            return df.copy(deep=deep)
+
+        sdc_func = sdc.jit(test_impl)
+        indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e'], None]
+        cases_deep = [None, True, False]
+
+        for idx in indexes:
+            df = pd.DataFrame({"A": [3.2, np.nan, 7.0, 3.3, np.nan],
+                               "B": [3, 4, 1, 0, 222],
+                               "C": [True, True, False, False, True],
+                               "D": ['a', 'dd', 'c', '12', None]}, index=idx)
+            for deep in cases_deep:
+                with self.subTest(index=idx, deep=deep):
+                    pd.testing.assert_frame_equal(sdc_func(df, deep), test_impl(df, deep))
 
     def test_pct_change1(self):
         def test_impl(n):
@@ -1461,7 +1595,6 @@ class TestDataFrame(TestCase):
                     sdc_func(df, arr)
                 self.assertIn('Item wrong length', str(raises.exception))
 
-
     @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx(self):
         dfs = [gen_df(test_global_input_data_float64),
@@ -1500,7 +1633,6 @@ class TestDataFrame(TestCase):
                 self._test_df_getitem_bool_series_even_idx(df)
                 self._test_df_getitem_bool_array_even_idx(df)
 
-    @unittest.skip('DF.getitem df[bool_series] unsupported index')
     def test_df_getitem_bool_series_even_idx_with_index(self):
         df = gen_df(test_global_input_data_float64, with_index=True)
         self._test_df_getitem_bool_series_even_idx(df)
