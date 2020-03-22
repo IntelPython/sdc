@@ -947,32 +947,67 @@ def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 @sdc_overload_method(DataFrameType, 'sum')
 def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.sum` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.sum
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_sum*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level``, ``numeric_only`` and ``min_count`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
-       min_count:
-            *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_sum.py
+       :language: python
+       :lines: 35-
+       :caption: Return the sum of the values for the columns.
+       :name: ex_dataframe_sum
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return the sum of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_sum.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`Series.sum <pandas.Series.sum>`
+            Return the sum.
+
+        :ref:`Series.min <pandas.Series.min>`
+            Return the minimum.
+
+        :ref:`Series.max <pandas.Series.max>`
+            Return the maximum.
+
+        :ref:`Series.idxmin <pandas.Series.idxmin>`
+            Return the index of the minimum.
+
+        :ref:`Series.idxmax <pandas.Series.idxmax>`
+            Return the index of the maximum.
+
+        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
+            Return the sum over the requested axis.
+
+        :ref:`DataFrame.min <pandas.DataFrame.min>`
+            Return the minimum over the requested axis.
+
+        :ref:`DataFrame.max <pandas.DataFrame.max>`
+            Return the maximum over the requested axis.
+
+        :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
+            Return the index of the minimum over the requested axis.
+
+        :ref:`DataFrame.idxmax <pandas.DataFrame.idxmax>`
+            Return the index of the maximum over the requested axis.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.sum` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_sum*
+    """
 
     name = 'sum'
 
