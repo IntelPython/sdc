@@ -2048,11 +2048,58 @@ def df_set_column_overload(self, key, value):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
+    Pandas API: pandas.DataFrame.setitem
+
+    Set data to a DataFrame by indexer.
 
     Limitations
     -----------
-    - Supported setting a columns in a non-empty DataFrame as a 1D array only.
-    - Unsupported change of the Parent DataFrame, returned new DataFrame.
+    - Supported setting a column in a DataFrame through private method ``df._set_column(key, value)``.
+    - DataFrame passed into jit region as a parameter is not changed outside of the region.
+    New DataFrame should be returned from the region in this case.
+    - Supported setting a column in a non-empty DataFrame as a 1D array only.
+
+    .. literalinclude:: ../../../examples/dataframe/setitem/df_set_new_column.py
+       :language: python
+       :lines: 37-
+       :caption: Setting new column to the DataFrame.
+       :name: ex_dataframe_set_new_column
+
+    .. command-output:: python ./dataframe/setitem/df_set_new_column.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/setitem/df_set_existing_column.py
+       :language: python
+       :lines: 37-
+       :caption: Setting data to existing column of the DataFrame.
+       :name: ex_dataframe_set_existing_column
+
+    .. command-output:: python ./dataframe/setitem/df_set_existing_column.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.getitem <pandas.Series.getitem>`
+            Get value(s) of Series by key.
+        :ref:`Series.setitem <pandas.Series.setitem>`
+            Set value to Series by index
+        :ref:`Series.loc <pandas.Series.loc>`
+            Access a group of rows and columns by label(s) or a boolean array.
+        :ref:`Series.iloc <pandas.Series.iloc>`
+            Purely integer-location based indexing for selection by position.
+        :ref:`Series.at <pandas.Series.at>`
+            Access a single value for a row/column label pair.
+        :ref:`Series.iat <pandas.Series.iat>`
+            Access a single value for a row/column pair by integer position.
+        :ref:`DataFrame.getitem <pandas.DataFrame.getitem>`
+            Set value to DataFrame by index
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Access a group of rows and columns by label(s) or a boolean array.
+        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+            Purely integer-location based indexing for selection by position.
+        :ref:`DataFrame.at <pandas.DataFrame.at>`
+            Access a single value for a row/column label pair.
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Access a single value for a row/column pair by integer position.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
