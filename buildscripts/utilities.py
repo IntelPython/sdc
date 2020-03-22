@@ -132,6 +132,7 @@ class SDC_Build_Utilities:
             print(f'{time.strftime("%d/%m/%Y %H:%M:%S")}: {self.line_double}', flush=True)
         print(f'{time.strftime("%d/%m/%Y %H:%M:%S")}: {msg}', flush=True)
 
+
 """
 Create conda environment with desired python and packages
 """
