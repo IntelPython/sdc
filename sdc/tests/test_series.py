@@ -4892,8 +4892,8 @@ class TestSeries(
     @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_series_quantile(self):
         def test_impl():
-            A = pd.Series([1, 2.5, .5, 3, 5])
-            return A.quantile()
+            a = pd.Series([1, 2.5, .5, 3, 5])
+            return a.quantile()
 
         hpat_func = self.jit(test_impl)
         np.testing.assert_equal(hpat_func(), test_impl())
@@ -4903,12 +4903,12 @@ class TestSeries(
         def test_series_quantile_q_vector_impl(S, param1):
             return S.quantile(param1)
 
-        S = pd.Series(np.random.ranf(100))
+        s = pd.Series(np.random.ranf(100))
         hpat_func = self.jit(test_series_quantile_q_vector_impl)
 
         param1 = [0.0, 0.25, 0.5, 0.75, 1.0]
-        result_ref = test_series_quantile_q_vector_impl(S, param1)
-        result = hpat_func(S, param1)
+        result_ref = test_series_quantile_q_vector_impl(s, param1)
+        result = hpat_func(s, param1)
         np.testing.assert_equal(result, result_ref)
 
     @unittest.skip("Implement unique without sorting like in pandas")

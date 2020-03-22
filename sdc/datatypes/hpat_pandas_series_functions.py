@@ -3378,6 +3378,10 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
 
     Pandas API: pandas.Series.quantile
 
+    Limitations
+    -----------
+    Parameter ``interpolation`` is currently unsupported.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_quantile.py
@@ -3389,13 +3393,14 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     .. command-output:: python ./series/series_quantile.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter interpolation is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
-        `numpy.absolute <https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html#numpy.percentile>`_
+        :ref:`core.window.Rolling.quantile <pandas.core.window.Rolling.quantile>`
+            Calculate the rolling quantile.
+
+        `numpy.percentile
+        <https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html#numpy.percentile>`_
+            Compute the q-th percentile of the data along the specified axis.
 
 
     Intel Scalable Dataframe Compiler Developer Guide
