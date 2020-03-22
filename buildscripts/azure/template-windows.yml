@@ -21,7 +21,7 @@ jobs:
 
     - script: |
         call C:\\Miniconda\\Scripts\\activate.bat
-        python buildscripts/build.py --python=$PYTHON_VER --numpy=$NUMPY_VER
+        python buildscripts\\build.py --python=%PYTHON_VER% --numpy=%NUMPY_VER%
       displayName: 'Build Intel SDC'
       continueOnError: ${{ parameters.allowFailure }}
 

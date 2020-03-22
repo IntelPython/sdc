@@ -41,11 +41,10 @@ def build(sdc_utils):
         '--no-test',
         f'--python {sdc_utils.python}',
         f'--numpy {sdc_utils.numpy}',
-        f'--croot {sdc_utils.croot_folder}',
         f'--output-folder {str(sdc_utils.output_folder)}',
         sdc_utils.channels,
         '--override-channels',
-        sdc_utils.recipe
+        str(sdc_utils.recipe)
     ])
     sdc_utils.run_command(conda_build_cmd)
     sdc_utils.log_info('Intel SDC build SUCCESSFUL', separate=True)
