@@ -19,11 +19,24 @@ the code by leveraging modern hardware instructions and by utilizing all availab
 
 Intel SDC's documentation can be found `here <https://intelpython.github.io/sdc-doc/>`_.
 
-Installing Binary Packages (conda)
+Installing Binary Packages (conda and wheel)
 ----------------------------------
+Intel SDC is available on the Anaconda Cloud intel/label/beta channel.
+Distribution includes Intel SDC for Python 3.6 and Python 3.7 for Windows and Linux platforms.
+
+Intel SDC conda package can be installed using the steps below:
 ::
 
-   Currently binary packages are not provided.
+    > conda create -n sdc_env python=<3.7 or 3.6>
+    > conda activate sdc_env
+    > conda install sdc -c intel/label/beta -c intel -c defaults -c conda-forge --override-channels
+
+Intel SDC wheel package can be installed using the steps below:
+::
+
+    > conda create -n sdc_env python=<3.7 or 3.6> pip
+    > conda activate sdc_env
+    > pip install --index-url https://pypi.anaconda.org/intel/label/beta/simple --extra-index-url https://pypi.anaconda.org/intel/simple --extra-index-url https://pypi.org/simple sdc
 
 
 Building Intel® SDC from Source on Linux
