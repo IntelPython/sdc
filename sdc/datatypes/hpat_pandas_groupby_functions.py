@@ -45,10 +45,26 @@ from numba.special import literally
 from sdc.datatypes.common_functions import sdc_arrays_argsort, _sdc_asarray, _sdc_take
 from sdc.datatypes.hpat_pandas_groupby_types import DataFrameGroupByType, SeriesGroupByType
 from sdc.utilities.sdc_typing_utils import TypeChecker, kwsparams2list, sigparams2list
-from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
+from sdc.utilities.utils import (sdc_overload, sdc_overload_method, sdc_register_jitable,
+                                 sdc_register_jitable)
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_ext import string_type
+
+
+@sdc_register_jitable
+def merge_groupby_dicts(left, right):
+    if not right:
+        return left
+
+    for key, right_group_list in right.items():
+        left_group_list = left.get(key)
+        if left_group_list is None:
+            left[key] = right_group_list
+        else:
+            left_group_list.extend(right_group_list)
+
+    return left
 
 
 @intrinsic
