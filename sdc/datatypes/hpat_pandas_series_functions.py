@@ -4614,7 +4614,9 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     Limitations
     -----------
-    - Parameters kind, order are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``axis`` is supported only with default value ``0``.
+    - Parameter ``order`` is supported only with default value ``None``.
+    - Parameter ``kind`` is supported only with values ``'mergesort'`` and ``'quicksort'``.
 
     Examples
     --------
@@ -4627,13 +4629,9 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     .. command-output:: python ./series/series_argsort.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
-        `numpy.absolute
+        `numpy.ndarray.argsort
         <https://docs.scipy.org/doc/numpy/reference/generated/numpy.ndarray.argsort.html#numpy.ndarray.argsort>`_
             Return indices of the minimum values along the given axis.
 
