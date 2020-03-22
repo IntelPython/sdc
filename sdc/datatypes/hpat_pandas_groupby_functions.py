@@ -45,10 +45,26 @@ from numba.special import literally
 from sdc.datatypes.common_functions import sdc_arrays_argsort, _sdc_asarray, _sdc_take
 from sdc.datatypes.hpat_pandas_groupby_types import DataFrameGroupByType, SeriesGroupByType
 from sdc.utilities.sdc_typing_utils import TypeChecker, kwsparams2list, sigparams2list
-from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
+from sdc.utilities.utils import (sdc_overload, sdc_overload_method, sdc_register_jitable,
+                                 sdc_register_jitable)
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_ext import string_type
+
+
+@sdc_register_jitable
+def merge_groupby_dicts(left, right):
+    if not right:
+        return left
+
+    for key, right_group_list in right.items():
+        left_group_list = left.get(key)
+        if left_group_list is None:
+            left[key] = right_group_list
+        else:
+            left_group_list.extend(right_group_list)
+
+    return left
 
 
 @intrinsic
@@ -141,10 +157,10 @@ def sdc_pandas_dataframe_getitem(self, idx):
             if idx_is_literal_str == True:  # noqa
                 # no need to pass index into this series, as we group by array
                 target_series = pandas.Series(
-                    data=get_dataframe_data(self._parent, target_col_id_literal),
+                    data=self._parent._data[target_col_id_literal],
                     name=self._parent._columns[target_col_id_literal]
                 )
-                by_arr_data = get_dataframe_data(self._parent, by_col_id_literal)
+                by_arr_data = self._parent._data[by_col_id_literal]
                 return init_series_groupby(target_series, by_arr_data, self._data, self._sort)
             else:
                 return init_dataframe_groupby(self._parent, by_col_id_literal, self._data, self._sort, idx)
@@ -182,12 +198,12 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, de
     # TODO: remove conversion from Numba typed.List to reflected one while creating group_arr_{i}
     func_lines.extend(['\n'.join([
         f'  result_data_{i} = numpy.empty(res_index_len, dtype=res_arrays_dtypes[{i}])',
-        f'  column_data_{i} = get_dataframe_data({df}, {column_ids[i]})',
+        f'  column_data_{i} = {df}._data[{column_ids[i]}]',
         f'  for j in numpy.arange(res_index_len):',
-        f'    group_arr_{i} = _sdc_take(column_data_{i}, list({groupby_dict}[group_keys[j]]))',
-        f'    group_series_{i} = pandas.Series(group_arr_{i})',
         f'    idx = argsorted_index[j] if {groupby_param_sort} else j',
-        f'    result_data_{i}[idx] = group_series_{i}.{func_name}({extra_impl_params})',
+        f'    group_arr_{i} = _sdc_take(column_data_{i}, list({groupby_dict}[group_keys[idx]]))',
+        f'    group_series_{i} = pandas.Series(group_arr_{i})',
+        f'    result_data_{i}[j] = group_series_{i}.{func_name}({extra_impl_params})',
     ]) for i in range(len(columns))])
 
     data = ', '.join(f'\'{column_names[i]}\': result_data_{i}' for i in range(len(columns)))
@@ -204,8 +220,7 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, de
                    'numpy': numpy,
                    '_sdc_asarray': _sdc_asarray,
                    '_sdc_take': _sdc_take,
-                   'sdc_arrays_argsort': sdc_arrays_argsort,
-                   'get_dataframe_data': get_dataframe_data}
+                   'sdc_arrays_argsort': sdc_arrays_argsort}
 
     return func_text, global_vars
 
@@ -229,10 +244,10 @@ def _sdc_pandas_series_groupby_generic_func_codegen(func_name, func_params, defa
         f'    argsorted_index = sdc_arrays_argsort(group_keys, kind=\'mergesort\')',
         f'  result_data = numpy.empty(res_index_len, dtype=res_dtype)',
         f'  for j in numpy.arange(res_index_len):',
-        f'    group_arr = _sdc_take({series}._data, list({groupby_dict}[group_keys[j]]))',
-        f'    group_series = pandas.Series(group_arr)',
         f'    idx = argsorted_index[j] if {groupby_param_sort} else j',
-        f'    result_data[idx] = group_series.{func_name}({extra_impl_params})',
+        f'    group_arr = _sdc_take({series}._data, list({groupby_dict}[group_keys[idx]]))',
+        f'    group_series = pandas.Series(group_arr)',
+        f'    result_data[j] = group_series.{func_name}({extra_impl_params})',
         f'  if {groupby_param_sort}:',
         f'    res_index = _sdc_take(group_keys, argsorted_index)',
         f'  else:',

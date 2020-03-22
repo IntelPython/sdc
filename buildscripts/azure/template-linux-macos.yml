@@ -27,21 +27,15 @@ jobs:
       continueOnError: ${{ parameters.allowFailure }}
 
     - script: |
-        if [ "$USE_NUMBA_MASTER" == "False" ]; then
-            $HOME/miniconda3/bin/python buildscripts/test.py --test-mode=conda --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$HOME/miniconda3;
-        else
-            $HOME/miniconda3/bin/python buildscripts/test.py --test-mode=conda --python=$PYTHON_VER --numpy=$NUMPY_VER --use-numba-master --conda-prefix=$HOME/miniconda3;
-        fi
-      displayName: 'Test conda package'
+        source $HOME/miniconda3/bin/activate
+        python buildscripts/test.py --python=$PYTHON_VER --sdc-channel=./sdc-build
+      displayName: 'Test Intel SDC conda package'
       continueOnError: ${{ parameters.allowFailure }}
 
     - script: |
-        if [ "$USE_NUMBA_MASTER" == "False" ]; then
-            $HOME/miniconda3/bin/python buildscripts/test.py --test-mode=examples --python=$PYTHON_VER --numpy=$NUMPY_VER --conda-prefix=$HOME/miniconda3;
-        else
-            $HOME/miniconda3/bin/python buildscripts/test.py --test-mode=examples --python=$PYTHON_VER --numpy=$NUMPY_VER --use-numba-master --conda-prefix=$HOME/miniconda3;
-        fi
-      displayName: 'Test package examples'
+        source $HOME/miniconda3/bin/activate
+        python buildscripts/run_examples.py --python=$PYTHON_VER --sdc-channel=./sdc-build
+      displayName: 'Run Intel SDC examples'
       continueOnError: ${{ parameters.allowFailure }}
 
     - script: |

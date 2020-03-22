@@ -22,8 +22,7 @@ before_install:
 
 install: skip
 
-script:
-    - $CONDA_PREFIX_PATH/bin/python buildscripts/test.py --test-mode=$TEST_MODE --python=$PYTHON_VER --numpy=$NUMPY_VER --use-numba-master --conda-prefix=$CONDA_PREFIX_PATH
+script: skip
 
 after_success: skip
 
