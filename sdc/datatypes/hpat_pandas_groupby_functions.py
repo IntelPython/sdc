@@ -580,3 +580,156 @@ def sdc_pandas_series_groupby_var(self, ddof=1, *args):
 
     applied_func_name = 'var'
     return sdc_pandas_series_groupby_apply_func(self, applied_func_name, method_args, default_values, impl_used_params)
+
+
+sdc_pandas_dataframe_groupby_docstring_tmpl = """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.core.groupby.GroupBy.{method_name}
+{limitations_block}
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/groupby/dataframe_groupby_{method_name}.py
+       :language: python
+       :lines: 27-
+       :caption: {example_caption}
+       :name: ex_dataframe_groupby_{method_name}
+
+    .. command-output:: python ./dataframe/groupby/dataframe_groupby_{method_name}.py
+       :cwd: ../../../examples
+{see_also}
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.groupby.{method_name}()` implementation.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_groupby.TestGroupBy.test_dataframe_groupby_{method_name}*
+
+    Parameters
+    ----------
+    self: :class:`pandas.DataFrame.groupby`
+        input arg{extra_params}
+
+    Returns
+    -------
+    :obj:`pandas.DataFrame`
+         returns :obj:`pandas.DataFrame` object
+"""
+
+
+sdc_pandas_dataframe_groupby_count.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'count',
+    'example_caption': 'Compute count of group, excluding missing values.',
+    'limitations_block': '',
+    'see_also':
+    """
+    .. seealso::
+        :ref:`Series.groupby <pandas.Series.groupby>`
+            Group Series using a mapper or by a Series of columns.
+        :ref:`DataFrame.groupby <pandas.DataFrame.groupby>`
+            Group DataFrame using a mapper or by a Series of columns.
+    """,
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_max.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'max',
+    'example_caption': 'Compute max of group values.',
+    'limitations_block': '',
+    'see_also': '',
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_mean.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'mean',
+    'example_caption': 'Compute mean of groups, excluding missing values.',
+    'limitations_block': '',
+    'see_also':
+    """
+    .. seealso::
+        :ref:`Series.groupby <pandas.Series.groupby>`
+            Group Series using a mapper or by a Series of columns.
+        :ref:`DataFrame.groupby <pandas.DataFrame.groupby>`
+            Group DataFrame using a mapper or by a Series of columns.
+    """,
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_median.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'median',
+    'example_caption': 'Compute median of groups, excluding missing values.',
+    'limitations_block': '',
+    'see_also':
+    """
+    .. seealso::
+        :ref:`Series.groupby <pandas.Series.groupby>`
+            Group Series using a mapper or by a Series of columns.
+        :ref:`DataFrame.groupby <pandas.DataFrame.groupby>`
+            Group DataFrame using a mapper or by a Series of columns.
+    """,
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_min.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'min',
+    'example_caption': 'Compute min of group values.',
+    'limitations_block': '',
+    'see_also': '',
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_prod.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'prod',
+    'example_caption': 'Compute prod of group values.',
+    'limitations_block': '',
+    'see_also': '',
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_std.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'std',
+    'example_caption': 'Compute standard deviation of groups, excluding missing values.',
+    'limitations_block': '',
+    'see_also':
+    """
+    .. seealso::
+        :ref:`Series.groupby <pandas.Series.groupby>`
+            Group Series using a mapper or by a Series of columns.
+        :ref:`DataFrame.groupby <pandas.DataFrame.groupby>`
+            Group DataFrame using a mapper or by a Series of columns.
+    """,
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_sum.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'sum',
+    'example_caption': 'Compute sum of groups, excluding missing values.',
+    'limitations_block': '',
+    'see_also': '',
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_var.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'sum',
+    'example_caption': 'Compute variance of groups, excluding missing values.',
+    'limitations_block': '',
+    'see_also':
+    """
+    .. seealso::
+        :ref:`Series.groupby <pandas.Series.groupby>`
+            Group Series using a mapper or by a Series of columns.
+        :ref:`DataFrame.groupby <pandas.DataFrame.groupby>`
+            Group DataFrame using a mapper or by a Series of columns.
+    """,
+    'extra_params': ''
+})
