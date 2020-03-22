@@ -69,8 +69,12 @@ if __name__ == '__main__':
     sdc_utils.numpy = args.numpy
     sdc_utils.log_info('Build Intel(R) SDC conda and wheel packages', separate=True)
     sdc_utils.log_info(sdc_utils.line_double)
-    # Install conda-build and python from anaconda channel due to issue with wheel
+
+    sdc_env_packages = ['conda-build']
+    if platform.system() == 'Windows':
+        sdc_env_packages += ['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64', 'pywin32=223']
+    # Install conda-build and other packages from anaconda channel due to issue with wheel
     # output build if use intel channels first
-    sdc_utils.create_environment(['conda-build', '-c', 'anaconda'])
+    sdc_utils.create_environment(sdc_env_packages + ['-c', 'anaconda'])
 
     build(sdc_utils)
