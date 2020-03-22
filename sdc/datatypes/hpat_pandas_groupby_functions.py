@@ -184,10 +184,10 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, de
         f'  result_data_{i} = numpy.empty(res_index_len, dtype=res_arrays_dtypes[{i}])',
         f'  column_data_{i} = {df}._data[{column_ids[i]}]',
         f'  for j in numpy.arange(res_index_len):',
-        f'    group_arr_{i} = _sdc_take(column_data_{i}, list({groupby_dict}[group_keys[j]]))',
-        f'    group_series_{i} = pandas.Series(group_arr_{i})',
         f'    idx = argsorted_index[j] if {groupby_param_sort} else j',
-        f'    result_data_{i}[idx] = group_series_{i}.{func_name}({extra_impl_params})',
+        f'    group_arr_{i} = _sdc_take(column_data_{i}, list({groupby_dict}[group_keys[idx]]))',
+        f'    group_series_{i} = pandas.Series(group_arr_{i})',
+        f'    result_data_{i}[j] = group_series_{i}.{func_name}({extra_impl_params})',
     ]) for i in range(len(columns))])
 
     data = ', '.join(f'\'{column_names[i]}\': result_data_{i}' for i in range(len(columns)))
@@ -228,10 +228,10 @@ def _sdc_pandas_series_groupby_generic_func_codegen(func_name, func_params, defa
         f'    argsorted_index = sdc_arrays_argsort(group_keys, kind=\'mergesort\')',
         f'  result_data = numpy.empty(res_index_len, dtype=res_dtype)',
         f'  for j in numpy.arange(res_index_len):',
-        f'    group_arr = _sdc_take({series}._data, list({groupby_dict}[group_keys[j]]))',
-        f'    group_series = pandas.Series(group_arr)',
         f'    idx = argsorted_index[j] if {groupby_param_sort} else j',
-        f'    result_data[idx] = group_series.{func_name}({extra_impl_params})',
+        f'    group_arr = _sdc_take({series}._data, list({groupby_dict}[group_keys[idx]]))',
+        f'    group_series = pandas.Series(group_arr)',
+        f'    result_data[j] = group_series.{func_name}({extra_impl_params})',
         f'  if {groupby_param_sort}:',
         f'    res_index = _sdc_take(group_keys, argsorted_index)',
         f'  else:',
