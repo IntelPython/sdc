@@ -871,30 +871,53 @@ def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 @sdc_overload_method(DataFrameType, 'max')
 def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.max` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.max
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_max*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level`` and  ``numeric_only`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_max.py
+       :language: python
+       :lines: 35-
+       :caption: Return the maximum of the values for the columns.
+       :name: ex_dataframe_max
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return the maximum of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_max.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.sum <pandas.Series.sum>`
+            Return the sum.
+        :ref:`Series.max <pandas.Series.max>`
+            Return the maximum.
+        :ref:`Series.idxmin <pandas.Series.idxmin>`
+            Return the index of the minimum.
+        :ref:`Series.idxmax <pandas.Series.idxmax>`
+            Return the index of the maximum.
+        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
+            Return the sum over the requested axis.
+        :ref:`DataFrame.min <pandas.DataFrame.min>`
+            Return the minimum over the requested axis.
+        :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
+            Return the index of the minimum over the requested axis.
+        :ref:`DataFrame.idxmax <pandas.DataFrame.idxmax>`
+            Return the index of the maximum over the requested axis.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.max` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_max*
+    """
 
     name = 'max'
 
