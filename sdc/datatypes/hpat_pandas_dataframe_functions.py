@@ -688,8 +688,8 @@ def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, 
     if not (isinstance(numeric_only, types.Omitted) or numeric_only is None):
         ty_checker.raise_exc(numeric_only, 'unsupported', 'numeric_only')
 
-    if not (isinstance(ddof, types.Omitted) or ddof == 1):
-        ty_checker.raise_exc(ddof, 'unsupported', 'ddof')
+    if not (isinstance(ddof, (types.Omitted, types.Integer)) or ddof == 1):
+        ty_checker.raise_exc(ddof, 'int', 'ddof')
 
     if not (isinstance(min_count, types.Omitted) or min_count == 0):
         ty_checker.raise_exc(min_count, 'unsupported', 'min_count')
@@ -820,32 +820,43 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 @sdc_overload_method(DataFrameType, 'var')
 def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.var` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.var
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_var*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       ddof:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_var.py
+       :language: python
+       :lines: 35-
+       :caption: Return unbiased variance over requested axis.
+       :name: ex_dataframe_var
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return sample standard deviation over requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_var.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.std <pandas.Series.std>`
+            Returns sample standard deviation over Series.
+        :ref:`Series.var<pandas.Series.var>`
+            Returns unbiased variance over Series.
+        :ref:`DataFrame.std <pandas.DataFrame.std>`
+            Returns sample standard deviation over DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.var` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_var*
+    """
 
     name = 'var'
 
