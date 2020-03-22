@@ -21,12 +21,9 @@ jobs:
       displayName: 'Install conda'
 
     - script: |
-        if [ "$USE_NUMBA_MASTER" == "False" ]; then
-            $HOME/miniconda3/bin/python buildscripts/build.py --build-mode=package --python=$PYTHON_VER --numpy=$NUMPY_VER --skip-smoke-tests --conda-prefix=$HOME/miniconda3;
-        else
-            $HOME/miniconda3/bin/python buildscripts/build.py --build-mode=package --python=$PYTHON_VER --numpy=$NUMPY_VER --use-numba-master --skip-smoke-tests --conda-prefix=$HOME/miniconda3;
-        fi
-      displayName: 'Build conda and wheel packages'
+        source $HOME/miniconda3/bin/activate
+        python buildscripts/build.py --python=$PYTHON_VER --numpy=$NUMPY_VER
+      displayName: 'Build Intel SDC'
       continueOnError: ${{ parameters.allowFailure }}
 
     - script: |
