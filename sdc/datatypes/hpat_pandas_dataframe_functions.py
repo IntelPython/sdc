@@ -765,30 +765,39 @@ def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 @sdc_overload_method(DataFrameType, 'mean')
 def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.mean` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.mean
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_mean*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_mean.py
+       :language: python
+       :lines: 35-
+       :caption: Return the mean of the values for the columns.
+       :name: ex_dataframe_mean
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return the mean of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_mean.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.mean <pandas.Series.mean>`
+            Return the mean of the values for the Series.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.mean` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_mean*
+    """
 
     name = 'mean'
 
