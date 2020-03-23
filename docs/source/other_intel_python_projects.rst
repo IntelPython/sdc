@@ -38,6 +38,3 @@ Intel also directly upstream optimizations to some open source projects such as
 
 For more information please visit
 `Intel® Distribution for Python* <https://software.intel.com/en-us/distribution-for-python>`_  product page.
-
-.. todo::
-     Links to other resources about Intel Python (examples, documentation, media, use cases, press)
