@@ -4412,12 +4412,12 @@ def hpat_pandas_series_nunique(self, dropna=True):
        :cwd: ../../../examples
 
     .. seealso::
-
         :ref:`DataFrame.nunique <pandas.DataFrame.nunique>`
             Method nunique for DataFrame.
-
         :ref:`Series.count <pandas.Series.count>`
             Count non-NA/null observations in the Series.
+        :ref:`DatatFrame.count <pandas.DataFrame.count>`
+            Count non-NA cells for each column
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
