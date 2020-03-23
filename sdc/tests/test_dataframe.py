@@ -1694,36 +1694,93 @@ class TestDataFrame(TestCase):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)
 
-        hpat_func = self.jit(test_impl)
+        sdc_func = self.jit(test_impl)
         n = 11
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         df2 = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         df2.A[n // 2:] = n
-        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+        pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
 
-    def test_append_df_diff_cols_no_index(self):
+    def test_append_df_same_cols_index_default(self):
+        def test_impl(df, df2):
+            return df.append(df2)
+
+        sdc_func = self.jit(test_impl)
+        n = 11
+        df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2}, index=np.arange(n) ** 4)
+        df2 = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2}, index=np.arange(n) ** 8)
+        df2.A[n // 2:] = n
+
+        pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
+
+    def test_append_df_diff_cols_index_ignore_false(self):
+        def test_impl(df, df2):
+            return df.append(df2, ignore_index=False)
+
+        sdc_func = self.jit(test_impl)
+        n1 = 11
+        n2 = n1 * 2
+        df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1)**2}, index=np.arange(n1) ** 4)
+        df2 = pd.DataFrame({'C': np.arange(n2), 'D': np.arange(n2)**2, 'E S D': np.arange(n2) + 100},
+                           index=np.arange(n2) ** 8)
+
+        pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
+
+    def test_append_df_diff_cols_index_ignore_index(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)
 
-        hpat_func = self.jit(test_impl)
+        sdc_func = self.jit(test_impl)
         n1 = 11
+        n2 = n1 * 2
+        df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1)**2}, index=np.arange(n1) ** 4)
+        df2 = pd.DataFrame({'C': np.arange(n2), 'D': np.arange(n2)**2, 'E S D': np.arange(n2) + 100},
+                           index=np.arange(n2) ** 8)
+
+        pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
+
+    def test_append_df_diff_cols_no_index(self):
+        def test_impl(df, df2):
+            return df.append(df2)
+
+        sdc_func = self.jit(test_impl)
+        n1 = 4
         n2 = n1 * 2
         df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1)**2})
         df2 = pd.DataFrame({'C': np.arange(n2), 'D': np.arange(n2)**2, 'E S D': np.arange(n2) + 100})
 
-        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+        pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
 
     def test_append_df_cross_cols_no_index(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)
 
-        hpat_func = self.jit(test_impl)
+        sdc_func = self.jit(test_impl)
         n1 = 11
         n2 = n1 * 2
         df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1)**2})
         df2 = pd.DataFrame({'A': np.arange(n2), 'D': np.arange(n2)**2, 'E S D': np.arange(n2) + 100})
 
-        pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
+        pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
+
+    def test_append_df_exception_incomparable_index_type(self):
+        def test_impl(df, df2):
+            return df.append(df2, ignore_index=False)
+
+        sdc_func = self.jit(test_impl)
+
+        n1 = 2
+        n2 = n1 * 2
+        df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1) ** 2}, index=['a', 'b'])
+        df2 = pd.DataFrame({'A': np.arange(n2), 'D': np.arange(n2) ** 2, 'E S D': np.arange(n2) + 100},
+                           index=np.arange(n2))
+
+        with self.assertRaises(SDCLimitation) as raises:
+            sdc_func(df, df2)
+
+        msg = "Indexes of dataframes are expected to have comparable (both Numeric or String) types " \
+              "if parameter ignore_index is set to False."
+        self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit
     def test_append_df_diff_types_no_index(self):

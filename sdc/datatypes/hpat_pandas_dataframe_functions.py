@@ -30,11 +30,11 @@
 '''
 
 
+import numba
+import numpy
 import operator
 import pandas
-import numpy
 import sdc
-
 
 from pandas.core.indexing import IndexingError
 
@@ -58,12 +58,13 @@ from sdc.datatypes.common_functions import SDCLimitation
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
-from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby
+from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby, merge_groupby_dicts
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
 from sdc.hiframes.api import isna
 from sdc.functions.numpy_like import getitem_by_mask
 from sdc.datatypes.common_functions import _sdc_take, sdc_reindex_series
+from sdc.utilities.prange_utils import parallel_chunks
 
 @sdc_overload_attribute(DataFrameType, 'index')
 def hpat_pandas_dataframe_index(df):
@@ -242,13 +243,15 @@ def hpat_pandas_dataframe_values(df):
     return hpat_pandas_df_values_impl(df, numba_common_dtype)
 
 
-def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
+def sdc_pandas_dataframe_append_codegen(df, other, _func_name, ignore_index_value, indexes_comparable, args):
     """
     Input:
     df = pd.DataFrame({'A': ['cat', 'dog', np.nan], 'B': [.2, .3, np.nan]})
     other = pd.DataFrame({'A': ['bird', 'fox', 'mouse'], 'C': ['a', np.nan, '']})
+    ignore_index=True
+
     Func generated:
-    def sdc_pandas_dataframe_append_impl(df, other, ignore_index=True, verify_integrity=False, sort=None):
+    def sdc_pandas_dataframe_append_impl(df, other, ignore_index=False, verify_integrity=False, sort=None):
         len_df = len(df._data[0])
         len_other = len(other._data[0])
         new_col_A_data_df = df._data[0]
@@ -265,12 +268,7 @@ def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
     indent = 4 * ' '
     func_args = ['df', 'other']
 
-    for key, value in args:
-        # TODO: improve check
-        if key not in func_args:
-            if isinstance(value, types.Literal):
-                value = value.literal_value
-            func_args.append(f'{key}={value}')
+    func_args = ['df', 'other'] + kwsparams2list(args)
 
     df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
     other_columns_indx = {col_name: i for i, col_name in enumerate(other.columns)}
@@ -321,21 +319,32 @@ def sdc_pandas_dataframe_append_codegen(df, other, _func_name, args):
             column_list.append((f'new_col_{col_id}_other', col_name))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
-    # TODO: Handle index
-    func_text.append(f"return pandas.DataFrame({{{data}}})\n")
+
+    if ignore_index_value == True:  # noqa
+        func_text.append(f'return pandas.DataFrame({{{data}}})\n')
+    else:
+        if indexes_comparable == False:  # noqa
+            func_text.append(f'raise SDCLimitation("Indexes of dataframes are expected to have comparable '
+                             f'(both Numeric or String) types if parameter ignore_index is set to False.")')
+        else:
+            func_text += [f'joined_index = hpat_arrays_append(df.index, other.index)\n',
+                          f'return pandas.DataFrame({{{data}}}, index=joined_index)\n']
+
     func_definition.extend([indent + func_line for func_line in func_text])
     func_def = '\n'.join(func_definition)
 
     global_vars = {'pandas': pandas,
                    'init_series': sdc.hiframes.api.init_series,
                    'fill_array': sdc.datatypes.common_functions.fill_array,
-                   'fill_str_array': sdc.datatypes.common_functions.fill_str_array}
+                   'fill_str_array': sdc.datatypes.common_functions.fill_str_array,
+                   'hpat_arrays_append': sdc.datatypes.common_functions.hpat_arrays_append,
+                   'SDCLimitation': SDCLimitation}
 
     return func_def, global_vars
 
 
 @sdc_overload_method(DataFrameType, 'append')
-def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=False, sort=None):
+def sdc_pandas_dataframe_append(df, other, ignore_index=False, verify_integrity=False, sort=None):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
@@ -344,8 +353,10 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
 
     Limitations
     -----------
-     - Parameters ``ignore_index``, ``verify_integrity`` and ``sort`` are unsupported.
-     - Parameter ``other`` can be only :obj:`pandas.DataFrame`.
+    - Parameters ``verify_integrity`` and ``sort`` are unsupported.
+    - Parameter ``other`` can be only :obj:`pandas.DataFrame`.
+    - Indexes of dataframes are expected to have comparable (both Numeric or String) types if parameter ignore_index
+    is set to False.
 
     Examples
     --------
@@ -376,9 +387,6 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     ty_checker.check(df, DataFrameType)
     # TODO: support other array-like types
     ty_checker.check(other, DataFrameType)
-    # TODO: support index in series from df-columns
-    if not isinstance(ignore_index, (bool, types.Boolean, types.Omitted)) and not ignore_index:
-        ty_checker.raise_exc(ignore_index, 'boolean', 'ignore_index')
 
     if not isinstance(verify_integrity, (bool, types.Boolean, types.Omitted)) and verify_integrity:
         ty_checker.raise_exc(verify_integrity, 'boolean', 'verify_integrity')
@@ -386,17 +394,29 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=True, verify_integrity=F
     if not isinstance(sort, (bool, types.Boolean, types.Omitted)) and sort is not None:
         ty_checker.raise_exc(sort, 'boolean, None', 'sort')
 
-    args = (('ignore_index', True), ('verify_integrity', False), ('sort', None))
+    if not isinstance(ignore_index, (bool, types.Boolean, types.Omitted)):
+        ty_checker.raise_exc(ignore_index, 'boolean', 'ignore_index')
 
-    def sdc_pandas_dataframe_append_impl(df, other, _func_name, args):
+    none_or_numeric_indexes = ((isinstance(df.index, types.NoneType) or isinstance(df.index, types.Number)) and
+                               (isinstance(other.index, types.NoneType) or isinstance(other.index, types.Number)))
+    indexes_comparable = check_types_comparable(df.index, other.index) or none_or_numeric_indexes
+
+    if isinstance(ignore_index, types.Literal):
+        ignore_index = ignore_index.literal_value
+    elif not (ignore_index is False or isinstance(ignore_index, types.Omitted)):
+        raise SDCLimitation("Parameter ignore_index should be Literal")
+
+    args = {'ignore_index': False, 'verify_integrity': False, 'sort': None}
+
+    def sdc_pandas_dataframe_append_impl(df, other, _func_name, ignore_index, indexes_comparable, args):
         loc_vars = {}
-        func_def, global_vars = sdc_pandas_dataframe_append_codegen(df, other, _func_name, args)
-
+        func_def, global_vars = sdc_pandas_dataframe_append_codegen(df, other, _func_name, ignore_index,
+                                                                    indexes_comparable, args)
         exec(func_def, global_vars, loc_vars)
         _append_impl = loc_vars['sdc_pandas_dataframe_append_impl']
         return _append_impl
 
-    return sdc_pandas_dataframe_append_impl(df, other, _func_name, args)
+    return sdc_pandas_dataframe_append_impl(df, other, _func_name, ignore_index, indexes_comparable, args)
 
 
 # Example func_text for func_name='count' columns=('A', 'B'):
@@ -831,32 +851,43 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 @sdc_overload_method(DataFrameType, 'var')
 def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.var` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.var
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_var*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       ddof:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_var.py
+       :language: python
+       :lines: 35-
+       :caption: Return unbiased variance over requested axis.
+       :name: ex_dataframe_var
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return sample standard deviation over requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_var.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.std <pandas.Series.std>`
+            Returns sample standard deviation over Series.
+        :ref:`Series.var<pandas.Series.var>`
+            Returns unbiased variance over Series.
+        :ref:`DataFrame.std <pandas.DataFrame.std>`
+            Returns sample standard deviation over DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.var` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_var*
+    """
 
     name = 'var'
 
@@ -871,30 +902,53 @@ def var_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
 @sdc_overload_method(DataFrameType, 'max')
 def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.max` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.max
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_max*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level`` and  ``numeric_only`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_max.py
+       :language: python
+       :lines: 35-
+       :caption: Return the maximum of the values for the columns.
+       :name: ex_dataframe_max
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return the maximum of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_max.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.sum <pandas.Series.sum>`
+            Return the sum.
+        :ref:`Series.max <pandas.Series.max>`
+            Return the maximum.
+        :ref:`Series.idxmin <pandas.Series.idxmin>`
+            Return the index of the minimum.
+        :ref:`Series.idxmax <pandas.Series.idxmax>`
+            Return the index of the maximum.
+        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
+            Return the sum over the requested axis.
+        :ref:`DataFrame.min <pandas.DataFrame.min>`
+            Return the minimum over the requested axis.
+        :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
+            Return the index of the minimum over the requested axis.
+        :ref:`DataFrame.idxmax <pandas.DataFrame.idxmax>`
+            Return the index of the maximum over the requested axis.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.max` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_max*
+    """
 
     name = 'max'
 
@@ -909,30 +963,57 @@ def max_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 @sdc_overload_method(DataFrameType, 'min')
 def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.min` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.min
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_min*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_min.py
+       :language: python
+       :lines: 35-
+       :caption: Return the minimum of the values for the columns.
+       :name: ex_dataframe_min
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               returns: the minimum of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_min.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.sum <pandas.Series.sum>`
+            Return the sum.
+        :ref:`Series.min <pandas.Series.min>`
+            Return the minimum.
+        :ref:`Series.max <pandas.Series.max>`
+            Return the maximum.
+        :ref:`Series.idxmin <pandas.Series.idxmin>`
+            Return the index of the minimum.
+        :ref:`Series.idxmax <pandas.Series.idxmax>`
+            Return the index of the maximum.
+        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
+            Return the sum over the requested axis.
+        :ref:`DataFrame.min <pandas.DataFrame.min>`
+            Return the minimum over the requested axis.
+        :ref:`DataFrame.max <pandas.DataFrame.max>`
+            Return the maximum over the requested axis.
+        :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
+            Return the index of the minimum over the requested axis.
+        :ref:`DataFrame.idxmax <pandas.DataFrame.idxmax>`
+            Return the index of the maximum over the requested axis.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.min` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_min*
+    """
 
     name = 'min'
 
@@ -947,32 +1028,67 @@ def min_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 @sdc_overload_method(DataFrameType, 'sum')
 def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.sum` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.sum
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_sum*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level``, ``numeric_only`` and ``min_count`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
-       min_count:
-            *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_sum.py
+       :language: python
+       :lines: 35-
+       :caption: Return the sum of the values for the columns.
+       :name: ex_dataframe_sum
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return the sum of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_sum.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`Series.sum <pandas.Series.sum>`
+            Return the sum.
+
+        :ref:`Series.min <pandas.Series.min>`
+            Return the minimum.
+
+        :ref:`Series.max <pandas.Series.max>`
+            Return the maximum.
+
+        :ref:`Series.idxmin <pandas.Series.idxmin>`
+            Return the index of the minimum.
+
+        :ref:`Series.idxmax <pandas.Series.idxmax>`
+            Return the index of the maximum.
+
+        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
+            Return the sum over the requested axis.
+
+        :ref:`DataFrame.min <pandas.DataFrame.min>`
+            Return the minimum over the requested axis.
+
+        :ref:`DataFrame.max <pandas.DataFrame.max>`
+            Return the maximum over the requested axis.
+
+        :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
+            Return the index of the minimum over the requested axis.
+
+        :ref:`DataFrame.idxmax <pandas.DataFrame.idxmax>`
+            Return the index of the maximum over the requested axis.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.sum` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_sum*
+    """
 
     name = 'sum'
 
@@ -1027,26 +1143,42 @@ def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min
 @sdc_overload_method(DataFrameType, 'count')
 def count_overload(df, axis=0, level=None, numeric_only=False):
     """
-    Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.
-    .. only:: developer
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_count*
+    Pandas API: pandas.DataFrame.count
 
-    Parameters
+    Limitations
     -----------
-    df: :class:`pandas.DataFrame`
-      input arg
-    axis:
-      *unsupported*
-    level:
-      *unsupported*
-    numeric_only:
-      *unsupported*
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
-    Returns
-    -------
-    :obj:`pandas.Series` or `pandas.DataFrame`
-      for each column/row the number of non-NA/null entries. If level is specified returns a DataFrame.
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_count.py
+       :language: python
+       :lines: 33-
+       :caption: Count non-NA cells for each column or row.
+       :name: ex_dataframe_count
+
+    .. command-output:: python ./dataframe/dataframe_count.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.count <pandas.Series.count>`
+            Number of non-NA elements in a Series.
+        :ref:`DataFrame.shape <pandas.DataFrame.shape>`
+            Number of DataFrame rows and columns (including NA elements).
+        :ref:`DataFrame.isna <pandas.DataFrame.isna>`
+            Boolean same-sized DataFrame showing places of NA elements.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.count` implementation.
+
+        .. only:: developer
+
+            Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_count*
     """
 
     name = 'count'
@@ -1067,51 +1199,6 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
     ser_par = {'level': 'level'}
 
     return sdc_pandas_dataframe_reduce_columns(df, name, params, ser_par)
-
-
-def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
-    """
-    Input:
-    df.drop(columns='M', errors='ignore')
-
-    Func generated:
-    def sdc_pandas_dataframe_drop_impl(df, labels=None, axis=0, index=None, columns=None, level=None, inplace=False,
-     errors="raise"):
-        if errors == "raise":
-          raise ValueError("The label M is not found in the selected axis")
-        new_col_A_data_df = df._data[0]
-        new_col_B_data_df = df._data[1]
-        new_col_C_data_df = df._data[2]
-        return pandas.DataFrame({"A": new_col_A_data_df, "B": new_col_B_data_df, "C": new_col_C_data_df})
-
-    """
-    indent = 4 * ' '
-    df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
-    saved_df_columns = [column for column in df.columns if column not in drop_cols]
-    func_definition = [f'def sdc_pandas_dataframe_{func_name}_impl({", ".join(func_args)}):']
-    func_text = []
-    column_list = []
-
-    for label in drop_cols:
-        if label not in df.columns:
-            func_text.append(f'if errors == "raise":')
-            func_text.append(indent + f'raise ValueError("The label {label} is not found in the selected axis")')
-            break
-
-    for column_id, column_name in enumerate(saved_df_columns):
-        func_text.append(f'new_col_{column_id}_data_{"df"} = {"df"}._data['
-                         f'{df_columns_indx[column_name]}]')
-        column_list.append((f'new_col_{column_id}_data_df', column_name))
-
-    data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
-    index = 'df.index'
-    func_text.append(f"return pandas.DataFrame({{{data}}}, index={index})\n")
-    func_definition.extend([indent + func_line for func_line in func_text])
-    func_def = '\n'.join(func_definition)
-
-    global_vars = {'pandas': pandas}
-
-    return func_def, global_vars
 
 
 def _dataframe_codegen_isna(func_name, columns, df):
@@ -1205,6 +1292,51 @@ def isna_overload(df):
     return sdc_pandas_dataframe_isna_codegen(df, 'isna')
 
 
+def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
+    """
+    Input:
+    df.drop(columns='M', errors='ignore')
+
+    Func generated:
+    def sdc_pandas_dataframe_drop_impl(df, labels=None, axis=0, index=None, columns=None, level=None, inplace=False,
+     errors="raise"):
+        if errors == "raise":
+          raise ValueError("The label M is not found in the selected axis")
+        new_col_A_data_df = df._data[0]
+        new_col_B_data_df = df._data[1]
+        new_col_C_data_df = df._data[2]
+        return pandas.DataFrame({"A": new_col_A_data_df, "B": new_col_B_data_df, "C": new_col_C_data_df})
+
+    """
+    indent = 4 * ' '
+    df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
+    saved_df_columns = [column for column in df.columns if column not in drop_cols]
+    func_definition = [f'def sdc_pandas_dataframe_{func_name}_impl({", ".join(func_args)}):']
+    func_text = []
+    column_list = []
+
+    for label in drop_cols:
+        if label not in df.columns:
+            func_text.append(f'if errors == "raise":')
+            func_text.append(indent + f'raise ValueError("The label {label} is not found in the selected axis")')
+            break
+
+    for column_id, column_name in enumerate(saved_df_columns):
+        func_text.append(f'new_col_{column_id}_data_{"df"} = get_dataframe_data({"df"}, '
+                         f'{df_columns_indx[column_name]})')
+        column_list.append((f'new_col_{column_id}_data_df', column_name))
+
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
+    index = 'df.index'
+    func_text.append(f"return pandas.DataFrame({{{data}}}, index={index})\n")
+    func_definition.extend([indent + func_line for func_line in func_text])
+    func_def = '\n'.join(func_definition)
+
+    global_vars = {'pandas': pandas, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
+
+    return func_def, global_vars
+
+
 @sdc_overload_method(DataFrameType, 'drop')
 def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None, level=None, inplace=False,
                               errors='raise'):
@@ -1215,7 +1347,11 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
 
     Limitations
     -----------
-    Parameter columns is expected to be a Literal value with one column name or Tuple with columns names.
+    - Parameters ``labels``, ``axis``, ``index``, ``level`` and ``inplace`` are currently unsupported.
+    - Parameter ``columns`` is required and is expected to be a Literal value with one column name
+    or Tuple with columns names.
+    - Supported ``errors`` can be {``raise``, ``ignore``}, default ``raise``. If ``ignore``, suppress error and only
+    existing labels are dropped.
 
     Examples
     --------
@@ -1227,11 +1363,6 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
 
     .. command-output:: python ./dataframe/dataframe_drop.py
         :cwd: ../../../examples
-
-     .. note::
-        Parameters axis, index, level, inplace, errors are currently unsupported
-        by Intel Scalable Dataframe Compiler
-        Currently multi-indexing is not supported.
 
     .. seealso::
         :ref:`DataFrame.loc <pandas.DataFrame.loc>`
@@ -1248,36 +1379,7 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
     Pandas DataFrame method :meth:`pandas.DataFrame.drop` implementation.
     .. only:: developer
     Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_drop*
-    Parameters
-    -----------
-    df: :obj:`pandas.DataFrame`
-        input arg
-    labels: single label or list-like
-        Column labels to drop
-        *unsupported*
-    axis: :obj:`int` default 0
-        *unsupported*
-    index: single label or list-like
-        *unsupported*
-    columns: single label or list-like
-    level: :obj:`int` or :obj:`str`
-        For MultiIndex, level from which the labels will be removed.
-        *unsupported*
-    inplace: :obj:`bool` default False
-        *unsupported*
-    errors: :obj:`str` default 'raise'
-        If 'ignore', suppress error and only existing labels are dropped.
-        *unsupported*
 
-    Returns
-    -------
-    :obj: `pandas.DataFrame`
-        DataFrame without the removed index or column labels.
-
-    Raises
-    -------
-    KeyError
-        If any of the labels is not found in the selected axis.
     """
 
     _func_name = 'drop'
@@ -1584,114 +1686,6 @@ gen_df_getitem_bool_array_idx_impl = gen_impl_generator(
 
 @sdc_overload(operator.getitem)
 def sdc_pandas_dataframe_getitem(self, idx):
-    """
-        Intel Scalable Dataframe Compiler User Guide
-        ********************************************
-        Pandas API: pandas.DataFrame.getitem
-
-        Get data from a DataFrame by indexer.
-
-        Limitations
-        -----------
-        Supported ``key`` can be one of the following:
-
-        * String literal, e.g. :obj:`df['A']`
-        * A slice, e.g. :obj:`df[2:5]`
-        * A tuple of string, e.g. :obj:`df[('A', 'B')]`
-        * An array of booleans, e.g. :obj:`df[True,False]`
-        * A series of booleans, e.g. :obj:`df(series([True,False]))`
-
-        Supported getting a column through getting attribute.
-
-        Examples
-        --------
-        .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_attr.py
-           :language: python
-           :lines: 37-
-           :caption: Getting Pandas DataFrame column through getting attribute.
-           :name: ex_dataframe_getitem
-
-        .. command-output:: python ./dataframe/getitem/df_getitem_attr.py
-           :cwd: ../../../examples
-
-        .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem.py
-           :language: python
-           :lines: 37-
-           :caption: Getting Pandas DataFrame column where key is a string.
-           :name: ex_dataframe_getitem
-
-        .. command-output:: python ./dataframe/getitem/df_getitem.py
-           :cwd: ../../../examples
-
-        .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_slice.py
-           :language: python
-           :lines: 34-
-           :caption: Getting slice of Pandas DataFrame.
-           :name: ex_dataframe_getitem
-
-        .. command-output:: python ./dataframe/getitem/df_getitem_slice.py
-           :cwd: ../../../examples
-
-        .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_tuple.py
-           :language: python
-           :lines: 37-
-           :caption: Getting Pandas DataFrame elements where key is a tuple of strings.
-           :name: ex_dataframe_getitem
-
-        .. command-output:: python ./dataframe/getitem/df_getitem_tuple.py
-           :cwd: ../../../examples
-
-        .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_array.py
-           :language: python
-           :lines: 34-
-           :caption: Getting Pandas DataFrame elements where key is an array of booleans.
-           :name: ex_dataframe_getitem
-
-        .. command-output:: python ./dataframe/getitem/df_getitem_array.py
-           :cwd: ../../../examples
-
-        .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_series.py
-           :language: python
-           :lines: 34-
-           :caption: Getting Pandas DataFrame elements where key is series of booleans.
-           :name: ex_dataframe_getitem
-
-        .. command-output:: python ./dataframe/getitem/df_getitem_series.py
-           :cwd: ../../../examples
-
-        .. seealso::
-            :ref:`Series.getitem <pandas.Series.getitem>`
-                Get value(s) of Series by key.
-            :ref:`Series.setitem <pandas.Series.setitem>`
-                Set value to Series by index
-            :ref:`Series.loc <pandas.Series.loc>`
-                Access a group of rows and columns by label(s) or a boolean array.
-            :ref:`Series.iloc <pandas.Series.iloc>`
-                Purely integer-location based indexing for selection by position.
-            :ref:`Series.at <pandas.Series.at>`
-                Access a single value for a row/column label pair.
-            :ref:`Series.iat <pandas.Series.iat>`
-                Access a single value for a row/column pair by integer position.
-            :ref:`DataFrame.setitem <pandas.DataFrame.setitem>`
-                Set value to DataFrame by index
-            :ref:`DataFrame.loc <pandas.DataFrame.loc>`
-                Access a group of rows and columns by label(s) or a boolean array.
-            :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
-                Purely integer-location based indexing for selection by position.
-            :ref:`DataFrame.at <pandas.DataFrame.at>`
-                Access a single value for a row/column label pair.
-            :ref:`DataFrame.iat <pandas.DataFrame.iat>`
-                Access a single value for a row/column pair by integer position.
-
-        Intel Scalable Dataframe Compiler Developer Guide
-        *************************************************
-
-        Pandas DataFrame method :meth:`pandas.DataFrame.getitem` implementation.
-
-        .. only:: developer
-
-        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_getitem*
-        """
     ty_checker = TypeChecker('Operator getitem().')
 
     if not isinstance(self, DataFrameType):
@@ -1914,17 +1908,32 @@ def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=Tru
     def sdc_pandas_dataframe_groupby_impl(self, by=None, axis=0, level=None, as_index=True, sort=True,
                                           group_keys=True, squeeze=False, observed=False):
 
-        grouped = Dict.empty(by_type, list_type)
         by_column_data = self._data[column_id]
-        for i in numpy.arange(len(by_column_data)):
-            if isna(by_column_data, i):
-                continue
-            value = by_column_data[i]
-            group_list = grouped.get(value, List.empty_list(types.int64))
-            group_list.append(i)
-            grouped[value] = group_list
+        chunks = parallel_chunks(len(by_column_data))
+        dict_parts = [Dict.empty(by_type, list_type) for _ in range(len(chunks))]
 
-        return init_dataframe_groupby(self, column_id, grouped, sort)
+        # filling separate dict of by_value -> positions for each chunk of initial array
+        for i in numba.prange(len(chunks)):
+            chunk = chunks[i]
+            res = dict_parts[i]
+            for j in range(chunk.start, chunk.stop):
+                if isna(by_column_data, j):
+                    continue
+                value = by_column_data[j]
+                group_list = res.get(value)
+                if group_list is None:
+                    new_group_list = List.empty_list(types.int64)
+                    new_group_list.append(j)
+                    res[value] = new_group_list
+                else:
+                    group_list.append(j)
+
+        # merging all dict parts into a single resulting dict
+        res_dict = dict_parts[0]
+        for i in range(1, len(chunks)):
+            res_dict = merge_groupby_dicts(res_dict, dict_parts[i])
+
+        return init_dataframe_groupby(self, column_id, res_dict, sort)
 
     return sdc_pandas_dataframe_groupby_impl
 
@@ -2059,11 +2068,58 @@ def df_set_column_overload(self, key, value):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
+    Pandas API: pandas.DataFrame.setitem
+
+    Set data to a DataFrame by indexer.
 
     Limitations
     -----------
-    - Supported setting a columns in a non-empty DataFrame as a 1D array only.
-    - Unsupported change of the Parent DataFrame, returned new DataFrame.
+    - Supported setting a column in a DataFrame through private method ``df._set_column(key, value)``.
+    - DataFrame passed into jit region as a parameter is not changed outside of the region.
+    New DataFrame should be returned from the region in this case.
+    - Supported setting a column in a non-empty DataFrame as a 1D array only.
+
+    .. literalinclude:: ../../../examples/dataframe/setitem/df_set_new_column.py
+       :language: python
+       :lines: 37-
+       :caption: Setting new column to the DataFrame.
+       :name: ex_dataframe_set_new_column
+
+    .. command-output:: python ./dataframe/setitem/df_set_new_column.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/setitem/df_set_existing_column.py
+       :language: python
+       :lines: 37-
+       :caption: Setting data to existing column of the DataFrame.
+       :name: ex_dataframe_set_existing_column
+
+    .. command-output:: python ./dataframe/setitem/df_set_existing_column.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.getitem <pandas.Series.getitem>`
+            Get value(s) of Series by key.
+        :ref:`Series.setitem <pandas.Series.setitem>`
+            Set value to Series by index
+        :ref:`Series.loc <pandas.Series.loc>`
+            Access a group of rows and columns by label(s) or a boolean array.
+        :ref:`Series.iloc <pandas.Series.iloc>`
+            Purely integer-location based indexing for selection by position.
+        :ref:`Series.at <pandas.Series.at>`
+            Access a single value for a row/column label pair.
+        :ref:`Series.iat <pandas.Series.iat>`
+            Access a single value for a row/column pair by integer position.
+        :ref:`DataFrame.getitem <pandas.DataFrame.getitem>`
+            Set value to DataFrame by index
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Access a group of rows and columns by label(s) or a boolean array.
+        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+            Purely integer-location based indexing for selection by position.
+        :ref:`DataFrame.at <pandas.DataFrame.at>`
+            Access a single value for a row/column label pair.
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Access a single value for a row/column pair by integer position.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************

@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -27,54 +27,37 @@
 
 import argparse
 import os
-import platform
+import shutil
 
 from pathlib import Path
 from utilities import SDC_Build_Utilities
 
 
-def build(sdc_utils):
-    os.chdir(str(sdc_utils.src_path))
-    # For Windows build do not use intel channel due to build issue
-    if platform.system() == 'Windows':
-        sdc_utils.channels = '-c intel/label/beta -c defaults -c conda-forge'
+def run_benchmarks(sdc_utils, args_list, num_threads_list):
+    os.chdir(str(sdc_utils.src_path.parent))
 
-    sdc_utils.log_info('Start Intel SDC build', separate=True)
-    conda_build_cmd = ' '.join([
-        'conda build',
-        '--no-test',
-        f'--python {sdc_utils.python}',
-        f'--numpy {sdc_utils.numpy}',
-        f'--output-folder {str(sdc_utils.output_folder)}',
-        sdc_utils.channels,
-        '--override-channels',
-        str(sdc_utils.recipe)
-    ])
-    sdc_utils.run_command(conda_build_cmd)
-    sdc_utils.log_info('Intel SDC build SUCCESSFUL', separate=True)
-
-    return
+    for args_set in args_list:
+        for num_threads in num_threads_list:
+            os.environ['NUMBA_NUM_THREADS'] = num_threads
+            sdc_utils.log_info(f'Run Intel SDC benchmarks on {num_threads} threads', separate=True)
+            sdc_utils.run_command(f'python -W ignore -m sdc.runtests {args_set}')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--python', required=True, choices=['3.6', '3.7', '3.8'],
-                        help='Python version')
-    parser.add_argument('--numpy', required=True, choices=['1.16', '1.17', '1.18'],
-                        help='Numpy version')
+    parser.add_argument('--python', default='3.7', choices=['3.6', '3.7', '3.8'],
+                        help='Python version, default = 3.7')
+    parser.add_argument('--sdc-channel', default=None, help='Intel SDC channel')
+    parser.add_argument('--args-list', required=True, nargs='+', help='List of arguments sets for benchmarks')
+    parser.add_argument('--num-threads-list', required=True, nargs='+',
+                        help='List of values for NUMBA_NUM_THREADS env variable')
 
     args = parser.parse_args()
 
-    sdc_utils = SDC_Build_Utilities(args.python)
-    sdc_utils.numpy = args.numpy
-    sdc_utils.log_info('Build Intel(R) SDC conda and wheel packages', separate=True)
+    sdc_utils = SDC_Build_Utilities(args.python, args.sdc_channel)
+    sdc_utils.log_info('Run Intel(R) SDC benchmarks', separate=True)
     sdc_utils.log_info(sdc_utils.line_double)
+    sdc_utils.create_environment(['scipy', 'openpyxl', 'xlrd'])
+    sdc_utils.install_conda_package(['sdc'])
 
-    sdc_env_packages = ['conda-build']
-    if platform.system() == 'Windows':
-        sdc_env_packages += ['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64', 'pywin32=223']
-    # Install conda-build and other packages from anaconda channel due to issue with wheel
-    # output build if use intel channels first
-    sdc_utils.create_environment(sdc_env_packages + ['-c', 'anaconda'])
-
-    build(sdc_utils)
+    run_benchmarks(sdc_utils, args.args_list, args.num_threads_list)
