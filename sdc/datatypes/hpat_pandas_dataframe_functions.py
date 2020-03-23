@@ -1110,32 +1110,39 @@ def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_
 @sdc_overload_method(DataFrameType, 'prod')
 def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.prod` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.prod
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_prod*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level``, ``numeric_only`` and ``min_count`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
-       min_count:
-            *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_prod.py
+       :language: python
+       :lines: 35-
+       :caption: Return the product of the values for the columns.
+       :name: ex_dataframe_prod
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return the product of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_prod.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.prod <pandas.Series.prod>`
+            Returns the product of the values for the Series.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.prod` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_prod*
+    """
 
     name = 'prod'
 
