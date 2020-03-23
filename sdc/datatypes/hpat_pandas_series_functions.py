@@ -263,7 +263,9 @@ def hpat_pandas_series_getitem(self, idx):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
-    Pandas API: pandas.Series.__getitem__
+    Pandas API: pandas.Series.getitem
+
+    Get value(s) of Series by key.
 
     Limitations
     -----------
@@ -320,6 +322,30 @@ def hpat_pandas_series_getitem(self, idx):
 
     .. command-output:: python ./series/series_getitem/series_getitem_series.py
        :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.setitem <pandas.Series.setitem>`
+            Set value to Series by index
+        :ref:`Series.loc <pandas.Series.loc>`
+            Access a group of rows and columns by label(s) or a boolean array.
+        :ref:`Series.iloc <pandas.Series.iloc>`
+            Purely integer-location based indexing for selection by position.
+        :ref:`Series.at <pandas.Series.at>`
+            Access a single value for a row/column label pair.
+        :ref:`Series.iat <pandas.Series.iat>`
+            Access a single value for a row/column pair by integer position.
+        :ref:`DataFrame.getitem <pandas.DataFrame.getitem>`
+            Get data from a DataFrame by indexer.
+        :ref:`DataFrame.setitem <pandas.DataFrame.setitem>`
+            Set value to DataFrame by index
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Access a group of rows and columns by label(s) or a boolean array.
+        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+            Purely integer-location based indexing for selection by position.
+        :ref:`DataFrame.at <pandas.DataFrame.at>`
+            Access a single value for a row/column label pair.
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Access a single value for a row/column pair by integer position.
 
     .. todo:: Fix SDC behavior and add the expected output of the > python ./series_getitem.py to the docstring
 
@@ -3352,6 +3378,10 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
 
     Pandas API: pandas.Series.quantile
 
+    Limitations
+    -----------
+    Parameter ``interpolation`` is currently unsupported.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_quantile.py
@@ -3363,13 +3393,14 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     .. command-output:: python ./series/series_quantile.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter interpolation is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
-        `numpy.absolute <https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html#numpy.percentile>`_
+        :ref:`core.window.Rolling.quantile <pandas.core.window.Rolling.quantile>`
+            Calculate the rolling quantile.
+
+        `numpy.percentile
+        <https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html#numpy.percentile>`_
+            Compute the q-th percentile of the data along the specified axis.
 
 
     Intel Scalable Dataframe Compiler Developer Guide
@@ -3482,7 +3513,7 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level``, ``numeric_only`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
@@ -3494,10 +3525,6 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
 
     .. command-output:: python ./series/series_min.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3515,6 +3542,21 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
 
         :ref:`Series.idxmax <pandas.Series.idxmax>`
             Return the index of the maximum.
+
+        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
+            Return the sum over the requested axis.
+
+        :ref:`DataFrame.min <pandas.DataFrame.min>`
+            Return the minimum over the requested axis.
+
+        :ref:`DataFrame.max <pandas.DataFrame.max>`
+            Return the maximum over the requested axis.
+
+        :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
+            Return the index of the minimum over the requested axis.
+
+        :ref:`DataFrame.idxmax <pandas.DataFrame.idxmax>`
+            Return the index of the maximum over the requested axis.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -4577,7 +4619,9 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     Limitations
     -----------
-    - Parameters kind, order are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``axis`` is supported only with default value ``0``.
+    - Parameter ``order`` is supported only with default value ``None``.
+    - Parameter ``kind`` is supported only with values ``'mergesort'`` and ``'quicksort'``.
 
     Examples
     --------
@@ -4590,13 +4634,9 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     .. command-output:: python ./series/series_argsort.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
-        `numpy.absolute
+        `numpy.ndarray.argsort
         <https://docs.scipy.org/doc/numpy/reference/generated/numpy.ndarray.argsort.html#numpy.ndarray.argsort>`_
             Return indices of the minimum values along the given axis.
 

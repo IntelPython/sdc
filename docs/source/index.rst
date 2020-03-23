@@ -33,13 +33,6 @@ User Manual
    for_developers
    other_intel_python_projects
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
 User Manual To-Do List
 ======================
 
