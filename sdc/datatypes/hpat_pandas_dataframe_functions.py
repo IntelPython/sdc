@@ -718,30 +718,39 @@ def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, 
 @sdc_overload_method(DataFrameType, 'median')
 def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.median` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.median
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_median*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_median.py
+       :language: python
+       :lines: 35-
+       :caption: Return the median of the values for the columns.
+       :name: ex_dataframe_median
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return the median of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_median.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.median <pandas.Series.median>`
+            Returns the median of the values for the Series.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.median` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_median*
+    """
 
     name = 'median'
 
