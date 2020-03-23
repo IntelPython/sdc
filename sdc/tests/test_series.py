@@ -121,10 +121,13 @@ def gen_srand_array(size, nchars=8):
     return np.random.choice(rands_chars, size=nchars * size).view((np.str_, nchars))
 
 
-def gen_frand_array(size, min=-100, max=100):
+def gen_frand_array(size, min=-100, max=100, nancount=0):
     """Generate array of float of specified size based on [-100-100]"""
     np.random.seed(100)
-    return (max - min) * np.random.sample(size) + min
+    res = (max - min) * np.random.sample(size) + min
+    if nancount:
+        res[np.random.choice(np.arange(size), nancount)] = np.nan
+    return res
 
 
 def gen_strlist(size, nchars=8, accepted_chars=None):
@@ -272,6 +275,10 @@ def isdecimal_usecase(series):
 
 def isupper_usecase(series):
     return series.str.isupper()
+
+
+def upper_usecase(series):
+    return series.str.upper()
 
 
 def strip_usecase(series, to_strip=None):
@@ -2929,6 +2936,15 @@ class TestSeries(
         ref_result = test_impl(series, width)
         pd.testing.assert_series_equal(jit_result, ref_result)
 
+    def test_series_str_center_with_none(self):
+        def test_impl(series, width, fillchar):
+            return series.str.center(width, fillchar)
+
+        cfunc = self.jit(test_impl)
+        idx = ['City 1', 'City 2', 'City 3', 'City 4', 'City 5', 'City 6', 'City 7', 'City 8']
+        s = pd.Series(['New_York', 'Lisbon', np.nan, 'Tokyo', 'Paris', None, 'Munich', None], index=idx)
+        pd.testing.assert_series_equal(cfunc(s, width=13, fillchar='*'), test_impl(s, width=13, fillchar='*'))
+
     def test_series_str_endswith(self):
         def test_impl(series, pat):
             return series.str.endswith(pat)
@@ -3079,6 +3095,15 @@ class TestSeries(
             ref_result = pyfunc(series, width)
             pd.testing.assert_series_equal(jit_result, ref_result)
 
+    def test_series_str_rjust_with_none(self):
+        def test_impl(series, width, fillchar):
+            return series.str.rjust(width, fillchar)
+
+        cfunc = self.jit(test_impl)
+        idx = ['City 1', 'City 2', 'City 3', 'City 4', 'City 5', 'City 6', 'City 7', 'City 8']
+        s = pd.Series(['New_York', 'Lisbon', np.nan, 'Tokyo', 'Paris', None, 'Munich', None], index=idx)
+        pd.testing.assert_series_equal(cfunc(s, width=13, fillchar='*'), test_impl(s, width=13, fillchar='*'))
+
     def test_series_str_startswith(self):
         def test_impl(series, pat):
             return series.str.startswith(pat)
@@ -3216,6 +3241,15 @@ class TestSeries(
             with self.subTest(data=data):
                 s = pd.Series(data)
                 pd.testing.assert_series_equal(sdc_func(s), test_impl(s))
+
+    def test_series_upper_str(self):
+        sdc_func = self.jit(upper_usecase)
+        test_data = [test_global_input_data_unicode_kind4,
+                     ['lower', None, 'CAPITALS', None, 'this is a sentence', 'SwApCaSe', None]]
+        for data in test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                pd.testing.assert_series_equal(sdc_func(s), upper_usecase(s))
 
     def test_series_swapcase_str(self):
         def test_impl(S):
@@ -4861,8 +4895,8 @@ class TestSeries(
     @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_series_quantile(self):
         def test_impl():
-            A = pd.Series([1, 2.5, .5, 3, 5])
-            return A.quantile()
+            a = pd.Series([1, 2.5, .5, 3, 5])
+            return a.quantile()
 
         hpat_func = self.jit(test_impl)
         np.testing.assert_equal(hpat_func(), test_impl())
@@ -4872,12 +4906,12 @@ class TestSeries(
         def test_series_quantile_q_vector_impl(S, param1):
             return S.quantile(param1)
 
-        S = pd.Series(np.random.ranf(100))
+        s = pd.Series(np.random.ranf(100))
         hpat_func = self.jit(test_series_quantile_q_vector_impl)
 
         param1 = [0.0, 0.25, 0.5, 0.75, 1.0]
-        result_ref = test_series_quantile_q_vector_impl(S, param1)
-        result = hpat_func(S, param1)
+        result_ref = test_series_quantile_q_vector_impl(s, param1)
+        result = hpat_func(s, param1)
         np.testing.assert_equal(result, result_ref)
 
     @unittest.skip("Implement unique without sorting like in pandas")
@@ -5977,19 +6011,19 @@ class TestSeries(
             pd.testing.assert_series_equal(cfunc(S), islower_usecase(S))
 
     def test_series_strip_str(self):
-        s = pd.Series(['1. Ant.  ', '2. Bee!\n', '3. Cat?\t'])
+        s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
         cfunc = self.jit(strip_usecase)
         for to_strip in [None, '123.', '.!? \n\t', '123.!? \n\t']:
             pd.testing.assert_series_equal(cfunc(s, to_strip), strip_usecase(s, to_strip))
 
     def test_series_lstrip_str(self):
-        s = pd.Series(['1. Ant.  ', '2. Bee!\n', '3. Cat?\t'])
+        s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
         cfunc = self.jit(lstrip_usecase)
         for to_strip in [None, '123.', '.!? \n\t', '123.!? \n\t']:
             pd.testing.assert_series_equal(cfunc(s, to_strip), lstrip_usecase(s, to_strip))
 
     def test_series_rstrip_str(self):
-        s = pd.Series(['1. Ant.  ', '2. Bee!\n', '3. Cat?\t'])
+        s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
         cfunc = self.jit(rstrip_usecase)
         for to_strip in [None, '123.', '.!? \n\t', '123.!? \n\t']:
             pd.testing.assert_series_equal(cfunc(s, to_strip), rstrip_usecase(s, to_strip))
@@ -6031,8 +6065,8 @@ class TestSeries(
         cfunc = self.jit(isupper_usecase)
         test_data = [test_global_input_data_unicode_kind1, test_global_input_data_unicode_kind4]
         for data in test_data:
-            S = pd.Series(data)
-            pd.testing.assert_series_equal(cfunc(S), isupper_usecase(S))
+            s = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(s), isupper_usecase(s))
 
     @skip_sdc_jit('Old-style implementation returns string, but not series')
     def test_series_describe_numeric(self):

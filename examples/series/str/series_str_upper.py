@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -25,30 +25,14 @@
 # *****************************************************************************
 
 import pandas as pd
-from numba import njit, prange
-
-# Dataset for analysis
-FNAME = "employees.csv"
+from numba import njit
 
 
-# This function gets compiled by Numba* and multi-threaded
-@njit(parallel=True)
-def get_analyzed_data():
-    df = pd.read_csv(FNAME)
-    s_bonus = pd.Series(df['Bonus %'])
-    s_first_name = pd.Series(df['First Name'])
+@njit
+def series_str_upper():
+    series = pd.Series(['lower', 'CAPITALS', 'this is a sentence', 'SwApCaSe'])
 
-    # Use explicit loop to compute the mean. It will be compiled as parallel loop
-    m = 0.0
-    for i in prange(s_bonus.size):
-        m += s_bonus.values[i]
-    m /= s_bonus.size
-
-    names = s_first_name.sort_values()
-    return m, names
+    return series.str.upper()
 
 
-# Printing names and their average bonus percent
-mean_bonus, sorted_first_names = get_analyzed_data()
-print(sorted_first_names)
-print('Average Bonus %:', mean_bonus)
+print(series_str_upper())
