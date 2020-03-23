@@ -1016,10 +1016,10 @@ limitation_nans_unsupported = """
         Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
 """
 
-limitation_none_unsupported = """
+limitation_nans_supported = """
         Limitations
         -----------
-        Methods converts `None` in `NaN`.
+        All values in Series equal to `None` are converted to `NaNs`.
 """
 
 seealso_strip_methods = """
@@ -1133,7 +1133,7 @@ stringmethods_funcs = {
         'method': hpat_pandas_stringmethods_lower,
         'caption': 'Convert strings in the Series to lowercase.',
         'seealso': seealso_transform_methods,
-        'limitations': limitation_none_unsupported
+        'limitations': limitation_nans_supported
     },
     'upper': {
         'method': hpat_pandas_stringmethods_upper,
