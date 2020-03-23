@@ -823,7 +823,7 @@ def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=No
     .. seealso::
         :ref:`Series.std <pandas.Series.std>`
             Returns sample standard deviation over Series.
-        :ref:`Series.var<pandas.Series.var>`
+        :ref:`Series.var <pandas.Series.var>`
             Returns unbiased variance over Series.
         :ref:`DataFrame.var <pandas.DataFrame.var>`
             Returns unbiased variance over DataFrame.
