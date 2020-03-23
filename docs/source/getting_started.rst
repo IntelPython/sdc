@@ -11,24 +11,36 @@ with `Pandas*`_ operations.
 Like in `Numba*`_ the compilation is controlled by a regular ``@njit`` decorator and respective compilation
 directives which control its behavior.
 
-The code below illustrates a typical workflow that Intel® SDC is intended to compile
+The code below illustrates a typical workflow that Intel® SDC is intended to compile:
 
-.. todo::
-    Short code illustrating how Intel SDC can compile read_csv and compute aggregators over columns
- 
+.. literalinclude:: ../../examples/basic_workflow.py
+   :language: python
+   :lines: 27-
+   :caption: Example 1: Compiling Basic Pandas* Workflow
+   :name: ex_getting_started_basic_workflow
+
+The workflow typically starts with reading data from a file (or multiple files) into a dataframe (or multiple
+dataframes) followed by data transformations of dataframes and/or individual columns, cleaning the data, grouping and
+binning, and finally by feeding the cleaned data into machine learning algorithm for training or inference.
+
+.. image:: ./_images/workflow.png
+    :width: 526px
+    :align: center
+    :alt: Data analytics workflows
+
 We also recommend to read `A ~5 minute guide to Numba <https://numba.pydata.org/numba-doc/dev/user/5minguide.html>`_
 for getting started with `Numba*`_.
  
 Installation
-#####################
-
-Intel
+#############
+You can use conda and pip package managers to install Intel® SDC into your Python* environment.
 
 .. todo::
-         
-   instructions how to install hpat using 1) conda, 2) pip
- 
-Experienced users can also compile Intel® SDC  from sources<link to github build instructions for hpat>
+    Provide installation instructions for public packages on Anaconda.org and PyPI
+
+Experienced users can also buildIntel SDC from sources
+`for Linux*<https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-linux>`_ and
+`for Windows*<https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-windows>`_.
  
 Basic Usage
 ###########
@@ -39,9 +51,11 @@ Basic Usage
     •	Working with a dataframe
     •	Working with a machine learning library, e.g. scikit-learn, xgboost, daal
     
-    Each snapshot can have two flavors - serial and parallel to illustrate easiness of getting parallel performance. Each code snapshot provides the link to full examples located at GitHub repo>
+    Each snapshot can have two flavors - serial and parallel to illustrate easiness of getting parallel performance.
+Each code snapshot provides the link to full examples located at GitHub repo>
 
-Here's an example which describes reading data from a csv file and performing basic operation like finding mean and sorting values of a specific column:
+Here's an example which describes reading data from a csv file and performing basic operation like finding mean and
+sorting values of a specific column:
 
 What If I Get A Compilation Error
 #################################

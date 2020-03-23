@@ -42,6 +42,7 @@ from sdc.tests.test_utils import (count_array_OneDs,
                                   skip_numba_jit,
                                   skip_sdc_jit,
                                   sdc_limitation)
+from sdc.tests.test_series import gen_frand_array
 
 
 _pivot_df1 = pd.DataFrame({"A": ["foo", "foo", "foo", "foo", "foo",
@@ -106,12 +107,13 @@ class TestGroupBy(TestCase):
             return df.groupby('A', sort=param).min()
         hpat_func = self.jit(test_impl)
 
-        n = 11
+        n, m = 1000, 20
+        np.random.seed(0)
         df = pd.DataFrame({
-                    'A': ['b', 'a', 'a', 'a', 'b', 'b', 'a', ' ', None, 'a', None],
+                    'A': np.random.choice(np.arange(m), n),
                     'B': np.arange(n, dtype=np.intp),
                     'C': np.arange(n, dtype=np.float_),
-                    'D': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+                    'D': gen_frand_array(n, nancount=n // 2),
         })
 
         for value in [True, False]:

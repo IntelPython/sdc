@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -25,30 +25,34 @@
 # *****************************************************************************
 
 import pandas as pd
-from numba import njit, prange
-
-# Dataset for analysis
-FNAME = "employees.csv"
+from numba import njit
+import numpy as np
 
 
-# This function gets compiled by Numba* and multi-threaded
-@njit(parallel=True)
-def get_analyzed_data():
-    df = pd.read_csv(FNAME)
+# Datasets for analysis
+file_names = [
+    "employees_batch1.csv",
+    "employees_batch2.csv",
+]
+
+
+# This function gets compiled by Numba*
+# For scalability use @njit(parallel=True)
+@njit
+def get_analyzed_data(file_name):
+    df = pd.read_csv(file_name,
+                     dtype={'Bonus %': np.float64, 'First Name': str},
+                     usecols=['Bonus %', 'First Name'])
     s_bonus = pd.Series(df['Bonus %'])
     s_first_name = pd.Series(df['First Name'])
-
-    # Use explicit loop to compute the mean. It will be compiled as parallel loop
-    m = 0.0
-    for i in prange(s_bonus.size):
-        m += s_bonus.values[i]
-    m /= s_bonus.size
-
+    m = s_bonus.mean()
     names = s_first_name.sort_values()
     return m, names
 
 
 # Printing names and their average bonus percent
-mean_bonus, sorted_first_names = get_analyzed_data()
-print(sorted_first_names)
-print('Average Bonus %:', mean_bonus)
+for file_name in file_names:
+    mean_bonus, sorted_first_names = get_analyzed_data(file_name)
+    print(file_name)
+    print(sorted_first_names)
+    print('Average Bonus %:', mean_bonus)
