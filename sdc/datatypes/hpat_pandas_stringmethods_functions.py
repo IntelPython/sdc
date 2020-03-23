@@ -1016,6 +1016,12 @@ limitation_nans_unsupported = """
         Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
 """
 
+limitation_none_unsupported = """
+        Limitations
+        -----------
+        Methods converts `None` in `NaN`.
+"""
+
 seealso_strip_methods = """
                         :ref:`Series.str.strip <pandas.Series.str.strip>`
                             Remove leading and trailing characters in Series/Index.
@@ -1127,7 +1133,7 @@ stringmethods_funcs = {
         'method': hpat_pandas_stringmethods_lower,
         'caption': 'Convert strings in the Series to lowercase.',
         'seealso': seealso_transform_methods,
-        'limitations': ''
+        'limitations': limitation_none_unsupported
     },
     'upper': {
         'method': hpat_pandas_stringmethods_upper,
