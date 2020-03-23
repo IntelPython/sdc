@@ -1126,6 +1126,12 @@ limitation_nans_unsupported = """
         Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
 """
 
+limitation_nans_supported = """
+        Limitations
+        -----------
+        All values in Series equal to `None` are converted to `NaNs`.
+"""
+
 seealso_strip_methods = """
                         :ref:`Series.str.strip <pandas.Series.str.strip>`
                             Remove leading and trailing characters in Series/Index.
@@ -1195,49 +1201,49 @@ stringmethods_funcs = {
         'method': hpat_pandas_stringmethods_capitalize,
         'caption': 'Convert strings in the Series to be capitalized.',
         'seealso': seealso_transform_methods,
-        'limitations': ''
+        'limitations': limitation_nans_supported
     },
     'title': {
         'method': hpat_pandas_stringmethods_title,
         'caption': 'Convert strings in the Series to titlecase.',
         'seealso': seealso_transform_methods,
-        'limitations': ''
+        'limitations': limitation_nans_supported
     },
     'swapcase': {
         'method': hpat_pandas_stringmethods_swapcase,
         'caption': 'Convert strings in the Series to be swapcased.',
         'seealso': seealso_transform_methods,
-        'limitations': ''
+        'limitations': limitation_nans_supported
     },
     'casefold': {
         'method': hpat_pandas_stringmethods_casefold,
         'caption': 'Convert strings in the Series to be casefolded.',
         'seealso': seealso_transform_methods,
-        'limitations': ''
+        'limitations': limitation_nans_supported
     },
     'strip': {
         'method': hpat_pandas_stringmethods_strip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
-        'limitations': ''
+        'limitations': limitation_nans_supported
     },
     'lstrip': {
         'method': hpat_pandas_stringmethods_lstrip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
-        'limitations': ''
+        'limitations': limitation_nans_supported
     },
     'rstrip': {
         'method': hpat_pandas_stringmethods_rstrip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
-        'limitations': ''
+        'limitations': limitation_nans_supported
     },
     'upper': {
         'method': hpat_pandas_stringmethods_upper,
         'caption': 'Convert strings in the Series to upper case.',
         'seealso': seealso_transform_methods,
-        'limitations': ''
+        'limitations': limitation_nans_supported
     },
 }
 
