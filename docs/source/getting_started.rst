@@ -89,9 +89,21 @@ Measuring Performance
 What If I Get Poor Performance?
 ###############################
 
-.. todo::
-   Short introduction why performance may be slower than expected. GIL, Object mode and nopython mode. Overheads related to boxing and unboxing Python objects.
-   Reference to relevant sections of Intel® SDC and Numba documentation for detailed discussion
+.. 1. Short introduction why performance may be slower than expected.
+.. 2. GIL, Object mode and nopython mode.
+.. 3. Overheads related to boxing and unboxing Python objects.
+.. 4. Reference to relevant sections of Intel® SDC and Numba documentation for detailed discussion
+
+If you get poor performance you need to consider several reasons, among which
+compilation overheads, overheads related to converting Python objects to native structures and back,
+amount of parallelism in compiled code, to what extent the code is “static” and many other factors.
+See more details in Intel® SDC documentation :ref:`Getting Performance With Intel® SDC <performance>`.
+
+Also you need to consider limitations of particular function.
+See more details in Intel® SDC documentation for particular function :ref:`apireference`.
+
+See also `Numba*`_ documentation `Performance Tips <http://numba.pydata.org/numba-doc/latest/user/performance-tips.html>`_
+and `The compiled code is too slow <http://numba.pydata.org/numba-doc/latest/user/troubleshoot.html#the-compiled-code-is-too-slow>`_.
 
 Build Instructions
 ##################
