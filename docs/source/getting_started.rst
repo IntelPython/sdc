@@ -60,7 +60,7 @@ sorting values of a specific column:
 What If I Get A Compilation Error
 #################################
 
-Not all Python code can be compiled with Intel® SDC. Not all Pandas and Numpy APIs are currently supported and not all valid python code can be compiled using underlying Numba compiler.
+Not all Python code can be compiled with Intel® SDC. Not all `Pandas*`_ and `Numpy*`_ APIs are currently supported and not all valid python code can be compiled using underlying Numba compiler.
 
 To be successfully compiled code must use only supported subset of Pandas API and use only subset Python supported by Numba (e.g. be type-stable)
 
