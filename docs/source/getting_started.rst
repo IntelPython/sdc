@@ -114,8 +114,8 @@ Example of measuring performance:
       return finish_time - start_time, res  # <-- boxing
 
    s = pd.Series(np.random.ranf(size=100000))
-   time, res = perf_series_max(s)
-   print("Execution time in JIT code: ", time)
+   exec_time, res = perf_series_max(s)
+   print("Execution time in JIT code: ", exec_time)
 
 .. 4. Reference to relevant discussion in Numba documentation.
 
