@@ -44,18 +44,16 @@ Experienced users can also buildIntel SDC from sources
  
 Basic Usage
 ###########
-.. todo::
-   Provide a few code snapshots illustrating typical usages of Intel® SDC:
-    •	Reading a file
-    •	Working with a column - a few basic ops, e.g. aggregation or sorting + UDF
-    •	Working with a dataframe
-    •	Working with a machine learning library, e.g. scikit-learn, xgboost, daal
-    
-    Each snapshot can have two flavors - serial and parallel to illustrate easiness of getting parallel performance.
-Each code snapshot provides the link to full examples located at GitHub repo>
+The code below illustrates a typical ML workflow including data pre-processing and predicting stages.
+Intel® SDC is intended to compile pre-processing stage which includes
+reading data from a csv file, filtering data and performing Pearson correlation operation.
+scikit-learn is used to perform prediction based on gradient boosting regression model.
 
-Here's an example which describes reading data from a csv file and performing basic operation like finding mean and
-sorting values of a specific column:
+.. literalinclude:: ../../examples/basic_usage_nyse_predict.py
+   :language: python
+   :lines: 27-
+   :caption: Typical usage of Intel® SDC in combination with scikit-learn
+   :name: ex_getting_started_basic_usage_nyse_predict
 
 What If I Get A Compilation Error
 #################################
