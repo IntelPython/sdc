@@ -889,6 +889,8 @@ def hpat_pandas_series_loc(self):
     - Loc always returns Series.
     - Loc slice is supported only with numeric values and specified ``start``.
     - Loc callable is not supported yet.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -1009,6 +1011,11 @@ def hpat_pandas_series_at(self):
 
     Pandas API: pandas.Series.at
 
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_at/series_at_single_result.py
@@ -1069,7 +1076,9 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
 
     Limitations
     -----------
-    Parameter ``keep`` is supported only with default value ``'first'``.
+    - Parameter ``keep`` is supported only with default value ``'first'``.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -1135,7 +1144,9 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
 
     Limitations
     -----------
-    Parameter ``keep`` is supported only with default value ``'first'``.
+    - Parameter ``keep`` is supported only with default value ``'first'``.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -1357,6 +1368,8 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
     - Parameters ``normalize`` and ``bins`` are currently unsupported.
     - Parameter ``dropna`` is unsupported for String Series.
     - Elements with the same count might appear in result in a different order than in Pandas.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -1598,6 +1611,11 @@ def hpat_pandas_series_index(self):
     ********************************************
 
     Pandas API: pandas.Series.index
+
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -1999,6 +2017,11 @@ def hpat_pandas_series_isin(self, values):
 
     Pandas API: pandas.Series.isin
 
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_isin.py
@@ -2051,6 +2074,8 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
     -----------
     - Parameter verify_integrity is currently unsupported by Intel Scalable Dataframe Compiler
     - Parameter ignore_index supported as literal value only
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -4281,6 +4306,8 @@ def hpat_pandas_series_unique(self):
     Limitations
     -----------
     - Return values order is unspecified
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -4399,6 +4426,11 @@ def hpat_pandas_series_nunique(self, dropna=True):
     ********************************************
 
     Pandas API: pandas.Series.nunique
+
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -4622,6 +4654,8 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     - Parameter ``axis`` is supported only with default value ``0``.
     - Parameter ``order`` is supported only with default value ``None``.
     - Parameter ``kind`` is supported only with values ``'mergesort'`` and ``'quicksort'``.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -4736,6 +4770,8 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     - Parameter ``inplace`` is supported only with default value ``False``.
     - Parameter ``axis`` is currently unsupported by Intel Scalable Dataframe Compiler.
     - Parameter ``kind`` is supported only with values ``'mergesort'`` and ``'quicksort'``.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -5113,6 +5149,8 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
     -----------
     - Unsupported mixed numeric and string data
     - Parameters limit, freq are currently unsupported by Intel Scalable Dataframe Compiler
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------

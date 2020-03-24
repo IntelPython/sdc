@@ -468,6 +468,8 @@ sdc_pandas_dataframe_rolling_apply.__doc__ = sdc_pandas_dataframe_rolling_docstr
     """
     Limitations
     -----------
+    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
     Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
     DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
@@ -557,7 +559,13 @@ sdc_pandas_dataframe_rolling_mean.__doc__ = sdc_pandas_dataframe_rolling_docstri
 sdc_pandas_dataframe_rolling_median.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
     'method_name': 'median',
     'example_caption': 'Calculate the rolling median.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'extra_params': ''
 })
 
@@ -575,6 +583,8 @@ sdc_pandas_dataframe_rolling_quantile.__doc__ = sdc_pandas_dataframe_rolling_doc
     """
     Limitations
     -----------
+    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
     Supported ``interpolation`` only can be `'linear'`.
     DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,

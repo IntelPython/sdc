@@ -1141,31 +1141,66 @@ stringmethods_funcs = {
         'method': hpat_pandas_stringmethods_istitle,
         'caption': 'Check if each word start with an upper case letter',
         'seealso': seealso_check_methods,
-        'limitations': limitation_nans_unsupported
+        'limitations':
+        """
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
     'isspace': {
         'method': hpat_pandas_stringmethods_isspace,
         'caption': 'Check if all the characters in the text are whitespaces',
         'seealso': seealso_check_methods,
-        'limitations': limitation_nans_unsupported
+        'limitations':
+        """
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
     'isalpha': {
         'method': hpat_pandas_stringmethods_isalpha,
         'caption': 'Check whether all characters in each string are alphabetic',
         'seealso': seealso_check_methods,
-        'limitations': limitation_nans_unsupported
+        'limitations':
+        """
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
     'islower': {
         'method': hpat_pandas_stringmethods_islower,
         'caption': 'Check if all the characters in the text are alphanumeric',
         'seealso': seealso_check_methods,
-        'limitations': limitation_nans_unsupported
+        'limitations':
+        """
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
     'isalnum': {
         'method': hpat_pandas_stringmethods_isalnum,
         'caption': 'Check if all the characters in the text are alphanumeric',
         'seealso': seealso_check_methods,
-        'limitations': limitation_nans_unsupported
+        'limitations':
+        """
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
     'isnumeric': {
         'method': hpat_pandas_stringmethods_isnumeric,
@@ -1189,55 +1224,116 @@ stringmethods_funcs = {
         'method': hpat_pandas_stringmethods_isupper,
         'caption': 'Check whether all characters in each string are uppercase.',
         'seealso': seealso_check_methods,
-        'limitations': limitation_nans_unsupported
+        'limitations':
+        """
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
     'capitalize': {
         'method': hpat_pandas_stringmethods_capitalize,
         'caption': 'Convert strings in the Series to be capitalized.',
         'seealso': seealso_transform_methods,
-        'limitations': ''
+        'limitations':
+        """
+        Limitations
+        -----------
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
     'title': {
         'method': hpat_pandas_stringmethods_title,
         'caption': 'Convert strings in the Series to titlecase.',
         'seealso': seealso_transform_methods,
-        'limitations': ''
+        'limitations':
+        """
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
     'swapcase': {
         'method': hpat_pandas_stringmethods_swapcase,
         'caption': 'Convert strings in the Series to be swapcased.',
         'seealso': seealso_transform_methods,
-        'limitations': ''
+        'limitations':
+        """
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
     'casefold': {
         'method': hpat_pandas_stringmethods_casefold,
         'caption': 'Convert strings in the Series to be casefolded.',
         'seealso': seealso_transform_methods,
-        'limitations': ''
+        'limitations':
+        """
+        Limitations
+        -----------
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
     'strip': {
         'method': hpat_pandas_stringmethods_strip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
-        'limitations': ''
+        'limitations':
+        """
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
     'lstrip': {
         'method': hpat_pandas_stringmethods_lstrip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
-        'limitations': ''
+        'limitations':
+        """
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
     'rstrip': {
         'method': hpat_pandas_stringmethods_rstrip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
-        'limitations': ''
+        'limitations':
+        """
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
     'upper': {
         'method': hpat_pandas_stringmethods_upper,
         'caption': 'Convert strings in the Series to upper case.',
         'seealso': seealso_transform_methods,
-        'limitations': ''
+        'limitations':
+        """
+        Limitations
+        -----------
+        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
     },
 }
 

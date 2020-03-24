@@ -1154,6 +1154,8 @@ hpat_pandas_series_rolling_apply.__doc__ = hpat_pandas_series_rolling_docstring_
     """
     Limitations
     -----------
+    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
     Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
     DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
@@ -1243,7 +1245,13 @@ hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_t
 hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'median',
     'example_caption': 'Calculate the rolling median.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'extra_params': ''
 })
 
@@ -1261,6 +1269,8 @@ hpat_pandas_series_rolling_quantile.__doc__ = hpat_pandas_series_rolling_docstri
     """
     Limitations
     -----------
+    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
     Supported ``interpolation`` only can be `'linear'`.
     DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,

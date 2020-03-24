@@ -357,6 +357,8 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=False, verify_integrity=
     - Parameter ``other`` can be only :obj:`pandas.DataFrame`.
     - Indexes of dataframes are expected to have comparable (both Numeric or String) types if parameter ignore_index
     is set to False.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
