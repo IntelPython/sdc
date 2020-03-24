@@ -5048,12 +5048,16 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
     .. command-output:: python ./series/series_cov.py
        :cwd: ../../../examples
 
+    .. seealso::
+        :ref:`Series.corr <pandas.Series.corr>`
+            Compute correlation with other Series, excluding missing values.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.cov` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_cov
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_cov*
     """
 
     ty_checker = TypeChecker('Method cov().')

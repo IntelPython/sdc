@@ -2864,15 +2864,15 @@ class TestSeries(
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_corr1(self):
-        def test_impl(S1, S2):
-            return S1.corr(S2)
+        def test_impl(s1, s2):
+            return s1.corr(s2)
         hpat_func = self.jit(test_impl)
 
         for pair in _cov_corr_series:
-            S1, S2 = pair
-            with self.subTest(S1=S1.values, S2=S2.values):
-                result = hpat_func(S1, S2)
-                result_ref = test_impl(S1, S2)
+            s1, s2 = pair
+            with self.subTest(s1=s1.values, s2=s2.values):
+                result = hpat_func(s1, s2)
+                result_ref = test_impl(s1, s2)
                 np.testing.assert_almost_equal(result, result_ref)
 
     def test_series_str_center_default_fillchar(self):
@@ -5241,20 +5241,20 @@ class TestSeries(
                 self.assertIn(msg, str(raises.exception))
 
     def test_series_cov1(self):
-        def test_impl(S1, S2):
-            return S1.cov(S2)
+        def test_impl(s1, s2):
+            return s1.cov(s2)
         hpat_func = self.jit(test_impl)
 
         for pair in _cov_corr_series:
-            S1, S2 = pair
+            s1, s2 = pair
             np.testing.assert_almost_equal(
-                hpat_func(S1, S2), test_impl(S1, S2),
-                err_msg='S1={}\nS2={}'.format(S1, S2))
+                hpat_func(s1, s2), test_impl(s1, s2),
+                err_msg='s1={}\ns2={}'.format(s1, s2))
 
     @skip_sdc_jit('Series.cov() parameter "min_periods" unsupported')
     def test_series_cov(self):
-        def test_series_cov_impl(S1, S2, min_periods=None):
-            return S1.cov(S2, min_periods)
+        def test_series_cov_impl(s1, s2, min_periods=None):
+            return s1.cov(s2, min_periods)
 
         hpat_func = self.jit(test_series_cov_impl)
         test_input_data1 = [[.2, .0, .6, .2],
@@ -5271,51 +5271,51 @@ class TestSeries(
                             [np.nan, np.nan, np.inf, np.nan]]
         for input_data1 in test_input_data1:
             for input_data2 in test_input_data2:
-                S1 = pd.Series(input_data1)
-                S2 = pd.Series(input_data2)
+                s1 = pd.Series(input_data1)
+                s2 = pd.Series(input_data2)
                 for period in [None, 2, 1, 8, -4]:
                     with self.subTest(input_data1=input_data1, input_data2=input_data2, min_periods=period):
-                        result_ref = test_series_cov_impl(S1, S2, min_periods=period)
-                        result = hpat_func(S1, S2, min_periods=period)
+                        result_ref = test_series_cov_impl(s1, s2, min_periods=period)
+                        result = hpat_func(s1, s2, min_periods=period)
                         np.testing.assert_allclose(result, result_ref)
 
     @skip_sdc_jit('Series.cov() parameter "min_periods" unsupported')
     def test_series_cov_unsupported_dtype(self):
-        def test_series_cov_impl(S1, S2, min_periods=None):
-            return S1.cov(S2, min_periods=min_periods)
+        def test_series_cov_impl(s1, s2, min_periods=None):
+            return s1.cov(s2, min_periods=min_periods)
 
         hpat_func = self.jit(test_series_cov_impl)
-        S1 = pd.Series([.2, .0, .6, .2])
-        S2 = pd.Series(['abcdefgh', 'a','abcdefg', 'ab', 'abcdef', 'abc'])
-        S3 = pd.Series(['aaaaa', 'bbbb', 'ccc', 'dd', 'e'])
-        S4 = pd.Series([.3, .6, .0, .1])
+        s1 = pd.Series([.2, .0, .6, .2])
+        s2 = pd.Series(['abcdefgh', 'a', 'abcdefg', 'ab', 'abcdef', 'abc'])
+        s3 = pd.Series(['aaaaa', 'bbbb', 'ccc', 'dd', 'e'])
+        s4 = pd.Series([.3, .6, .0, .1])
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S1, S2, min_periods=5)
+            hpat_func(s1, s2, min_periods=5)
         msg = 'Method cov(). The object other.data'
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S3, S4, min_periods=5)
+            hpat_func(s3, s4, min_periods=5)
         msg = 'Method cov(). The object self.data'
         self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('Series.cov() parameter "min_periods" unsupported')
     def test_series_cov_unsupported_period(self):
-        def test_series_cov_impl(S1, S2, min_periods=None):
-            return S1.cov(S2, min_periods)
+        def test_series_cov_impl(s1, s2, min_periods=None):
+            return s1.cov(s2, min_periods)
 
         hpat_func = self.jit(test_series_cov_impl)
-        S1 = pd.Series([.2, .0, .6, .2])
-        S2 = pd.Series([.3, .6, .0, .1])
+        s1 = pd.Series([.2, .0, .6, .2])
+        s2 = pd.Series([.3, .6, .0, .1])
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S1, S2, min_periods='aaaa')
+            hpat_func(s1, s2, min_periods='aaaa')
         msg = 'Method cov(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S1, S2, min_periods=0.5)
+            hpat_func(s1, s2, min_periods=0.5)
         msg = 'Method cov(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
