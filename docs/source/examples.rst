@@ -4,5 +4,7 @@
 List of examples
 ================
 
-.. todo::
-     Auto-generate the list of examples from respective docstrings in examples
+.. toctree::
+   :maxdepth: 2
+
+   examples_list
