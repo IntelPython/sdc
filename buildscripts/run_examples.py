@@ -79,7 +79,7 @@ if __name__ == '__main__':
     sdc_utils = SDC_Build_Utilities(args.python, args.sdc_channel)
     sdc_utils.log_info('Run Intel(R) SDC examples', separate=True)
     sdc_utils.log_info(sdc_utils.line_double)
-    sdc_utils.create_environment(['scipy', 'sklearn'])
+    sdc_utils.create_environment(['scipy', 'scikit-learn'])
     sdc_utils.install_conda_package(['sdc'])
 
     run_examples(sdc_utils)
