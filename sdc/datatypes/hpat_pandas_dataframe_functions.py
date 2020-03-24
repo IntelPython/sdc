@@ -718,30 +718,39 @@ def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, 
 @sdc_overload_method(DataFrameType, 'median')
 def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.median` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.median
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_median*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_median.py
+       :language: python
+       :lines: 35-
+       :caption: Return the median of the values for the columns.
+       :name: ex_dataframe_median
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return the median of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_median.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.median <pandas.Series.median>`
+            Returns the median of the values for the Series.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.median` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_median*
+    """
 
     name = 'median'
 
@@ -756,30 +765,39 @@ def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 @sdc_overload_method(DataFrameType, 'mean')
 def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.mean` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.mean
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_mean*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_mean.py
+       :language: python
+       :lines: 35-
+       :caption: Return the mean of the values for the columns.
+       :name: ex_dataframe_mean
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return the mean of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_mean.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.mean <pandas.Series.mean>`
+            Return the mean of the values for the Series.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.mean` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_mean*
+    """
 
     name = 'mean'
 
@@ -800,32 +818,43 @@ sdc_pandas_dataframe_rolling.__doc__ = sdc_pandas_rolling_docstring_tmpl.format(
 @sdc_overload_method(DataFrameType, 'std')
 def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.std` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.std
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_std*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       ddof:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_std.py
+       :language: python
+       :lines: 35-
+       :caption: Return sample standard deviation over columns.
+       :name: ex_dataframe_std
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return sample standard deviation over requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_std.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.std <pandas.Series.std>`
+            Returns sample standard deviation over Series.
+        :ref:`Series.var <pandas.Series.var>`
+            Returns unbiased variance over Series.
+        :ref:`DataFrame.var <pandas.DataFrame.var>`
+            Returns unbiased variance over DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.std` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_std*
+    """
 
     name = 'std'
 
@@ -1092,32 +1121,39 @@ def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_
 @sdc_overload_method(DataFrameType, 'prod')
 def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.prod` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.prod
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_prod*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level``, ``numeric_only`` and ``min_count`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
-       min_count:
-            *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_prod.py
+       :language: python
+       :lines: 35-
+       :caption: Return the product of the values for the columns.
+       :name: ex_dataframe_prod
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return the product of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_prod.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.prod <pandas.Series.prod>`
+            Returns the product of the values for the Series.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.prod` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_prod*
+    """
 
     name = 'prod'
 
