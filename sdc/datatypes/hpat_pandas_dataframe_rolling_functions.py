@@ -468,10 +468,10 @@ sdc_pandas_dataframe_rolling_apply.__doc__ = sdc_pandas_dataframe_rolling_docstr
     """
     Limitations
     -----------
-    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
     between staying in JIT-region with that function or going back to interpreter mode.
-    Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
-    DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    - Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
+    - DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """
@@ -583,10 +583,10 @@ sdc_pandas_dataframe_rolling_quantile.__doc__ = sdc_pandas_dataframe_rolling_doc
     """
     Limitations
     -----------
-    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
     between staying in JIT-region with that function or going back to interpreter mode.
-    Supported ``interpolation`` only can be `'linear'`.
-    DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    - Supported ``interpolation`` only can be `'linear'`.
+    - DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """

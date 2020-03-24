@@ -1145,7 +1145,6 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
         This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
@@ -1158,7 +1157,6 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
         This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
@@ -1171,7 +1169,6 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
         This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
@@ -1184,7 +1181,6 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
         This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
@@ -1197,7 +1193,6 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
         This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
@@ -1228,7 +1223,6 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
         This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
@@ -1253,7 +1247,6 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
         This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
@@ -1266,7 +1259,6 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
         This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
@@ -1291,7 +1283,6 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
         This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
@@ -1304,7 +1295,6 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
         This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
@@ -1317,7 +1307,6 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
         This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
@@ -1330,7 +1319,6 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
         This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
