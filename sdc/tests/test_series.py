@@ -277,6 +277,10 @@ def isupper_usecase(series):
     return series.str.isupper()
 
 
+def lower_usecase(series):
+    return series.str.lower()
+
+
 def upper_usecase(series):
     return series.str.upper()
 
@@ -6021,6 +6025,16 @@ class TestSeries(
         for ser in series:
             S = pd.Series(ser)
             pd.testing.assert_series_equal(cfunc(S), islower_usecase(S))
+
+    def test_series_lower_str(self):
+        all_data = [['leopard', None, 'Golden Eagle', np.nan, 'SNAKE', ''],
+                    ['Hello world!', np.nan, 'hello 123', None, 'mynameisPeter']
+                    ]
+
+        cfunc = self.jit(lower_usecase)
+        for data in all_data:
+            s = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(s), lower_usecase(s))
 
     def test_series_strip_str(self):
         s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
