@@ -90,102 +90,6 @@ from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
 from sdc.hiframes.api import get_nan_mask
 from sdc.str_arr_ext import str_arr_set_na_by_mask, create_str_arr_from_list
 
-_hpat_pandas_stringmethods_autogen_global_dict = {
-    'pandas': pandas,
-    'numpy': numpy,
-    'numba': numba,
-    'StringMethodsType': StringMethodsType,
-    'TypeChecker': TypeChecker
-}
-
-_hpat_pandas_stringmethods_functions_params = {
-    'cat': ', others=None, sep=None, na_rep=None, join="left"',
-    'center': ', width, fillchar=" "',
-    'contains': ', pat, case=True, flags=0, na=numpy.nan, regex=True',
-    'count': ', pat, flags=0',
-    'decode': ', encoding, errors="strict"',
-    'encode': ', encoding, errors="strict"',
-    'endswith': ', pat, na=numpy.nan',
-    'extractall': ', pat, flags=0',
-    'extract': ', pat, flags=0, expand=True',
-    'findall': ', pat, flags=0',
-    'find': ', sub, start=0, end=None',
-    'get': ', i',
-    'get_dummies': ', sep="|"',
-    'index': ', sub, start=0, end=None',
-    'join': ', sep',
-    'ljust': ', width, fillchar=" "',
-    'match': ', pat, case=True, flags=0, na=numpy.nan',
-    'normalize': ', form',
-    'pad': ', width, side="left", fillchar=" "',
-    'partition': ', sep=" ", expand=True',
-    'repeat': ', repeats',
-    'replace': ', pat, repl, n=-1, case=None, flags=0, regex=True',
-    'rfind': ', sub, start=0, end=None',
-    'rindex': ', sub, start=0, end=None',
-    'rjust': ', width, fillchar=" "',
-    'rpartition': ', sep=" ", expand=True',
-    'rsplit': ', pat=None, n=-1, expand=False',
-    'slice_replace': ', start=None, stop=None, repl=None',
-    'slice': ', start=None, stop=None, step=None',
-    'split': ', pat=None, n=-1, expand=False',
-    'startswith': ', pat, na=numpy.nan',
-    'translate': ', table',
-    'wrap': ', width',
-    'zfill': ', width',
-}
-
-_hpat_pandas_stringmethods_functions_template = """
-# @sdc_overload_method(StringMethodsType, '{methodname}')
-def hpat_pandas_stringmethods_{methodname}(self{methodparams}):
-    \"\"\"
-    Pandas Series method :meth:`pandas.core.strings.StringMethods.{methodname}()` implementation.
-
-    Note: Unicode type of list elements are supported only. Numpy.NaN is not supported as elements.
-
-    .. only:: developer
-
-    Test: python -m sdc.runtests sdc.tests.test_strings.TestStrings.test_str2str
-          python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_str2str
-          python -m sdc.runtests sdc.tests.test_hiframes.TestHiFrames.test_str_get
-          python -m sdc.runtests sdc.tests.test_hiframes.TestHiFrames.test_str_replace_noregex
-          python -m sdc.runtests sdc.tests.test_hiframes.TestHiFrames.test_str_split
-          python -m sdc.runtests sdc.tests.test_hiframes.TestHiFrames.test_str_contains_regex
-
-    Parameters
-    ----------
-    self: :class:`pandas.core.strings.StringMethods`
-        input arg
-    other: {methodparams}
-        input arguments decription in
-        https://pandas.pydata.org/pandas-docs/version/0.25/reference/series.html#string-handling
-
-    Returns
-    -------
-    :obj:`pandas.Series`
-         returns :obj:`pandas.Series` object
-    \"\"\"
-
-    ty_checker = TypeChecker('Method {methodname}().')
-    ty_checker.check(self, StringMethodsType)
-
-    def hpat_pandas_stringmethods_{methodname}_impl(self{methodparams}):
-        item_count = len(self._data)
-        result = [''] * item_count
-        # result = numba.typed.List.empty_list(numba.types.unicode_type)
-
-        for it in range(item_count):
-            item = self._data._data[it]
-            if len(item) > 0:
-                result[it] = item.{methodname}({methodparams_call})
-            else:
-                result[it] = item
-
-        return pandas.Series(result, self._data._index, name=self._data._name)
-
-    return hpat_pandas_stringmethods_{methodname}_impl
-"""
-
 
 @sdc_overload_method(StringMethodsType, 'center')
 def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
@@ -461,7 +365,8 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
 
     Limitations
     -----------
-    Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -503,10 +408,13 @@ def hpat_pandas_stringmethods_ljust(self, width, fillchar=' '):
         ty_checker.raise_exc(fillchar, 'str', 'fillchar')
 
     def hpat_pandas_stringmethods_ljust_impl(self, width, fillchar=' '):
+        mask = get_nan_mask(self._data._data)
         item_count = len(self._data)
-        result = [''] * item_count
-        for idx, item in enumerate(self._data._data):
-            result[idx] = item.ljust(width, fillchar)
+        res_list = [''] * item_count
+        for idx in numba.prange(item_count):
+            res_list[idx] = self._data._data[idx].ljust(width, fillchar)
+        str_arr = create_str_arr_from_list(res_list)
+        result = str_arr_set_na_by_mask(str_arr, mask)
 
         return pandas.Series(result, self._data._index, name=self._data._name)
 
@@ -705,45 +613,6 @@ def hpat_pandas_stringmethods_zfill(self, width):
         return pandas.Series(result, self._data._index, name=self._data._name)
 
     return hpat_pandas_stringmethods_zfill_impl
-
-
-def _hpat_pandas_stringmethods_autogen(method_name):
-    """"
-    The function generates a function for 'method_name' from source text that is created on the fly.
-    """
-
-    params = ""
-    params_call = ""
-
-    # get function parameters by name
-    params_dict = _hpat_pandas_stringmethods_functions_params.get(method_name)
-    if params_dict is not None:
-        params = params_dict
-
-    if len(params) > 0:
-        """
-        Translate parameters string for method
-
-        For example:
-            parameters for split(): ', pat=None, n=-1, expand=False'
-                    translate into: 'pat, n, expand'
-        """
-
-        params_call_splitted = params.split(',')
-        params_call_list = []
-        for item in params_call_splitted:
-            params_call_list.append(item.split("=")[0])
-        params_call = ",".join(params_call_list)
-        if len(params_call) > 1:
-            params_call = params_call[2:]
-
-    sourcecode = _hpat_pandas_stringmethods_functions_template.format(methodname=method_name,
-                                                                      methodparams=params,
-                                                                      methodparams_call=params_call)
-    exec(sourcecode, _hpat_pandas_stringmethods_autogen_global_dict)
-
-    global_dict_name = 'hpat_pandas_stringmethods_{methodname}'.format(methodname=method_name)
-    return _hpat_pandas_stringmethods_autogen_global_dict[global_dict_name]
 
 
 sdc_pandas_series_str_docstring_template = """
@@ -982,6 +851,31 @@ def hpat_pandas_stringmethods_casefold(self):
     return hpat_pandas_stringmethods_casefold_impl
 
 
+@sdc_overload_method(StringMethodsType, 'lower')
+def hpat_pandas_stringmethods_lower(self):
+    ty_checker = TypeChecker('Method lower().')
+    ty_checker.check(self, StringMethodsType)
+
+    def hpat_pandas_stringmethods_lower_impl(self):
+        mask = get_nan_mask(self._data._data)
+        item_count = len(self._data)
+        res_list = [''] * item_count
+
+        for it in range(item_count):
+            item = self._data._data[it]
+            if len(item) > 0:
+                res_list[it] = item.lower()
+            else:
+                res_list[it] = item
+
+        str_arr = create_str_arr_from_list(res_list)
+        result = str_arr_set_na_by_mask(str_arr, mask)
+
+        return pandas.Series(result, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_lower_impl
+
+
 @sdc_overload_method(StringMethodsType, 'upper')
 def hpat_pandas_stringmethods_upper(self):
     ty_checker = TypeChecker('Method upper().')
@@ -1126,6 +1020,12 @@ limitation_nans_unsupported = """
         Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
 """
 
+limitation_nans_supported = """
+        Limitations
+        -----------
+        All values in Series equal to `None` are converted to `NaNs`.
+"""
+
 seealso_strip_methods = """
                         :ref:`Series.str.strip <pandas.Series.str.strip>`
                             Remove leading and trailing characters in Series/Index.
@@ -1235,7 +1135,8 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        - All values in Series equal to `None` are converted to `NaNs`.
+        - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
     },
@@ -1247,7 +1148,8 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        - All values in Series equal to `None` are converted to `NaNs`.
+        - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
     },
@@ -1259,7 +1161,8 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        - All values in Series equal to `None` are converted to `NaNs`.
+        - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
     },
@@ -1271,7 +1174,8 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        - All values in Series equal to `None` are converted to `NaNs`.
+        - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
     },
@@ -1283,7 +1187,8 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        - All values in Series equal to `None` are converted to `NaNs`.
+        - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
     },
@@ -1295,19 +1200,33 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        - All values in Series equal to `None` are converted to `NaNs`.
+        - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
     },
     'rstrip': {
-        'method': hpat_pandas_stringmethods_rstrip,
+        'method': hpat_pandas_stringmethods_lstrip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
         'limitations':
         """
         Limitations
         -----------
-        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        - All values in Series equal to `None` are converted to `NaNs`.
+        - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        between staying in JIT-region with that function or going back to interpreter mode.
+        """
+    },
+    'lower': {
+        'caption': 'Convert strings in the Series to lowercase.',
+        'seealso': seealso_transform_methods,
+        'limitations':
+        """
+        Limitations
+        -----------
+        - All values in Series equal to `None` are converted to `NaNs`.
+        - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
     },
@@ -1319,7 +1238,8 @@ stringmethods_funcs = {
         """
         Limitations
         -----------
-        This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+        - All values in Series equal to `None` are converted to `NaNs`.
+        - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
         between staying in JIT-region with that function or going back to interpreter mode.
         """
     },
@@ -1333,14 +1253,3 @@ for name, data in stringmethods_funcs.items():
            'limitations': data['limitations']
            }
     )
-
-_hpat_pandas_stringmethods_autogen_methods = ['lower']
-"""
-    This is the list of function which are autogenerated to be used from Numba directly.
-"""
-
-_hpat_pandas_stringmethods_autogen_exceptions = ['split', 'get', 'replace']
-
-for method_name in _hpat_pandas_stringmethods_autogen_methods:
-    if not (method_name.startswith('__') or method_name in _hpat_pandas_stringmethods_autogen_exceptions):
-        sdc_overload_method(StringMethodsType, method_name)(_hpat_pandas_stringmethods_autogen(method_name))

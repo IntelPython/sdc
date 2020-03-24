@@ -35,12 +35,27 @@ Installation
 #############
 You can use conda and pip package managers to install Intel® SDC into your Python* environment.
 
-.. todo::
-    Provide installation instructions for public packages on Anaconda.org and PyPI
+Intel SDC is available on the Anaconda Cloud intel/label/beta channel.
+Distribution includes Intel SDC for Python 3.6 and 3.7 for Windows and Linux platforms.
 
-Experienced users can also buildIntel SDC from sources
-`for Linux*<https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-linux>`_ and
-`for Windows*<https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-windows>`_.
+Intel SDC conda package can be installed using the steps below:
+::
+
+    > conda create -n sdc_env python=<3.7 or 3.6>
+    > conda activate sdc_env
+    > conda install sdc -c intel/label/beta -c intel -c defaults -c conda-forge --override-channels
+
+Intel SDC wheel package can be installed using the steps below:
+::
+
+    > conda create -n sdc_env python=<3.7 or 3.6> pip
+    > conda activate sdc_env
+    > pip install --index-url https://pypi.anaconda.org/intel/label/beta/simple --extra-index-url https://pypi.anaconda.org/intel/simple --extra-index-url https://pypi.org/simple sdc
+
+
+Experienced users can also build Intel SDC from sources
+`for Linux* <https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-linux>`_ and
+`for Windows* <https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-windows>`_.
  
 Basic Usage
 ###########
@@ -81,5 +96,5 @@ What If I Get Poor Performance?
 Build Instructions
 ##################
 
-.. todo::
-   Provide step-by-step build instructions for Linux*, Windows*, and Mac*.
+Build instructions for Linux*: https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-linux
+Build instructions for Windows*: https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-windows
