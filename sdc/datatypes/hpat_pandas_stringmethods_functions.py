@@ -943,7 +943,7 @@ def hpat_pandas_stringmethods_lstrip(self, to_strip=None):
     ty_checker = TypeChecker('Method strip().')
     ty_checker.check(self, StringMethodsType)
 
-    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType)):
+    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType, Omitted)) and to_strip is not None:
         ty_checker.raise_exc(to_strip, 'str', 'to_strip')
 
     return sdc_pandas_series_str_lstrip_impl
@@ -954,7 +954,7 @@ def hpat_pandas_stringmethods_rstrip(self, to_strip=None):
     ty_checker = TypeChecker('Method rstrip().')
     ty_checker.check(self, StringMethodsType)
 
-    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType)):
+    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType, Omitted)) and to_strip is not None:
         ty_checker.raise_exc(to_strip, 'str', 'to_strip')
 
     return sdc_pandas_series_str_rstrip_impl
@@ -965,7 +965,7 @@ def hpat_pandas_stringmethods_strip(self, to_strip=None):
     ty_checker = TypeChecker('Method strip().')
     ty_checker.check(self, StringMethodsType)
 
-    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType)):
+    if not isinstance(to_strip, (NoneType, StringLiteral, UnicodeType, Omitted)) and to_strip is not None:
         ty_checker.raise_exc(to_strip, 'str', 'to_strip')
 
     return sdc_pandas_series_str_strip_impl
