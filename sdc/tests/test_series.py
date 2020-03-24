@@ -580,11 +580,10 @@ class TestSeries(
                             self.assertEqual(actual.index is S.index, expected.index is S.index)
                             self.assertEqual(actual.index is S.index, not deep)
 
-    @skip_parallel
     @skip_sdc_jit('Series.corr() parameter "min_periods" unsupported')
     def test_series_corr(self):
-        def test_series_corr_impl(S1, S2, min_periods=None):
-            return S1.corr(S2, min_periods=min_periods)
+        def test_series_corr_impl(s1, s2, min_periods=None):
+            return s1.corr(s2, min_periods=min_periods)
 
         hpat_func = self.jit(test_series_corr_impl)
         test_input_data1 = [[.2, .0, .6, .2],
@@ -601,50 +600,50 @@ class TestSeries(
                             [np.nan, np.nan, np.inf, np.nan]]
         for input_data1 in test_input_data1:
             for input_data2 in test_input_data2:
-                S1 = pd.Series(input_data1)
-                S2 = pd.Series(input_data2)
+                s1 = pd.Series(input_data1)
+                s2 = pd.Series(input_data2)
                 for period in [None, 2, 1, 8, -4]:
-                    result_ref = test_series_corr_impl(S1, S2, min_periods=period)
-                    result = hpat_func(S1, S2, min_periods=period)
+                    result_ref = test_series_corr_impl(s1, s2, min_periods=period)
+                    result = hpat_func(s1, s2, min_periods=period)
                     np.testing.assert_allclose(result, result_ref)
 
     @skip_sdc_jit('Series.corr() parameter "min_periods" unsupported')
     def test_series_corr_unsupported_dtype(self):
-        def test_series_corr_impl(S1, S2, min_periods=None):
-            return S1.corr(S2, min_periods=min_periods)
+        def test_series_corr_impl(s1, s2, min_periods=None):
+            return s1.corr(s2, min_periods=min_periods)
 
         hpat_func = self.jit(test_series_corr_impl)
-        S1 = pd.Series([.2, .0, .6, .2])
-        S2 = pd.Series(['abcdefgh', 'a', 'abcdefg', 'ab', 'abcdef', 'abc'])
-        S3 = pd.Series(['aaaaa', 'bbbb', 'ccc', 'dd', 'e'])
-        S4 = pd.Series([.3, .6, .0, .1])
+        s1 = pd.Series([.2, .0, .6, .2])
+        s2 = pd.Series(['abcdefgh', 'a', 'abcdefg', 'ab', 'abcdef', 'abc'])
+        s3 = pd.Series(['aaaaa', 'bbbb', 'ccc', 'dd', 'e'])
+        s4 = pd.Series([.3, .6, .0, .1])
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S1, S2, min_periods=5)
+            hpat_func(s1, s2, min_periods=5)
         msg = 'Method corr(). The object other.data'
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S3, S4, min_periods=5)
+            hpat_func(s3, s4, min_periods=5)
         msg = 'Method corr(). The object self.data'
         self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('Series.corr() parameter "min_periods" unsupported')
     def test_series_corr_unsupported_period(self):
-        def test_series_corr_impl(S1, S2, min_periods=None):
-            return S1.corr(S2, min_periods=min_periods)
+        def test_series_corr_impl(s1, s2, min_periods=None):
+            return s1.corr(s2, min_periods=min_periods)
 
         hpat_func = self.jit(test_series_corr_impl)
-        S1 = pd.Series([.2, .0, .6, .2])
-        S2 = pd.Series([.3, .6, .0, .1])
+        s1 = pd.Series([.2, .0, .6, .2])
+        s2 = pd.Series([.3, .6, .0, .1])
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S1, S2, min_periods='aaaa')
+            hpat_func(s1, s2, min_periods='aaaa')
         msg = 'Method corr(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S1, S2, min_periods=0.5)
+            hpat_func(s1, s2, min_periods=0.5)
         msg = 'Method corr(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 

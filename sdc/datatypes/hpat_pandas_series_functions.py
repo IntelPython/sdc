@@ -2211,14 +2211,16 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
     .. command-output:: python ./series/series_corr.py
        :cwd: ../../../examples
 
+    .. seealso::
+        :ref:`Series.cov <pandas.Series.cov>`
+            Compute covariance with Series, excluding missing values.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.corr` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_corr
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_corr_unsupported_dtype
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_corr_unsupported_period
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_corr*
     """
 
     _func_name = 'Method corr().'
