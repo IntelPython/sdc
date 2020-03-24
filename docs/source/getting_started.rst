@@ -101,6 +101,7 @@ Example of measuring performance:
 
 .. code::
 
+   import time
    import numpy as np
    import pandas as pd
    from numba import njit
