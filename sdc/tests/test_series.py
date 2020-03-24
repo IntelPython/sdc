@@ -5004,11 +5004,11 @@ class TestSeries(
         self.assertIn(msg, str(raises.exception))
 
     def test_series_nunique(self):
-        def test_series_nunique_impl(S):
-            return S.nunique()
+        def test_series_nunique_impl(s):
+            return s.nunique()
 
-        def test_series_nunique_param1_impl(S, dropna):
-            return S.nunique(dropna)
+        def test_series_nunique_param1_impl(s, dropna):
+            return s.nunique(dropna)
 
         hpat_func = self.jit(test_series_nunique_impl)
 
@@ -5018,7 +5018,8 @@ class TestSeries(
                        [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
                        [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
                        ['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd'],
-                       ['aa', 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                       ['aa', 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string,
+                        'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
                        []
                        ]
 
@@ -5026,7 +5027,8 @@ class TestSeries(
                       [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
                       [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
                       ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd'],
-                      [np.nan, 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                      [np.nan, 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string,
+                       'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
                       [np.nan, np.nan, np.nan],
                       [np.nan, np.nan, np.inf],
                       ]
@@ -5041,10 +5043,10 @@ class TestSeries(
             test_input_data = data_simple + data_extra
 
         for input_data in test_input_data:
-            S = pd.Series(input_data)
+            s = pd.Series(input_data)
 
-            result_ref = test_series_nunique_impl(S)
-            result = hpat_func(S)
+            result_ref = test_series_nunique_impl(s)
+            result = hpat_func(s)
             self.assertEqual(result, result_ref)
 
             if not sdc.config.config_pipeline_hpat_default:
@@ -5055,8 +5057,8 @@ class TestSeries(
                 hpat_func_param1 = self.jit(test_series_nunique_param1_impl)
 
                 for param1 in [True, False]:
-                    result_param1_ref = test_series_nunique_param1_impl(S, param1)
-                    result_param1 = hpat_func_param1(S, param1)
+                    result_param1_ref = test_series_nunique_param1_impl(s, param1)
+                    result_param1 = hpat_func_param1(s, param1)
                     self.assertEqual(result_param1, result_param1_ref)
 
     def test_series_var(self):
