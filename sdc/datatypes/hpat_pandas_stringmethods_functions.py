@@ -1206,7 +1206,7 @@ stringmethods_funcs = {
         """
     },
     'rstrip': {
-        'method': hpat_pandas_stringmethods_lstrip,
+        'method': hpat_pandas_stringmethods_rstrip,
         'caption': 'Remove leading and trailing characters.',
         'seealso': seealso_strip_methods,
         'limitations':
@@ -1219,6 +1219,7 @@ stringmethods_funcs = {
         """
     },
     'lower': {
+        'method': hpat_pandas_stringmethods_lower,
         'caption': 'Convert strings in the Series to lowercase.',
         'seealso': seealso_transform_methods,
         'limitations':

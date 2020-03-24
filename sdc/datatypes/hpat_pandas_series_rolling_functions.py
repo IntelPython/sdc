@@ -1154,10 +1154,10 @@ hpat_pandas_series_rolling_apply.__doc__ = hpat_pandas_series_rolling_docstring_
     """
     Limitations
     -----------
-    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
     between staying in JIT-region with that function or going back to interpreter mode.
-    Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
-    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    - Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
+    - DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """
