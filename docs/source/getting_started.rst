@@ -53,9 +53,9 @@ Intel SDC wheel package can be installed using the steps below:
     > pip install --index-url https://pypi.anaconda.org/intel/label/beta/simple --extra-index-url https://pypi.anaconda.org/intel/simple --extra-index-url https://pypi.org/simple sdc
 
 
-Experienced users can also buildIntel SDC from sources
-`for Linux*<https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-linux>`_ and
-`for Windows*<https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-windows>`_.
+Experienced users can also build Intel SDC from sources
+`for Linux* <https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-linux>`_ and
+`for Windows* <https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-windows>`_.
  
 Basic Usage
 ###########
@@ -96,5 +96,5 @@ What If I Get Poor Performance?
 Build Instructions
 ##################
 
-.. todo::
-   Provide step-by-step build instructions for Linux*, Windows*, and Mac*.
+Build instructions for Linux*: https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-linux
+Build instructions for Windows*: https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-windows
