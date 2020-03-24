@@ -58,7 +58,7 @@ from sdc.datatypes.common_functions import SDCLimitation
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
-from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby, merge_groupby_dicts
+from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby, merge_groupby_dicts_inplace
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
 from sdc.hiframes.api import isna
@@ -2025,7 +2025,7 @@ are currently unsupported by Intel Scalable Dataframe Compiler
         # merging all dict parts into a single resulting dict
         res_dict = dict_parts[0]
         for i in range(1, len(chunks)):
-            res_dict = merge_groupby_dicts(res_dict, dict_parts[i])
+            res_dict = merge_groupby_dicts_inplace(res_dict, dict_parts[i])
 
         return init_dataframe_groupby(self, column_id, res_dict, sort)
 

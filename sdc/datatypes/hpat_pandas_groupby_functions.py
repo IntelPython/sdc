@@ -53,7 +53,10 @@ from sdc.str_ext import string_type
 
 
 @sdc_register_jitable
-def merge_groupby_dicts(left, right):
+def merge_groupby_dicts_inplace(left, right):
+    """ Merges one internal groupby dictionary (right) into another one (left) and returns
+    the merging result. Used for aggregating partial dicts into single result. """
+
     if not right:
         return left
 

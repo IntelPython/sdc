@@ -4919,7 +4919,7 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
     Limitations
     -----------
     - Parameters ``method``, ``limit`` and ``downcast`` are currently unsupported by Intel Scalable Dataframe Compiler.
-    - Parameter inplace is supported as literal value only.
+    - Parameter ``inplace`` is supported as literal value only.
 
     Examples
     --------
