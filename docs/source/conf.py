@@ -76,7 +76,7 @@ if not sdc_doc_no_api_ref:
 # -- Project information -----------------------------------------------------
 
 project = 'Intel® Scalable Dataframe Compiler'
-copyright = '2019, Intel Corporation'
+copyright = '2019-2020, Intel Corporation'
 author = 'Intel Corporation'
 
 # The full version, including alpha/beta/rc tags
