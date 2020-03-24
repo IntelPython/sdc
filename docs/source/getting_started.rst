@@ -62,7 +62,7 @@ What If I Get A Compilation Error
 
 Not all Python code can be compiled with Intel® SDC. Not all `Pandas*`_ and `Numpy*`_ APIs are currently supported and not all valid python code can be compiled using underlying Numba compiler.
 
-To be successfully compiled code must use only supported subset of Pandas API and use only subset Python supported by Numba (e.g. be type-stable)
+To be successfully compiled code must use only supported subset of `Pandas*`_ API and use only subset `Python*`_ supported by `Numba*`_ (e.g. be type-stable)
 
 Example of currently unsupported code:
 
