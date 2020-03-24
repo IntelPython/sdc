@@ -34,24 +34,15 @@ from pathlib import Path
 from utilities import SDC_Build_Utilities
 
 
-examples_to_skip = {'basic_usage_nyse_predict.py'}
-
-
 def run_examples(sdc_utils):
     total = 0
     passed = 0
     failed = 0
-    skipped = 0
     failed_examples = []
 
     os.chdir(str(sdc_utils.examples_path))
     for sdc_example in Path('.').glob('**/*.py'):
         total += 1
-
-        if sdc_example.name in examples_to_skip:
-            skipped += 1
-            continue
-
         sdc_example = str(sdc_example)
         try:
             sdc_utils.log_info(sdc_utils.line_double)
@@ -65,8 +56,7 @@ def run_examples(sdc_utils):
             passed += 1
             sdc_utils.log_info(f'{sdc_example} PASSED')
 
-    summary_msg = f'SDC examples summary: {total} RUN, {passed} PASSED, {failed} FAILED, {skipped} SKIPPED'
-    sdc_utils.log_info(summary_msg, separate=True)
+    sdc_utils.log_info(f'SDC examples summary: {total} RUN, {passed} PASSED, {failed} FAILED', separate=True)
     for failed_example in failed_examples:
         sdc_utils.log_info(f'FAILED: {failed_example}')
 
@@ -89,7 +79,7 @@ if __name__ == '__main__':
     sdc_utils = SDC_Build_Utilities(args.python, args.sdc_channel)
     sdc_utils.log_info('Run Intel(R) SDC examples', separate=True)
     sdc_utils.log_info(sdc_utils.line_double)
-    sdc_utils.create_environment(['scipy'])
+    sdc_utils.create_environment(['scipy', 'sklearn'])
     sdc_utils.install_conda_package(['sdc'])
 
     run_examples(sdc_utils)
