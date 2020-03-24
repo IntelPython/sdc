@@ -76,7 +76,9 @@ Example of currently unsupported code:
      return a  # Type of a cannot be inferred
 
 :ref:`SDC API reference<apireference>`
+
 :ref:`More info on SDC compilation process and supported Python features<compilation>`
+
 `Numba documentation <https://numba.pydata.org/numba-doc/latest/user/troubleshoot.html>`_
 
 Measuring Performance
