@@ -44,10 +44,10 @@ Experienced users can also buildIntel SDC from sources
  
 Basic Usage
 ###########
-The code below illustrates a typical ML workflow including data pre-processing and predicting stages.
-Intel® SDC is intended to compile pre-processing stage which includes
-reading data from a csv file, filtering data and performing Pearson correlation operation.
-scikit-learn is used to perform prediction based on gradient boosting regression model.
+The code below illustrates a typical ML workflow that consists of data pre-processing and predicting stages.
+Intel® SDC is intended to compile pre-processing stage that includes
+reading dataset from a csv file, filtering data and performing Pearson correlation operation.
+The prediction based on gradient boosting regression module is made using scikit-learn module.
 
 .. literalinclude:: ../../examples/basic_usage_nyse_predict.py
    :language: python
