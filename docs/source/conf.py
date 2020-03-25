@@ -73,6 +73,33 @@ if not sdc_doc_no_api_ref:
 
     generate_api_reference()
 
+SDC_DOC_NO_EXAMPLES_STR = 'SDC_DOC_NO_EXAMPLES'
+SDC_DOC_EXAMPLES_DIR = '_examples'
+
+sdc_doc_no_examples = False  # Generate examples list by default
+if SDC_DOC_NO_EXAMPLES_STR in os.environ:
+    sdc_doc_no_examples = os.environ[SDC_DOC_NO_EXAMPLES_STR] == '1'
+
+if not sdc_doc_no_examples:
+    if os.path.exists(SDC_DOC_EXAMPLES_DIR):
+        shutil.rmtree(SDC_DOC_EXAMPLES_DIR)
+
+    try:
+        import sdc
+    except ImportError:
+        raise ImportError('Cannot import sdc.\n'
+                          'Documentation generator for Examples for a given module expects that module '
+                          'to be installed. Use conda/pip install SDC to install it prior to using API Examples '
+                          'generation. If you want to disable Examples generation, set the environment '
+                          'variable SDC_DOC_NO_EXAMPLES_STR=1')
+
+    try:
+        from examples_generator import generate_examples
+    except ImportError:
+        raise ImportError('Cannot import examples_generator', os.getcwd())
+
+    generate_examples()
+
 # -- Project information -----------------------------------------------------
 
 project = 'Intel® Scalable Dataframe Compiler'
