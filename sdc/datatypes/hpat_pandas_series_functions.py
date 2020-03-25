@@ -3062,7 +3062,8 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters ``level``, ``fill_value`` and ``axis`` are unsupported.
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
