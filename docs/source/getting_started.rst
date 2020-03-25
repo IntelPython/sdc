@@ -4,7 +4,7 @@
 Getting Started
 ===============
 
-Intel® Scalable Dataframe Compiler (Intel® SDC) extends capabilities of Numba* to compile a subset
+Intel® Scalable Dataframe Compiler (Intel® SDC) extends capabilities of `Numba*`_ to compile a subset
 of `Pandas*`_ into native code. Being integral part of `Numba*`_ it allows to combine regular `NumPy*`_ codes
 with `Pandas*`_ operations.
 
@@ -30,10 +30,10 @@ binning, and finally by feeding the cleaned data into machine learning algorithm
 
 We also recommend to read `A ~5 minute guide to Numba <https://numba.pydata.org/numba-doc/dev/user/5minguide.html>`_
 for getting started with `Numba*`_.
- 
+
 Installation
 #############
-You can use conda and pip package managers to install Intel® SDC into your Python* environment.
+You can use conda and pip package managers to install Intel® SDC into your `Python*`_ environment.
 
 Intel SDC is available on the Anaconda Cloud intel/label/beta channel.
 Distribution includes Intel SDC for Python 3.6 and 3.7 for Windows and Linux platforms.

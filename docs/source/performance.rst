@@ -76,5 +76,5 @@ parallelism available in a JIT-region. To do that you need to add ``parallel=Tru
 
 Other Performance Tips
 ----------------------
-Please refer to `Numba Performance Tips<https://numba.pydata.org/numba-doc/dev/user/performance-tips.html>`_
+Please refer to `Numba Performance Tips <https://numba.pydata.org/numba-doc/dev/user/performance-tips.html>`_
 for additional hints on obtaining good performance with Intel SDC.
