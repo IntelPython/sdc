@@ -27,25 +27,22 @@
 
 from sdc.tests.test_basic import *
 from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
-
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
 from sdc.tests.test_strings import *
-
+from sdc.tests.test_dataframe import *
+from sdc.tests.test_io import *
+from sdc.tests.test_rolling import *
 from sdc.tests.test_groupby import *
 from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
 
 from sdc.tests.test_ml import *
-
-from sdc.tests.test_io import *
-
-from sdc.tests.test_hpat_jit import *
+# from sdc.tests.test_d4p import *
 
 from sdc.tests.test_sdc_numpy import *
 from sdc.tests.test_prange_utils import *
 
 # performance tests
 import sdc.tests.tests_perf
+
+# tests from old pipeline and unsupported features
+# from sdc.tests.test_date import *
+# from sdc.tests.test_hpat_jit import *

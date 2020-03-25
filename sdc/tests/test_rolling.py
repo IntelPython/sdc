@@ -39,8 +39,7 @@ from numba.errors import TypingError
 from sdc.hiframes.rolling import supported_rolling_funcs
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_series import gen_frand_array
-from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                  skip_numba_jit, skip_sdc_jit,
+from sdc.tests.test_utils import (skip_numba_jit, skip_sdc_jit,
                                   test_global_input_data_float64)
 
 
@@ -63,7 +62,6 @@ def rolling_var_usecase(obj, window, min_periods, ddof):
 
 class TestRolling(TestCase):
 
-    @skip_numba_jit
     def test_series_rolling1(self):
         def test_impl(S):
             return S.rolling(3).sum()
@@ -143,46 +141,6 @@ class TestRolling(TestCase):
         for n, w, c in itertools.product(sizes, wins, centers):
             df = pd.DataFrame({'B': np.arange(n)})
             pd.testing.assert_frame_equal(hpat_func(df, w, c), test_impl(df, w, c))
-
-    @skip_numba_jit
-    def test_fixed_parallel1(self):
-        def test_impl(n, w, center):
-            df = pd.DataFrame({'B': np.arange(n)})
-            R = df.rolling(w, center=center).sum()
-            return R.B.sum()
-
-        hpat_func = self.jit(test_impl)
-        sizes = (121,)
-        wins = (5,)
-        if LONG_TEST:
-            sizes = (1, 2, 10, 11, 121, 1000)
-            wins = (2, 4, 5, 10, 11)
-        centers = (False, True)
-        for args in itertools.product(sizes, wins, centers):
-            self.assertEqual(hpat_func(*args), test_impl(*args),
-                             "rolling fixed window with {}".format(args))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_fixed_parallel_apply1(self):
-        def test_impl(n, w, center):
-            df = pd.DataFrame({'B': np.arange(n)})
-            R = df.rolling(w, center=center).apply(lambda a: a.sum())
-            return R.B.sum()
-
-        hpat_func = self.jit(test_impl)
-        sizes = (121,)
-        wins = (5,)
-        if LONG_TEST:
-            sizes = (1, 2, 10, 11, 121, 1000)
-            wins = (2, 4, 5, 10, 11)
-        centers = (False, True)
-        for args in itertools.product(sizes, wins, centers):
-            self.assertEqual(hpat_func(*args), test_impl(*args),
-                             "rolling fixed window with {}".format(args))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
 
     @skip_numba_jit
     def test_variable1(self):
@@ -283,56 +241,6 @@ class TestRolling(TestCase):
                 time = pd.date_range(start='1/1/2018', periods=n, freq='s')
                 df = pd.DataFrame({'B': np.arange(n), 'time': time})
                 pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
-
-    @skip_numba_jit
-    @unittest.skipIf(platform.system() == 'Windows', "ValueError: time must be monotonic")
-    def test_variable_parallel1(self):
-        wins = ('2s',)
-        sizes = (121,)
-        if LONG_TEST:
-            wins = ('1s', '2s', '3s', '4s')
-            # XXX: Pandas returns time = [np.nan] for size==1 for some reason
-            sizes = (2, 10, 11, 121, 1000)
-        # all functions except apply
-        for w, func_name in itertools.product(wins, test_funcs):
-            func_text = "def test_impl(n):\n"
-            func_text += "  df = pd.DataFrame({'B': np.arange(n), 'time': "
-            func_text += "    pd.DatetimeIndex(np.arange(n) * 1000000000)})\n"
-            func_text += "  res = df.rolling('{}', on='time').{}()\n".format(w, func_name)
-            func_text += "  return res.B.sum()\n"
-            loc_vars = {}
-            exec(func_text, {'pd': pd, 'np': np}, loc_vars)
-            test_impl = loc_vars['test_impl']
-            hpat_func = self.jit(test_impl)
-            for n in sizes:
-                np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    @unittest.skipIf(platform.system() == 'Windows', "ValueError: time must be monotonic")
-    def test_variable_apply_parallel1(self):
-        wins = ('2s',)
-        sizes = (121,)
-        if LONG_TEST:
-            wins = ('1s', '2s', '3s', '4s')
-            # XXX: Pandas returns time = [np.nan] for size==1 for some reason
-            sizes = (2, 10, 11, 121, 1000)
-        # all functions except apply
-        for w in wins:
-            func_text = "def test_impl(n):\n"
-            func_text += "  df = pd.DataFrame({'B': np.arange(n), 'time': "
-            func_text += "    pd.DatetimeIndex(np.arange(n) * 1000000000)})\n"
-            func_text += "  res = df.rolling('{}', on='time').apply(lambda a: a.sum())\n".format(w)
-            func_text += "  return res.B.sum()\n"
-            loc_vars = {}
-            exec(func_text, {'pd': pd, 'np': np}, loc_vars)
-            test_impl = loc_vars['test_impl']
-            hpat_func = self.jit(test_impl)
-            for n in sizes:
-                np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
 
     @skip_numba_jit
     def test_series_fixed1(self):

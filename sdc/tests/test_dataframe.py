@@ -38,16 +38,8 @@ from numba.errors import TypingError
 
 import sdc
 from sdc.datatypes.common_functions import SDCLimitation
-from sdc.tests.gen_test_data import ParquetGenerator
 from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (check_numba_version,
-                                  count_array_OneDs,
-                                  count_array_REPs,
-                                  count_parfor_OneDs,
-                                  count_parfor_REPs,
-                                  dist_IR_contains,
-                                  gen_df, gen_df_int_cols,
-                                  get_start_end,
+from sdc.tests.test_utils import (gen_df, gen_df_int_cols,
                                   skip_numba_jit,
                                   skip_sdc_jit,
                                   test_global_input_data_float64,
@@ -252,62 +244,6 @@ class TestDataFrame(TestCase):
                                           dtype=pd.api.types.CategoricalDtype(['N', 'Y']))})
         pd.testing.assert_frame_equal(hpat_func(df.copy(deep=True)), test_impl(df))
 
-    @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
-    def test_box_dist_return(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
-            return df
-
-        hpat_func = self.jit(distributed={'df'})(test_impl)
-        n = 11
-        hres, res = hpat_func(n), test_impl(n)
-        self.assertEqual(count_array_OneDs(), 3)
-        self.assertEqual(count_parfor_OneDs(), 2)
-        dist_sum = self.jit(
-            lambda a: sdc.distributed_api.dist_reduce(
-                a, np.int32(sdc.distributed_api.Reduce_Type.Sum.value)))
-        dist_sum(1)  # run to compile
-        np.testing.assert_allclose(dist_sum(hres.A.sum()), res.A.sum())
-        np.testing.assert_allclose(dist_sum(hres.B.sum()), res.B.sum())
-
-    @skip_numba_jit
-    def test_len1(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.random.ranf(n)})
-            return len(df)
-
-        hpat_func = self.jit(test_impl)
-        n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_shape1(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n, np.int64), 'B': np.random.ranf(n)})
-            return df.shape
-
-        hpat_func = self.jit(test_impl)
-        n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_column_getitem1(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
-            Ac = df['A'].values
-            return Ac.sum()
-
-        hpat_func = self.jit(test_impl)
-        n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-        self.assertEqual(count_parfor_OneDs(), 1)
-
     @skip_numba_jit
     def test_column_list_getitem1(self):
         def test_impl(df):
@@ -318,44 +254,6 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame(
             {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
-
-    def test_filter1(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
-            df1 = df[df.A > .5]
-            return df1.B.sum()
-
-        hpat_func = self.jit(test_impl)
-        n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit('np.sum of Series unsupported')
-    def test_filter2(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
-            df1 = df.loc[df.A > .5]
-            return np.sum(df1.B)
-
-        hpat_func = self.jit(test_impl)
-        n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit('np.sum of Series unsupported')
-    def test_filter3(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
-            df1 = df.iloc[(df.A > .5).values]
-            return np.sum(df1.B)
-
-        hpat_func = self.jit(test_impl)
-        n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
 
     @skip_numba_jit
     def test_iloc1(self):
@@ -702,18 +600,6 @@ class TestDataFrame(TestCase):
             with self.subTest(values=values):
                 np.testing.assert_array_equal(sdc_func(n, values), test_impl(n, values))
 
-    @skip_numba_jit
-    def test_df_values_parallel1(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
-            return df.values.sum()
-
-        hpat_func = self.jit(test_impl)
-        n = 11
-        np.testing.assert_array_equal(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
     def _test_df_index(self, df):
         def test_impl(df):
             return df.index
@@ -774,22 +660,6 @@ class TestDataFrame(TestCase):
         n = 121
         hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
-
-    @skip_numba_jit
-    @skip_sdc_jit('Not implemented in sequential transport layer')
-    def test_df_describe(self):
-        def test_impl(n):
-            df = pd.DataFrame({'A': np.arange(0, n, 1, np.float32),
-                               'B': np.arange(n)})
-            #df.A[0:1] = np.nan
-            return df.describe()
-
-        hpat_func = self.jit(test_impl)
-        n = 1001
-        hpat_func(n)
-        # XXX: test actual output
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
 
     @skip_numba_jit
     def test_sort_values(self):
@@ -868,29 +738,6 @@ class TestDataFrame(TestCase):
         sorted_df = df.sort_values('A', inplace=False, kind='mergesort')
         hpat_func = self.jit(test_impl)
         self.assertTrue((hpat_func(df) == sorted_df.B.values).all())
-
-    @skip_numba_jit
-    def test_sort_parallel_single_col(self):
-        # create `kde.parquet` file
-        ParquetGenerator.gen_kde_pq()
-
-        # TODO: better parallel sort test
-        def test_impl():
-            df = pd.read_parquet('kde.parquet')
-            df.sort_values('points', inplace=True)
-            res = df.points.values
-            return res
-
-        hpat_func = self.jit(locals={'res:return': 'distributed'})(test_impl)
-
-        save_min_samples = sdc.hiframes.sort.MIN_SAMPLES
-        try:
-            sdc.hiframes.sort.MIN_SAMPLES = 10
-            res = hpat_func()
-            self.assertTrue((np.diff(res) >= 0).all())
-        finally:
-            # restore global val
-            sdc.hiframes.sort.MIN_SAMPLES = save_min_samples
 
     @skip_numba_jit
     def test_df_isna1(self):
@@ -972,30 +819,6 @@ class TestDataFrame(TestCase):
                            'D': np.arange(float(n), dtype=np.float32)
                            })
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
-
-    @skip_numba_jit
-    def test_sort_parallel(self):
-        # create `kde.parquet` file
-        ParquetGenerator.gen_kde_pq()
-
-        # TODO: better parallel sort test
-        def test_impl():
-            df = pd.read_parquet('kde.parquet')
-            df['A'] = df.points.astype(np.float64)
-            df.sort_values('points', inplace=True)
-            res = df.A.values
-            return res
-
-        hpat_func = self.jit(locals={'res:return': 'distributed'})(test_impl)
-
-        save_min_samples = sdc.hiframes.sort.MIN_SAMPLES
-        try:
-            sdc.hiframes.sort.MIN_SAMPLES = 10
-            res = hpat_func()
-            self.assertTrue((np.diff(res) >= 0).all())
-        finally:
-            # restore global val
-            sdc.hiframes.sort.MIN_SAMPLES = save_min_samples
 
     @skip_numba_jit
     def test_itertuples(self):
@@ -2142,6 +1965,129 @@ class TestDataFrame(TestCase):
         expected = np.asarray([True, False, True, False, True, True, False])
         result = jitted_func(df)
         np.testing.assert_array_equal(result, expected)
+
+    @skip_numba_jit("Requires support of inplace operators for Series")
+    def test_column_list_select2(self):
+        # make sure SDC copies the columns like Pandas does
+        def test_impl(df):
+            df2 = df[['A']]
+            df2['A'] += 10
+            return df2.A, df.A
+
+        hpat_func = self.jit(test_impl)
+        n = 11
+        df = pd.DataFrame(
+            {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
+        np.testing.assert_array_equal(hpat_func(df.copy())[1], test_impl(df)[1])
+
+    def test_getitem_bool_series(self):
+        def test_impl(df):
+            return df['A'][df['B']].values
+
+        hpat_func = self.jit(test_impl)
+        df = pd.DataFrame({'A': [1, 2, 3], 'B': [True, False, True]})
+        np.testing.assert_array_equal(test_impl(df), hpat_func(df))
+
+    def test_column_fillna(self):
+        def test_impl():
+            A = np.array([1., 2., 3.])
+            A[0] = np.nan
+            df = pd.DataFrame({'A': A})
+            B = df.A.fillna(5.0)
+            return B.sum()
+
+        hpat_func = self.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
+    def test_column_fillna_inplace(self):
+        def test_impl():
+            A = np.array([1., 2., 3.])
+            A[0] = np.nan
+            df = pd.DataFrame({'A': A})
+            df.A.fillna(5.0, inplace=True)
+            return df.A.sum()
+
+        hpat_func = self.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
+    def test_column_mean(self):
+        def test_impl():
+            A = np.array([1., 2., 3.])
+            A[0] = np.nan
+            df = pd.DataFrame({'A': A})
+            return df.A.mean()
+
+        hpat_func = self.jit(test_impl)
+        self.assertEqual(hpat_func(), test_impl())
+
+    def test_column_var(self):
+        def test_impl():
+            A = np.array([1., 2., 3.])
+            A[0] = 4.0
+            df = pd.DataFrame({'A': A})
+            return df.A.var()
+
+        hpat_func = self.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(), test_impl())
+
+    def test_column_std(self):
+        def test_impl():
+            A = np.array([1., 2., 3.])
+            A[0] = 4.0
+            df = pd.DataFrame({'A': A})
+            return df.A.std()
+
+        hpat_func = self.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(), test_impl())
+
+    @skip_numba_jit
+    def test_column_map(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n)})
+            df['B'] = df.A.map(lambda a: 2 * a)
+            return df.B.sum()
+
+        n = 121
+        hpat_func = self.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+
+    @skip_numba_jit
+    def test_column_map_arg(self):
+        def test_impl(df):
+            df['B'] = df.A.map(lambda a: 2 * a)
+            return
+
+        n = 121
+        df1 = pd.DataFrame({'A': np.arange(n)})
+        df2 = pd.DataFrame({'A': np.arange(n)})
+        hpat_func = self.jit(test_impl)
+        hpat_func(df1)
+        self.assertTrue(hasattr(df1, 'B'))
+        test_impl(df2)
+        np.testing.assert_equal(df1.B.values, df2.B.values)
+
+    def test_column_quantile(self):
+        def test_impl(A):
+            df = pd.DataFrame({'A': A})
+            return df.A.quantile(.25)
+
+        hpat_func = self.jit(test_impl)
+        n = 1001
+        A = np.arange(0, n, 1, np.float64)
+        np.testing.assert_almost_equal(hpat_func(A), test_impl(A))
+
+    def test_column_nunique(self):
+        def test_impl(n):
+            df = pd.DataFrame({'A': np.arange(n)})
+            df.A[2] = 0
+            return df.A.nunique()
+
+        hpat_func = self.jit(test_impl)
+        n = 1001
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
+        # test compile again for overload related issues
+        hpat_func = self.jit(test_impl)
+        np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
 
 if __name__ == "__main__":

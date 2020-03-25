@@ -46,7 +46,6 @@ from sdc.tests.test_utils import (check_numba_version,
 
 class TestML(TestCase):
 
-    @skip_numba_jit
     @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_logistic_regression(self):
         def test_impl(n, d):
@@ -63,10 +62,10 @@ class TestML(TestCase):
         n = 11
         d = 4
         np.testing.assert_allclose(hpat_func(n, d), test_impl(n, d))
-        self.assertEqual(count_array_OneDs(), 3)
-        self.assertEqual(count_parfor_OneDs(), 3)
+        # TODO: implement distribution analysis for new-pipeline
+        # self.assertEqual(count_array_OneDs(), 3)
+        # self.assertEqual(count_parfor_OneDs(), 3)
 
-    @skip_numba_jit
     @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_logistic_regression_acc(self):
         def test_impl(N, D):
@@ -86,10 +85,10 @@ class TestML(TestCase):
         n = 11
         d = 4
         np.testing.assert_approx_equal(hpat_func(n, d), test_impl(n, d))
-        self.assertEqual(count_array_OneDs(), 3)
-        self.assertEqual(count_parfor_OneDs(), 4)
+        # TODO: implement distribution analysis for new-pipeline
+        # self.assertEqual(count_array_OneDs(), 3)
+        # self.assertEqual(count_parfor_OneDs(), 4)
 
-    @skip_numba_jit
     @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_linear_regression(self):
         def test_impl(N, D):
@@ -107,10 +106,10 @@ class TestML(TestCase):
         n = 11
         d = 4
         np.testing.assert_allclose(hpat_func(n, d), test_impl(n, d))
-        self.assertEqual(count_array_OneDs(), 5)
-        self.assertEqual(count_parfor_OneDs(), 3)
+        # TODO: implement distribution analysis for new-pipeline
+        # self.assertEqual(count_array_OneDs(), 5)
+        # self.assertEqual(count_parfor_OneDs(), 3)
 
-    @skip_numba_jit
     def test_kde(self):
         def test_impl(n):
             X = np.ones(n)
@@ -128,10 +127,10 @@ class TestML(TestCase):
         hpat_func = self.jit(test_impl)
         n = 11
         np.testing.assert_approx_equal(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_OneDs(), 1)
-        self.assertEqual(count_parfor_OneDs(), 2)
+        # TODO: implement distribution analysis for new-pipeline
+        # self.assertEqual(count_array_OneDs(), 1)
+        # self.assertEqual(count_parfor_OneDs(), 2)
 
-    @unittest.expectedFailure  # https://github.com/numba/numba/issues/4690
     def test_kmeans(self):
         def test_impl(numCenter, numIter, N, D):
             A = np.ones((N, D))
@@ -150,10 +149,11 @@ class TestML(TestCase):
         hpat_func = self.jit(test_impl)
         n = 11
         np.testing.assert_allclose(hpat_func(1, 1, n, 2), test_impl(1, 1, n, 2))
-        self.assertEqual(count_array_OneDs(), 4)
-        self.assertEqual(count_array_OneD_Vars(), 1)
-        self.assertEqual(count_parfor_OneDs(), 5)
-        self.assertEqual(count_parfor_OneD_Vars(), 1)
+        # TODO: implement distribution analysis for new-pipeline
+        # self.assertEqual(count_array_OneDs(), 4)
+        # self.assertEqual(count_array_OneD_Vars(), 1)
+        # self.assertEqual(count_parfor_OneDs(), 5)
+        # self.assertEqual(count_parfor_OneD_Vars(), 1)
 
 
 if __name__ == "__main__":

@@ -647,7 +647,6 @@ class TestSeries(
         msg = 'Method corr(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
-    @skip_parallel
     @skip_inline
     def test_series_astype_int_to_str1(self):
         """Verifies Series.astype implementation with function 'str' as argument
@@ -661,7 +660,6 @@ class TestSeries(
         S = pd.Series(np.arange(n))
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_inline
     def test_series_astype_int_to_str2(self):
         """Verifies Series.astype implementation with a string literal dtype argument
@@ -675,7 +673,6 @@ class TestSeries(
         S = pd.Series(np.arange(n))
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_inline
     def test_series_astype_str_to_str1(self):
         """Verifies Series.astype implementation with function 'str' as argument
@@ -688,7 +685,6 @@ class TestSeries(
         S = pd.Series(['aa', 'bb', 'cc'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_inline
     def test_series_astype_str_to_str2(self):
         """Verifies Series.astype implementation with a string literal dtype argument
@@ -701,7 +697,6 @@ class TestSeries(
         S = pd.Series(['aa', 'bb', 'cc'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_inline
     def test_series_astype_str_to_str_index_str(self):
         """Verifies Series.astype implementation with function 'str' as argument
@@ -716,7 +711,6 @@ class TestSeries(
         S = pd.Series(['aa', 'bb', 'cc'], index=['d', 'e', 'f'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_inline
     def test_series_astype_str_to_str_index_int(self):
         """Verifies Series.astype implementation with function 'str' as argument
@@ -837,7 +831,6 @@ class TestSeries(
         S = pd.Series(['3.24', '1E+05', '-1', '-1.3E-01', 'nan', 'inf'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_inline
     def test_series_astype_str_index_str(self):
         """Verifies Series.astype implementation with function 'str' as argument
@@ -851,7 +844,6 @@ class TestSeries(
         S = pd.Series(['aa', 'bb', 'cc'], index=['a', 'b', 'c'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_inline
     def test_series_astype_str_index_int(self):
         """Verifies Series.astype implementation with function 'str' as argument
@@ -1329,7 +1321,7 @@ class TestSeries(
                     pd.testing.assert_series_equal(hpat_func(S, data_left, data_right),
                                                    test_impl(S, data_left, data_right))
 
-    @skip_parallel
+    @skip_numba_jit("SDC div and mod operators return diff result for 0/0 in int domain")
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support comparing Series of different lengths')
     def test_series_op1_integer(self):
         """Verifies using all various Series arithmetic binary operators on two integer Series with default indexes"""
@@ -1354,7 +1346,6 @@ class TestSeries(
                     # check_dtype=False because SDC implementation always returns float64 Series
                     pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2), check_dtype=False)
 
-    @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support division/modulo/etc by zero')
     def test_series_op2_integer(self):
         """Verifies using all various Series arithmetic binary operators
@@ -1381,7 +1372,6 @@ class TestSeries(
                         # check_dtype=False because SDC implementation always returns float64 Series
                         pd.testing.assert_series_equal(hpat_func(S, scalar), test_impl(S, scalar), check_dtype=False)
 
-    @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support comparing Series of different lengths')
     def test_series_op1_float(self):
         """Verifies using all various Series arithmetic binary operators on two float Series with default indexes"""
@@ -1402,7 +1392,6 @@ class TestSeries(
                     # check_dtype=False because SDC implementation always returns float64 Series
                     pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2), check_dtype=False)
 
-    @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support division/modulo/etc by zero')
     def test_series_op2_float(self):
         """Verifies using all various Series arithmetic binary operators
@@ -1424,7 +1413,6 @@ class TestSeries(
                         S = pd.Series(data_left)
                         pd.testing.assert_series_equal(hpat_func(S, scalar), test_impl(S, scalar), check_dtype=False)
 
-    @skip_parallel
     @skip_numba_jit('Not implemented in new-pipeline yet')
     def test_series_op3(self):
         arithmetic_binops = ('+=', '-=', '*=', '/=', '//=', '%=', '**=')
@@ -1442,7 +1430,6 @@ class TestSeries(
             test_impl(A2, B)
             pd.testing.assert_series_equal(A1, A2)
 
-    @skip_parallel
     @skip_numba_jit('Not implemented in new-pipeline yet')
     def test_series_op4(self):
         arithmetic_binops = ('+=', '-=', '*=', '/=', '//=', '%=', '**=')
@@ -1459,7 +1446,6 @@ class TestSeries(
             test_impl(S2, 1)
             pd.testing.assert_series_equal(S1, S2)
 
-    @skip_parallel
     def test_series_op5(self):
         arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
 
@@ -1472,7 +1458,6 @@ class TestSeries(
             S2 = pd.Series(np.ones(n - 1), name='B')
             pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
-    @skip_parallel
     def test_series_op5_integer_scalar(self):
         arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
 
@@ -1491,7 +1476,6 @@ class TestSeries(
                 test_impl(operand_series, operand_scalar),
                 check_names=False)
 
-    @skip_parallel
     def test_series_op5_float_scalar(self):
         arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
 
@@ -1507,7 +1491,6 @@ class TestSeries(
                 test_impl(operand_series, operand_scalar),
                 check_names=False)
 
-    @skip_parallel
     @skip_numba_jit
     def test_series_op6(self):
         def test_impl(A):
@@ -1518,7 +1501,6 @@ class TestSeries(
         A = pd.Series(np.arange(n))
         pd.testing.assert_series_equal(hpat_func(A), test_impl(A))
 
-    @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support Series indexes')
     def test_series_op7(self):
         """Verifies using all various Series comparison binary operators on two integer Series with various indexes"""
@@ -1540,7 +1522,6 @@ class TestSeries(
                     B = pd.Series(data_right, index=index_data)
                     pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
 
-    @skip_parallel
     @skip_sdc_jit('Old-style implementation of operators doesn\'t support comparing to inf')
     def test_series_op7_scalar(self):
         """Verifies using all various Series comparison binary operators on an integer Series and scalar values"""
@@ -1555,7 +1536,6 @@ class TestSeries(
                 with self.subTest(left=S, right=scalar, operator=operator):
                     pd.testing.assert_series_equal(hpat_func(S, scalar), test_impl(S, scalar))
 
-    @skip_parallel
     def test_series_op8(self):
         comparison_methods = ('lt', 'gt', 'le', 'ge', 'ne', 'eq')
 
@@ -1568,8 +1548,6 @@ class TestSeries(
             B = pd.Series(np.arange(n)**2)
             pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_names=False)
 
-    @skip_parallel
-    @unittest.skipIf(platform.system() == 'Windows', "Attribute dtype are different: int64, int32")
     def test_series_op8_integer_scalar(self):
         comparison_methods = ('lt', 'gt', 'le', 'ge', 'eq', 'ne')
 
@@ -1585,7 +1563,6 @@ class TestSeries(
                 test_impl(operand_series, operand_scalar),
                 check_names=False)
 
-    @skip_parallel
     def test_series_op8_float_scalar(self):
         comparison_methods = ('lt', 'gt', 'le', 'ge', 'eq', 'ne')
 
@@ -1601,7 +1578,6 @@ class TestSeries(
                 test_impl(operand_series, operand_scalar),
                 check_names=False)
 
-    @skip_parallel
     @skip_numba_jit
     def test_series_inplace_binop_array(self):
         def test_impl(A, B):
@@ -1614,70 +1590,34 @@ class TestSeries(
         B = pd.Series(np.ones(n))
         np.testing.assert_array_equal(hpat_func(A.copy(), B), test_impl(A, B))
 
-    if sdc.config.config_pipeline_hpat_default:
-        def test_series_fusion1(self):
-            def test_impl(A, B):
-                return A + B + 1
-            hpat_func = self.jit(test_impl)
+    @skip_numba_jit('Functionally test passes, but in old-style it checked fusion of parfors.\n'
+                    'TODO: implement the same checks in new-pipeline')
+    def test_series_fusion1(self):
+        def test_impl(A, B):
+            return A + B + 1
+        hpat_func = self.jit(test_impl)
 
-            n = 11
-            if platform.system() == 'Windows' and not IS_32BITS:
-                A = pd.Series(np.arange(n), dtype=np.int64)
-                B = pd.Series(np.arange(n)**2, dtype=np.int64)
-            else:
-                A = pd.Series(np.arange(n))
-                B = pd.Series(np.arange(n)**2)
-            pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
-            self.assertEqual(count_parfor_REPs(), 1)
-    else:
-        @skip_numba_jit('Functionally test passes, but in old-style it checked fusion of parfors.\n'
-                        'TODO: implement the same checks in new-pipeline')
-        def test_series_fusion1(self):
-            def test_impl(A, B):
-                return A + B + 1
-            hpat_func = self.jit(test_impl)
+        n = 11
+        A = pd.Series(np.arange(n))
+        B = pd.Series(np.arange(n)**2)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False)
+        # self.assertEqual(count_parfor_REPs(), 1)
 
-            n = 11
-            A = pd.Series(np.arange(n))
-            B = pd.Series(np.arange(n)**2)
-            pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False)
-            # self.assertEqual(count_parfor_REPs(), 1)
+    @skip_numba_jit('Functionally test passes, but in old-style it checked fusion of parfors.\n'
+                    'TODO: implement the same checks in new-pipeline')
+    def test_series_fusion2(self):
+        def test_impl(A, B):
+            S = B + 2
+            if A.iat[0] == 0:
+                S = A + 1
+            return S + B
+        hpat_func = self.jit(test_impl)
 
-    if sdc.config.config_pipeline_hpat_default:
-        def test_series_fusion2(self):
-            # make sure getting data var avoids incorrect single def assumption
-            def test_impl(A, B):
-                S = B + 2
-                if A[0] == 0:
-                    S = A + 1
-                return S + B
-            hpat_func = self.jit(test_impl)
-
-            n = 11
-            if platform.system() == 'Windows' and not IS_32BITS:
-                A = pd.Series(np.arange(n), dtype=np.int64)
-                B = pd.Series(np.arange(n)**2, dtype=np.int64)
-            else:
-                A = pd.Series(np.arange(n))
-                B = pd.Series(np.arange(n)**2)
-            pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
-            self.assertEqual(count_parfor_REPs(), 3)
-    else:
-        @skip_numba_jit('Functionally test passes, but in old-style it checked fusion of parfors.\n'
-                        'TODO: implement the same checks in new-pipeline')
-        def test_series_fusion2(self):
-            def test_impl(A, B):
-                S = B + 2
-                if A.iat[0] == 0:
-                    S = A + 1
-                return S + B
-            hpat_func = self.jit(test_impl)
-
-            n = 11
-            A = pd.Series(np.arange(n))
-            B = pd.Series(np.arange(n)**2)
-            pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False)
-            # self.assertEqual(count_parfor_REPs(), 3)
+        n = 11
+        A = pd.Series(np.arange(n))
+        B = pd.Series(np.arange(n)**2)
+        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False)
+        # self.assertEqual(count_parfor_REPs(), 3)
 
     def test_series_len(self):
         def test_impl(A):
@@ -1835,7 +1775,6 @@ class TestSeries(
         S = pd.Series([1.0, 2.0, np.nan, 1.0, np.inf], index=[1, 2, 5, 7, 10])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_inline
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_str_index1(self):
@@ -1847,7 +1786,6 @@ class TestSeries(
         S = pd.Series(['aa', 'b', None, 'cccd', ''], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_inline
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_str_index2(self):
@@ -1859,7 +1797,6 @@ class TestSeries(
         S = pd.Series(['aa', 'b', None, 'cccd', ''], ['a', 'b', 'c', 'd', 'e'])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_inline
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_str_index3(self):
@@ -1871,7 +1808,6 @@ class TestSeries(
         S = pd.Series(['aa', 'b', None, 'cccd', ''], index=[1, 2, 5, 7, 10])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_float_inplace1(self):
         """Verifies Series.fillna() implementation for float series with default index and inplace argument True"""
@@ -1884,7 +1820,6 @@ class TestSeries(
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
-    @skip_parallel
     @unittest.skip('TODO: add reflection support and check method return value')
     def test_series_fillna_float_inplace2(self):
         """Verifies Series.fillna(inplace=True) results are reflected back in the original float series"""
@@ -1898,7 +1833,6 @@ class TestSeries(
         self.assertIsNone(test_impl(S2))
         pd.testing.assert_series_equal(S1, S2)
 
-    @skip_parallel
     def test_series_fillna_float_inplace3(self):
         """Verifies Series.fillna() implementation correcly handles omitted inplace argument as default False"""
         def test_impl(S):
@@ -1910,7 +1844,6 @@ class TestSeries(
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S1))
         pd.testing.assert_series_equal(S1, S2)
 
-    @skip_parallel
     def test_series_fillna_inplace_non_literal(self):
         """Verifies Series.fillna() implementation handles only Boolean literals as inplace argument"""
         def test_impl(S, param):
@@ -1922,7 +1855,6 @@ class TestSeries(
         expected = ValueError if sdc.config.config_pipeline_hpat_default else TypingError
         self.assertRaises(expected, hpat_func, S, True)
 
-    @skip_parallel
     @skip_numba_jit('TODO: investigate why Numba types inplace as bool (non-literal value)')
     def test_series_fillna_str_inplace1(self):
         """Verifies Series.fillna() implementation for series of strings
@@ -1951,7 +1883,6 @@ class TestSeries(
         self.assertIsNone(test_impl(S2))
         pd.testing.assert_series_equal(S1, S2)
 
-    @skip_parallel
     @skip_numba_jit('TODO: investigate why Numba types inplace as bool (non-literal value)')
     def test_series_fillna_str_inplace_empty1(self):
         def test_impl(A):
@@ -1988,7 +1919,6 @@ class TestSeries(
         S = pd.Series([pd.NaT, pd.Timestamp('1970-12-01'), pd.Timestamp('2012-07-25')])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_parallel
     def test_series_fillna_bool_no_index1(self):
         """Verifies Series.fillna() implementation for bool series with default index"""
         def test_impl(S):
@@ -1999,7 +1929,6 @@ class TestSeries(
         S2 = S1.copy()
         pd.testing.assert_series_equal(hpat_func(S1), test_impl(S2))
 
-    @skip_parallel
     @skip_sdc_jit('BUG: old-style fillna impl returns series without index')
     def test_series_fillna_int_no_index1(self):
         """Verifies Series.fillna() implementation for integer series with default index"""
@@ -2153,22 +2082,6 @@ class TestSeries(
         self.assertIsNone(hpat_func(S1))
         self.assertIsNone(test_impl(S2))
         pd.testing.assert_series_equal(S1, S2)
-
-    @skip_numba_jit
-    def test_series_dropna_str_parallel1(self):
-        """Verifies Series.dropna() distributed work for series of strings with default index"""
-        def test_impl(A):
-            B = A.dropna()
-            return (B == 'gg').sum()
-        hpat_func = self.jit(distributed=['A'])(test_impl)
-
-        S1 = pd.Series(['aa', 'b', None, 'ccc', 'dd', 'gg'])
-        start, end = get_start_end(len(S1))
-        # TODO: gatherv
-        self.assertEqual(hpat_func(S1[start:end]), test_impl(S1))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-        self.assertTrue(count_array_OneDs() > 0)
 
     @unittest.skip('AssertionError: Series are different\n'
                    'Series length are different\n'
@@ -2420,7 +2333,7 @@ class TestSeries(
         if np.isnan(actual) or np.isnan(expected):
             self.assertEqual(np.isnan(actual), np.isnan(expected))
         else:
-            self.assertEqual(actual, expected)
+            np.testing.assert_almost_equal(actual, expected)
 
     def test_series_mean(self):
         def test_impl(S):
@@ -2675,49 +2588,6 @@ class TestSeries(
 
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl())
-
-    @skip_numba_jit
-    def test_series_dist_input1(self):
-        """Verify distribution of a Series without index"""
-        def test_impl(S):
-            return S.max()
-        hpat_func = self.jit(distributed={'S'})(test_impl)
-
-        n = 111
-        S = pd.Series(np.arange(n))
-        start, end = get_start_end(n)
-        self.assertEqual(hpat_func(S[start:end]), test_impl(S))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_sdc_jit("Fails to compile with latest Numba")
-    @skip_numba_jit
-    def test_series_dist_input2(self):
-        """Verify distribution of a Series with integer index"""
-        def test_impl(S):
-            return S.max()
-        hpat_func = self.jit(distributed={'S'})(test_impl)
-
-        n = 111
-        S = pd.Series(np.arange(n), 1 + np.arange(n))
-        start, end = get_start_end(n)
-        self.assertEqual(hpat_func(S[start:end]), test_impl(S[start:end]))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @unittest.skip("Passed if run single")
-    def test_series_dist_input3(self):
-        """Verify distribution of a Series with string index"""
-        def test_impl(S):
-            return S.max()
-        hpat_func = self.jit(distributed={'S'})(test_impl)
-
-        n = 111
-        S = pd.Series(np.arange(n), ['abc{}'.format(id) for id in range(n)])
-        start, end = get_start_end(n)
-        self.assertEqual(hpat_func(S[start:end]), test_impl(S))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
 
     def test_series_tuple_input1(self):
         def test_impl(s_tup):
@@ -3722,24 +3592,6 @@ class TestSeries(
                 else:
                     pd.testing.assert_series_equal(ref_result, jit_result)
 
-    @skip_numba_jit('Series.nlargest() parallelism unsupported and parquet not supported')
-    def test_series_nlargest_parallel(self):
-        # create `kde.parquet` file
-        ParquetGenerator.gen_kde_pq()
-
-        def test_impl():
-            df = pq.read_table('kde.parquet').to_pandas()
-            S = df.points
-            return S.nlargest(4)
-        hpat_func = self.jit(test_impl)
-
-        if sdc.config.config_pipeline_hpat_default:
-            np.testing.assert_array_equal(test_impl(), hpat_func())
-        else:
-            pd.testing.assert_series_equal(test_impl(), hpat_func())
-        self.assertEqual(count_parfor_REPs(), 0)
-        self.assertTrue(count_array_OneDs() > 0)
-
     @skip_sdc_jit('Series.nlargest() parameter keep unsupported')
     def test_series_nlargest_full(self):
         def test_impl(series, n, keep):
@@ -3843,24 +3695,6 @@ class TestSeries(
                     np.testing.assert_array_equal(ref_result, jit_result)
                 else:
                     pd.testing.assert_series_equal(ref_result, jit_result)
-
-    @skip_numba_jit('Series.nsmallest() parallelism unsupported and parquet not supported')
-    def test_series_nsmallest_parallel(self):
-        # create `kde.parquet` file
-        ParquetGenerator.gen_kde_pq()
-
-        def test_impl():
-            df = pq.read_table('kde.parquet').to_pandas()
-            S = df.points
-            return S.nsmallest(4)
-        hpat_func = self.jit(test_impl)
-
-        if sdc.config.config_pipeline_hpat_default:
-            np.testing.assert_array_equal(test_impl(), hpat_func())
-        else:
-            pd.testing.assert_series_equal(test_impl(), hpat_func())
-        self.assertEqual(count_parfor_REPs(), 0)
-        self.assertTrue(count_array_OneDs() > 0)
 
     @skip_sdc_jit('Series.nsmallest() parameter keep unsupported')
     def test_series_nsmallest_full(self):
@@ -4185,35 +4019,6 @@ class TestSeries(
         S2 = pd.Series([2., 3., 5., np.nan, 5., 6., 7.])
         self.assertEqual(np.isnan(hpat_func(S2)), np.isnan(test_impl(S2)))
 
-    @skip_numba_jit
-    def test_series_median_parallel1(self):
-        # create `kde.parquet` file
-        ParquetGenerator.gen_kde_pq()
-
-        def test_impl():
-            df = pq.read_table('kde.parquet').to_pandas()
-            S = df.points
-            return S.median()
-        hpat_func = self.jit(test_impl)
-
-        self.assertEqual(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-        self.assertTrue(count_array_OneDs() > 0)
-
-    @skip_numba_jit
-    def test_series_argsort_parallel(self):
-        # create `kde.parquet` file
-        ParquetGenerator.gen_kde_pq()
-
-        def test_impl():
-            df = pq.read_table('kde.parquet').to_pandas()
-            S = df.points
-            return S.argsort().values
-        hpat_func = self.jit(test_impl)
-
-        np.testing.assert_array_equal(hpat_func(), test_impl())
-
     def test_series_idxmin1(self):
         def test_impl(a):
             return a.idxmin()
@@ -4518,7 +4323,6 @@ class TestSeries(
                 S = pd.Series(data, index=index_data)
                 pd.testing.assert_series_equal(hpat_func(S), test_impl(S), check_names=False)
 
-    @skip_parallel
     @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_full(self):
         def test_impl(series, ascending, kind):
@@ -4565,7 +4369,6 @@ class TestSeries(
                         np.testing.assert_array_equal(ref_result.data, jit_result.data)
                         self.assertEqual(ref, jit)
 
-    @skip_parallel
     @skip_sdc_jit('Old-style impl returns array but not Series')
     def test_series_sort_values_full_idx(self):
         def test_impl(series, ascending, kind):
@@ -5621,7 +5424,6 @@ class TestSeries(
                 B = pd.Series(np.arange(n)**2, index=np.arange(n, dtype=dtype_right))
                 pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False)
 
-    @skip_parallel
     @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
     def test_series_operator_add_numeric_same_index_numeric_fixme(self):
         """ Same as test_series_operator_add_same_index_numeric but with w/a for the problem.
@@ -5643,7 +5445,6 @@ class TestSeries(
                 B = pd.Series(np.arange(n)**2, index=np.arange(n, dtype=dtype_right))
                 pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False)
 
-    @skip_parallel
     @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
     def test_series_operator_add_numeric_same_index_str(self):
         """Verifies implementation of Series.operator.add between two numeric Series with the same string indexes"""
@@ -5656,7 +5457,6 @@ class TestSeries(
         B = pd.Series(np.arange(n)**2, index=['a', 'c', 'e', 'c', 'b', 'a', 'o'])
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
-    @skip_parallel
     @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
     def test_series_operator_add_numeric_align_index_int(self):
         """Verifies implementation of Series.operator.add between two numeric Series with non-equal integer indexes"""
@@ -5673,7 +5473,6 @@ class TestSeries(
         B = pd.Series(np.arange(n)**2, index=index_B)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
-    @skip_parallel
     @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
     def test_series_operator_add_numeric_align_index_str(self):
         """Verifies implementation of Series.operator.add between two numeric Series with non-equal string indexes"""
@@ -5707,7 +5506,6 @@ class TestSeries(
         B = pd.Series(np.arange(n)**2, index=index_B)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
-    @skip_parallel
     @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
     def test_series_operator_add_numeric_align_index_other_dtype(self):
         """Verifies implementation of Series.operator.add between two numeric Series
@@ -5733,7 +5531,6 @@ class TestSeries(
         B = pd.Series(np.arange(size_B)**2)
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
-    @skip_parallel
     @skip_sdc_jit('Arithmetic operations on Series requiring alignment of indexes are not supported in old-style')
     def test_series_operator_add_align_index_int_capacity(self):
         """Verifies implementation of Series.operator.add and alignment of numeric indexes of large size"""
@@ -5777,7 +5574,6 @@ class TestSeries(
         B = pd.Series(['b', 'aa', '', 'b', 'o', None, 'oo'])
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
 
-    @skip_parallel
     @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
     def test_series_operator_add_str_align_index_int(self):
         """Verifies implementation of Series.operator.add between two string Series with non-equal integer indexes"""
@@ -6262,7 +6058,6 @@ class TestSeries(
         B = pd.Series([-1, 2, 0, 5, 3, -5, 4])
         pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
 
-    @skip_parallel
     @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
     def test_series_operator_mul_str_align_index_int1(self):
         """ Verifies implementation of Series.operator.add between two string Series

@@ -32,15 +32,7 @@ from math import sqrt
 
 import sdc
 from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_OneD_Vars,
-                                  count_array_OneDs,
-                                  count_array_REPs,
-                                  count_parfor_OneD_Vars,
-                                  count_parfor_OneDs,
-                                  count_parfor_REPs,
-                                  dist_IR_contains,
-                                  skip_numba_jit,
-                                  skip_sdc_jit)
+from sdc.tests.test_utils import (skip_numba_jit, skip_sdc_jit)
 
 from datetime import datetime
 import random

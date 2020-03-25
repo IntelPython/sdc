@@ -28,8 +28,6 @@ import numba
 import numpy as np
 import pandas as pd
 import platform
-import pyarrow.parquet as pq
-import random
 import string
 import unittest
 from pandas.api.types import CategoricalDtype
@@ -37,32 +35,10 @@ from pandas.api.types import CategoricalDtype
 import sdc
 from sdc.str_arr_ext import StringArray
 from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_OneDs,
-                                  count_array_REPs,
-                                  count_parfor_OneDs,
-                                  count_parfor_REPs,
-                                  dist_IR_contains,
-                                  get_start_end,
-                                  skip_numba_jit)
+from sdc.tests.test_utils import skip_numba_jit
 
 
 class TestJoin(TestCase):
-
-    @skip_numba_jit
-    def test_join1(self):
-        def test_impl(n):
-            df1 = pd.DataFrame({'key1': np.arange(n) + 3, 'A': np.arange(n) + 1.0})
-            df2 = pd.DataFrame({'key2': 2 * np.arange(n) + 1, 'B': n + np.arange(n) + 1.0})
-            df3 = pd.merge(df1, df2, left_on='key1', right_on='key2')
-            return df3.B.sum()
-
-        hpat_func = self.jit(test_impl)
-        n = 11
-        self.assertEqual(hpat_func(n), test_impl(n))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-        n = 11111
-        self.assertEqual(hpat_func(n), test_impl(n))
 
     @skip_numba_jit
     def test_join1_seq(self):
@@ -160,46 +136,6 @@ class TestJoin(TestCase):
         self.assertEqual(h_res, p_res)
 
     @skip_numba_jit
-    def test_join_left_parallel1(self):
-        """
-        """
-        def test_impl(A1, B1, C1, A2, B2, D2):
-            df1 = pd.DataFrame({'A': A1, 'B': B1, 'C': C1})
-            df2 = pd.DataFrame({'A': A2, 'B': B2, 'D': D2})
-            df3 = df1.merge(df2, on=('A', 'B'))
-            return df3.C.sum() + df3.D.sum()
-
-        hpat_func = self.jit(locals={
-            'A1:input': 'distributed',
-            'B1:input': 'distributed',
-            'C1:input': 'distributed', })(test_impl)
-        df1 = pd.DataFrame({'A': [3, 1, 1, 3, 4],
-                            'B': [1, 2, 3, 2, 3],
-                            'C': [7, 8, 9, 4, 5]})
-
-        df2 = pd.DataFrame({'A': [2, 1, 4, 4, 3],
-                            'B': [1, 3, 2, 3, 2],
-                            'D': [1, 2, 3, 4, 8]})
-
-        start, end = get_start_end(len(df1))
-        h_A1 = df1.A.values[start:end]
-        h_B1 = df1.B.values[start:end]
-        h_C1 = df1.C.values[start:end]
-        h_A2 = df2.A.values
-        h_B2 = df2.B.values
-        h_D2 = df2.D.values
-        p_A1 = df1.A.values
-        p_B1 = df1.B.values
-        p_C1 = df1.C.values
-        p_A2 = df2.A.values
-        p_B2 = df2.B.values
-        p_D2 = df2.D.values
-        h_res = hpat_func(h_A1, h_B1, h_C1, h_A2, h_B2, h_D2)
-        p_res = test_impl(p_A1, p_B1, p_C1, p_A2, p_B2, p_D2)
-        self.assertEqual(h_res, p_res)
-        self.assertEqual(count_array_OneDs(), 3)
-
-    @skip_numba_jit
     def test_join_datetime_seq1(self):
         def test_impl(df1, df2):
             return pd.merge(df1, df2, on='time')
@@ -212,27 +148,6 @@ class TestJoin(TestCase):
             {'time': pd.DatetimeIndex(
                 ['2017-01-01', '2017-01-06', '2017-01-03']), 'A': [7, 8, 9]})
         pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
-
-    @unittest.skip("Method max(). Currently function supports only numeric values. Given data type: datetime64[ns]")
-    def test_join_datetime_parallel1(self):
-        def test_impl(df1, df2):
-            df3 = pd.merge(df1, df2, on='time')
-            return (df3.A.sum(), df3.time.max(), df3.B.sum())
-
-        hpat_func = self.jit(distributed=['df1', 'df2'])(test_impl)
-        df1 = pd.DataFrame(
-            {'time': pd.DatetimeIndex(
-                ['2017-01-03', '2017-01-06', '2017-02-21']), 'B': [4, 5, 6]})
-        df2 = pd.DataFrame(
-            {'time': pd.DatetimeIndex(
-                ['2017-01-01', '2017-01-06', '2017-01-03']), 'A': [7, 8, 9]})
-        start1, end1 = get_start_end(len(df1))
-        start2, end2 = get_start_end(len(df2))
-        self.assertEqual(
-            hpat_func(df1.iloc[start1:end1], df2.iloc[start2:end2]),
-            test_impl(df1, df2))
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
 
     @skip_numba_jit
     def test_merge_asof_seq1(self):
@@ -248,17 +163,6 @@ class TestJoin(TestCase):
                 ['2017-01-01', '2017-01-02', '2017-01-04', '2017-02-23',
                  '2017-02-25']), 'A': [2, 3, 7, 8, 9]})
         pd.testing.assert_frame_equal(hpat_func(df1, df2), test_impl(df1, df2))
-
-    @unittest.skip("Method max(). Currently function supports only numeric values. Given data type: datetime64[ns]")
-    def test_merge_asof_parallel1(self):
-        def test_impl():
-            df1 = pd.read_parquet('asof1.pq')
-            df2 = pd.read_parquet('asof2.pq')
-            df3 = pd.merge_asof(df1, df2, on='time')
-            return (df3.A.sum(), df3.time.max(), df3.B.sum())
-
-        hpat_func = self.jit(test_impl)
-        self.assertEqual(hpat_func(), test_impl())
 
     @skip_numba_jit
     def test_join_left_seq1(self):

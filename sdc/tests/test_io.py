@@ -28,7 +28,6 @@ import numpy as np
 import os
 import pandas as pd
 import platform
-import pyarrow.parquet as pq
 import unittest
 import numba
 from numba.config import IS_32BITS
@@ -37,18 +36,10 @@ from pandas.api.types import CategoricalDtype
 import sdc
 from sdc.io.csv_ext import pandas_read_csv as pd_read_csv
 from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_OneDs,
-                                  count_array_REPs,
-                                  count_parfor_OneDs,
-                                  count_parfor_REPs,
-                                  dist_IR_contains,
-                                  get_rank,
+from sdc.tests.test_utils import (get_rank,
                                   get_start_end,
                                   skip_numba_jit,
                                   skip_sdc_jit)
-
-
-kde_file = 'kde.parquet'
 
 
 class TestIO(TestCase):
@@ -77,160 +68,6 @@ class TestIO(TestCase):
             n = 111
             A = np.random.ranf(n)
             A.tofile("np_file1.dat")
-
-
-class TestParquet(TestIO):
-
-    @skip_numba_jit
-    def test_pq_read(self):
-        def test_impl():
-            t = pq.read_table('kde.parquet')
-            df = t.to_pandas()
-            X = df['points']
-            return X.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pq_read_global_str1(self):
-        def test_impl():
-            df = pd.read_parquet(kde_file)
-            X = df['points']
-            return X.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pq_read_freevar_str1(self):
-        kde_file2 = 'kde.parquet'
-
-        def test_impl():
-            df = pd.read_parquet(kde_file2)
-            X = df['points']
-            return X.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pd_read_parquet(self):
-        def test_impl():
-            df = pd.read_parquet('kde.parquet')
-            X = df['points']
-            return X.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pq_str(self):
-        def test_impl():
-            df = pq.read_table('example.parquet').to_pandas()
-            A = df.two.values == 'foo'
-            return A.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pq_str_with_nan_seq(self):
-        def test_impl():
-            df = pq.read_table('example.parquet').to_pandas()
-            A = df.five.values == 'foo'
-            return A
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-
-    @skip_numba_jit
-    def test_pq_str_with_nan_par(self):
-        def test_impl():
-            df = pq.read_table('example.parquet').to_pandas()
-            A = df.five.values == 'foo'
-            return A.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pq_str_with_nan_par_multigroup(self):
-        def test_impl():
-            df = pq.read_table('example2.parquet').to_pandas()
-            A = df.five.values == 'foo'
-            return A.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pq_bool(self):
-        def test_impl():
-            df = pq.read_table('example.parquet').to_pandas()
-            return df.three.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pq_nan(self):
-        def test_impl():
-            df = pq.read_table('example.parquet').to_pandas()
-            return df.one.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pq_float_no_nan(self):
-        def test_impl():
-            df = pq.read_table('example.parquet').to_pandas()
-            return df.four.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pq_pandas_date(self):
-        def test_impl():
-            df = pd.read_parquet('pandas_dt.pq')
-            return pd.DataFrame({'DT64': df.DT64, 'col2': df.DATE})
-
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
-
-    @skip_sdc_jit('Error: Attribute "dtype" are different\n'
-                  '[left]:  datetime64[ns]\n'
-                  '[right]: object')
-    @skip_numba_jit
-    def test_pq_spark_date(self):
-        def test_impl():
-            df = pd.read_parquet('sdf_dt.pq')
-            return pd.DataFrame({'DT64': df.DT64, 'col2': df.DATE})
-
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
 
 class TestCSV(TestIO):
@@ -733,51 +570,17 @@ class TestCSV(TestIO):
         # TODO: delete files
         pd.testing.assert_frame_equal(pd.read_csv(hp_fname), pd.read_csv(pd_fname))
 
-    @skip_numba_jit
-    @skip_sdc_jit('AttributeError: Failed in hpat mode pipeline (step: convert to distributed)\n'
-                  'module \'sdc.hio\' has no attribute \'file_write_parallel\'')
-    def test_write_csv_parallel1(self):
-        def test_impl(n, fname):
-            df = pd.DataFrame({'A': np.arange(n)})
-            df.to_csv(fname)
-
-        hpat_func = self.jit(test_impl)
-        n = 111
-        hp_fname = 'test_write_csv1_hpat_par.csv'
-        pd_fname = 'test_write_csv1_pd_par.csv'
-        hpat_func(n, hp_fname)
-        test_impl(n, pd_fname)
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-        # TODO: delete files
-        if get_rank() == 0:
-            pd.testing.assert_frame_equal(
-                pd.read_csv(hp_fname), pd.read_csv(pd_fname))
-
 
 class TestNumpy(TestIO):
 
     @skip_numba_jit
-    def test_np_io1(self):
+    def test_np_io(self):
         def test_impl():
             A = np.fromfile("np_file1.dat", np.float64)
             return A
 
         hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(), test_impl())
-
-    @skip_numba_jit
-    @skip_sdc_jit('Not implemented in sequential transport layer')
-    def test_np_io2(self):
-        # parallel version
-        def test_impl():
-            A = np.fromfile("np_file1.dat", np.float64)
-            return A.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
 
     def test_np_io3(self):
         def test_impl(A):
