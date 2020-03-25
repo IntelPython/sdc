@@ -1024,11 +1024,11 @@ limitation_nans_supported = """
 seealso_strip_methods = """
         .. seealso::
             :ref:`Series.str.strip <pandas.Series.str.strip>`
-                Remove leading and trailing characters in Series/Index.
+                Remove leading and trailing characters in Series.
             :ref:`Series.str.lstrip <pandas.Series.str.lstrip>`
-                Remove leading characters in Series/Index.
+                Remove leading characters in Series.
             :ref:`Series.str.strip <pandas.Series.str.strip>`
-                Remove trailing characters in Series/Index.
+                Remove trailing characters in Series.
 """
 
 

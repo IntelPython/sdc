@@ -26,9 +26,7 @@
 # *****************************************************************************
 from pathlib import Path
 
-from sdc_object_utils import (get_sdc_object_by_pandas_name,
-                              init_pandas_structure, init_sdc_structure,
-                              init_pandas_sdc_dict)
+from sdc_object_utils import get_sdc_object_by_pandas_name, init_sdc_structure
 from sdc_doc_utils import get_docstring, reindent, split_in_sections
 from apiref_generator import (APIREF_TEMPLATE_FNAMES, reformat)
 
@@ -102,12 +100,10 @@ def generate_examples():
     """
     Master function for examples list generation.
 
-    This function initializes all required data structures, and parses required templates for
+    This function initializes SDC data structures, and parses required templates for
     Final RST file generation that lists all the examples.
     """
-    init_pandas_structure()
     init_sdc_structure()
-    init_pandas_sdc_dict()
 
     all_examples = []
     for templ_fname in APIREF_TEMPLATE_FNAMES:
