@@ -58,7 +58,7 @@ from sdc.utilities.sdc_typing_utils import SDCLimitation
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
-from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby, merge_groupby_dicts
+from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby, merge_groupby_dicts_inplace
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
 from sdc.hiframes.api import isna
@@ -2032,6 +2032,75 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
 @sdc_overload_method(DataFrameType, 'groupby')
 def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=True, sort=True,
                                  group_keys=True, squeeze=False, observed=False):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.groupby
+
+    Limitations
+    -----------
+    - Parameters ``axis``, ``level``, ``as_index``, ``group_keys``, ``squeeze`` and ``observed`` \
+are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``by`` is supported as single literal column name only
+    - Mutating the contents of a DataFrame between creating a groupby object and calling it's methods is unsupported
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/groupby/dataframe_groupby_min.py
+       :language: python
+       :lines: 27-
+       :caption: Groupby and calculate the minimum in each group.
+       :name: ex_dataframe_groupby
+
+    .. command-output:: python ./dataframe/groupby/dataframe_groupby_min.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`resample <pandas.DataFrame.resample>`
+            Resample time-series data.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame attribute :meth:`pandas.DataFrame.groupby` implementation
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_groupby.TestGroupBy.test_dataframe_groupby*
+
+    Parameters
+    ----------
+
+    self: :obj:`pandas.DataFrame`
+        Input DataFrame.
+    by: :obj:`mapping`, :obj:`function`, :obj:`string` or :obj:`list`
+        Used to determine the groups for the groupby.
+    axis : :obj:`int` or :obj:`string`, default 0
+        Split along rows (0) or columns (1).
+    level : :obj:`int` or :obj:`str`, default None
+        If the axis is a MultiIndex (hierarchical), group by a particular
+        level or levels.
+    as_index : :obj:`bool`, default True
+        For aggregated output, return object with group labels as the
+        index.
+    sort : :obj:`bool`, default True
+        Sort group keys. Get better performance by turning this off.
+        Note this does not influence the order of observations within each
+        group. Groupby preserves the order of rows within each group.
+    group_keys : :obj:`bool`, default True
+        When calling apply, add group keys to index to identify pieces.
+    squeeze : :obj:`bool`, default False
+        Reduce the dimensionality of the return type if possible,
+        otherwise return a consistent type.
+    observed : :obj:`bool`, default False
+        This only applies if any of the groupers are Categoricals.
+        If True: only show observed values for categorical groupers.
+        If False: show all values for categorical groupers.
+
+    Returns
+    -------
+    :class:`pandas.DataFrameGroupBy`
+        Returns a groupby object that contains information about the groups.
+"""
 
     if not isinstance(by, types.StringLiteral):
         return None
@@ -2066,7 +2135,7 @@ def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=Tru
         # merging all dict parts into a single resulting dict
         res_dict = dict_parts[0]
         for i in range(1, len(chunks)):
-            res_dict = merge_groupby_dicts(res_dict, dict_parts[i])
+            res_dict = merge_groupby_dicts_inplace(res_dict, dict_parts[i])
 
         return init_dataframe_groupby(self, column_id, res_dict, sort)
 
