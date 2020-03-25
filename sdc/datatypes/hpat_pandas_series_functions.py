@@ -2222,7 +2222,7 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
 
     Limitations
     -----------
-    - 'method' parameter accepts only 'pearson' value. Other values are not supported
+    - Parameter ``method`` is supported only with default value 'pearson'
 
     Examples
     --------
