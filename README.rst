@@ -19,6 +19,10 @@ the code by leveraging modern hardware instructions and by utilizing all availab
 
 Intel SDC's documentation can be found `here <https://intelpython.github.io/sdc-doc/>`_.
 
+Intel SDC uses special Numba build based on ``0.48.0`` tag for build and run.
+Required Numba version can be installed from ``intel/label/beta`` channel from the Anaconda Cloud.
+Note: For maximum performance and stability please use numba from ``intel/label/beta`` channel.
+
 Installing Binary Packages (conda and wheel)
 ----------------------------------
 Intel SDC is available on the Anaconda Cloud intel/label/beta channel.
@@ -54,6 +58,7 @@ If you do not have conda, we recommend using Miniconda3::
 
 Intel SDC uses special Numba build based on ``0.48.0`` tag for build and run.
 Required Numba version can be installed from ``intel/label/beta`` channel from the Anaconda Cloud.
+Note: For maximum performance and stability please use numba from ``intel/label/beta`` channel.
 
 It is possible to build Intel SDC via conda-build or setuptools. Follow one of the
 cases below to install Intel SDC and its dependencies on Linux.
