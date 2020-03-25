@@ -1,4 +1,4 @@
-﻿.. _getting_started:
+.. _getting_started:
 .. include:: ./ext_links.txt
 
 Getting Started
@@ -81,9 +81,63 @@ Also give very short introduction to what kind of code Numba/Intel® SDC can com
 Measuring Performance
 #####################
 
-.. todo::
-   Short intro how to measure performance. Compilation time and run time. Illustrate by example. Reference to relevant discussion in Numba documentation
- 
+.. 1. Short intro how to measure performance.
+
+Lets consider we want to measure performance of Series.max() method.
+
+.. code::
+
+   from numba import njit
+
+   @njit
+   def series_max(s):
+      return s.max()
+
+.. 2. Compilation time and run time.
+
+First, recall that Intel® SDC is based on Numba. Therefore, execution time may consist of the following:
+   1. Numba has to *compile* your function for the first time, this takes time.
+   2. *Boxing* and *unboxing* convert Python objects into native values, and vice-versa. They occur at the boundaries of calling a `Numba*`_ function from the Python interpreter. E.g. boxing and unboxing apply to `Pandas*`_ types like :ref:`Series <pandas.Series>` and :ref:`DataFrame <pandas.DataFrame>`.
+   3. The execution of the *function itself*.
+
+A really common mistake when measuring performance is to not account for the above behaviour and
+to time code once with a simple timer that includes the time taken to compile your function in the execution time.
+
+A good way to measure the impact Numba JIT has on your code is to time execution using
+the `timeit <https://docs.python.org/3/library/timeit.html>`_ module functions.
+
+Intel® SDC also recommends eliminate the impact of compilation and boxing/unboxing by measuring the time inside Numba JIT code.
+
+.. 3. Illustrate by example.
+
+Example of measuring performance:
+
+.. code::
+
+   import time
+   import numpy as np
+   import pandas as pd
+   from numba import njit
+
+   @njit
+   def perf_series_max(s):                  # <-- unboxing
+      start_time = time.time()              # <-- time inside Numba JIT code
+      res = s.max()
+      finish_time = time.time()             # <-- time inside Numba JIT code
+      return finish_time - start_time, res  # <-- boxing
+
+   s = pd.Series(np.random.ranf(size=100000))
+   exec_time, res = perf_series_max(s)
+   print("Execution time in JIT code: ", exec_time)
+
+.. 4. Reference to relevant discussion in Numba documentation.
+
+See also `Numba*`_ documentation `How to measure the performance of Numba? <http://numba.pydata.org/numba-doc/latest/user/5minguide.html#how-to-measure-the-performance-of-numba>`_
+
+.. 5. Link to performance tests.
+
+See also Intel® SDC repository `performance tests <https://github.com/IntelPython/sdc/tree/master/sdc/tests/tests_perf>`_.
+
 What If I Get Poor Performance?
 ###############################
 
