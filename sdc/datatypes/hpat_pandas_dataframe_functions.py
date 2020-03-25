@@ -168,7 +168,13 @@ def hpat_pandas_dataframe_values(df):
 
     Limitations
     -----------
-    Only numeric values supported as an output
+    - Only numeric values supported as an output
+    - The dtype will be a lower-common-denominator dtype (implicit upcasting);
+    that is to say if the dtypes (even of numeric types) are mixed, the one that accommodates all will be chosen.
+    Use this with care if you are not dealing with the blocks.
+    e.g. If the dtypes are float16 and float32, dtype will be upcast to float32. If dtypes are int32 and uint8,
+    dtype will be upcast to int32. By numpy.find_common_type() convention,
+    mixing int64 and uint64 will result in a float64 dtype.
 
     Examples
     --------
@@ -189,15 +195,6 @@ def hpat_pandas_dataframe_values(df):
             Retrieve the index labels.
         :ref:`DataFrame.columns <pandas.DataFrame.columns>`
             Retrieving the column names.
-
-    .. note::
-
-        The dtype will be a lower-common-denominator dtype (implicit upcasting);
-        that is to say if the dtypes (even of numeric types) are mixed, the one that accommodates all will be chosen.
-        Use this with care if you are not dealing with the blocks.
-        e.g. If the dtypes are float16 and float32, dtype will be upcast to float32. If dtypes are int32 and uint8,
-        dtype will be upcast to int32. By numpy.find_common_type() convention,
-        mixing int64 and uint64 will result in a float64 dtype.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
