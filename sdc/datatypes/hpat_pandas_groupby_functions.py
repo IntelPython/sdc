@@ -625,7 +625,13 @@ sdc_pandas_dataframe_groupby_docstring_tmpl = """
 sdc_pandas_dataframe_groupby_count.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
     'method_name': 'count',
     'example_caption': 'Compute count of group, excluding missing values.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'see_also':
     """
     .. seealso::
@@ -641,7 +647,13 @@ sdc_pandas_dataframe_groupby_count.__doc__ = sdc_pandas_dataframe_groupby_docstr
 sdc_pandas_dataframe_groupby_max.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
     'method_name': 'max',
     'example_caption': 'Compute max of group values.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'see_also': '',
     'extra_params': ''
 })
@@ -650,7 +662,13 @@ sdc_pandas_dataframe_groupby_max.__doc__ = sdc_pandas_dataframe_groupby_docstrin
 sdc_pandas_dataframe_groupby_mean.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
     'method_name': 'mean',
     'example_caption': 'Compute mean of groups, excluding missing values.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'see_also':
     """
     .. seealso::
@@ -666,7 +684,13 @@ sdc_pandas_dataframe_groupby_mean.__doc__ = sdc_pandas_dataframe_groupby_docstri
 sdc_pandas_dataframe_groupby_median.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
     'method_name': 'median',
     'example_caption': 'Compute median of groups, excluding missing values.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'see_also':
     """
     .. seealso::
@@ -682,7 +706,13 @@ sdc_pandas_dataframe_groupby_median.__doc__ = sdc_pandas_dataframe_groupby_docst
 sdc_pandas_dataframe_groupby_min.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
     'method_name': 'min',
     'example_caption': 'Compute min of group values.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'see_also': '',
     'extra_params': ''
 })
@@ -691,7 +721,13 @@ sdc_pandas_dataframe_groupby_min.__doc__ = sdc_pandas_dataframe_groupby_docstrin
 sdc_pandas_dataframe_groupby_prod.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
     'method_name': 'prod',
     'example_caption': 'Compute prod of group values.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'see_also': '',
     'extra_params': ''
 })
@@ -700,7 +736,13 @@ sdc_pandas_dataframe_groupby_prod.__doc__ = sdc_pandas_dataframe_groupby_docstri
 sdc_pandas_dataframe_groupby_std.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
     'method_name': 'std',
     'example_caption': 'Compute standard deviation of groups, excluding missing values.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'see_also':
     """
     .. seealso::
@@ -716,16 +758,28 @@ sdc_pandas_dataframe_groupby_std.__doc__ = sdc_pandas_dataframe_groupby_docstrin
 sdc_pandas_dataframe_groupby_sum.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
     'method_name': 'sum',
     'example_caption': 'Compute sum of groups, excluding missing values.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'see_also': '',
     'extra_params': ''
 })
 
 
 sdc_pandas_dataframe_groupby_var.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
-    'method_name': 'sum',
+    'method_name': 'var',
     'example_caption': 'Compute variance of groups, excluding missing values.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'see_also':
     """
     .. seealso::
