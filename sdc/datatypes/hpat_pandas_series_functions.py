@@ -4582,7 +4582,7 @@ def hpat_pandas_series_median(self, axis=None, skipna=None, level=None, numeric_
     Limitations
     -----------
 
-    * Parameters ``axis``, ``level`` and ``numeric_only`` are supported supported only with default value ``None``
+    * Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -4594,6 +4594,10 @@ def hpat_pandas_series_median(self, axis=None, skipna=None, level=None, numeric_
 
     .. command-output:: python ./series/series_median.py
        :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`DataFrame.median <pandas.DataFrame.median>`
+            Return the median of the values for the columns.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
