@@ -2513,7 +2513,8 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -2577,7 +2578,8 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters ``level``, ``fill_value`` and ``axis`` are unsupported.
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level``, ``fill_value`` and ``axis`` are unsupported.
 
     Examples
     --------
@@ -2640,7 +2642,8 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -2987,7 +2990,8 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
 
     Examples
     --------
@@ -3130,7 +3134,8 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     Limitations
     -----------
-    Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
 
     Examples
     --------
@@ -3202,7 +3207,8 @@ def hpat_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -3270,7 +3276,8 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -3780,7 +3787,8 @@ def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -3844,7 +3852,8 @@ def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -3908,7 +3917,8 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
