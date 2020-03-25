@@ -24,24 +24,20 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-"""
-Expect Series
-a    210.0
-b    185.0
-dtype: float64
-"""
 import pandas as pd
-import numpy as np
 from numba import njit
 
 
 @njit
-def series_groupby():
-    S = pd.Series([390., 350., 30., 20.])
-    by = np.asarray([0, 1, 0, 1])
+def df_groupby_var():
+    df = pd.DataFrame({'A': [1, 2, 3, 1, 2, 3, 3, 3, 2],
+                       'B': [0, 1, 5, 0, 2, 4, 3, 2, 3],
+                       'C': [1, 2, 3, 4, 5, 6, 7, 8, 9]})
+    out_df = df.groupby('A').var()
 
-    # Expect Series of pd.Series([210.0, 185.0], index=[0, 1])
-    return S.groupby(by).mean()
+    # Expect DataFrame of
+    # {'B': [0.000000, 1.000000, 1.666667], 'C': [4.500000, 12.333333, 4.666667} with index=[1, 2, 3]
+    return out_df
 
 
-print(series_groupby())
+print(df_groupby_var())

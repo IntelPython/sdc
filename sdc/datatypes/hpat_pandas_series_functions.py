@@ -2072,8 +2072,8 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
 
     Limitations
     -----------
-    - Parameter ``verify_integrity`` is currently unsupported by Intel Scalable Dataframe Compiler.
-    - Parameter ``ignore_index`` is supported as literal value only.
+    - Parameter ``verify_integrity`` is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``ignore_index`` is supported as literal value only
     - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
     between staying in JIT-region with that function or going back to interpreter mode.
 
@@ -2222,7 +2222,8 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
 
     Limitations
     -----------
-    - Parrameter ``method`` is supported only with default value ``pearson``.
+    - 'method' parameter accepts only 'pearson' value. Other values are not supported
+    - Unsupported mixed numeric and string data
 
     Examples
     --------
@@ -4839,7 +4840,7 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
 
     Limitations
     -----------
-    - Parameter inplace is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``inplace`` is currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -4917,8 +4918,8 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
 
     Limitations
     -----------
-    - Parameters method, limit, downcast are currently unsupported by Intel Scalable Dataframe Compiler
-    - Parameter inplace supported as literal value only
+    - Parameters ``method``, ``limit`` and ``downcast`` are currently unsupported by Intel Scalable Dataframe Compiler.
+    - Parameter ``inplace`` is supported as literal value only.
 
     Examples
     --------
@@ -5226,8 +5227,8 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
 
     Limitations
     -----------
-    - Differs from Pandas in returning statistics as Series of strings when applied to
-    Series of strings or date-time values
+    - Parameters ``include`` and ``exclude`` are currently unsupported by Intel Scalable Dataframe Compiler.
+    - For string Series resulting values are returned as strings.
 
     Examples
     --------
@@ -5269,7 +5270,8 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
        Tests: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_describe*
     """
 
-    ty_checker = TypeChecker('Method describe().')
+    _func_name = 'Method describe().'
+    ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
     if not (isinstance(percentiles, (types.List, types.Array, types.UniTuple))
@@ -5277,6 +5279,12 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
             or isinstance(percentiles, (types.Omitted, types.NoneType))
             or percentiles is None):
         ty_checker.raise_exc(percentiles, 'list-like', 'percentiles')
+
+    if not (isinstance(include, (types.Omitted, types.NoneType)) or include is None):
+        raise TypingError('{} Unsupported parameters. Given include: {}'.format(_func_name, include))
+
+    if not (isinstance(exclude, (types.Omitted, types.NoneType)) or exclude is None):
+        raise TypingError('{} Unsupported parameters. Given exclude: {}'.format(_func_name, exclude))
 
     is_percentiles_none = percentiles is None or isinstance(percentiles, (types.Omitted, types.NoneType))
 
@@ -5616,8 +5624,10 @@ def sdc_pandas_series_groupby(self, by=None, axis=0, level=None, as_index=True, 
 
     Limitations
     -----------
-    - Parameters level, as_index, group_keys, squeeze, observed
-    are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``axis``, ``level``, ``as_index``, ``group_keys``, ``squeeze`` and ``observed`` \
+are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``by`` is supported as single literal column name only
+    - Mutating the contents of a DataFrame between creating a groupby object and calling it's methods is unsupported
 
     Examples
     --------
@@ -5634,10 +5644,6 @@ def sdc_pandas_series_groupby(self, by=None, axis=0, level=None, as_index=True, 
 
         :ref:`Series.resample <pandas.Series.resample>`
             Resample time-series data.
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
