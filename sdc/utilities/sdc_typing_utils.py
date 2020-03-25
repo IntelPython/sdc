@@ -41,6 +41,11 @@ from numba import numpy_support
 from sdc.str_arr_type import string_array_type
 
 
+class SDCLimitation(Exception):
+    """Exception to be raised in case of SDC limitation"""
+    pass
+
+
 class TypeChecker:
     """
         Validate object type and raise TypingError if the type is invalid, e.g.:
@@ -90,7 +95,7 @@ class TypeChecker:
         self._raise_exc(self, exc_cls, self.default_tmpl, self.func_name,
                         name, data, expected_types)
 
-    def raise_unsupported_exc(self, data, name='', exc_cls=TypingError):
+    def raise_unsupported_exc(self, data, name='', exc_cls=SDCLimitation):
         """
         Raise exception with message about unsupported parameter
         Parameters

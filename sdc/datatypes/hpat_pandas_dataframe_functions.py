@@ -54,7 +54,7 @@ from sdc.str_arr_ext import StringArrayType
 from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.datatypes.hpat_pandas_dataframe_getitem_types import (DataFrameGetitemAccessorType,
                                                                dataframe_getitem_accessor_init)
-from sdc.datatypes.common_functions import SDCLimitation
+from sdc.utilities.sdc_typing_utils import SDCLimitation
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
