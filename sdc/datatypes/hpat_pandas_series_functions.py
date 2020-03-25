@@ -2640,7 +2640,7 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``level``, ``fill_value`` are currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
