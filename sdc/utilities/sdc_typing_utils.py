@@ -92,7 +92,7 @@ class TypeChecker:
         exc_cls: :obj:`Exception`
             class of the exception to be raised
         """
-        self._raise_exc(self, exc_cls, self.default_tmpl, self.func_name,
+        self._raise_exc(exc_cls, self.default_tmpl, self.func_name,
                         name, data, expected_types)
 
     def raise_unsupported_exc(self, data, name='', exc_cls=SDCLimitation):
@@ -108,7 +108,7 @@ class TypeChecker:
             class of the exception to be raised
         """
         tmpl = '{} Unsupported object {}\n given: {}'
-        self._raise_exc(self, exc_cls, tmpl, self.func_name, name, data)
+        self._raise_exc(exc_cls, tmpl, self.func_name, name, data)
 
     def check(self, data, accepted_type, name=''):
         """
