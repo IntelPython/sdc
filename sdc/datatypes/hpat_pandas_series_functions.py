@@ -4581,11 +4581,7 @@ def hpat_pandas_series_median(self, axis=None, skipna=None, level=None, numeric_
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameters ``axis``, ``level`` and ``numeric_only`` are supported supported only with default value ``None``
 
     Examples
     --------
