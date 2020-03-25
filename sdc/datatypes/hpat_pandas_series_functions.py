@@ -2223,7 +2223,6 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
     Limitations
     -----------
     - 'method' parameter accepts only 'pearson' value. Other values are not supported
-    - Unsupported mixed numeric and string data
 
     Examples
     --------
@@ -5067,10 +5066,6 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
 
     Pandas API: pandas.Series.cov
 
-    Limitations
-    -----------
-    - Unsupported mixed numeric and string data
-
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_cov.py
@@ -5149,7 +5144,6 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
 
     Limitations
     -----------
-    - Unsupported mixed numeric and string data
     - Parameters limit, freq are currently unsupported by Intel Scalable Dataframe Compiler
     - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
     between staying in JIT-region with that function or going back to interpreter mode.
