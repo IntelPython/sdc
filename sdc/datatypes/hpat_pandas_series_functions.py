@@ -1835,7 +1835,7 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
     .. literalinclude:: ../../../examples/series/series_astype.py
        :language: python
        :lines: 36-
-       :caption: Cast a pandas object to a specified dtype dtype.
+       :caption: Cast a pandas object to a specified dtype.
        :name: ex_series_astype
 
     .. command-output:: python ./series/series_astype.py
@@ -3465,7 +3465,7 @@ def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=
 
     Limitations
     -----------
-    - Parameter ``level`` is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``level`` is currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
@@ -4957,7 +4957,7 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
     -----------
     - Parameters ``method``, ``limit`` and ``downcast`` are currently unsupported
     by Intel Scalable Dataframe Compiler.
-    - Parameter ``inplace`` supported as literal value only.
+    - Parameter ``inplace`` is supported with literal value only.
 
     Examples
     --------
