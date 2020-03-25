@@ -4582,7 +4582,7 @@ def hpat_pandas_series_median(self, axis=None, skipna=None, level=None, numeric_
     Limitations
     -----------
 
-    * Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
+    - Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
 
     Examples
     --------
