@@ -4132,7 +4132,8 @@ def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
@@ -4196,7 +4197,8 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
 
     Examples
     --------
