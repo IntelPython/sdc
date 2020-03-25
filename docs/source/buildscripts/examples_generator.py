@@ -33,7 +33,7 @@ from sdc_doc_utils import get_docstring, reindent, split_in_sections
 from apiref_generator import (APIREF_TEMPLATE_FNAMES, reformat)
 
 
-EXAMPLES_REL_PATH = Path('.')
+EXAMPLES_REL_PATH = Path('.') / '_examples'
 
 
 def get_obj_examples(pandas_name):
@@ -56,7 +56,8 @@ def get_obj_examples(pandas_name):
     for subsection in example_section.strip().split('\n\n'):
         subsection = subsection.strip()
         if any(subsection.startswith(f'.. {name}') for name in section_names):
-            examples.append(subsection)
+            # remove a directory level from path to examples
+            examples.append(subsection.replace(' ../', ' '))
 
     return reformat('\n\n'.join(examples))
 
@@ -115,9 +116,8 @@ def generate_examples():
     if not EXAMPLES_REL_PATH.exists():
         EXAMPLES_REL_PATH.mkdir(parents=True, exist_ok=True)
 
-    examples_rst_path = EXAMPLES_REL_PATH / 'examples_list.rst'
+    examples_rst_path = EXAMPLES_REL_PATH / 'examples.rst'
     with examples_rst_path.open('w', encoding='utf-8') as fd:
-        fd.write('.. _examples_list:\n')
         for examples in all_examples:
             fd.write(examples + '\n')
 

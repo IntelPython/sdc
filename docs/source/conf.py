@@ -74,12 +74,16 @@ if not sdc_doc_no_api_ref:
     generate_api_reference()
 
 SDC_DOC_NO_EXAMPLES_STR = 'SDC_DOC_NO_EXAMPLES'
+SDC_DOC_EXAMPLES_DIR = '_examples'
 
 sdc_doc_no_examples = False  # Generate examples list by default
 if SDC_DOC_NO_EXAMPLES_STR in os.environ:
     sdc_doc_no_examples = os.environ[SDC_DOC_NO_EXAMPLES_STR] == '1'
 
 if not sdc_doc_no_examples:
+    if os.path.exists(SDC_DOC_EXAMPLES_DIR):
+        shutil.rmtree(SDC_DOC_EXAMPLES_DIR)
+
     try:
         import sdc
     except ImportError:
