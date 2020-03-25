@@ -2527,10 +2527,6 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     .. command-output:: python ./series/series_ne.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.ne` implementation.
