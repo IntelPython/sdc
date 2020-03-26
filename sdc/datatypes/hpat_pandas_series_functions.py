@@ -2072,8 +2072,8 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
 
     Limitations
     -----------
-    - Parameter verify_integrity is currently unsupported by Intel Scalable Dataframe Compiler
-    - Parameter ignore_index supported as literal value only
+    - Parameter ``verify_integrity`` is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``ignore_index`` is supported as literal value only
     - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
     between staying in JIT-region with that function or going back to interpreter mode.
 
@@ -2222,8 +2222,7 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
 
     Limitations
     -----------
-    - 'method' parameter accepts only 'pearson' value. Other values are not supported
-    - Unsupported mixed numeric and string data
+    - Parameter ``method`` is supported only with default value 'pearson'
 
     Examples
     --------
@@ -2513,7 +2512,8 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -2525,10 +2525,6 @@ def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
 
     .. command-output:: python ./series/series_ne.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -2577,7 +2573,8 @@ def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters ``level``, ``fill_value`` and ``axis`` are unsupported.
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``
 
     Examples
     --------
@@ -2640,7 +2637,8 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -2652,10 +2650,6 @@ def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
 
     .. command-output:: python ./series/series_sub.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -2987,7 +2981,8 @@ def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -3058,7 +3053,8 @@ def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    Parameters ``level``, ``fill_value`` and ``axis`` are unsupported.
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -3130,7 +3126,8 @@ def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0)
 
     Limitations
     -----------
-    Parameters ``level``, ``fill_value`` and ``axis`` are currently unsupported.
+    * Parameter ``axis`` is c
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -3202,7 +3199,8 @@ def hpat_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -3214,10 +3212,6 @@ def hpat_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0
 
     .. command-output:: python ./series/series_floordiv.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -3270,7 +3264,8 @@ def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -3780,7 +3775,8 @@ def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -3792,10 +3788,6 @@ def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
 
     .. command-output:: python ./series/series_mod.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -3844,7 +3836,8 @@ def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -3856,10 +3849,6 @@ def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
 
     .. command-output:: python ./series/series_mod.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -3908,7 +3897,8 @@ def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -4067,7 +4057,8 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -4079,10 +4070,6 @@ def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
 
     .. command-output:: python ./series/series_lt.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -4131,7 +4118,8 @@ def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -4143,10 +4131,6 @@ def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
 
     .. command-output:: python ./series/series_gt.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -4195,7 +4179,8 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
 
     Limitations
     -----------
-    - Parameters level, fill_value are currently unsupported by Intel Scalable Dataframe Compiler
+    * Parameter ``axis`` is supported only with default value ``0``.
+    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -4207,10 +4192,6 @@ def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
 
     .. command-output:: python ./series/series_le.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -4581,8 +4562,7 @@ def hpat_pandas_series_median(self, axis=None, skipna=None, level=None, numeric_
 
     Limitations
     -----------
-    - Parameters ``level``, ``numeric_only`` and ``axis`` are currently unsupported
-    by Intel Scalable Dataframe Compiler.
+    - Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -4594,6 +4574,10 @@ def hpat_pandas_series_median(self, axis=None, skipna=None, level=None, numeric_
 
     .. command-output:: python ./series/series_median.py
        :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`DataFrame.median <pandas.DataFrame.median>`
+            Return the median of the values for the columns.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -5069,10 +5053,6 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
 
     Pandas API: pandas.Series.cov
 
-    Limitations
-    -----------
-    - Unsupported mixed numeric and string data
-
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_cov.py
@@ -5151,7 +5131,6 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
 
     Limitations
     -----------
-    - Unsupported mixed numeric and string data
     - Parameters limit, freq are currently unsupported by Intel Scalable Dataframe Compiler
     - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
     between staying in JIT-region with that function or going back to interpreter mode.
@@ -5270,8 +5249,8 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
 
     Limitations
     -----------
-    - Differs from Pandas in returning statistics as Series of strings when applied to
-    Series of strings or date-time values
+    - Parameters ``include`` and ``exclude`` are currently unsupported by Intel Scalable Dataframe Compiler.
+    - For string Series resulting values are returned as strings.
 
     Examples
     --------
@@ -5313,7 +5292,8 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
        Tests: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_describe*
     """
 
-    ty_checker = TypeChecker('Method describe().')
+    _func_name = 'Method describe().'
+    ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
     if not (isinstance(percentiles, (types.List, types.Array, types.UniTuple))
@@ -5321,6 +5301,12 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
             or isinstance(percentiles, (types.Omitted, types.NoneType))
             or percentiles is None):
         ty_checker.raise_exc(percentiles, 'list-like', 'percentiles')
+
+    if not (isinstance(include, (types.Omitted, types.NoneType)) or include is None):
+        raise TypingError('{} Unsupported parameters. Given include: {}'.format(_func_name, include))
+
+    if not (isinstance(exclude, (types.Omitted, types.NoneType)) or exclude is None):
+        raise TypingError('{} Unsupported parameters. Given exclude: {}'.format(_func_name, exclude))
 
     is_percentiles_none = percentiles is None or isinstance(percentiles, (types.Omitted, types.NoneType))
 
@@ -5660,8 +5646,10 @@ def sdc_pandas_series_groupby(self, by=None, axis=0, level=None, as_index=True, 
 
     Limitations
     -----------
-    - Parameters ``level``, ``as_index``, ``group_keys``, ``squeeze``, ``observed`` and ``axis``
-    are currently unsupported by Intel Scalable Dataframe Compiler.
+    - Parameters ``axis``, ``level``, ``as_index``, ``group_keys``, ``squeeze`` and ``observed`` \
+are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``by`` is supported as single literal column name only
+    - Mutating the contents of a DataFrame between creating a groupby object and calling it's methods is unsupported
 
     Examples
     --------

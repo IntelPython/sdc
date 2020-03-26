@@ -58,7 +58,7 @@ from sdc.datatypes.common_functions import SDCLimitation
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
-from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby, merge_groupby_dicts
+from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby, merge_groupby_dicts_inplace
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
 from sdc.hiframes.api import isna
@@ -69,37 +69,30 @@ from sdc.utilities.prange_utils import parallel_chunks
 @sdc_overload_attribute(DataFrameType, 'index')
 def hpat_pandas_dataframe_index(df):
     """
-       Intel Scalable Dataframe Compiler User Guide
-       ********************************************
-       Pandas API: pandas.DataFrame.index
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.index
 
-       Examples
-       --------
-       .. literalinclude:: ../../../examples/dataframe/dataframe_index.py
-          :language: python
-          :lines: 27-
-          :caption: The index (row labels) of the DataFrame.
-          :name: ex_dataframe_index
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_index.py
+        :language: python
+        :lines: 27-
+        :caption: The index (row labels) of the DataFrame.
+        :name: ex_dataframe_index
 
-       .. command-output:: python ./dataframe/dataframe_index.py
-           :cwd: ../../../examples
+    .. command-output:: python ./dataframe/dataframe_index.py
+        :cwd: ../../../examples
 
-       Intel Scalable Dataframe Compiler Developer Guide
-       *************************************************
-       Pandas DataFrame attribute :attr:`pandas.DataFrame.index` implementation.
-       .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_index*
-       Parameters
-       -----------
-       df: :obj:`pandas.DataFrame`
-           input arg
-       Returns
-       -------
-       :obj: `numpy.array`
-           return the index of DataFrame
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame attribute :attr:`pandas.DataFrame.index` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_index*
     """
 
-    ty_checker = TypeChecker(f'Attribute index.')
+    ty_checker = TypeChecker('Attribute index.')
     ty_checker.check(df, DataFrameType)
 
     if isinstance(df.index, types.NoneType) or df.index is None:
@@ -175,7 +168,13 @@ def hpat_pandas_dataframe_values(df):
 
     Limitations
     -----------
-    Only numeric values supported as an output
+    - Only numeric values supported as an output
+    - The dtype will be a lower-common-denominator dtype (implicit upcasting);
+    that is to say if the dtypes (even of numeric types) are mixed, the one that accommodates all will be chosen.
+    Use this with care if you are not dealing with the blocks.
+    e.g. If the dtypes are float16 and float32, dtype will be upcast to float32. If dtypes are int32 and uint8,
+    dtype will be upcast to int32. By numpy.find_common_type() convention,
+    mixing int64 and uint64 will result in a float64 dtype.
 
     Examples
     --------
@@ -197,28 +196,12 @@ def hpat_pandas_dataframe_values(df):
         :ref:`DataFrame.columns <pandas.DataFrame.columns>`
             Retrieving the column names.
 
-    .. note::
-
-        The dtype will be a lower-common-denominator dtype (implicit upcasting);
-        that is to say if the dtypes (even of numeric types) are mixed, the one that accommodates all will be chosen.
-        Use this with care if you are not dealing with the blocks.
-        e.g. If the dtypes are float16 and float32, dtype will be upcast to float32. If dtypes are int32 and uint8,
-        dtype will be upcast to int32. By numpy.find_common_type() convention,
-        mixing int64 and uint64 will result in a float64 dtype.
-
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas DataFrame attribute :attr:`pandas.DataFrame.values` implementation.
+
     .. only:: developer
-    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_values*
-    Parameters
-    -----------
-    df: :obj:`pandas.DataFrame`
-       input arg
-    Returns
-    -------
-    :obj: `numpy.ndarray`
-       return a Numpy representation of the DataFrame
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_values*
     """
 
     func_name = 'Attribute values.'
@@ -379,8 +362,9 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=False, verify_integrity=
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas DataFrame method :meth:`pandas.DataFrame.append` implementation.
+
     .. only:: developer
-    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_append*
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_append*
     """
 
     _func_name = 'append'
@@ -1305,7 +1289,7 @@ def isna_overload(df):
         :ref:`DataFrame.dropna <pandas.DataFrame.dropna>`
             Omit axes labels with missing values.
 
-        `pandas.absolute <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.isna.html#pandas.isna>`_
+        `pandas.isna <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.isna.html#pandas.isna>`_
             Top-level isna.
 
     Intel Scalable Dataframe Compiler Developer Guide
@@ -2032,6 +2016,75 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
 @sdc_overload_method(DataFrameType, 'groupby')
 def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=True, sort=True,
                                  group_keys=True, squeeze=False, observed=False):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.groupby
+
+    Limitations
+    -----------
+    - Parameters ``axis``, ``level``, ``as_index``, ``group_keys``, ``squeeze`` and ``observed`` \
+are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``by`` is supported as single literal column name only
+    - Mutating the contents of a DataFrame between creating a groupby object and calling it's methods is unsupported
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/groupby/dataframe_groupby_min.py
+       :language: python
+       :lines: 27-
+       :caption: Groupby and calculate the minimum in each group.
+       :name: ex_dataframe_groupby
+
+    .. command-output:: python ./dataframe/groupby/dataframe_groupby_min.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`resample <pandas.DataFrame.resample>`
+            Resample time-series data.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame attribute :meth:`pandas.DataFrame.groupby` implementation
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_groupby.TestGroupBy.test_dataframe_groupby*
+
+    Parameters
+    ----------
+
+    self: :obj:`pandas.DataFrame`
+        Input DataFrame.
+    by: :obj:`mapping`, :obj:`function`, :obj:`string` or :obj:`list`
+        Used to determine the groups for the groupby.
+    axis : :obj:`int` or :obj:`string`, default 0
+        Split along rows (0) or columns (1).
+    level : :obj:`int` or :obj:`str`, default None
+        If the axis is a MultiIndex (hierarchical), group by a particular
+        level or levels.
+    as_index : :obj:`bool`, default True
+        For aggregated output, return object with group labels as the
+        index.
+    sort : :obj:`bool`, default True
+        Sort group keys. Get better performance by turning this off.
+        Note this does not influence the order of observations within each
+        group. Groupby preserves the order of rows within each group.
+    group_keys : :obj:`bool`, default True
+        When calling apply, add group keys to index to identify pieces.
+    squeeze : :obj:`bool`, default False
+        Reduce the dimensionality of the return type if possible,
+        otherwise return a consistent type.
+    observed : :obj:`bool`, default False
+        This only applies if any of the groupers are Categoricals.
+        If True: only show observed values for categorical groupers.
+        If False: show all values for categorical groupers.
+
+    Returns
+    -------
+    :class:`pandas.DataFrameGroupBy`
+        Returns a groupby object that contains information about the groups.
+"""
 
     if not isinstance(by, types.StringLiteral):
         return None
@@ -2066,7 +2119,7 @@ def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=Tru
         # merging all dict parts into a single resulting dict
         res_dict = dict_parts[0]
         for i in range(1, len(chunks)):
-            res_dict = merge_groupby_dicts(res_dict, dict_parts[i])
+            res_dict = merge_groupby_dicts_inplace(res_dict, dict_parts[i])
 
         return init_dataframe_groupby(self, column_id, res_dict, sort)
 

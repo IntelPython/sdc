@@ -73,11 +73,27 @@ The prediction based on gradient boosting regression module is made using scikit
 What If I Get A Compilation Error
 #################################
 
-.. todo::
-   Need to give basic information that hpat and numba do not support full set of Pandas and Numpy APIs, provide the link to the API Reference section for Intel® SDC, relevant reference to Numba documentation.
- 
-Also give very short introduction to what kind of code Numba/Intel® SDC can compile and what cannot, i.e. type stability etc. Provide the links to relevant sections in Intel® SDC and Numba documentations focusing on compilation issues/limitations
-  
+Not all Python code can be compiled with Intel® SDC. Not all `Pandas*`_ and `Numpy*`_ APIs are currently supported and not all valid python code can be compiled using underlying Numba compiler.
+
+To be successfully compiled code must use only supported subset of `Pandas*`_ API and use only subset `Python*`_ supported by `Numba*`_ (e.g. be type-stable)
+
+Example of currently unsupported code:
+
+.. code-block::
+    :emphasize-lines: 2, 4
+
+    if flag:
+       a = 1.0
+    else:
+       a = np.ones(10)
+     return a  # Type of a cannot be inferred
+
+:ref:`SDC API reference<apireference>`
+
+:ref:`More info on SDC compilation process and supported Python features<compilation>`
+
+`Numba documentation <https://numba.pydata.org/numba-doc/latest/user/troubleshoot.html>`_
+
 Measuring Performance
 #####################
 
