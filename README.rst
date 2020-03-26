@@ -145,7 +145,9 @@ Troubleshooting Windows Build
 * For setting up Visual Studio, one might need go to registry at
   ``HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\SxS\VS7``,
   and add a string value named ``14.0`` whose data is ``C:\Program Files (x86)\Microsoft Visual Studio 14.0\``.
-* Sometimes if the conda version or visual studio version being used are not latest then building Intel® SDC can throw some vague error about a keyword used in a file. So make sure you are using the latest versions.
+* Sometimes if the conda version or visual studio version being used are not latest then
+  building Intel® SDC can throw some vague error about a keyword used in a file.
+  So make sure you are using the latest versions.
 
 Building documentation
 ----------------------
