@@ -16,7 +16,7 @@ Intel® Scalable Dataframe Compiler
 Numba* Extension For Pandas* Operations Compilation
 ###################################################
 
-Intel® Scalable Dataframe Compiler (Intel® SDC), which is an extension of `Numba*`_
+Intel® Scalable Dataframe Compiler (Intel® SDC) is an extension of `Numba*`_
 that enables compilation of `Pandas*`_ operations. It automatically vectorizes and parallelizes
 the code by leveraging modern hardware instructions and by utilizing all available cores.
 
