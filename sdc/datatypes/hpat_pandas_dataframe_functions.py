@@ -1936,8 +1936,10 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
         if isinstance(idx, types.SliceType):
             return gen_df_getitem_iloc_slice_impl(self.dataframe, idx)
 
-        if (isinstance(idx, (types.List, types.Array)) and
-            isinstance(idx.dtype, (types.Boolean, bool))):
+        if (
+            isinstance(idx, (types.List, types.Array)) and
+            isinstance(idx.dtype, (types.Boolean, bool))
+        ):
             return gen_df_getitem_iloc_list_bool_impl(self.dataframe, idx)
 
         if isinstance(idx, types.List):
