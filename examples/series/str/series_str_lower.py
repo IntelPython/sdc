@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,24 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-"""
-Expect Series
-a    210.0
-b    185.0
-dtype: float64
-"""
 import pandas as pd
-import numpy as np
 from numba import njit
 
 
 @njit
-def series_groupby():
-    S = pd.Series([390., 350., 30., 20.])
-    by = np.asarray([0, 1, 0, 1])
+def series_str_lower():
+    series = pd.Series(['DOG', 'foo', 'BaR'])
+    out_series = series.str.lower()
 
-    # Expect Series of pd.Series([210.0, 185.0], index=[0, 1])
-    return S.groupby(by).mean()
+    return out_series
 
 
-print(series_groupby())
+print(series_str_lower())

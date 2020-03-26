@@ -160,7 +160,7 @@ def has_parent(typingctx, df=None):
 # TODO: alias analysis
 # this function should be used for getting df._data for alias analysis to work
 # no_cpython_wrapper since Array(DatetimeDate) cannot be boxed
-@numba.njit(nopython=True, no_cpython_wrapper=True, inline='always')
+@numba.njit(no_cpython_wrapper=True, inline='always')
 def get_dataframe_data(df, i):
     return df._data[i]
 

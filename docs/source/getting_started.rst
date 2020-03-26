@@ -1,10 +1,10 @@
-﻿.. _getting_started:
+.. _getting_started:
 .. include:: ./ext_links.txt
 
 Getting Started
 ===============
 
-Intel® Scalable Dataframe Compiler (Intel® SDC) extends capabilities of Numba* to compile a subset
+Intel® Scalable Dataframe Compiler (Intel® SDC) extends capabilities of `Numba*`_ to compile a subset
 of `Pandas*`_ into native code. Being integral part of `Numba*`_ it allows to combine regular `NumPy*`_ codes
 with `Pandas*`_ operations.
 
@@ -30,56 +30,151 @@ binning, and finally by feeding the cleaned data into machine learning algorithm
 
 We also recommend to read `A ~5 minute guide to Numba <https://numba.pydata.org/numba-doc/dev/user/5minguide.html>`_
 for getting started with `Numba*`_.
- 
+
 Installation
 #############
-You can use conda and pip package managers to install Intel® SDC into your Python* environment.
+You can use conda and pip package managers to install Intel® SDC into your `Python*`_ environment.
 
-.. todo::
-    Provide installation instructions for public packages on Anaconda.org and PyPI
+Intel SDC is available on the Anaconda Cloud intel/label/beta channel.
+Distribution includes Intel SDC for Python 3.6 and 3.7 for Windows and Linux platforms.
 
-Experienced users can also buildIntel SDC from sources
-`for Linux*<https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-linux>`_ and
-`for Windows*<https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-windows>`_.
+Intel SDC conda package can be installed using the steps below:
+::
+
+    > conda create -n sdc_env python=<3.7 or 3.6>
+    > conda activate sdc_env
+    > conda install sdc -c intel/label/beta -c intel -c defaults -c conda-forge --override-channels
+
+Intel SDC wheel package can be installed using the steps below:
+::
+
+    > conda create -n sdc_env python=<3.7 or 3.6> pip
+    > conda activate sdc_env
+    > pip install --index-url https://pypi.anaconda.org/intel/label/beta/simple --extra-index-url https://pypi.anaconda.org/intel/simple --extra-index-url https://pypi.org/simple sdc
+
+
+Experienced users can also build Intel SDC from sources
+`for Linux* <https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-linux>`_ and
+`for Windows* <https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-windows>`_.
  
 Basic Usage
 ###########
-.. todo::
-   Provide a few code snapshots illustrating typical usages of Intel® SDC:
-    •	Reading a file
-    •	Working with a column - a few basic ops, e.g. aggregation or sorting + UDF
-    •	Working with a dataframe
-    •	Working with a machine learning library, e.g. scikit-learn, xgboost, daal
-    
-    Each snapshot can have two flavors - serial and parallel to illustrate easiness of getting parallel performance.
-Each code snapshot provides the link to full examples located at GitHub repo>
+The code below illustrates a typical ML workflow that consists of data pre-processing and predicting stages.
+Intel® SDC is intended to compile pre-processing stage that includes
+reading dataset from a csv file, filtering data and performing Pearson correlation operation.
+The prediction based on gradient boosting regression module is made using scikit-learn module.
 
-Here's an example which describes reading data from a csv file and performing basic operation like finding mean and
-sorting values of a specific column:
+.. literalinclude:: ../../examples/basic_usage_nyse_predict.py
+   :language: python
+   :lines: 27-
+   :caption: Typical usage of Intel® SDC in combination with scikit-learn
+   :name: ex_getting_started_basic_usage_nyse_predict
 
 What If I Get A Compilation Error
 #################################
 
-.. todo::
-   Need to give basic information that hpat and numba do not support full set of Pandas and Numpy APIs, provide the link to the API Reference section for Intel® SDC, relevant reference to Numba documentation.
- 
-Also give very short introduction to what kind of code Numba/Intel® SDC can compile and what cannot, i.e. type stability etc. Provide the links to relevant sections in Intel® SDC and Numba documentations focusing on compilation issues/limitations
-  
+Not all Python code can be compiled with Intel® SDC. Not all `Pandas*`_ and `Numpy*`_ APIs are currently supported and not all valid python code can be compiled using underlying Numba compiler.
+
+To be successfully compiled code must use only supported subset of `Pandas*`_ API and use only subset `Python*`_ supported by `Numba*`_ (e.g. be type-stable)
+
+Example of currently unsupported code:
+
+.. code-block::
+    :emphasize-lines: 2, 4
+
+    if flag:
+       a = 1.0
+    else:
+       a = np.ones(10)
+     return a  # Type of a cannot be inferred
+
+:ref:`SDC API reference<apireference>`
+
+:ref:`More info on SDC compilation process and supported Python features<compilation>`
+
+`Numba documentation <https://numba.pydata.org/numba-doc/latest/user/troubleshoot.html>`_
+
 Measuring Performance
 #####################
 
-.. todo::
-   Short intro how to measure performance. Compilation time and run time. Illustrate by example. Reference to relevant discussion in Numba documentation
- 
+.. 1. Short intro how to measure performance.
+
+Lets consider we want to measure performance of Series.max() method.
+
+.. code::
+
+   from numba import njit
+
+   @njit
+   def series_max(s):
+      return s.max()
+
+.. 2. Compilation time and run time.
+
+First, recall that Intel® SDC is based on Numba. Therefore, execution time may consist of the following:
+   1. Numba has to *compile* your function for the first time, this takes time.
+   2. *Boxing* and *unboxing* convert Python objects into native values, and vice-versa. They occur at the boundaries of calling a `Numba*`_ function from the Python interpreter. E.g. boxing and unboxing apply to `Pandas*`_ types like :ref:`Series <pandas.Series>` and :ref:`DataFrame <pandas.DataFrame>`.
+   3. The execution of the *function itself*.
+
+A really common mistake when measuring performance is to not account for the above behaviour and
+to time code once with a simple timer that includes the time taken to compile your function in the execution time.
+
+A good way to measure the impact Numba JIT has on your code is to time execution using
+the `timeit <https://docs.python.org/3/library/timeit.html>`_ module functions.
+
+Intel® SDC also recommends eliminate the impact of compilation and boxing/unboxing by measuring the time inside Numba JIT code.
+
+.. 3. Illustrate by example.
+
+Example of measuring performance:
+
+.. code::
+
+   import time
+   import numpy as np
+   import pandas as pd
+   from numba import njit
+
+   @njit
+   def perf_series_max(s):                  # <-- unboxing
+      start_time = time.time()              # <-- time inside Numba JIT code
+      res = s.max()
+      finish_time = time.time()             # <-- time inside Numba JIT code
+      return finish_time - start_time, res  # <-- boxing
+
+   s = pd.Series(np.random.ranf(size=100000))
+   exec_time, res = perf_series_max(s)
+   print("Execution time in JIT code: ", exec_time)
+
+.. 4. Reference to relevant discussion in Numba documentation.
+
+See also `Numba*`_ documentation `How to measure the performance of Numba? <http://numba.pydata.org/numba-doc/latest/user/5minguide.html#how-to-measure-the-performance-of-numba>`_
+
+.. 5. Link to performance tests.
+
+See also Intel® SDC repository `performance tests <https://github.com/IntelPython/sdc/tree/master/sdc/tests/tests_perf>`_.
+
 What If I Get Poor Performance?
 ###############################
 
-.. todo::
-   Short introduction why performance may be slower than expected. GIL, Object mode and nopython mode. Overheads related to boxing and unboxing Python objects.
-   Reference to relevant sections of Intel® SDC and Numba documentation for detailed discussion
+.. 1. Short introduction why performance may be slower than expected.
+.. 2. GIL, Object mode and nopython mode.
+.. 3. Overheads related to boxing and unboxing Python objects.
+.. 4. Reference to relevant sections of Intel® SDC and Numba documentation for detailed discussion
+
+If you get poor performance you need to consider several reasons, among which
+compilation overheads, overheads related to converting Python objects to native structures and back,
+amount of parallelism in compiled code, to what extent the code is “static” and many other factors.
+See more details in Intel® SDC documentation :ref:`Getting Performance With Intel® SDC <performance>`.
+
+Also you need to consider limitations of particular function.
+See more details in Intel® SDC documentation for particular function :ref:`apireference`.
+
+See also `Numba*`_ documentation `Performance Tips <http://numba.pydata.org/numba-doc/latest/user/performance-tips.html>`_
+and `The compiled code is too slow <http://numba.pydata.org/numba-doc/latest/user/troubleshoot.html#the-compiled-code-is-too-slow>`_.
 
 Build Instructions
 ##################
 
-.. todo::
-   Provide step-by-step build instructions for Linux*, Windows*, and Mac*.
+Build instructions for Linux*: https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-linux
+Build instructions for Windows*: https://github.com/IntelPython/sdc#building-intel-sdc-from-source-on-windows

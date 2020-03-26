@@ -58,7 +58,7 @@ from sdc.datatypes.common_functions import SDCLimitation
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import _hpat_pandas_df_rolling_init
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
-from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby, merge_groupby_dicts
+from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby, merge_groupby_dicts_inplace
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
 from sdc.hiframes.api import isna
@@ -357,6 +357,8 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=False, verify_integrity=
     - Parameter ``other`` can be only :obj:`pandas.DataFrame`.
     - Indexes of dataframes are expected to have comparable (both Numeric or String) types if parameter ignore_index
     is set to False.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -718,30 +720,39 @@ def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, 
 @sdc_overload_method(DataFrameType, 'median')
 def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.median` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.median
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_median*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_median.py
+       :language: python
+       :lines: 35-
+       :caption: Return the median of the values for the columns.
+       :name: ex_dataframe_median
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return the median of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_median.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.median <pandas.Series.median>`
+            Returns the median of the values for the Series.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.median` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_median*
+    """
 
     name = 'median'
 
@@ -756,30 +767,39 @@ def median_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 @sdc_overload_method(DataFrameType, 'mean')
 def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.mean` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.mean
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_mean*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_mean.py
+       :language: python
+       :lines: 35-
+       :caption: Return the mean of the values for the columns.
+       :name: ex_dataframe_mean
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return the mean of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_mean.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.mean <pandas.Series.mean>`
+            Return the mean of the values for the Series.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.mean` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_mean*
+    """
 
     name = 'mean'
 
@@ -800,32 +820,43 @@ sdc_pandas_dataframe_rolling.__doc__ = sdc_pandas_rolling_docstring_tmpl.format(
 @sdc_overload_method(DataFrameType, 'std')
 def std_overload(df, axis=None, skipna=None, level=None, ddof=1, numeric_only=None):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.std` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.std
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_std*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       ddof:
-           *unsupported*
-       numeric_only:
-           *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_std.py
+       :language: python
+       :lines: 35-
+       :caption: Return sample standard deviation over columns.
+       :name: ex_dataframe_std
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return sample standard deviation over requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_std.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.std <pandas.Series.std>`
+            Returns sample standard deviation over Series.
+        :ref:`Series.var <pandas.Series.var>`
+            Returns unbiased variance over Series.
+        :ref:`DataFrame.var <pandas.DataFrame.var>`
+            Returns unbiased variance over DataFrame.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.std` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_std*
+    """
 
     name = 'std'
 
@@ -1092,32 +1123,39 @@ def sum_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_
 @sdc_overload_method(DataFrameType, 'prod')
 def prod_overload(df, axis=None, skipna=None, level=None, numeric_only=None, min_count=0):
     """
-       Pandas DataFrame method :meth:`pandas.DataFrame.prod` implementation.
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
 
-       .. only:: developer
+    Pandas API: pandas.DataFrame.prod
 
-           Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_prod*
+    Limitations
+    -----------
+    Parameters ``axis``, ``level``, ``numeric_only`` and ``min_count`` are unsupported.
 
-       Parameters
-       -----------
-       df: :class:`pandas.DataFrame`
-           input arg
-       axis:
-           *unsupported*
-       skipna:
-           *unsupported*
-       level:
-           *unsupported*
-       numeric_only:
-           *unsupported*
-       min_count:
-            *unsupported*
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_prod.py
+       :language: python
+       :lines: 35-
+       :caption: Return the product of the values for the columns.
+       :name: ex_dataframe_prod
 
-       Returns
-       -------
-       :obj:`pandas.Series` or `pandas.DataFrame`
-               return the product of the values for the requested axis.
-       """
+    .. command-output:: python ./dataframe/dataframe_prod.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.prod <pandas.Series.prod>`
+            Returns the product of the values for the Series.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.prod` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_prod*
+    """
 
     name = 'prod'
 
@@ -1675,6 +1713,114 @@ gen_df_getitem_bool_array_idx_impl = gen_impl_generator(
 
 @sdc_overload(operator.getitem)
 def sdc_pandas_dataframe_getitem(self, idx):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.getitem
+
+    Get data from a DataFrame by indexer.
+
+    Limitations
+    -----------
+    Supported ``key`` can be one of the following:
+
+    * String literal, e.g. :obj:`df['A']`
+    * A slice, e.g. :obj:`df[2:5]`
+    * A tuple of string, e.g. :obj:`df[('A', 'B')]`
+    * An array of booleans, e.g. :obj:`df[True,False]`
+    * A series of booleans, e.g. :obj:`df(series([True,False]))`
+
+    Supported getting a column through getting attribute.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_attr.py
+       :language: python
+       :lines: 37-
+       :caption: Getting Pandas DataFrame column through getting attribute.
+       :name: ex_dataframe_getitem
+
+    .. command-output:: python ./dataframe/getitem/df_getitem_attr.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem.py
+       :language: python
+       :lines: 37-
+       :caption: Getting Pandas DataFrame column where key is a string.
+       :name: ex_dataframe_getitem
+
+    .. command-output:: python ./dataframe/getitem/df_getitem.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_slice.py
+       :language: python
+       :lines: 34-
+       :caption: Getting slice of Pandas DataFrame.
+       :name: ex_dataframe_getitem
+
+    .. command-output:: python ./dataframe/getitem/df_getitem_slice.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_tuple.py
+       :language: python
+       :lines: 37-
+       :caption: Getting Pandas DataFrame elements where key is a tuple of strings.
+       :name: ex_dataframe_getitem
+
+    .. command-output:: python ./dataframe/getitem/df_getitem_tuple.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_array.py
+       :language: python
+       :lines: 34-
+       :caption: Getting Pandas DataFrame elements where key is an array of booleans.
+       :name: ex_dataframe_getitem
+
+    .. command-output:: python ./dataframe/getitem/df_getitem_array.py
+       :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/getitem/df_getitem_series.py
+       :language: python
+       :lines: 34-
+       :caption: Getting Pandas DataFrame elements where key is series of booleans.
+       :name: ex_dataframe_getitem
+
+    .. command-output:: python ./dataframe/getitem/df_getitem_series.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.getitem <pandas.Series.getitem>`
+            Get value(s) of Series by key.
+        :ref:`Series.setitem <pandas.Series.setitem>`
+            Set value to Series by index
+        :ref:`Series.loc <pandas.Series.loc>`
+            Access a group of rows and columns by label(s) or a boolean array.
+        :ref:`Series.iloc <pandas.Series.iloc>`
+            Purely integer-location based indexing for selection by position.
+        :ref:`Series.at <pandas.Series.at>`
+            Access a single value for a row/column label pair.
+        :ref:`Series.iat <pandas.Series.iat>`
+            Access a single value for a row/column pair by integer position.
+        :ref:`DataFrame.setitem <pandas.DataFrame.setitem>`
+            Set value to DataFrame by index
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Access a group of rows and columns by label(s) or a boolean array.
+        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+            Purely integer-location based indexing for selection by position.
+        :ref:`DataFrame.at <pandas.DataFrame.at>`
+            Access a single value for a row/column label pair.
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Access a single value for a row/column pair by integer position.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.getitem` implementation.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_getitem*
+    """
     ty_checker = TypeChecker('Operator getitem().')
 
     if not isinstance(self, DataFrameType):
@@ -1886,6 +2032,75 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
 @sdc_overload_method(DataFrameType, 'groupby')
 def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=True, sort=True,
                                  group_keys=True, squeeze=False, observed=False):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.groupby
+
+    Limitations
+    -----------
+    - Parameters ``axis``, ``level``, ``as_index``, ``group_keys``, ``squeeze`` and ``observed`` \
+are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``by`` is supported as single literal column name only
+    - Mutating the contents of a DataFrame between creating a groupby object and calling it's methods is unsupported
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/groupby/dataframe_groupby_min.py
+       :language: python
+       :lines: 27-
+       :caption: Groupby and calculate the minimum in each group.
+       :name: ex_dataframe_groupby
+
+    .. command-output:: python ./dataframe/groupby/dataframe_groupby_min.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`resample <pandas.DataFrame.resample>`
+            Resample time-series data.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame attribute :meth:`pandas.DataFrame.groupby` implementation
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_groupby.TestGroupBy.test_dataframe_groupby*
+
+    Parameters
+    ----------
+
+    self: :obj:`pandas.DataFrame`
+        Input DataFrame.
+    by: :obj:`mapping`, :obj:`function`, :obj:`string` or :obj:`list`
+        Used to determine the groups for the groupby.
+    axis : :obj:`int` or :obj:`string`, default 0
+        Split along rows (0) or columns (1).
+    level : :obj:`int` or :obj:`str`, default None
+        If the axis is a MultiIndex (hierarchical), group by a particular
+        level or levels.
+    as_index : :obj:`bool`, default True
+        For aggregated output, return object with group labels as the
+        index.
+    sort : :obj:`bool`, default True
+        Sort group keys. Get better performance by turning this off.
+        Note this does not influence the order of observations within each
+        group. Groupby preserves the order of rows within each group.
+    group_keys : :obj:`bool`, default True
+        When calling apply, add group keys to index to identify pieces.
+    squeeze : :obj:`bool`, default False
+        Reduce the dimensionality of the return type if possible,
+        otherwise return a consistent type.
+    observed : :obj:`bool`, default False
+        This only applies if any of the groupers are Categoricals.
+        If True: only show observed values for categorical groupers.
+        If False: show all values for categorical groupers.
+
+    Returns
+    -------
+    :class:`pandas.DataFrameGroupBy`
+        Returns a groupby object that contains information about the groups.
+"""
 
     if not isinstance(by, types.StringLiteral):
         return None
@@ -1920,7 +2135,7 @@ def sdc_pandas_dataframe_groupby(self, by=None, axis=0, level=None, as_index=Tru
         # merging all dict parts into a single resulting dict
         res_dict = dict_parts[0]
         for i in range(1, len(chunks)):
-            res_dict = merge_groupby_dicts(res_dict, dict_parts[i])
+            res_dict = merge_groupby_dicts_inplace(res_dict, dict_parts[i])
 
         return init_dataframe_groupby(self, column_id, res_dict, sort)
 

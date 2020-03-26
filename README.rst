@@ -19,11 +19,28 @@ the code by leveraging modern hardware instructions and by utilizing all availab
 
 Intel SDC's documentation can be found `here <https://intelpython.github.io/sdc-doc/>`_.
 
-Installing Binary Packages (conda)
+Intel SDC uses special Numba build based on ``0.48.0`` tag for build and run.
+Required Numba version can be installed from ``intel/label/beta`` channel from the Anaconda Cloud.
+Note: For maximum performance and stability please use numba from ``intel/label/beta`` channel.
+
+Installing Binary Packages (conda and wheel)
 ----------------------------------
+Intel SDC is available on the Anaconda Cloud intel/label/beta channel.
+Distribution includes Intel SDC for Python 3.6 and Python 3.7 for Windows and Linux platforms.
+
+Intel SDC conda package can be installed using the steps below:
 ::
 
-   Currently binary packages are not provided.
+    > conda create -n sdc_env python=<3.7 or 3.6>
+    > conda activate sdc_env
+    > conda install sdc -c intel/label/beta -c intel -c defaults -c conda-forge --override-channels
+
+Intel SDC wheel package can be installed using the steps below:
+::
+
+    > conda create -n sdc_env python=<3.7 or 3.6> pip
+    > conda activate sdc_env
+    > pip install --index-url https://pypi.anaconda.org/intel/label/beta/simple --extra-index-url https://pypi.anaconda.org/intel/simple --extra-index-url https://pypi.org/simple sdc
 
 
 Building Intel® SDC from Source on Linux
@@ -39,8 +56,9 @@ If you do not have conda, we recommend using Miniconda3::
     ./miniconda.sh -b
     export PATH=$HOME/miniconda3/bin:$PATH
 
-Intel SDC uses Numba ``0.48.0`` tag (referred later as ``numba_commit``) from master branch for build and run.
-That is why it is required to build specified Numba first. Build steps are described below.
+Intel SDC uses special Numba build based on ``0.48.0`` tag for build and run.
+Required Numba version can be installed from ``intel/label/beta`` channel from the Anaconda Cloud.
+Note: For maximum performance and stability please use numba from ``intel/label/beta`` channel.
 
 It is possible to build Intel SDC via conda-build or setuptools. Follow one of the
 cases below to install Intel SDC and its dependencies on Linux.
@@ -55,10 +73,7 @@ Building on Linux with conda-build
     source activate CBLD
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
-    # Build Numba
-    conda build --python $PYVER --numpy $NUMPYVER --output-folder <path_to_sdc>/numba_build -c numba -c defaults -c intel --override-channels buildscripts/numba-conda-recipe/recipe
-    # Build Intel SDC
-    conda build --python $PYVER --numpy $NUMPYVER -c file://<path_to_sdc>/numba_build -c numba -c defaults -c conda-forge --override-channels buildscripts/sdc-conda-recipe
+    conda build --python $PYVER --numpy $NUMPYVER --output-folder=<output_folder> -c intel/label/beta -c defaults -c intel -c conda-forge --override-channels buildscripts/sdc-conda-recipe
 
 Building on Linux with setuptools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -66,15 +81,8 @@ Building on Linux with setuptools
 
     PYVER=<3.6 or 3.7>
     NUMPYVER=<1.16 or 1.17>
-    conda create -n SDC -q -y -c numba -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER pandas=0.25.3 scipy pyarrow=0.15.1 gcc_linux-64 gxx_linux-64 tbb-devel llvmlite=0.31.0
+    conda create -n SDC -q -y -c intel/label/beta -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER numba=0.48.0 pandas=0.25.3 scipy pyarrow=0.15.1 gcc_linux-64 gxx_linux-64
     source activate SDC
-    # Build Numba
-    git clone https://github.com/numba/numba.git
-    cd numba
-    git checkout numba_commit
-    python setup.py install
-    # build SDC
-    cd ..
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
     python setup.py install
@@ -103,10 +111,7 @@ Building on Windows with conda-build
     conda activate CBLD
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
-    # Build Numba
-    conda build --python %PYVER% --numpy %NUMPYVER% --output-folder <path_to_sdc>\numba_build -c numba -c defaults -c intel --override-channels buildscripts\numba-conda-recipe\recipe
-    # Build Intel SDC
-    conda build --python %PYVER% --numpy %NUMPYVER% -c <path_to_sdc>\numba_build -c numba -c defaults -c conda-forge --override-channels buildscripts\sdc-conda-recipe
+    conda build --python %PYVER% --numpy %NUMPYVER% --output-folder=<output_folder> -c intel/label/beta -c defaults -c intel -c conda-forge --override-channels buildscripts\sdc-conda-recipe
 
 Building on Windows with setuptools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -114,17 +119,10 @@ Building on Windows with setuptools
 
     set PYVER=<3.6 or 3.7>
     set NUMPYVER=<1.16 or 1.17>
-    conda create -n SDC -c numba -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% pandas=0.25.3 scipy pyarrow=0.15.1 tbb-devel llvmlite=0.31.0
+    conda create -n SDC -c intel/label/beta -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% numba=0.48.0 pandas=0.25.3 scipy pyarrow=0.15.1
     conda activate SDC
     set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
     set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
-    # Build Numba
-    git clone https://github.com/numba/numba.git
-    cd numba
-    git checkout numba_commit
-    python setup.py install
-    # Build Intel SDC
-    cd ..
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
     python setup.py install
@@ -146,6 +144,12 @@ Troubleshooting Windows Build
 Building documentation
 ----------------------
 Building Intel SDC User's Guide documentation requires pre-installed Intel SDC package along with compatible Pandas* version as well as Sphinx* 2.2.1 or later.
+
+Intel SDC documentation includes Intel SDC examples output which is pasted to functions description in the API Reference.
+In order to get the correct examples result it is required to install ``scipy`` package before documentation build:
+::
+
+    conda install scipy -c intel --override-channels
 
 Use ``pip`` to install Sphinx* and extensions:
 ::

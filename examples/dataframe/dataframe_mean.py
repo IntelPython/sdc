@@ -25,23 +25,25 @@
 # *****************************************************************************
 
 """
-Expect Series
-a    210.0
-b    185.0
-dtype: float64
+   Expected result:
+    A    0.25
+    B    2.50
+    C     inf
+    dtype: float64
 """
+
 import pandas as pd
 import numpy as np
 from numba import njit
 
 
 @njit
-def series_groupby():
-    S = pd.Series([390., 350., 30., 20.])
-    by = np.asarray([0, 1, 0, 1])
+def dataframe_mean():
+    df = pd.DataFrame({"A": [.2, .0, .6, .2],
+                       "B": [2, 0, 6, 2],
+                       "C": [-1, np.nan, 1, np.inf]})
 
-    # Expect Series of pd.Series([210.0, 185.0], index=[0, 1])
-    return S.groupby(by).mean()
+    return df.mean()
 
 
-print(series_groupby())
+print(dataframe_mean())
