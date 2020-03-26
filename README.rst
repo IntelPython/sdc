@@ -152,7 +152,8 @@ Troubleshooting Windows Build
 Building documentation
 ----------------------
 
-Building Intel® SDC User's Guide documentation requires pre-installed Intel® SDC package along with compatible Pandas* version as well as `Sphinx*`_ 2.2.1 or later.
+Building Intel® SDC User's Guide documentation requires pre-installed Intel® SDC package
+along with compatible `Pandas*`_ version as well as `Sphinx*`_ 2.2.1 or later.
 
 Intel® SDC documentation includes Intel® SDC examples output which is pasted to functions description in the API Reference.
 In order to get the correct examples result it is required to install ``scipy`` package before documentation build:
