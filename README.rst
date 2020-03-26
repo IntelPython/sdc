@@ -142,9 +142,9 @@ Troubleshooting Windows Build
   and add a string value named ``14.0`` whose data is ``C:\Program Files (x86)\Microsoft Visual Studio 14.0\``.
 * Sometimes if the conda version or visual studio version being used are not latest then building Intel® SDC can throw some vague error about a keyword used in a file. So make sure you are using the latest versions.
 
-
 Building documentation
 ----------------------
+
 Building Intel® SDC User's Guide documentation requires pre-installed Intel® SDC package along with compatible Pandas* version as well as Sphinx* 2.2.1 or later.
 
 Intel® SDC documentation includes Intel® SDC examples output which is pasted to functions description in the API Reference.
@@ -173,6 +173,7 @@ To preview the documentation open ``index.html`` file.
 
 Sphinx* Generation Internals
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 The documentation generation is controlled by ``conf.py`` script automatically invoked by Sphinx.
 See `Sphinx documentation <http://www.sphinx-doc.org/en/master/usage/configuration.html>`_ for details.
 
@@ -185,7 +186,8 @@ located at ``./sdc/docs/source/_api_ref`` directory.
     Sphinx will automatically clean the ``_api_ref`` directory on the next invocation of the documenation build.
 
 Intel® SDC docstring decoration rules
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Since SDC API Reference is auto-generated from respective Pandas* and Intel® SDC docstrings there are certain rules that must be
 followed to accurately generate the API description.
 
