@@ -1775,30 +1775,27 @@ def df_getitem_tuple_at_codegen(self, row, col):
             raise IndexingError('Index is out of bounds for axis')
     """
     func_lines = ['def _df_getitem_tuple_at_impl(self, idx):']
-    check_col = False
     for i in range(len(self.columns)):
         if self.columns[i] == col:
-            check_col = True
-            col_idx = i
-    if check_col == True:  # noqa
-        func_lines += ['  row, _ = idx',
-                       '  check_row = False',
-                       '  for i in prange(len(self._dataframe.index)):',
-                       '    if self._dataframe.index[i] == row:',
-                       '      check_row = True',
-                       '  if check_row:',
-                       f'    data = self._dataframe._data[{col_idx}]',
-                       '    res_data = pandas.Series(data, index=self._dataframe.index)',
-                       '    return res_data.at[row]',
-                       "  raise IndexingError('Index is out of bounds for axis')"]
-
+            func_lines += [
+                '  row, _ = idx',
+                '  check_row = False',
+                '  for i in prange(len(self._dataframe.index)):',
+                '    if self._dataframe.index[i] == row:',
+                '      check_row = True',
+                '  if check_row:',
+                f'    data = self._dataframe._data[{i}]',
+                '    res_data = pandas.Series(data, index=self._dataframe.index)',
+                '    return res_data.at[row]',
+                '  raise IndexingError("Index is out of bounds for axis")'
+            ]
+            break
     else:
         raise IndexingError('Index is out of bounds for axis')
 
     func_text = '\n'.join(func_lines)
 
     global_vars = {'pandas': pandas,
-                   'get_dataframe_data': get_dataframe_data,
                    'prange': prange,
                    'IndexingError': IndexingError}
 
@@ -1904,6 +1901,10 @@ def sdc_pandas_dataframe_at(self):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
+
+    Limitations
+    -----------
+    - Parameter ``column`` in ``idx`` must be a literal value. 
 
     Pandas API: pandas.DataFrame.at
 
