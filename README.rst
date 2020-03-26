@@ -28,6 +28,7 @@ Note: For maximum performance and stability please use numba from ``intel/label/
 
 Installing Binary Packages (conda and wheel)
 --------------------------------------------
+
 Intel® SDC is available on the Anaconda Cloud intel/label/beta channel.
 Distribution includes Intel® SDC for Python 3.6 and Python 3.7 for Windows and Linux platforms.
 
