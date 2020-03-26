@@ -1775,7 +1775,9 @@ def df_getitem_int_iloc_codegen(self, idx):
                   '  if -1 < idx < len(self._dataframe.index):']
     results = []
     index = []
-    name = df_name_codegen_iloc(self)
+    name = 'self._dataframe._index[idx]'
+    if isinstance(self.index, types.NoneType):
+        name = 'idx'
     for i, c in enumerate(self.columns):
         result_c = f"result_{i}"
         func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{i}])",
@@ -1800,19 +1802,17 @@ def df_getitem_slice_iloc_codegen(self, idx):
             result_0 = data_0.iloc[idx]
             data_1 = pandas.Series(self._dataframe._data[1])
             result_1 = data_1.iloc[idx]
-            return pandas.DataFrame(data={"A": result_0, "B": result_1}, index=self._dataframe.index[idx])                
+            return pandas.DataFrame(data={"A": result_0, "B": result_1}, index=self._dataframe.index[idx])
     """
     func_lines = ['def _df_getitem_slice_iloc_impl(self, idx):']
     results = []
-    index = 'self._dataframe.index[idx]'
-    name = df_name_codegen_iloc(self)
     for i, c in enumerate(self.columns):
         result_c = f"result_{i}"
         func_lines += [f"  data_{i} = pandas.Series(self._dataframe._data[{i}])",
                        f"  {result_c} = data_{i}.iloc[idx]"]
         results.append((c, result_c))
     data = ', '.join(f'"{col}": {data}' for col, data in results)
-    func_lines += [f"  return pandas.DataFrame(data={{{data}}}, index={index})"]
+    func_lines += [f"  return pandas.DataFrame(data={{{data}}}, index=self._dataframe.index[idx])"]
 
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas, 'numpy': numpy}
@@ -1846,7 +1846,6 @@ def df_getitem_list_iloc_codegen(self, idx):
     index = '[self._dataframe._index[i] for i in idx]'
     if isinstance(self.index, types.NoneType):
         index = 'idx'
-    name = df_name_codegen_iloc(self)
     for i, c in enumerate(self.columns):
         result_c = f"result_{i}"
         func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{i}])",
@@ -1879,7 +1878,6 @@ def df_getitem_list_bool_iloc_codegen(self, idx):
     results = []
     index = 'self._dataframe.index[numpy.array(idx)]'
     func_lines += ['  if len(self._dataframe.index) == len(idx):']
-    name = df_name_codegen_iloc(self)
     for i, c in enumerate(self.columns):
         result_c = f"result_{i}"
         func_lines += [f"    data_{i} = self._dataframe._data[{i}]",
@@ -1893,13 +1891,6 @@ def df_getitem_list_bool_iloc_codegen(self, idx):
     global_vars = {'pandas': pandas, 'numpy': numpy, 'IndexingError': IndexingError}
 
     return func_text, global_vars
-
-
-def df_name_codegen_iloc(self):
-    if isinstance(self.index, types.NoneType):
-        return 'idx'
-
-    return 'self._dataframe._index[idx]'
 
 
 gen_df_getitem_iloc_int_impl = gen_impl_generator(
@@ -1945,10 +1936,8 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
         if isinstance(idx, types.SliceType):
             return gen_df_getitem_iloc_slice_impl(self.dataframe, idx)
 
-        if (
-            isinstance(idx, (types.List, types.Array)) and
-            isinstance(idx.dtype, (types.Boolean, bool))
-        ):
+        if (isinstance(idx, (types.List, types.Array)) and
+            isinstance(idx.dtype, (types.Boolean, bool))):
             return gen_df_getitem_iloc_list_bool_impl(self.dataframe, idx)
 
         if isinstance(idx, types.List):
@@ -1977,7 +1966,7 @@ def sdc_pandas_dataframe_iloc(self):
 
     Limitations
     -----------
-    - Parameter 'name' in new DataFrame can be String only
+    - Parameter ``'name'`` in new DataFrame can be String only
     - Column can be literal value only, in DataFrame.iloc[row, column]
     - Iloc works with basic cases only: an integer, a list or array of integers,
         a slice object with ints, a boolean array
@@ -1986,7 +1975,7 @@ def sdc_pandas_dataframe_iloc(self):
     --------
     .. literalinclude:: ../../../examples/dataframe/dataframe_iloc.py
        :language: python
-       :lines: 27-
+       :lines: 36-
        :caption: Get value at specified index position.
        :name: ex_dataframe_iloc
 
@@ -2012,10 +2001,8 @@ def sdc_pandas_dataframe_iloc(self):
         Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_iloc*
     """
 
-    _func_name = 'Attribute iloc().'
-
-    if not isinstance(self, DataFrameType):
-        raise TypingError('{} The object must be a pandas.dataframe. Given: {}'.format(_func_name, self))
+    ty_checker = TypeChecker('Attribute iloc().')
+    ty_checker.check(self, DataFrameType)
 
     def sdc_pandas_dataframe_iloc_impl(self):
         return dataframe_getitem_accessor_init(self, 'iloc')

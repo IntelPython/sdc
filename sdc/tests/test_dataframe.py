@@ -1088,10 +1088,9 @@ class TestDataFrame(TestCase):
             df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
                                "B": [5.5, np.nan, 3, 0, 7.7],
                                "C": [3, 4, 1, 0, 222]}, index=idx)
-            for n in cases_n:
-                for k in cases_n[::-1]:
-                    with self.subTest(index=idx, n=n, k=k):
-                        pd.testing.assert_frame_equal(sdc_func(df, n, k), test_impl(df, n, k))
+            for n, k in product(cases_n, cases_n[::-1]):
+                with self.subTest(index=idx, n=n, k=k):
+                    pd.testing.assert_frame_equal(sdc_func(df, n, k), test_impl(df, n, k))
 
     def test_df_iloc_values(self):
         def test_impl(df, n):
@@ -1108,18 +1107,29 @@ class TestDataFrame(TestCase):
                     if not (np.isnan(sdc_func(df, n)) and np.isnan(test_impl(df, n))):
                         self.assertEqual(sdc_func(df, n), test_impl(df, n))
 
-    def test_df_iloc_int_value_error(self):
-        def test_impl(df):
+    def test_df_iloc_value_error(self):
+        def int_impl(df):
             return df.iloc[11]
-        sdc_func = sdc.jit(test_impl)
+
+        def list_impl(df):
+            return df.iloc[[7, 14]]
+
+        def list_bool_impl(df):
+            return df.iloc[[True, False]]
+
+        msg1 = 'Index is out of bounds for axis'
+        msg2 = 'Item wrong length'
         df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
                            "B": [5.5, np.nan, 3, 0, 7.7],
                            "C": [3, 4, 1, 0, 222]})
 
-        with self.assertRaises(IndexingError) as raises:
-            sdc_func(df)
-        msg = 'Index is out of bounds for axis'
-        self.assertIn(msg, str(raises.exception))
+        impls = [(int_impl, msg1), (list_impl, msg1), (list_bool_impl, msg2)]
+        for impl, msg in impls:
+            with self.subTest(case=impl, msg=msg):
+                func = self.jit(impl)
+                with self.assertRaises(IndexingError) as raises:
+                    func(df)
+                self.assertIn(msg, str(raises.exception))
 
     def test_df_iloc_int(self):
         def test_impl(df, n):
@@ -1135,19 +1145,6 @@ class TestDataFrame(TestCase):
                 with self.subTest(index=idx, n=n):
                     pd.testing.assert_series_equal(sdc_func(df, n), test_impl(df, n), check_names=False)
 
-    def test_df_iloc_list_value_error(self):
-        def test_impl(df):
-            return df.iloc[[7, 14]]
-        sdc_func = sdc.jit(test_impl)
-        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
-                           "B": [3, 4, 1, 0, 222],
-                           "C": [5.5, np.nan, 3, 0, 7.7]})
-
-        with self.assertRaises(IndexingError) as raises:
-            sdc_func(df)
-        msg = 'Index is out of bounds for axis'
-        self.assertIn(msg, str(raises.exception))
-
     def test_df_iloc_list(self):
         def test_impl(df, n):
             return df.iloc[n]
@@ -1161,19 +1158,6 @@ class TestDataFrame(TestCase):
             for n in cases_n:
                 with self.subTest(index=idx, n=n):
                     pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
-
-    def test_df_iloc_list_bool_value_error(self):
-        def test_impl(df):
-            return df.iloc[[True, False]]
-        sdc_func = sdc.jit(test_impl)
-        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
-                           "B": [3, 4, 1, 0, 222],
-                           "C": ['a', 'dd', 'c', '12', 'ddf']})
-
-        with self.assertRaises(IndexingError) as raises:
-            sdc_func(df)
-        msg = 'Item wrong length'
-        self.assertIn(msg, str(raises.exception))
 
     def test_df_iloc_list_bool(self):
         def test_impl(df, n):
