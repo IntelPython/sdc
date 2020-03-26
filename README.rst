@@ -10,11 +10,14 @@ Intel® Scalable Dataframe Compiler
     :target: https://dev.azure.com/IntelPython/HPAT/_build/latest?definitionId=2&branchName=master
     :alt: Azure Pipelines
 
+.. _Numba*: https://numba.pydata.org/
+.. _Pandas*: https://pandas.pydata.org/
+
 Numba* Extension For Pandas* Operations Compilation
 ###################################################
 
-Intel® Scalable Dataframe Compiler (Intel® SDC), which is an extension of `Numba* <https://numba.pydata.org/>`_
-that enables compilation of `Pandas* <https://pandas.pydata.org/>`_ operations. It automatically vectorizes and parallelizes
+Intel® Scalable Dataframe Compiler (Intel® SDC), which is an extension of `Numba*`_
+that enables compilation of `Pandas*`_ operations. It automatically vectorizes and parallelizes
 the code by leveraging modern hardware instructions and by utilizing all available cores.
 
 Intel SDC's documentation can be found `here <https://intelpython.github.io/sdc-doc/>`_.
@@ -24,7 +27,7 @@ Required Numba version can be installed from ``intel/label/beta`` channel from t
 Note: For maximum performance and stability please use numba from ``intel/label/beta`` channel.
 
 Installing Binary Packages (conda and wheel)
-----------------------------------
+--------------------------------------------
 Intel SDC is available on the Anaconda Cloud intel/label/beta channel.
 Distribution includes Intel SDC for Python 3.6 and Python 3.7 for Windows and Linux platforms.
 
@@ -166,8 +169,8 @@ To build HTML documentation you will need to run
 
     make html
 
-The built documentation will be located in the ``.sdc/docs/build/html`` directory. To preview the documentation open ``index.html``
-file.
+The built documentation will be located in the ``./sdc/docs/build/html`` directory.
+To preview the documentation open ``index.html`` file.
 
 Sphinx* Generation Internals
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
