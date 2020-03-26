@@ -90,7 +90,7 @@ Please note, that an array is returned from objmode. Returning Series or DataFra
         return s.cummax()
 
 
-Please note that last two options would result in performing boxing/unboxing which could signifficantly affect performance.
+Please note that last two options would result in performing boxing/unboxing which could significantly affect performance.
 
 For more details on performance see :ref:`Getting Performance With Intel® SDC <performance>`
 
@@ -163,7 +163,7 @@ Dealing With Integer NaN Values
 
 The :py:class:`pandas.Series` are built upon :py:class:`numpy.ndarray`, which does not support
 ``NaN`` values for integers and booleans. For that reason `Pandas*`_ dynamically converts integer columns to floating point ones
-when ``NaN`` values are needed. Intel SDC doesn't perform such convertion and it is user responsobility to manually
+when ``NaN`` values are needed. Intel SDC doesn't perform such conversion and it is user responsibility to manually
 convert from integer data to floating point data.
 
 
@@ -188,4 +188,4 @@ If Intel SDC fails to infer types from the file, the schema must be manually spe
 
 Alternatively you can take file reading out of the compiled region.
 
-Note: if data file contains integer data with empy positions (Nans) it is highly recomended to manually specify column type to float.
+Note: if data file contains integer data with empty positions (Nans) it is highly recommended to manually specify column type to float.
