@@ -71,8 +71,8 @@ Building on Linux with conda-build
 
     PYVER=<3.6 or 3.7>
     NUMPYVER=<1.16 or 1.17>
-    conda create -n CBLD python=$PYVER conda-build
-    source activate CBLD
+    conda create -n conda-build-env python=$PYVER conda-build
+    source activate conda-build-env
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
     conda build --python $PYVER --numpy $NUMPYVER --output-folder=<output_folder> -c intel/label/beta -c defaults -c intel -c conda-forge --override-channels buildscripts/sdc-conda-recipe
@@ -83,8 +83,8 @@ Building on Linux with setuptools
 
     PYVER=<3.6 or 3.7>
     NUMPYVER=<1.16 or 1.17>
-    conda create -n SDC -q -y -c intel/label/beta -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER numba=0.48.0 pandas=0.25.3 scipy pyarrow=0.15.1 gcc_linux-64 gxx_linux-64
-    source activate SDC
+    conda create -n sdc-env -q -y -c intel/label/beta -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER numba=0.48.0 pandas=0.25.3 scipy pyarrow=0.15.1 gcc_linux-64 gxx_linux-64
+    source activate sdc-env
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
     python setup.py install
@@ -109,8 +109,8 @@ Building on Windows with conda-build
 
     set PYVER=<3.6 or 3.7>
     set NUMPYVER=<1.16 or 1.17>
-    conda create -n CBLD -q -y python=%PYVER% conda-build conda-verify vc vs2015_runtime vs2015_win-64
-    conda activate CBLD
+    conda create -n conda-build-env -q -y python=%PYVER% conda-build conda-verify vc vs2015_runtime vs2015_win-64
+    conda activate conda-build-env
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
     conda build --python %PYVER% --numpy %NUMPYVER% --output-folder=<output_folder> -c intel/label/beta -c defaults -c intel -c conda-forge --override-channels buildscripts\sdc-conda-recipe
@@ -121,8 +121,8 @@ Building on Windows with setuptools
 
     set PYVER=<3.6 or 3.7>
     set NUMPYVER=<1.16 or 1.17>
-    conda create -n SDC -c intel/label/beta -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% numba=0.48.0 pandas=0.25.3 scipy pyarrow=0.15.1
-    conda activate SDC
+    conda create -n sdc-env -c intel/label/beta -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% numba=0.48.0 pandas=0.25.3 scipy pyarrow=0.15.1
+    conda activate sdc-env
     set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
     set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
     git clone https://github.com/IntelPython/sdc.git
