@@ -20,25 +20,25 @@ Intel® Scalable Dataframe Compiler (Intel® SDC) is an extension of `Numba*`_
 that enables compilation of `Pandas*`_ operations. It automatically vectorizes and parallelizes
 the code by leveraging modern hardware instructions and by utilizing all available cores.
 
-Intel SDC's documentation can be found `here <https://intelpython.github.io/sdc-doc/>`_.
+Intel® SDC documentation can be found `here <https://intelpython.github.io/sdc-doc/>`_.
 
-Intel SDC uses special Numba build based on ``0.48.0`` tag for build and run.
+Intel® SDC uses special Numba build based on ``0.48.0`` tag for build and run.
 Required Numba version can be installed from ``intel/label/beta`` channel from the Anaconda Cloud.
 Note: For maximum performance and stability please use numba from ``intel/label/beta`` channel.
 
 Installing Binary Packages (conda and wheel)
 --------------------------------------------
-Intel SDC is available on the Anaconda Cloud intel/label/beta channel.
-Distribution includes Intel SDC for Python 3.6 and Python 3.7 for Windows and Linux platforms.
+Intel® SDC is available on the Anaconda Cloud intel/label/beta channel.
+Distribution includes Intel® SDC for Python 3.6 and Python 3.7 for Windows and Linux platforms.
 
-Intel SDC conda package can be installed using the steps below:
+Intel® SDC conda package can be installed using the steps below:
 ::
 
     > conda create -n sdc_env python=<3.7 or 3.6>
     > conda activate sdc_env
     > conda install sdc -c intel/label/beta -c intel -c defaults -c conda-forge --override-channels
 
-Intel SDC wheel package can be installed using the steps below:
+Intel® SDC wheel package can be installed using the steps below:
 ::
 
     > conda create -n sdc_env python=<3.7 or 3.6> pip
@@ -50,7 +50,7 @@ Building Intel® SDC from Source on Linux
 ----------------------------------------
 
 We use `Anaconda <https://www.anaconda.com/download/>`_ distribution of
-Python for setting up Intel SDC build environment.
+Python for setting up Intel® SDC build environment.
 
 If you do not have conda, we recommend using Miniconda3::
 
@@ -59,12 +59,12 @@ If you do not have conda, we recommend using Miniconda3::
     ./miniconda.sh -b
     export PATH=$HOME/miniconda3/bin:$PATH
 
-Intel SDC uses special Numba build based on ``0.48.0`` tag for build and run.
+Intel® SDC uses special Numba build based on ``0.48.0`` tag for build and run.
 Required Numba version can be installed from ``intel/label/beta`` channel from the Anaconda Cloud.
 Note: For maximum performance and stability please use numba from ``intel/label/beta`` channel.
 
-It is possible to build Intel SDC via conda-build or setuptools. Follow one of the
-cases below to install Intel SDC and its dependencies on Linux.
+It is possible to build Intel® SDC via conda-build or setuptools. Follow one of the
+cases below to install Intel® SDC and its dependencies on Linux.
 
 Building on Linux with conda-build
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -101,8 +101,8 @@ Building Intel® SDC on Windows requires Build Tools for Visual Studio 2019 (wit
 * Install `Miniconda for Windows <https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe>`_.
 * Start 'Anaconda prompt'
 
-It is possible to build Intel SDC via conda-build or setuptools. Follow one of the
-cases below to install Intel SDC and its dependencies on Windows.
+It is possible to build Intel® SDC via conda-build or setuptools. Follow one of the
+cases below to install Intel® SDC and its dependencies on Windows.
 
 Building on Windows with conda-build
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -141,14 +141,14 @@ Troubleshooting Windows Build
 * For setting up Visual Studio, one might need go to registry at
   ``HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\SxS\VS7``,
   and add a string value named ``14.0`` whose data is ``C:\Program Files (x86)\Microsoft Visual Studio 14.0\``.
-* Sometimes if the conda version or visual studio version being used are not latest then building Intel SDC can throw some vague error about a keyword used in a file. So make sure you are using the latest versions.
+* Sometimes if the conda version or visual studio version being used are not latest then building Intel® SDC can throw some vague error about a keyword used in a file. So make sure you are using the latest versions.
 
 
 Building documentation
 ----------------------
-Building Intel SDC User's Guide documentation requires pre-installed Intel SDC package along with compatible Pandas* version as well as Sphinx* 2.2.1 or later.
+Building Intel® SDC User's Guide documentation requires pre-installed Intel® SDC package along with compatible Pandas* version as well as Sphinx* 2.2.1 or later.
 
-Intel SDC documentation includes Intel SDC examples output which is pasted to functions description in the API Reference.
+Intel® SDC documentation includes Intel® SDC examples output which is pasted to functions description in the API Reference.
 In order to get the correct examples result it is required to install ``scipy`` package before documentation build:
 ::
 
@@ -177,7 +177,7 @@ Sphinx* Generation Internals
 The documentation generation is controlled by ``conf.py`` script automatically invoked by Sphinx.
 See `Sphinx documentation <http://www.sphinx-doc.org/en/master/usage/configuration.html>`_ for details.
 
-The API Reference for Intel SDC User's Guide is auto-generated by inspecting ``pandas`` and ``sdc`` modules. That's why these modules must be pre-installed for documentation generation using Sphinx*. However, there is a possibility to skip API Reference auto-generation by setting environment variable ``SDC_DOC_NO_API_REF_STR=1``.
+The API Reference for Intel® SDC User's Guide is auto-generated by inspecting ``pandas`` and ``sdc`` modules. That's why these modules must be pre-installed for documentation generation using Sphinx*. However, there is a possibility to skip API Reference auto-generation by setting environment variable ``SDC_DOC_NO_API_REF_STR=1``.
 
 If the environment variable ``SDC_DOC_NO_API_REF_STR`` is unset then Sphinx's ``conf.py`` invokes ``generate_api_reference()`` function located in ``./sdc/docs/source/buildscripts/apiref_generator`` module. This function parses ``pandas`` and ``sdc`` docstrings for each API, combines those into single docstring and writes it into RST file with respective Pandas* API name. The auto-generated RST files are
 located at ``./sdc/docs/source/_api_ref`` directory.
@@ -185,9 +185,9 @@ located at ``./sdc/docs/source/_api_ref`` directory.
 .. note:
     Sphinx will automatically clean the ``_api_ref`` directory on the next invocation of the documenation build.
 
-Intel SDC docstring decoration rules
+Intel® SDC docstring decoration rules
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Since SDC API Reference is auto-generated from respective Pandas* and Intel SDC docstrings there are certain rules that must be
+Since SDC API Reference is auto-generated from respective Pandas* and Intel® SDC docstrings there are certain rules that must be
 followed to accurately generate the API description.
 
 1. Every SDC API must have the docstring.
@@ -200,7 +200,7 @@ followed to accurately generate the API description.
     and will include respective note in the API Reference that **This API is currently unsupported**.
 
 3. Description (introductory section, the very first few paragraphs without a title) is taken from Pandas*.
-Intel SDC developers should not include API description in SDC docstring.
+Intel® SDC developers should not include API description in SDC docstring.
     But developers are encouraged to follow Pandas API description naming conventions
     so that the combined docstring appears consistent.
 
@@ -217,7 +217,7 @@ SDC developers should not include such descriptions in their SDC docstrings.
         ********************************************
         Pandas API: <full pandas name, e.g. pandas.Series.nlargest>
 
-        <Intel SDC specific sections>
+        <Intel® SDC specific sections>
 
         Intel Scalable Dataframe Compiler Developer Guide
         *************************************************
@@ -227,7 +227,7 @@ SDC developers should not include such descriptions in their SDC docstrings.
 The first two lines must be the User Guide header. This is an indication to Sphinx that this section is intended for public API
 and it will be combined with repsective Pandas API docstring.
 
-Line 3 must specify what Pandas API this Intel SDC docstring does correspond to. It must start with ``Pandas API:`` followed by
+Line 3 must specify what Pandas API this Intel® SDC docstring does correspond to. It must start with ``Pandas API:`` followed by
 full Pandas API name that corresponds to this SDC docstring. Remember to include full name, for example, ``nlargest`` is not
 sufficient for auto-generator to perform the match. The full name must be ``pandas.Series.nlargest``.
 
@@ -236,7 +236,7 @@ Developer's Guide and must not be included into User's Guide.
 
 6. Examples, See Also, References sections are **NOT** taken from Pandas docstring. SDC developers are expected to complete these sections in SDC doctrings.
     This is so because respective Pandas sections are sometimes too Pandas specific and are not relevant to SDC. SDC developers have to
-    rewrite those sections in Intel SDC style. Do not forget about User Guide header and Pandas API name prior to adding SDC specific
+    rewrite those sections in Intel® SDC style. Do not forget about User Guide header and Pandas API name prior to adding SDC specific
     sections.
 
 7. Examples section is mandatory for every SDC API. 'One API - at least one example' rule is applied.
@@ -244,7 +244,7 @@ Developer's Guide and must not be included into User's Guide.
 
 8. Embed examples into Examples section from ``./sdc/examples``.
     Rather than writing example in the docstring (which is error-prone) embed relevant example scripts into the docstring. For example,
-    here is an example how to embed example for ``pandas.Series.get()`` function into respective Intel SDC docstring:
+    here is an example how to embed example for ``pandas.Series.get()`` function into respective Intel® SDC docstring:
 
     ::
 
@@ -317,7 +317,7 @@ Running unit tests
 References
 ##########
 
-Intel SDC follows ideas and initial code base of High-Performance Analytics Toolkit (HPAT). These academic papers describe ideas and methods behind HPAT:
+Intel® SDC follows ideas and initial code base of High-Performance Analytics Toolkit (HPAT). These academic papers describe ideas and methods behind HPAT:
 
 - `HPAT paper at ICS'17 <http://dl.acm.org/citation.cfm?id=3079099>`_
 - `HPAT at HotOS'17 <http://dl.acm.org/citation.cfm?id=3103004>`_
