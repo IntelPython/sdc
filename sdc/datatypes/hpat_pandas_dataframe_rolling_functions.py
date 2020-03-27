@@ -123,8 +123,8 @@ def df_rolling_method_other_df_codegen(method_name, self, other, args=None, kws=
             f'    raise ValueError("Method rolling.{method_name}(). The object pairwise\\n expected: False, None")'
         ]
 
-    data_length = 'len(get_dataframe_data(self._data, 0))' if data_columns else '0'
-    other_length = 'len(get_dataframe_data(other, 0))' if other_columns else '0'
+    data_length = 'len(self._data._data[0])' if data_columns else '0'
+    other_length = 'len(other._data[0])' if other_columns else '0'
     func_lines += [f'  length = max([{data_length}, {other_length}])']
 
     for col in all_columns:
@@ -134,8 +134,8 @@ def df_rolling_method_other_df_codegen(method_name, self, other, args=None, kws=
             method_kws['other'] = other_series
             method_params = ', '.join(args + kwsparams2list(method_kws))
             func_lines += [
-                f'  data_{col} = get_dataframe_data(self._data, {data_columns[col]})',
-                f'  other_data_{col} = get_dataframe_data(other, {other_columns[col]})',
+                f'  data_{col} = self._data._data[{data_columns[col]}]',
+                f'  other_data_{col} = other._data[{other_columns[col]}]',
                 f'  series_{col} = pandas.Series(data_{col})',
                 f'  {other_series} = pandas.Series(other_data_{col})',
                 f'  rolling_{col} = series_{col}.rolling({rolling_params})',
@@ -153,8 +153,7 @@ def df_rolling_method_other_df_codegen(method_name, self, other, args=None, kws=
     func_lines += [f'  return pandas.DataFrame({{{data}}})']
     func_text = '\n'.join(func_lines)
 
-    global_vars = {'numpy': numpy, 'pandas': pandas, 'float64': float64,
-                   'get_dataframe_data': get_dataframe_data}
+    global_vars = {'numpy': numpy, 'pandas': pandas, 'float64': float64}
 
     return func_text, global_vars
 
@@ -168,7 +167,7 @@ def df_rolling_method_main_codegen(method_params, df_columns, method_name):
     for idx, col in enumerate(df_columns):
         res_data = f'result_data_{col}'
         func_lines += [
-            f'  data_{col} = get_dataframe_data(self._data, {idx})',
+            f'  data_{col} = self._data._data[{idx}]',
             f'  series_{col} = pandas.Series(data_{col})',
             f'  rolling_{col} = series_{col}.rolling({rolling_params})',
             f'  result_{col} = rolling_{col}.{method_name}({method_params_as_str})',
@@ -208,7 +207,7 @@ def gen_df_rolling_method_other_none_codegen(rewrite_name=None):
         func_lines += df_rolling_method_main_codegen(method_params, self.data.columns, method_name)
         func_text = '\n'.join(func_lines)
 
-        global_vars = {'pandas': pandas, 'get_dataframe_data': get_dataframe_data}
+        global_vars = {'pandas': pandas}
 
         return func_text, global_vars
 
@@ -233,7 +232,7 @@ def df_rolling_method_codegen(method_name, self, args=None, kws=None):
     func_lines += df_rolling_method_main_codegen(method_params, self.data.columns, method_name)
     func_text = '\n'.join(func_lines)
 
-    global_vars = {'pandas': pandas, 'get_dataframe_data': get_dataframe_data}
+    global_vars = {'pandas': pandas}
 
     return func_text, global_vars
 
@@ -469,8 +468,10 @@ sdc_pandas_dataframe_rolling_apply.__doc__ = sdc_pandas_dataframe_rolling_docstr
     """
     Limitations
     -----------
-    Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
-    DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    - Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
+    - DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """
@@ -558,7 +559,13 @@ sdc_pandas_dataframe_rolling_mean.__doc__ = sdc_pandas_dataframe_rolling_docstri
 sdc_pandas_dataframe_rolling_median.__doc__ = sdc_pandas_dataframe_rolling_docstring_tmpl.format(**{
     'method_name': 'median',
     'example_caption': 'Calculate the rolling median.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'extra_params': ''
 })
 
@@ -576,8 +583,10 @@ sdc_pandas_dataframe_rolling_quantile.__doc__ = sdc_pandas_dataframe_rolling_doc
     """
     Limitations
     -----------
-    Supported ``interpolation`` only can be `'linear'`.
-    DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    - Supported ``interpolation`` only can be `'linear'`.
+    - DataFrame elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """

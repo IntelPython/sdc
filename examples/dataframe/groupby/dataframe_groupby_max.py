@@ -29,23 +29,15 @@ from numba import njit
 
 
 @njit
-def dataframe_pct_change():
-    df = pd.DataFrame({"A": [14, 4, 5, 4, 1, 55],
-                       "B": [5, 2, 54, 3, 2, 32],
-                       "C": [20, 20, 7, 21, 8, 5],
-                       "D": [14, 3, 6, 2, 6, 4]})
-    out_df = df.pct_change()
+def df_groupby_max():
+    df = pd.DataFrame({'A': [1, 2, 3, 1, 2, 3, 3, 3, 2],
+                       'B': [0, 1, 5, 0, 2, 4, 3, 2, 3],
+                       'C': [1, 2, 3, 4, 5, 6, 7, 8, 9]})
+    out_df = df.groupby('A').max()
 
+    # Expect DataFrame of
+    # {'B': [0, 3, 5], 'C': [4, 9, 8} with index=[1, 2, 3]
     return out_df
 
-# result DataFrame
-#            A          B         C         D
-# 0        NaN        NaN       NaN       NaN
-# 1  -0.714286  -0.600000  0.000000 -0.785714
-# 2   0.250000  26.000000 -0.650000  1.000000
-# 3  -0.200000  -0.944444  2.000000 -0.666667
-# 4  -0.750000  -0.333333 -0.619048  2.000000
-# 5  54.000000  15.000000 -0.375000 -0.333333
 
-
-print(dataframe_pct_change())
+print(df_groupby_max())

@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -51,15 +51,6 @@ class DataFrameAttribute(AttributeTemplate):
 
     def resolve_shape(self, ary):
         return types.UniTuple(types.intp, 2)
-
-    def resolve_iat(self, ary):
-        return DataFrameIatType(ary)
-
-    def resolve_iloc(self, ary):
-        return DataFrameILocType(ary)
-
-    def resolve_loc(self, ary):
-        return DataFrameLocType(ary)
 
     if sdc.config.config_pipeline_hpat_default:
         def resolve_values(self, ary):
@@ -136,13 +127,10 @@ def init_dataframe(typingctx, *args):
         column_tup = context.make_tuple(
             builder, types.UniTuple(string_type, n_cols), column_strs)
         zero = context.get_constant(types.int8, 0)
-        unboxed_tup = context.make_tuple(
-            builder, types.UniTuple(types.int8, n_cols + 1), [zero] * (n_cols + 1))
 
         dataframe.data = data_tup
         dataframe.index = index
         dataframe.columns = column_tup
-        dataframe.unboxed = unboxed_tup
         dataframe.parent = context.get_constant_null(types.pyobject)
 
         # increase refcount of stored values
@@ -172,16 +160,9 @@ def has_parent(typingctx, df=None):
 # TODO: alias analysis
 # this function should be used for getting df._data for alias analysis to work
 # no_cpython_wrapper since Array(DatetimeDate) cannot be boxed
-@numba.generated_jit(nopython=True, no_cpython_wrapper=True)
+@numba.njit(no_cpython_wrapper=True, inline='always')
 def get_dataframe_data(df, i):
-
-    def _impl(df, i):
-        if has_parent(df) and df._unboxed[i] == 0:
-            # TODO: make df refcounted to avoid repeated unboxing
-            df = sdc.hiframes.boxing.unbox_dataframe_column(df, i)
-        return df._data[i]
-
-    return _impl
+    return df._data[i]
 
 
 # TODO: use separate index type instead of just storing array
@@ -341,7 +322,6 @@ def df_len_overload(df):
     if len(df.columns) == 0:  # empty df
         return lambda df: 0
     return lambda df: len(df._data[0])
-
 
 if sdc.config.config_pipeline_hpat_default:
     @overload(operator.getitem)  # TODO: avoid lowering?

@@ -36,6 +36,9 @@ from utilities import SDC_Build_Utilities
 def build_doc(sdc_utils):
     os.chdir(str(sdc_utils.doc_path))
 
+    # Set NUMBA_DISABLE_PERFORMANCE_WARNINGS to disable warnings in examples output
+    os.environ['NUMBA_DISABLE_PERFORMANCE_WARNINGS'] = '1'
+
     sdc_utils.log_info('Start documentation build', separate=True)
     sdc_utils.run_command('make html')
     sdc_utils.log_info('Documentation build SUCCESSFUL', separate=True)
@@ -93,7 +96,7 @@ if __name__ == '__main__':
     sdc_utils = SDC_Build_Utilities(args.python, args.sdc_channel)
     sdc_utils.log_info('Build Intel(R) SDC documentation', separate=True)
     sdc_utils.log_info(sdc_utils.line_double)
-    sdc_utils.create_environment(['sphinx', 'sphinxcontrib-programoutput'])
+    sdc_utils.create_environment(['sphinx', 'sphinxcontrib-programoutput', 'scipy'])
     sdc_utils.install_conda_package(['sdc'])
 
     build_doc(sdc_utils)

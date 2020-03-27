@@ -1046,6 +1046,27 @@ type_callable(operator.sub)(type_sub)
 
 @overload(pd.Series)
 def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.Series
+
+    Limitations
+    -----------
+    - Parameters ``dtype`` and ``copy`` are currently unsupported.
+    - Types iterable and dict as ``data`` parameter are currently unsupported.
+
+    Examples
+    --------
+    Create Series with data [1, 2, 3] and index ['A', 'B', 'C'].
+
+    >>> pd.Series([1, 2, 3], ['A', 'B', 'C'])
+
+    .. seealso::
+
+        :ref:`DataFrame <pandas.DataFrame>`
+            DataFrame constructor.
+    """
 
     is_index_none = isinstance(index, types.NoneType) or index is None
 

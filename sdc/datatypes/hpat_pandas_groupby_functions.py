@@ -45,10 +45,34 @@ from numba.special import literally
 from sdc.datatypes.common_functions import sdc_arrays_argsort, _sdc_asarray, _sdc_take
 from sdc.datatypes.hpat_pandas_groupby_types import DataFrameGroupByType, SeriesGroupByType
 from sdc.utilities.sdc_typing_utils import TypeChecker, kwsparams2list, sigparams2list
-from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
+from sdc.utilities.utils import (sdc_overload, sdc_overload_method, sdc_register_jitable,
+                                 sdc_register_jitable)
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_ext import string_type
+
+
+performance_limitation = "This function may reveal slower performance than Pandas* on user system.\
+    Users should exercise a tradeoff between staying in JIT-region with that function or\
+    going back to interpreter mode."
+
+
+@sdc_register_jitable
+def merge_groupby_dicts_inplace(left, right):
+    """ Merges one internal groupby dictionary (right) into another one (left) and returns
+    the merging result. Used for aggregating partial dicts into single result. """
+
+    if not right:
+        return left
+
+    for key, right_group_list in right.items():
+        left_group_list = left.get(key)
+        if left_group_list is None:
+            left[key] = right_group_list
+        else:
+            left_group_list.extend(right_group_list)
+
+    return left
 
 
 @intrinsic
@@ -141,10 +165,10 @@ def sdc_pandas_dataframe_getitem(self, idx):
             if idx_is_literal_str == True:  # noqa
                 # no need to pass index into this series, as we group by array
                 target_series = pandas.Series(
-                    data=get_dataframe_data(self._parent, target_col_id_literal),
+                    data=self._parent._data[target_col_id_literal],
                     name=self._parent._columns[target_col_id_literal]
                 )
-                by_arr_data = get_dataframe_data(self._parent, by_col_id_literal)
+                by_arr_data = self._parent._data[by_col_id_literal]
                 return init_series_groupby(target_series, by_arr_data, self._data, self._sort)
             else:
                 return init_dataframe_groupby(self._parent, by_col_id_literal, self._data, self._sort, idx)
@@ -182,12 +206,12 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, de
     # TODO: remove conversion from Numba typed.List to reflected one while creating group_arr_{i}
     func_lines.extend(['\n'.join([
         f'  result_data_{i} = numpy.empty(res_index_len, dtype=res_arrays_dtypes[{i}])',
-        f'  column_data_{i} = get_dataframe_data({df}, {column_ids[i]})',
+        f'  column_data_{i} = {df}._data[{column_ids[i]}]',
         f'  for j in numpy.arange(res_index_len):',
-        f'    group_arr_{i} = _sdc_take(column_data_{i}, list({groupby_dict}[group_keys[j]]))',
-        f'    group_series_{i} = pandas.Series(group_arr_{i})',
         f'    idx = argsorted_index[j] if {groupby_param_sort} else j',
-        f'    result_data_{i}[idx] = group_series_{i}.{func_name}({extra_impl_params})',
+        f'    group_arr_{i} = _sdc_take(column_data_{i}, list({groupby_dict}[group_keys[idx]]))',
+        f'    group_series_{i} = pandas.Series(group_arr_{i})',
+        f'    result_data_{i}[j] = group_series_{i}.{func_name}({extra_impl_params})',
     ]) for i in range(len(columns))])
 
     data = ', '.join(f'\'{column_names[i]}\': result_data_{i}' for i in range(len(columns)))
@@ -204,8 +228,7 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, de
                    'numpy': numpy,
                    '_sdc_asarray': _sdc_asarray,
                    '_sdc_take': _sdc_take,
-                   'sdc_arrays_argsort': sdc_arrays_argsort,
-                   'get_dataframe_data': get_dataframe_data}
+                   'sdc_arrays_argsort': sdc_arrays_argsort}
 
     return func_text, global_vars
 
@@ -229,10 +252,10 @@ def _sdc_pandas_series_groupby_generic_func_codegen(func_name, func_params, defa
         f'    argsorted_index = sdc_arrays_argsort(group_keys, kind=\'mergesort\')',
         f'  result_data = numpy.empty(res_index_len, dtype=res_dtype)',
         f'  for j in numpy.arange(res_index_len):',
-        f'    group_arr = _sdc_take({series}._data, list({groupby_dict}[group_keys[j]]))',
-        f'    group_series = pandas.Series(group_arr)',
         f'    idx = argsorted_index[j] if {groupby_param_sort} else j',
-        f'    result_data[idx] = group_series.{func_name}({extra_impl_params})',
+        f'    group_arr = _sdc_take({series}._data, list({groupby_dict}[group_keys[idx]]))',
+        f'    group_series = pandas.Series(group_arr)',
+        f'    result_data[j] = group_series.{func_name}({extra_impl_params})',
         f'  if {groupby_param_sort}:',
         f'    res_index = _sdc_take(group_keys, argsorted_index)',
         f'  else:',
@@ -565,3 +588,201 @@ def sdc_pandas_series_groupby_var(self, ddof=1, *args):
 
     applied_func_name = 'var'
     return sdc_pandas_series_groupby_apply_func(self, applied_func_name, method_args, default_values, impl_used_params)
+
+
+sdc_pandas_dataframe_groupby_docstring_tmpl = """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.core.groupby.GroupBy.{method_name}
+{limitations_block}
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/groupby/dataframe_groupby_{method_name}.py
+       :language: python
+       :lines: 27-
+       :caption: {example_caption}
+       :name: ex_dataframe_groupby_{method_name}
+
+    .. command-output:: python ./dataframe/groupby/dataframe_groupby_{method_name}.py
+       :cwd: ../../../examples
+{see_also}
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+
+    Pandas DataFrame method :meth:`pandas.DataFrame.groupby.{method_name}()` implementation.
+
+    .. only:: developer
+
+    Test: python -m sdc.runtests -k sdc.tests.test_groupby.TestGroupBy.test_dataframe_groupby_{method_name}*
+
+    Parameters
+    ----------
+    self: :class:`pandas.DataFrame.groupby`
+        input arg{extra_params}
+
+    Returns
+    -------
+    :obj:`pandas.DataFrame`
+         returns :obj:`pandas.DataFrame` object
+"""
+
+
+sdc_pandas_dataframe_groupby_count.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'count',
+    'example_caption': 'Compute count of group, excluding missing values.',
+    'limitations_block':
+        f"""
+        Limitations
+        -----------
+        - {performance_limitation}
+        """,
+    'see_also':
+    """
+    .. seealso::
+        :ref:`Series.groupby <pandas.Series.groupby>`
+            Group Series using a mapper or by a Series of columns.
+        :ref:`DataFrame.groupby <pandas.DataFrame.groupby>`
+            Group DataFrame using a mapper or by a Series of columns.
+    """,
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_max.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'max',
+    'example_caption': 'Compute max of group values.',
+    'limitations_block':
+        f"""
+        Limitations
+        -----------
+        - {performance_limitation}
+        """,
+    'see_also': '',
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_mean.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'mean',
+    'example_caption': 'Compute mean of groups, excluding missing values.',
+    'limitations_block':
+        f"""
+        Limitations
+        -----------
+        - {performance_limitation}
+        """,
+    'see_also':
+    """
+    .. seealso::
+        :ref:`Series.groupby <pandas.Series.groupby>`
+            Group Series using a mapper or by a Series of columns.
+        :ref:`DataFrame.groupby <pandas.DataFrame.groupby>`
+            Group DataFrame using a mapper or by a Series of columns.
+    """,
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_median.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'median',
+    'example_caption': 'Compute median of groups, excluding missing values.',
+    'limitations_block':
+        f"""
+        Limitations
+        -----------
+        - {performance_limitation}
+        """,
+    'see_also':
+    """
+    .. seealso::
+        :ref:`Series.groupby <pandas.Series.groupby>`
+            Group Series using a mapper or by a Series of columns.
+        :ref:`DataFrame.groupby <pandas.DataFrame.groupby>`
+            Group DataFrame using a mapper or by a Series of columns.
+    """,
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_min.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'min',
+    'example_caption': 'Compute min of group values.',
+    'limitations_block':
+        f"""
+        Limitations
+        -----------
+        - {performance_limitation}
+        """,
+    'see_also': '',
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_prod.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'prod',
+    'example_caption': 'Compute prod of group values.',
+    'limitations_block':
+        f"""
+        Limitations
+        -----------
+        - {performance_limitation}
+        """,
+    'see_also': '',
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_std.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'std',
+    'example_caption': 'Compute standard deviation of groups, excluding missing values.',
+    'limitations_block':
+        f"""
+        Limitations
+        -----------
+        - {performance_limitation}
+        """,
+    'see_also':
+    """
+    .. seealso::
+        :ref:`Series.groupby <pandas.Series.groupby>`
+            Group Series using a mapper or by a Series of columns.
+        :ref:`DataFrame.groupby <pandas.DataFrame.groupby>`
+            Group DataFrame using a mapper or by a Series of columns.
+    """,
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_sum.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'sum',
+    'example_caption': 'Compute sum of groups, excluding missing values.',
+    'limitations_block':
+        f"""
+        Limitations
+        -----------
+        - {performance_limitation}
+        """,
+    'see_also': '',
+    'extra_params': ''
+})
+
+
+sdc_pandas_dataframe_groupby_var.__doc__ = sdc_pandas_dataframe_groupby_docstring_tmpl.format(**{
+    'method_name': 'var',
+    'example_caption': 'Compute variance of groups, excluding missing values.',
+    'limitations_block':
+        f"""
+        Limitations
+        -----------
+        - {performance_limitation}
+        """,
+    'see_also':
+    """
+    .. seealso::
+        :ref:`Series.groupby <pandas.Series.groupby>`
+            Group Series using a mapper or by a Series of columns.
+        :ref:`DataFrame.groupby <pandas.DataFrame.groupby>`
+            Group DataFrame using a mapper or by a Series of columns.
+    """,
+    'extra_params': ''
+})
