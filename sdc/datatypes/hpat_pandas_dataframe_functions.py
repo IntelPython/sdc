@@ -1867,12 +1867,62 @@ def sdc_pandas_dataframe_getitem(self, idx):
     ty_checker.raise_exc(idx, expected_types, 'idx')
 
 
+def df_getitem_single_label_loc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_single_label_loc_impl(self, idx):
+            for i in numba.prange(len(self._dataframe.index)):
+                if self._dataframe._index[i] == idx:
+                data_0 = pandas.Series(self._dataframe._data[0], index=self._dataframe.index)
+                result_0 = data_0.at[idx]
+                data_1 = pandas.Series(self._dataframe._data[1], index=self._dataframe.index)
+                result_1 = data_1.at[idx]
+                return pandas.Series(data=[result_0[0], result_1[0]], index=['A', 'B'], name=str(idx))
+            raise IndexingError('Index is out of bounds for axis')
+    """
+    func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
+                  '  for i in numba.prange(len(self._dataframe.index)):',
+                  '    if self._dataframe._index[i] == idx:']
+    if isinstance(self.index, types.NoneType):
+        func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
+                      '  if -1 < idx < len(self._dataframe._data):']
+    results = []
+    result_index = []
+    for i, c in enumerate(self.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"      data_{i} = pandas.Series(self._dataframe._data[{i}], index=self._dataframe.index)",
+                       f"      {result_c} = data_{i}.at[idx]"]
+        results.append(result_c)
+        result_index.append(c)
+    data = '[0], '.join(col for col in results) + '[0]'
+    func_lines += [f"      return pandas.Series(data=[{data}], index={result_index}, name=str(idx))",
+                   f"  raise IndexingError('Index is out of bounds for axis')"]
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'numba': numba,
+                   'IndexingError': IndexingError}
+
+    return func_text, global_vars
+
+
+gen_df_getitem_loc_single_label_impl = gen_impl_generator(
+    df_getitem_single_label_loc_codegen, '_df_getitem_single_label_loc_impl')
+
+
 @sdc_overload(operator.getitem)
 def sdc_pandas_dataframe_accessor_getitem(self, idx):
     if not isinstance(self, DataFrameGetitemAccessorType):
         return None
 
     accessor = self.accessor.literal_value
+
+    if accessor == 'loc':
+        if isinstance(idx, types.Integer):
+            return gen_df_getitem_loc_single_label_impl(self.dataframe, idx)
+
+        raise TypingError('Operator getitem(). The index must be a single label, a  list or array of labels,\
+                          a slice object with labels, a boolean array or a callable. Given: {}'.format(idx))
 
     if accessor == 'iat':
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
@@ -1942,6 +1992,52 @@ def sdc_pandas_dataframe_iat(self):
         return dataframe_getitem_accessor_init(self, 'iat')
 
     return sdc_pandas_dataframe_iat_impl
+
+
+@sdc_overload_attribute(DataFrameType, 'loc')
+def sdc_pandas_dataframe_loc(self):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.DataFrame.loc
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_loc.py
+       :language: python
+       :lines: 34-
+       :caption: Access a group of rows and columns by label(s) or a boolean array.
+       :name: ex_dataframe_loc
+
+    .. command-output:: python ./dataframe/dataframe_loc.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`DataFrame.at <pandas.DataFrame.at>`
+            Access a single value for a row/column label pair.
+        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+            Access group of rows and columns by integer position(s).
+        :ref:`DataFrame.xs <pandas.DataFrame.xs>`
+            Returns a cross-section (row(s) or column(s)) from the Series/DataFrame.
+        :ref:`Series.loc <pandas.Series.loc>`
+            Access group of values using labels.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.DataFrame.loc` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_loc*
+    """
+
+    ty_checker = TypeChecker('Attribute loc().')
+    ty_checker.check(self, DataFrameType)
+
+    def sdc_pandas_dataframe_loc_impl(self):
+        return sdc.datatypes.hpat_pandas_dataframe_getitem_types.dataframe_getitem_accessor_init(self, 'loc')
+
+    return sdc_pandas_dataframe_loc_impl
 
 
 @sdc_overload_method(DataFrameType, 'pct_change')

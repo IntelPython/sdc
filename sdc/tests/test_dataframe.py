@@ -1100,6 +1100,17 @@ class TestDataFrame(TestCase):
         msg = 'Index is out of bounds for axis'
         self.assertIn(msg, str(raises.exception))
 
+    def test_df_loc(self):
+        def test_impl(df):
+            return df.loc[4]
+
+        sdc_func = sdc.jit(test_impl)
+        idx = [3, 4, 1, 2, 0]
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": [3.1, 8.4, 7.1, 3.2, 1]}, index=idx)
+        pd.testing.assert_series_equal(sdc_func(df), test_impl(df), check_names=False)
+
     def test_df_head(self):
         def get_func(n):
             def impl(a):
