@@ -2044,7 +2044,7 @@ def hpat_pandas_series_isin(self, values):
     Pandas Series method :meth:`pandas.Series.isin` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_isin_list1
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_isin
     """
 
     _func_name = 'Method isin().'
@@ -2058,6 +2058,7 @@ def hpat_pandas_series_isin(self, values):
     if isinstance(values.dtype, (types.UnicodeType, types.StringLiteral)):
         def hpat_pandas_series_isin_impl(self, values):
             # TODO: replace with below line when Numba supports np.isin in nopython mode
+            # return pandas.Series (np.isin (self._data, values))
 
             values = str_list_to_array(list(values))
             values = set(values)
@@ -2070,6 +2071,7 @@ def hpat_pandas_series_isin(self, values):
     else:
         def hpat_pandas_series_isin_impl(self, values):
             # TODO: replace with below line when Numba supports np.isin in nopython mode
+            # return pandas.Series (np.isin (self._data, values))
 
             values = set(values)
             data_len = len(self._data)
