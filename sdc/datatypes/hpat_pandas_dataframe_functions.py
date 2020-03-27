@@ -69,37 +69,30 @@ from sdc.utilities.prange_utils import parallel_chunks
 @sdc_overload_attribute(DataFrameType, 'index')
 def hpat_pandas_dataframe_index(df):
     """
-       Intel Scalable Dataframe Compiler User Guide
-       ********************************************
-       Pandas API: pandas.DataFrame.index
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.index
 
-       Examples
-       --------
-       .. literalinclude:: ../../../examples/dataframe/dataframe_index.py
-          :language: python
-          :lines: 27-
-          :caption: The index (row labels) of the DataFrame.
-          :name: ex_dataframe_index
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_index.py
+        :language: python
+        :lines: 27-
+        :caption: The index (row labels) of the DataFrame.
+        :name: ex_dataframe_index
 
-       .. command-output:: python ./dataframe/dataframe_index.py
-           :cwd: ../../../examples
+    .. command-output:: python ./dataframe/dataframe_index.py
+        :cwd: ../../../examples
 
-       Intel Scalable Dataframe Compiler Developer Guide
-       *************************************************
-       Pandas DataFrame attribute :attr:`pandas.DataFrame.index` implementation.
-       .. only:: developer
-       Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_index*
-       Parameters
-       -----------
-       df: :obj:`pandas.DataFrame`
-           input arg
-       Returns
-       -------
-       :obj: `numpy.array`
-           return the index of DataFrame
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame attribute :attr:`pandas.DataFrame.index` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_index*
     """
 
-    ty_checker = TypeChecker(f'Attribute index.')
+    ty_checker = TypeChecker('Attribute index.')
     ty_checker.check(df, DataFrameType)
 
     if isinstance(df.index, types.NoneType) or df.index is None:
@@ -175,7 +168,13 @@ def hpat_pandas_dataframe_values(df):
 
     Limitations
     -----------
-    Only numeric values supported as an output
+    - Only numeric values supported as an output
+    - The dtype will be a lower-common-denominator dtype (implicit upcasting);
+    that is to say if the dtypes (even of numeric types) are mixed, the one that accommodates all will be chosen.
+    Use this with care if you are not dealing with the blocks.
+    e.g. If the dtypes are float16 and float32, dtype will be upcast to float32. If dtypes are int32 and uint8,
+    dtype will be upcast to int32. By numpy.find_common_type() convention,
+    mixing int64 and uint64 will result in a float64 dtype.
 
     Examples
     --------
@@ -197,28 +196,12 @@ def hpat_pandas_dataframe_values(df):
         :ref:`DataFrame.columns <pandas.DataFrame.columns>`
             Retrieving the column names.
 
-    .. note::
-
-        The dtype will be a lower-common-denominator dtype (implicit upcasting);
-        that is to say if the dtypes (even of numeric types) are mixed, the one that accommodates all will be chosen.
-        Use this with care if you are not dealing with the blocks.
-        e.g. If the dtypes are float16 and float32, dtype will be upcast to float32. If dtypes are int32 and uint8,
-        dtype will be upcast to int32. By numpy.find_common_type() convention,
-        mixing int64 and uint64 will result in a float64 dtype.
-
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas DataFrame attribute :attr:`pandas.DataFrame.values` implementation.
+
     .. only:: developer
-    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_values*
-    Parameters
-    -----------
-    df: :obj:`pandas.DataFrame`
-       input arg
-    Returns
-    -------
-    :obj: `numpy.ndarray`
-       return a Numpy representation of the DataFrame
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_values*
     """
 
     func_name = 'Attribute values.'
@@ -379,8 +362,9 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=False, verify_integrity=
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas DataFrame method :meth:`pandas.DataFrame.append` implementation.
+
     .. only:: developer
-    Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_append*
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_append*
     """
 
     _func_name = 'append'
@@ -1305,7 +1289,7 @@ def isna_overload(df):
         :ref:`DataFrame.dropna <pandas.DataFrame.dropna>`
             Omit axes labels with missing values.
 
-        `pandas.absolute <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.isna.html#pandas.isna>`_
+        `pandas.isna <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.isna.html#pandas.isna>`_
             Top-level isna.
 
     Intel Scalable Dataframe Compiler Developer Guide
