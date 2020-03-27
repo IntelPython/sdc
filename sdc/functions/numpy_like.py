@@ -900,9 +900,30 @@ def getitem_by_mask(arr, idx):
 
 @sdc_overload(getitem_by_mask)
 def getitem_by_mask_overload(arr, idx):
-    dtype = arr.dtype
-    is_str_arr = arr == string_array_type
+    """
+    Creates a new array from arr by selecting elements indicated by Boolean mask idx.
 
+    Parameters
+    -----------
+    arr: :obj:`Array` or :obj:`Range`
+        Input array or range
+    idx: :obj:`Array` of dtype :class:`bool`
+        Boolean mask
+
+    Returns
+    -------
+    :obj:`Array` of the same dtype as arr
+        Array with only elements indicated by mask left
+
+    """
+
+    is_range = isinstance(arr, types.RangeType) and isinstance(arr.dtype, types.Integer)
+    is_str_arr = arr == string_array_type
+    if not (isinstance(arr, types.Array) or is_str_arr or is_range):
+        return
+
+    res_dtype = arr.dtype
+    is_str_arr = arr == string_array_type
     def getitem_by_mask_impl(arr, idx):
         chunks = parallel_chunks(len(arr))
         arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
@@ -921,7 +942,7 @@ def getitem_by_mask_overload(arr, idx):
             result_data = [''] * length
             result_nan_mask = numpy.empty(shape=length, dtype=types.bool_)
         else:
-            result_data = numpy.empty(shape=length, dtype=dtype)
+            result_data = numpy.empty(shape=length, dtype=res_dtype)
         for i in prange(len(chunks)):
             chunk = chunks[i]
             new_start = int(sum(arr_len[0:i]))
@@ -929,7 +950,11 @@ def getitem_by_mask_overload(arr, idx):
 
             for j in range(chunk.start, chunk.stop):
                 if idx[j]:
-                    result_data[current_pos] = arr[j]
+                    if is_range == True:  # noqa
+                        value = arr.start + arr.step * j
+                    else:
+                        value = arr[j]
+                    result_data[current_pos] = value
                     if is_str_arr == True:  # noqa
                         result_nan_mask[current_pos] = isna(arr, j)
                     current_pos += 1

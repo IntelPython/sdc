@@ -629,6 +629,24 @@ def _sdc_take_overload(data, indexes):
 
         return _sdc_take_str_arr_impl
 
+    elif (isinstance(data, types.RangeType) and isinstance(data.dtype, types.Integer)):
+        arr_dtype = data.dtype
+
+        def _sdc_take_array_impl(data, indexes):
+            res_size = len(indexes)
+            index_errors = 0
+            res_arr = numpy.empty(res_size, dtype=arr_dtype)
+            for i in numba.prange(res_size):
+                value = data.start + data.step * indexes[i]
+                if value >= data.stop:
+                    index_errors += 1
+                res_arr[i] = value
+            if index_errors:
+                raise IndexError("_sdc_take: index out-of-bounds")
+            return res_arr
+
+        return _sdc_take_array_impl
+
     return None
 
 
