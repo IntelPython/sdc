@@ -78,6 +78,7 @@ cases = [
     TC(name='min', size=[10 ** 7], check_skipna=True),
     TC(name='pct_change', size=[10 ** 7]),
     TC(name='prod', size=[10 ** 7], check_skipna=True),
+    TC(name='reset_index', size=[10 ** 7], params='drop=False'),
     TC(name='std', size=[10 ** 7], check_skipna=True),
     TC(name='sum', size=[10 ** 7], check_skipna=True),
     TC(name='var', size=[10 ** 7], check_skipna=True),

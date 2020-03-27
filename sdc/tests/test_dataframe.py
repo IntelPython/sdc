@@ -1302,6 +1302,36 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
+    def test_df_reset_index_drop_true_index_int(self):
+        def test_impl(df):
+            return df.reset_index(drop=True)
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0],
+                           'B': np.arange(4.0)}, index=[5, 8, 4, 6])
+        hpat_func = self.jit(test_impl)
+
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_reset_index_drop_default_index_int(self):
+        def test_impl(df):
+            return df.reset_index()
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0],
+                           'B': np.arange(4.0)}, index=[5, 8, 4, 6])
+        hpat_func = self.jit(test_impl)
+
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    @skip_numba_jit
+    def test_df_reset_index_empty_df(self):
+        def test_impl(df):
+            return df.reset_index()
+
+        df = pd.DataFrame({})
+        hpat_func = self.jit(test_impl)
+
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
     @skip_numba_jit
     def test_df_reset_index_inplace1(self):
         def test_impl():
