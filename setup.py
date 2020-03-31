@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2017-2020, Intel Corporation All rights reserved.
 #
@@ -314,7 +314,7 @@ setup(name=SDC_NAME_STR,
       install_requires=[
           'scipy',
           'numpy>=1.16',
-          'pandas==0.25.3',
+          'pandas>=0.25.3',
           'pyarrow==0.15.1',
           'numba==0.48'
           ],
