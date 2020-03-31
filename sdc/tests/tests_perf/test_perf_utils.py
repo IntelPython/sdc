@@ -31,6 +31,7 @@ import gc
 import logging
 import sys
 import sdc
+from sdc.pandas_support import version as pandas_version
 import time
 from contextlib import contextmanager
 from copy import copy
@@ -297,13 +298,21 @@ class TestResults:
         # so replace NaN in index with empty string
         data = self.test_results_data.fillna(value={column: '' for column in index})
 
+        if pandas_version >= (1,0):
+            data = data.convert_dtypes()
+
         grouped = data.groupby(index)
 
         median_col = grouped['Time(s)'].median()
         min_col = grouped['Time(s)'].min()
         max_col = grouped['Time(s)'].max()
-        compilation_col = grouped['Compile(s)'].median(skipna=False)
-        boxing_col = grouped['Boxing(s)'].median(skipna=False)
+
+        median_args = {}
+        if pandas_version < (1, 0):
+            median_args['skipna'] = False
+
+        compilation_col = grouped['Compile(s)'].median(**median_args)
+        boxing_col = grouped['Boxing(s)'].median(**median_args)
 
         test_results_data = data.set_index(index)
         test_results_data['median'] = median_col
