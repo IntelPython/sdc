@@ -1995,16 +1995,16 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     ty_checker = TypeChecker('Method {}().'.format(name))
     ty_checker.check(df, DataFrameType)
 
-    if not isinstance(periods, (types.Integer, types.Omitted)):
+    if not isinstance(periods, (types.Integer, types.Omitted)) and periods != 1:
         ty_checker.raise_exc(periods, 'int64', 'periods')
 
     if not isinstance(fill_method, (str, types.UnicodeType, types.StringLiteral, types.NoneType, types.Omitted)):
         ty_checker.raise_exc(fill_method, 'string', 'fill_method')
 
-    if not isinstance(limit, (types.Omitted, types.NoneType)):
+    if not isinstance(limit, (types.Omitted, types.NoneType)) and limit is not None:
         ty_checker.raise_exc(limit, 'None', 'limit')
 
-    if not isinstance(freq, (types.Omitted, types.NoneType)):
+    if not isinstance(freq, (types.Omitted, types.NoneType)) and freq is not None:
         ty_checker.raise_exc(freq, 'None', 'freq')
 
     params = {'periods': 1, 'fill_method': '"pad"', 'limit': None, 'freq': None}
