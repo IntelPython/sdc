@@ -758,7 +758,7 @@ def mean_overload(df, axis=None, skipna=None, level=None, numeric_only=None):
 
     Limitations
     -----------
-    Parameters ``axis``, ``level`` and ``numeric_only`` are unsupported.
+    Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -1954,7 +1954,7 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
 
     Limitations
     -----------
-    Parameters ``limit`` and ``freq`` are unsupported.
+    Parameters ``limit`` and ``freq`` are supported.
 
     Examples
     --------
