@@ -430,7 +430,7 @@ def hpat_pandas_series_getitem(self, idx):
 
                 return pandas.Series(
                     data=numpy_like.getitem_by_mask(self._data, idx._data),
-                    index=numpy_like.getitem_by_mask(range(0, len(self)), idx._data),
+                    index=numpy_like.getitem_by_mask(range(len(self)), idx._data),
                     name=self._name
                 )
             else:
