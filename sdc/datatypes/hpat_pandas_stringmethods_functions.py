@@ -211,6 +211,12 @@ def hpat_pandas_stringmethods_contains(self, pat, case=True, flags=0, na=None, r
         ty_checker.raise_exc(regex, 'bool', 'regex')
 
     def hpat_pandas_stringmethods_contains_impl(self, pat, case=True, flags=0, na=None, regex=True):
+        if flags != 0:
+            raise ValueError('Parameter flags can be only 0.')
+
+        if not regex:
+            raise ValueError('Parameter regex can be only True.')
+
         if not case:
             _pat = pat.lower()
         else:

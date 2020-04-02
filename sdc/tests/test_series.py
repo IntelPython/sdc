@@ -6112,6 +6112,26 @@ class TestSeries(
         pd.testing.assert_series_equal(hpat_func(s, pat, flags=0, na=None, regex=True),
                                        contains_usecase(s, pat, flags=0, na=None, regex=True))
 
+    def test_series_contains_unsupported(self):
+        hpat_func = self.jit(contains_usecase)
+        s = pd.Series(['Mouse', 'dog', 'house and parrot', '23'])
+        pat = 'og'
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(s, pat, flags=1)
+        msg = 'Parameter flags can be only 0'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, pat, na=0)
+        msg = 'Method contains(). The object na'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(s, pat, regex=False)
+        msg = 'Parameter regex can be only True'
+        self.assertIn(msg, str(raises.exception))
+
     @skip_sdc_jit('Old-style implementation returns string, but not series')
     def test_series_describe_numeric(self):
         def test_impl(A):
