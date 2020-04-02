@@ -34,10 +34,11 @@ import sdc
 import string
 import unittest
 from itertools import combinations, combinations_with_replacement, islice, permutations, product
+import numba
 from numba import types
-from numba.config import IS_32BITS
-from numba.errors import TypingError
-from numba.special import literally
+from numba.core.config import IS_32BITS
+from numba.core.errors import TypingError
+from numba import literally
 
 from sdc.tests.test_series_apply import TestSeries_apply
 from sdc.tests.test_series_map import TestSeries_map
@@ -5891,7 +5892,7 @@ class TestSeries(
 
     @skip_numba_jit('Numba propagates different exception:\n'
                     'numba.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)\n'
-                    'Internal error at <numba.typeinfer.IntrinsicCallConstraint ...\n'
+                    'Internal error at <numba.core.typeinfer.IntrinsicCallConstraint ...\n'
                     '\'Signature\' object is not iterable')
     @skip_sdc_jit('Typing checks not implemented for Series operators in old-style')
     def test_series_operator_lt_index_mismatch3(self):
@@ -5952,7 +5953,7 @@ class TestSeries(
 
     @skip_numba_jit('Numba propagates different exception:\n'
                     'numba.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)\n'
-                    'Internal error at <numba.typeinfer.IntrinsicCallConstraint ...\n'
+                    'Internal error at <numba.core.typeinfer.IntrinsicCallConstraint ...\n'
                     '\'Signature\' object is not iterable')
     @skip_sdc_jit('Typing checks not implemented for Series operators in old-style')
     def test_series_operator_lt_unsupported_dtypes(self):

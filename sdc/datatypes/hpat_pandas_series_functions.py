@@ -36,13 +36,15 @@ import pandas
 import math
 import sys
 
-from numba.errors import TypingError
-from numba.typing import signature
+from numba.core.errors import TypingError
+from numba.core.typing import signature
 from numba.extending import intrinsic
-from numba import (types, numpy_support, cgutils)
+from numba import types
+from numba.core import cgutils
+from numba.np import numpy_support
 from numba.typed import List, Dict
 from numba import prange
-from numba.targets.arraymath import get_isnan
+from numba.np.arraymath import get_isnan
 from pandas.core.indexing import IndexingError
 
 import sdc

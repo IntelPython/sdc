@@ -35,22 +35,22 @@ from llvmlite import ir as lir
 import llvmlite.llvmpy.core as lc
 
 import numba
-from numba import ir
-from numba import cgutils, types
-from numba.ir_utils import mk_unique_var
-import numba.array_analysis
-from numba.typing import signature
-from numba.typing.templates import infer_global, AbstractTemplate, CallableTemplate
-from numba.typing.arraydecl import _expand_integer
+from numba.core import ir
+from numba.core import cgutils, types
+from numba.core.ir_utils import mk_unique_var
+from numba.parfors import array_analysis
+from numba.core.typing import signature
+from numba.core.typing.templates import infer_global, AbstractTemplate, CallableTemplate
+from numba.core.typing.arraydecl import _expand_integer
 from numba.extending import overload, intrinsic, register_model, models
-from numba.targets.imputils import (
+from numba.core.imputils import (
     lower_builtin,
     impl_ret_untracked,
     impl_ret_new_ref,
     impl_ret_borrowed,
     iternext_impl,
     RefType)
-from numba.targets.arrayobj import make_array
+from numba.np.arrayobj import make_array
 
 import sdc
 from sdc.utilities.utils import (_numba_to_c_type_map, unliteral_all)
@@ -79,7 +79,7 @@ from sdc.shuffle_utils import (
     alloc_pre_shuffle_metadata)
 from sdc.hiframes.join import write_send_buff
 from sdc.hiframes.split_impl import string_array_split_view_type
-from numba.errors import TypingError
+from numba.core.errors import TypingError
 
 # XXX: used in agg func output to avoid mutating filter, agg, join, etc.
 # TODO: fix type inferrer and remove this
@@ -112,7 +112,7 @@ nth_parallel = types.ExternalFunction(
         types.int64,
         types.int32))
 
-# from numba.typing.templates import infer_getattr, AttributeTemplate, bound_function
+# from numba.core.typing.templates import infer_getattr, AttributeTemplate, bound_function
 # from numba import types
 #
 # @infer_getattr
@@ -225,7 +225,7 @@ class ConcatType(AbstractTemplate):
         else:
             # use typer of np.concatenate
             arr_list_to_arr = if_series_to_array_type(arr_list)
-            ret_typ = numba.typing.npydecl.NdConcatenate(self.context).generic()(arr_list_to_arr)
+            ret_typ = numba.core.typing.npydecl.NdConcatenate(self.context).generic()(arr_list_to_arr)
 
         return signature(ret_typ, arr_list)
 
@@ -708,7 +708,7 @@ def nlargest_parallel(A, k, is_largest, cmp_f):
 #         "75%      "+str(q75)+"\n"\
 #         "max      "+str(a_max)+"\n"
 
-# import numba.typing.arraydecl
+# import numba.core.typing.arraydecl
 # from numba import types
 # import numba.utils
 # import numpy as np
@@ -729,7 +729,7 @@ def nlargest_parallel(A, k, is_largest, cmp_f):
 #             return sig
 #     return types.BoundFunction(VarType, ary)
 #
-# numba.typing.arraydecl.ArrayAttribute.resolve_var = array_attribute_attachment
+# numba.core.typing.arraydecl.ArrayAttribute.resolve_var = array_attribute_attachment
 
 
 @lower_builtin(mean, types.Array)
@@ -1059,29 +1059,29 @@ def get_index_data(S):
 
 def alias_ext_dummy_func(lhs_name, args, alias_map, arg_aliases):
     assert len(args) >= 1
-    numba.ir_utils._add_alias(lhs_name, args[0].name, alias_map, arg_aliases)
+    numba.core.ir_utils._add_alias(lhs_name, args[0].name, alias_map, arg_aliases)
 
 
 def alias_ext_init_series(lhs_name, args, alias_map, arg_aliases):
     assert len(args) >= 1
-    numba.ir_utils._add_alias(lhs_name, args[0].name, alias_map, arg_aliases)
+    numba.core.ir_utils._add_alias(lhs_name, args[0].name, alias_map, arg_aliases)
     if len(args) > 1:  # has index
-        numba.ir_utils._add_alias(lhs_name, args[1].name, alias_map, arg_aliases)
+        numba.core.ir_utils._add_alias(lhs_name, args[1].name, alias_map, arg_aliases)
 
 
-if hasattr(numba.ir_utils, 'alias_func_extensions'):
-    numba.ir_utils.alias_func_extensions[('init_series', 'sdc.hiframes.api')] = alias_ext_init_series
-    numba.ir_utils.alias_func_extensions[('get_series_data', 'sdc.hiframes.api')] = alias_ext_dummy_func
-    numba.ir_utils.alias_func_extensions[('get_series_index', 'sdc.hiframes.api')] = alias_ext_dummy_func
-    numba.ir_utils.alias_func_extensions[('init_datetime_index', 'sdc.hiframes.api')] = alias_ext_dummy_func
-    numba.ir_utils.alias_func_extensions[('get_index_data', 'sdc.hiframes.api')] = alias_ext_dummy_func
-    numba.ir_utils.alias_func_extensions[('dummy_unbox_series', 'sdc.hiframes.api')] = alias_ext_dummy_func
-    numba.ir_utils.alias_func_extensions[('get_dataframe_data',
+if hasattr(numba.core.ir_utils, 'alias_func_extensions'):
+    numba.core.ir_utils.alias_func_extensions[('init_series', 'sdc.hiframes.api')] = alias_ext_init_series
+    numba.core.ir_utils.alias_func_extensions[('get_series_data', 'sdc.hiframes.api')] = alias_ext_dummy_func
+    numba.core.ir_utils.alias_func_extensions[('get_series_index', 'sdc.hiframes.api')] = alias_ext_dummy_func
+    numba.core.ir_utils.alias_func_extensions[('init_datetime_index', 'sdc.hiframes.api')] = alias_ext_dummy_func
+    numba.core.ir_utils.alias_func_extensions[('get_index_data', 'sdc.hiframes.api')] = alias_ext_dummy_func
+    numba.core.ir_utils.alias_func_extensions[('dummy_unbox_series', 'sdc.hiframes.api')] = alias_ext_dummy_func
+    numba.core.ir_utils.alias_func_extensions[('get_dataframe_data',
                                           'sdc.hiframes.pd_dataframe_ext')] = alias_ext_dummy_func
     # TODO: init_dataframe
-    numba.ir_utils.alias_func_extensions[('to_arr_from_series', 'sdc.hiframes.api')] = alias_ext_dummy_func
-    numba.ir_utils.alias_func_extensions[('ts_series_to_arr_typ', 'sdc.hiframes.api')] = alias_ext_dummy_func
-    numba.ir_utils.alias_func_extensions[('to_date_series_type', 'sdc.hiframes.api')] = alias_ext_dummy_func
+    numba.core.ir_utils.alias_func_extensions[('to_arr_from_series', 'sdc.hiframes.api')] = alias_ext_dummy_func
+    numba.core.ir_utils.alias_func_extensions[('ts_series_to_arr_typ', 'sdc.hiframes.api')] = alias_ext_dummy_func
+    numba.core.ir_utils.alias_func_extensions[('to_date_series_type', 'sdc.hiframes.api')] = alias_ext_dummy_func
 
 
 @numba.njit
@@ -1104,7 +1104,7 @@ class ConvertTupRecType(AbstractTemplate):
         if isinstance(in_dtype, types.BaseTuple):
             np_dtype = np.dtype(
                 ','.join(str(t) for t in in_dtype.types), align=True)
-            out_dtype = numba.numpy_support.from_dtype(np_dtype)
+            out_dtype = numba.np.numpy_support.from_dtype(np_dtype)
 
         return signature(out_dtype, in_dtype)
 
@@ -1340,7 +1340,7 @@ def init_series(typingctx, data, index=None, name=None):
         series.index = index_val
         if is_named:
             if isinstance(name, types.StringLiteral):
-                series.name = numba.unicode.make_string_from_constant(
+                series.name = numba.cpython.unicode.make_string_from_constant(
                     context, builder, string_type, name.literal_value)
             else:
                 series.name = name_val
@@ -1377,7 +1377,7 @@ def init_datetime_index(typingctx, data, name=None):
         dt_index.data = data_val
         if is_named:
             if isinstance(name, types.StringLiteral):
-                dt_index.name = numba.unicode.make_string_from_constant(
+                dt_index.name = numba.cpython.unicode.make_string_from_constant(
                     context, builder, string_type, name.literal_value)
             else:
                 dt_index.name = name_val
@@ -1410,7 +1410,7 @@ def init_timedelta_index(typingctx, data, name=None):
         timedelta_index.data = data_val
         if is_named:
             if isinstance(name, types.StringLiteral):
-                timedelta_index.name = numba.unicode.make_string_from_constant(
+                timedelta_index.name = numba.cpython.unicode.make_string_from_constant(
                     context, builder, string_type, name.literal_value)
             else:
                 timedelta_index.name = name_val
@@ -1771,7 +1771,7 @@ def iternext_itertuples(context, builder, sig, args, result):
 
 #     return None
 
-# numba.array_analysis.ArrayAnalysis._analyze_op_static_getitem = _analyze_op_static_getitem
+# array_analysis.ArrayAnalysis._analyze_op_static_getitem = _analyze_op_static_getitem
 
 # FIXME: fix array analysis for tuples in general
 def _analyze_op_pair_first(self, scope, equiv_set, expr):
@@ -1800,4 +1800,4 @@ def _analyze_op_pair_first(self, scope, equiv_set, expr):
     return shape, [lhs_assign] + out
 
 
-numba.array_analysis.ArrayAnalysis._analyze_op_pair_first = _analyze_op_pair_first
+array_analysis.ArrayAnalysis._analyze_op_pair_first = _analyze_op_pair_first

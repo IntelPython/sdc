@@ -30,9 +30,9 @@ import numba
 from numba import types
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
                              type_callable, infer, overload, make_attribute_wrapper, box)
-from numba.typing.templates import (infer_global, AbstractTemplate, signature,
+from numba.core.typing.templates import (infer_global, AbstractTemplate, signature,
                                     AttributeTemplate, bound_function)
-from numba.targets.boxing import box_array
+from numba.core.boxing import box_array
 
 import sdc
 from sdc.str_ext import string_type
@@ -99,7 +99,7 @@ def box_dt_index(typ, val, c):
     mod_name = c.context.insert_const_string(c.builder.module, "pandas")
     pd_class_obj = c.pyapi.import_module_noblock(mod_name)
 
-    dt_index = numba.cgutils.create_struct_proxy(
+    dt_index = numba.core.cgutils.create_struct_proxy(
         typ)(c.context, c.builder, val)
 
     arr = box_array(_dt_index_data_typ, dt_index.data, c)

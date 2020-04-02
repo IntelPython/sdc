@@ -28,10 +28,10 @@
 from numba import types
 from numba.extending import (typeof_impl, unbox, register_model, models,
                              NativeValue, box)
-from numba.typing.templates import infer_global, AbstractTemplate
-from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
+from numba.core.typing.templates import infer_global, AbstractTemplate
+from numba.core.imputils import (impl_ret_new_ref, impl_ret_borrowed,
                                     lower_builtin)
-from numba.typing import signature
+from numba.core.typing import signature
 
 from sdc.hiframes.pd_timestamp_ext import (datetime_date_type,
                                             box_datetime_date_array)

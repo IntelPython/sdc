@@ -33,14 +33,15 @@ import numpy as np
 from llvmlite import ir as lir
 import llvmlite.binding as ll
 
-import numba.targets.arrayobj
-from numba import types, cgutils
+import numba.np.arrayobj
+from numba import types
+from numba.core import cgutils
 from numba.extending import overload
-from numba.targets.imputils import impl_ret_borrowed, lower_builtin
-from numba.targets.arrayobj import make_array
-from numba.typing import signature
-from numba.typing.templates import infer_global, AbstractTemplate
-from numba.typing.builtins import IndexValueType
+from numba.core.imputils import impl_ret_borrowed, lower_builtin
+from numba.np.arrayobj import make_array
+from numba.core.typing import signature
+from numba.core.typing.templates import infer_global, AbstractTemplate
+from numba.core.typing.builtins import IndexValueType
 
 import sdc
 from sdc import distributed_api
@@ -488,7 +489,7 @@ def setitem_req_array(context, builder, sig, args):
 #
 #     # replace inner array access call for setitem generation
 #     cgutils.get_item_pointer2 = dist_get_item_pointer2
-#     numba.targets.arrayobj.setitem_array(context, builder, sig, args)
+#     numba.np.arrayobj.setitem_array(context, builder, sig, args)
 #     cgutils.get_item_pointer2 = regular_get_item_pointer2
 #     return lir.Constant(lir.IntType(32), 0)
 

@@ -24,11 +24,11 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from numba.ir import Assign, Const, Expr, Var
-from numba.ir_utils import mk_unique_var
-from numba.rewrites import register_rewrite, Rewrite
-from numba.types import StringLiteral
-from numba.typing import signature
+from numba.core.ir import Assign, Const, Expr, Var
+from numba.core.ir_utils import mk_unique_var
+from numba.core.rewrites import register_rewrite, Rewrite
+from numba.core.types import StringLiteral
+from numba.core.typing import signature
 
 from sdc.config import config_pipeline_hpat_default
 from sdc.hiframes.pd_dataframe_type import DataFrameType

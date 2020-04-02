@@ -31,14 +31,16 @@ from llvmlite import ir as lir
 from collections import namedtuple
 import operator
 import numba
-from numba import ir_utils, ir, types, cgutils
-from numba.ir_utils import (guard, get_definition, find_callname, require,
+from numba import types
+from numba.core import cgutils
+from numba.core import ir_utils, ir
+from numba.core.ir_utils import (guard, get_definition, find_callname, require,
                             add_offset_to_labels, find_topo_order, find_const)
-from numba.typing import signature
-from numba.typing.templates import infer_global, AbstractTemplate
-from numba.targets.imputils import lower_builtin
+from numba.core.typing import signature
+from numba.core.typing.templates import infer_global, AbstractTemplate
+from numba.core.imputils import lower_builtin
 from numba.extending import overload, intrinsic, lower_cast
-from numba import numpy_support
+from numba.np import numpy_support
 import numpy as np
 import sdc
 from sdc.str_ext import string_type, list_string_array_type
@@ -47,7 +49,7 @@ from sdc.config import (config_use_parallel_overloads, config_inline_overloads)
 from enum import Enum
 import types as pytypes
 from numba.extending import overload, overload_method, overload_attribute
-from numba.extending import register_jitable
+from numba.extending import register_jitable, register_model
 
 
 # int values for types to pass to C code
@@ -145,8 +147,7 @@ class BooleanLiteral(types.Literal, types.Boolean):
 
 types.Literal.ctor_map[bool] = BooleanLiteral
 
-numba.datamodel.register_default(
-    BooleanLiteral)(numba.extending.models.BooleanModel)
+register_model(BooleanLiteral)(numba.extending.models.BooleanModel)
 
 
 @lower_cast(BooleanLiteral, types.Boolean)
@@ -196,7 +197,7 @@ def inline_new_blocks(func_ir, block, i, callee_blocks, work_list=None):
     block.body.append(ir.Jump(min_label, instr.loc))
 
     # 6. replace Return with assignment to LHS
-    numba.inline_closurecall._replace_returns(callee_blocks, instr.target, new_label)
+    numba.core.inline_closurecall._replace_returns(callee_blocks, instr.target, new_label)
     #    remove the old definition of instr.target too
     if (instr.target.name in func_ir._definitions):
         func_ir._definitions[instr.target.name] = []
@@ -206,7 +207,7 @@ def inline_new_blocks(func_ir, block, i, callee_blocks, work_list=None):
         # block scope must point to parent's
         block = callee_blocks[label]
         block.scope = scope
-        numba.inline_closurecall._add_definitions(func_ir, block)
+        numba.core.inline_closurecall._add_definitions(func_ir, block)
         func_ir.blocks[label] = block
         new_blocks.append((label, block))
 
@@ -520,7 +521,7 @@ def include_new_blocks(blocks, new_blocks, label, new_body, remove_non_return=Tr
         for _label in topo_order:
             block = inner_blocks[_label]
             block.scope = scope
-            numba.inline_closurecall._add_definitions(func_ir, block)
+            numba.core.inline_closurecall._add_definitions(func_ir, block)
             work_list.append((_label, block))
     return label
 

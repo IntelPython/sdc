@@ -31,10 +31,10 @@ from numba import types
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
                              make_attribute_wrapper, lower_builtin, box, unbox, lower_cast,
                              lower_getattr, infer_getattr, overload_method, overload, intrinsic)
-from numba import cgutils
-from numba.targets.arrayobj import make_array, _empty_nd_impl, store_item, basic_indexing
-from numba.targets.boxing import box_array
-from numba.typing.templates import (infer_getattr, AttributeTemplate,
+from numba.core import cgutils
+from numba.np.arrayobj import make_array, _empty_nd_impl, store_item, basic_indexing
+from numba.core.boxing import box_array
+from numba.core.typing.templates import (infer_getattr, AttributeTemplate,
                                     bound_function, signature, infer_global, AbstractTemplate,
                                     ConcreteTemplate)
 
@@ -166,7 +166,7 @@ class CmpOpNe(CompDT64):
     key = operator.ne
 
 
-class MinMaxBaseDT64(numba.typing.builtins.MinMaxBase):
+class MinMaxBaseDT64(numba.core.typing.builtins.MinMaxBase):
 
     def _unify_minmax(self, tys):
         for ty in tys:
@@ -992,7 +992,7 @@ def parse_datetime_str(str):
 #             else:
 #                 assert isinstance(idx, types.Integer)
 #                 return signature(pandas_timestamp_type, *args)
-# from numba.targets.listobj import ListInstance
+# from numba.cpython.listobj import ListInstance
 # from llvmlite import ir as lir
 # import llvmlite.binding as ll
 # #from .. import hdatetime_ext

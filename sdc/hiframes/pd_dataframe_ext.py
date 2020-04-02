@@ -31,13 +31,14 @@ import pandas as pd
 import numpy as np
 
 import numba
-from numba import types, cgutils
+from numba import types
+from numba.core import cgutils
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
                              type_callable, infer, overload, intrinsic,
                              lower_builtin, overload_method)
-from numba.typing.templates import (infer_global, AbstractTemplate, signature,
+from numba.core.typing.templates import (infer_global, AbstractTemplate, signature,
                                     AttributeTemplate, bound_function)
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
+from numba.core.imputils import impl_ret_new_ref, impl_ret_borrowed
 
 import sdc
 from sdc.hiframes.pd_series_ext import SeriesType
@@ -116,7 +117,7 @@ def init_dataframe(typingctx, *args):
         in_tup = args[0]
         data_arrs = [builder.extract_value(in_tup, i) for i in range(n_cols)]
         index = builder.extract_value(in_tup, n_cols)
-        column_strs = [numba.unicode.make_string_from_constant(
+        column_strs = [numba.cpython.unicode.make_string_from_constant(
             context, builder, string_type, c) for c in column_names]
         # create dataframe struct and store values
         dataframe = cgutils.create_struct_proxy(
@@ -243,7 +244,7 @@ def set_df_column_with_reflect(typingctx, df, cname, arr):
         if is_new_col:
             data_arrs.append(arr_arg)
 
-        column_strs = [numba.unicode.make_string_from_constant(
+        column_strs = [numba.cpython.unicode.make_string_from_constant(
             context, builder, string_type, c) for c in column_names]
 
         zero = context.get_constant(types.int8, 0)
@@ -1372,7 +1373,7 @@ class SumDummyTyper(AbstractTemplate):
         df = args[0]
         # TODO: ignore non-numerics
         # get series sum output types
-        dtypes = tuple(numba.typing.arraydecl.ArrayAttribute.resolve_sum(
+        dtypes = tuple(numba.core.typing.arraydecl.ArrayAttribute.resolve_sum(
             self, SeriesType(d.dtype)).get_call_type(self, (), {}).return_type
             for d in df.data)
 
@@ -1412,7 +1413,7 @@ class ProdDummyTyper(AbstractTemplate):
         df = args[0]
         # TODO: ignore non-numerics
         # get series prod output types
-        dtypes = tuple(numba.typing.arraydecl.ArrayAttribute.resolve_prod(
+        dtypes = tuple(numba.core.typing.arraydecl.ArrayAttribute.resolve_prod(
             self, SeriesType(d.dtype)).get_call_type(self, (), {}).return_type
             for d in df.data)
 

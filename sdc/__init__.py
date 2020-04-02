@@ -57,8 +57,8 @@ if not sdc.config.config_pipeline_hpat_default:
     """
 
     # sdc.config.numba_compiler_define_nopython_pipeline_orig = \
-    # numba.compiler.DefaultPassBuilder.define_nopython_pipeline
-    # numba.compiler.DefaultPassBuilder.define_nopython_pipeline = \
+    # numba.core.compiler.DefaultPassBuilder.define_nopython_pipeline
+    # numba.core.compiler.DefaultPassBuilder.define_nopython_pipeline = \
     # sdc.datatypes.hpat_pandas_dataframe_pass.sdc_nopython_pipeline_lite_register
 
     import sdc.rewrites.dataframe_constructor

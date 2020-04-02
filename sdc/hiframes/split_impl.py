@@ -31,17 +31,17 @@ import pandas
 import numba
 import sdc
 from numba import types
-from numba.typing.templates import (infer_global, AbstractTemplate, infer,
+from numba.core.typing.templates import (infer_global, AbstractTemplate, infer,
                                     signature, AttributeTemplate, infer_getattr, bound_function)
-import numba.typing.typeof
-from numba.datamodel import StructModel
-from numba.errors import TypingError
+import numba.core.typing.typeof
+from numba.core.datamodel import StructModel
+from numba.core.errors import TypingError
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
                              make_attribute_wrapper, lower_builtin, box, unbox,
                              lower_getattr, intrinsic, overload_method, overload, overload_attribute)
-from numba import cgutils
+from numba.core import cgutils
 from sdc.str_ext import string_type
-from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
+from numba.core.imputils import (impl_ret_new_ref, impl_ret_borrowed,
                                     iternext_impl, RefType)
 from sdc.str_arr_ext import (string_array_type, get_data_ptr,
                               is_str_arr_typ, pre_alloc_string_array, _memcpy)
@@ -486,7 +486,7 @@ def hpat_pandas_spliview_stringmethods_len(self):
 @overload(operator.getitem)
 def str_arr_split_view_getitem_overload(A, ind):
     if A == string_array_split_view_type and isinstance(ind, types.Integer):
-        kind = numba.unicode.PY_UNICODE_1BYTE_KIND
+        kind = numba.cpython.unicode.PY_UNICODE_1BYTE_KIND
 
         def _impl(A, ind):
             start_index = getitem_c_arr(A._index_offsets, ind)
@@ -504,7 +504,7 @@ def str_arr_split_view_getitem_overload(A, ind):
                 data_end = getitem_c_arr(
                     A._data_offsets, start_index + i + 1)
                 length = data_end - data_start
-                _str = numba.unicode._empty_string(kind, length)
+                _str = numba.cpython.unicode._empty_string(kind, length)
                 ptr = get_array_ctypes_ptr(A._data, data_start)
                 _memcpy(_str._data, ptr, length, 1)
                 str_list[i] = _str

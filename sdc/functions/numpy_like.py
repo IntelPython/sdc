@@ -38,9 +38,10 @@ import sys
 import pandas
 import numpy as np
 
-from numba import types, jit, prange, numpy_support, literally
-from numba.errors import TypingError
-from numba.targets.arraymath import get_isnan
+from numba import types, jit, prange, literally
+from numba.np import numpy_support
+from numba.core.errors import TypingError
+from numba.np.arraymath import get_isnan
 
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
@@ -645,7 +646,7 @@ def nanprod(a):
 @sdc_overload(nanprod)
 def np_nanprod(a):
     """
-    Reimplemented with parfor from numba.targets.arraymath.
+    Reimplemented with parfor from numba.np.arraymath.
     """
     if not isinstance(a, types.Array):
         return

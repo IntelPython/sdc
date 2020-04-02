@@ -31,18 +31,20 @@ import operator
 from collections import namedtuple, defaultdict
 import numpy as np
 import numba
-from numba import compiler, ir, ir_utils, typed_passes, typeinfer, types
-from numba.ir_utils import (visit_vars_inner, replace_vars_inner, remove_dead,
+from numba.core import compiler, ir, ir_utils, typed_passes, typeinfer, types
+from numba.core.ir_utils import (visit_vars_inner, replace_vars_inner, remove_dead,
                             compile_to_numba_ir, replace_arg_nodes,
                             replace_vars_stmt, find_callname, guard,
                             mk_unique_var, find_topo_order, is_getitem,
                             build_definitions, remove_dels, get_ir_of_code,
                             get_definition, find_callname, get_name_var_table,
                             replace_var_names)
-from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks, Parfor
-from numba.analysis import compute_use_defs
-from numba.typing import signature
-from numba.typing.templates import infer_global, AbstractTemplate
+from numba.parfors.parfor import wrap_parfor_blocks, unwrap_parfor_blocks, Parfor
+from numba.parfors import array_analysis
+from numba.core import analysis
+from numba.core.analysis import compute_use_defs
+from numba.core.typing import signature
+from numba.core.typing.templates import infer_global, AbstractTemplate
 from numba.extending import overload, lower_builtin
 import sdc
 from sdc.utilities.utils import (is_call_assign, is_var_assign, is_assign, debug_prints,
@@ -146,7 +148,7 @@ def _column_var_impl_linear(A):  # pragma: no cover
     mean_x = 0.0
     ssqdm_x = 0.0
     N = len(A)
-    for i in numba.parfor.internal_prange(N):
+    for i in numba.parfors.parfor.internal_prange(N):
         sdc.hiframes.aggregate.__special_combine(
             ssqdm_x, mean_x, nobs, sdc.hiframes.aggregate._var_combine)
         val = A[i]
@@ -168,7 +170,7 @@ def _column_std_impl_linear(A):  # pragma: no cover
     mean_x = 0.0
     ssqdm_x = 0.0
     N = len(A)
-    for i in numba.parfor.internal_prange(N):
+    for i in numba.parfors.parfor.internal_prange(N):
         sdc.hiframes.aggregate.__special_combine(
             ssqdm_x, mean_x, nobs, sdc.hiframes.aggregate._var_combine)
         val = A[i]
@@ -276,10 +278,10 @@ def aggregate_usedefs(aggregate_node, use_set=None, def_set=None):
     if aggregate_node.out_key_vars is not None:
         def_set.update({v.name for v in aggregate_node.out_key_vars})
 
-    return numba.analysis._use_defs_result(usemap=use_set, defmap=def_set)
+    return analysis._use_defs_result(usemap=use_set, defmap=def_set)
 
 
-numba.analysis.ir_extension_usedefs[Aggregate] = aggregate_usedefs
+analysis.ir_extension_usedefs[Aggregate] = aggregate_usedefs
 
 
 def remove_dead_aggregate(aggregate_node, lives, arg_aliases, alias_map, func_ir, typemap):
@@ -445,7 +447,7 @@ def aggregate_array_analysis(aggregate_node, equiv_set, typemap,
     return [], post
 
 
-numba.array_analysis.array_analysis_extensions[Aggregate] = aggregate_array_analysis
+array_analysis.array_analysis_extensions[Aggregate] = aggregate_array_analysis
 
 
 def aggregate_distributed_analysis(aggregate_node, array_dists):
@@ -815,7 +817,7 @@ def get_key_dict_overload(arr):
     # get byte_vec dict for multi-key case
     if isinstance(arr, types.BaseTuple) and len(arr.types) != 1:
         n_bytes = 0
-        context = numba.targets.registry.cpu_target.target_context
+        context = numba.core.registry.cpu_target.target_context
         for t in arr.types:
             n_bytes += context.get_abi_sizeof(context.get_data_type(t.dtype))
 
@@ -845,7 +847,7 @@ def _getitem_keys_overload(arrs, ind, b_v):
     if isinstance(arrs, types.BaseTuple) and len(arrs.types) != 1:
         func_text = "def getitem_impl(arrs, ind, b_v):\n"
         offset = 0
-        context = numba.targets.registry.cpu_target.target_context
+        context = numba.core.registry.cpu_target.target_context
         for i, t in enumerate(arrs.types):
             n_bytes = context.get_abi_sizeof(context.get_data_type(t.dtype))
             func_text += "  arr_ptr = arrs[{}].ctypes.data + ind * {}\n".format(i, n_bytes)
@@ -1104,20 +1106,20 @@ def compile_to_optimized_ir(func, arg_typs, typingctx):
     flags = compiler.Flags()
     state.targetctx = numba.targets.cpu.CPUContext(typingctx)
 
-    preparfor_pass = numba.parfor.PreParforPass(state.func_ir, state.typemap, state.calltypes, state.typingctx, options)
+    preparfor_pass = numba.parfors.parfor.PreParforPass(state.func_ir, state.typemap, state.calltypes, state.typingctx, options)
     preparfor_pass.run()
     state.func_ir._definitions = build_definitions(state.func_ir.blocks)
     df_t_pass = sdc.hiframes.hiframes_typed.HiFramesTypedPass()
     df_t_pass.run_pass(state)
-    numba.rewrites.rewrite_registry.apply('after-inference', state)
-    parfor_pass = numba.parfor.ParforPass(state.func_ir, state.typemap,
+    numba.core.rewrites.rewrite_registry.apply('after-inference', state)
+    parfor_pass = numba.parfors.parfor.ParforPass(state.func_ir, state.typemap,
                                           state.calltypes, return_type, state.typingctx,
                                           options, flags)
     parfor_pass.run()
     remove_dels(state.func_ir.blocks)
     # make sure eval nodes are after the parfor for easier extraction
     # TODO: extract an eval func more robustly
-    numba.parfor.maximize_fusion(state.func_ir, state.func_ir.blocks, state.typemap, False)
+    numba.parfors.parfor.maximize_fusion(state.func_ir, state.func_ir.blocks, state.typemap, False)
     return state.func_ir, state
 
 
@@ -1158,7 +1160,7 @@ def get_agg_func_struct(agg_func, in_col_types, out_col_typs, typingctx,
 
         parfor_ind = -1
         for i, stmt in enumerate(block_body):
-            if isinstance(stmt, numba.parfor.Parfor):
+            if isinstance(stmt, numba.parfors.parfor.Parfor):
                 assert parfor_ind == -1, "only one parfor for aggregation function"
                 parfor_ind = i
 
@@ -1291,8 +1293,8 @@ def gen_init_func(init_nodes, reduce_vars, var_types, typingctx, targetctx):
 
     # parallelaccelerator adds functions that check the size of input array
     # these calls need to be removed
-    _checker_calls = (numba.parfor.max_checker, numba.parfor.min_checker,
-                      numba.parfor.argmax_checker, numba.parfor.argmin_checker)
+    _checker_calls = (numba.parfors.parfor.max_checker, numba.parfors.parfor.min_checker,
+                      numba.parfors.parfor.argmax_checker, numba.parfors.parfor.argmin_checker)
     checker_vars = set()
     cleaned_init_nodes = []
     for stmt in init_nodes:
@@ -1323,7 +1325,7 @@ def gen_init_func(init_nodes, reduce_vars, var_types, typingctx, targetctx):
     # compile implementation to binary (Dispatcher)
     init_all_func = compiler.compile_ir(typingctx, targetctx, f_ir, (), return_typ, compiler.DEFAULT_FLAGS, {})
 
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](dummy_f)
+    imp_dis = numba.core.registry.dispatcher_registry['cpu'](dummy_f)
     imp_dis.add_overload(init_all_func)
     return imp_dis
 
@@ -1378,7 +1380,7 @@ def gen_all_update_func(update_funcs, reduce_var_types, in_col_types,
     # compile implementation to binary (Dispatcher)
     update_all_func = compiler.compile_ir(typingctx, targetctx, f_ir, arg_typs, types.none, compiler.DEFAULT_FLAGS, {})
 
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](update_all_f)
+    imp_dis = numba.core.registry.dispatcher_registry['cpu'](update_all_f)
     imp_dis.add_overload(update_all_func)
     return imp_dis
 
@@ -1433,7 +1435,7 @@ def gen_all_combine_func(combine_funcs, reduce_var_types, redvar_offsets,
     # compile implementation to binary (Dispatcher)
     combine_all_func = compiler.compile_ir(typingctx, targetctx, f_ir, arg_typs, types.none, compiler.DEFAULT_FLAGS, {})
 
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](combine_all_f)
+    imp_dis = numba.core.registry.dispatcher_registry['cpu'](combine_all_f)
     imp_dis.add_overload(combine_all_func)
     return imp_dis
 
@@ -1480,7 +1482,7 @@ def gen_all_eval_func(eval_funcs, reduce_var_types, redvar_offsets,
     # compile implementation to binary (Dispatcher)
     eval_all_func = compiler.compile_ir(typingctx, targetctx, f_ir, arg_typs, types.none, compiler.DEFAULT_FLAGS, {})
 
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](eval_all_f)
+    imp_dis = numba.core.registry.dispatcher_registry['cpu'](eval_all_f)
     imp_dis.add_overload(eval_all_func)
     return imp_dis
 
@@ -1518,7 +1520,7 @@ def gen_eval_func(f_ir, eval_nodes, reduce_vars, var_types, pm, typingctx, targe
     # compile implementation to binary (Dispatcher)
     eval_func = compiler.compile_ir(typingctx, targetctx, f_ir, arg_typs, return_typ, compiler.DEFAULT_FLAGS, {})
 
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](agg_eval)
+    imp_dis = numba.core.registry.dispatcher_registry['cpu'](agg_eval)
     imp_dis.add_overload(eval_func)
     return imp_dis
 
@@ -1600,7 +1602,7 @@ def gen_combine_func(f_ir, parfor, redvars, var_to_redvar, var_types, arr_var,
     # compile implementation to binary (Dispatcher)
     combine_func = compiler.compile_ir(typingctx, targetctx, f_ir, arg_typs, return_typ, compiler.DEFAULT_FLAGS, {})
 
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](agg_combine)
+    imp_dis = numba.core.registry.dispatcher_registry['cpu'](agg_combine)
     imp_dis.add_overload(combine_func)
     return imp_dis
 
@@ -1736,7 +1738,7 @@ def gen_update_func(parfor, redvars, var_to_redvar, var_types, arr_var,
     # compile implementation to binary (Dispatcher)
     agg_impl_func = compiler.compile_ir(typingctx, targetctx, f_ir, arg_typs, return_typ, compiler.DEFAULT_FLAGS, {})
 
-    imp_dis = numba.targets.registry.dispatcher_registry['cpu'](agg_update)
+    imp_dis = numba.core.registry.dispatcher_registry['cpu'](agg_update)
     imp_dis.add_overload(agg_impl_func)
     return imp_dis
 

@@ -29,9 +29,9 @@ import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
                              type_callable, overload_method, intrinsic)
-from numba.targets.imputils import impl_ret_borrowed
+from numba.core.imputils import impl_ret_borrowed
 from numba import types
-from numba.targets.boxing import box_array, unbox_array
+from numba.core.boxing import box_array, unbox_array
 
 import numpy as np
 import pandas as pd

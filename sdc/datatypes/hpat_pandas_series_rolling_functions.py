@@ -31,7 +31,7 @@ from functools import partial
 
 from numba import prange
 from numba.extending import register_jitable
-from numba.types import (float64, Boolean, Integer, NoneType, Number,
+from numba.core.types import (float64, Boolean, Integer, NoneType, Number,
                          Omitted, StringLiteral, UnicodeType)
 
 from sdc.datatypes.common_functions import _almost_equal

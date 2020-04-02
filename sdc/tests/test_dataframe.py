@@ -33,9 +33,9 @@ import string
 import unittest
 from itertools import permutations, product
 from numba import types
-from numba.config import IS_32BITS
-from numba.special import literal_unroll
-from numba.errors import TypingError
+from numba.core.config import IS_32BITS
+from numba import literal_unroll
+from numba.core.errors import TypingError
 
 import sdc
 from sdc.datatypes.common_functions import SDCLimitation

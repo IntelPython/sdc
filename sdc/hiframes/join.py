@@ -29,16 +29,19 @@ from .. import chiframes
 from sdc import config as hpat_config
 import llvmlite.binding as ll
 from numba.extending import (register_model, models, lower_builtin)
-from numba.typing.templates import (signature, AbstractTemplate, infer_global, infer)
+from numba.core.typing.templates import (signature, AbstractTemplate, infer_global, infer)
 from collections import defaultdict
 import numpy as np
 
 import numba
-from numba import generated_jit, ir, ir_utils, typeinfer, types
+from numba import generated_jit, types
+from numba.core import ir, ir_utils, typeinfer
 from numba.extending import overload
-from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
+from numba.core.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes,
                             mk_unique_var)
+from numba.core import analysis
+from numba.parfors import array_analysis
 import sdc
 from sdc import distributed, distributed_analysis
 from sdc.utilities.utils import alloc_arr_tup, debug_prints
@@ -139,7 +142,7 @@ def join_array_analysis(join_node, equiv_set, typemap, array_analysis):
     return [], post
 
 
-numba.array_analysis.array_analysis_extensions[Join] = join_array_analysis
+array_analysis.array_analysis_extensions[Join] = join_array_analysis
 
 
 def join_distributed_analysis(join_node, array_dists):
@@ -275,10 +278,10 @@ def join_usedefs(join_node, use_set=None, def_set=None):
     # output columns are defined
     def_set.update({v.name for v in join_node.df_out_vars.values()})
 
-    return numba.analysis._use_defs_result(usemap=use_set, defmap=def_set)
+    return analysis._use_defs_result(usemap=use_set, defmap=def_set)
 
 
-numba.analysis.ir_extension_usedefs[Join] = join_usedefs
+analysis.ir_extension_usedefs[Join] = join_usedefs
 
 
 def get_copies_join(join_node, typemap):

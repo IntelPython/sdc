@@ -33,14 +33,14 @@ import warnings
 
 import numba
 from numba import ir, ir_utils, types
-from numba.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
+from numba.core.ir_utils import (replace_arg_nodes, compile_to_numba_ir,
                             find_topo_order, gen_np_call, get_definition, guard,
                             find_callname, mk_alloc, find_const, is_setitem,
                             is_getitem, mk_unique_var, dprint_func_ir,
                             build_definitions, find_build_sequence,
                             GuardException, compute_cfg_from_blocks)
-from numba.inline_closurecall import inline_closure_call
-from numba.compiler_machinery import FunctionPass, register_pass
+from numba.core.inline_closurecall import inline_closure_call
+from numba.core.compiler_machinery import FunctionPass, register_pass
 import sdc
 from sdc import hiframes
 from sdc.utilities.utils import (debug_prints, inline_new_blocks, ReplaceFunc,
@@ -1048,10 +1048,10 @@ class DataFramePassImpl(object):
         # make series to enable getitem of dt64 to timestamp for example
         for i in range(len(used_cols)):
             func_text += "  c{} = sdc.hiframes.api.init_series(c{})\n".format(i, i)
-        func_text += "  numba.parfor.init_prange()\n"
+        func_text += "  numba.parfors.parfor.init_prange()\n"
         func_text += "  n = len(c0)\n"
         func_text += "  S = numba.unsafe.ndarray.empty_inferred((n,))\n"
-        func_text += "  for i in numba.parfor.internal_prange(n):\n"
+        func_text += "  for i in numba.parfors.parfor.internal_prange(n):\n"
         func_text += "     row = Row({})\n".format(row_args)
         func_text += "     S[i] = map_func(row)\n"
         func_text += "  return sdc.hiframes.api.init_series(S)\n"
@@ -1795,9 +1795,9 @@ class DataFramePassImpl(object):
         pivot_arr = columns
 
         def _agg_len_impl(in_arr):  # pragma: no cover
-            numba.parfor.init_prange()
+            numba.parfors.parfor.init_prange()
             count = 0
-            for i in numba.parfor.internal_prange(len(in_arr)):
+            for i in numba.parfors.parfor.internal_prange(len(in_arr)):
                 count += 1
             return count
 
@@ -2204,7 +2204,7 @@ class DataFramePassImpl(object):
                 return d_var
 
             # TODO: stararg needs special handling?
-            args = numba.typing.fold_arguments(
+            args = numba.core.typing.fold_arguments(
                 pysig, args, kws, normal_handler, default_handler,
                 normal_handler)
 

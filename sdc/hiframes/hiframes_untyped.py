@@ -31,11 +31,12 @@ from collections import namedtuple
 import itertools
 
 import numba
-from numba import ir, ir_utils, types
-from numba import compiler as numba_compiler
-from numba.targets.registry import CPUDispatcher
+from numba import types
+from numba.core import ir, ir_utils
+from numba.core import compiler as numba_compiler
+from numba.core.registry import CPUDispatcher
 
-from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
+from numba.core.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc, remove_dels,
                             get_name_var_table, replace_var_names,
                             add_offset_to_labels, get_ir_of_code, find_const,
@@ -44,9 +45,9 @@ from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             build_definitions, replace_vars_stmt,
                             replace_vars_inner, find_build_sequence)
 
-from numba.inline_closurecall import inline_closure_call
-from numba.analysis import compute_cfg_from_blocks
-from numba.compiler_machinery import FunctionPass, register_pass
+from numba.core.inline_closurecall import inline_closure_call
+from numba.core.analysis import compute_cfg_from_blocks
+from numba.core.compiler_machinery import FunctionPass, register_pass
 
 import sdc
 from sdc import config
@@ -82,7 +83,7 @@ def remove_hiframes(rhs, lives, call_list):
         return True
     # used in stencil generation of rolling
     if (len(call_list) == 1 and isinstance(call_list[0], CPUDispatcher)
-            and call_list[0].py_func == numba.stencilparfor._compute_last_ind):
+            and call_list[0].py_func == numba.stencils.stencilparfor._compute_last_ind):
         return True
     # used in stencil generation of rolling
     if call_list == ['ceil', math]:
@@ -128,7 +129,7 @@ def remove_hiframes(rhs, lives, call_list):
     return False
 
 
-numba.ir_utils.remove_call_handlers.append(remove_hiframes)
+numba.core.ir_utils.remove_call_handlers.append(remove_hiframes)
 
 
 @register_pass(mutates_CFG=True, analysis_only=False)
