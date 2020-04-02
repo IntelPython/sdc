@@ -2038,6 +2038,18 @@ class TestDataFrame(TestCase):
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     @skip_sdc_jit
+    def test_pct_change_with_parameters_limit_and_freq(self):
+        def test_impl(df, limit, freq):
+            return df.pct_change(limit=limit, freq=freq)
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [14, 4, 5, 4, 1, 55],
+                           "B": [5, 2, None, 3, 2, 32],
+                           "C": [20, 20, 7, 21, 8, None],
+                           "D": [14, None, 6, 2, 6, 4]})
+        pd.testing.assert_frame_equal(hpat_func(df, None, None), test_impl(df, None, None))
+
+    @skip_sdc_jit
     def test_pct_change_with_parametrs(self):
         def test_impl(df, periods, method):
             return df.pct_change(periods=periods, fill_method=method, limit=None, freq=None)
