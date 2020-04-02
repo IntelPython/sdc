@@ -1454,13 +1454,16 @@ def df_length_expr(self):
     return '0'
 
 
-def df_index_expr(self, length_expr=None):
+def df_index_expr(self, length_expr=None, as_range=False):
     """Generate expression to get or create index of DF"""
     if isinstance(self.index, types.NoneType):
         if length_expr is None:
             length_expr = df_length_expr(self)
 
-        return f'numpy.arange({length_expr})'
+        if as_range:
+            return f'range({length_expr})'
+        else:
+            return f'numpy.arange({length_expr})'
 
     return 'self._index'
 
@@ -1507,12 +1510,13 @@ def df_getitem_bool_series_idx_main_codelines(self, idx):
     # optimization for default indexes in df and idx when index alignment is trivial
     if (isinstance(self.index, types.NoneType) and isinstance(idx.index, types.NoneType)):
         func_lines = [f'  length = {df_length_expr(self)}',
+                      f'  self_index = {df_index_expr(self, as_range=True)}',
                       f'  if length > len(idx):',
                       f'    msg = "Unalignable boolean Series provided as indexer " + \\',
                       f'          "(index of the boolean Series and of the indexed object do not match)."',
                       f'    raise IndexingError(msg)',
                       f'  # do not trim idx._data to length as getitem_by_mask handles such case',
-                      f'  res_index = getitem_by_mask(self.index, idx._data)',
+                      f'  res_index = getitem_by_mask(self_index, idx._data)',
                       f'  # df index is default, same as positions so it can be used in take']
         results = []
         for i, col in enumerate(self.columns):
@@ -1532,7 +1536,7 @@ def df_getitem_bool_series_idx_main_codelines(self, idx):
                       f'  self_index = self.index',
                       f'  idx_reindexed = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)',
                       f'  res_index = getitem_by_mask(self_index, idx_reindexed._data)',
-                      f'  selected_pos = getitem_by_mask(numpy.arange(length), idx_reindexed._data)']
+                      f'  selected_pos = getitem_by_mask(range(length), idx_reindexed._data)']
 
         results = []
         for i, col in enumerate(self.columns):
@@ -1553,11 +1557,13 @@ def df_getitem_bool_series_idx_main_codelines(self, idx):
 
 def df_getitem_bool_array_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem"""
+
     func_lines = [f'  length = {df_length_expr(self)}',
                   f'  if length != len(idx):',
                   f'    raise ValueError("Item wrong length.")',
-                  f'  taken_pos = getitem_by_mask(numpy.arange(length), idx)',
-                  f'  res_index = sdc_take(self.index, taken_pos)']
+                  f'  self_index = {df_index_expr(self, as_range=True)}',
+                  f'  taken_pos = getitem_by_mask(self_index, idx)',
+                  f'  res_index = sdc_take(self_index, taken_pos)']
     results = []
     for i, col in enumerate(self.columns):
         res_data = f'res_data_{i}'
@@ -1635,12 +1641,13 @@ def df_getitem_bool_series_idx_codegen(self, idx):
     Example of generated implementation with provided index:
         def _df_getitem_bool_series_idx_impl(self, idx):
           length = len(self._data[0])
+          self_index = range(len(self._data[0]))
           if length > len(idx):
             msg = "Unalignable boolean Series provided as indexer " + \
                   "(index of the boolean Series and of the indexed object do not match)."
             raise IndexingError(msg)
           # do not trim idx._data to length as getitem_by_mask handles such case
-          res_index = getitem_by_mask(self.index, idx._data)
+          res_index = getitem_by_mask(self_index, idx._data)
           # df index is default, same as positions so it can be used in take
           data_0 = self._data[0]
           res_data_0 = sdc_take(data_0, res_index)
@@ -1667,8 +1674,9 @@ def df_getitem_bool_array_idx_codegen(self, idx):
           length = len(self._data[0])
           if length != len(idx):
             raise ValueError("Item wrong length.")
-          taken_pos = getitem_by_mask(numpy.arange(length), idx)
-          res_index = sdc_take(self.index, taken_pos)
+          self_index = range(len(self._data[0]))
+          taken_pos = getitem_by_mask(self_index, idx)
+          res_index = sdc_take(self_index, taken_pos)
           data_0 = self._data[0]
           res_data_0 = sdc_take(data_0, taken_pos)
           data_1 = self._data[1]
