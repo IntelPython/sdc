@@ -36,7 +36,7 @@ import numpy
 import operator
 import pandas
 
-from numba.errors import TypingError
+from numba.core.errors import TypingError
 from numba import types
 
 from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric, check_types_comparable,

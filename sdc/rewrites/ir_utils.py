@@ -28,10 +28,10 @@ from sys import modules
 
 from types import FunctionType
 
-from numba.ir import (Const, Global, Var, FreeVar,
+from numba.core.ir import (Const, Global, Var, FreeVar,
                       Expr, Assign, Del,
                       unknown_loc)
-from numba.ir_utils import (guard, find_const, mk_unique_var)
+from numba.core.ir_utils import (guard, find_const, mk_unique_var)
 from numba.extending import _Intrinsic
 
 

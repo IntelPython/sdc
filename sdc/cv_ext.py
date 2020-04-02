@@ -28,12 +28,12 @@
 import numba
 import sdc
 from numba import types
-from numba.typing.templates import infer_global, AbstractTemplate, infer, signature
+from numba.core.typing.templates import infer_global, AbstractTemplate, infer, signature
 from numba.extending import lower_builtin, overload, intrinsic
-from numba import cgutils
+from numba.core import cgutils
 from sdc.str_ext import string_type
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
-from numba.targets.arrayobj import _empty_nd_impl
+from numba.core.imputils import impl_ret_new_ref, impl_ret_borrowed
+from numba.np.arrayobj import _empty_nd_impl
 
 import cv2
 import numpy as np

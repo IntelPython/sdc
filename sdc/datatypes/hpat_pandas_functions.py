@@ -32,8 +32,9 @@ import pandas as pd
 import numpy as np
 
 import numba
-from numba import types, numpy_support
-from numba.errors import TypingError
+from numba import types
+from numba.np import numpy_support
+from numba.core.errors import TypingError
 from numba.extending import overload
 
 from sdc.io.csv_ext import (

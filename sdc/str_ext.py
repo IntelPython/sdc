@@ -32,13 +32,13 @@ from llvmlite import ir as lir
 import llvmlite.binding as ll
 
 import numba
-from numba import cgutils, types
+from numba.core import cgutils, types
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
                              type_callable, overload_method, intrinsic)
-import numba.targets.hashing
-from numba.targets.imputils import lower_constant, impl_ret_new_ref, impl_ret_untracked
-from numba.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
+import numba.cpython.hashing
+from numba.core.imputils import lower_constant, impl_ret_new_ref, impl_ret_untracked
+from numba.core.typing.templates import (signature, AbstractTemplate, infer, infer_getattr,
                                     ConcreteTemplate, AttributeTemplate, bound_function, infer_global)
 
 import sdc
@@ -67,18 +67,18 @@ string_type = types.unicode_type
 # TODO: make sure hash(str) is not already instantiated in overloads
 # def _rm_hash_str_overload():
 #     try:
-#         fn = numba.targets.registry.cpu_target.typing_context.resolve_value_type(hash)
+#         fn = numba.core.registry.cpu_target.typing_context.resolve_value_type(hash)
 #         sig = signature(types.int64, types.unicode_type)
 #         key = fn.get_impl_key(sig)
-#         numba.targets.registry.cpu_target.target_context._defns[key]._cache.pop(sig.args)
+#         numba.core.registry.cpu_target.target_context._defns[key]._cache.pop(sig.args)
 #     except:
 #         pass
 
 # _rm_hash_str_overload()
 
-numba.targets.hashing._Py_HashSecret_djbx33a_suffix = 0
-numba.targets.hashing._Py_HashSecret_siphash_k0 = 0
-numba.targets.hashing._Py_HashSecret_siphash_k1 = 0
+numba.cpython.hashing._Py_HashSecret_djbx33a_suffix = 0
+numba.cpython.hashing._Py_HashSecret_siphash_k0 = 0
+numba.cpython.hashing._Py_HashSecret_siphash_k1 = 0
 
 
 # use objmode for string methods for now
@@ -499,11 +499,11 @@ def gen_unicode_to_std_str(context, builder, unicode_val):
 
 
 def gen_std_str_to_unicode(context, builder, std_str_val, del_str=False):
-    kind = numba.unicode.PY_UNICODE_1BYTE_KIND
+    kind = numba.cpython.unicode.PY_UNICODE_1BYTE_KIND
 
     def _std_str_to_unicode(std_str):
         length = sdc.str_ext.get_std_str_len(std_str)
-        ret = numba.unicode._empty_string(kind, length)
+        ret = numba.cpython.unicode._empty_string(kind, length)
         sdc.str_arr_ext._memcpy(
             ret._data, sdc.str_ext.get_c_str(std_str), length, 1)
         if del_str:
@@ -554,7 +554,7 @@ def alloc_str_list(typingctx, n_t=None):
     def codegen(context, builder, sig, args):
         nitems = args[0]
         list_type = types.List(string_type)
-        result = numba.targets.listobj.ListInstance.allocate(context, builder, list_type, nitems)
+        result = numba.cpython.listobj.ListInstance.allocate(context, builder, list_type, nitems)
         result.size = nitems
         return impl_ret_new_ref(context, builder, list_type, result.value)
     return types.List(string_type)(types.intp), codegen
@@ -570,7 +570,7 @@ def alloc_list_list_str(typingctx, n_t=None):
     def codegen(context, builder, sig, args):
         nitems = args[0]
         list_type = list_string_array_type
-        result = numba.targets.listobj.ListInstance.allocate(context, builder, list_type, nitems)
+        result = numba.cpython.listobj.ListInstance.allocate(context, builder, list_type, nitems)
         result.size = nitems
         return impl_ret_new_ref(context, builder, list_type, result.value)
     return list_string_array_type(types.intp), codegen
@@ -782,7 +782,7 @@ def string_split_impl(context, builder, sig, args):
     size = builder.load(nitems)
     # TODO: use ptr instead of allocating and copying, use NRT_MemInfo_new
     # TODO: deallocate ptr
-    _list = numba.targets.listobj.ListInstance.allocate(context, builder,
+    _list = numba.cpython.listobj.ListInstance.allocate(context, builder,
                                                         sig.return_type, size)
     _list.size = size
     with cgutils.for_range(builder, size) as loop:

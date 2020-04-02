@@ -27,7 +27,7 @@
 import numpy
 import pandas
 from numba import prange, types
-from numba.targets.registry import cpu_target
+from numba.core.registry import cpu_target
 
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.utilities.utils import sdc_overload_method

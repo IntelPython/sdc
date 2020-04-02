@@ -37,10 +37,10 @@ import sdc
 
 from pandas.core.indexing import IndexingError
 
-from numba import types, prange
-from numba.special import literally
+from numba import types
+from numba import literally
 from numba.typed import List, Dict
-from numba.errors import TypingError
+from numba.core.errors import TypingError
 from pandas.core.indexing import IndexingError
 
 from sdc.hiframes.pd_dataframe_ext import DataFrameType

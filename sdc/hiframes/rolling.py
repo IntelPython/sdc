@@ -28,7 +28,7 @@
 import pandas as pd
 import sdc
 import numba
-from numba.ir_utils import guard, find_const
+from numba.core.ir_utils import guard, find_const
 
 
 supported_rolling_funcs = ('sum', 'mean', 'var', 'std', 'count', 'median',

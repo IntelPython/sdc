@@ -32,11 +32,13 @@ import numpy as np
 import numba
 from numba.extending import (typeof_impl, unbox, register_model, models,
                              NativeValue, box, intrinsic)
-from numba import numpy_support, types, cgutils
-from numba.typing import signature
-from numba.targets.boxing import box_array, unbox_array, box_list
-from numba.targets.boxing import _NumbaTypeHelper
-from numba.targets import listobj
+from numba import types
+from numba.core import cgutils
+from numba.np import numpy_support
+from numba.core.typing import signature
+from numba.core.boxing import box_array, unbox_array, box_list
+from numba.core.boxing import _NumbaTypeHelper
+from numba.cpython import listobj
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.str_ext import string_type, list_string_array_type
@@ -79,7 +81,7 @@ def unbox_dataframe(typ, val, c):
     columns will be extracted later if necessary.
     """
     n_cols = len(typ.columns)
-    column_strs = [numba.unicode.make_string_from_constant(
+    column_strs = [numba.cpython.unicode.make_string_from_constant(
         c.context, c.builder, string_type, a) for a in typ.columns]
     # create dataframe struct and store values
     dataframe = cgutils.create_struct_proxy(typ)(c.context, c.builder)
@@ -302,7 +304,7 @@ def unbox_series(typ, val, c):
 
     if typ.is_named:
         name_obj = c.pyapi.object_getattr_string(val, "name")
-        series.name = numba.unicode.unbox_unicode_str(
+        series.name = numba.cpython.unicode.unbox_unicode_str(
             string_type, name_obj, c).value
     # TODO: handle index and name
     c.pyapi.decref(arr_obj)
@@ -359,7 +361,7 @@ def _box_series_data(dtype, data_typ, val, c):
     if isinstance(dtype, types.BaseTuple):
         np_dtype = np.dtype(
             ','.join(str(t) for t in dtype.types), align=True)
-        dtype = numba.numpy_support.from_dtype(np_dtype)
+        dtype = numba.np.numpy_support.from_dtype(np_dtype)
 
     if dtype == string_type:
         arr = box_str_arr(string_array_type, val, c)
