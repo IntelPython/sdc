@@ -32,7 +32,7 @@ from numba import njit
 def series_str_contains():
     series = pd.Series(['dog', 'foo', 'bar'])
 
-    return series.str.contains('o') # Expect series of True, True, False
+    return series.str.contains('o')  # Expect series of True, True, False
 
 
 print(series_str_contains())
