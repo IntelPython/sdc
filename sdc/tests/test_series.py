@@ -297,6 +297,10 @@ def rstrip_usecase(series, to_strip=None):
     return series.str.rstrip(to_strip)
 
 
+def contains_usecase(series, pat, case=True, flags=0, na=None, regex=True):
+    return series.str.contains(pat, case, flags, na, regex)
+
+
 class TestSeries(
     TestSeries_apply,
     TestSeries_map,
@@ -6092,6 +6096,21 @@ class TestSeries(
         for data in test_data:
             s = pd.Series(data)
             pd.testing.assert_series_equal(cfunc(s), isupper_usecase(s))
+
+    def test_series_contains(self):
+        hpat_func = self.jit(contains_usecase)
+        s = pd.Series(['Mouse', 'dog', 'house and parrot', '23'])
+        for pat in ['og', 'Og', 'OG', 'o']:
+            for case in [True, False]:
+                with self.subTest(pat=pat, case=case):
+                    pd.testing.assert_series_equal(hpat_func(s, pat, case), contains_usecase(s, pat, case))
+
+    def test_series_contains_with_na_flags_regex(self):
+        hpat_func = self.jit(contains_usecase)
+        s = pd.Series(['Mouse', 'dog', 'house and parrot', '23'])
+        pat = 'og'
+        pd.testing.assert_series_equal(hpat_func(s, pat, flags=0, na=None, regex=True),
+                                       contains_usecase(s, pat, flags=0, na=None, regex=True))
 
     @skip_sdc_jit('Old-style implementation returns string, but not series')
     def test_series_describe_numeric(self):
