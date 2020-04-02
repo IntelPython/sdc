@@ -324,6 +324,7 @@ Developer's Guide and must not be included into User's Guide.
 Running unit tests
 ------------------
 ::
+
     # Scipy is required for tests
     conda install -y scipy
 
