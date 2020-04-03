@@ -82,13 +82,14 @@ import pandas
 
 import numba
 from numba.types import (Boolean, Integer, NoneType,
-                         Omitted, StringLiteral, UnicodeType, Number, Set)
+                         Omitted, StringLiteral, UnicodeType)
 
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
 from sdc.hiframes.api import get_nan_mask
 from sdc.str_arr_ext import str_arr_set_na_by_mask, create_str_arr_from_list
+from sdc.datatypes.common_functions import SDCLimitation
 
 
 @sdc_overload_method(StringMethodsType, 'center')
@@ -212,10 +213,10 @@ def hpat_pandas_stringmethods_contains(self, pat, case=True, flags=0, na=None, r
 
     def hpat_pandas_stringmethods_contains_impl(self, pat, case=True, flags=0, na=None, regex=True):
         if flags != 0:
-            raise ValueError('Parameter flags can be only 0.')
+            raise SDCLimitation("Method contains(). Unsupported parameter. Given 'flags' != 0")
 
         if not regex:
-            raise ValueError('Parameter regex can be only True.')
+            raise SDCLimitation("Method contains(). Unsupported parameter. Given 'regex' is False")
 
         if not case:
             _pat = pat.lower()

@@ -56,6 +56,7 @@ from sdc.tests.test_utils import (count_array_OneDs,
 from sdc.tests.gen_test_data import ParquetGenerator
 
 from sdc.tests.test_utils import test_global_input_data_unicode_kind1
+from sdc.datatypes.common_functions import SDCLimitation
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -6117,19 +6118,19 @@ class TestSeries(
         s = pd.Series(['Mouse', 'dog', 'house and parrot', '23'])
         pat = 'og'
 
-        with self.assertRaises(ValueError) as raises:
+        with self.assertRaises(SDCLimitation) as raises:
             hpat_func(s, pat, flags=1)
-        msg = 'Parameter flags can be only 0'
+        msg = "Method contains(). Unsupported parameter. Given 'flags' != 0"
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
             hpat_func(s, pat, na=0)
-        msg = 'Method contains(). The object na'
+        msg = 'Method contains(). The object na\n given: int64\n expected: none'
         self.assertIn(msg, str(raises.exception))
 
-        with self.assertRaises(ValueError) as raises:
+        with self.assertRaises(SDCLimitation) as raises:
             hpat_func(s, pat, regex=False)
-        msg = 'Parameter regex can be only True'
+        msg = "Method contains(). Unsupported parameter. Given 'regex' is False"
         self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('Old-style implementation returns string, but not series')
