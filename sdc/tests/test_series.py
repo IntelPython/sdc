@@ -56,6 +56,7 @@ from sdc.tests.test_utils import (count_array_OneDs,
 from sdc.tests.gen_test_data import ParquetGenerator
 
 from sdc.tests.test_utils import test_global_input_data_unicode_kind1
+from sdc.datatypes.common_functions import SDCLimitation
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -295,6 +296,10 @@ def lstrip_usecase(series, to_strip=None):
 
 def rstrip_usecase(series, to_strip=None):
     return series.str.rstrip(to_strip)
+
+
+def contains_usecase(series, pat, case=True, flags=0, na=None, regex=True):
+    return series.str.contains(pat, case, flags, na, regex)
 
 
 class TestSeries(
@@ -6092,6 +6097,41 @@ class TestSeries(
         for data in test_data:
             s = pd.Series(data)
             pd.testing.assert_series_equal(cfunc(s), isupper_usecase(s))
+
+    def test_series_contains(self):
+        hpat_func = self.jit(contains_usecase)
+        s = pd.Series(['Mouse', 'dog', 'house and parrot', '23'])
+        for pat in ['og', 'Og', 'OG', 'o']:
+            for case in [True, False]:
+                with self.subTest(pat=pat, case=case):
+                    pd.testing.assert_series_equal(hpat_func(s, pat, case), contains_usecase(s, pat, case))
+
+    def test_series_contains_with_na_flags_regex(self):
+        hpat_func = self.jit(contains_usecase)
+        s = pd.Series(['Mouse', 'dog', 'house and parrot', '23'])
+        pat = 'og'
+        pd.testing.assert_series_equal(hpat_func(s, pat, flags=0, na=None, regex=True),
+                                       contains_usecase(s, pat, flags=0, na=None, regex=True))
+
+    def test_series_contains_unsupported(self):
+        hpat_func = self.jit(contains_usecase)
+        s = pd.Series(['Mouse', 'dog', 'house and parrot', '23'])
+        pat = 'og'
+
+        with self.assertRaises(SDCLimitation) as raises:
+            hpat_func(s, pat, flags=1)
+        msg = "Method contains(). Unsupported parameter. Given 'flags' != 0"
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, pat, na=0)
+        msg = 'Method contains(). The object na\n given: int64\n expected: none'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(SDCLimitation) as raises:
+            hpat_func(s, pat, regex=False)
+        msg = "Method contains(). Unsupported parameter. Given 'regex' is False"
+        self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('Old-style implementation returns string, but not series')
     def test_series_describe_numeric(self):

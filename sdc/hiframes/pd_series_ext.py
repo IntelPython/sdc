@@ -498,7 +498,7 @@ str2str_methods_excluded = [
     'lower', 'lstrip', 'rjust', 'rstrip', 'startswith', 'strip', 'zfill',
     'isspace', 'islower', 'isalpha', 'isalnum', 'istitle', 'isnumeric',
     'isdigit', 'isdecimal', 'isupper', 'capitalize', 'title', 'swapcase',
-    'casefold',
+    'casefold', 'contains'
 ]
 """
     Functions which are used from Numba directly by calling from StringMethodsType
@@ -519,9 +519,9 @@ str2str_methods_excluded = [
 class SeriesStrMethodAttribute(AttributeTemplate):
     key = StringMethodsType
 
-    @bound_function("strmethod.contains")
-    def resolve_contains(self, ary, args, kws):
-        return signature(SeriesType(types.bool_), *args)
+    # @bound_function("strmethod.contains")
+    # def resolve_contains(self, ary, args, kws):
+    #     return signature(SeriesType(types.bool_), *args)
 
     # @bound_function("strmethod.len")
     # def resolve_len(self, ary, args, kws):

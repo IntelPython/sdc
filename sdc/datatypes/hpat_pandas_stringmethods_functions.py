@@ -89,6 +89,7 @@ from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
 from sdc.hiframes.api import get_nan_mask
 from sdc.str_arr_ext import str_arr_set_na_by_mask, create_str_arr_from_list
+from sdc.datatypes.common_functions import SDCLimitation
 
 
 @sdc_overload_method(StringMethodsType, 'center')
@@ -149,6 +150,87 @@ def hpat_pandas_stringmethods_center(self, width, fillchar=' '):
         return pandas.Series(result, self._data._index, name=self._data._name)
 
     return hpat_pandas_stringmethods_center_impl
+
+
+@sdc_overload_method(StringMethodsType, 'contains')
+def hpat_pandas_stringmethods_contains(self, pat, case=True, flags=0, na=None, regex=True):
+    """
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+        Pandas API: pandas.Series.str.contains
+
+        Limitations
+        -----------
+        - Series elements are expected to be Unicode strings. Elements cannot be `NaNs`.
+        - Parameter ``na`` is supported only with default value ``None``.
+        - Parameter ``flags`` is supported only with default value ``0``.
+        - Parameter ``regex`` is supported only with default value ``True``.
+
+        Examples
+        --------
+        .. literalinclude:: ../../../examples/series/str/series_str_contains.py
+           :language: python
+           :lines: 27-
+           :caption: Tests if string element contains a pattern.
+           :name: ex_series_str_contains
+
+        .. command-output:: python ./series/str/series_str_contains.py
+           :cwd: ../../../examples
+
+        .. seealso::
+            :ref:`Series.str.startswith <pandas.Series.str.startswith>`
+                Same as endswith, but tests the start of string.
+            :ref:`Series.str.endswith <pandas.Series.str.endswith>`
+                Same as startswith, but tests the end of string.
+
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+
+        Pandas Series method :meth:`pandas.core.strings.StringMethods.contains()` implementation.
+
+        .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_contains
+        """
+
+    ty_checker = TypeChecker('Method contains().')
+    ty_checker.check(self, StringMethodsType)
+
+    if not isinstance(pat, (StringLiteral, UnicodeType)):
+        ty_checker.raise_exc(pat, 'str', 'pat')
+
+    if not isinstance(na, (Omitted, NoneType)) and na is not None:
+        ty_checker.raise_exc(na, 'none', 'na')
+
+    if not isinstance(case, (Boolean, Omitted)) and case is not True:
+        ty_checker.raise_exc(case, 'bool', 'case')
+
+    if not isinstance(flags, (Omitted, Integer)) and flags != 0:
+        ty_checker.raise_exc(flags, 'int64', 'flags')
+
+    if not isinstance(regex, (Omitted, Boolean)) and regex is not True:
+        ty_checker.raise_exc(regex, 'bool', 'regex')
+
+    def hpat_pandas_stringmethods_contains_impl(self, pat, case=True, flags=0, na=None, regex=True):
+        if flags != 0:
+            raise SDCLimitation("Method contains(). Unsupported parameter. Given 'flags' != 0")
+
+        if not regex:
+            raise SDCLimitation("Method contains(). Unsupported parameter. Given 'regex' is False")
+
+        if not case:
+            _pat = pat.lower()
+        else:
+            _pat = pat
+
+        len_data = len(self._data)
+        res_list = numpy.empty(len_data, numba.types.boolean)
+        for idx in numba.prange(len_data):
+            res_list[idx] = _pat in self._data._data[idx]
+
+        return pandas.Series(res_list, self._data._index, name=self._data._name)
+
+    return hpat_pandas_stringmethods_contains_impl
 
 
 @sdc_overload_method(StringMethodsType, 'endswith')
