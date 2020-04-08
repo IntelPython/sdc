@@ -1883,21 +1883,21 @@ def df_getitem_single_label_loc_codegen(self, idx):
     func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
                   '  for i in numba.prange(len(self._dataframe.index)):',
                   '    if self._dataframe._index[i] == idx:']
-    space = '  '
+    indent = ' ' * 6
     if isinstance(self.index, types.NoneType):
         func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
                       '  if -1 < idx < len(self._dataframe._data):']
-        space = ''
+        indent =  ' ' * 4
     results = []
     result_index = []
     for i, c in enumerate(self.columns):
         result_c = f"result_{i}"
-        func_lines += [f"{space}    data_{i} = pandas.Series(self._dataframe._data[{i}], index=self._dataframe.index)",
-                       f"{space}    {result_c} = data_{i}.at[idx]"]
+        func_lines += [f"{indent}data_{i} = pandas.Series(self._dataframe._data[{i}], index=self._dataframe.index)",
+                       f"{indent}{result_c} = data_{i}.at[idx]"]
         results.append(result_c)
         result_index.append(c)
     data = '[0], '.join(col for col in results) + '[0]'
-    func_lines += [f"{space}    return pandas.Series(data=[{data}], index={result_index}, name=str(idx))",
+    func_lines += [f"{indent}return pandas.Series(data=[{data}], index={result_index}, name=str(idx))",
                    f"  raise IndexingError('Index is out of bounds for axis')"]
 
     func_text = '\n'.join(func_lines)
@@ -2006,8 +2006,8 @@ def sdc_pandas_dataframe_loc(self):
 
     Limitations
     -----------
-    - Parameter ``'name'`` in new DataFrame can be String only
-    - Loc works with basic case only: single label
+    - Parameter ``'name'`` in result Series can be String only
+    - Parameter ``idx`` is supported only to be a single value, e.g. :obj:`df.loc['A']`.
 
     Examples
     --------
