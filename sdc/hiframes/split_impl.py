@@ -483,22 +483,22 @@ def hpat_pandas_spliview_stringmethods_len(self):
     return hpat_pandas_spliview_stringmethods_len_impl
 
 
-# @infer_global(operator.getitem)
-class GetItemStringArraySplitView(AbstractTemplate):
-    key = operator.getitem
-
-    def generic(self, args, kws):
-        assert not kws
-        [ary, idx] = args
-        if ary == string_array_split_view_type:
-            if isinstance(idx, types.SliceType):
-                return signature(string_array_split_view_type, *args)
-            elif isinstance(idx, types.Integer):
-                return signature(types.List(string_type), *args)
-            elif idx == types.Array(types.bool_, 1, 'C'):
-                return signature(string_array_split_view_type, *args)
-            elif idx == types.Array(types.intp, 1, 'C'):
-                return signature(string_array_split_view_type, *args)
+# # @infer_global(operator.getitem)
+# class GetItemStringArraySplitView(AbstractTemplate):
+#     key = operator.getitem
+#
+#     def generic(self, args, kws):
+#         assert not kws
+#         [ary, idx] = args
+#         if ary == string_array_split_view_type:
+#             if isinstance(idx, types.SliceType):
+#                 return signature(string_array_split_view_type, *args)
+#             elif isinstance(idx, types.Integer):
+#                 return signature(types.List(string_type), *args)
+#             elif idx == types.Array(types.bool_, 1, 'C'):
+#                 return signature(string_array_split_view_type, *args)
+#             elif idx == types.Array(types.intp, 1, 'C'):
+#                 return signature(string_array_split_view_type, *args)
 
 
 @overload(operator.getitem)
