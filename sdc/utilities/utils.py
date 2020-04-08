@@ -31,6 +31,7 @@ from llvmlite import ir as lir
 from collections import namedtuple
 import operator
 import numba
+import numba.datamodel
 from numba import ir_utils, ir, types, cgutils
 from numba.ir_utils import (guard, get_definition, find_callname, require,
                             add_offset_to_labels, find_topo_order, find_const)

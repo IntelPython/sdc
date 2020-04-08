@@ -44,7 +44,7 @@ from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed, iternex
 from numba.targets.listobj import ListInstance
 from numba.typing.templates import (infer_global, AbstractTemplate, infer,
                                     signature, AttributeTemplate, infer_getattr, bound_function)
-from numba.special import prange
+from numba import prange
 
 from sdc.str_ext import string_type
 from sdc.str_arr_type import (StringArray, string_array_type, StringArrayType,
@@ -109,7 +109,7 @@ class StrArrayIteratorModel(models.StructModel):
         super(StrArrayIteratorModel, self).__init__(dmm, fe_type, members)
 
 
-lower_builtin('getiter', string_array_type)(numba.targets.arrayobj.getiter_array)
+lower_builtin('getiter', string_array_type)(numba.np.arrayobj.getiter_array)
 
 lower_builtin('iternext', StringArrayIterator)(iternext_impl(RefType.NEW)(iternext_str_array))
 

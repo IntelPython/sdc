@@ -35,9 +35,9 @@ import string
 import unittest
 from itertools import combinations, combinations_with_replacement, islice, permutations, product
 from numba import types
-from numba.config import IS_32BITS
+from numba.core.config import IS_32BITS
 from numba.errors import TypingError
-from numba.special import literally
+from numba.misc.special import literally
 
 from sdc.tests.test_series_apply import TestSeries_apply
 from sdc.tests.test_series_map import TestSeries_map

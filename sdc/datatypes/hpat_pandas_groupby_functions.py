@@ -40,7 +40,7 @@ from numba.extending import intrinsic
 from numba.targets.registry import cpu_target
 from numba.typed import List, Dict
 from numba.typing import signature
-from numba.special import literally
+from numba.misc.special import literally
 
 from sdc.datatypes.common_functions import sdc_arrays_argsort, _sdc_asarray, _sdc_take
 from sdc.datatypes.hpat_pandas_groupby_types import DataFrameGroupByType, SeriesGroupByType

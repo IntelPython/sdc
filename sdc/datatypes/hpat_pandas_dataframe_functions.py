@@ -38,7 +38,7 @@ import sdc
 from pandas.core.indexing import IndexingError
 
 from numba import types
-from numba.special import literally
+from numba.misc.special import literally
 from numba.typed import List, Dict
 from numba.errors import TypingError
 from pandas.core.indexing import IndexingError

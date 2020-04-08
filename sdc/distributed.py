@@ -40,7 +40,8 @@ from collections import defaultdict
 import numpy as np
 
 import numba
-from numba import ir, ir_utils, postproc, types
+from numba import ir, ir_utils, types
+from numba.core import postproc
 from numba.ir_utils import (
     mk_unique_var,
     replace_vars_inner,

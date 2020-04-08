@@ -26,7 +26,8 @@
 
 from numba.rewrites import register_rewrite, Rewrite
 from numba.ir_utils import find_callname, guard, mk_unique_var
-from numba import ir, errors, consts
+from numba import ir, errors
+from numba.core import consts
 
 from sdc.rewrites.ir_utils import remove_unused_recursively, make_assign, find_operations
 

@@ -34,6 +34,7 @@ from collections import defaultdict
 import numpy as np
 
 import numba
+import numba.analysis
 from numba import generated_jit, ir, ir_utils, typeinfer, types
 from numba.extending import overload
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
