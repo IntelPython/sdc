@@ -1887,7 +1887,7 @@ def df_getitem_single_label_loc_codegen(self, idx):
     if isinstance(self.index, types.NoneType):
         func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
                       '  if -1 < idx < len(self._dataframe._data):']
-        indent =  ' ' * 4
+        indent = ' ' * 4
     results = []
     result_index = []
     for i, c in enumerate(self.columns):
