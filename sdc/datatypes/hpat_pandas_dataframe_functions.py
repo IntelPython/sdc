@@ -1923,8 +1923,8 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
         if isinstance(idx, types.Integer):
             return gen_df_getitem_loc_single_label_impl(self.dataframe, idx)
 
-        raise TypingError('Operator getitem(). The index must be a single label, a  list or array of labels,\
-                          a slice object with labels, a boolean array or a callable. Given: {}'.format(idx))
+        ty_checker = TypeChecker('Operator loc().')
+        ty_checker.raise_exc(idx, 'int', 'idx')
 
     if accessor == 'iat':
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
