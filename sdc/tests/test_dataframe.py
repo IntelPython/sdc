@@ -32,6 +32,7 @@ import random
 import string
 import unittest
 from itertools import permutations, product
+from numba import types
 from numba.config import IS_32BITS
 from numba.special import literal_unroll
 from numba.errors import TypingError
@@ -1277,13 +1278,58 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
 
-    @skip_numba_jit
-    def test_df_reset_index1(self):
+    def test_df_reset_index_drop(self):
+        def test_impl(df, drop):
+            return df.reset_index(drop=drop)
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': np.arange(4.0)})
+        hpat_func = self.jit(test_impl)
+
+        for drop in [True, False]:
+            with self.subTest(drop=drop):
+                with self.assertRaises(Exception) as raises:
+                    hpat_func(df, drop)
+                msg = 'only work with Boolean literals drop'
+                self.assertIn(msg.format(types.bool_), str(raises.exception))
+
+    def test_df_reset_index_drop_false_index_int(self):
+        def test_impl(df):
+            return df.reset_index(drop=False)
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0],
+                           'B': np.arange(4.0)}, index=[5, 8, 4, 6])
+        hpat_func = self.jit(test_impl)
+
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_reset_index_drop_true_index_int(self):
         def test_impl(df):
             return df.reset_index(drop=True)
 
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0],
+                           'B': np.arange(4.0)}, index=[5, 8, 4, 6])
         hpat_func = self.jit(test_impl)
+
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_reset_index_drop_default_index_int(self):
+        def test_impl(df):
+            return df.reset_index()
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0],
+                           'B': np.arange(4.0)}, index=[5, 8, 4, 6])
+        hpat_func = self.jit(test_impl)
+
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    @skip_numba_jit
+    def test_df_reset_index_empty_df(self):
+        def test_impl(df):
+            return df.reset_index()
+
+        df = pd.DataFrame({})
+        hpat_func = self.jit(test_impl)
+
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     @skip_numba_jit
