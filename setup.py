@@ -162,7 +162,7 @@ ext_parquet = Extension(name="sdc.parquet_cpp",
 
 _ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq]
 
-# Support of Parquet is disabled because HPAT pipeline is not work now
+# Support of Parquet is disabled because HPAT pipeline does not work now
 # if _has_pyarrow:
 #     _ext_mods.append(ext_parquet)
 
