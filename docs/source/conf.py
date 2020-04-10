@@ -168,8 +168,7 @@ todo_link_only = True
 intersphinx_mapping = {
     'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
     'python': ('http://docs.python.org/2', None),
-    'numpy': ('http://docs.scipy.org/doc/numpy', None),
-    'scipy': ('http://docs.scipy.org/doc/scipy/reference', None),
+    'numpy': ('http://docs.scipy.org/doc/numpy', None)
 }
 
 # -- Napoleon extension configuration (Numpy and Google docstring options) -------
