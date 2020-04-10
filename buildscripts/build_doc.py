@@ -96,7 +96,7 @@ if __name__ == '__main__':
     sdc_utils = SDC_Build_Utilities(args.python, args.sdc_channel)
     sdc_utils.log_info('Build Intel(R) SDC documentation', separate=True)
     sdc_utils.log_info(sdc_utils.line_double)
-    sdc_utils.create_environment(['sphinx', 'sphinxcontrib-programoutput', 'scipy'])
+    sdc_utils.create_environment(['sphinx', 'sphinxcontrib-programoutput'])
     sdc_utils.install_conda_package(['sdc'])
 
     build_doc(sdc_utils)
