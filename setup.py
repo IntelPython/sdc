@@ -162,8 +162,9 @@ ext_parquet = Extension(name="sdc.parquet_cpp",
 
 _ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq]
 
-if _has_pyarrow:
-    _ext_mods.append(ext_parquet)
+# Support of Parquet is disabled because HPAT pipeline does not work now
+# if _has_pyarrow:
+#     _ext_mods.append(ext_parquet)
 
 
 class style(Command):
@@ -318,7 +319,6 @@ setup(name=SDC_NAME_STR,
           'pyarrow==0.15.1',
           'numba==0.48'
           ],
-      extras_require={'Parquet': ["pyarrow"], },
       cmdclass=sdc_build_commands,
       ext_modules=_ext_mods,
       entry_points={
