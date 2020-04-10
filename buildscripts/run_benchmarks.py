@@ -57,7 +57,7 @@ if __name__ == '__main__':
     sdc_utils = SDC_Build_Utilities(args.python, args.sdc_channel)
     sdc_utils.log_info('Run Intel(R) SDC benchmarks', separate=True)
     sdc_utils.log_info(sdc_utils.line_double)
-    sdc_utils.create_environment(['scipy', 'openpyxl', 'xlrd'])
+    sdc_utils.create_environment(['openpyxl', 'xlrd'])
     sdc_utils.install_conda_package(['sdc'])
 
     run_benchmarks(sdc_utils, args.args_list, args.num_threads_list)
