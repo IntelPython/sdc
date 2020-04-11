@@ -28,9 +28,12 @@ def gen_series_fixed_str(data_num, data_length, input_data, data_width):
     return results
 
 
-def gen_arr_from_input(input_data, data_length, random=True):
+def gen_arr_from_input(data_length, input_data, random=True, repeat=True, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+
     if random:
-        return np.random.choice(input_data, data_length)
+        return np.random.choice(input_data, data_length, replace=repeat)
     else:
         return np.asarray(multiply_oneds_data(input_data, data_length))
 
@@ -50,7 +53,7 @@ def gen_arr_of_dtype(data_length, dtype='float', random=True, limits=None, nuniq
 
     # prefer generation based on input data if it's provided
     if input_data is not None:
-        return gen_arr_from_input(input_data, data_length, random=random)
+        return gen_arr_from_input(data_length, input_data, random=random)
 
     if dtype == 'float':
         return np.random.ranf(data_length)
@@ -65,6 +68,21 @@ def gen_arr_of_dtype(data_length, dtype='float', random=True, limits=None, nuniq
         return np.random.choice([True, False], data_length)
 
     return None
+
+
+def gen_unique_values(data_length, dtype='int', seed=None):
+    """
+    data_length: result length of array of unique values,
+    dtype: dtype of generated array,
+    seed: seed to initialize random state
+    """
+
+    if dtype in ('float', 'int'):
+        values = np.arange(data_length, dtype=dtype)
+    if dtype == 'str':
+        values = gen_strlist(data_length)
+
+    return gen_arr_from_input(data_length, values, repeat=False, seed=seed)
 
 
 def gen_series(data_length, dtype='float', random=True, limits=None, nunique=1000, input_data=None, seed=None):
@@ -82,7 +100,7 @@ def gen_series(data_length, dtype='float', random=True, limits=None, nunique=100
 
     # prefer generation based on input data if it's provided
     if input_data is not None:
-        series_data = gen_arr_from_input(input_data, data_length, random=random)
+        series_data = gen_arr_from_input(data_length, input_data, random=random)
     else:
         series_data = gen_arr_of_dtype(data_length, dtype=dtype, limits=limits, nunique=nunique)
 
@@ -98,6 +116,7 @@ def gen_df(data_length,
            limits=None,
            nunique=1000,
            input_data=None,
+           index_gen=None,
            seed=None):
     """
     data_length: result series length,
@@ -105,6 +124,7 @@ def gen_df(data_length,
     limits: a tuple of (min, max) limits for numeric series,
     nunique: number of unique values in generated series,
     input_data: 2D sequence of values used for generation of dataframe columns,
+    index_gen: callable that will generate index of needed size,
     seed: seed to initialize random state
     """
 
@@ -116,10 +136,10 @@ def gen_df(data_length,
     for i in range(columns):
         # prefer generation based on input data if it's provided
         if (input_data is not None and i < len(input_data)):
-            col_data = gen_arr_from_input(input_data[i], data_length, random=random)
+            col_data = gen_arr_from_input(data_length, input_data[i], random=random)
         else:
             col_data = gen_arr_of_dtype(data_length, dtype=dtype, limits=limits, nunique=nunique)
         all_data.append(col_data)
 
-    # TODO: support index generation
-    return pd.DataFrame(dict(zip(col_names, all_data)))
+    index_data = index_gen(data_length) if index_gen is not None else None
+    return pd.DataFrame(dict(zip(col_names, all_data)), index=index_data)

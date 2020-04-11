@@ -420,7 +420,7 @@ def hpat_pandas_series_getitem(self, idx):
                   ' Given: self.index={}, idx.index={}'
             raise TypingError(msg.format(_func_name, self.index, idx.index))
 
-        def hpat_pandas_series_getitem_idx_bool_indexer_impl(self, idx):
+        def _series_getitem_idx_bool_indexer_impl(self, idx):
 
             if none_indexes == True:  # noqa
                 if len(self) > len(idx):
@@ -428,21 +428,19 @@ def hpat_pandas_series_getitem(self, idx):
                           "(index of the boolean Series and of the indexed object do not match)."
                     raise IndexingError(msg)
 
-                return pandas.Series(
-                    data=numpy_like.getitem_by_mask(self._data, idx._data),
-                    index=numpy_like.getitem_by_mask(range(len(self)), idx._data),
-                    name=self._name
-                )
+                self_index = range(len(self))
+                reindexed_idx = idx
             else:
                 self_index = self.index
-                idx_reindexed = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)
-                return pandas.Series(
-                    data=numpy_like.getitem_by_mask(self._data, idx_reindexed._data),
-                    index=numpy_like.getitem_by_mask(self_index, idx_reindexed._data),
-                    name=self._name
-                )
+                reindexed_idx = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)
 
-        return hpat_pandas_series_getitem_idx_bool_indexer_impl
+            return pandas.Series(
+                data=numpy_like.getitem_by_mask(self._data, reindexed_idx._data),
+                index=numpy_like.getitem_by_mask(self_index, reindexed_idx._data),
+                name=self._name
+            )
+
+        return _series_getitem_idx_bool_indexer_impl
 
     # idx is Series and it's index is None, idx.dtype is not Boolean
     if (isinstance(idx, SeriesType) and index_is_none
