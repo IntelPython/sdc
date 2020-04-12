@@ -122,10 +122,21 @@ def init_dataframe(typingctx, *args):
         dataframe = cgutils.create_struct_proxy(
             signature.return_type)(context, builder)
 
+        # data_tup = context.make_tuple(
+        #     builder, types.Tuple(data_typs), data_arrs)
+        # column_tup = context.make_tuple(
+        #     builder, types.UniTuple(string_type, n_cols), column_strs)
+
+        data_list_type = types.List(data_typs[0])
+        data_list = context.build_list(builder, data_list_type, data_arrs)
         data_tup = context.make_tuple(
-            builder, types.Tuple(data_typs), data_arrs)
+            builder, types.Tuple([data_list_type]), [data_list])
+
+        col_list_type = types.List(string_type)
+        column_list = context.build_list(builder, col_list_type, column_strs)
         column_tup = context.make_tuple(
-            builder, types.UniTuple(string_type, n_cols), column_strs)
+            builder, types.UniTuple(col_list_type, 1), [column_list])
+
         zero = context.get_constant(types.int8, 0)
 
         dataframe.data = data_tup

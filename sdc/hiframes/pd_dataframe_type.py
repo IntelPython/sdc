@@ -87,9 +87,11 @@ class DataFrameModel(models.StructModel):
     def __init__(self, dmm, fe_type):
         n_cols = len(fe_type.columns)
         members = [
-            ('data', types.Tuple(fe_type.data)),
+            # ('data', types.Tuple(fe_type.data)),
+            ('data', types.Tuple([types.List(fe_type.data[0])])),
             ('index', fe_type.index),
-            ('columns', types.UniTuple(string_type, n_cols)),
+            # ('columns', types.UniTuple(string_type, n_cols)),
+            ('columns', types.UniTuple(types.List(string_type), 1)),
             ('parent', types.pyobject),
         ]
         super(DataFrameModel, self).__init__(dmm, fe_type, members)

@@ -421,7 +421,7 @@ def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, col
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     for i, c in enumerate(columns):
         result_c = f'result_{i}'
-        func_lines += [f'  series_{i} = pandas.Series({func_params[0]}._data[{i}])',
+        func_lines += [f'  series_{i} = pandas.Series({func_params[0]}._data[0][{i}])',
                        f'  {result_c} = series_{i}.{func_name}({series_params})']
         result_name_list.append(result_c)
     all_results = ', '.join(result_name_list)
