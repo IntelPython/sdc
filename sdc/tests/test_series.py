@@ -6985,6 +6985,31 @@ class TestSeries(
         self.assertIn(str(sdc_exception), str(pandas_exception))
 
     @skip_sdc_jit('Not implemented in old-pipeline')
+    def test_series_getitem_idx_bool_series3(self):
+        """ Verifies Series.getitem by mask indicated by a Boolean Series with the same object as index """
+        def test_impl(A, mask, index):
+            S = pd.Series(A, index)
+            idx = pd.Series(mask, S.index)
+            return S[idx]
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        np.random.seed(0)
+
+        idxs_to_test = [
+            np.arange(n),
+            np.arange(n, dtype='float'),
+            gen_strlist(n, 2, 'abcd123 ')
+        ]
+        series_data = np.arange(n)
+        mask = np.random.choice([True, False], n)
+        for index in idxs_to_test:
+            with self.subTest(series_index=index):
+                result = hpat_func(series_data, mask, index)
+                result_ref = test_impl(series_data, mask, index)
+                pd.testing.assert_series_equal(result, result_ref)
+
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_getitem_idx_bool_series_reindex(self):
         """ Verifies Series.getitem with reindexing by mask indicated by a Boolean Series
         on Series with various types of indexes """

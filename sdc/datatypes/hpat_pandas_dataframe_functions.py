@@ -29,7 +29,6 @@
 | Also, it contains Numba internal operators which are required for DataFrame type handling
 '''
 
-
 import numba
 import numpy
 import operator
@@ -65,6 +64,7 @@ from sdc.hiframes.api import isna
 from sdc.functions.numpy_like import getitem_by_mask
 from sdc.datatypes.common_functions import _sdc_take, sdc_reindex_series
 from sdc.utilities.prange_utils import parallel_chunks
+
 
 @sdc_overload_attribute(DataFrameType, 'index')
 def hpat_pandas_dataframe_index(df):
@@ -105,6 +105,7 @@ def hpat_pandas_dataframe_index(df):
 
         return hpat_pandas_df_index_none_impl
     else:
+
         def hpat_pandas_df_index_impl(df):
             return df._index
 
@@ -403,7 +404,6 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=False, verify_integrity=
         return _append_impl
 
     return sdc_pandas_dataframe_append_impl(df, other, _func_name, ignore_index, indexes_comparable, args)
-
 
 # Example func_text for func_name='count' columns=('A', 'B'):
 #
@@ -1534,9 +1534,9 @@ def df_getitem_bool_series_idx_main_codelines(self, idx):
     else:
         func_lines = [f'  length = {df_length_expr(self)}',
                       f'  self_index = self.index',
-                      f'  idx_reindexed = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)',
-                      f'  res_index = getitem_by_mask(self_index, idx_reindexed._data)',
-                      f'  selected_pos = getitem_by_mask(range(length), idx_reindexed._data)']
+                      f'  reindexed_idx = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)',
+                      f'  res_index = getitem_by_mask(self_index, reindexed_idx._data)',
+                      f'  selected_pos = getitem_by_mask(numpy.arange(length), reindexed_idx._data)']
 
         results = []
         for i, col in enumerate(self.columns):
@@ -1835,6 +1835,7 @@ def sdc_pandas_dataframe_getitem(self, idx):
         return _df_getitem_str_literal_idx_impl
 
     if isinstance(idx, types.UnicodeType):
+
         def _df_getitem_unicode_idx_impl(self, idx):
             # http://numba.pydata.org/numba-doc/dev/developer/literal.html#specifying-for-literal-typing
             # literally raises special exception to call getitem with literal idx value got from unicode
@@ -1886,6 +1887,7 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
             col = idx[1].literal_value
             if -1 < col < len(self.dataframe.columns):
+
                 def df_getitem_iat_tuple_impl(self, idx):
                     row, _ = idx
                     if -1 < row < len(self._dataframe.index):
@@ -2335,6 +2337,7 @@ def df_set_column_overload(self, key, value):
             return gen_df_replace_column_impl(self, key)
 
     if isinstance(key, types.UnicodeType):
+
         def _df_set_column_unicode_key_impl(self, key, value):
             # http://numba.pydata.org/numba-doc/dev/developer/literal.html#specifying-for-literal-typing
             # literally raises special exception to call df._set_column with literal idx value got from unicode
