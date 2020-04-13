@@ -1,0 +1,15 @@
+channels:
+  - numba
+  - defaults
+dependencies:
+  - python=3.7
+  - numba=0.48.0
+  - pandas=0.25.3
+  - pyarrow=0.15.1
+  - scipy=1.4.1
+  - mpich=3.3.2
+  - gcc_linux-64=7.3.0
+  - gxx_linux-64=7.3.0
+
+  - pytest
+  - pytest-xdist
