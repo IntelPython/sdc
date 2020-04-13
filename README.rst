@@ -149,6 +149,13 @@ Troubleshooting Windows Build
   building Intel® SDC can throw some vague error about a keyword used in a file.
   So make sure you are using the latest versions.
 
+Create Development Environment
+------------------------------
+
+::
+
+    conda env create -n sdc-dev-env -f environment.yml
+
 Building documentation
 ----------------------
 
