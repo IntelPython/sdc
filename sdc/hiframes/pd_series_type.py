@@ -32,7 +32,7 @@ from numba import types, cgutils
 from numba.numpy_support import from_dtype
 from numba.extending import (models, register_model, make_attribute_wrapper, lower_builtin)
 from numba.targets.imputils import (impl_ret_new_ref, iternext_impl, RefType)
-from numba.targets.arrayobj import (make_array, _getitem_array1d)
+from numba.targets.arrayobj import make_array
 
 from sdc.str_arr_ext import string_array_type
 from sdc.str_ext import string_type, list_string_array_type
