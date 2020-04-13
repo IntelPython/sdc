@@ -40,7 +40,6 @@ from numba.extending import (
 
 import sdc
 from sdc.hiframes.pd_categorical_ext import PDCategoricalDtype
-from sdc.hiframes.pd_timestamp_ext import datetime_date_type
 from sdc.hiframes.split_impl import string_array_split_view_type
 
 from sdc.str_arr_ext import string_array_type
@@ -57,21 +56,8 @@ def is_dt64_series_typ(t):
     return isinstance(t, SeriesType) and t.dtype == types.NPDatetime('ns')
 
 
-def is_timedelta64_series_typ(t):
-    return isinstance(t, SeriesType) and t.dtype == types.NPTimedelta('ns')
-
-
-def is_datetime_date_series_typ(t):
-    return isinstance(t, SeriesType) and t.dtype == datetime_date_type
-
-
 def series_to_array_type(typ, replace_boxed=False):
     return typ.data
-    # return _get_series_array_type(typ.dtype)
-
-
-def is_series_type(typ):
-    return isinstance(typ, SeriesType)
 
 
 def arr_to_series_type(arr):
