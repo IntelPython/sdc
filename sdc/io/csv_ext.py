@@ -33,7 +33,8 @@ from llvmlite import ir as lir
 from .. import hio
 from collections import defaultdict
 import numba
-from numba import typeinfer, ir, ir_utils, config, types, cgutils
+from numba import typeinfer, ir, ir_utils, config, cgutils
+from numba.core import types
 from numba.typing.templates import signature
 from numba.extending import overload, intrinsic, register_model, models, box
 from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
