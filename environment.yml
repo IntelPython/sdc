@@ -14,3 +14,6 @@ dependencies:
   - pycodestyle
   - pytest
   - pytest-xdist
+  - sphinx
+  - pip:
+    - sphinxcontrib-programoutput
