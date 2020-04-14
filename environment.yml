@@ -11,5 +11,6 @@ dependencies:
   - gcc_linux-64=7.3.0
   - gxx_linux-64=7.3.0
 
+  - pycodestyle
   - pytest
   - pytest-xdist
