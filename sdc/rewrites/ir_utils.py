@@ -270,8 +270,10 @@ def _remove_unused_internal(var, block, func_ir):
 
     for stmt in find_usage(var, block):
         usage_list.append(stmt)
-        if isinstance(stmt, Del):
-            use_count -= 1
+        if isinstance(stmt, Assign) and var == stmt.target:
+            continue
+        elif isinstance(stmt, Del):
+            continue
         else:
             use_count += 1
 
