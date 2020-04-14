@@ -1819,12 +1819,19 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
     accessor = self.accessor.literal_value
 
     if accessor == 'at':
-        if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
-            row = idx[0]
-            col = idx[1].literal_value
-            return gen_df_getitem_tuple_at_impl(self.dataframe, row, col)
+        num_idx = isinstance(idx[0], types.Number) and isinstance(self.dataframe.index, types.Array)
+        str_idx = (isinstance(idx[0], (types.UnicodeType, types.StringLiteral))
+                   and isinstance(self.dataframe.index, StringArrayType))
+        if isinstance(idx, types.Tuple) and isinstance(idx[1], types.StringLiteral):
+            if num_idx or str_idx:
+                row = idx[0]
+                col = idx[1].literal_value
+                return gen_df_getitem_tuple_at_impl(self.dataframe, row, col)
 
-        raise TypingError('Operator getitem(). The index must be a row and literal column. Given: {}'.format(idx))
+            raise TypingError('Operator at(). The row parameter type ({}) is different from the index type\
+                              ({})'.format(type(idx[0]), type(self.dataframe.index.dtype)))
+
+        raise TypingError('Operator at(). The index must be a row and literal column. Given: {}'.format(idx))
 
     if accessor == 'iat':
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
