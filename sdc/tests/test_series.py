@@ -56,6 +56,7 @@ from sdc.tests.test_utils import (count_array_OneDs,
 from sdc.tests.gen_test_data import ParquetGenerator
 
 from sdc.tests.test_utils import test_global_input_data_unicode_kind1
+from sdc.datatypes.common_functions import SDCLimitation
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -121,10 +122,13 @@ def gen_srand_array(size, nchars=8):
     return np.random.choice(rands_chars, size=nchars * size).view((np.str_, nchars))
 
 
-def gen_frand_array(size, min=-100, max=100):
+def gen_frand_array(size, min=-100, max=100, nancount=0):
     """Generate array of float of specified size based on [-100-100]"""
     np.random.seed(100)
-    return (max - min) * np.random.sample(size) + min
+    res = (max - min) * np.random.sample(size) + min
+    if nancount:
+        res[np.random.choice(np.arange(size), nancount)] = np.nan
+    return res
 
 
 def gen_strlist(size, nchars=8, accepted_chars=None):
@@ -274,6 +278,10 @@ def isupper_usecase(series):
     return series.str.isupper()
 
 
+def lower_usecase(series):
+    return series.str.lower()
+
+
 def upper_usecase(series):
     return series.str.upper()
 
@@ -288,6 +296,10 @@ def lstrip_usecase(series, to_strip=None):
 
 def rstrip_usecase(series, to_strip=None):
     return series.str.rstrip(to_strip)
+
+
+def contains_usecase(series, pat, case=True, flags=0, na=None, regex=True):
+    return series.str.contains(pat, case, flags, na, regex)
 
 
 class TestSeries(
@@ -573,11 +585,10 @@ class TestSeries(
                             self.assertEqual(actual.index is S.index, expected.index is S.index)
                             self.assertEqual(actual.index is S.index, not deep)
 
-    @skip_parallel
     @skip_sdc_jit('Series.corr() parameter "min_periods" unsupported')
     def test_series_corr(self):
-        def test_series_corr_impl(S1, S2, min_periods=None):
-            return S1.corr(S2, min_periods=min_periods)
+        def test_series_corr_impl(s1, s2, min_periods=None):
+            return s1.corr(s2, min_periods=min_periods)
 
         hpat_func = self.jit(test_series_corr_impl)
         test_input_data1 = [[.2, .0, .6, .2],
@@ -594,50 +605,50 @@ class TestSeries(
                             [np.nan, np.nan, np.inf, np.nan]]
         for input_data1 in test_input_data1:
             for input_data2 in test_input_data2:
-                S1 = pd.Series(input_data1)
-                S2 = pd.Series(input_data2)
+                s1 = pd.Series(input_data1)
+                s2 = pd.Series(input_data2)
                 for period in [None, 2, 1, 8, -4]:
-                    result_ref = test_series_corr_impl(S1, S2, min_periods=period)
-                    result = hpat_func(S1, S2, min_periods=period)
+                    result_ref = test_series_corr_impl(s1, s2, min_periods=period)
+                    result = hpat_func(s1, s2, min_periods=period)
                     np.testing.assert_allclose(result, result_ref)
 
     @skip_sdc_jit('Series.corr() parameter "min_periods" unsupported')
     def test_series_corr_unsupported_dtype(self):
-        def test_series_corr_impl(S1, S2, min_periods=None):
-            return S1.corr(S2, min_periods=min_periods)
+        def test_series_corr_impl(s1, s2, min_periods=None):
+            return s1.corr(s2, min_periods=min_periods)
 
         hpat_func = self.jit(test_series_corr_impl)
-        S1 = pd.Series([.2, .0, .6, .2])
-        S2 = pd.Series(['abcdefgh', 'a', 'abcdefg', 'ab', 'abcdef', 'abc'])
-        S3 = pd.Series(['aaaaa', 'bbbb', 'ccc', 'dd', 'e'])
-        S4 = pd.Series([.3, .6, .0, .1])
+        s1 = pd.Series([.2, .0, .6, .2])
+        s2 = pd.Series(['abcdefgh', 'a', 'abcdefg', 'ab', 'abcdef', 'abc'])
+        s3 = pd.Series(['aaaaa', 'bbbb', 'ccc', 'dd', 'e'])
+        s4 = pd.Series([.3, .6, .0, .1])
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S1, S2, min_periods=5)
+            hpat_func(s1, s2, min_periods=5)
         msg = 'Method corr(). The object other.data'
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S3, S4, min_periods=5)
+            hpat_func(s3, s4, min_periods=5)
         msg = 'Method corr(). The object self.data'
         self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('Series.corr() parameter "min_periods" unsupported')
     def test_series_corr_unsupported_period(self):
-        def test_series_corr_impl(S1, S2, min_periods=None):
-            return S1.corr(S2, min_periods=min_periods)
+        def test_series_corr_impl(s1, s2, min_periods=None):
+            return s1.corr(s2, min_periods=min_periods)
 
         hpat_func = self.jit(test_series_corr_impl)
-        S1 = pd.Series([.2, .0, .6, .2])
-        S2 = pd.Series([.3, .6, .0, .1])
+        s1 = pd.Series([.2, .0, .6, .2])
+        s2 = pd.Series([.3, .6, .0, .1])
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S1, S2, min_periods='aaaa')
+            hpat_func(s1, s2, min_periods='aaaa')
         msg = 'Method corr(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S1, S2, min_periods=0.5)
+            hpat_func(s1, s2, min_periods=0.5)
         msg = 'Method corr(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
@@ -2862,15 +2873,15 @@ class TestSeries(
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_corr1(self):
-        def test_impl(S1, S2):
-            return S1.corr(S2)
+        def test_impl(s1, s2):
+            return s1.corr(s2)
         hpat_func = self.jit(test_impl)
 
         for pair in _cov_corr_series:
-            S1, S2 = pair
-            with self.subTest(S1=S1.values, S2=S2.values):
-                result = hpat_func(S1, S2)
-                result_ref = test_impl(S1, S2)
+            s1, s2 = pair
+            with self.subTest(s1=s1.values, s2=s2.values):
+                result = hpat_func(s1, s2)
+                result_ref = test_impl(s1, s2)
                 np.testing.assert_almost_equal(result, result_ref)
 
     def test_series_str_center_default_fillchar(self):
@@ -3092,6 +3103,16 @@ class TestSeries(
             jit_result = cfunc(series, width)
             ref_result = pyfunc(series, width)
             pd.testing.assert_series_equal(jit_result, ref_result)
+
+    def test_series_str_ljust_with_none(self):
+        def test_impl(series, width, fillchar):
+            return series.str.ljust(width, fillchar)
+
+        cfunc = self.jit(test_impl)
+        idx = ['City 1', 'City 2', 'City 3', 'City 4', 'City 5', 'City 6', 'City 7', 'City 8']
+        s = pd.Series(['New_York', 'Lisbon', np.nan, 'Tokyo', 'Paris', None, 'Munich', None], index=idx)
+        pd.testing.assert_series_equal(cfunc(s, width=13, fillchar='*'), test_impl(s, width=13, fillchar='*'))
+
 
     def test_series_str_rjust_with_none(self):
         def test_impl(series, width, fillchar):
@@ -4969,8 +4990,8 @@ class TestSeries(
     @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_series_quantile(self):
         def test_impl():
-            A = pd.Series([1, 2.5, .5, 3, 5])
-            return A.quantile()
+            a = pd.Series([1, 2.5, .5, 3, 5])
+            return a.quantile()
 
         hpat_func = self.jit(test_impl)
         np.testing.assert_equal(hpat_func(), test_impl())
@@ -4980,12 +5001,12 @@ class TestSeries(
         def test_series_quantile_q_vector_impl(S, param1):
             return S.quantile(param1)
 
-        S = pd.Series(np.random.ranf(100))
+        s = pd.Series(np.random.ranf(100))
         hpat_func = self.jit(test_series_quantile_q_vector_impl)
 
         param1 = [0.0, 0.25, 0.5, 0.75, 1.0]
-        result_ref = test_series_quantile_q_vector_impl(S, param1)
-        result = hpat_func(S, param1)
+        result_ref = test_series_quantile_q_vector_impl(s, param1)
+        result = hpat_func(s, param1)
         np.testing.assert_equal(result, result_ref)
 
     @unittest.skip("Implement unique without sorting like in pandas")
@@ -5078,11 +5099,11 @@ class TestSeries(
         self.assertIn(msg, str(raises.exception))
 
     def test_series_nunique(self):
-        def test_series_nunique_impl(S):
-            return S.nunique()
+        def test_series_nunique_impl(s):
+            return s.nunique()
 
-        def test_series_nunique_param1_impl(S, dropna):
-            return S.nunique(dropna)
+        def test_series_nunique_param1_impl(s, dropna):
+            return s.nunique(dropna)
 
         hpat_func = self.jit(test_series_nunique_impl)
 
@@ -5092,7 +5113,8 @@ class TestSeries(
                        [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
                        [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
                        ['aa', 'aa', 'b', 'b', 'cccc', 'dd', 'ddd', 'dd'],
-                       ['aa', 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                       ['aa', 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string,
+                        'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
                        []
                        ]
 
@@ -5100,7 +5122,8 @@ class TestSeries(
                       [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
                       [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
                       ['aa', np.nan, 'b', 'b', 'cccc', np.nan, 'ddd', 'dd'],
-                      [np.nan, 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string, 'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
+                      [np.nan, 'copy aa', the_same_string, 'b', 'b', 'cccc', the_same_string,
+                       'dd', 'ddd', 'dd', 'copy aa', 'copy aa'],
                       [np.nan, np.nan, np.nan],
                       [np.nan, np.nan, np.inf],
                       ]
@@ -5115,10 +5138,10 @@ class TestSeries(
             test_input_data = data_simple + data_extra
 
         for input_data in test_input_data:
-            S = pd.Series(input_data)
+            s = pd.Series(input_data)
 
-            result_ref = test_series_nunique_impl(S)
-            result = hpat_func(S)
+            result_ref = test_series_nunique_impl(s)
+            result = hpat_func(s)
             self.assertEqual(result, result_ref)
 
             if not sdc.config.config_pipeline_hpat_default:
@@ -5129,8 +5152,8 @@ class TestSeries(
                 hpat_func_param1 = self.jit(test_series_nunique_param1_impl)
 
                 for param1 in [True, False]:
-                    result_param1_ref = test_series_nunique_param1_impl(S, param1)
-                    result_param1 = hpat_func_param1(S, param1)
+                    result_param1_ref = test_series_nunique_param1_impl(s, param1)
+                    result_param1 = hpat_func_param1(s, param1)
                     self.assertEqual(result_param1, result_param1_ref)
 
     def test_series_var(self):
@@ -5313,20 +5336,20 @@ class TestSeries(
                 self.assertIn(msg, str(raises.exception))
 
     def test_series_cov1(self):
-        def test_impl(S1, S2):
-            return S1.cov(S2)
+        def test_impl(s1, s2):
+            return s1.cov(s2)
         hpat_func = self.jit(test_impl)
 
         for pair in _cov_corr_series:
-            S1, S2 = pair
+            s1, s2 = pair
             np.testing.assert_almost_equal(
-                hpat_func(S1, S2), test_impl(S1, S2),
-                err_msg='S1={}\nS2={}'.format(S1, S2))
+                hpat_func(s1, s2), test_impl(s1, s2),
+                err_msg='s1={}\ns2={}'.format(s1, s2))
 
     @skip_sdc_jit('Series.cov() parameter "min_periods" unsupported')
     def test_series_cov(self):
-        def test_series_cov_impl(S1, S2, min_periods=None):
-            return S1.cov(S2, min_periods)
+        def test_series_cov_impl(s1, s2, min_periods=None):
+            return s1.cov(s2, min_periods)
 
         hpat_func = self.jit(test_series_cov_impl)
         test_input_data1 = [[.2, .0, .6, .2],
@@ -5343,51 +5366,51 @@ class TestSeries(
                             [np.nan, np.nan, np.inf, np.nan]]
         for input_data1 in test_input_data1:
             for input_data2 in test_input_data2:
-                S1 = pd.Series(input_data1)
-                S2 = pd.Series(input_data2)
+                s1 = pd.Series(input_data1)
+                s2 = pd.Series(input_data2)
                 for period in [None, 2, 1, 8, -4]:
                     with self.subTest(input_data1=input_data1, input_data2=input_data2, min_periods=period):
-                        result_ref = test_series_cov_impl(S1, S2, min_periods=period)
-                        result = hpat_func(S1, S2, min_periods=period)
+                        result_ref = test_series_cov_impl(s1, s2, min_periods=period)
+                        result = hpat_func(s1, s2, min_periods=period)
                         np.testing.assert_allclose(result, result_ref)
 
     @skip_sdc_jit('Series.cov() parameter "min_periods" unsupported')
     def test_series_cov_unsupported_dtype(self):
-        def test_series_cov_impl(S1, S2, min_periods=None):
-            return S1.cov(S2, min_periods=min_periods)
+        def test_series_cov_impl(s1, s2, min_periods=None):
+            return s1.cov(s2, min_periods=min_periods)
 
         hpat_func = self.jit(test_series_cov_impl)
-        S1 = pd.Series([.2, .0, .6, .2])
-        S2 = pd.Series(['abcdefgh', 'a','abcdefg', 'ab', 'abcdef', 'abc'])
-        S3 = pd.Series(['aaaaa', 'bbbb', 'ccc', 'dd', 'e'])
-        S4 = pd.Series([.3, .6, .0, .1])
+        s1 = pd.Series([.2, .0, .6, .2])
+        s2 = pd.Series(['abcdefgh', 'a', 'abcdefg', 'ab', 'abcdef', 'abc'])
+        s3 = pd.Series(['aaaaa', 'bbbb', 'ccc', 'dd', 'e'])
+        s4 = pd.Series([.3, .6, .0, .1])
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S1, S2, min_periods=5)
+            hpat_func(s1, s2, min_periods=5)
         msg = 'Method cov(). The object other.data'
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S3, S4, min_periods=5)
+            hpat_func(s3, s4, min_periods=5)
         msg = 'Method cov(). The object self.data'
         self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('Series.cov() parameter "min_periods" unsupported')
     def test_series_cov_unsupported_period(self):
-        def test_series_cov_impl(S1, S2, min_periods=None):
-            return S1.cov(S2, min_periods)
+        def test_series_cov_impl(s1, s2, min_periods=None):
+            return s1.cov(s2, min_periods)
 
         hpat_func = self.jit(test_series_cov_impl)
-        S1 = pd.Series([.2, .0, .6, .2])
-        S2 = pd.Series([.3, .6, .0, .1])
+        s1 = pd.Series([.2, .0, .6, .2])
+        s2 = pd.Series([.3, .6, .0, .1])
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S1, S2, min_periods='aaaa')
+            hpat_func(s1, s2, min_periods='aaaa')
         msg = 'Method cov(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
         with self.assertRaises(TypingError) as raises:
-            hpat_func(S1, S2, min_periods=0.5)
+            hpat_func(s1, s2, min_periods=0.5)
         msg = 'Method cov(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
@@ -6084,6 +6107,16 @@ class TestSeries(
             S = pd.Series(ser)
             pd.testing.assert_series_equal(cfunc(S), islower_usecase(S))
 
+    def test_series_lower_str(self):
+        all_data = [['leopard', None, 'Golden Eagle', np.nan, 'SNAKE', ''],
+                    ['Hello world!', np.nan, 'hello 123', None, 'mynameisPeter']
+                    ]
+
+        cfunc = self.jit(lower_usecase)
+        for data in all_data:
+            s = pd.Series(data)
+            pd.testing.assert_series_equal(cfunc(s), lower_usecase(s))
+
     def test_series_strip_str(self):
         s = pd.Series(['1. Ant.  ', None, '2. Bee!\n', np.nan, '3. Cat?\t'])
         cfunc = self.jit(strip_usecase)
@@ -6141,6 +6174,41 @@ class TestSeries(
         for data in test_data:
             s = pd.Series(data)
             pd.testing.assert_series_equal(cfunc(s), isupper_usecase(s))
+
+    def test_series_contains(self):
+        hpat_func = self.jit(contains_usecase)
+        s = pd.Series(['Mouse', 'dog', 'house and parrot', '23'])
+        for pat in ['og', 'Og', 'OG', 'o']:
+            for case in [True, False]:
+                with self.subTest(pat=pat, case=case):
+                    pd.testing.assert_series_equal(hpat_func(s, pat, case), contains_usecase(s, pat, case))
+
+    def test_series_contains_with_na_flags_regex(self):
+        hpat_func = self.jit(contains_usecase)
+        s = pd.Series(['Mouse', 'dog', 'house and parrot', '23'])
+        pat = 'og'
+        pd.testing.assert_series_equal(hpat_func(s, pat, flags=0, na=None, regex=True),
+                                       contains_usecase(s, pat, flags=0, na=None, regex=True))
+
+    def test_series_contains_unsupported(self):
+        hpat_func = self.jit(contains_usecase)
+        s = pd.Series(['Mouse', 'dog', 'house and parrot', '23'])
+        pat = 'og'
+
+        with self.assertRaises(SDCLimitation) as raises:
+            hpat_func(s, pat, flags=1)
+        msg = "Method contains(). Unsupported parameter. Given 'flags' != 0"
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, pat, na=0)
+        msg = 'Method contains(). The object na\n given: int64\n expected: none'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(SDCLimitation) as raises:
+            hpat_func(s, pat, regex=False)
+        msg = "Method contains(). Unsupported parameter. Given 'regex' is False"
+        self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('Old-style implementation returns string, but not series')
     def test_series_describe_numeric(self):
@@ -6992,6 +7060,31 @@ class TestSeries(
             hpat_func(S, idx)
         sdc_exception = context.exception
         self.assertIn(str(sdc_exception), str(pandas_exception))
+
+    @skip_sdc_jit('Not implemented in old-pipeline')
+    def test_series_getitem_idx_bool_series3(self):
+        """ Verifies Series.getitem by mask indicated by a Boolean Series with the same object as index """
+        def test_impl(A, mask, index):
+            S = pd.Series(A, index)
+            idx = pd.Series(mask, S.index)
+            return S[idx]
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        np.random.seed(0)
+
+        idxs_to_test = [
+            np.arange(n),
+            np.arange(n, dtype='float'),
+            gen_strlist(n, 2, 'abcd123 ')
+        ]
+        series_data = np.arange(n)
+        mask = np.random.choice([True, False], n)
+        for index in idxs_to_test:
+            with self.subTest(series_index=index):
+                result = hpat_func(series_data, mask, index)
+                result_ref = test_impl(series_data, mask, index)
+                pd.testing.assert_series_equal(result, result_ref)
 
     @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_getitem_idx_bool_series_reindex(self):

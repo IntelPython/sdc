@@ -573,7 +573,7 @@ def _sdc_asarray(data):
     pass
 
 
-@sdc_overload(_sdc_asarray, jit_options={'parallel': True})
+@sdc_overload(_sdc_asarray)
 def _sdc_asarray_overload(data):
 
     # TODO: extend with other types
@@ -641,6 +641,24 @@ def _sdc_take_overload(data, indexes):
 
         return _sdc_take_str_arr_impl
 
+    elif (isinstance(data, types.RangeType) and isinstance(data.dtype, types.Integer)):
+        arr_dtype = data.dtype
+
+        def _sdc_take_array_impl(data, indexes):
+            res_size = len(indexes)
+            index_errors = 0
+            res_arr = numpy.empty(res_size, dtype=arr_dtype)
+            for i in numba.prange(res_size):
+                value = data.start + data.step * indexes[i]
+                if value >= data.stop:
+                    index_errors += 1
+                res_arr[i] = value
+            if index_errors:
+                raise IndexError("_sdc_take: index out-of-bounds")
+            return res_arr
+
+        return _sdc_take_array_impl
+
     return None
 
 
@@ -667,14 +685,21 @@ def sdc_reindex_series(arr, index, name, by_index):
     pass
 
 
-@sdc_overload(sdc_reindex_series, jit_options={'parallel': True})
+@sdc_overload(sdc_reindex_series)
 def sdc_reindex_series_overload(arr, index, name, by_index):
     """ Reindexes series data by new index following the logic of pandas.core.indexing.check_bool_indexer """
 
+    same_index_types = index is by_index
     data_dtype, index_dtype = arr.dtype, index.dtype
     data_is_str_arr = isinstance(arr.dtype, types.UnicodeType)
 
     def sdc_reindex_series_impl(arr, index, name, by_index):
+
+        # if index types are the same, we may not reindex if indexes are the same
+        if same_index_types == True:  # noqa
+            if index is by_index:
+                return pandas.Series(data=arr, index=index, name=name)
+
         if data_is_str_arr == True:  # noqa
             _res_data = [''] * len(by_index)
             res_data_nan_mask = numpy.zeros(len(by_index), dtype=types.bool_)
@@ -716,5 +741,3 @@ def sdc_reindex_series_overload(arr, index, name, by_index):
         return pandas.Series(data=res_data, index=by_index, name=name)
 
     return sdc_reindex_series_impl
-
-    return None

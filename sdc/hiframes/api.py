@@ -71,7 +71,7 @@ from sdc.hiframes.pd_series_ext import (
     if_series_to_array_type,
     is_dt64_series_typ)
 from sdc.hiframes.pd_index_ext import DatetimeIndexType, TimedeltaIndexType
-from sdc.hiframes.sort import (
+from sdc.shuffle_utils import (
     alltoallv,
     alltoallv_tup,
     finalize_shuffle_meta,

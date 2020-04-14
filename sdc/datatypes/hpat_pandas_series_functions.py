@@ -263,7 +263,9 @@ def hpat_pandas_series_getitem(self, idx):
     """
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
-    Pandas API: pandas.Series.__getitem__
+    Pandas API: pandas.Series.getitem
+
+    Get value(s) of Series by key.
 
     Limitations
     -----------
@@ -320,6 +322,30 @@ def hpat_pandas_series_getitem(self, idx):
 
     .. command-output:: python ./series/series_getitem/series_getitem_series.py
        :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`Series.setitem <pandas.Series.setitem>`
+            Set value to Series by index
+        :ref:`Series.loc <pandas.Series.loc>`
+            Access a group of rows and columns by label(s) or a boolean array.
+        :ref:`Series.iloc <pandas.Series.iloc>`
+            Purely integer-location based indexing for selection by position.
+        :ref:`Series.at <pandas.Series.at>`
+            Access a single value for a row/column label pair.
+        :ref:`Series.iat <pandas.Series.iat>`
+            Access a single value for a row/column pair by integer position.
+        :ref:`DataFrame.getitem <pandas.DataFrame.getitem>`
+            Get data from a DataFrame by indexer.
+        :ref:`DataFrame.setitem <pandas.DataFrame.setitem>`
+            Set value to DataFrame by index
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Access a group of rows and columns by label(s) or a boolean array.
+        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+            Purely integer-location based indexing for selection by position.
+        :ref:`DataFrame.at <pandas.DataFrame.at>`
+            Access a single value for a row/column label pair.
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Access a single value for a row/column pair by integer position.
 
     .. todo:: Fix SDC behavior and add the expected output of the > python ./series_getitem.py to the docstring
 
@@ -394,7 +420,7 @@ def hpat_pandas_series_getitem(self, idx):
                   ' Given: self.index={}, idx.index={}'
             raise TypingError(msg.format(_func_name, self.index, idx.index))
 
-        def hpat_pandas_series_getitem_idx_bool_indexer_impl(self, idx):
+        def _series_getitem_idx_bool_indexer_impl(self, idx):
 
             if none_indexes == True:  # noqa
                 if len(self) > len(idx):
@@ -402,21 +428,19 @@ def hpat_pandas_series_getitem(self, idx):
                           "(index of the boolean Series and of the indexed object do not match)."
                     raise IndexingError(msg)
 
-                return pandas.Series(
-                    data=numpy_like.getitem_by_mask(self._data, idx._data),
-                    index=numpy_like.getitem_by_mask(self.index, idx._data),
-                    name=self._name
-                )
+                self_index = range(len(self))
+                reindexed_idx = idx
             else:
                 self_index = self.index
-                idx_reindexed = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)
-                return pandas.Series(
-                    data=numpy_like.getitem_by_mask(self._data, idx_reindexed._data),
-                    index=numpy_like.getitem_by_mask(self_index, idx_reindexed._data),
-                    name=self._name
-                )
+                reindexed_idx = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)
 
-        return hpat_pandas_series_getitem_idx_bool_indexer_impl
+            return pandas.Series(
+                data=numpy_like.getitem_by_mask(self._data, reindexed_idx._data),
+                index=numpy_like.getitem_by_mask(self_index, reindexed_idx._data),
+                name=self._name
+            )
+
+        return _series_getitem_idx_bool_indexer_impl
 
     # idx is Series and it's index is None, idx.dtype is not Boolean
     if (isinstance(idx, SeriesType) and index_is_none
@@ -863,6 +887,8 @@ def hpat_pandas_series_loc(self):
     - Loc always returns Series.
     - Loc slice is supported only with numeric values and specified ``start``.
     - Loc callable is not supported yet.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -983,6 +1009,11 @@ def hpat_pandas_series_at(self):
 
     Pandas API: pandas.Series.at
 
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_at/series_at_single_result.py
@@ -1043,7 +1074,9 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
 
     Limitations
     -----------
-    Parameter ``keep`` is supported only with default value ``'first'``.
+    - Parameter ``keep`` is supported only with default value ``'first'``.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -1109,7 +1142,9 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
 
     Limitations
     -----------
-    Parameter ``keep`` is supported only with default value ``'first'``.
+    - Parameter ``keep`` is supported only with default value ``'first'``.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -1331,6 +1366,8 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
     - Parameters ``normalize`` and ``bins`` are currently unsupported.
     - Parameter ``dropna`` is unsupported for String Series.
     - Elements with the same count might appear in result in a different order than in Pandas.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -1573,6 +1610,11 @@ def hpat_pandas_series_index(self):
 
     Pandas API: pandas.Series.index
 
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_index.py
@@ -1784,14 +1826,14 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
 
     Limitations
     -----------
-    - Currently copy=False is not supported
+    - Parameter ``copy`` is supported only with default value ``True``.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_astype.py
        :language: python
        :lines: 36-
-       :caption: Cast a pandas object to a specified dtype dtype.
+       :caption: Cast a pandas object to a specified dtype.
        :name: ex_series_astype
 
     .. command-output:: python ./series/series_astype.py
@@ -1799,19 +1841,19 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
 
     .. seealso::
 
-        `pandas.absolute
+        `pandas.to_datetime
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.to_datetime.html#pandas.to_datetime>`_
             Convert argument to datetime.
 
-        `pandas.absolute
+        `pandas.to_timedelta
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.to_timedelta.html#pandas.to_timedelta>`_
             Convert argument to timedelta.
 
-        `pandas.absolute
+        `pandas.to_numeric
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.to_numeric.html#pandas.to_numeric>`_
             Convert argument to a numeric type.
 
-        `numpy.absolute
+        `numpy.ndarray.astype
         <https://docs.scipy.org/doc/numpy/reference/generated/numpy.ndarray.astype.html#numpy.ndarray.astype>`_
             Copy of the array, cast to a specified type.
 
@@ -1973,6 +2015,11 @@ def hpat_pandas_series_isin(self, values):
 
     Pandas API: pandas.Series.isin
 
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_isin.py
@@ -2023,8 +2070,10 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
 
     Limitations
     -----------
-    - Parameter verify_integrity is currently unsupported by Intel Scalable Dataframe Compiler
-    - Parameter ignore_index supported as literal value only
+    - Parameter ``verify_integrity`` is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``ignore_index`` is supported as literal value only
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -2171,8 +2220,7 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
 
     Limitations
     -----------
-    - 'method' parameter accepts only 'pearson' value. Other values are not supported
-    - Unsupported mixed numeric and string data
+    - Parameter ``method`` is supported only with default value 'pearson'
 
     Examples
     --------
@@ -2185,14 +2233,16 @@ def hpat_pandas_series_corr(self, other, method='pearson', min_periods=None):
     .. command-output:: python ./series/series_corr.py
        :cwd: ../../../examples
 
+    .. seealso::
+        :ref:`Series.cov <pandas.Series.cov>`
+            Compute covariance with Series, excluding missing values.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.corr` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_corr
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_corr_unsupported_dtype
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_corr_unsupported_period
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_corr*
     """
 
     _func_name = 'Method corr().'
@@ -2806,6 +2856,10 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
 
     Pandas API: pandas.Series.quantile
 
+    Limitations
+    -----------
+    Parameter ``interpolation`` is currently unsupported.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_quantile.py
@@ -2817,13 +2871,14 @@ def hpat_pandas_series_quantile(self, q=0.5, interpolation='linear'):
     .. command-output:: python ./series/series_quantile.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter interpolation is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
-        `numpy.absolute <https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html#numpy.percentile>`_
+        :ref:`core.window.Rolling.quantile <pandas.core.window.Rolling.quantile>`
+            Calculate the rolling quantile.
+
+        `numpy.percentile
+        <https://docs.scipy.org/doc/numpy/reference/generated/numpy.percentile.html#numpy.percentile>`_
+            Compute the q-th percentile of the data along the specified axis.
 
 
     Intel Scalable Dataframe Compiler Developer Guide
@@ -2861,7 +2916,7 @@ def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=
 
     Limitations
     -----------
-    - Parameter level is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``level`` is currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
@@ -2936,7 +2991,7 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
+    Parameters ``level``, ``numeric_only`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
@@ -2948,10 +3003,6 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
 
     .. command-output:: python ./series/series_min.py
        :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     .. seealso::
 
@@ -2969,6 +3020,21 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
 
         :ref:`Series.idxmax <pandas.Series.idxmax>`
             Return the index of the maximum.
+
+        :ref:`DataFrame.sum <pandas.DataFrame.sum>`
+            Return the sum over the requested axis.
+
+        :ref:`DataFrame.min <pandas.DataFrame.min>`
+            Return the minimum over the requested axis.
+
+        :ref:`DataFrame.max <pandas.DataFrame.max>`
+            Return the maximum over the requested axis.
+
+        :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
+            Return the index of the minimum over the requested axis.
+
+        :ref:`DataFrame.idxmax <pandas.DataFrame.idxmax>`
+            Return the index of the maximum over the requested axis.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -3165,8 +3231,8 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
 
     Limitations
     -----------
-    Parameter ``axis`` is supported only with default value ``None``.
-    Parameter ``skipna`` cannot be ``False`` with data of string type.
+    - Parameter ``axis`` is supported only with default value ``None``.
+    - Parameter ``skipna`` cannot be ``False`` with data of string type.
 
     Examples
     --------
@@ -3184,7 +3250,7 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
         :ref:`Series.idxmax <pandas.Series.idxmax>`
             Return index label of the first occurrence of maximum of values.
 
-        `numpy.absolute <https://docs.scipy.org/doc/numpy/reference/generated/numpy.argmin.html#numpy.argmin>`_
+        `numpy.argmin <https://docs.scipy.org/doc/numpy/reference/generated/numpy.argmin.html#numpy.argmin>`_
             Return indices of the minimum values along the given axis.
 
         :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
@@ -3309,6 +3375,8 @@ def hpat_pandas_series_unique(self):
     Limitations
     -----------
     - Return values order is unspecified
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -3428,6 +3496,11 @@ def hpat_pandas_series_nunique(self, dropna=True):
 
     Pandas API: pandas.Series.nunique
 
+    Limitations
+    -----------
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_nunique.py
@@ -3440,12 +3513,12 @@ def hpat_pandas_series_nunique(self, dropna=True):
        :cwd: ../../../examples
 
     .. seealso::
-
         :ref:`DataFrame.nunique <pandas.DataFrame.nunique>`
             Method nunique for DataFrame.
-
         :ref:`Series.count <pandas.Series.count>`
             Count non-NA/null observations in the Series.
+        :ref:`DatatFrame.count <pandas.DataFrame.count>`
+            Count non-NA cells for each column
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -3575,11 +3648,7 @@ def hpat_pandas_series_median(self, axis=None, skipna=None, level=None, numeric_
 
     Limitations
     -----------
-    - Parameters level, numeric_only are currently unsupported by Intel Scalable Dataframe Compiler
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -3591,6 +3660,10 @@ def hpat_pandas_series_median(self, axis=None, skipna=None, level=None, numeric_
 
     .. command-output:: python ./series/series_median.py
        :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`DataFrame.median <pandas.DataFrame.median>`
+            Return the median of the values for the columns.
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -3647,7 +3720,11 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     Limitations
     -----------
-    - Parameters kind, order are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``axis`` is supported only with default value ``0``.
+    - Parameter ``order`` is supported only with default value ``None``.
+    - Parameter ``kind`` is supported only with values ``'mergesort'`` and ``'quicksort'``.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -3660,13 +3737,9 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
     .. command-output:: python ./series/series_argsort.py
        :cwd: ../../../examples
 
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
     .. seealso::
 
-        `numpy.absolute
+        `numpy.ndarray.argsort
         <https://docs.scipy.org/doc/numpy/reference/generated/numpy.ndarray.argsort.html#numpy.ndarray.argsort>`_
             Return indices of the minimum values along the given axis.
 
@@ -3766,6 +3839,8 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
     - Parameter ``inplace`` is supported only with default value ``False``.
     - Parameter ``axis`` is currently unsupported by Intel Scalable Dataframe Compiler.
     - Parameter ``kind`` is supported only with values ``'mergesort'`` and ``'quicksort'``.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -3872,7 +3947,7 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
 
     Limitations
     -----------
-    - Parameter inplace is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``inplace`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
@@ -3899,7 +3974,7 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
         :ref:`DataFrame.dropna <pandas.DataFrame.dropna>`
             Drop rows or columns which contain NA values.
 
-        `pandas.absolute
+        `pandas.Index.dropna
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Index.dropna.html#pandas.Index.dropna>`_
             Return Index without NA/NaN values
 
@@ -3950,8 +4025,9 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
 
     Limitations
     -----------
-    - Parameters method, limit, downcast are currently unsupported by Intel Scalable Dataframe Compiler
-    - Parameter inplace supported as literal value only
+    - Parameters ``method``, ``limit`` and ``downcast`` are currently unsupported
+    by Intel Scalable Dataframe Compiler.
+    - Parameter ``inplace`` is supported with literal value only.
 
     Examples
     --------
@@ -3966,15 +4042,15 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
 
     .. seealso::
 
-        `pandas.absolute
+        `pandas.interpolate
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.interpolate.html#pandas.Series.interpolate>`_
             Fill NaN values using interpolation.
 
-        `pandas.absolute
+        `pandas.reindex
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.reindex.html#pandas.Series.reindex>`_
             Conform object to new index.
 
-        `pandas.absolute
+        `pandas.asfreq
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.asfreq.html#pandas.Series.asfreq>`_
             Convert TimeSeries to specified frequency.
 
@@ -4063,10 +4139,6 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
 
     Pandas API: pandas.Series.cov
 
-    Limitations
-    -----------
-    - Unsupported mixed numeric and string data
-
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_cov.py
@@ -4078,12 +4150,16 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
     .. command-output:: python ./series/series_cov.py
        :cwd: ../../../examples
 
+    .. seealso::
+        :ref:`Series.corr <pandas.Series.corr>`
+            Compute correlation with other Series, excluding missing values.
+
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.cov` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_cov
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_cov*
     """
 
     ty_checker = TypeChecker('Method cov().')
@@ -4141,8 +4217,9 @@ def hpat_pandas_series_pct_change(self, periods=1, fill_method='pad', limit=None
 
     Limitations
     -----------
-    - Unsupported mixed numeric and string data
     - Parameters limit, freq are currently unsupported by Intel Scalable Dataframe Compiler
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
 
     Examples
     --------
@@ -4258,8 +4335,8 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
 
     Limitations
     -----------
-    - Differs from Pandas in returning statistics as Series of strings when applied to
-    Series of strings or date-time values
+    - Parameters ``include`` and ``exclude`` are currently unsupported by Intel Scalable Dataframe Compiler.
+    - For string Series resulting values are returned as strings.
 
     Examples
     --------
@@ -4301,7 +4378,8 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
        Tests: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_describe*
     """
 
-    ty_checker = TypeChecker('Method describe().')
+    _func_name = 'Method describe().'
+    ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
     if not (isinstance(percentiles, (types.List, types.Array, types.UniTuple))
@@ -4309,6 +4387,12 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
             or isinstance(percentiles, (types.Omitted, types.NoneType))
             or percentiles is None):
         ty_checker.raise_exc(percentiles, 'list-like', 'percentiles')
+
+    if not (isinstance(include, (types.Omitted, types.NoneType)) or include is None):
+        raise TypingError('{} Unsupported parameters. Given include: {}'.format(_func_name, include))
+
+    if not (isinstance(exclude, (types.Omitted, types.NoneType)) or exclude is None):
+        raise TypingError('{} Unsupported parameters. Given exclude: {}'.format(_func_name, exclude))
 
     is_percentiles_none = percentiles is None or isinstance(percentiles, (types.Omitted, types.NoneType))
 
@@ -4648,8 +4732,10 @@ def sdc_pandas_series_groupby(self, by=None, axis=0, level=None, as_index=True, 
 
     Limitations
     -----------
-    - Parameters level, as_index, group_keys, squeeze, observed
-    are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``axis``, ``level``, ``as_index``, ``group_keys``, ``squeeze`` and ``observed`` \
+are currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``by`` is supported as single literal column name only
+    - Mutating the contents of a DataFrame between creating a groupby object and calling it's methods is unsupported
 
     Examples
     --------
@@ -4666,10 +4752,6 @@ def sdc_pandas_series_groupby(self, by=None, axis=0, level=None, as_index=True, 
 
         :ref:`Series.resample <pandas.Series.resample>`
             Resample time-series data.
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************

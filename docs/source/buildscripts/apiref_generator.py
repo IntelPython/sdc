@@ -39,6 +39,7 @@ APIREF_TEMPLATE_FNAMES = [
     './_templates/_api_ref.pandas.series_templ.rst',
     './_templates/_api_ref.pandas.dataframe_templ.rst',
     './_templates/_api_ref.pandas.window_templ.rst',
+    './_templates/_api_ref.pandas.groupby_templ.rst',
 ]
 
 
@@ -303,7 +304,7 @@ def reformat_pandas_params(title, text):
             line = lines[0]
             line = line.strip()
             idx = line.find(' : ')
-            if idx >= 0 & line[0:idx].isalnum():
+            if idx >= 0 & line[0:idx].isalnum() and line[0:idx].isidentifier():
                 # Check if previous parameter existed. If so, need to add it to reformatted text
                 if param != '':
                     new_text += _get_param_text(title, param) + '\n' + reindent(description, indent+4) + '\n'
