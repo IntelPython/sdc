@@ -54,7 +54,7 @@ def get_numba_array_types_for_csv(df):
         except NotImplementedError:
             numba_type = None
 
-        if numba_type:
+        if numba_type and numba_type != types.pyobject:
             array_type = types.Array(numba_type, 1, 'C')
         else:
             # default type for CSV is string
