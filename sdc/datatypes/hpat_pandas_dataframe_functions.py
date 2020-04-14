@@ -1828,10 +1828,10 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
                 col = idx[1].literal_value
                 return gen_df_getitem_tuple_at_impl(self.dataframe, row, col)
 
-            raise TypingError('Operator at(). The row parameter type ({}) is different from the index type\
+            raise TypingError('Attribute at(). The row parameter type ({}) is different from the index type\
                               ({})'.format(type(idx[0]), type(self.dataframe.index.dtype)))
 
-        raise TypingError('Operator at(). The index must be a row and literal column. Given: {}'.format(idx))
+        raise TypingError('Attribute at(). The index must be a row and literal column. Given: {}'.format(idx))
 
     if accessor == 'iat':
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
