@@ -4183,7 +4183,10 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
 
     def hpat_pandas_series_cov_impl(self, other, min_periods=None):
 
-        if min_periods is None or min_periods < 2:
+        if min_periods is None:
+            min_periods = 2
+
+        if min_periods < 2:
             min_periods = 2
 
         min_len = min(len(self._data), len(other._data))
