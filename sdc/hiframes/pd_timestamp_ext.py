@@ -132,8 +132,9 @@ def impl_ctor_pandas_dts(context, builder, sig, args):
 # TODO: move to Numba
 
 class CompDT64(ConcreteTemplate):
-    cases = signature(
-        types.boolean, types.NPDatetime('ns'), types.NPDatetime('ns'))
+    cases = [
+        signature(types.boolean, types.NPDatetime('ns'), types.NPDatetime('ns')),
+    ]
 
 
 @infer_global(operator.lt)
