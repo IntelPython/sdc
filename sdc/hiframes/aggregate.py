@@ -70,18 +70,6 @@ supported_agg_funcs = ['sum', 'count', 'mean',
 
 
 def get_agg_func(func_ir, func_name, rhs):
-    from sdc.hiframes.series_kernels import series_replace_funcs
-    if func_name == 'var':
-        return _column_var_impl_linear
-    if func_name == 'std':
-        return _column_std_impl_linear
-    if func_name in supported_agg_funcs[:-2]:
-        func = series_replace_funcs[func_name]
-        # returning generic function
-        # TODO: support type-specific funcs e.g. for dt64
-        if isinstance(func, dict):
-            func = func[types.float64]
-        return func
 
     assert func_name in ['agg', 'aggregate']
     # agg case

@@ -54,7 +54,6 @@ from sdc.hiframes.split_impl import (string_array_split_view_type,
 from .. import hstr_ext
 import llvmlite.binding as ll
 from llvmlite import ir as lir
-import llvmlite.llvmpy.core as lc
 from llvmlite.llvmpy.core import Type as LLType
 ll.add_symbol('array_size', hstr_ext.array_size)
 ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
