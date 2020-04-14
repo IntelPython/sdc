@@ -1954,6 +1954,10 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
 
             return df_getitem_tuple_iat_impl
 
+        raise TypingError('Attribute iloc(). The index must be an integer, a list or array of integers,\
+                          a slice object with ints or a boolean array.\
+                          Given: {}'.format(idx))
+
     raise TypingError('Operator getitem(). Unknown accessor. Only "loc", "iloc", "at", "iat" are supported.\
                       Given: {}'.format(accessor))
 
