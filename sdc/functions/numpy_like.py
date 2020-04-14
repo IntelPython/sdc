@@ -744,7 +744,10 @@ def corr_overload(self, other, method='pearson', min_periods=None):
         if method not in ('pearson', ''):
             raise ValueError("Method corr(). Unsupported parameter. Given method != 'pearson'")
 
-        if min_periods is None or min_periods < 1:
+        if min_periods is None:
+            min_periods = 1
+
+        if min_periods < 1:
             min_periods = 1
 
         min_len = min(len(self._data), len(other._data))
