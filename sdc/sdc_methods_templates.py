@@ -192,7 +192,7 @@ def sdc_pandas_series_binop(self, other, level=None, fill_value=None, axis=0):
                 result_size = len(joined_index)
                 left_values = numpy.empty(result_size, dtype=numpy.float64)
                 right_values = numpy.empty(result_size, dtype=numpy.float64)
-                for i in numba.prange(result_size):
+                for i in range(result_size):
                     left_pos, right_pos = left_indexer[i], right_indexer[i]
                     left_values[i] = self._data[left_pos] if left_pos != -1 else _fill_value
                     right_values[i] = other._data[right_pos] if right_pos != -1 else _fill_value
