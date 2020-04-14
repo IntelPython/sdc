@@ -1923,7 +1923,7 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
         if isinstance(idx, types.Integer):
             return gen_df_getitem_loc_single_label_impl(self.dataframe, idx)
 
-        ty_checker = TypeChecker('Operator loc().')
+        ty_checker = TypeChecker('Attribute loc().')
         ty_checker.raise_exc(idx, 'int', 'idx')
 
     if accessor == 'iat':
