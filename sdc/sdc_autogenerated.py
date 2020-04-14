@@ -2177,8 +2177,6 @@ def sdc_pandas_series_operator_add(self, other):
         The result of the operation
     """
 
-    _func_name = 'Operator add().'
-
     ty_checker = TypeChecker('Operator add().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
     if not (self_is_series or other_is_series):
@@ -2242,8 +2240,6 @@ def sdc_pandas_series_operator_sub(self, other):
     :obj:`pandas.Series`
         The result of the operation
     """
-
-    _func_name = 'Operator sub().'
 
     ty_checker = TypeChecker('Operator sub().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
@@ -2309,8 +2305,6 @@ def sdc_pandas_series_operator_mul(self, other):
         The result of the operation
     """
 
-    _func_name = 'Operator mul().'
-
     ty_checker = TypeChecker('Operator mul().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
     if not (self_is_series or other_is_series):
@@ -2374,8 +2368,6 @@ def sdc_pandas_series_operator_truediv(self, other):
     :obj:`pandas.Series`
         The result of the operation
     """
-
-    _func_name = 'Operator truediv().'
 
     ty_checker = TypeChecker('Operator truediv().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
@@ -2441,8 +2433,6 @@ def sdc_pandas_series_operator_floordiv(self, other):
         The result of the operation
     """
 
-    _func_name = 'Operator floordiv().'
-
     ty_checker = TypeChecker('Operator floordiv().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
     if not (self_is_series or other_is_series):
@@ -2506,8 +2496,6 @@ def sdc_pandas_series_operator_mod(self, other):
     :obj:`pandas.Series`
         The result of the operation
     """
-
-    _func_name = 'Operator mod().'
 
     ty_checker = TypeChecker('Operator mod().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
@@ -2573,8 +2561,6 @@ def sdc_pandas_series_operator_pow(self, other):
         The result of the operation
     """
 
-    _func_name = 'Operator pow().'
-
     ty_checker = TypeChecker('Operator pow().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
     if not (self_is_series or other_is_series):
@@ -2635,8 +2621,6 @@ def sdc_pandas_series_operator_lt(self, other):
         The result of the operation
     """
 
-    _func_name = 'Operator lt().'
-
     ty_checker = TypeChecker('Operator lt().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
     if not (self_is_series or other_is_series):
@@ -2690,8 +2674,6 @@ def sdc_pandas_series_operator_gt(self, other):
     :obj:`pandas.Series`
         The result of the operation
     """
-
-    _func_name = 'Operator gt().'
 
     ty_checker = TypeChecker('Operator gt().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
@@ -2747,8 +2729,6 @@ def sdc_pandas_series_operator_le(self, other):
         The result of the operation
     """
 
-    _func_name = 'Operator le().'
-
     ty_checker = TypeChecker('Operator le().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
     if not (self_is_series or other_is_series):
@@ -2802,8 +2782,6 @@ def sdc_pandas_series_operator_ge(self, other):
     :obj:`pandas.Series`
         The result of the operation
     """
-
-    _func_name = 'Operator ge().'
 
     ty_checker = TypeChecker('Operator ge().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
@@ -2859,8 +2837,6 @@ def sdc_pandas_series_operator_ne(self, other):
         The result of the operation
     """
 
-    _func_name = 'Operator ne().'
-
     ty_checker = TypeChecker('Operator ne().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
     if not (self_is_series or other_is_series):
@@ -2914,8 +2890,6 @@ def sdc_pandas_series_operator_eq(self, other):
     :obj:`pandas.Series`
         The result of the operation
     """
-
-    _func_name = 'Operator eq().'
 
     ty_checker = TypeChecker('Operator eq().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)

@@ -117,11 +117,12 @@ if __name__ == '__main__':
     imports_start_line, import_end_line = min(imports_line_numbers), max(imports_line_numbers)
     import_section_text = ''.join(module_text_lines[imports_start_line: import_end_line + 1])
 
+    series_operator_comp_binop = templates_module.sdc_pandas_series_operator_comp_binop
     # read function templates for arithmetic and comparison operators from templates module
     template_series_arithmetic_binop = inspect.getsource(templates_module.sdc_pandas_series_binop)
     template_series_comparison_binop = inspect.getsource(templates_module.sdc_pandas_series_comp_binop)
     template_series_arithmetic_binop_operator = inspect.getsource(templates_module.sdc_pandas_series_operator_binop)
-    template_series_comparison_binop_operator = inspect.getsource(templates_module.sdc_pandas_series_operator_comp_binop)
+    template_series_comparison_binop_operator = series_operator_comp_binop
     template_str_arr_comparison_binop = inspect.getsource(templates_module.sdc_str_arr_operator_comp_binop)
 
     exit_status = -1

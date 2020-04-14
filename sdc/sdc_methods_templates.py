@@ -333,6 +333,7 @@ def sdc_pandas_series_comp_binop(self, other, level=None, fill_value=None, axis=
 
     return None
 
+
 def sdc_pandas_series_operator_binop(self, other):
     """
     Pandas Series operator :attr:`pandas.Series.binop` implementation
@@ -358,8 +359,6 @@ def sdc_pandas_series_operator_binop(self, other):
     :obj:`pandas.Series`
         The result of the operation
     """
-
-    _func_name = 'Operator binop().'
 
     ty_checker = TypeChecker('Operator binop().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
@@ -419,8 +418,6 @@ def sdc_pandas_series_operator_comp_binop(self, other):
     :obj:`pandas.Series`
         The result of the operation
     """
-
-    _func_name = 'Operator comp_binop().'
 
     ty_checker = TypeChecker('Operator comp_binop().')
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
