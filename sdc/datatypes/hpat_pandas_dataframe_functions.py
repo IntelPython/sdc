@@ -1893,48 +1893,40 @@ def df_getitem_single_label_loc_codegen(self, idx):
             return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=numpy.array(new_index))
     """
     if isinstance(self.index, types.NoneType):
-        func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
-                      '  if -1 < idx < len(self._dataframe._data):']
-        results = []
-        result_index = []
-        for i, c in enumerate(self.columns):
-            result_c = f"result_{i}"
-            func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{i}], index=self._dataframe.index)",
-                        f"    {result_c} = data_{i}.at[idx]"]
-            results.append(result_c)
-            result_index.append(c)
-        data = '[0], '.join(col for col in results) + '[0]'
-        func_lines += [f"    return pandas.Series(data=[{data}], index={result_index}, name=str(idx))",
-                       f"  raise IndexingError('Index is out of bounds for axis')"]
+        fill_list = ['  idx_list.append(idx)']
+        new_index = ['  new_index.append(idx)']
 
     else:
-        func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
-                      '  idx_list = []',
-                      '  for i in range(len(self._dataframe.index)):',
-                      '    if self._dataframe._index[i] == idx:',
-                      '      idx_list.append(i)']
-        results = []
-        for i, c in enumerate(self.columns):
-            data = f'data_{i}'
-            index_in_list = f'index_in_list_{i}'
-            res_data = f'res_data_{i}'
-            func_lines += [
-                f'  {data} = []',
-                f'  for i in numba.prange(len(idx_list)):',
-                f'    {index_in_list} = idx_list[i]',
-                f'    {data}.append(self._dataframe._data[{i}][{index_in_list}])',
-                f'  {res_data} = pandas.Series({data})',
-            ]
-            results.append((c, res_data))
+        fill_list = ['  for i in range(len(self._dataframe.index)):',
+                     '    if self._dataframe._index[i] == idx:',
+                     '      idx_list.append(i)']
+        new_index = ['  for i in numba.prange(len(idx_list)):',
+                     '    new_index.append(self._dataframe._index[idx_list[i]])']
 
-        func_lines += ["  if len(idx_list) < 1:",
-                       f"    raise IndexingError('Index is out of bounds for axis')"]
+    fill_list_text = '\n'.join(fill_list)
+    new_index_text = '\n'.join(new_index)
+    func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
+                  '  idx_list = []',
+                  f'{fill_list_text}']
+    results = []
+    for i, c in enumerate(self.columns):
+        data = f'data_{i}'
+        index_in_list = f'index_in_list_{i}'
+        res_data = f'res_data_{i}'
+        func_lines += [f'  {data} = []',
+                       '  for i in numba.prange(len(idx_list)):',
+                       f'    {index_in_list} = idx_list[i]',
+                       f'    {data}.append(self._dataframe._data[{i}][{index_in_list}])',
+                       f'  {res_data} = pandas.Series({data})']
+        results.append((c, res_data))
 
-        data = ', '.join(f'"{col}": {data}' for col, data in results)
-        func_lines += [f'  new_index = []',
-                       f'  for i in numba.prange(len(idx_list)):',
-                       f'    new_index.append(self._dataframe._index[idx_list[i]])',
-                       f'  return pandas.DataFrame({{{data}}}, index=numpy.array(new_index))']
+    func_lines += ['  if len(idx_list) < 1:',
+                   "    raise IndexingError('Index is out of bounds for axis')"]
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += ['  new_index = []',
+                   f'{new_index_text}',
+                   f'  return pandas.DataFrame({{{data}}}, index=numpy.array(new_index))']
 
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas, 'numpy': numpy,
@@ -2042,7 +2034,7 @@ def sdc_pandas_dataframe_loc(self):
 
     Limitations
     -----------
-    - Parameter ``'name'`` in result Series can be String only
+    - Loc always returns Dataframe.
     - Parameter ``idx`` is supported only to be a single value, e.g. :obj:`df.loc['A']`.
 
     Examples
