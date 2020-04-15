@@ -124,96 +124,88 @@ def sdc_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
         ty_checker.raise_exc(axis, 'int', 'axis')
     fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     # specializations for numeric series only
-    if not operands_are_series:
-        def _series_add_scalar_impl(self, other, level=None, fill_value=None, axis=0):
-            if self_is_series == True:  # noqa
-                if not (fill_value is None or numpy.isnan(fill_value)):
-                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
-                result_data = numpy.empty(len(self._data), dtype=numpy.float64)
-                result_data[:] = self._data + numpy.float64(other)
-                return pandas.Series(result_data, index=self._index, name=self._name)
-            else:
-                if not (fill_value is None or numpy.isnan(fill_value)):
-                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
-                result_data = numpy.empty(len(other._data), dtype=numpy.float64)
-                result_data[:] = numpy.float64(self) + other._data
-                return pandas.Series(result_data, index=other._index, name=other._name)
+    # if not operands_are_series:
+    #     def _series_add_scalar_impl(self, other, level=None, fill_value=None, axis=0):
+    #         if self_is_series == True:  # noqa
+    #             if not (fill_value is None or numpy.isnan(fill_value)):
+    #                 numpy_like.fillna(self._data, inplace=True, value=fill_value)
+    #             result_data = numpy.empty(len(self._data), dtype=numpy.float64)
+    #             result_data[:] = self._data + numpy.float64(other)
+    #             return pandas.Series(result_data, index=self._index, name=self._name)
+    #         else:
+    #             if not (fill_value is None or numpy.isnan(fill_value)):
+    #                 numpy_like.fillna(other._data, inplace=True, value=fill_value)
+    #             result_data = numpy.empty(len(other._data), dtype=numpy.float64)
+    #             result_data[:] = numpy.float64(self) + other._data
+    #             return pandas.Series(result_data, index=other._index, name=other._name)
 
-        return _series_add_scalar_impl
+    #     return _series_add_scalar_impl
 
-    else:   # both operands are numeric series
-        # optimization for series with default indexes, that can be aligned differently
-        if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
-            def _series_add_none_indexes_impl(self, other, level=None, fill_value=None, axis=0):
-                _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
-                if not (fill_value is None or numpy.isnan(fill_value)):
-                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
-                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
+    # else:   # both operands are numeric series
+    #     # optimization for series with default indexes, that can be aligned differently
+    #     if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
+    #         def _series_add_none_indexes_impl(self, other, level=None, fill_value=None, axis=0):
+    #             _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
+    #             if not (fill_value is None or numpy.isnan(fill_value)):
+    #                 numpy_like.fillna(self._data, inplace=True, value=fill_value)
+    #                 numpy_like.fillna(other._data, inplace=True, value=fill_value)
 
-                if (len(self._data) == len(other._data)):
-                    result_data = numpy_like.astype(self._data, numpy.float64)
-                    result_data = result_data + other._data
-                    return pandas.Series(result_data)
-                else:
-                    left_size, right_size = len(self._data), len(other._data)
-                    min_data_size = min(left_size, right_size)
-                    max_data_size = max(left_size, right_size)
-                    result_data = numpy.empty(max_data_size, dtype=numpy.float64)
-                    if (left_size == min_data_size):
-                        result_data[:min_data_size] = self._data
-                        for i in range(min_data_size, len(result_data)):
-                            result_data[i] = _fill_value
-                        result_data = result_data + other._data
-                    else:
-                        result_data[:min_data_size] = other._data
-                        for i in range(min_data_size, len(result_data)):
-                            result_data[i] = _fill_value
-                        result_data = self._data + result_data
+    #             if (len(self._data) == len(other._data)):
+    #                 result_data = numpy_like.astype(self._data, numpy.float64)
+    #                 result_data = result_data + other._data
+    #                 return pandas.Series(result_data)
+    #             else:
+    #                 left_size, right_size = len(self._data), len(other._data)
+    #                 min_data_size = min(left_size, right_size)
+    #                 max_data_size = max(left_size, right_size)
+    #                 result_data = numpy.empty(max_data_size, dtype=numpy.float64)
+    #                 if (left_size == min_data_size):
+    #                     result_data[:min_data_size] = self._data
+    #                     for i in range(min_data_size, len(result_data)):
+    #                         result_data[i] = _fill_value
+    #                     result_data = result_data + other._data
+    #                 else:
+    #                     result_data[:min_data_size] = other._data
+    #                     for i in range(min_data_size, len(result_data)):
+    #                         result_data[i] = _fill_value
+    #                     result_data = self._data + result_data
 
-                    return pandas.Series(result_data)
+    #                 return pandas.Series(result_data)
 
-            return _series_add_none_indexes_impl
-        else:
+    #         return _series_add_none_indexes_impl
+    #     else:
             # for numeric indexes find common dtype to be used when creating joined index
-            if none_or_numeric_indexes:
-                ty_left_index_dtype = types.int64 if isinstance(self.index, types.NoneType) else self.index.dtype
-                ty_right_index_dtype = types.int64 if isinstance(other.index, types.NoneType) else other.index.dtype
-                numba_index_common_dtype = find_common_dtype_from_numpy_dtypes(
-                    [ty_left_index_dtype, ty_right_index_dtype], [])
+            # if none_or_numeric_indexes:
+            #     ty_left_index_dtype = types.int64 if isinstance(self.index, types.NoneType) else self.index.dtype
+            #     ty_right_index_dtype = types.int64 if isinstance(other.index, types.NoneType) else other.index.dtype
+            #     numba_index_common_dtype = find_common_dtype_from_numpy_dtypes(
+            #         [ty_left_index_dtype, ty_right_index_dtype], [])
 
-            def _series_add_common_impl(self, other, level=None, fill_value=None, axis=0):
-                left_index, right_index = self.index, other.index
-                _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
-                if not (fill_value is None or numpy.isnan(fill_value)):
-                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
-                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
-                # check if indexes are equal and series don't have to be aligned
-                if sdc_check_indexes_equal(left_index, right_index):
-                    result_data = numpy.empty(len(self._data), dtype=numpy.float64)
-                    result_data[:] = self._data + other._data
+    def _series_add_common_impl(self, other, level=None, fill_value=None, axis=0):
+        left_index, right_index = self.index, other.index
+        _fill_value = numpy.nan
+        joined_index = [0, 1, 2, 3, 3, 4, 9]
+        left_indexer = [-1, -1, 4, 0, 2, 1, 3]
+        right_indexer = [0, 1, 2, 3, 3, 4, -1]
+        result_size = len(joined_index)
+        left_values = numpy.empty(result_size, dtype=numpy.float64)
+        right_values = numpy.empty(result_size, dtype=numpy.float64)
+        for i in numba.prange(result_size):
+            left_pos, right_pos = left_indexer[i], right_indexer[i]
+            if left_pos != -1:
+                left_values[i] = self._data[left_pos]
+            else:
+                left_values[i] = _fill_value
+            if right_pos != -1:
+                right_values[i] = other._data[right_pos]
+            else:
+                right_values[i] = _fill_value
+        result_data = left_values + right_values
+        return pandas.Series(result_data, joined_index)
 
-                    if none_or_numeric_indexes == True:  # noqa
-                        result_index = numpy_like.astype(left_index, numba_index_common_dtype)
-                    else:
-                        result_index = self._index
+    return _series_add_common_impl
 
-                    return pandas.Series(result_data, index=result_index)
-
-                # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
-                joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
-                result_size = len(joined_index)
-                left_values = numpy.empty(result_size, dtype=numpy.float64)
-                right_values = numpy.empty(result_size, dtype=numpy.float64)
-                for i in range(result_size):
-                    left_pos, right_pos = left_indexer[i], right_indexer[i]
-                    left_values[i] = self._data[left_pos] if left_pos != -1 else _fill_value
-                    right_values[i] = other._data[right_pos] if right_pos != -1 else _fill_value
-                result_data = left_values + right_values
-                return pandas.Series(result_data, joined_index)
-
-            return _series_add_common_impl
-
-    return None
+    # return None
 
 
 @sdc_overload_method(SeriesType, 'div')
