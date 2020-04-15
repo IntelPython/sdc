@@ -1871,34 +1871,70 @@ def df_getitem_single_label_loc_codegen(self, idx):
     """
     Example of generated implementation:
         def _df_getitem_single_label_loc_impl(self, idx):
-            for i in numba.prange(len(self._dataframe.index)):
+            idx_list = []
+            for i in range(len(self._dataframe.index)):
                 if self._dataframe._index[i] == idx:
-                    data_0 = pandas.Series(self._dataframe._data[0], index=self._dataframe.index)
-                    result_0 = data_0.at[idx]
-                    data_1 = pandas.Series(self._dataframe._data[1], index=self._dataframe.index)
-                    result_1 = data_1.at[idx]
-                    return pandas.Series(data=[result_0[0], result_1[0]], index=['A', 'B'], name=str(idx))
-            raise IndexingError('Index is out of bounds for axis')
+                idx_list.append(i)
+            data_0 = []
+            for i in numba.prange(len(idx_list)):
+                index_in_list_0 = idx_list[i]
+                data_0.append(self._dataframe._data[0][index_in_list_0])
+            res_data_0 = pandas.Series(data_0)
+            data_1 = []
+            for i in numba.prange(len(idx_list)):
+                index_in_list_1 = idx_list[i]
+                data_1.append(self._dataframe._data[1][index_in_list_1])
+            res_data_1 = pandas.Series(data_1)
+            if len(idx_list) < 1:
+                raise IndexingError('Index is out of bounds for axis')
+            new_index = []
+            for i in numba.prange(len(idx_list)):
+                new_index.append(self._dataframe._index[idx_list[i]])
+            return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=numpy.array(new_index))
     """
-    func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
-                  '  for i in numba.prange(len(self._dataframe.index)):',
-                  '    if self._dataframe._index[i] == idx:']
-    indent = ' ' * 6
     if isinstance(self.index, types.NoneType):
         func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
                       '  if -1 < idx < len(self._dataframe._data):']
-        indent = ' ' * 4
-    results = []
-    result_index = []
-    for i, c in enumerate(self.columns):
-        result_c = f"result_{i}"
-        func_lines += [f"{indent}data_{i} = pandas.Series(self._dataframe._data[{i}], index=self._dataframe.index)",
-                       f"{indent}{result_c} = data_{i}.at[idx]"]
-        results.append(result_c)
-        result_index.append(c)
-    data = '[0], '.join(col for col in results) + '[0]'
-    func_lines += [f"{indent}return pandas.Series(data=[{data}], index={result_index}, name=str(idx))",
-                   f"  raise IndexingError('Index is out of bounds for axis')"]
+        results = []
+        result_index = []
+        for i, c in enumerate(self.columns):
+            result_c = f"result_{i}"
+            func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{i}], index=self._dataframe.index)",
+                        f"    {result_c} = data_{i}.at[idx]"]
+            results.append(result_c)
+            result_index.append(c)
+        data = '[0], '.join(col for col in results) + '[0]'
+        func_lines += [f"    return pandas.Series(data=[{data}], index={result_index}, name=str(idx))",
+                       f"  raise IndexingError('Index is out of bounds for axis')"]
+
+    else:
+        func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
+                      '  idx_list = []',
+                      '  for i in range(len(self._dataframe.index)):',
+                      '    if self._dataframe._index[i] == idx:',
+                      '      idx_list.append(i)']
+        results = []
+        for i, c in enumerate(self.columns):
+            data = f'data_{i}'
+            index_in_list = f'index_in_list_{i}'
+            res_data = f'res_data_{i}'
+            func_lines += [
+                f'  {data} = []',
+                f'  for i in numba.prange(len(idx_list)):',
+                f'    {index_in_list} = idx_list[i]',
+                f'    {data}.append(self._dataframe._data[{i}][{index_in_list}])',
+                f'  {res_data} = pandas.Series({data})',
+            ]
+            results.append((c, res_data))
+
+        func_lines += ["  if len(idx_list) < 1:",
+                       f"    raise IndexingError('Index is out of bounds for axis')"]
+
+        data = ', '.join(f'"{col}": {data}' for col, data in results)
+        func_lines += [f'  new_index = []',
+                       f'  for i in numba.prange(len(idx_list)):',
+                       f'    new_index.append(self._dataframe._index[idx_list[i]])',
+                       f'  return pandas.DataFrame({{{data}}}, index=numpy.array(new_index))']
 
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas, 'numpy': numpy,
