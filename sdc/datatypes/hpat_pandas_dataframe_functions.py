@@ -1881,15 +1881,9 @@ def df_getitem_tuple_at_codegen(self, row, col):
     Example of generated implementation:
         def _df_getitem_tuple_at_impl(self, idx):
             row, _ = idx
-            check_row = False
-            for i in prange(len(self._dataframe.index)):
-                if self._dataframe.index[i] == row:
-                    check_row = True
-            if check_row:
-                data = self._dataframe._data[2]
-                res_data = pandas.Series(data, index=self._dataframe.index)
-                return res_data.at[row]
-            raise IndexingError('Index is out of bounds for axis')
+            data = self._dataframe._data[2]
+            res_data = pandas.Series(data, index=self._dataframe.index)
+            return res_data.at[row][0]
     """
     func_lines = ['def _df_getitem_tuple_at_impl(self, idx):']
     for i in range(len(self.columns)):
