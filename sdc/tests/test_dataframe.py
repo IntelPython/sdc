@@ -36,6 +36,7 @@ from numba import types
 from numba.config import IS_32BITS
 from numba.special import literal_unroll
 from numba.errors import TypingError
+from pandas.core.indexing import IndexingError
 
 import sdc
 from sdc.datatypes.common_functions import SDCLimitation
@@ -1076,6 +1077,101 @@ class TestDataFrame(TestCase):
                                    "int": [3, 4, 1, 0, 222],
                                    "string": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
                 with self.subTest(n=n, index=idx):
+                    pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
+
+    def test_df_iloc_slice(self):
+        def test_impl(df, n, k):
+            return df.iloc[n:k]
+        sdc_func = sdc.jit(test_impl)
+        cases_idx = [[3, 4, 2, 6, 1], None]
+        cases_n = [-10, 0, 8, None]
+        for idx in cases_idx:
+            df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                               "B": [5.5, np.nan, 3, 0, 7.7],
+                               "C": [3, 4, 1, 0, 222]}, index=idx)
+            for n, k in product(cases_n, cases_n[::-1]):
+                with self.subTest(index=idx, n=n, k=k):
+                    pd.testing.assert_frame_equal(sdc_func(df, n, k), test_impl(df, n, k))
+
+    def test_df_iloc_values(self):
+        def test_impl(df, n):
+            return df.iloc[n, 1]
+        sdc_func = sdc.jit(test_impl)
+        cases_idx = [[3, 4, 2, 6, 1], None]
+        cases_n = [1, 0, 2]
+        for idx in cases_idx:
+            df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                               "B": [5.5, np.nan, 3, 0, 7.7],
+                               "C": [3, 4, 1, 0, 222]}, index=idx)
+            for n in cases_n:
+                with self.subTest(index=idx, n=n):
+                    if not (np.isnan(sdc_func(df, n)) and np.isnan(test_impl(df, n))):
+                        self.assertEqual(sdc_func(df, n), test_impl(df, n))
+
+    def test_df_iloc_value_error(self):
+        def int_impl(df):
+            return df.iloc[11]
+
+        def list_impl(df):
+            return df.iloc[[7, 14]]
+
+        def list_bool_impl(df):
+            return df.iloc[[True, False]]
+
+        msg1 = 'Index is out of bounds for axis'
+        msg2 = 'Item wrong length'
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [5.5, np.nan, 3, 0, 7.7],
+                           "C": [3, 4, 1, 0, 222]})
+
+        impls = [(int_impl, msg1), (list_impl, msg1), (list_bool_impl, msg2)]
+        for impl, msg in impls:
+            with self.subTest(case=impl, msg=msg):
+                func = self.jit(impl)
+                with self.assertRaises(IndexingError) as raises:
+                    func(df)
+                self.assertIn(msg, str(raises.exception))
+
+    def test_df_iloc_int(self):
+        def test_impl(df, n):
+            return df.iloc[n]
+        sdc_func = sdc.jit(test_impl)
+        cases_idx = [[3, 4, 2, 6, 1], None]
+        cases_n = [0, 1, 2]
+        for idx in cases_idx:
+            df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                               "B": [5.5, np.nan, 3, 0, 7.7],
+                               "C": [3, 4, 1, 0, 222]}, index=idx)
+            for n in cases_n:
+                with self.subTest(index=idx, n=n):
+                    pd.testing.assert_series_equal(sdc_func(df, n), test_impl(df, n), check_names=False)
+
+    def test_df_iloc_list(self):
+        def test_impl(df, n):
+            return df.iloc[n]
+        sdc_func = sdc.jit(test_impl)
+        cases_idx = [[3, 4, 2, 6, 1], None]
+        cases_n = [[0, 1], [2, 0]]
+        for idx in cases_idx:
+            df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                               "B": [5.5, np.nan, 3, 0, 7.7],
+                               "C": [3, 4, 1, 0, 222]}, index=idx)
+            for n in cases_n:
+                with self.subTest(index=idx, n=n):
+                    pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
+
+    def test_df_iloc_list_bool(self):
+        def test_impl(df, n):
+            return df.iloc[n]
+        sdc_func = sdc.jit(test_impl)
+        cases_idx = [[3, 4, 2, 6, 1], None]
+        cases_n = [[True, False, True, False, True]]
+        for idx in cases_idx:
+            df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                               "B": [5.5, np.nan, 3, 0, 7.7],
+                               "C": [3, 4, 1, 0, 222]}, index=idx)
+            for n in cases_n:
+                with self.subTest(index=idx, n=n):
                     pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
 
     def test_df_iat(self):
