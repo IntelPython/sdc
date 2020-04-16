@@ -4918,7 +4918,6 @@ class TestSeries(
         result = cfunc(series, indices)
         pd.testing.assert_series_equal(ref_result, result)
 
-    @unittest.expectedFailure
     def test_series_iterator_int(self):
         def test_impl(A):
             return [i for i in A]
@@ -4927,7 +4926,6 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @unittest.expectedFailure
     def test_series_iterator_float(self):
         def test_impl(A):
             return [i for i in A]
@@ -4936,7 +4934,6 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @unittest.expectedFailure
     def test_series_iterator_boolean(self):
         def test_impl(A):
             return [i for i in A]
@@ -4953,7 +4950,6 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @unittest.expectedFailure
     def test_series_iterator_one_value(self):
         def test_impl(A):
             return [i for i in A]
@@ -4971,7 +4967,6 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
-    @unittest.expectedFailure
     def test_series_iterator_empty(self):
         def test_impl(A):
             return [i for i in A]
