@@ -5343,7 +5343,6 @@ class TestSeries(
                 msg = 'TypingError: Method cumsum(). The object axis\n given: int64\n expected: None\n'
                 self.assertIn(msg, str(raises.exception))
 
-    @unittest.expectedFailure
     def test_series_cov1(self):
         def test_impl(s1, s2):
             return s1.cov(s2)
@@ -5355,7 +5354,6 @@ class TestSeries(
                 hpat_func(s1, s2), test_impl(s1, s2),
                 err_msg='s1={}\ns2={}'.format(s1, s2))
 
-    @unittest.expectedFailure
     @skip_sdc_jit('Series.cov() parameter "min_periods" unsupported')
     def test_series_cov(self):
         def test_series_cov_impl(s1, s2, min_periods=None):
