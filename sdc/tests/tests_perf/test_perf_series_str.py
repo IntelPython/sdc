@@ -77,6 +77,7 @@ cases = [
     TC(name='capitalize', size=[10 ** 4, 10 ** 5]),
     TC(name='casefold', size=[10 ** 4, 10 ** 5]),
     TC(name='center', params='1', size=[10 ** 4, 10 ** 5],  input_data=test_global_input_data_unicode_kind1),
+    TC(name='contains', params='"a"', size=[10 ** 4, 10 ** 5]),
     TC(name='endswith', params='"e"', size=[10 ** 4, 10 ** 5]),
     TC(name='find', params='"e"', size=[10 ** 4, 10 ** 5]),
     TC(name='isalnum', size=[10 ** 4, 10 ** 5]),

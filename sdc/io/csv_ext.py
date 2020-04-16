@@ -366,16 +366,63 @@ def pyarrow_cpu_count_equal_numba_num_treads(func):
 
 @pyarrow_cpu_count_equal_numba_num_treads
 def pandas_read_csv(
-    filepath_or_buffer,
-    sep=",",
-    # Column and Index Locations and Names
-    names=None,
-    usecols=None,
-    # General Parsing Configuration
-    dtype=None,
-    skiprows=None,
-    # Datetime Handling
-    parse_dates=False,
+        filepath_or_buffer,
+        sep=',',
+        delimiter=None,
+        # Column and Index Locations and Names
+        header="infer",
+        names=None,
+        index_col=None,
+        usecols=None,
+        squeeze=False,
+        prefix=None,
+        mangle_dupe_cols=True,
+        # General Parsing Configuration
+        dtype=None,
+        engine=None,
+        converters=None,
+        true_values=None,
+        false_values=None,
+        skipinitialspace=False,
+        skiprows=None,
+        skipfooter=0,
+        nrows=None,
+        # NA and Missing Data Handling
+        na_values=None,
+        keep_default_na=True,
+        na_filter=True,
+        verbose=False,
+        skip_blank_lines=True,
+        # Datetime Handling
+        parse_dates=False,
+        infer_datetime_format=False,
+        keep_date_col=False,
+        date_parser=None,
+        dayfirst=False,
+        cache_dates=True,
+        # Iteration
+        iterator=False,
+        chunksize=None,
+        # Quoting, Compression, and File Format
+        compression="infer",
+        thousands=None,
+        decimal=b".",
+        lineterminator=None,
+        quotechar='"',
+        # quoting=csv.QUOTE_MINIMAL,  # not supported
+        doublequote=True,
+        escapechar=None,
+        comment=None,
+        encoding=None,
+        dialect=None,
+        # Error Handling
+        error_bad_lines=True,
+        warn_bad_lines=True,
+        # Internal
+        delim_whitespace=False,
+        # low_memory=_c_parser_defaults["low_memory"],  # not supported
+        memory_map=False,
+        float_precision=None,
 ):
     """Implements pandas.read_csv via pyarrow.csv.read_csv.
     This function has the same interface as pandas.read_csv.
@@ -387,16 +434,71 @@ def pandas_read_csv(
         need_categorical |= any(isinstance(v, pd.CategoricalDtype) for v in dtype.values())
     except: pass
 
-    if need_categorical:
+    fallback_to_pandas = need_categorical
+
+    if fallback_to_pandas:
         return pd.read_csv(
-            filepath_or_buffer,
+            filepath_or_buffer=filepath_or_buffer,
             sep=sep,
+            delimiter=delimiter,
+            # Column and Index Locations and Names
+            header=header,
             names=names,
+            index_col=index_col,
             usecols=usecols,
+            squeeze=squeeze,
+            prefix=prefix,
+            mangle_dupe_cols=mangle_dupe_cols,
+            # General Parsing Configuration
             dtype=dtype,
+            engine=engine,
+            converters=converters,
+            true_values=true_values,
+            false_values=false_values,
+            skipinitialspace=skipinitialspace,
             skiprows=skiprows,
-            parse_dates=parse_dates
+            skipfooter=skipfooter,
+            nrows=nrows,
+            # NA and Missing Data Handling
+            na_values=na_values,
+            keep_default_na=keep_default_na,
+            na_filter=na_filter,
+            verbose=verbose,
+            skip_blank_lines=skip_blank_lines,
+            # Datetime Handling
+            parse_dates=parse_dates,
+            infer_datetime_format=infer_datetime_format,
+            keep_date_col=keep_date_col,
+            date_parser=date_parser,
+            dayfirst=dayfirst,
+            cache_dates=cache_dates,
+            # Iteration
+            iterator=iterator,
+            chunksize=chunksize,
+            # Quoting, Compression, and File Format
+            compression=compression,
+            thousands=thousands,
+            decimal=decimal,
+            lineterminator=lineterminator,
+            quotechar=quotechar,
+            # quoting=csv.QUOTE_MINIMAL,  # not supported
+            doublequote=doublequote,
+            escapechar=escapechar,
+            comment=comment,
+            encoding=encoding,
+            dialect=dialect,
+            # Error Handling
+            error_bad_lines=error_bad_lines,
+            warn_bad_lines=warn_bad_lines,
+            # Internal
+            delim_whitespace=delim_whitespace,
+            # low_memory=_c_parser_defaults["low_memory"],  # not supported
+            memory_map=memory_map,
+            float_precision=float_precision,
         )
+
+    if delimiter is None:
+        delimiter = sep
 
     autogenerate_column_names = bool(names)
 
@@ -404,18 +506,17 @@ def pandas_read_csv(
 
     # categories = None
 
-    if usecols is not None:
-        include_columns = [f'f{i}' for i in usecols]
-
-    read_options = pyarrow.csv.ReadOptions(
-        skip_rows=skiprows,
-        # column_names=column_names,
-        autogenerate_column_names=autogenerate_column_names,
-    )
-
-    parse_options = pyarrow.csv.ParseOptions(
-        delimiter=sep,
-    )
+    if usecols:
+        if type(usecols[0]) == str:
+            if names:
+                include_columns = [f'f{names.index(col)}' for col in usecols]
+            else:
+                include_columns = usecols
+        elif type(usecols[0]) == int:
+            include_columns = [f'f{i}' for i in usecols]
+        else:
+            # usecols should be all str or int
+            assert False
 
     # try:
     #     keys = [k for k, v in dtype.items() if isinstance(v, pd.CategoricalDtype)]
@@ -426,12 +527,23 @@ def pandas_read_csv(
     #         categories = [f"f{names_list.index(k)}" for k in keys]
     # except: pass
 
-    if dtype is not None:
-        names_list = list(names)
-        if not hasattr(dtype, 'items'):
-            dtype = { f"f{names_list.index(k)}": pyarrow.from_numpy_dtype(dtype) for k in names }
+    if dtype:
+        if names:
+            names_list = list(names)
+            if isinstance(dtype, dict):
+                dtype = {f"f{names_list.index(k)}": pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
+            else:
+                dtype = {f"f{names_list.index(k)}": pyarrow.from_numpy_dtype(dtype) for k in names}
+        elif usecols:
+            if isinstance(dtype, dict):
+                dtype = {k: pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
+            else:
+                dtype = {k: pyarrow.from_numpy_dtype(dtype) for k in usecols}
         else:
-            dtype = { f"f{names_list.index(k)}": pyarrow.from_numpy_dtype(v) for k, v in dtype.items() }
+            if isinstance(dtype, dict):
+                dtype = {k: pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
+            else:
+                dtype = pyarrow.from_numpy_dtype(dtype)
 
     try:
         for column in parse_dates:
@@ -440,6 +552,16 @@ def pandas_read_csv(
             # dtype[name] = pyarrow.from_numpy_dtype(np.datetime64) # string
             del dtype[name]
     except: pass
+
+    parse_options = pyarrow.csv.ParseOptions(
+        delimiter=delimiter,
+    )
+
+    read_options = pyarrow.csv.ReadOptions(
+        skip_rows=skiprows,
+        # column_names=column_names,
+        autogenerate_column_names=autogenerate_column_names,
+    )
 
     convert_options = pyarrow.csv.ConvertOptions(
         column_types=dtype,
@@ -458,8 +580,14 @@ def pandas_read_csv(
         # categories=categories,
     )
 
-    if names is not None:
-        dataframe.columns = names
+    if names:
+        if usecols and len(names) != len(usecols):
+            if isinstance(usecols[0], int):
+                dataframe.columns = [names[col] for col in usecols]
+            elif isinstance(usecols[0], str):
+                dataframe.columns = [name for name in names if name in usecols]
+        else:
+            dataframe.columns = names
 
     return dataframe
 
@@ -470,43 +598,70 @@ def _gen_csv_reader_py_pyarrow(col_names, col_typs, usecols, sep, typingctx, tar
     return _gen_csv_reader_py_pyarrow_jit_func(csv_reader_py)
 
 
-def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, usecols, sep, skiprows, signature=None):
+def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, dtype_present, usecols, signature=None):
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs) if t.dtype == types.NPDatetime('ns'))
-    typ_strs = ", ".join(["{}='{}'".format(to_varname(cname), _get_dtype_str(t))
-                          for cname, t in zip(col_names, col_typs)])
-    pd_dtype_strs = ", ".join(["'{}':{}".format(cname, _get_pd_dtype_str(t)) for cname, t in zip(col_names, col_typs)])
+    return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
+    nb_objmode_vars = ", ".join([
+        "{}='{}'".format(to_varname(cname), _get_dtype_str(t))
+        for cname, t in zip(return_columns, col_typs)
+    ])
+    pd_dtype_strs = ", ".join([
+        "'{}':{}".format(cname, _get_pd_dtype_str(t))
+        for cname, t in zip(return_columns, col_typs)
+    ])
 
     if signature is None:
-        signature = "fname"
+        signature = "filepath_or_buffer"
     func_text = "def csv_reader_py({}):\n".format(signature)
-    func_text += "  with objmode({}):\n".format(typ_strs)
-    func_text += "    df = pandas_read_csv(fname, names={},\n".format(col_names)
-    func_text += "       parse_dates=[{}],\n".format(date_inds)
-    func_text += "       dtype={{{}}},\n".format(pd_dtype_strs)
-    func_text += "       skiprows={},\n".format(skiprows)
-    func_text += "       usecols={}, sep='{}')\n".format(usecols, sep)
-    for cname in col_names:
+    func_text += "  with objmode({}):\n".format(nb_objmode_vars)
+    func_text += "    df = pandas_read_csv(filepath_or_buffer,\n"
+
+    # pyarrow reads unnamed header as " ", pandas reads it as "Unnamed: N"
+    # during inference from file names should be raplaced with "Unnamed: N"
+    # passing names to pyarrow means that one row is header and should be skipped
+    if col_names and any(map(lambda x: x.startswith('Unnamed: '), col_names)):
+        func_text += "        names={},\n".format(col_names)
+        func_text += "        skiprows=(skiprows and skiprows + 1) or 1,\n"
+    else:
+        func_text += "        names=names,\n"
+        func_text += "        skiprows=skiprows,\n"
+
+    func_text += "        parse_dates=[{}],\n".format(date_inds)
+
+    # Python objects (e.g. str, np.float) could not be jitted and passed to objmode
+    # so they are hardcoded to function
+    # func_text += "        dtype={{{}}},\n".format(pd_dtype_strs) if dtype_present else \
+    #              "        dtype=dtype,\n"
+    # dtype is hardcoded because datetime should be read as string
+    func_text += "        dtype={{{}}},\n".format(pd_dtype_strs)
+
+    func_text += "        usecols=usecols,\n"
+    func_text += "        sep=sep,\n"
+    func_text += "        delimiter=delimiter,\n"
+    func_text += "    )\n"
+    for cname in return_columns:
         func_text += "    {} = df['{}'].values\n".format(to_varname(cname), cname)
         # func_text += "    print({})\n".format(cname)
     return func_text, 'csv_reader_py'
 
 
-def _gen_csv_reader_py_pyarrow_func_text(col_names, col_typs, usecols, sep, skiprows):
-    func_text, func_name = _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, usecols, sep, skiprows)
+def _gen_csv_reader_py_pyarrow_func_text(col_names, col_typs, usecols):
+    func_text, func_name = _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, usecols)
 
     func_text += "  return ({},)\n".format(", ".join(to_varname(c) for c in col_names))
 
     return func_text, func_name
 
 
-def _gen_csv_reader_py_pyarrow_func_text_dataframe(col_names, col_typs, usecols, sep, skiprows, signature):
+def _gen_csv_reader_py_pyarrow_func_text_dataframe(col_names, col_typs, dtype_present, usecols, signature):
     func_text, func_name = _gen_csv_reader_py_pyarrow_func_text_core(
-        col_names, col_typs, usecols, sep, skiprows, signature)
+        col_names, col_typs, dtype_present, usecols, signature)
+    return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
 
     func_text += "  return sdc.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
-        ", ".join(to_varname(c) for c in col_names),
-        ", ".join("'{}'".format(c) for c in col_names)
+        ", ".join(to_varname(c) for c in return_columns),
+        ", ".join("'{}'".format(c) for c in return_columns)
     )
 
     return func_text, func_name

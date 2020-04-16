@@ -46,8 +46,8 @@ from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
 from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype,
                                               box_categorical_array, unbox_categorical_array)
-from sdc.hiframes.pd_series_ext import (SeriesType, arr_to_series_type,
-                                         _get_series_array_type)
+from sdc.hiframes.pd_series_ext import (SeriesType, arr_to_series_type)
+from sdc.hiframes.pd_series_type import _get_series_array_type
 from sdc.hiframes.split_impl import (string_array_split_view_type,
                                       box_str_arr_split_view)
 

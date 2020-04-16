@@ -20,18 +20,5 @@ Intel SDC generates machine code using the `LLVM* Compiler`_:
    :name: ex_basic_workflow
 
 On a single machine Intel SDC uses multi-threading (based on `Intel® TBB`_ or `OpenMP*`_ )
-to parallelize `Pandas*`_ and `Numpy*`_ operations. To turn on the multi-threading you just need to add
-``parallel=True`` option to ``@njit`` decorator:
-
-.. literalinclude:: ../../examples/basic_workflow_parallel.py
-   :language: python
-   :emphasize-lines: 9-10
-   :lines: 27-
-   :caption: Example 2: Parallelizing `Pandas*`_ Workflow
-   :name: ex_basic_workflow_parallel
-
-.. note::
-    Using the same ``@njit`` decorator the Intel SDC is designed to scale to many nodes automatically
-    without the need to use frameworks like `Dask*`_ , `Ray*`_, and `Spark*`_.
-
-    This feature is in active development, and will become available in a future Intel SDC release.
+to parallelize `Pandas*`_ and `Numpy*`_ operations. Most of these operations are parallelized on function-level,
+so that no extra action is required from users in most cases.

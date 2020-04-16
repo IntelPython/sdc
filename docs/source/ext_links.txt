@@ -2,6 +2,7 @@
     **********************************************************
     THESE ARE EXTERNAL PROJECT LINKS USED IN THE DOCUMENTATION
     **********************************************************
+.. _Python*: https://www.python.org/
 .. _NumPy*: https://numpy.org/
 .. _Numba*: https://numba.pydata.org/
 .. _Pandas*: https://pandas.pydata.org/

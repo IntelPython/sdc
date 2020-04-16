@@ -73,10 +73,37 @@ if not sdc_doc_no_api_ref:
 
     generate_api_reference()
 
+SDC_DOC_NO_EXAMPLES_STR = 'SDC_DOC_NO_EXAMPLES'
+SDC_DOC_EXAMPLES_DIR = '_examples'
+
+sdc_doc_no_examples = False  # Generate examples list by default
+if SDC_DOC_NO_EXAMPLES_STR in os.environ:
+    sdc_doc_no_examples = os.environ[SDC_DOC_NO_EXAMPLES_STR] == '1'
+
+if not sdc_doc_no_examples:
+    if os.path.exists(SDC_DOC_EXAMPLES_DIR):
+        shutil.rmtree(SDC_DOC_EXAMPLES_DIR)
+
+    try:
+        import sdc
+    except ImportError:
+        raise ImportError('Cannot import sdc.\n'
+                          'Documentation generator for Examples for a given module expects that module '
+                          'to be installed. Use conda/pip install SDC to install it prior to using API Examples '
+                          'generation. If you want to disable Examples generation, set the environment '
+                          'variable SDC_DOC_NO_EXAMPLES_STR=1')
+
+    try:
+        from examples_generator import generate_examples
+    except ImportError:
+        raise ImportError('Cannot import examples_generator', os.getcwd())
+
+    generate_examples()
+
 # -- Project information -----------------------------------------------------
 
 project = 'Intel® Scalable Dataframe Compiler'
-copyright = '2019, Intel Corporation'
+copyright = '2019-2020, Intel Corporation'
 author = 'Intel Corporation'
 
 # The full version, including alpha/beta/rc tags
@@ -141,8 +168,7 @@ todo_link_only = True
 intersphinx_mapping = {
     'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
     'python': ('http://docs.python.org/2', None),
-    'numpy': ('http://docs.scipy.org/doc/numpy', None),
-    'scipy': ('http://docs.scipy.org/doc/scipy/reference', None),
+    'numpy': ('http://docs.scipy.org/doc/numpy', None)
 }
 
 # -- Napoleon extension configuration (Numpy and Google docstring options) -------

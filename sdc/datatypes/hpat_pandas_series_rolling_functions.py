@@ -62,6 +62,15 @@ hpat_pandas_series_rolling_docstring_tmpl = """
     .. command-output:: python ./series/rolling/series_rolling_{method_name}.py
        :cwd: ../../../examples
 
+    .. literalinclude:: ../../../examples/dataframe/rolling/dataframe_rolling_{method_name}.py
+       :language: python
+       :lines: 27-
+       :caption: {example_caption}
+       :name: ex_dataframe_rolling_{method_name}
+
+    .. command-output:: python ./dataframe/rolling/dataframe_rolling_{method_name}.py
+       :cwd: ../../../examples
+
     .. seealso::
         :ref:`Series.rolling <pandas.Series.rolling>`
             Calling object with a Series.
@@ -1145,8 +1154,10 @@ hpat_pandas_series_rolling_apply.__doc__ = hpat_pandas_series_rolling_docstring_
     """
     Limitations
     -----------
-    Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    - Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
+    - DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """
@@ -1165,13 +1176,13 @@ hpat_pandas_series_rolling_corr.__doc__ = hpat_pandas_series_rolling_docstring_t
     """
     Limitations
     -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
-    Resulting Series has default index and name.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    Resulting DataFrame/Series has default index and name.
     """,
     'extra_params':
     """
-    other: :obj:`Series`
-        Other Series.
+    other: :obj:`DataFrame` or :obj:`Series`
+        Other DataFrame/Series.
     pairwise: :obj:`bool`
         Not relevant for Series.
     """
@@ -1191,13 +1202,13 @@ hpat_pandas_series_rolling_cov.__doc__ = hpat_pandas_series_rolling_docstring_tm
     """
     Limitations
     -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
-    Resulting Series has default index and name.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    Resulting DataFrame/Series has default index and name.
     """,
     'extra_params':
     """
-    other: :obj:`Series`
-        Other Series.
+    other: :obj:`DataFrame` or :obj:`Series`
+        Other DataFrame/Series.
     pairwise: :obj:`bool`
         Not relevant for Series.
     ddof: :obj:`int`
@@ -1226,7 +1237,7 @@ hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_t
     """
     Limitations
     -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params': ''
 })
@@ -1234,7 +1245,13 @@ hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_t
 hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'median',
     'example_caption': 'Calculate the rolling median.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'extra_params': ''
 })
 
@@ -1252,8 +1269,10 @@ hpat_pandas_series_rolling_quantile.__doc__ = hpat_pandas_series_rolling_docstri
     """
     Limitations
     -----------
+    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
     Supported ``interpolation`` only can be `'linear'`.
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """
@@ -1278,7 +1297,7 @@ hpat_pandas_series_rolling_std.__doc__ = hpat_pandas_series_rolling_docstring_tm
     """
     Limitations
     -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """
@@ -1289,12 +1308,12 @@ hpat_pandas_series_rolling_std.__doc__ = hpat_pandas_series_rolling_docstring_tm
 
 hpat_pandas_series_rolling_sum.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'sum',
-    'example_caption': 'Calculate rolling sum of given Series.',
+    'example_caption': 'Calculate rolling sum',
     'limitations_block':
     """
     Limitations
     -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params': ''
 })
@@ -1306,7 +1325,7 @@ hpat_pandas_series_rolling_var.__doc__ = hpat_pandas_series_rolling_docstring_tm
     """
     Limitations
     -----------
-    Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """
