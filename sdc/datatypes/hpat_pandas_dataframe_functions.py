@@ -64,6 +64,7 @@ from sdc.hiframes.api import isna
 from sdc.functions.numpy_like import getitem_by_mask
 from sdc.datatypes.common_functions import _sdc_take, sdc_reindex_series
 from sdc.utilities.prange_utils import parallel_chunks
+from sdc.functions.numpy_like import find_idx
 
 
 @sdc_overload_attribute(DataFrameType, 'index')
@@ -1894,19 +1895,16 @@ def df_getitem_single_label_loc_codegen(self, idx):
             return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=numpy.array(new_index))
     """
     if isinstance(self.index, types.NoneType):
-        fill_list = ['  idx_list.append(idx)']
+        fill_list = ['  idx_list =  numpy.array([idx])']
         new_index = ['  new_index = numpy.array([idx])']
 
     else:
-        fill_list = ['  for i in range(len(self._dataframe.index)):',
-                     '    if self._dataframe._index[i] == idx:',
-                     '      idx_list.append(i)']
+        fill_list = ['  idx_list = find_idx(self._dataframe._index, idx)']
         new_index = ['  new_index = _sdc_take(self._dataframe._index, idx_list)']
 
     fill_list_text = '\n'.join(fill_list)
     new_index_text = '\n'.join(new_index)
     func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
-                  '  idx_list = []',
                   f'{fill_list_text}']
     results = []
     for i, c in enumerate(self.columns):
@@ -1928,6 +1926,7 @@ def df_getitem_single_label_loc_codegen(self, idx):
     global_vars = {'pandas': pandas, 'numpy': numpy,
                    'numba': numba,
                    '_sdc_take': _sdc_take,
+                   'find_idx': find_idx,
                    'IndexingError': IndexingError}
 
     return func_text, global_vars

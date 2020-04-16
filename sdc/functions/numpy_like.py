@@ -710,6 +710,45 @@ def dropna_overload(arr, idx, name):
     return dropna_impl
 
 
+def find_idx(arr, idx):
+    pass
+
+
+@sdc_overload(find_idx)
+def find_idx_overload(arr, idx):
+    dtype = arr.dtype
+
+    def find_idx_impl(arr, idx):
+        chunks = parallel_chunks(len(arr))
+        arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
+        length = 0
+
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            res = 0
+            for j in range(chunk.start, chunk.stop):
+                if arr[j] == idx:
+                    res += 1
+            length += res
+            arr_len[i] = res
+
+        result_data = numpy.empty(shape=length, dtype=dtype)
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            new_start = int(sum(arr_len[0:i]))
+            new_stop = new_start + arr_len[i]
+            current_pos = new_start
+
+            for j in range(chunk.start, chunk.stop):
+                if arr[j] == idx:
+                    result_data[current_pos] = j
+                    current_pos += 1
+
+        return result_data
+
+    return find_idx_impl
+
+
 def nanmean(a):
     pass
 
