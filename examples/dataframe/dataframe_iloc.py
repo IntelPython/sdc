@@ -25,39 +25,23 @@
 # *****************************************************************************
 
 
-import argparse
-import os
-import shutil
-
-from pathlib import Path
-from utilities import SDC_Build_Utilities
-
-
-def run_benchmarks(sdc_utils, args_list, num_threads_list):
-    os.chdir(str(sdc_utils.src_path.parent))
-
-    for args_set in args_list:
-        for num_threads in num_threads_list:
-            os.environ['NUMBA_NUM_THREADS'] = num_threads
-            sdc_utils.log_info(f'Run Intel SDC benchmarks on {num_threads} threads', separate=True)
-            sdc_utils.run_command(f'python -W ignore -m sdc.runtests {args_set}')
+"""
+   Expected result:
+    A    2.0
+    B    5.0
+    Name: 1, dtype: float64
+"""
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--python', default='3.7', choices=['3.6', '3.7', '3.8'],
-                        help='Python version, default = 3.7')
-    parser.add_argument('--sdc-channel', default=None, help='Intel SDC channel')
-    parser.add_argument('--args-list', required=True, nargs='+', help='List of arguments sets for benchmarks')
-    parser.add_argument('--num-threads-list', required=True, nargs='+',
-                        help='List of values for NUMBA_NUM_THREADS env variable')
+import pandas as pd
+from numba import njit
 
-    args = parser.parse_args()
 
-    sdc_utils = SDC_Build_Utilities(args.python, args.sdc_channel)
-    sdc_utils.log_info('Run Intel(R) SDC benchmarks', separate=True)
-    sdc_utils.log_info(sdc_utils.line_double)
-    sdc_utils.create_environment(['openpyxl', 'xlrd'])
-    sdc_utils.install_conda_package(['sdc'])
+@njit
+def dataframe_iloc():
+    df = pd.DataFrame({'A': [1.0, 2.0, 3.0, 1.0], 'B': [4, 5, 6, 7]})
 
-    run_benchmarks(sdc_utils, args.args_list, args.num_threads_list)
+    return df.iloc[1]
+
+
+print(dataframe_iloc())

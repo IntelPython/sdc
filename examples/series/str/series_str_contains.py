@@ -24,23 +24,15 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import numba
-import sdc
-import sdc.timsort
-
-from sdc.str_arr_ext import (to_string_list, cp_str_list_to_array)
+import pandas as pd
+from numba import njit
 
 
-# TODO: fix cache issue
-@numba.njit(no_cpython_wrapper=True, cache=False)
-def local_sort(key_arrs, data, ascending=True):
-    # convert StringArray to list(string) to enable swapping in sort
-    l_key_arrs = to_string_list(key_arrs)
-    l_data = to_string_list(data)
-    n_out = len(key_arrs[0])
-    sdc.timsort.sort(l_key_arrs, 0, n_out, l_data)
-    if not ascending:
-        sdc.timsort.reverseRange(l_key_arrs, 0, n_out, l_data)
-    cp_str_list_to_array(key_arrs, l_key_arrs)
-    cp_str_list_to_array(data, l_data)
+@njit
+def series_str_contains():
+    series = pd.Series(['dog', 'foo', 'bar'])
+
+    return series.str.contains('o')  # Expect series of True, True, False
+
+
+print(series_str_contains())

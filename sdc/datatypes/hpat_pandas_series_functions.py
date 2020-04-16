@@ -420,7 +420,7 @@ def hpat_pandas_series_getitem(self, idx):
                   ' Given: self.index={}, idx.index={}'
             raise TypingError(msg.format(_func_name, self.index, idx.index))
 
-        def hpat_pandas_series_getitem_idx_bool_indexer_impl(self, idx):
+        def _series_getitem_idx_bool_indexer_impl(self, idx):
 
             if none_indexes == True:  # noqa
                 if len(self) > len(idx):
@@ -428,21 +428,19 @@ def hpat_pandas_series_getitem(self, idx):
                           "(index of the boolean Series and of the indexed object do not match)."
                     raise IndexingError(msg)
 
-                return pandas.Series(
-                    data=numpy_like.getitem_by_mask(self._data, idx._data),
-                    index=numpy_like.getitem_by_mask(self.index, idx._data),
-                    name=self._name
-                )
+                self_index = range(len(self))
+                reindexed_idx = idx
             else:
                 self_index = self.index
-                idx_reindexed = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)
-                return pandas.Series(
-                    data=numpy_like.getitem_by_mask(self._data, idx_reindexed._data),
-                    index=numpy_like.getitem_by_mask(self_index, idx_reindexed._data),
-                    name=self._name
-                )
+                reindexed_idx = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)
 
-        return hpat_pandas_series_getitem_idx_bool_indexer_impl
+            return pandas.Series(
+                data=numpy_like.getitem_by_mask(self._data, reindexed_idx._data),
+                index=numpy_like.getitem_by_mask(self_index, reindexed_idx._data),
+                name=self._name
+            )
+
+        return _series_getitem_idx_bool_indexer_impl
 
     # idx is Series and it's index is None, idx.dtype is not Boolean
     if (isinstance(idx, SeriesType) and index_is_none
@@ -1828,14 +1826,14 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
 
     Limitations
     -----------
-    - Currently copy=False is not supported
+    - Parameter ``copy`` is supported only with default value ``True``.
 
     Examples
     --------
     .. literalinclude:: ../../../examples/series/series_astype.py
        :language: python
        :lines: 36-
-       :caption: Cast a pandas object to a specified dtype dtype.
+       :caption: Cast a pandas object to a specified dtype.
        :name: ex_series_astype
 
     .. command-output:: python ./series/series_astype.py
@@ -1843,19 +1841,19 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
 
     .. seealso::
 
-        `pandas.absolute
+        `pandas.to_datetime
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.to_datetime.html#pandas.to_datetime>`_
             Convert argument to datetime.
 
-        `pandas.absolute
+        `pandas.to_timedelta
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.to_timedelta.html#pandas.to_timedelta>`_
             Convert argument to timedelta.
 
-        `pandas.absolute
+        `pandas.to_numeric
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.to_numeric.html#pandas.to_numeric>`_
             Convert argument to a numeric type.
 
-        `numpy.absolute
+        `numpy.ndarray.astype
         <https://docs.scipy.org/doc/numpy/reference/generated/numpy.ndarray.astype.html#numpy.ndarray.astype>`_
             Copy of the array, cast to a specified type.
 
@@ -3460,7 +3458,7 @@ def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=
 
     Limitations
     -----------
-    - Parameter level is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameter ``level`` is currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
@@ -3962,8 +3960,8 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
 
     Limitations
     -----------
-    Parameter ``axis`` is supported only with default value ``None``.
-    Parameter ``skipna`` cannot be ``False`` with data of string type.
+    - Parameter ``axis`` is supported only with default value ``None``.
+    - Parameter ``skipna`` cannot be ``False`` with data of string type.
 
     Examples
     --------
@@ -3981,7 +3979,7 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
         :ref:`Series.idxmax <pandas.Series.idxmax>`
             Return index label of the first occurrence of maximum of values.
 
-        `numpy.absolute <https://docs.scipy.org/doc/numpy/reference/generated/numpy.argmin.html#numpy.argmin>`_
+        `numpy.argmin <https://docs.scipy.org/doc/numpy/reference/generated/numpy.argmin.html#numpy.argmin>`_
             Return indices of the minimum values along the given axis.
 
         :ref:`DataFrame.idxmin <pandas.DataFrame.idxmin>`
@@ -4562,7 +4560,6 @@ def hpat_pandas_series_median(self, axis=None, skipna=None, level=None, numeric_
 
     Limitations
     -----------
-
     - Parameters ``axis``, ``level`` and ``numeric_only`` are supported only with default value ``None``.
 
     Examples
@@ -4862,7 +4859,7 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
 
     Limitations
     -----------
-    - Parameter ``inplace`` is currently unsupported by Intel Scalable Dataframe Compiler
+    - Parameters ``inplace`` and ``axis`` are currently unsupported by Intel Scalable Dataframe Compiler.
 
     Examples
     --------
@@ -4889,7 +4886,7 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
         :ref:`DataFrame.dropna <pandas.DataFrame.dropna>`
             Drop rows or columns which contain NA values.
 
-        `pandas.absolute
+        `pandas.Index.dropna
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Index.dropna.html#pandas.Index.dropna>`_
             Return Index without NA/NaN values
 
@@ -4940,8 +4937,9 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
 
     Limitations
     -----------
-    - Parameters ``method``, ``limit`` and ``downcast`` are currently unsupported by Intel Scalable Dataframe Compiler.
-    - Parameter ``inplace`` is supported as literal value only.
+    - Parameters ``method``, ``limit`` and ``downcast`` are currently unsupported
+    by Intel Scalable Dataframe Compiler.
+    - Parameter ``inplace`` is supported with literal value only.
 
     Examples
     --------
@@ -4956,15 +4954,15 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
 
     .. seealso::
 
-        `pandas.absolute
+        `pandas.interpolate
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.interpolate.html#pandas.Series.interpolate>`_
             Fill NaN values using interpolation.
 
-        `pandas.absolute
+        `pandas.reindex
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.reindex.html#pandas.Series.reindex>`_
             Conform object to new index.
 
-        `pandas.absolute
+        `pandas.asfreq
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.asfreq.html#pandas.Series.asfreq>`_
             Convert TimeSeries to specified frequency.
 

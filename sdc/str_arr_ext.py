@@ -1543,3 +1543,14 @@ def sdc_str_arr_operator_mul(self, other):
         return res_arr
 
     return _sdc_str_arr_operator_mul_impl
+
+
+@lower_builtin(operator.is_, StringArrayType, StringArrayType)
+def sdc_str_arr_operator_is(context, builder, sig, args):
+
+    # meminfo ptr uniquely identifies each StringArray allocation
+    a = context.make_helper(builder, string_array_type, args[0])
+    b = context.make_helper(builder, string_array_type, args[1])
+    ma = builder.ptrtoint(a.meminfo, cgutils.intp_t)
+    mb = builder.ptrtoint(b.meminfo, cgutils.intp_t)
+    return builder.icmp_signed('==', ma, mb)
