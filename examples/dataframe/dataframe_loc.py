@@ -27,10 +27,8 @@
 
 """
    Expected result:
-    A    3.0
-    B    6.0
-    C    2.0
-    Name: 2, dtype: float64
+        A  B  C
+    2  3.0  6  2
 """
 
 import pandas as pd
