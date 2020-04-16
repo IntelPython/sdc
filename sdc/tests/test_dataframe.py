@@ -1225,16 +1225,16 @@ class TestDataFrame(TestCase):
 
     def test_df_at_value_error(self):
         def test_impl(df):
-            return df.at[1, 'D']
+            return df.at[5, 'C']
         sdc_func = sdc.jit(test_impl)
         idx = [3, 4, 1, 2, 0]
         df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
                            "B": [3, 4, 1, 0, 222],
                            "C": [3, 4, 2, 6, 1]}, index=idx)
 
-        with self.assertRaises(TypingError) as raises:
+        with self.assertRaises(ValueError) as raises:
             sdc_func(df)
-        msg = 'Index is out of bounds for axis'
+        msg = 'Index is not in the DataFrame'
         self.assertIn(msg, str(raises.exception))
 
     def test_df_head(self):

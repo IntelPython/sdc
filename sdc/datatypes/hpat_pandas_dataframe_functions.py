@@ -1896,19 +1896,13 @@ def df_getitem_tuple_at_codegen(self, row, col):
         if self.columns[i] == col:
             func_lines += [
                 '  row, _ = idx',
-                '  check_row = False',
-                '  for i in prange(len(self._dataframe.index)):',
-                '    if self._dataframe.index[i] == row:',
-                '      check_row = True',
-                '  if check_row:',
-                f'    data = self._dataframe._data[{i}]',
-                '    res_data = pandas.Series(data, index=self._dataframe.index)',
-                '    return res_data.at[row][0]',
-                '  raise IndexingError("Index is out of bounds for axis")'
+                f'  data = self._dataframe._data[{i}]',
+                '  res_data = pandas.Series(data, index=self._dataframe.index)',
+                '  return res_data.at[row][0]',
             ]
             break
     else:
-        raise IndexingError('Index is out of bounds for axis')
+        raise KeyError('Column is not in the DataFrame')
 
     func_text = '\n'.join(func_lines)
 
