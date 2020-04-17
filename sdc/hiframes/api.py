@@ -46,7 +46,6 @@ from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import (
     StringArrayType,
     string_array_type)
-from sdc.hiframes.pd_timestamp_ext import pandas_timestamp_type
 from sdc.hiframes.pd_series_ext import (
     SeriesType,
     if_series_to_array_type)
