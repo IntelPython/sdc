@@ -1881,9 +1881,9 @@ def df_getitem_tuple_at_codegen(self, row, col):
     Example of generated implementation:
         def _df_getitem_tuple_at_impl(self, idx):
             row, _ = idx
-            data = self._dataframe._data[2]
+            data = self._dataframe._data[1]
             res_data = pandas.Series(data, index=self._dataframe.index)
-            return res_data.at[row][0]
+            return res_data.at[row]
     """
     func_lines = ['def _df_getitem_tuple_at_impl(self, idx):',
                   '  row, _ = idx']
@@ -1900,9 +1900,7 @@ def df_getitem_tuple_at_codegen(self, row, col):
         raise KeyError('Column is not in the DataFrame')
 
     func_text = '\n'.join(func_lines)
-    global_vars = {'pandas': pandas,
-                   'prange': prange,
-                   'IndexingError': IndexingError}
+    global_vars = {'pandas': pandas}
 
     return func_text, global_vars
 
