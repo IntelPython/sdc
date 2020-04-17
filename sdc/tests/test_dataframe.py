@@ -1202,13 +1202,13 @@ class TestDataFrame(TestCase):
             return df.at[n, 'C']
 
         sdc_func = sdc.jit(test_impl)
-        idx = [3, 4, 1, 2, 0]
+        idx = [3, 0, 1, 2, 0]
         n_cases = [0, 2]
         df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
                            "B": [3, 4, 1, 0, 222],
                            "C": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
         for n in n_cases:
-            self.assertEqual(sdc_func(df, n), test_impl(df, n))
+            np.testing.assert_array_equal(sdc_func(df, n), test_impl(df, n))
 
     def test_df_at_type(self):
         def test_impl(df, n, k):
@@ -1234,7 +1234,7 @@ class TestDataFrame(TestCase):
 
         with self.assertRaises(ValueError) as raises:
             sdc_func(df)
-        msg = 'Index is not in the DataFrame'
+        msg = 'Index is not in the Series'
         self.assertIn(msg, str(raises.exception))
 
     def test_df_head(self):

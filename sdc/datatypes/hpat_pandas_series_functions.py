@@ -252,7 +252,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
                     if mask[i] == True:  # noqa
                         check = True
                 if check != True:  # noqa
-                    raise ValueError("Index is not in the DataFrame")
+                    raise ValueError("Index is not in the Series")
                 return self._series._data[mask]
 
             return hpat_pandas_series_at_impl

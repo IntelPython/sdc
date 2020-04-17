@@ -1885,21 +1885,21 @@ def df_getitem_tuple_at_codegen(self, row, col):
             res_data = pandas.Series(data, index=self._dataframe.index)
             return res_data.at[row][0]
     """
-    func_lines = ['def _df_getitem_tuple_at_impl(self, idx):']
+    func_lines = ['def _df_getitem_tuple_at_impl(self, idx):',
+                  '  row, _ = idx']
+    check = False
     for i in range(len(self.columns)):
         if self.columns[i] == col:
+            check = True
             func_lines += [
-                '  row, _ = idx',
                 f'  data = self._dataframe._data[{i}]',
-                '  res_data = pandas.Series(data, index=self._dataframe.index)',
-                '  return res_data.at[row][0]',
+                f'  res_data = pandas.Series(data, index=self._dataframe.index)',
+                '  return res_data.at[row]',
             ]
-            break
-    else:
+    if check == False: # noqa
         raise KeyError('Column is not in the DataFrame')
 
     func_text = '\n'.join(func_lines)
-
     global_vars = {'pandas': pandas,
                    'prange': prange,
                    'IndexingError': IndexingError}
