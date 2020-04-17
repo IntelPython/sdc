@@ -46,10 +46,8 @@ from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
 from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype,
                                               box_categorical_array, unbox_categorical_array)
-from sdc.hiframes.pd_series_ext import (SeriesType, arr_to_series_type)
+from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.hiframes.pd_series_type import _get_series_array_type
-from sdc.hiframes.split_impl import (string_array_split_view_type,
-                                      box_str_arr_split_view)
 
 from .. import hstr_ext
 import llvmlite.binding as ll
@@ -245,8 +243,6 @@ def box_dataframe(typ, val, c):
         elif isinstance(dtype, PDCategoricalDtype):
             arr_obj = box_categorical_array(arr_typ, arr, c)
             # context.nrt.incref(builder, arr_typ, arr)
-        elif arr_typ == string_array_split_view_type:
-            arr_obj = box_str_arr_split_view(arr_typ, arr, c)
         elif dtype == types.List(string_type):
             arr_obj = box_list(list_string_array_type, arr, c)
             # context.nrt.incref(builder, arr_typ, arr)  # TODO required?
@@ -335,10 +331,6 @@ def _unbox_series_data(dtype, data_typ, arr_obj, c):
         return unbox_datetime_date_array(data_typ, arr_obj, c)
     elif data_typ == list_string_array_type:
         return _unbox_array_list_str(arr_obj, c)
-    elif data_typ == string_array_split_view_type:
-        # XXX dummy unboxing to avoid errors in _get_dataframe_data()
-        out_view = c.context.make_helper(c.builder, string_array_split_view_type)
-        return NativeValue(out_view._getvalue())
     elif isinstance(dtype, PDCategoricalDtype):
         return unbox_categorical_array(data_typ, arr_obj, c)
 
@@ -392,8 +384,6 @@ def _box_series_data(dtype, data_typ, val, c):
         arr = box_datetime_date_array(data_typ, val, c)
     elif isinstance(dtype, PDCategoricalDtype):
         arr = box_categorical_array(data_typ, val, c)
-    elif data_typ == string_array_split_view_type:
-        arr = box_str_arr_split_view(data_typ, val, c)
     elif dtype == types.List(string_type):
         arr = box_list(list_string_array_type, val, c)
     else:

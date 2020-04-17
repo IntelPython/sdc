@@ -51,7 +51,6 @@ from sdc.hiframes.pd_series_ext import (
     SeriesType,
     if_series_to_array_type)
 from sdc.hiframes.pd_index_ext import DatetimeIndexType
-from sdc.hiframes.split_impl import string_array_split_view_type
 from numba.errors import TypingError
 
 
@@ -65,8 +64,6 @@ def isna_overload(arr, i):
         return lambda arr, i: sdc.str_arr_ext.str_arr_is_na(arr, i)
     # TODO: support NaN in list(list(str))
     if arr == list_string_array_type:
-        return lambda arr, i: False
-    if arr == string_array_split_view_type:
         return lambda arr, i: False
     # TODO: extend to other types
     assert isinstance(arr, types.Array) or isinstance(arr, types.List)
