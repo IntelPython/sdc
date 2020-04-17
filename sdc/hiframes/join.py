@@ -27,18 +27,8 @@
 
 import numpy as np
 
-import numba
 from numba import generated_jit, ir, ir_utils, typeinfer, types
 from numba.extending import overload
-import sdc
-from sdc import distributed, distributed_analysis
-
-from sdc.str_arr_ext import (string_array_type, str_arr_set_na)
-from sdc.hiframes.pd_categorical_ext import CategoricalArray
-
-
-def write_send_buff(shuffle_meta, node_id, i, val, data):
-    return i
 
 
 def setitem_arr_nan(arr, ind):
@@ -50,33 +40,4 @@ def setitem_arr_nan_overload(arr, ind):
     if isinstance(arr.dtype, types.Float):
         return setitem_arr_nan
 
-    if isinstance(arr.dtype, (types.NPDatetime, types.NPTimedelta)):
-        nat = arr.dtype('NaT')
-
-        def _setnan_impl(arr, ind):
-            arr[ind] = nat
-        return _setnan_impl
-
-    if arr == string_array_type:
-        return lambda arr, ind: str_arr_set_na(arr, ind)
-    # TODO: support strings, bools, etc.
-    # XXX: set NA values in bool arrays to False
-    # FIXME: replace with proper NaN
-    if arr.dtype == types.bool_:
-        def b_set(arr, ind):
-            arr[ind] = False
-        return b_set
-
-    if isinstance(arr, CategoricalArray):
-        def setitem_arr_nan_cat(arr, ind):
-            int_arr = sdc.hiframes.pd_categorical_ext.cat_array_to_int(arr)
-            int_arr[ind] = -1
-        return setitem_arr_nan_cat
-
-    # XXX set integer NA to 0 to avoid unexpected errors
-    # TODO: convert integer to float if nan
-    if isinstance(arr.dtype, types.Integer):
-        def setitem_arr_nan_int(arr, ind):
-            arr[ind] = 0
-        return setitem_arr_nan_int
     return lambda arr, ind: None
