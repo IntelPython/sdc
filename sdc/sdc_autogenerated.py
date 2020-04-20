@@ -27,7 +27,7 @@
 
 """
 
-| This file contains overloads for various extension types auto-generated with autogen_sources_methods.py
+| This file contains overloads for various extension types auto-generated with autogen_sources.py
 
 """
 
@@ -65,15 +65,11 @@ def sdc_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_add.py
        :language: python
        :lines: 27-
-       :caption: Getting the addition of Series and other
+       :caption:
        :name: ex_series_add
 
     .. command-output:: python ./series/series_add.py
        :cwd: ../../../examples
-
-    .. seealso::
-
-        :ref:`Series.radd <pandas.Series.radd>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
@@ -233,22 +229,18 @@ def sdc_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_div.py
        :language: python
        :lines: 27-
-       :caption: Element-wise division of one Series by another (binary operator div)
+       :caption:
        :name: ex_series_div
 
     .. command-output:: python ./series/series_div.py
        :cwd: ../../../examples
-
-    .. seealso::
-
-        :ref:`Series.rdiv <pandas.Series.rdiv>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.div` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
     """
 
     ty_checker = TypeChecker('Method div().')
@@ -401,22 +393,18 @@ def sdc_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_sub.py
        :language: python
        :lines: 27-
-       :caption: Return Subtraction of series and other, element-wise (binary operator sub).
+       :caption:
        :name: ex_series_sub
 
     .. command-output:: python ./series/series_sub.py
        :cwd: ../../../examples
-
-    .. seealso::
-
-        :ref:`Series.rsub <pandas.Series.rsub>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.sub` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
     """
 
     ty_checker = TypeChecker('Method sub().')
@@ -569,22 +557,18 @@ def sdc_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_mul.py
        :language: python
        :lines: 27-
-       :caption: Element-wise multiplication of two Series
+       :caption:
        :name: ex_series_mul
 
     .. command-output:: python ./series/series_mul.py
        :cwd: ../../../examples
-
-    .. seealso::
-
-        :ref:`Series.rmul <pandas.Series.rmul>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.mul` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
     """
 
     ty_checker = TypeChecker('Method mul().')
@@ -737,22 +721,18 @@ def sdc_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_truediv.py
        :language: python
        :lines: 27-
-       :caption: Element-wise division of one Series by another (binary operator truediv)
+       :caption:
        :name: ex_series_truediv
 
     .. command-output:: python ./series/series_truediv.py
        :cwd: ../../../examples
 
-    .. seealso::
-
-        :ref:`Series.rtruediv <pandas.Series.rtruediv>`
-
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
-    Pandas Series :meth:`pandas.Series.truediv` implementation.
+    Pandas Series method :meth:`pandas.Series.truediv` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
     """
 
     ty_checker = TypeChecker('Method truediv().')
@@ -905,22 +885,18 @@ def sdc_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0)
     .. literalinclude:: ../../../examples/series/series_floordiv.py
        :language: python
        :lines: 27-
-       :caption: Return Integer division of series and other, element-wise (binary operator floordiv).
+       :caption:
        :name: ex_series_floordiv
 
     .. command-output:: python ./series/series_floordiv.py
        :cwd: ../../../examples
-
-    .. seealso::
-
-        :ref:`Series.rfloordiv <pandas.Series.rfloordiv>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.floordiv` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
     """
 
     ty_checker = TypeChecker('Method floordiv().')
@@ -1073,7 +1049,7 @@ def sdc_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_mod.py
        :language: python
        :lines: 27-
-       :caption: Return Modulo of series and other, element-wise (binary operator mod).
+       :caption:
        :name: ex_series_mod
 
     .. command-output:: python ./series/series_mod.py
@@ -1084,7 +1060,7 @@ def sdc_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
     Pandas Series method :meth:`pandas.Series.mod` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
     """
 
     ty_checker = TypeChecker('Method mod().')
@@ -1237,22 +1213,18 @@ def sdc_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_pow.py
        :language: python
        :lines: 27-
-       :caption: Element-wise power of one Series by another (binary operator pow)
+       :caption:
        :name: ex_series_pow
 
     .. command-output:: python ./series/series_pow.py
        :cwd: ../../../examples
-
-    .. seealso::
-
-        :ref:`Series.rpow <pandas.Series.rpow>`
 
     Intel Scalable Dataframe Compiler Developer Guide
     *************************************************
     Pandas Series method :meth:`pandas.Series.pow` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
+        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
     """
 
     ty_checker = TypeChecker('Method pow().')
@@ -1405,7 +1377,7 @@ def sdc_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_lt.py
        :language: python
        :lines: 27-
-       :caption: Element-wise less than of one Series by another (binary operator lt)
+       :caption:
        :name: ex_series_lt
 
     .. command-output:: python ./series/series_lt.py
@@ -1416,7 +1388,7 @@ def sdc_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
     Pandas Series method :meth:`pandas.Series.lt` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8
     """
 
     _func_name = 'Method lt().'
@@ -1532,7 +1504,7 @@ def sdc_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_gt.py
        :language: python
        :lines: 27-
-       :caption: Element-wise greater than of one Series by another (binary operator gt)
+       :caption:
        :name: ex_series_gt
 
     .. command-output:: python ./series/series_gt.py
@@ -1543,7 +1515,7 @@ def sdc_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
     Pandas Series method :meth:`pandas.Series.gt` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8
     """
 
     _func_name = 'Method gt().'
@@ -1659,7 +1631,7 @@ def sdc_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_le.py
        :language: python
        :lines: 27-
-       :caption: Element-wise less than or equal of one Series by another (binary operator le)
+       :caption:
        :name: ex_series_le
 
     .. command-output:: python ./series/series_le.py
@@ -1670,7 +1642,7 @@ def sdc_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
     Pandas Series method :meth:`pandas.Series.le` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8
     """
 
     _func_name = 'Method le().'
@@ -1786,7 +1758,7 @@ def sdc_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_ge.py
        :language: python
        :lines: 27-
-       :caption: Element-wise greater than or equal of one Series by another (binary operator ge)
+       :caption:
        :name: ex_series_ge
 
     .. command-output:: python ./series/series_ge.py
@@ -1797,7 +1769,7 @@ def sdc_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
     Pandas Series method :meth:`pandas.Series.ge` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8
     """
 
     _func_name = 'Method ge().'
@@ -1913,7 +1885,7 @@ def sdc_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_ne.py
        :language: python
        :lines: 27-
-       :caption: Element-wise not equal of one Series by another (binary operator ne)
+       :caption:
        :name: ex_series_ne
 
     .. command-output:: python ./series/series_ne.py
@@ -1924,7 +1896,7 @@ def sdc_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     Pandas Series method :meth:`pandas.Series.ne` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8
     """
 
     _func_name = 'Method ne().'
@@ -2040,10 +2012,10 @@ def sdc_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
     .. literalinclude:: ../../../examples/series/series_eq.py
        :language: python
        :lines: 27-
-       :caption: Element-wise equal of one Series by another (binary operator eq)
+       :caption:
        :name: ex_series_eq
 
-    .. command-output:: python ./series/series_mod.py
+    .. command-output:: python ./series/series_eq.py
        :cwd: ../../../examples
 
     Intel Scalable Dataframe Compiler Developer Guide
@@ -2051,7 +2023,7 @@ def sdc_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
     Pandas Series method :meth:`pandas.Series.eq` implementation.
 
     .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8
     """
 
     _func_name = 'Method eq().'
