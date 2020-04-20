@@ -49,7 +49,6 @@ from sdc.str_arr_ext import (
 from sdc.hiframes.pd_series_ext import (
     SeriesType,
     if_series_to_array_type)
-from sdc.hiframes.pd_index_ext import DatetimeIndexType
 from numba.errors import TypingError
 
 
@@ -165,8 +164,6 @@ class FixDfArrayType(AbstractTemplate):
             and (column.dtype == string_type
                  or isinstance(column.dtype, types.Optional) and column.dtype.type == string_type)):
             ret_typ = string_array_type
-        if isinstance(column, DatetimeIndexType):
-            ret_typ = sdc.hiframes.pd_index_ext._dt_index_data_typ
         if isinstance(column, SeriesType):
             ret_typ = column.data
         # TODO: add other types
@@ -197,9 +194,6 @@ def fix_df_array_overload(column):
         def fix_df_array_str_impl(column):  # pragma: no cover
             return sdc.str_arr_ext.StringArray(column)
         return fix_df_array_str_impl
-
-    if isinstance(column, DatetimeIndexType):
-        return lambda column: sdc.hiframes.api.get_index_data(column)
 
     if isinstance(column, SeriesType):
         return lambda column: sdc.hiframes.api.get_series_data(column)
