@@ -41,6 +41,7 @@ import numpy as np
 from numba import types, jit, prange, numpy_support, literally
 from numba.errors import TypingError
 from numba.targets.arraymath import get_isnan
+from numba.typed import List
 
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
@@ -716,35 +717,16 @@ def find_idx(arr, idx):
 
 @sdc_overload(find_idx)
 def find_idx_overload(arr, idx):
-    dtype = arr.dtype
-
     def find_idx_impl(arr, idx):
         chunks = parallel_chunks(len(arr))
-        arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
-        length = 0
-
+        new_arr = [List.empty_list(types.int64) for i in range(len(chunks))]
         for i in prange(len(chunks)):
             chunk = chunks[i]
-            res = 0
             for j in range(chunk.start, chunk.stop):
                 if arr[j] == idx:
-                    res += 1
-            length += res
-            arr_len[i] = res
+                    new_arr[i].append(j)
 
-        result_data = numpy.empty(shape=length, dtype=dtype)
-        for i in prange(len(chunks)):
-            chunk = chunks[i]
-            new_start = int(sum(arr_len[0:i]))
-            new_stop = new_start + arr_len[i]
-            current_pos = new_start
-
-            for j in range(chunk.start, chunk.stop):
-                if arr[j] == idx:
-                    result_data[current_pos] = j
-                    current_pos += 1
-
-        return result_data
+        return new_arr
 
     return find_idx_impl
 

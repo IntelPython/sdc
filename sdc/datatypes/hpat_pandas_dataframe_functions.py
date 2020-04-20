@@ -1881,18 +1881,15 @@ def df_getitem_single_label_loc_codegen(self, idx):
     """
     Example of generated implementation:
         def _df_getitem_single_label_loc_impl(self, idx):
-            idx_list = []
-            for i in range(len(self._dataframe.index)):
-                if self._dataframe._index[i] == idx:
-                idx_list.append(i)
+            idx_list = find_idx(self._dataframe._index, idx)
             data_0 = _sdc_take(self._dataframe._data[0], idx_list)
             res_data_0 = pandas.Series(data_0)
             data_1 = _sdc_take(self._dataframe._data[1], idx_list)
             res_data_1 = pandas.Series(data_1)
             if len(idx_list) < 1:
-                raise IndexingError('Index is out of bounds for axis')
+                raise KeyError('Index is not in the DataFrame')
             new_index = _sdc_take(self._dataframe._index, idx_list)
-            return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=numpy.array(new_index))
+            return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=new_index)
     """
     if isinstance(self.index, types.NoneType):
         fill_list = ['  idx_list =  numpy.array([idx])']
@@ -1916,18 +1913,18 @@ def df_getitem_single_label_loc_codegen(self, idx):
         results.append((c, res_data))
 
     func_lines += ['  if len(idx_list) < 1:',
-                   "    raise IndexingError('Index is out of bounds for axis')"]
+                   "    raise KeyError('Index is not in the DataFrame')"]
 
     data = ', '.join(f'"{col}": {data}' for col, data in results)
     func_lines += [f'{new_index_text}',
-                   f'  return pandas.DataFrame({{{data}}}, index=numpy.array(new_index))']
+                   f'  return pandas.DataFrame({{{data}}}, index=new_index)']
 
     func_text = '\n'.join(func_lines)
     global_vars = {'pandas': pandas, 'numpy': numpy,
                    'numba': numba,
                    '_sdc_take': _sdc_take,
                    'find_idx': find_idx,
-                   'IndexingError': IndexingError}
+                   'KeyError': KeyError}
 
     return func_text, global_vars
 
@@ -2090,11 +2087,11 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
     accessor = self.accessor.literal_value
 
     if accessor == 'loc':
-        if isinstance(idx, types.Integer):
+        if isinstance(idx, (types.Integer, types.UnicodeType, types.StringLiteral)):
             return gen_df_getitem_loc_single_label_impl(self.dataframe, idx)
 
         ty_checker = TypeChecker('Attribute loc().')
-        ty_checker.raise_exc(idx, 'int', 'idx')
+        ty_checker.raise_exc(idx, 'int or str', 'idx')
 
     if accessor == 'iat':
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):

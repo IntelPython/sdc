@@ -1209,6 +1209,18 @@ class TestDataFrame(TestCase):
         pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
     @unittest.skip("SDC Dataframe.loc[] always return Dataframe")
+    def test_df_loc_str(self):
+        def test_impl(df):
+            return df.loc['c']
+
+        sdc_func = sdc.jit(test_impl)
+        idx = ['a', 'b', 'c', 'с', 'e']
+        df = pd.DataFrame({"A": ['3.2', '4.4', '7.0', '3.3', '1.0'],
+                           "B": ['3', '4', '1', '0', '222'],
+                           "C": ['3.1', '8.4', '7.1', '3.2', '1']}, index=idx)
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    @unittest.skip("SDC Dataframe.loc[] always return Dataframe")
     def test_df_loc_no_idx(self):
         def test_impl(df):
             return df.loc[2]

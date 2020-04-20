@@ -596,8 +596,59 @@ def _sdc_take(data, indexes):
 
 @sdc_overload(_sdc_take, jit_options={'parallel': True})
 def _sdc_take_overload(data, indexes):
+    if isinstance(indexes.dtype, types.ListType) and isinstance(data, (types.Array, types.List)):
+        arr_dtype = data.dtype
+        def _sdc_take_list_impl(data, indexes):
+            res_size = 0
+            for i in numba.prange(len(indexes)):
+                res_size += len(indexes[i])
+            res_arr = numpy.empty(res_size, dtype=arr_dtype)
+            for i in numba.prange(len(indexes)):
+                start = 0
+                for l in range(len(indexes[0:i])):
+                    start += len(indexes[l])
+                current_pos = start
+                for j in range(len(indexes[i])):
+                    res_arr[current_pos] = data[indexes[i][j]]
+                    current_pos += 1
+            return res_arr
 
-    if isinstance(data, types.Array):
+        return _sdc_take_list_impl
+
+    elif isinstance(indexes.dtype, types.ListType) and data == string_array_type:
+        def _sdc_take_list_str_impl(data, indexes):
+            res_size = 0
+            for i in numba.prange(len(indexes)):
+                res_size += len(indexes[i])
+            nan_mask = numpy.zeros(res_size, dtype=numpy.bool_)
+            num_total_bytes = 0
+            for i in numba.prange(len(indexes)):
+                start = 0
+                for l in range(len(indexes[0:i])):
+                    start += len(indexes[l])
+                current_pos = start
+                for j in range(len(indexes[i])):
+                    num_total_bytes += get_utf8_size(data[indexes[i][j]])
+                    if isna(data, indexes[i][j]):
+                        nan_mask[current_pos] = True
+                    current_pos += 1
+            res_arr = pre_alloc_string_array(res_size, num_total_bytes)
+            for i in numba.prange(len(indexes)):
+                start = 0
+                for l in range(len(indexes[0:i])):
+                    start += len(indexes[l])
+                current_pos = start
+                for j in range(len(indexes[i])):
+                    res_arr[current_pos] = data[indexes[i][j]]
+                    if nan_mask[current_pos]:
+                        str_arr_set_na(res_arr, current_pos)
+                    current_pos += 1
+
+            return res_arr
+
+        return _sdc_take_list_str_impl
+
+    elif isinstance(data, types.Array):
         arr_dtype = data.dtype
 
         def _sdc_take_array_impl(data, indexes):
