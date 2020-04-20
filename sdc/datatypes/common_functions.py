@@ -598,6 +598,7 @@ def _sdc_take(data, indexes):
 def _sdc_take_overload(data, indexes):
     if isinstance(indexes.dtype, types.ListType) and isinstance(data, (types.Array, types.List)):
         arr_dtype = data.dtype
+
         def _sdc_take_list_impl(data, indexes):
             res_size = 0
             for i in numba.prange(len(indexes)):
