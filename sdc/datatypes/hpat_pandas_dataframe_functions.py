@@ -2242,6 +2242,7 @@ def sdc_pandas_dataframe_at(self):
 
     Limitations
     -----------
+    - ``Dataframe.at`` always returns ``array``.
     - Parameter ``column`` in ``idx`` must be a literal value.
 
     Pandas API: pandas.DataFrame.at
