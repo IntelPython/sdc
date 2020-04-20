@@ -40,8 +40,6 @@ from numba.extending import (
 
 import sdc
 from sdc.hiframes.pd_categorical_ext import PDCategoricalDtype
-from sdc.hiframes.pd_timestamp_ext import datetime_date_type
-from sdc.hiframes.split_impl import string_array_split_view_type
 
 from sdc.str_arr_ext import string_array_type
 from sdc.str_ext import string_type, list_string_array_type
@@ -57,21 +55,8 @@ def is_dt64_series_typ(t):
     return isinstance(t, SeriesType) and t.dtype == types.NPDatetime('ns')
 
 
-def is_timedelta64_series_typ(t):
-    return isinstance(t, SeriesType) and t.dtype == types.NPTimedelta('ns')
-
-
-def is_datetime_date_series_typ(t):
-    return isinstance(t, SeriesType) and t.dtype == datetime_date_type
-
-
 def series_to_array_type(typ, replace_boxed=False):
     return typ.data
-    # return _get_series_array_type(typ.dtype)
-
-
-def is_series_type(typ):
-    return isinstance(typ, SeriesType)
 
 
 def arr_to_series_type(arr):
@@ -83,9 +68,6 @@ def arr_to_series_type(arr):
         series_type = SeriesType(string_type)
     elif arr == list_string_array_type:
         series_type = SeriesType(types.List(string_type))
-    elif arr == string_array_split_view_type:
-        series_type = SeriesType(types.List(string_type),
-                                 string_array_split_view_type)
     return series_type
 
 
@@ -105,9 +87,6 @@ def if_series_to_array_type(typ, replace_boxed=False):
 
 
 def if_arr_to_series_type(typ):
-    if isinstance(typ, types.Array) or typ in (string_array_type,
-                                               list_string_array_type, string_array_split_view_type):
-        return arr_to_series_type(typ)
     if isinstance(typ, (types.Tuple, types.UniTuple)):
         return types.Tuple([if_arr_to_series_type(t) for t in typ.types])
     if isinstance(typ, types.List):

@@ -29,12 +29,10 @@ import numba
 from numba.extending import (box, unbox, typeof_impl, register_model, models,
                              NativeValue, lower_builtin, lower_cast, overload,
                              type_callable, overload_method, intrinsic)
-from numba.targets.imputils import impl_ret_borrowed
 from numba import types
 from numba.targets.boxing import box_array, unbox_array
 
 import numpy as np
-import pandas as pd
 
 
 class PDCategoricalDtype(types.Opaque):
@@ -44,29 +42,11 @@ class PDCategoricalDtype(types.Opaque):
         super(PDCategoricalDtype, self).__init__(name=name)
 
 
-@register_model(PDCategoricalDtype)
-class CategoricalDtypeModel(models.IntegerModel):
-    def __init__(self, dmm, fe_type):
-        int_dtype = get_categories_int_type(fe_type)
-        super(CategoricalDtypeModel, self).__init__(dmm, int_dtype)
-
-
-# Array of categorical data (similar to Pandas Categorical array)
-# same as Array but knows how to box etc.
-# TODO: defer to Array for all operations
 class CategoricalArray(types.Array):
     def __init__(self, dtype):
         self.dtype = dtype
         super(CategoricalArray, self).__init__(
             dtype, 1, 'C', name='CategoricalArray({})'.format(dtype))
-
-
-@register_model(CategoricalArray)
-class CategoricalArrayModel(models.ArrayModel):
-    def __init__(self, dmm, fe_type):
-        int_dtype = get_categories_int_type(fe_type.dtype)
-        data_array = types.Array(int_dtype, 1, 'C')
-        super(CategoricalArrayModel, self).__init__(dmm, data_array)
 
 
 @unbox(CategoricalArray)
@@ -105,15 +85,7 @@ def box_categorical_array(typ, val, c):
         idx = c.context.get_constant(types.intp, i)
         c.pyapi.incref(item_objs[i])
         c.pyapi.list_setitem(list_obj, idx, item_objs[i])
-    # TODO: why does list_pack crash for test_csv_cat2?
-    #list_obj = c.pyapi.list_pack(item_objs)
 
-    # call pd.api.types.CategoricalDtype(['A', 'B', 'C'])
-    # api_obj = c.pyapi.object_getattr_string(pd_class_obj, "api")
-    # types_obj = c.pyapi.object_getattr_string(api_obj, "types")
-    # pd_dtype = c.pyapi.call_method(types_obj, "CategoricalDtype", (list_obj,))
-    # c.pyapi.decref(api_obj)
-    # c.pyapi.decref(types_obj)
 
     int_dtype = get_categories_int_type(dtype)
     arr = box_array(types.Array(int_dtype, 1, 'C'), val, c)
@@ -138,53 +110,3 @@ def _get_cat_obj_items(categories, c):
 
     dtype = numba.typeof(val)
     return [c.box(dtype, c.context.get_constant(dtype, item)) for item in categories]
-
-# HACK: dummy overload for CategoricalDtype to avoid type inference errors
-# TODO: implement dtype properly
-@overload(pd.api.types.CategoricalDtype)
-def cat_overload_dummy(val_list):
-    return lambda val_list: 1
-
-
-@intrinsic
-def fix_cat_array_type(typingctx, arr=None):
-    # fix array type from Array(CatDtype) to CategoricalArray(CatDtype)
-    # no-op for other arrays
-    fixed_arr = arr
-    if isinstance(arr.dtype, PDCategoricalDtype):
-        fixed_arr = CategoricalArray(arr.dtype)
-
-    def codegen(context, builder, sig, args):
-        return impl_ret_borrowed(context, builder, sig.return_type, args[0])
-
-    return fixed_arr(arr), codegen
-
-
-@intrinsic
-def cat_array_to_int(typingctx, arr=None):
-    # TODO: fix aliasing
-    # get the underlying integer array for a CategoricalArray
-    out_arr = arr
-    if isinstance(arr.dtype, PDCategoricalDtype):
-        int_dtype = get_categories_int_type(arr.dtype)
-        out_arr = types.Array(int_dtype, 1, 'C')
-
-    def codegen(context, builder, sig, args):
-        return impl_ret_borrowed(context, builder, sig.return_type, args[0])
-
-    return out_arr(arr), codegen
-
-
-@overload_method(CategoricalArray, 'copy')
-def cat_arr_copy_overload(arr):
-    return lambda arr: set_cat_dtype(cat_array_to_int(arr).copy(), arr)
-
-
-@intrinsic
-def set_cat_dtype(typingctx, arr, cat_arr=None):
-    # set dtype of integer array to categorical from categorical array
-
-    def codegen(context, builder, sig, args):
-        return impl_ret_borrowed(context, builder, sig.return_type, args[0])
-
-    return cat_arr(arr, cat_arr), codegen
