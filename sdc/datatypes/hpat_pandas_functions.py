@@ -42,8 +42,7 @@ from sdc.io.csv_ext import (
 )
 from sdc.str_arr_ext import string_array_type
 
-# this code for some reason fixes the test test_df_copy
-from sdc.hiframes.hiframes_untyped import HiFramesPassImpl
+from sdc.hiframes import join, aggregate, sort
 
 
 def get_numba_array_types_for_csv(df):
