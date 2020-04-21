@@ -5784,33 +5784,29 @@ def sdc_pandas_series_skew(self, axis=None, skipna=None, level=None, numeric_onl
             _skipna = skipna
 
         len_val = len(self._data)
-        data = []
+        nfinite = 0
+        _sum = 0
+        square_sum = 0
+        cube_sum = 0
+
         for idx in numba.prange(len_val):
             if numpy.isfinite(self._data[idx]):
-                data.append(self._data[idx])
+                nfinite += 1
+                _sum += self._data[idx]
+                square_sum += self._data[idx] ** 2
+                cube_sum += self._data[idx] ** 3
+            else:
+                if not _skipna:
+                    return numpy.nan
 
-        nfinite = len(data)
+        n = nfinite
+        m2 = (square_sum - _sum * _sum / n) / n
+        m3 = (cube_sum - 3. * _sum * square_sum / n + 2. * _sum * _sum * _sum / n / n) / n
+        res = numpy.nan if m2 == 0 else m3 / m2 ** 1.5
 
-        if not _skipna and nfinite < len_val:
-            return numpy.nan
-        else:
-            _sum = 0
-            square_sum = 0
-            cube_sum = 0
+        if (n > 2) & (m2 > 0):
+            res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
 
-            for i in numba.prange(nfinite):
-                _sum += data[i]
-                square_sum += data[i] ** 2
-                cube_sum += data[i] ** 3
-
-            n = nfinite
-            m2 = (square_sum - _sum * _sum / n) / n
-            m3 = (cube_sum - 3. * _sum * square_sum / n + 2. * _sum * _sum * _sum / n / n) / n
-            res = numpy.nan if m2 == 0 else m3 / m2 ** 1.5
-
-            if (n > 2) & (m2 > 0):
-                res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
-
-            return res
+        return res
 
     return sdc_pandas_series_skew_impl
