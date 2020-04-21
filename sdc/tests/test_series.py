@@ -7141,7 +7141,6 @@ class TestSeries(
 
         hpat_func = self.jit(test_impl)
         s = pd.Series([1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2])
-        
         with self.assertRaises(TypingError) as raises:
             hpat_func(s, axis=0.75)
         msg = 'TypingError: Method Series.skew() The object axis\n given: float64\n expected: int64'
