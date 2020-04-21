@@ -5725,3 +5725,89 @@ are currently unsupported by Intel Scalable Dataframe Compiler
         return init_series_groupby(self, by, grouped, sort)
 
     return sdc_pandas_series_groupby_impl
+
+
+@sdc_overload_method(SeriesType, 'skew')
+def sdc_pandas_series_skew(self, axis=None, skipna=None, level=None, numeric_only=None):
+    """
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+
+        Pandas API: pandas.Series.skew
+
+        Limitations
+        -----------
+        - Parameters ``level`` and ``numeric_only`` are supported only with default value ``None``.
+
+        Examples
+        --------
+        .. literalinclude:: ../../../examples/series/series_skew.py
+           :language: python
+           :lines: 27-
+           :caption: Unbiased rolling skewness.
+           :name: ex_series_skew
+
+        .. command-output:: python ./series/series_skew.py
+           :cwd: ../../../examples
+
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+        Pandas Series method :meth:`pandas.Series.skew` implementation.
+
+        .. only:: developer
+            Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_skew*
+        """
+    _func_name = 'Method Series.skew()'
+
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
+
+    if not isinstance(axis, (types.Integer, types.NoneType, types.Omitted)) and axis is not None:
+        ty_checker.raise_exc(axis, 'int64', 'axis')
+
+    if not isinstance(skipna, (types.Boolean, types.NoneType, types.Omitted)) and skipna is not None:
+        ty_checker.raise_exc(skipna, 'bool', 'skipna')
+
+    if not isinstance(level, (types.Omitted, types.NoneType)) and level is not None:
+        ty_checker.raise_exc(level, 'None', 'level')
+
+    if not isinstance(numeric_only, (types.Omitted, types.NoneType)) and numeric_only is not None:
+        ty_checker.raise_exc(numeric_only, 'None', 'numeric_only')
+
+    def sdc_pandas_series_skew_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
+        if axis != 0 and axis is not None:
+            raise ValueError('Parameter axis must be only 0 or None.')
+
+        if skipna is None:
+            _skipna = True
+        else:
+            _skipna = skipna
+
+        infinite_mask = numpy.isfinite(self._data)
+        len_val = len(infinite_mask)
+        data = self._data[infinite_mask]
+        nfinite = len(data)
+
+        if not _skipna and nfinite < len_val:
+            return numpy.nan
+        else:
+            _sum = 0
+            square_sum = 0
+            cube_sum = 0
+
+            for i in numba.prange(nfinite):
+                _sum += data[i]
+                square_sum += data[i] ** 2
+                cube_sum += data[i] ** 3
+
+            n = nfinite
+            m2 = (square_sum - _sum * _sum / n) / n
+            m3 = (cube_sum - 3. * _sum * square_sum / n + 2. * _sum * _sum * _sum / n / n) / n
+            res = numpy.nan if m2 == 0 else m3 / m2 ** 1.5
+
+            if (n > 2) & (m2 > 0):
+                res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
+
+            return res
+
+    return sdc_pandas_series_skew_impl
