@@ -415,14 +415,18 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=False, verify_integrity=
 #           return pandas.Series([result_A, result_B], ['A', 'B'])
 
 
-def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, columns):
+def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, columns, df_structure):
     result_name_list = []
     joined = ', '.join(func_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
+
     for i, c in enumerate(columns):
+        type_id, col_id = df_structure[c]
         result_c = f'result_{i}'
-        func_lines += [f'  series_{i} = pandas.Series({func_params[0]}._data[{i}])',
+
+        func_lines += [f'  series_{i} = pandas.Series({func_params[0]}._data[{type_id}][{col_id}])',
                        f'  {result_c} = series_{i}.{func_name}({series_params})']
+
         result_name_list.append(result_c)
     all_results = ', '.join(result_name_list)
     all_columns = ', '.join([f"'{c}'" for c in columns])
@@ -448,7 +452,8 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
 
     df_func_name = f'_df_{func_name}_impl'
 
-    func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, s_par, df.columns)
+    func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, s_par, df.columns,
+                                                               df.df_structure)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]

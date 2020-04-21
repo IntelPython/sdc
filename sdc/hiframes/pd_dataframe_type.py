@@ -36,7 +36,7 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
     """Temporary type class for DataFrame objects.
     """
 
-    def __init__(self, data=None, index=None, columns=None, has_parent=False):
+    def __init__(self, data=None, index=None, columns=None, has_parent=False, df_structure=None):
         self.data = data
         if index is None:
             index = types.none
@@ -45,8 +45,9 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
         # keeping whether it is unboxed from Python to enable reflection of new
         # columns
         self.has_parent = has_parent
+        self.df_structure = df_structure
         super(DataFrameType, self).__init__(
-            name="dataframe({}, {}, {}, {})".format(data, index, columns, has_parent))
+            name="dataframe({}, {}, {}, {}, {})".format(data, index, columns, has_parent, df_structure))
 
     def copy(self, index=None, has_parent=None):
         # XXX is copy necessary?
@@ -55,7 +56,7 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
         data = tuple(a.copy() for a in self.data)
         if has_parent is None:
             has_parent = self.has_parent
-        return DataFrameType(data, index, self.columns, has_parent)
+        return DataFrameType(data, index, self.columns, has_parent, self.df_structure)
 
     @property
     def key(self):
@@ -85,12 +86,20 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
 @register_model(DataFrameType)
 class DataFrameModel(models.StructModel):
     def __init__(self, dmm, fe_type):
-        n_cols = len(fe_type.columns)
+        types_unique = set()
+        df_types = []
+        for col_id, col_type in enumerate(fe_type.data):
+            if col_type in types_unique:
+                continue
+            types_unique.add(col_type)
+            df_types.append(col_type)
+
         members = [
-            ('data', types.Tuple(fe_type.data)),
+            ('data', types.Tuple([types.List(typ) for typ in df_types])),
             ('index', fe_type.index),
-            ('columns', types.UniTuple(string_type, n_cols)),
+            ('columns', types.UniTuple(types.List(string_type), 1)),
             ('parent', types.pyobject),
+            ('df_structure', types.pyobject),
         ]
         super(DataFrameModel, self).__init__(dmm, fe_type, members)
 
