@@ -5783,9 +5783,12 @@ def sdc_pandas_series_skew(self, axis=None, skipna=None, level=None, numeric_onl
         else:
             _skipna = skipna
 
-        infinite_mask = numpy.isfinite(self._data)
-        len_val = len(infinite_mask)
-        data = self._data[infinite_mask]
+        len_val = len(self._data)
+        data = []
+        for idx in numba.prange(len_val):
+            if numpy.isfinite(self._data[idx]):
+                data.append(self._data[idx])
+
         nfinite = len(data)
 
         if not _skipna and nfinite < len_val:
