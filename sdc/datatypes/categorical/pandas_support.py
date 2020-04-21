@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,30 +24,40 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
-from .categorical import *
+from numba import types
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
+from .types import CategoricalDtypeType
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
 
-from sdc.tests.test_ml import *
+def from_dtype(pdtype):
+    """
+    Return a Numba Type instance corresponding to the given Pandas *dtype*.
+    NotImplementedError is raised if unsupported Pandas dtypes.
+    """
+    # TODO: use issubclass
+    if isinstance(pdtype, pd.CategoricalDtype):
+        if pdtype.categories is None:
+            categories = None
+        else:
+            categories = list(pdtype.categories)
+        return CategoricalDtypeType(categories=categories,
+                                    ordered=pdtype.ordered)
 
-from sdc.tests.test_io import *
+    raise NotImplementedError("%r cannot be represented as a Numba type"
+                              % (pdtype,))
 
-from sdc.tests.test_hpat_jit import *
-from sdc.tests.test_indexes import *
 
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
+def as_dtype(nbtype):
+    """
+    Return a Pandas *dtype* instance corresponding to the given Numba type.
+    NotImplementedError is raised if no correspondence is known.
+    """
+    nbtype = types.unliteral(nbtype)
+    if isinstance(nbtype, CategoricalDtypeType):
+        return pd.CategoricalDtype(categories=nbtype.categories,
+                                   ordered=nbtype.ordered)
 
-# performance tests
-import sdc.tests.tests_perf
+    raise NotImplementedError("%r cannot be represented as a Pandas dtype"
+                              % (nbtype,))
