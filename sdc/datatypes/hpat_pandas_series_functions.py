@@ -5783,30 +5783,9 @@ def sdc_pandas_series_skew(self, axis=None, skipna=None, level=None, numeric_onl
         else:
             _skipna = skipna
 
-        len_val = len(self._data)
-        nfinite = 0
-        _sum = 0
-        square_sum = 0
-        cube_sum = 0
+        if _skipna:
+            return numpy_like.nanskew(self._data)
 
-        for idx in numba.prange(len_val):
-            if numpy.isfinite(self._data[idx]):
-                nfinite += 1
-                _sum += self._data[idx]
-                square_sum += self._data[idx] ** 2
-                cube_sum += self._data[idx] ** 3
-            else:
-                if not _skipna:
-                    return numpy.nan
-
-        n = nfinite
-        m2 = (square_sum - _sum * _sum / n) / n
-        m3 = (cube_sum - 3. * _sum * square_sum / n + 2. * _sum * _sum * _sum / n / n) / n
-        res = numpy.nan if m2 == 0 else m3 / m2 ** 1.5
-
-        if (n > 2) & (m2 > 0):
-            res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
-
-        return res
+        return numpy_like.skew(self._data)
 
     return sdc_pandas_series_skew_impl

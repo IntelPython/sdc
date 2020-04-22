@@ -967,3 +967,77 @@ def getitem_by_mask_overload(arr, idx):
             return result_data
 
     return getitem_by_mask_impl
+
+
+def skew(a):
+    pass
+
+
+def nanskew(a):
+    pass
+
+
+@sdc_overload(skew)
+def np_skew(arr):
+    if not isinstance(arr, types.Array):
+        return
+
+    def skew_impl(arr):
+        len_val = len(arr)
+        nfinite = 0
+        _sum = 0
+        square_sum = 0
+        cube_sum = 0
+
+        for idx in numba.prange(len_val):
+            if numpy.isfinite(arr[idx]):
+                nfinite += 1
+                _sum += arr[idx]
+                square_sum += arr[idx] ** 2
+                cube_sum += arr[idx] ** 3
+            else:
+                return numpy.nan
+
+        n = nfinite
+        m2 = (square_sum - _sum * _sum / n) / n
+        m3 = (cube_sum - 3. * _sum * square_sum / n + 2. * _sum * _sum * _sum / n / n) / n
+        res = numpy.nan if m2 == 0 else m3 / m2 ** 1.5
+
+        if (n > 2) & (m2 > 0):
+            res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
+
+        return res
+
+    return skew_impl
+
+
+@sdc_overload(nanskew)
+def np_nanskew(arr):
+    if not isinstance(arr, types.Array):
+        return
+
+    def nanskew_impl(arr):
+        len_val = len(arr)
+        nfinite = 0
+        _sum = 0
+        square_sum = 0
+        cube_sum = 0
+
+        for idx in numba.prange(len_val):
+            if numpy.isfinite(arr[idx]):
+                nfinite += 1
+                _sum += arr[idx]
+                square_sum += arr[idx] ** 2
+                cube_sum += arr[idx] ** 3
+
+        n = nfinite
+        m2 = (square_sum - _sum * _sum / n) / n
+        m3 = (cube_sum - 3. * _sum * square_sum / n + 2. * _sum * _sum * _sum / n / n) / n
+        res = numpy.nan if m2 == 0 else m3 / m2 ** 1.5
+
+        if (n > 2) & (m2 > 0):
+            res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
+
+        return res
+
+    return nanskew_impl
