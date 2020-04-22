@@ -316,7 +316,7 @@ setup(name=SDC_NAME_STR,
           'numpy>=1.16',
           'pandas==0.25.3',
           'pyarrow==0.15.1',
-          'numba==0.48'
+          'numba>=0.48'
           ],
       cmdclass=sdc_build_commands,
       ext_modules=_ext_mods,

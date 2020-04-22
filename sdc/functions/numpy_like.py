@@ -41,6 +41,7 @@ import numpy as np
 from numba import types, jit, prange, numpy_support, literally
 from numba.errors import TypingError
 from numba.targets.arraymath import get_isnan
+from numba.typed import List
 
 import sdc
 from sdc.utilities.sdc_typing_utils import TypeChecker
@@ -708,6 +709,26 @@ def dropna_overload(arr, idx, name):
         return pandas.Series(result_data, result_index, name)
 
     return dropna_impl
+
+
+def find_idx(arr, idx):
+    pass
+
+
+@sdc_overload(find_idx)
+def find_idx_overload(arr, idx):
+    def find_idx_impl(arr, idx):
+        chunks = parallel_chunks(len(arr))
+        new_arr = [List.empty_list(types.int64) for i in range(len(chunks))]
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            for j in range(chunk.start, chunk.stop):
+                if arr[j] == idx:
+                    new_arr[i].append(j)
+
+        return new_arr
+
+    return find_idx_impl
 
 
 def nanmean(a):

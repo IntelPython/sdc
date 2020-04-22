@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -25,26 +25,21 @@
 # *****************************************************************************
 
 
-from __future__ import print_function, division, absolute_import
+"""
+   Expected result:
+        A  B  C
+    2  3.0  6  2
+"""
 
-import numba
-from numba import compiler, ir, ir_utils, typed_passes, typeinfer, types
-from numba.typing import signature
-from numba.typing.templates import infer_global, AbstractTemplate
-from numba.extending import overload, lower_builtin
-
-
-@infer_global(bool)
-class BoolNoneTyper(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args) == 1
-        val_t = args[0]
-        if val_t == types.none:
-            return signature(types.boolean, *args)
+import pandas as pd
+from numba import njit
 
 
-@lower_builtin(bool, types.none)
-def lower_column_mean_impl(context, builder, sig, args):
-    res = context.compile_internal(builder, lambda a: False, sig, args)
-    return res  # impl_ret_untracked(context, builder, sig.return_type, res)
+@njit
+def dataframe_loc():
+    df = pd.DataFrame({'A': [1.0, 2.0, 3.0, 1.0], 'B': [4, 5, 6, 7], 'C': [4, 5, 2, 1]})
+
+    return df.loc[2]
+
+
+print(dataframe_loc())
