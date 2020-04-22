@@ -17,6 +17,6 @@ def dataframe_head(df):
     return series
 
 
-df = pd.DataFrame({'A': [1,2,4,6,4,2], 'B': [3.,2.,77.,2.,5.,6.5]})
+df = pd.DataFrame({'A': [1, 2, 4, 6, 4, 2], 'B': [3., 2., 77., 2., 5., 6.5]})
 
 print(dataframe_head(df))
