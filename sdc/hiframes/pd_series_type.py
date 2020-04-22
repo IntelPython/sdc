@@ -34,10 +34,8 @@ from numba.extending import (models, register_model, make_attribute_wrapper, low
 from numba.targets.imputils import (impl_ret_new_ref, iternext_impl, RefType)
 from numba.targets.arrayobj import (make_array, _getitem_array1d)
 
-from sdc.str_arr_ext import string_array_type
 from sdc.str_ext import string_type, list_string_array_type
 from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype, CategoricalArray)
-from sdc.hiframes.pd_timestamp_ext import (pandas_timestamp_type, datetime_date_type)
 from sdc.str_arr_ext import (string_array_type, iternext_str_array, StringArrayType)
 
 

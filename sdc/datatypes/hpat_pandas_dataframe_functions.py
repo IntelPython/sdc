@@ -64,6 +64,7 @@ from sdc.hiframes.api import isna
 from sdc.functions.numpy_like import getitem_by_mask
 from sdc.datatypes.common_functions import _sdc_take, sdc_reindex_series
 from sdc.utilities.prange_utils import parallel_chunks
+from sdc.functions.numpy_like import find_idx
 
 
 @sdc_overload_attribute(DataFrameType, 'index')
@@ -1905,6 +1906,58 @@ def df_getitem_tuple_at_codegen(self, row, col):
     return func_text, global_vars
 
 
+def df_getitem_single_label_loc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_single_label_loc_impl(self, idx):
+            idx_list = find_idx(self._dataframe._index, idx)
+            data_0 = _sdc_take(self._dataframe._data[0], idx_list)
+            res_data_0 = pandas.Series(data_0)
+            data_1 = _sdc_take(self._dataframe._data[1], idx_list)
+            res_data_1 = pandas.Series(data_1)
+            if len(idx_list) < 1:
+                raise KeyError('Index is not in the DataFrame')
+            new_index = _sdc_take(self._dataframe._index, idx_list)
+            return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=new_index)
+    """
+    if isinstance(self.index, types.NoneType):
+        fill_list = ['  idx_list =  numpy.array([idx])']
+        new_index = ['  new_index = numpy.array([idx])']
+
+    else:
+        fill_list = ['  idx_list = find_idx(self._dataframe._index, idx)']
+        new_index = ['  new_index = _sdc_take(self._dataframe._index, idx_list)']
+
+    fill_list_text = '\n'.join(fill_list)
+    new_index_text = '\n'.join(new_index)
+    func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
+                  f'{fill_list_text}']
+    results = []
+    for i, c in enumerate(self.columns):
+        data = f'data_{i}'
+        index_in_list = f'index_in_list_{i}'
+        res_data = f'res_data_{i}'
+        func_lines += [f'  {data} = _sdc_take(self._dataframe._data[{i}], idx_list)',
+                       f'  {res_data} = pandas.Series({data})']
+        results.append((c, res_data))
+
+    func_lines += ['  if len(idx_list) < 1:',
+                   "    raise KeyError('Index is not in the DataFrame')"]
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'{new_index_text}',
+                   f'  return pandas.DataFrame({{{data}}}, index=new_index)']
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'numba': numba,
+                   '_sdc_take': _sdc_take,
+                   'find_idx': find_idx,
+                   'KeyError': KeyError}
+
+    return func_text, global_vars
+
+
 def df_getitem_int_iloc_codegen(self, idx):
     """
     Example of generated implementation:
@@ -2048,6 +2101,9 @@ def gen_df_getitem_tuple_at_impl(self, row, col):
     return _reduce_impl
 
 
+gen_df_getitem_loc_single_label_impl = gen_impl_generator(
+    df_getitem_single_label_loc_codegen, '_df_getitem_single_label_loc_impl')
+
 gen_df_getitem_iloc_int_impl = gen_impl_generator(
     df_getitem_int_iloc_codegen, '_df_getitem_int_iloc_impl')
 
@@ -2082,6 +2138,13 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
                               ({})'.format(type(idx[0]), type(self.dataframe.index)))
 
         raise TypingError('Attribute at(). The index must be a row and literal column. Given: {}'.format(idx))
+
+    if accessor == 'loc':
+        if isinstance(idx, (types.Integer, types.UnicodeType, types.StringLiteral)):
+            return gen_df_getitem_loc_single_label_impl(self.dataframe, idx)
+
+        ty_checker = TypeChecker('Attribute loc().')
+        ty_checker.raise_exc(idx, 'int or str', 'idx')
 
     if accessor == 'iat':
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
@@ -2284,6 +2347,57 @@ def sdc_pandas_dataframe_at(self):
         return dataframe_getitem_accessor_init(self, 'at')
 
     return sdc_pandas_dataframe_at_impl
+
+
+@sdc_overload_attribute(DataFrameType, 'loc')
+def sdc_pandas_dataframe_loc(self):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.DataFrame.loc
+
+    Limitations
+    -----------
+    - Loc always returns Dataframe.
+    - Parameter ``idx`` is supported only to be a single value, e.g. :obj:`df.loc['A']`.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_loc.py
+       :language: python
+       :lines: 36-
+       :caption: Access a group of rows and columns by label(s) or a boolean array.
+       :name: ex_dataframe_loc
+
+    .. command-output:: python ./dataframe/dataframe_loc.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`DataFrame.at <pandas.DataFrame.at>`
+            Access a single value for a row/column label pair.
+        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+            Access group of rows and columns by integer position(s).
+        :ref:`DataFrame.xs <pandas.DataFrame.xs>`
+            Returns a cross-section (row(s) or column(s)) from the Series/DataFrame.
+        :ref:`Series.loc <pandas.Series.loc>`
+            Access group of values using labels.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.DataFrame.loc` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_loc*
+    """
+
+    ty_checker = TypeChecker('Attribute loc().')
+    ty_checker.check(self, DataFrameType)
+
+    def sdc_pandas_dataframe_loc_impl(self):
+        return sdc.datatypes.hpat_pandas_dataframe_getitem_types.dataframe_getitem_accessor_init(self, 'loc')
+
+    return sdc_pandas_dataframe_loc_impl
 
 
 @sdc_overload_method(DataFrameType, 'pct_change')
