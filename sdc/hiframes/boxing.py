@@ -326,7 +326,7 @@ def _unbox_series_data(dtype, data_typ, arr_obj, c):
 
 
 @box(SeriesType)
-@vtune_profiling_boxing(name_handle="Series_unbox")
+@vtune_profiling_boxing(name_handle="Series_box")
 def box_series(typ, val, c):
     """
     """
