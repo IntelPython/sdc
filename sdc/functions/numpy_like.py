@@ -984,21 +984,21 @@ def np_skew(arr):
 
     def skew_impl(arr):
         len_val = len(arr)
-        nfinite = 0
+        n = 0
         _sum = 0
         square_sum = 0
         cube_sum = 0
 
         for idx in numba.prange(len_val):
-            if numpy.isfinite(arr[idx]):
-                nfinite += 1
+            if not numpy.isnan(arr[idx]):
+                n += 1
                 _sum += arr[idx]
                 square_sum += arr[idx] ** 2
                 cube_sum += arr[idx] ** 3
-            else:
-                return numpy.nan
 
-        n = nfinite
+        if n == 0 or n < len_val:
+            return numpy.nan
+
         m2 = (square_sum - _sum * _sum / n) / n
         m3 = (cube_sum - 3. * _sum * square_sum / n + 2. * _sum * _sum * _sum / n / n) / n
         res = numpy.nan if m2 == 0 else m3 / m2 ** 1.5
@@ -1018,19 +1018,21 @@ def np_nanskew(arr):
 
     def nanskew_impl(arr):
         len_val = len(arr)
-        nfinite = 0
+        n = 0
         _sum = 0
         square_sum = 0
         cube_sum = 0
 
         for idx in numba.prange(len_val):
-            if numpy.isfinite(arr[idx]):
-                nfinite += 1
+            if not numpy.isnan(arr[idx]):
+                n += 1
                 _sum += arr[idx]
                 square_sum += arr[idx] ** 2
                 cube_sum += arr[idx] ** 3
 
-        n = nfinite
+        if n == 0:
+            return numpy.nan
+
         m2 = (square_sum - _sum * _sum / n) / n
         m3 = (cube_sum - 3. * _sum * square_sum / n + 2. * _sum * _sum * _sum / n / n) / n
         res = numpy.nan if m2 == 0 else m3 / m2 ** 1.5

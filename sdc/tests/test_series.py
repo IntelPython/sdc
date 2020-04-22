@@ -7116,7 +7116,19 @@ class TestSeries(
             return series.skew(axis=axis, skipna=skipna)
 
         hpat_func = self.jit(test_impl)
-        for data in test_global_input_data_numeric:
+        test_data = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+                     [],
+                     [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+                     [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+                     [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                     [np.nan, np.nan, np.nan],
+                     [np.nan, np.nan, np.inf],
+                     [np.inf, 0, np.inf, 1, 2, 3, 4, 5]
+                     ]
+        all_test_data = test_data + test_global_input_data_numeric
+        for data in all_test_data:
             with self.subTest(data=data):
                 s = pd.Series(data)
                 for axis in [0, None]:
