@@ -1896,7 +1896,7 @@ def df_getitem_tuple_at_codegen(self, row, col):
                 f'  res_data = pandas.Series(data, index=self._dataframe.index)',
                 '  return res_data.at[row]',
             ]
-    if check == False: # noqa
+    if check == False:  # noqa
         raise KeyError('Column is not in the DataFrame')
 
     func_text = '\n'.join(func_lines)
