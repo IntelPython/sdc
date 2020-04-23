@@ -7127,7 +7127,7 @@ class TestSeries(
                      [np.nan, np.nan, np.inf],
                      [np.inf, 0, np.inf, 1, 2, 3, 4, 5]
                      ]
-        all_test_data = test_data + test_global_input_data_numeric
+        all_test_data = test_data + test_global_input_data_float64
         for data in all_test_data:
             with self.subTest(data=data):
                 s = pd.Series(data)
