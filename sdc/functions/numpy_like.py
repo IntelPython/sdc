@@ -985,9 +985,9 @@ def np_skew(arr):
     def skew_impl(arr):
         len_val = len(arr)
         n = 0
-        _sum = 0
-        square_sum = 0
-        cube_sum = 0
+        _sum = 0.0
+        square_sum = 0.0
+        cube_sum = 0.0
 
         for idx in numba.prange(len_val):
             if not numpy.isnan(arr[idx]):
@@ -1019,9 +1019,9 @@ def np_nanskew(arr):
     def nanskew_impl(arr):
         len_val = len(arr)
         n = 0
-        _sum = 0
-        square_sum = 0
-        cube_sum = 0
+        _sum = 0.0
+        square_sum = 0.0
+        cube_sum = 0.0
 
         for idx in numba.prange(len_val):
             if not numpy.isnan(arr[idx]):
