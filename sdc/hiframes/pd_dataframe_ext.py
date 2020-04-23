@@ -86,8 +86,7 @@ def init_dataframe(typingctx, *args):
             # Get index of column in list of types
             col_idx_list = len(data_typs_map[col_typ][1])
             type_id = data_typs_map[col_typ][0]
-            df_structure[col_name] = Column_id(type_id,  col_idx_list)
-
+            df_structure[col_name] = Column_id(type_id, col_idx_list)
             data_typs_map[col_typ][1].append(col_id)
 
         type_id += 1
