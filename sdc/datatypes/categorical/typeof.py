@@ -31,10 +31,23 @@ pandas.CategoricalDtype
 import pandas as pd
 
 from numba.extending import typeof_impl
+from numba import numpy_support
+from numba import typeof
 
 from . import pandas_support
+from .types import Categorical
 
 
 @typeof_impl.register(pd.CategoricalDtype)
 def _typeof_CategoricalDtype(val, c):
     return pandas_support.from_dtype(val)
+
+
+@typeof_impl.register(pd.Categorical)
+def _typeof_Categorical(val, c):
+    try:
+        dtype = pandas_support.from_dtype(val.dtype)
+    except NotImplementedError:
+        raise ValueError("Unsupported Categorical dtype: %s" % (val.dtype,))
+    codes = typeof(val.codes)
+    return Categorical(dtype=dtype, codes=codes)

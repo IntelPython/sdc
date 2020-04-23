@@ -31,8 +31,13 @@ from numba.extending import intrinsic
 from numba.extending import type_callable
 from numba.extending import lower_builtin
 from numba import types
+from numba import typeof
+from numba import objmode
 
-from .types import CategoricalDtypeType
+from .types import (
+    CategoricalDtypeType,
+    Categorical,
+)
 
 
 # Possible alternative implementations:
@@ -120,3 +125,97 @@ def _CategoricalDtype_intrinsic(typingctx, categories, ordered):
 #     # All CategoricalDtype objects are dummy values in LLVM.
 #     # They only exist in the type level.
 #     return context.get_dummy_value()
+
+
+# TODO: use dtype too
+def _reconstruct_Categorical(values):
+    values_list = [v.literal_value for v in values]
+    return pd.Categorical(values=values_list)
+
+
+@overload(pd.Categorical)
+def _Categorical(values, categories=None, ordered=None, dtype=None, fastpath=False):
+    """
+    Implementation of constructor for pandas Categorical via objmode.
+    """
+    # TODO: support other parameters (only values now)
+
+    ty = typeof(_reconstruct_Categorical(values))
+    tyname = ty.name
+    setattr(types, tyname, ty)
+
+    from textwrap import dedent
+    text = dedent(f"""
+    def impl(values, categories=None, ordered=None, dtype=None, fastpath=False):
+        with objmode(categorical='vars()["{tyname}"]'):
+            categorical = pd.Categorical(values, categories, ordered, dtype, fastpath)
+        return categorical
+    """)
+    globals, locals = {'objmode': objmode, 'pd': pd}, {}
+    exec(text, globals, locals)
+    impl = locals['impl']
+    return impl
+
+
+# @type_callable(pd.Categorical)
+# def type_Categorical_constructor(context):
+#     """
+#     Similar to @infer_global(np.array).
+#     """
+#     def typer(values, categories=None, ordered=None, dtype=None, fastpath=False):
+#         # from numba.typing import npydecl
+#         # codes = npydecl.NpArray(context).generic()(values)
+#         categorical = _reconstruct_Categorical(values)
+#         return typeof(categorical)
+
+#     return typer
+
+
+# @lower_builtin(pd.Categorical, types.Any)
+# # @lower_builtin(np.Categorical, types.Any, types.DTypeSpec)
+# def pd_Categorical(context, builder, sig, args):
+#     """
+#     Similar to @lower_builtin(np.array, ...).
+#     """
+#     from numba.targets import arrayobj
+#     codes = sig.return_type.codes
+#     return arrayobj.np_array(context, builder, sig.replace(return_type=codes), args)
+
+
+# via intrinsic
+# @overload(pd.Categorical)
+# def _Categorical(values, categories=None, ordered=None, dtype=None, fastpath=False):
+#     """
+#     Implementation of constructor for pandas Categorical.
+#     """
+#     def impl(values, categories=None, ordered=None, dtype=None, fastpath=False):
+#         return _Categorical_intrinsic(values, categories, ordered, dtype, fastpath)
+#     return impl
+
+
+# @intrinsic
+# def _Categorical_intrinsic(typingctx, values, categories, ordered, dtype, fastpath):
+#     """
+#     Creates Categorical object.
+#     """
+#     if isinstance(values, types.Tuple):
+#         values_list = [v.literal_value for v in values]
+#         categorical = pd.Categorical(values=values_list)
+#         return_type = typeof(categorical)
+
+#         def codegen(context, builder, signature, args):
+#             [values] = args
+#             # TODO: can not recall similar function
+#             native_value = boxing.unbox_array(typ.codes, codes, c)
+#             return native_value
+
+#     sig = return_type(values, categories, ordered, dtype, fastpath)
+#     return sig, codegen
+
+#     # return_type = Categorical(dtype=CategoricalDtypeType(), codes=types.Array(types.int8, 1, 'C'))
+#     # sig = return_type(values)
+
+#     # def codegen(context, builder, signature, args):
+#     #     return context.get_dummy_value()
+
+#     # return sig, codegen

@@ -24,4 +24,5 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+from . import test_categorical
 from . import test_categoricaldtype

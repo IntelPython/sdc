@@ -27,7 +27,11 @@
 from numba.extending import models
 from numba.extending import register_model
 
-from .types import CategoricalDtypeType
+from .types import (
+    CategoricalDtypeType,
+    Categorical,
+)
 
 
 register_model(CategoricalDtypeType)(models.OpaqueModel)
+register_model(Categorical)(models.ArrayModel)

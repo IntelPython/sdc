@@ -29,3 +29,4 @@ from sdc.datatypes.common.rewriteutils import register_tuplify
 
 
 register_tuplify(pd.CategoricalDtype, 'categories')
+register_tuplify(pd.Categorical, 'values')
