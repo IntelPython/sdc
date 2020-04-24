@@ -70,6 +70,7 @@ class TestSeriesMethods(TestBase):
 cases = [
     TC(name='abs', size=[10 ** 8]),
     TC(name='add', size=[10 ** 7], params='other',  data_num=2),
+    TC(name='add', size=[10 ** 7], params='other, fill_value=3',  data_num=2),
     TC(name='append', size=[10 ** 7], params='other', data_num=2),
     TC(name='apply', size=[10 ** 7], params='lambda x: x'),
     TC(name='argsort', size=[10 ** 4]),
@@ -112,6 +113,7 @@ cases = [
     TC(name='le', size=[10 ** 7], params='other', data_num=2),
     TC(name='loc', size=[10 ** 7], call_expr='data.loc[0]', usecase_params='data'),
     TC(name='lt', size=[10 ** 7], params='other', data_num=2),
+    TC(name='lt', size=[10 ** 7], params='other, fill_value=3', data_num=2),
     TC(name='map', size=[10 ** 7], params='lambda x: x * 2'),
     TC(name='map', size=[10 ** 7], params='{2.: 42., 4.: 3.14}'),
     TC(name='max', size=[10 ** 8], check_skipna=True),
