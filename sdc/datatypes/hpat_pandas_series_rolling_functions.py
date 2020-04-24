@@ -36,7 +36,7 @@ from numba.types import (float64, Boolean, Integer, NoneType, Number,
 
 from sdc.datatypes.common_functions import _almost_equal
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
-from sdc.functions.static import skew_formula
+from sdc.functions.statics import skew_formula
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker

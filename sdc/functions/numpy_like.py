@@ -44,7 +44,7 @@ from numba.targets.arraymath import get_isnan
 from numba.typed import List
 
 import sdc
-from sdc.functions.static import skew_formula
+from sdc.functions.statics import skew_formula
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
