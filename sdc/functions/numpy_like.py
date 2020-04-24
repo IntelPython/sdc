@@ -44,6 +44,7 @@ from numba.targets.arraymath import get_isnan
 from numba.typed import List
 
 import sdc
+from sdc.functions.static import skew_formula
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
@@ -1020,14 +1021,7 @@ def np_skew(arr):
         if n == 0 or n < len_val:
             return numpy.nan
 
-        m2 = (square_sum - _sum * _sum / n) / n
-        m3 = (cube_sum - 3. * _sum * square_sum / n + 2. * _sum * _sum * _sum / n / n) / n
-        res = numpy.nan if m2 == 0 else m3 / m2 ** 1.5
-
-        if (n > 2) & (m2 > 0):
-            res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
-
-        return res
+        return skew_formula(n, _sum, square_sum, cube_sum)
 
     return skew_impl
 
@@ -1054,13 +1048,6 @@ def np_nanskew(arr):
         if n == 0:
             return numpy.nan
 
-        m2 = (square_sum - _sum * _sum / n) / n
-        m3 = (cube_sum - 3. * _sum * square_sum / n + 2. * _sum * _sum * _sum / n / n) / n
-        res = numpy.nan if m2 == 0 else m3 / m2 ** 1.5
-
-        if (n > 2) & (m2 > 0):
-            res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
-
-        return res
+        return skew_formula(n, _sum, square_sum, cube_sum)
 
     return nanskew_impl
