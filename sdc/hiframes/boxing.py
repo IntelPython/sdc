@@ -43,8 +43,9 @@ from numba.cpython import listobj
 from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
-from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype,
-                                              box_categorical_array, unbox_categorical_array)
+from sdc.hiframes.pd_categorical_ext import PDCategoricalDtype, box_categorical_array
+from sdc.datatypes.categorical.types import CategoricalDtypeType
+from sdc.datatypes.categorical.boxing import unbox_Categorical, box_Categorical
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.hiframes.pd_series_type import _get_series_array_type
 
@@ -153,8 +154,8 @@ def _infer_series_dtype(S):
         else:
             raise ValueError(
                 "object dtype infer: data type for column {} not supported".format(S.name))
-    elif isinstance(S.dtype, pandas.api.types.CategoricalDtype):
-        return PDCategoricalDtype(S.dtype.categories)
+    elif isinstance(S.dtype, pd.CategoricalDtype):
+        return numba.typeof(S.dtype)
     # regular numpy types
     try:
         return numpy_support.from_dtype(S.dtype)
@@ -320,8 +321,8 @@ def _unbox_series_data(dtype, data_typ, arr_obj, c):
         return unbox_str_series(string_array_type, arr_obj, c)
     elif data_typ == list_string_array_type:
         return _unbox_array_list_str(arr_obj, c)
-    elif isinstance(dtype, PDCategoricalDtype):
-        return unbox_categorical_array(data_typ, arr_obj, c)
+    elif isinstance(dtype, CategoricalDtypeType):
+        return unbox_Categorical(data_typ, arr_obj, c)
 
     # TODO: error handling like Numba callwrappers.py
     return unbox_array(data_typ, arr_obj, c)
@@ -373,8 +374,8 @@ def _box_series_data(dtype, data_typ, val, c):
 
     if dtype == string_type:
         arr = box_str_arr(string_array_type, val, c)
-    elif isinstance(dtype, PDCategoricalDtype):
-        arr = box_categorical_array(data_typ, val, c)
+    elif isinstance(dtype, CategoricalDtypeType):
+        arr = box_Categorical(data_typ, val, c)
     elif dtype == types.List(string_type):
         arr = box_list(list_string_array_type, val, c)
     else:

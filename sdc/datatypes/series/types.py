@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,5 +24,12 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from . import categorical
-from . import series
+"""
+Numba types for support pandas Series.
+"""
+
+__all__ = [
+    'SeriesType',
+]
+
+from sdc.hiframes.pd_series_type import SeriesType

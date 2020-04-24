@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,5 +24,36 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from . import categorical
-from . import series
+from numba.targets.imputils import lower_constant
+from numba import cgutils
+
+from .types import SeriesType
+
+
+@lower_constant(SeriesType)
+def constant_Series(context, builder, ty, pyval):
+    """
+    Create a constant Series.
+
+    See @unbox(SeriesType)
+    """
+    series = cgutils.create_struct_proxy(ty)(context, builder)
+    series.data = _constant_Series_data(context, builder, ty, pyval)
+    # TODO: index and name
+    return series._getvalue()
+
+
+def _constant_Series_data(context, builder, ty, pyval):
+    """
+    Create a constant for Series data.
+
+    Mostly reuses constant creation for pandas arrays.
+    """
+
+    from ..categorical.types import CategoricalDtypeType
+
+    if isinstance(ty.dtype, CategoricalDtypeType):
+        from ..categorical.boxing import constant_Categorical
+        return constant_Categorical(context, builder, ty.data, pyval.array)
+
+    raise NotImplementedError()

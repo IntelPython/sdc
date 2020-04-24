@@ -25,3 +25,4 @@
 # *****************************************************************************
 
 from .datatypes.categorical.types import *
+from .datatypes.series.types import *

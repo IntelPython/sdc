@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,5 +24,39 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from . import categorical
-from . import series
+import pandas as pd
+
+from numba import typeof
+from numba import types
+from numba import objmode
+
+from ..categorical.pdimpl import _reconstruct_CategoricalDtype
+
+
+def _reconstruct_Series(data, dtype):
+    values_list = [v.literal_value for v in data]
+    dtype = _reconstruct_CategoricalDtype(dtype)
+    return pd.Series(data=values_list, dtype=dtype)
+
+
+def _Series_category(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
+    """
+    Implementation of constructor for pandas Series via objmode.
+    """
+    # TODO: support other parameters (only data and dtype now)
+
+    ty = typeof(_reconstruct_Series(data, dtype))
+    tyname = ty.name
+    setattr(types, tyname, ty)
+
+    from textwrap import dedent
+    text = dedent(f"""
+    def impl(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
+        with objmode(series='vars()["{tyname}"]'):
+            series = pd.Series(data, index, dtype, name, copy, fastpath)
+        return series
+    """)
+    globals, locals = {'objmode': objmode, 'pd': pd}, {}
+    exec(text, globals, locals)
+    impl = locals['impl']
+    return impl

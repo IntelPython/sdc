@@ -39,11 +39,23 @@ from .types import (
     Categorical,
 )
 
+from . import pandas_support
+
 
 # Possible alternative implementations:
 # 1. @overload + @intrinsic
 # 2. @type_callable + @lower_builtin
 # They are equivalent. Who is defined firts - has higher priority.
+
+
+def _reconstruct_CategoricalDtype(dtype):
+    if isinstance(dtype, types.Literal):
+        return dtype.literal_value
+
+    if isinstance(dtype, CategoricalDtypeType):
+        return pandas_support.as_dtype(dtype)
+
+    raise NotImplementedError()
 
 
 @overload(pd.CategoricalDtype)
@@ -89,6 +101,17 @@ def _CategoricalDtype_intrinsic(typingctx, categories, ordered):
         return context.get_dummy_value()
 
     return sig, codegen
+
+
+# TODO: move to tools
+def is_categoricaldtype(dtype):
+    if isinstance(dtype, types.Literal) and dtype.literal_value == 'category':
+        return True
+
+    if isinstance(dtype, CategoricalDtypeType):
+        return True
+
+    return False
 
 
 # @type_callable(pd.CategoricalDtype)
