@@ -56,7 +56,7 @@ from sdc import objmode
 import pandas as pd
 import numpy as np
 
-from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype, CategoricalArray)
+from sdc.types import CategoricalDtypeType, Categorical
 
 import pyarrow
 import pyarrow.csv
@@ -302,13 +302,14 @@ def box_stream_reader(typ, val, c):
 
 def _get_dtype_str(t):
     dtype = t.dtype
-    if isinstance(dtype, PDCategoricalDtype):
-        cat_arr = CategoricalArray(dtype)
+
+    # if isinstance(dtype, CategoricalDtypeType):
+    if isinstance(t, Categorical):
         # HACK: add cat type to numba.types
         # FIXME: fix after Numba #3372 is resolved
-        cat_arr_name = 'CategoricalArray' + str(ir_utils.next_label())
-        setattr(types, cat_arr_name, cat_arr)
-        return cat_arr_name
+        setattr(types, "CategoricalDtype", CategoricalDtypeType)
+        setattr(types, "Categorical", Categorical)
+        return str(t)
 
     if dtype == types.NPDatetime('ns'):
         dtype = 'NPDatetime("ns")'
@@ -322,8 +323,8 @@ def _get_dtype_str(t):
 
 def _get_pd_dtype_str(t):
     dtype = t.dtype
-    if isinstance(dtype, PDCategoricalDtype):
-        return 'pd.api.types.CategoricalDtype({})'.format(dtype.categories)
+    if isinstance(t, Categorical):
+        return 'pd.{}'.format(t.pd_dtype)
     if dtype == types.NPDatetime('ns'):
         dtype = 'str'
     if t == string_array_type:
@@ -605,11 +606,11 @@ def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, dtype_present
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs) if t.dtype == types.NPDatetime('ns'))
     return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
     nb_objmode_vars = ", ".join([
-        "{}='{}'".format(to_varname(cname), _get_dtype_str(t))
+        '{}="{}"'.format(to_varname(cname), _get_dtype_str(t))
         for cname, t in zip(return_columns, col_typs)
     ])
     pd_dtype_strs = ", ".join([
-        "'{}':{}".format(cname, _get_pd_dtype_str(t))
+        "'{}': {}".format(cname, _get_pd_dtype_str(t))
         for cname, t in zip(return_columns, col_typs)
     ])
 
@@ -670,15 +671,10 @@ def _gen_csv_reader_py_pyarrow_func_text_dataframe(col_names, col_typs, dtype_pr
 
 
 def _gen_csv_reader_py_pyarrow_py_func(func_text, func_name):
-    # print(func_text)
-    glbls = globals()  # TODO: fix globals after Numba's #3355 is resolved
-    # {'objmode': objmode, 'csv_file_chunk_reader': csv_file_chunk_reader,
-    # 'pd': pd, 'np': np}
-    loc_vars = {}
-    exec(func_text, glbls, loc_vars)
-    csv_reader_py = loc_vars[func_name]
-
-    return csv_reader_py
+    locals = {}
+    exec(func_text, globals(), locals)
+    func = locals[func_name]
+    return func
 
 
 def _gen_csv_reader_py_pyarrow_jit_func(csv_reader_py):

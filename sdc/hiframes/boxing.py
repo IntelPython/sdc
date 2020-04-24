@@ -43,8 +43,7 @@ from numba.cpython import listobj
 from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
-from sdc.hiframes.pd_categorical_ext import PDCategoricalDtype, box_categorical_array
-from sdc.datatypes.categorical.types import CategoricalDtypeType
+from sdc.datatypes.categorical.types import CategoricalDtypeType, Categorical
 from sdc.datatypes.categorical.boxing import unbox_Categorical, box_Categorical
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.hiframes.pd_series_type import _get_series_array_type
@@ -228,8 +227,8 @@ def box_dataframe(typ, val, c):
 
         if dtype == string_type:
             arr_obj = box_str_arr(arr_typ, arr, c)
-        elif isinstance(dtype, PDCategoricalDtype):
-            arr_obj = box_categorical_array(arr_typ, arr, c)
+        elif isinstance(arr_typ, Categorical):
+            arr_obj = box_Categorical(arr_typ, arr, c)
             # context.nrt.incref(builder, arr_typ, arr)
         elif dtype == types.List(string_type):
             arr_obj = box_list(list_string_array_type, arr, c)

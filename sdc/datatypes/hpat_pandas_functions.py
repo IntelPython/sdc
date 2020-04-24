@@ -44,6 +44,7 @@ from sdc.io.csv_ext import (
 from sdc.str_arr_ext import string_array_type
 
 from sdc.hiframes import join, aggregate, sort
+from sdc.types import CategoricalDtypeType, Categorical
 
 
 def get_numba_array_types_for_csv(df):
@@ -266,6 +267,7 @@ def sdc_pandas_read_csv(
             values = [types.Array(types.int_, 1, 'C') if v == int else v for v in values]
             values = [types.Array(types.float64, 1, 'C') if v == float else v for v in values]
             values = [string_array_type if v == str else v for v in values]
+            values = [Categorical(v) if isinstance(v, CategoricalDtypeType) else v for v in values]
 
             dtype = dict(zip(keys, values))
 
