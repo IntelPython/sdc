@@ -177,7 +177,7 @@ The built documentation will be located in the ``./sdc/docs/build/html`` directo
 To preview the documentation open ``index.html`` file.
 
 
-More information about building and adding documentation can be found in ``README`` in the ``docs`` folder. `here <docs/README.rst>`_.
+More information about building and adding documentation can be found `here <docs/README.rst>`_.
 
 
 Running unit tests
