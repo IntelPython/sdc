@@ -1,6 +1,10 @@
 Intel® SDC docstring decoration rules
 #####################################
 
+.. _Numba*: https://numba.pydata.org/
+.. _Pandas*: https://pandas.pydata.org/
+.. _Sphinx*: https://www.sphinx-doc.org/
+
 Since Intel® SDC API Reference is auto-generated from respective `Pandas*`_ and Intel® SDC docstrings there are certain rules that must be
 followed to accurately generate the API description.
 
