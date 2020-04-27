@@ -86,14 +86,13 @@ def init_dataframe(typingctx, *args):
             # The first column in each type always has 0 index
             df_structure[col_name] = ColumnId(type_id, 0)
             types_order.append(col_typ)
+            type_id += 1
         else:
             # Get index of column in list of types
-            type_id, col_indices = data_typs_map[col_typ]
+            type_idx, col_indices = data_typs_map[col_typ]
             col_idx_list = len(col_indices)
-            df_structure[col_name] = ColumnId(type_id, col_idx_list)
+            df_structure[col_name] = ColumnId(type_idx, col_idx_list)
             col_indices.append(col_id)
-
-        type_id += 1
 
     def codegen(context, builder, signature, args):
         in_tup = args[0]
@@ -108,7 +107,7 @@ def init_dataframe(typingctx, *args):
         data_list_type = [types.List(typ) for typ in types_order]
 
         data_lists = []
-        for typ_id, typ in enumerate(data_typs_map.keys()):
+        for typ_id, typ in enumerate(types_order):
             data_list_typ = context.build_list(builder, data_list_type[typ_id],
                                                [data_arrs[data_id] for data_id in data_typs_map[typ][1]])
             data_lists.append(data_list_typ)
