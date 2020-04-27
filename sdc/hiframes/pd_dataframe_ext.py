@@ -28,7 +28,7 @@
 import operator
 
 import numba
-from collections import namedtuple
+from typing import NamedTuple
 from numba import types, cgutils
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
                              type_callable, infer, overload, intrinsic,
@@ -53,7 +53,9 @@ class DataFrameAttribute(AttributeTemplate):
             return SeriesType(arr_typ.dtype, arr_typ, df.index, True)
 
 
-Column_id = namedtuple('Column_id', ('type_id', 'col_type_id'))
+class ColumnId(NamedTuple):
+    type_id: int
+    col_type_id: int
 
 
 @intrinsic
@@ -74,6 +76,7 @@ def init_dataframe(typingctx, *args):
     df_structure = {}
     # Store unique types of columns ex. {'int64': (0, [0, 2]), 'float64': (1, [1])}
     data_typs_map = {}
+    types_order = []
     type_id = 0
     for col_id, col_typ in enumerate(data_typs):
         col_name = column_names[col_id]
@@ -81,13 +84,14 @@ def init_dataframe(typingctx, *args):
         if col_typ not in data_typs_map:
             data_typs_map[col_typ] = (type_id, [col_id])
             # The first column in each type always has 0 index
-            df_structure[col_name] = Column_id(type_id, 0)
+            df_structure[col_name] = ColumnId(type_id, 0)
+            types_order.append(col_typ)
         else:
             # Get index of column in list of types
-            col_idx_list = len(data_typs_map[col_typ][1])
-            type_id = data_typs_map[col_typ][0]
-            df_structure[col_name] = Column_id(type_id, col_idx_list)
-            data_typs_map[col_typ][1].append(col_id)
+            type_id, col_indices = data_typs_map[col_typ]
+            col_idx_list = len(col_indices)
+            df_structure[col_name] = ColumnId(type_id, col_idx_list)
+            col_indices.append(col_id)
 
         type_id += 1
 
@@ -101,7 +105,7 @@ def init_dataframe(typingctx, *args):
         dataframe = cgutils.create_struct_proxy(
             signature.return_type)(context, builder)
 
-        data_list_type = [types.List(typ) for typ in data_typs_map.keys()]
+        data_list_type = [types.List(typ) for typ in types_order]
 
         data_lists = []
         for typ_id, typ in enumerate(data_typs_map.keys()):

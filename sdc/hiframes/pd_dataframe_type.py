@@ -88,7 +88,7 @@ class DataFrameModel(models.StructModel):
     def __init__(self, dmm, fe_type):
         types_unique = set()
         df_types = []
-        for col_id, col_type in enumerate(fe_type.data):
+        for col_type in fe_type.data:
             if col_type in types_unique:
                 continue
             types_unique.add(col_type)
