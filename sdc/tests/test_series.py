@@ -7188,6 +7188,73 @@ class TestSeries(
                 msg = 'The index of boolean indexer is not comparable to Series index.'
                 self.assertIn(msg, str(raises.exception))
 
+    def test_series_skew(self):
+        def test_impl(series, axis, skipna):
+            return series.skew(axis=axis, skipna=skipna)
+
+        hpat_func = self.jit(test_impl)
+        test_data = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+                     [],
+                     [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+                     [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+                     [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                     [np.nan, np.nan, np.nan],
+                     [np.nan, np.nan, np.inf],
+                     [np.inf, 0, np.inf, 1, 2, 3, 4, 5]
+                     ]
+        all_test_data = test_data + test_global_input_data_float64
+        for data in all_test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                for axis in [0, None]:
+                    with self.subTest(axis=axis):
+                        for skipna in [None, False, True]:
+                            with self.subTest(skipna=skipna):
+                                res1 = test_impl(s, axis, skipna)
+                                res2 = hpat_func(s, axis, skipna)
+                                np.testing.assert_allclose(res1, res2)
+
+    def test_series_skew_default(self):
+        def test_impl():
+            s = pd.Series([np.nan, -2., 3., 9.1])
+            return s.skew()
+
+        hpat_func = self.jit(test_impl)
+        np.testing.assert_allclose(test_impl(), hpat_func())
+
+    def test_series_skew_not_supported(self):
+        def test_impl(series, axis=None, skipna=None, level=None, numeric_only=None):
+            return series.skew(axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
+
+        hpat_func = self.jit(test_impl)
+        s = pd.Series([1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2])
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, axis=0.75)
+        msg = 'TypingError: Method Series.skew() The object axis\n given: float64\n expected: int64'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, skipna=0)
+        msg = 'TypingError: Method Series.skew() The object skipna\n given: int64\n expected: bool'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, level=0)
+        msg = 'TypingError: Method Series.skew() The object level\n given: int64\n expected: None'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, numeric_only=0)
+        msg = 'TypingError: Method Series.skew() The object numeric_only\n given: int64\n expected: None'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(s, axis=5)
+        msg = 'Parameter axis must be only 0 or None.'
+        self.assertIn(msg, str(raises.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
