@@ -2760,7 +2760,6 @@ class TestSeries(
         S2 = pd.Series([6., 7.])
         np.testing.assert_array_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
-    @skip_numba_jit
     def test_series_combine(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
@@ -2770,7 +2769,6 @@ class TestSeries(
         S2 = pd.Series([6.0, 21., 3.6, 5.])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
-    @skip_numba_jit
     def test_series_combine_float3264(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
@@ -2804,7 +2802,6 @@ class TestSeries(
         with self.assertRaises(AssertionError):
             hpat_func(S1, S2)
 
-    @skip_numba_jit
     def test_series_combine_integer(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b, 16)
@@ -2814,7 +2811,6 @@ class TestSeries(
         S2 = pd.Series([6, 21, 3, 5])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
-    @skip_numba_jit
     def test_series_combine_different_types(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
@@ -2824,7 +2820,6 @@ class TestSeries(
         S2 = pd.Series([1, 2, 3, 4, 5])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
-    @skip_numba_jit
     def test_series_combine_integer_samelen(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
@@ -2834,7 +2829,6 @@ class TestSeries(
         S2 = pd.Series([6, 21, 17, -5, 4])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
-    @skip_numba_jit
     def test_series_combine_samelen(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
@@ -2844,7 +2838,6 @@ class TestSeries(
         S2 = pd.Series([6.0, 21., 3.6, 5., 0.0])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
-    @skip_numba_jit
     def test_series_combine_value(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b, 1237.56)
@@ -2854,7 +2847,6 @@ class TestSeries(
         S2 = pd.Series([6.0, 21., 3.6, 5.])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
-    @skip_numba_jit
     def test_series_combine_value_samelen(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b, 1237.56)

@@ -4818,3 +4818,65 @@ are currently unsupported by Intel Scalable Dataframe Compiler
         return init_series_groupby(self, by, grouped, sort)
 
     return sdc_pandas_series_groupby_impl
+
+
+@sdc_overload_method(SeriesType, 'combine')
+def sdc_pandas_series_combine(self, other, func, fill_value=None):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.combine
+
+    Limitations
+    -----------
+    - Only supports the case when data in series of the same type
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_combine.py
+       :language: python
+       :lines: 27-
+       :caption: Combined the Series with a Series according to func.
+       :name: ex_series_combine
+
+    .. command-output:: python ./series/series_combine.py
+       :cwd: ../../../examples
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas Series method :meth:`pandas.Series.combine` implementation.
+
+    .. only:: developer
+
+       Tests: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_combine*
+    """
+    _func_name = 'Method Series.combine().'
+
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
+
+    ty_checker.check(other, SeriesType)
+
+    if not isinstance(fill_value, (types.Omitted, types.NoneType, types.Number)) and fill_value is not None:
+        ty_checker.raise_exc(fill_value, 'number', 'fill_value')
+
+    def sdc_pandas_series_combine_impl(self, other, func, fill_value=None):
+
+        if fill_value is None:
+            fill_value = numpy.nan
+
+        len_val = max(len(self), len(other))
+        result = numpy.empty(len_val, self._data.dtype)
+        for ind in range(len_val):
+            val_self = self._data[ind]
+            val_other = other._data[ind]
+            if len(self) < ind + 1:
+                val_self = fill_value
+            if len(other) < ind + 1:
+                val_other = fill_value
+            result[ind] = func(val_self, val_other)
+
+        return pandas.Series(result)
+
+    return sdc_pandas_series_combine_impl
