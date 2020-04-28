@@ -200,9 +200,9 @@ def restore_series_sort_values(series, my_result_index, ascending):
     return 0
 
 
-def _make_func_from_text(func_text, func_name='test_impl'):
+def _make_func_from_text(func_text, func_name='test_impl', global_vars={}):
     loc_vars = {}
-    exec(func_text, {}, loc_vars)
+    exec(func_text, global_vars, loc_vars)
     test_impl = loc_vars[func_name]
     return test_impl
 
