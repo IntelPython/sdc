@@ -4820,6 +4820,70 @@ are currently unsupported by Intel Scalable Dataframe Compiler
     return sdc_pandas_series_groupby_impl
 
 
+@sdc_overload_method(SeriesType, 'skew')
+def sdc_pandas_series_skew(self, axis=None, skipna=None, level=None, numeric_only=None):
+    """
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+
+        Pandas API: pandas.Series.skew
+
+        Limitations
+        -----------
+        - Parameters ``level`` and ``numeric_only`` are supported only with default value ``None``.
+
+        Examples
+        --------
+        .. literalinclude:: ../../../examples/series/series_skew.py
+           :language: python
+           :lines: 27-
+           :caption: Unbiased rolling skewness.
+           :name: ex_series_skew
+
+        .. command-output:: python ./series/series_skew.py
+           :cwd: ../../../examples
+
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+        Pandas Series method :meth:`pandas.Series.skew` implementation.
+
+        .. only:: developer
+            Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_skew*
+        """
+    _func_name = 'Method Series.skew()'
+
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
+
+    if not isinstance(axis, (types.Integer, types.NoneType, types.Omitted)) and axis is not None:
+        ty_checker.raise_exc(axis, 'int64', 'axis')
+
+    if not isinstance(skipna, (types.Boolean, types.NoneType, types.Omitted)) and skipna is not None:
+        ty_checker.raise_exc(skipna, 'bool', 'skipna')
+
+    if not isinstance(level, (types.Omitted, types.NoneType)) and level is not None:
+        ty_checker.raise_exc(level, 'None', 'level')
+
+    if not isinstance(numeric_only, (types.Omitted, types.NoneType)) and numeric_only is not None:
+        ty_checker.raise_exc(numeric_only, 'None', 'numeric_only')
+
+    def sdc_pandas_series_skew_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
+        if axis != 0 and axis is not None:
+            raise ValueError('Parameter axis must be only 0 or None.')
+
+        if skipna is None:
+            _skipna = True
+        else:
+            _skipna = skipna
+
+        if _skipna:
+            return numpy_like.nanskew(self._data)
+
+        return numpy_like.skew(self._data)
+
+    return sdc_pandas_series_skew_impl
+
+
 @sdc_overload_method(SeriesType, 'combine')
 def sdc_pandas_series_combine(self, other, func, fill_value=None):
     """

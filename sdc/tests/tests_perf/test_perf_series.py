@@ -137,6 +137,7 @@ cases = [
     TC(name='shape', size=[10 ** 7], call_expr='data.shape', usecase_params='data'),
     TC(name='shift', size=[10 ** 8]),
     TC(name='size', size=[10 ** 7], call_expr='data.size', usecase_params='data'),
+    TC(name='skew', size=[10 ** 8], check_skipna=True),
     TC(name='sort_values', size=[10 ** 5]),
     TC(name='std', size=[10 ** 7], check_skipna=True),
     TC(name='sub', size=[10 ** 7], params='other', data_num=2),

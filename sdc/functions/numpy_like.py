@@ -44,6 +44,7 @@ from numba.targets.arraymath import get_isnan
 from numba.typed import List
 
 import sdc
+from sdc.functions.statistics import skew_formula
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
@@ -988,3 +989,65 @@ def getitem_by_mask_overload(arr, idx):
             return result_data
 
     return getitem_by_mask_impl
+
+
+def skew(a):
+    pass
+
+
+def nanskew(a):
+    pass
+
+
+@sdc_overload(skew)
+def np_skew(arr):
+    if not isinstance(arr, types.Array):
+        return
+
+    def skew_impl(arr):
+        len_val = len(arr)
+        n = 0
+        _sum = 0.
+        square_sum = 0.
+        cube_sum = 0.
+
+        for idx in numba.prange(len_val):
+            if not numpy.isnan(arr[idx]):
+                n += 1
+                _sum += arr[idx]
+                square_sum += arr[idx] ** 2
+                cube_sum += arr[idx] ** 3
+
+        if n == 0 or n < len_val:
+            return numpy.nan
+
+        return skew_formula(n, _sum, square_sum, cube_sum)
+
+    return skew_impl
+
+
+@sdc_overload(nanskew)
+def np_nanskew(arr):
+    if not isinstance(arr, types.Array):
+        return
+
+    def nanskew_impl(arr):
+        len_val = len(arr)
+        n = 0
+        _sum = 0.
+        square_sum = 0.
+        cube_sum = 0.
+
+        for idx in numba.prange(len_val):
+            if not numpy.isnan(arr[idx]):
+                n += 1
+                _sum += arr[idx]
+                square_sum += arr[idx] ** 2
+                cube_sum += arr[idx] ** 3
+
+        if n == 0:
+            return numpy.nan
+
+        return skew_formula(n, _sum, square_sum, cube_sum)
+
+    return nanskew_impl
