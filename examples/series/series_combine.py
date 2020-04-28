@@ -34,7 +34,7 @@ def series_copy():
     s1 = pd.Series([1, 5, 2])
     s2 = pd.Series([0, 3, 7, 8, 0])
 
-    return s1.combine(s2, max, fill_value=0)  # Expect new series of 1, 5, 7, 8, 0
+    return s1.combine(s2, max, fill_value=0)  # Expect series of 1, 5, 7, 8, 0
 
 
 print(series_copy())
