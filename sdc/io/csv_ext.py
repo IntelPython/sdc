@@ -303,13 +303,11 @@ def box_stream_reader(typ, val, c):
 def _get_dtype_str(t):
     dtype = t.dtype
 
-    # if isinstance(dtype, CategoricalDtypeType):
     if isinstance(t, Categorical):
-        # HACK: add cat type to numba.types
-        # FIXME: fix after Numba #3372 is resolved
-        setattr(types, "CategoricalDtype", CategoricalDtypeType)
-        setattr(types, "Categorical", Categorical)
-        return str(t)
+        # return categorical representation
+        # for some reason pandas and pyarrow read_csv() return CategoricalDtype with
+        # ordered=False in case when dtype is with ordered=None
+        return str(t).replace('ordered=None', 'ordered=False')
 
     if dtype == types.NPDatetime('ns'):
         dtype = 'NPDatetime("ns")'
@@ -431,83 +429,12 @@ def pandas_read_csv(
     This function has the same interface as pandas.read_csv.
     """
 
-    # Fallback to pandas
-    need_categorical = isinstance(dtype, pd.CategoricalDtype)
-    try:
-        need_categorical |= any(isinstance(v, pd.CategoricalDtype) for v in dtype.values())
-    except: pass
-
-    fallback_to_pandas = need_categorical
-
-    if fallback_to_pandas:
-        return pd.read_csv(
-            filepath_or_buffer=filepath_or_buffer,
-            sep=sep,
-            delimiter=delimiter,
-            # Column and Index Locations and Names
-            header=header,
-            names=names,
-            index_col=index_col,
-            usecols=usecols,
-            squeeze=squeeze,
-            prefix=prefix,
-            mangle_dupe_cols=mangle_dupe_cols,
-            # General Parsing Configuration
-            dtype=dtype,
-            engine=engine,
-            converters=converters,
-            true_values=true_values,
-            false_values=false_values,
-            skipinitialspace=skipinitialspace,
-            skiprows=skiprows,
-            skipfooter=skipfooter,
-            nrows=nrows,
-            # NA and Missing Data Handling
-            na_values=na_values,
-            keep_default_na=keep_default_na,
-            na_filter=na_filter,
-            verbose=verbose,
-            skip_blank_lines=skip_blank_lines,
-            # Datetime Handling
-            parse_dates=parse_dates,
-            infer_datetime_format=infer_datetime_format,
-            keep_date_col=keep_date_col,
-            date_parser=date_parser,
-            dayfirst=dayfirst,
-            cache_dates=cache_dates,
-            # Iteration
-            iterator=iterator,
-            chunksize=chunksize,
-            # Quoting, Compression, and File Format
-            compression=compression,
-            thousands=thousands,
-            decimal=decimal,
-            lineterminator=lineterminator,
-            quotechar=quotechar,
-            # quoting=csv.QUOTE_MINIMAL,  # not supported
-            doublequote=doublequote,
-            escapechar=escapechar,
-            comment=comment,
-            encoding=encoding,
-            dialect=dialect,
-            # Error Handling
-            error_bad_lines=error_bad_lines,
-            warn_bad_lines=warn_bad_lines,
-            # Internal
-            delim_whitespace=delim_whitespace,
-            # low_memory=_c_parser_defaults["low_memory"],  # not supported
-            memory_map=memory_map,
-            float_precision=float_precision,
-        )
-
     if delimiter is None:
         delimiter = sep
 
     autogenerate_column_names = bool(names)
 
     include_columns = None
-
-    # categories = None
 
     if usecols:
         if type(usecols[0]) == str:
@@ -530,30 +457,43 @@ def pandas_read_csv(
     #         categories = [f"f{names_list.index(k)}" for k in keys]
     # except: pass
 
+    categories = []
+
     if dtype:
         if names:
             names_list = list(names)
             if isinstance(dtype, dict):
-                dtype = {f"f{names_list.index(k)}": pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
+                column_types = {}
+                for k, v in dtype.items():
+                    column_name = "f{}".format(names_list.index(k))
+                    if isinstance(v, pd.CategoricalDtype):
+                        categories.append(column_name)
+                        column_type = pyarrow.string()
+                    else:
+                        column_type = pyarrow.from_numpy_dtype(v)
+                    column_types[column_name] = column_type
             else:
-                dtype = {f"f{names_list.index(k)}": pyarrow.from_numpy_dtype(dtype) for k in names}
+                pa_dtype = pyarrow.from_numpy_dtype(dtype)
+                column_types = {f"f{names_list.index(k)}": pa_dtype for k in names}
         elif usecols:
             if isinstance(dtype, dict):
-                dtype = {k: pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
+                column_types = {k: pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
             else:
-                dtype = {k: pyarrow.from_numpy_dtype(dtype) for k in usecols}
+                column_types = {k: pyarrow.from_numpy_dtype(dtype) for k in usecols}
         else:
             if isinstance(dtype, dict):
-                dtype = {k: pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
+                column_types = {k: pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
             else:
-                dtype = pyarrow.from_numpy_dtype(dtype)
+                column_types = pyarrow.from_numpy_dtype(dtype)
+    else:
+        column_types = None
 
     try:
         for column in parse_dates:
             name = f"f{column}"
             # TODO: Try to help pyarrow infer date type - set DateType.
             # dtype[name] = pyarrow.from_numpy_dtype(np.datetime64) # string
-            del dtype[name]
+            del column_types[name]
     except: pass
 
     parse_options = pyarrow.csv.ParseOptions(
@@ -567,7 +507,7 @@ def pandas_read_csv(
     )
 
     convert_options = pyarrow.csv.ConvertOptions(
-        column_types=dtype,
+        column_types=column_types,
         strings_can_be_null=True,
         include_columns=include_columns,
     )
@@ -580,7 +520,7 @@ def pandas_read_csv(
     )
 
     dataframe = table.to_pandas(
-        # categories=categories,
+        # categories=categories or None,
     )
 
     if names:
@@ -591,6 +531,12 @@ def pandas_read_csv(
                 dataframe.columns = [name for name in names if name in usecols]
         else:
             dataframe.columns = names
+
+    # fix when PyArrow will support predicted categories
+    if isinstance(dtype, dict):
+        for column_name, column_type in dtype.items():
+            if isinstance(column_type, pd.CategoricalDtype):
+                dataframe[column_name] = dataframe[column_name].astype(column_type)
 
     return dataframe
 
