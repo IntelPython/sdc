@@ -4958,7 +4958,6 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @unittest.skip("Fails when NUMA_PES>=2 due to unimplemented sync of such construction after distribution")
     def test_series_iterator_no_param(self):
         def test_impl():
             A = pd.Series([3, 2, 1, 5, 4])
