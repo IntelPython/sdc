@@ -2,3 +2,12 @@ build/
 *__pycache__*
 *.so
 *.dll
+
+*.egg-info
+
+*.pq
+*.csv
+*.parquet
+*.dat
+
+sdc-build
