@@ -236,7 +236,6 @@ class TestParquet(TestIO):
 
 class TestCSV(TestIO):
 
-    @dfRefactoringNotImplemented
     def test_pyarrow(self):
         tests = [
             "csv_keys1",
@@ -295,7 +294,6 @@ class TestCSV(TestIO):
 
     # inference errors
 
-    @dfRefactoringNotImplemented
     def test_csv_infer_error(self):
         read_csv = self._read_csv()
 

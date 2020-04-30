@@ -730,7 +730,6 @@ class TestGroupBy(TestCase):
 
         self.assertRaises(type(pandas_exception), hpat_func, df)
 
-    @dfRefactoringNotImplemented
     def test_series_groupby_by_array(self):
         def test_impl(A, data):
             return A.groupby(data).count()

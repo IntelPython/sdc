@@ -891,7 +891,6 @@ class TestRolling(TestCase):
         self._test_rolling_unsupported_values(df)
 
     @skip_sdc_jit('DataFrame.rolling.min() unsupported exceptions')
-    @dfRefactoringNotImplemented
     def test_df_rolling_unsupported_types(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -915,7 +914,6 @@ class TestRolling(TestCase):
         self._test_rolling_apply_mean(df)
 
     @skip_sdc_jit('DataFrame.rolling.apply() unsupported exceptions')
-    @dfRefactoringNotImplemented
     def test_df_rolling_apply_unsupported_types(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)
@@ -976,7 +974,6 @@ class TestRolling(TestCase):
         self._test_rolling_corr_with_no_other(df)
 
     @skip_sdc_jit('DataFrame.rolling.corr() unsupported exceptions')
-    @dfRefactoringNotImplemented
     def test_df_rolling_corr_unsupported_types(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)
@@ -1055,7 +1052,6 @@ class TestRolling(TestCase):
         self._test_rolling_cov_with_no_other(df)
 
     @skip_sdc_jit('DataFrame.rolling.cov() unsupported exceptions')
-    @dfRefactoringNotImplemented
     def test_df_rolling_cov_unsupported_types(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)
@@ -1203,7 +1199,6 @@ class TestRolling(TestCase):
         self._test_rolling_quantile(df)
 
     @skip_sdc_jit('DataFrame.rolling.quantile() unsupported exceptions')
-    @dfRefactoringNotImplemented
     def test_df_rolling_quantile_exception_unsupported_types(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)
@@ -1247,7 +1242,6 @@ class TestRolling(TestCase):
         self._test_rolling_std(df)
 
     @skip_sdc_jit('DataFrame.rolling.std() unsupported exceptions')
-    @dfRefactoringNotImplemented
     def test_df_rolling_std_exception_unsupported_ddof(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)
@@ -1285,7 +1279,6 @@ class TestRolling(TestCase):
         self._test_rolling_var(df)
 
     @skip_sdc_jit('DataFrame.rolling.var() unsupported exceptions')
-    @dfRefactoringNotImplemented
     def test_df_rolling_var_exception_unsupported_ddof(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)

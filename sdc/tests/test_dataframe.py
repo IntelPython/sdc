@@ -1219,7 +1219,6 @@ class TestDataFrame(TestCase):
                            "C": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
         self.assertEqual(sdc_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
     def test_df_iat_value_error(self):
         def test_impl(df):
             return df.iat[1, 22]
