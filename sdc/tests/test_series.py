@@ -1181,7 +1181,6 @@ class TestSeries(
         S = pd.Series(['1', '4', '6', '33', '7'], ['1', '3', '5', '4', '7'], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.expectedFailure
     def test_series_at(self):
         def test_impl(S, key):
             return S.at[key]
@@ -1195,7 +1194,6 @@ class TestSeries(
             S = pd.Series(data, index, name='A')
             self.assertEqual(jit_impl(S, key), test_impl(S, key))
 
-    @unittest.expectedFailure
     def test_series_at_array(self):
         def test_impl(A):
             return A.at[3]
@@ -1240,7 +1238,6 @@ class TestSeries(
             pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
 
     @skip_sdc_jit('Not impl in old style')
-    @unittest.expectedFailure
     def test_series_at_str(self):
         def test_impl(A):
             return A.at['1']

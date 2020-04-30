@@ -1202,7 +1202,6 @@ class TestDataFrame(TestCase):
         msg = 'Index is out of bounds for axis'
         self.assertIn(msg, str(raises.exception))
 
-    @unittest.expectedFailure
     def test_df_at(self):
         def test_impl(df, n):
             return df.at[n, 'C']
@@ -1216,7 +1215,6 @@ class TestDataFrame(TestCase):
         for n in n_cases:
             np.testing.assert_array_equal(sdc_func(df, n), test_impl(df, n))
 
-    @unittest.expectedFailure
     def test_df_at_type(self):
         def test_impl(df, n, k):
             return df.at[n, "B"]
@@ -1230,7 +1228,6 @@ class TestDataFrame(TestCase):
         for n in n_cases:
             self.assertEqual(sdc_func(df, n, "B"), test_impl(df, n, "B"))
 
-    @unittest.expectedFailure
     def test_df_at_value_error(self):
         def test_impl(df):
             return df.at[5, 'C']
