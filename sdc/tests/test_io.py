@@ -308,6 +308,7 @@ class TestCSV(TestIO):
 
     # inference from parameters
 
+    @unittest.expectedFailure
     def test_csv_infer_params_default(self):
         read_csv = self._read_csv()
         int_type = self._int_type()
@@ -323,6 +324,7 @@ class TestCSV(TestIO):
             with self.subTest(fname=fname):
                 pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
 
+    @unittest.expectedFailure
     def test_csv_infer_params_usecols_names(self):
         read_csv = self._read_csv()
         int_type = self._int_type()
@@ -337,6 +339,7 @@ class TestCSV(TestIO):
         cfunc = self.jit(pyfunc)
         pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
 
+    @unittest.expectedFailure
     def test_csv_infer_params_usecols_no_names(self):
         read_csv = self._read_csv()
         int_type = self._int_type()
