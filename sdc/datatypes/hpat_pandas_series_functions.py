@@ -245,13 +245,13 @@ def hpat_pandas_series_accessor_getitem(self, idx):
         if isinstance(idx, (int, types.Integer, types.UnicodeType, types.StringLiteral)):
             def hpat_pandas_series_at_impl(self, idx):
                 index = self._series.index
-                check = False
+                count = 0
                 mask = numpy.empty(len(self._series._data), numpy.bool_)
                 for i in numba.prange(len(index)):
                     mask[i] = index[i] == idx
                     if mask[i] == True:  # noqa
-                        check = True
-                if check != True:  # noqa
+                        count += 1
+                if count == 0:  # noqa
                     raise ValueError("Index is not in the Series")
                 return self._series._data[mask]
 
