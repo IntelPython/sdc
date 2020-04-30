@@ -212,6 +212,9 @@ def skip_inline(msg_or_func):
     return wrapper(func) if func else wrapper
 
 
+dfRefactoringNotImplemented = unittest.expectedFailure
+
+
 def take_k_elements(k, data, repeat=False, seed=None):
     if seed is not None:
         np.random.seed(seed)

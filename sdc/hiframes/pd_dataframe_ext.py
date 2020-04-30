@@ -28,6 +28,7 @@
 import operator
 
 import numba
+from typing import NamedTuple
 from numba import types, cgutils
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
                              type_callable, infer, overload, intrinsic,
@@ -52,6 +53,11 @@ class DataFrameAttribute(AttributeTemplate):
             return SeriesType(arr_typ.dtype, arr_typ, df.index, True)
 
 
+class ColumnId(NamedTuple):
+    type_id: int
+    col_type_id: int
+
+
 @intrinsic
 def init_dataframe(typingctx, *args):
     """Create a DataFrame with provided data, index and columns values.
@@ -66,6 +72,28 @@ def init_dataframe(typingctx, *args):
     index_typ = args[n_cols]
     column_names = tuple(a.literal_value for a in args[n_cols + 1:])
 
+    # Define df structure, map column name to column position ex. {'A': (0,0), 'B': (1,0), 'C': (0,1)}
+    df_structure = {}
+    # Store unique types of columns ex. {'int64': (0, [0, 2]), 'float64': (1, [1])}
+    data_typs_map = {}
+    types_order = []
+    type_id = 0
+    for col_id, col_typ in enumerate(data_typs):
+        col_name = column_names[col_id]
+
+        if col_typ not in data_typs_map:
+            data_typs_map[col_typ] = (type_id, [col_id])
+            # The first column in each type always has 0 index
+            df_structure[col_name] = ColumnId(type_id, 0)
+            types_order.append(col_typ)
+            type_id += 1
+        else:
+            # Get index of column in list of types
+            type_idx, col_indices = data_typs_map[col_typ]
+            col_idx_list = len(col_indices)
+            df_structure[col_name] = ColumnId(type_idx, col_idx_list)
+            col_indices.append(col_id)
+
     def codegen(context, builder, signature, args):
         in_tup = args[0]
         data_arrs = [builder.extract_value(in_tup, i) for i in range(n_cols)]
@@ -76,15 +104,23 @@ def init_dataframe(typingctx, *args):
         dataframe = cgutils.create_struct_proxy(
             signature.return_type)(context, builder)
 
+        data_list_type = [types.List(typ) for typ in types_order]
+
+        data_lists = []
+        for typ_id, typ in enumerate(types_order):
+            data_list_typ = context.build_list(builder, data_list_type[typ_id],
+                                               [data_arrs[data_id] for data_id in data_typs_map[typ][1]])
+            data_lists.append(data_list_typ)
+
         data_tup = context.make_tuple(
-            builder, types.Tuple(data_typs), data_arrs)
-        column_tup = context.make_tuple(
-            builder, types.UniTuple(string_type, n_cols), column_strs)
-        zero = context.get_constant(types.int8, 0)
+            builder, types.Tuple(data_list_type), data_lists)
+
+        col_list_type = types.List(string_type)
+        column_list = context.build_list(builder, col_list_type, column_strs)
 
         dataframe.data = data_tup
         dataframe.index = index
-        dataframe.columns = column_tup
+        dataframe.columns = column_list
         dataframe.parent = context.get_constant_null(types.pyobject)
 
         # increase refcount of stored values
@@ -97,7 +133,7 @@ def init_dataframe(typingctx, *args):
 
         return dataframe._getvalue()
 
-    ret_typ = DataFrameType(data_typs, index_typ, column_names)
+    ret_typ = DataFrameType(data_typs, index_typ, column_names, df_structure=df_structure)
     sig = signature(ret_typ, types.Tuple(args))
     return sig, codegen
 
