@@ -34,16 +34,13 @@ from sdc.tests.test_hiframes import *
 from sdc.tests.test_date import *
 from sdc.tests.test_strings import *
 
-# TODO: uncomment when new DataFrame structure implemented
-# from sdc.tests.test_groupby import *
+from sdc.tests.test_groupby import *
 from sdc.tests.test_join import *
-# TODO: uncomment when new DataFrame structure implemented
-# from sdc.tests.test_rolling import *
+from sdc.tests.test_rolling import *
 
 from sdc.tests.test_ml import *
 
-# TODO: uncomment when new DataFrame structure implemented
-# from sdc.tests.test_io import *
+from sdc.tests.test_io import *
 
 from sdc.tests.test_hpat_jit import *
 
