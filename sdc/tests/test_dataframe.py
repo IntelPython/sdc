@@ -81,7 +81,6 @@ class TestDataFrame(TestCase):
         B = np.random.ranf(n)
         pd.testing.assert_frame_equal(hpat_func(A, B), test_impl(A, B))
 
-    @unittest.expectedFailure
     def test_create2(self):
         def test_impl():
             df = pd.DataFrame({'A': [1, 2, 3]})
@@ -99,7 +98,6 @@ class TestDataFrame(TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
-    @unittest.expectedFailure
     def test_create_str(self):
         def test_impl():
             df = pd.DataFrame({'A': ['a', 'b', 'c']})
@@ -108,7 +106,6 @@ class TestDataFrame(TestCase):
 
         self.assertEqual(hpat_func(), test_impl())
 
-    @unittest.expectedFailure
     def test_create_with_series1(self):
         def test_impl(n):
             A = pd.Series(np.ones(n, dtype=np.int64))
@@ -131,7 +128,6 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
-    @unittest.expectedFailure
     @skip_sdc_jit
     def test_create_string_index(self):
         def test_impl(a):
@@ -228,7 +224,6 @@ class TestDataFrame(TestCase):
         do_check = False if platform.system() == 'Windows' and not IS_32BITS else True
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n), check_dtype=do_check)
 
-    @unittest.expectedFailure
     def test_box2(self):
         def test_impl():
             df = pd.DataFrame({'A': [1, 2, 3], 'B': ['a', 'bb', 'ccc']})
@@ -1202,7 +1197,6 @@ class TestDataFrame(TestCase):
         msg = 'Index is out of bounds for axis'
         self.assertIn(msg, str(raises.exception))
 
-    @unittest.expectedFailure
     def test_df_at(self):
         def test_impl(df, n):
             return df.at[n, 'C']
@@ -1216,7 +1210,6 @@ class TestDataFrame(TestCase):
         for n in n_cases:
             np.testing.assert_array_equal(sdc_func(df, n), test_impl(df, n))
 
-    @unittest.expectedFailure
     def test_df_at_type(self):
         def test_impl(df, n, k):
             return df.at[n, "B"]
@@ -1230,7 +1223,6 @@ class TestDataFrame(TestCase):
         for n in n_cases:
             self.assertEqual(sdc_func(df, n, "B"), test_impl(df, n, "B"))
 
-    @unittest.expectedFailure
     def test_df_at_value_error(self):
         def test_impl(df):
             return df.at[5, 'C']
@@ -1584,7 +1576,6 @@ class TestDataFrame(TestCase):
                                   index=index)
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    @unittest.expectedFailure
     def test_df_drop_one_column(self):
         def test_impl(index):
             df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
@@ -1625,7 +1616,6 @@ class TestDataFrame(TestCase):
                                   index=index)
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    @unittest.expectedFailure
     def test_df_drop_tuple_column(self):
         def gen_test_impl(do_jit=False):
             def test_impl(index):
@@ -1810,7 +1800,6 @@ class TestDataFrame(TestCase):
                 with self.assertRaises(KeyError):
                     sdc_func(df)
 
-    @unittest.expectedFailure
     @skip_sdc_jit('DF.getitem unsupported exceptions')
     def test_df_getitem_bool_array_idx_exception_value_error(self):
         sdc_func = self.jit(lambda df, arr: df[arr])
@@ -2346,7 +2335,6 @@ class TestDataFrame(TestCase):
         result = jitted_func()
         np.testing.assert_array_equal(result, expected)
 
-    @unittest.expectedFailure
     def test_df_create_str_with_none(self):
         """ Verifies creation of a dataframe with a string column from a list of Optional values. """
         def test_impl():

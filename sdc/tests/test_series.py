@@ -586,7 +586,6 @@ class TestSeries(
                             self.assertEqual(actual.index is S.index, expected.index is S.index)
                             self.assertEqual(actual.index is S.index, not deep)
 
-    @unittest.expectedFailure
     @skip_sdc_jit('Series.corr() parameter "min_periods" unsupported')
     def test_series_corr(self):
         def test_series_corr_impl(s1, s2, min_periods=None):
@@ -1181,7 +1180,6 @@ class TestSeries(
         S = pd.Series(['1', '4', '6', '33', '7'], ['1', '3', '5', '4', '7'], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.expectedFailure
     def test_series_at(self):
         def test_impl(S, key):
             return S.at[key]
@@ -1195,7 +1193,6 @@ class TestSeries(
             S = pd.Series(data, index, name='A')
             self.assertEqual(jit_impl(S, key), test_impl(S, key))
 
-    @unittest.expectedFailure
     def test_series_at_array(self):
         def test_impl(A):
             return A.at[3]
@@ -1240,7 +1237,6 @@ class TestSeries(
             pd.testing.assert_series_equal(hpat_func(S, n), test_impl(S, n))
 
     @skip_sdc_jit('Not impl in old style')
-    @unittest.expectedFailure
     def test_series_at_str(self):
         def test_impl(A):
             return A.at['1']
@@ -2877,7 +2873,6 @@ class TestSeries(
         S = pd.Series([np.nan, -2., 3., 0.5E-01, 0xFF, 0o7, 0b101])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @unittest.expectedFailure
     def test_series_corr1(self):
         def test_impl(s1, s2):
             return s1.corr(s2)
@@ -4919,7 +4914,6 @@ class TestSeries(
         result = cfunc(series, indices)
         pd.testing.assert_series_equal(ref_result, result)
 
-    @unittest.expectedFailure
     def test_series_iterator_int(self):
         def test_impl(A):
             return [i for i in A]
@@ -4928,7 +4922,6 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @unittest.expectedFailure
     def test_series_iterator_float(self):
         def test_impl(A):
             return [i for i in A]
@@ -4937,7 +4930,6 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @unittest.expectedFailure
     def test_series_iterator_boolean(self):
         def test_impl(A):
             return [i for i in A]
@@ -4954,7 +4946,6 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @unittest.expectedFailure
     def test_series_iterator_one_value(self):
         def test_impl(A):
             return [i for i in A]
@@ -4963,7 +4954,6 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @unittest.skip("Fails when NUMA_PES>=2 due to unimplemented sync of such construction after distribution")
     def test_series_iterator_no_param(self):
         def test_impl():
             A = pd.Series([3, 2, 1, 5, 4])
@@ -4972,7 +4962,6 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
-    @unittest.expectedFailure
     def test_series_iterator_empty(self):
         def test_impl(A):
             return [i for i in A]
@@ -5346,7 +5335,6 @@ class TestSeries(
                 msg = 'TypingError: Method cumsum(). The object axis\n given: int64\n expected: None\n'
                 self.assertIn(msg, str(raises.exception))
 
-    @unittest.expectedFailure
     def test_series_cov1(self):
         def test_impl(s1, s2):
             return s1.cov(s2)
@@ -5358,7 +5346,6 @@ class TestSeries(
                 hpat_func(s1, s2), test_impl(s1, s2),
                 err_msg='s1={}\ns2={}'.format(s1, s2))
 
-    @unittest.expectedFailure
     @skip_sdc_jit('Series.cov() parameter "min_periods" unsupported')
     def test_series_cov(self):
         def test_series_cov_impl(s1, s2, min_periods=None):
