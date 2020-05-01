@@ -50,7 +50,7 @@ class SDC_Build_Utilities:
         self.line_single = '-'*80
 
         # Set channels
-        self.channel_list = ['-c', 'intel/label/beta', '-c', 'intel', '-c', 'defaults', '-c', 'conda-forge']
+        self.channel_list = ['-c', 'intel/label/beta', '-c', 'intel', '-c', 'defaults']
         if sdc_local_channel:
             sdc_local_channel = Path(sdc_local_channel).resolve().as_uri()
             self.channel_list = ['-c', sdc_local_channel] + self.channel_list
