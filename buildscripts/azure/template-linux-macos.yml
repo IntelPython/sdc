@@ -22,13 +22,13 @@ jobs:
 
     - script: |
         source $HOME/miniconda3/bin/activate
-        python buildscripts/build.py --python=$PYTHON_VER --numpy=$NUMPY_VER
+        ./buildscripts/build.sh --python=$PYTHON_VER --numpy=$NUMPY_VER
       displayName: 'Build Intel SDC'
       continueOnError: ${{ parameters.allowFailure }}
 
     - script: |
         source $HOME/miniconda3/bin/activate
-        python buildscripts/test.py --python=$PYTHON_VER --sdc-channel=./sdc-build
+        ./buildscripts/test.sh --python=$PYTHON_VER --sdc-channel=./sdc-build
       displayName: 'Test Intel SDC conda package'
       continueOnError: ${{ parameters.allowFailure }}
 
