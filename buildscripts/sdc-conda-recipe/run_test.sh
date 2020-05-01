@@ -13,4 +13,7 @@ python -m sdc.tests.gen_test_data
 
 # TODO investigate root cause of NumbaPerformanceWarning
 # http://numba.pydata.org/numba-doc/latest/user/parallel.html#diagnostics
-python -W ignore -u -m sdc.runtests -v
+python -W ignore -u -m pytest -v \
+    --pyargs \
+    sdc.tests \
+    --ignore=sdc.tests.tests_perf

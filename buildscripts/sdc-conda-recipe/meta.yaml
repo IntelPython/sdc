@@ -39,6 +39,8 @@ requirements:
     - setuptools
 
 test:
+  requires:
+    - pytest
   imports:
     - sdc
 

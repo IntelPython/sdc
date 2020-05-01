@@ -9,10 +9,12 @@ if errorlevel 1 exit 1
 
 @rem TODO investigate root cause of NumbaPerformanceWarning
 @rem http://numba.pydata.org/numba-doc/latest/user/parallel.html#diagnostics
-python -W ignore -u -m sdc.runtests -v
+python -W ignore -u -m pytest -v ^
+    --pyargs ^
+    sdc.tests ^
+    --ignore=sdc.tests.tests_perf
 if errorlevel 1 exit 1
 
 REM Link check for Documentation using Sphinx's in-built linkchecker
 REM sphinx-build -b linkcheck -j1 usersource _build/html
 REM if errorlevel 1 exit 1
-
