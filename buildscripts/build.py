@@ -37,7 +37,7 @@ def build(sdc_utils):
     os.chdir(str(sdc_utils.src_path))
     # For Windows build do not use intel channel due to build issue
     if platform.system() == 'Windows':
-        sdc_utils.channels = '-c intel/label/beta -c defaults -c conda-forge'
+        sdc_utils.channels = '-c intel/label/beta -c defaults'
 
     sdc_utils.log_info('Start Intel SDC build', separate=True)
     conda_build_cmd = ' '.join([
