@@ -32,11 +32,12 @@ jobs:
       displayName: 'Test Intel SDC conda package'
       continueOnError: ${{ parameters.allowFailure }}
 
-    - script: |
-        source $HOME/miniconda3/bin/activate
-        python buildscripts/run_examples.py --python=$PYTHON_VER --sdc-channel=./sdc-build
-      displayName: 'Run Intel SDC examples'
-      continueOnError: ${{ parameters.allowFailure }}
+# TODO: unskip when all the DataFrame groupby methods are optimized
+#    - script: |
+#        source $HOME/miniconda3/bin/activate
+#        python buildscripts/run_examples.py --python=$PYTHON_VER --sdc-channel=./sdc-build
+#      displayName: 'Run Intel SDC examples'
+#      continueOnError: ${{ parameters.allowFailure }}
 
     - script: |
         source $HOME/miniconda3/bin/activate

@@ -2546,38 +2546,10 @@ are currently unsupported by Intel Scalable Dataframe Compiler
         return None
 
     column_id = self.columns.index(by.literal_value)
-    list_type = types.ListType(types.int64)
-    by_type = self.data[column_id].dtype
 
     def sdc_pandas_dataframe_groupby_impl(self, by=None, axis=0, level=None, as_index=True, sort=True,
                                           group_keys=True, squeeze=False, observed=False):
-
-        by_column_data = self._data[column_id]
-        chunks = parallel_chunks(len(by_column_data))
-        dict_parts = [Dict.empty(by_type, list_type) for _ in range(len(chunks))]
-
-        # filling separate dict of by_value -> positions for each chunk of initial array
-        for i in numba.prange(len(chunks)):
-            chunk = chunks[i]
-            res = dict_parts[i]
-            for j in range(chunk.start, chunk.stop):
-                if isna(by_column_data, j):
-                    continue
-                value = by_column_data[j]
-                group_list = res.get(value)
-                if group_list is None:
-                    new_group_list = List.empty_list(types.int64)
-                    new_group_list.append(j)
-                    res[value] = new_group_list
-                else:
-                    group_list.append(j)
-
-        # merging all dict parts into a single resulting dict
-        res_dict = dict_parts[0]
-        for i in range(1, len(chunks)):
-            res_dict = merge_groupby_dicts_inplace(res_dict, dict_parts[i])
-
-        return init_dataframe_groupby(self, column_id, res_dict, sort)
+        return init_dataframe_groupby(self, column_id, sort)
 
     return sdc_pandas_dataframe_groupby_impl
 
