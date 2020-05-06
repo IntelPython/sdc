@@ -37,14 +37,13 @@ RangeIndexDataType = types.range_state64_type
 
 
 class RangeIndexType(types.IterableType):
+
+    dtype = types.int64
+
     def __init__(self, is_named=False):
         self.is_named = is_named
         super(RangeIndexType, self).__init__(
             name='RangeIndexType({})'.format(is_named))
-
-    @property
-    def dtype(self):
-        return types.int64
 
     # TODO: provide iteration support by adding getiter and iternext
     @property

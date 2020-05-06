@@ -136,9 +136,6 @@ def pd_range_index_overload(start=None, stop=None, step=None, dtype=None, copy=F
         if _step == 0:
             raise ValueError("Step must not be zero")
 
-        if _start == 0 and _stop == 0 and _step == 0:
-            raise TypeError("RangeIndex(...) must be called with integers")
-
         return init_range_index(range(_start, _stop, _step), name)
 
     return pd_range_index_ctor_impl
@@ -178,6 +175,12 @@ def box_range_index(typ, val, c):
 
     res = c.pyapi.call_method(pd_class_obj, "RangeIndex", (start, stop, step, dtype, copy, name))
 
+    c.pyapi.decref(start)
+    c.pyapi.decref(stop)
+    c.pyapi.decref(step)
+    c.pyapi.decref(dtype)
+    c.pyapi.decref(copy)
+    c.pyapi.decref(name)
     c.pyapi.decref(pd_class_obj)
     return res
 
@@ -200,6 +203,7 @@ def unbox_range_index(typ, val, c):
         name_obj = c.pyapi.object_getattr_string(val, "name")
         range_index.name = numba.unicode.unbox_unicode_str(
             types.unicode_type, name_obj, c).value
+        c.pyapi.decref(name_obj)
 
     c.pyapi.decref(start_obj)
     c.pyapi.decref(stop_obj)

@@ -62,8 +62,8 @@ class TestRangeIndex(TestCase):
         sdc_func = self.jit(test_impl)
 
         for params in _generate_valid_range_params():
+            start, stop, step = params
             for name in test_global_index_names:
-                start, stop, step = params
                 with self.subTest(start=start, stop=stop, step=step, name=name):
                     result = sdc_func(start, stop, step, name)
                     result_ref = test_impl(start, stop, step, name)
@@ -75,8 +75,8 @@ class TestRangeIndex(TestCase):
         sdc_func = self.jit(test_impl)
 
         for params in _generate_valid_range_params():
+            start, stop, step = params
             for name in test_global_index_names:
-                start, stop, step = params
                 index = pd.RangeIndex(start, stop, step, name=name)
                 with self.subTest(index=index):
                     result = sdc_func(index)
@@ -148,8 +148,7 @@ class TestRangeIndex(TestCase):
         non_default_params = {'start': 2, 'stop': 7, 'step': 2, 'name': "'index'"}
         for arg in non_default_params.keys():
             with self.subTest(omitted=arg):
-                kwargs = non_default_params.copy()
-                del kwargs[arg]
+                kwargs = {key: val for key, val in non_default_params.items() if key != arg}
                 func_text = test_impl_text.format(', '.join(kwsparams2list(kwargs)))
                 test_impl = _make_func_from_text(func_text, global_vars={'pd': pd})
                 sdc_func = self.jit(test_impl)
@@ -314,8 +313,8 @@ class TestRangeIndex(TestCase):
         sdc_func = self.jit(test_impl)
 
         for params in _generate_valid_range_params():
+            start, stop, step = params
             for name, new_name in product(test_global_index_names, repeat=2):
-                start, stop, step = params
                 index = pd.RangeIndex(start, stop, step, name=name)
                 with self.subTest(index=index, new_name=new_name):
                     result = sdc_func(index, new_name)
