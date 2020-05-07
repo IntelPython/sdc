@@ -36,6 +36,7 @@ from numba.types import (float64, Boolean, Integer, NoneType, Number,
 
 from sdc.datatypes.common_functions import _almost_equal
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
+from sdc.functions.statistics import skew_formula
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker
@@ -549,15 +550,7 @@ def skew_result_or_nan(nfinite, minp, result):
 
     _sum, square_sum, cube_sum = result
 
-    n = nfinite
-    m2 = (square_sum - _sum * _sum / n) / n
-    m3 = (cube_sum - 3.*_sum*square_sum/n + 2.*_sum*_sum*_sum/n/n) / n
-    res = 0 if m2 == 0 else m3 / m2 ** 1.5
-
-    if (n > 2) & (m2 > 0):
-        res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
-
-    return res
+    return skew_formula(nfinite, _sum, square_sum, cube_sum)
 
 
 @sdc_register_jitable

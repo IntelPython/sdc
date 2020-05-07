@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2020, Intel Corporation All rights reserved.
 #
@@ -24,40 +25,17 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-import argparse
-import os
-import shutil
-
-from pathlib import Path
-from utilities import SDC_Build_Utilities
+import numpy
+from sdc.utilities.utils import sdc_register_jitable
 
 
-def run_benchmarks(sdc_utils, args_list, num_threads_list):
-    os.chdir(str(sdc_utils.src_path.parent))
+@sdc_register_jitable
+def skew_formula(n, _sum, square_sum, cube_sum):
+    m2 = (square_sum - _sum * _sum / n) / n
+    m3 = (cube_sum - 3. * _sum * square_sum / n + 2. * _sum * _sum * _sum / n / n) / n
+    res = numpy.nan if m2 == 0 else m3 / m2 ** 1.5
 
-    for args_set in args_list:
-        for num_threads in num_threads_list:
-            os.environ['NUMBA_NUM_THREADS'] = num_threads
-            sdc_utils.log_info(f'Run Intel SDC benchmarks on {num_threads} threads', separate=True)
-            sdc_utils.run_command(f'python -W ignore -m sdc.runtests {args_set}')
+    if (n > 2) & (m2 > 0):
+        res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
 
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--python', default='3.7', choices=['3.6', '3.7', '3.8'],
-                        help='Python version, default = 3.7')
-    parser.add_argument('--sdc-channel', default=None, help='Intel SDC channel')
-    parser.add_argument('--args-list', required=True, nargs='+', help='List of arguments sets for benchmarks')
-    parser.add_argument('--num-threads-list', required=True, nargs='+',
-                        help='List of values for NUMBA_NUM_THREADS env variable')
-
-    args = parser.parse_args()
-
-    sdc_utils = SDC_Build_Utilities(args.python, args.sdc_channel)
-    sdc_utils.log_info('Run Intel(R) SDC benchmarks', separate=True)
-    sdc_utils.log_info(sdc_utils.line_double)
-    sdc_utils.create_environment(['openpyxl', 'xlrd'])
-    sdc_utils.install_conda_package(['sdc'])
-
-    run_benchmarks(sdc_utils, args.args_list, args.num_threads_list)
+    return res

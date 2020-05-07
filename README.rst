@@ -88,7 +88,7 @@ Building on Linux with setuptools
 
     PYVER=<3.6 or 3.7>
     NUMPYVER=<1.16 or 1.17>
-    conda create -n sdc-env -q -y -c intel/label/beta -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER numba=0.48.0 pandas=0.25.3 scipy pyarrow=0.15.1 gcc_linux-64 gxx_linux-64
+    conda create -n sdc-env -q -y -c intel/label/beta -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER numba=0.48.0 pandas=0.25.3 pyarrow=0.15.1 gcc_linux-64 gxx_linux-64
     source activate sdc-env
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
@@ -126,7 +126,7 @@ Building on Windows with setuptools
 
     set PYVER=<3.6 or 3.7>
     set NUMPYVER=<1.16 or 1.17>
-    conda create -n sdc-env -c intel/label/beta -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% numba=0.48.0 pandas=0.25.3 scipy pyarrow=0.15.1
+    conda create -n sdc-env -c intel/label/beta -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% numba=0.48.0 pandas=0.25.3 pyarrow=0.15.1
     conda activate sdc-env
     set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
     set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
@@ -156,10 +156,6 @@ Building Intel® SDC User's Guide documentation requires pre-installed Intel® S
 along with compatible `Pandas*`_ version as well as `Sphinx*`_ 2.2.1 or later.
 
 Intel® SDC documentation includes Intel® SDC examples output which is pasted to functions description in the API Reference.
-In order to get the correct examples result it is required to install ``scipy`` package before documentation build:
-::
-
-    conda install scipy -c intel --override-channels
 
 Use ``pip`` to install `Sphinx*`_ and extensions:
 ::
@@ -324,8 +320,6 @@ Developer's Guide and must not be included into User's Guide.
 Running unit tests
 ------------------
 ::
-    # Scipy is required for tests
-    conda install -y scipy
 
     python sdc/tests/gen_test_data.py
     python -m unittest

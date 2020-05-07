@@ -56,6 +56,7 @@ from sdc.tests.test_utils import (count_array_OneDs,
 from sdc.tests.gen_test_data import ParquetGenerator
 
 from sdc.tests.test_utils import test_global_input_data_unicode_kind1
+from sdc.datatypes.common_functions import SDCLimitation
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -295,6 +296,10 @@ def lstrip_usecase(series, to_strip=None):
 
 def rstrip_usecase(series, to_strip=None):
     return series.str.rstrip(to_strip)
+
+
+def contains_usecase(series, pat, case=True, flags=0, na=None, regex=True):
+    return series.str.contains(pat, case, flags, na, regex)
 
 
 class TestSeries(
@@ -1472,6 +1477,7 @@ class TestSeries(
             S2 = pd.Series(np.ones(n - 1), name='B')
             pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
+    # SDC operator methods returns only float Series
     @skip_parallel
     def test_series_op5_integer_scalar(self):
         arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
@@ -1489,7 +1495,7 @@ class TestSeries(
             pd.testing.assert_series_equal(
                 hpat_func(operand_series, operand_scalar),
                 test_impl(operand_series, operand_scalar),
-                check_names=False)
+                check_names=False, check_dtype=False)
 
     @skip_parallel
     def test_series_op5_float_scalar(self):
@@ -3544,6 +3550,82 @@ class TestSeries(
         S3 = pd.Series([1.0])
         pd.testing.assert_series_equal(hpat_func(S1, S2, S3),
                                        test_impl(S1, S2, S3))
+
+    def sdc_join_series_indexes(self):
+        def test_impl(S1, S2):
+            return S1.add(S2)
+
+        sdc_func = self.jit(test_impl)
+
+        data = [0, 1, 2, 3, 4]
+        index1 = [3.3, 5.4, np.nan, 7.9, np.nan]
+        index2 = [3, 4, 3, 9, 2]
+        S1 = pd.Series(data, index1)
+        S2 = pd.Series(data, index2)
+        pd.testing.assert_series_equal(sdc_func(S1, S2), test_impl(S1, S2))
+
+    # SDC operator methods returns only float Series
+    def test_series_add(self):
+        def test_impl(S1, S2, value):
+            return S1.add(S2, fill_value=value)
+
+        sdc_func = self.jit(test_impl)
+
+        cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases_index = [[0, 1, 2, 3, 4], [3, 4, 3, 9, 2], None]
+        cases_value = [None, 4, 5.5]
+        for data, index, value in product(cases_data, cases_index, cases_value):
+            with self.subTest(data=data, index=index, value=value):
+                S1 = pd.Series(data, index)
+                S2 = pd.Series(index, data)
+                pd.testing.assert_series_equal(sdc_func(S1, S2, value), test_impl(S1, S2, value), check_dtype=False)
+
+    # SDC operator methods returns only float Series
+    def test_series_add_scalar(self):
+        def test_impl(S1, S2, value):
+            return S1.add(S2, fill_value=value)
+
+        sdc_func = self.jit(test_impl)
+
+        cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases_index = [[0, 1, 2, 3, 4], [3, 4, 3, 9, 2], None]
+        cases_scalar = [0, 1, 5.5, np.nan]
+        cases_value = [None, 4, 5.5]
+        for data, index, scalar, value in product(cases_data, cases_index, cases_scalar, cases_value):
+            with self.subTest(data=data, index=index, scalar=scalar, value=value):
+                S1 = pd.Series(data, index)
+                pd.testing.assert_series_equal(sdc_func(S1, scalar, value), test_impl(S1, scalar, value),
+                                               check_dtype=False)
+
+    def test_series_lt_fill_value(self):
+        def test_impl(S1, S2, value):
+            return S1.lt(S2, fill_value=value)
+
+        sdc_func = self.jit(test_impl)
+
+        cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases_index = [[3, 4, 3, 9, 2], None]
+        cases_value = [None, 4, 5.5]
+        for data, index, value in product(cases_data, cases_index, cases_value):
+            with self.subTest(data=data, index=index, value=value):
+                S1 = pd.Series(data, index)
+                S2 = pd.Series(data[::-1], index)
+                pd.testing.assert_series_equal(sdc_func(S1, S2, value), test_impl(S1, S2, value))
+
+    def test_series_lt_scalar_fill_value(self):
+        def test_impl(S1, S2, value):
+            return S1.lt(S2, fill_value=value)
+
+        sdc_func = self.jit(test_impl)
+
+        cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases_index = [[0, 1, 2, 3, 4], [3, 4, 3, 9, 2], None]
+        cases_scalar = [0, 1, 5.5, np.nan]
+        cases_value = [None, 4, 5.5]
+        for data, index, scalar, value in product(cases_data, cases_index, cases_scalar, cases_value):
+            with self.subTest(data=data, index=index, scalar=scalar, value=value):
+                S1 = pd.Series(data, index)
+                pd.testing.assert_series_equal(sdc_func(S1, scalar, value), test_impl(S1, scalar, value))
 
     def test_series_isin_list1(self):
         def test_impl(S, values):
@@ -6093,6 +6175,41 @@ class TestSeries(
             s = pd.Series(data)
             pd.testing.assert_series_equal(cfunc(s), isupper_usecase(s))
 
+    def test_series_contains(self):
+        hpat_func = self.jit(contains_usecase)
+        s = pd.Series(['Mouse', 'dog', 'house and parrot', '23'])
+        for pat in ['og', 'Og', 'OG', 'o']:
+            for case in [True, False]:
+                with self.subTest(pat=pat, case=case):
+                    pd.testing.assert_series_equal(hpat_func(s, pat, case), contains_usecase(s, pat, case))
+
+    def test_series_contains_with_na_flags_regex(self):
+        hpat_func = self.jit(contains_usecase)
+        s = pd.Series(['Mouse', 'dog', 'house and parrot', '23'])
+        pat = 'og'
+        pd.testing.assert_series_equal(hpat_func(s, pat, flags=0, na=None, regex=True),
+                                       contains_usecase(s, pat, flags=0, na=None, regex=True))
+
+    def test_series_contains_unsupported(self):
+        hpat_func = self.jit(contains_usecase)
+        s = pd.Series(['Mouse', 'dog', 'house and parrot', '23'])
+        pat = 'og'
+
+        with self.assertRaises(SDCLimitation) as raises:
+            hpat_func(s, pat, flags=1)
+        msg = "Method contains(). Unsupported parameter. Given 'flags' != 0"
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, pat, na=0)
+        msg = 'Method contains(). The object na\n given: int64\n expected: none'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(SDCLimitation) as raises:
+            hpat_func(s, pat, regex=False)
+        msg = "Method contains(). Unsupported parameter. Given 'regex' is False"
+        self.assertIn(msg, str(raises.exception))
+
     @skip_sdc_jit('Old-style implementation returns string, but not series')
     def test_series_describe_numeric(self):
         def test_impl(A):
@@ -6945,6 +7062,31 @@ class TestSeries(
         self.assertIn(str(sdc_exception), str(pandas_exception))
 
     @skip_sdc_jit('Not implemented in old-pipeline')
+    def test_series_getitem_idx_bool_series3(self):
+        """ Verifies Series.getitem by mask indicated by a Boolean Series with the same object as index """
+        def test_impl(A, mask, index):
+            S = pd.Series(A, index)
+            idx = pd.Series(mask, S.index)
+            return S[idx]
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        np.random.seed(0)
+
+        idxs_to_test = [
+            np.arange(n),
+            np.arange(n, dtype='float'),
+            gen_strlist(n, 2, 'abcd123 ')
+        ]
+        series_data = np.arange(n)
+        mask = np.random.choice([True, False], n)
+        for index in idxs_to_test:
+            with self.subTest(series_index=index):
+                result = hpat_func(series_data, mask, index)
+                result_ref = test_impl(series_data, mask, index)
+                pd.testing.assert_series_equal(result, result_ref)
+
+    @skip_sdc_jit('Not implemented in old-pipeline')
     def test_series_getitem_idx_bool_series_reindex(self):
         """ Verifies Series.getitem with reindexing by mask indicated by a Boolean Series
         on Series with various types of indexes """
@@ -7045,6 +7187,73 @@ class TestSeries(
                     hpat_func(S, idx)
                 msg = 'The index of boolean indexer is not comparable to Series index.'
                 self.assertIn(msg, str(raises.exception))
+
+    def test_series_skew(self):
+        def test_impl(series, axis, skipna):
+            return series.skew(axis=axis, skipna=skipna)
+
+        hpat_func = self.jit(test_impl)
+        test_data = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+                     [],
+                     [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+                     [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+                     [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                     [np.nan, np.nan, np.nan],
+                     [np.nan, np.nan, np.inf],
+                     [np.inf, 0, np.inf, 1, 2, 3, 4, 5]
+                     ]
+        all_test_data = test_data + test_global_input_data_float64
+        for data in all_test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                for axis in [0, None]:
+                    with self.subTest(axis=axis):
+                        for skipna in [None, False, True]:
+                            with self.subTest(skipna=skipna):
+                                res1 = test_impl(s, axis, skipna)
+                                res2 = hpat_func(s, axis, skipna)
+                                np.testing.assert_allclose(res1, res2)
+
+    def test_series_skew_default(self):
+        def test_impl():
+            s = pd.Series([np.nan, -2., 3., 9.1])
+            return s.skew()
+
+        hpat_func = self.jit(test_impl)
+        np.testing.assert_allclose(test_impl(), hpat_func())
+
+    def test_series_skew_not_supported(self):
+        def test_impl(series, axis=None, skipna=None, level=None, numeric_only=None):
+            return series.skew(axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
+
+        hpat_func = self.jit(test_impl)
+        s = pd.Series([1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2])
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, axis=0.75)
+        msg = 'TypingError: Method Series.skew() The object axis\n given: float64\n expected: int64'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, skipna=0)
+        msg = 'TypingError: Method Series.skew() The object skipna\n given: int64\n expected: bool'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, level=0)
+        msg = 'TypingError: Method Series.skew() The object level\n given: int64\n expected: None'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, numeric_only=0)
+        msg = 'TypingError: Method Series.skew() The object numeric_only\n given: int64\n expected: None'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(s, axis=5)
+        msg = 'Parameter axis must be only 0 or None.'
+        self.assertIn(msg, str(raises.exception))
 
 
 if __name__ == "__main__":

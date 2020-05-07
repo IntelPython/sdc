@@ -29,7 +29,6 @@
 import pandas as pd
 import pandas.api.types
 import numpy as np
-import datetime
 import numba
 from numba.extending import (typeof_impl, unbox, register_model, models,
                              NativeValue, box, intrinsic)
@@ -40,21 +39,16 @@ from numba.targets.boxing import _NumbaTypeHelper
 from numba.targets import listobj
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
-from sdc.hiframes.pd_timestamp_ext import (datetime_date_type,
-                                            unbox_datetime_date_array, box_datetime_date_array)
 from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
 from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype,
                                               box_categorical_array, unbox_categorical_array)
-from sdc.hiframes.pd_series_ext import (SeriesType, arr_to_series_type,
-                                         _get_series_array_type)
-from sdc.hiframes.split_impl import (string_array_split_view_type,
-                                      box_str_arr_split_view)
+from sdc.hiframes.pd_series_ext import SeriesType
+from sdc.hiframes.pd_series_type import _get_series_array_type
 
 from .. import hstr_ext
 import llvmlite.binding as ll
 from llvmlite import ir as lir
-import llvmlite.llvmpy.core as lc
 from llvmlite.llvmpy.core import Type as LLType
 ll.add_symbol('array_size', hstr_ext.array_size)
 ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
@@ -77,14 +71,6 @@ def typeof_pd_str_series(val, c):
     is_named = val.name is not None
     return SeriesType(
         _infer_series_dtype(val), index=index_type, is_named=is_named)
-
-
-@typeof_impl.register(pd.Index)
-def typeof_pd_index(val, c):
-    if len(val) > 0 and isinstance(val[0], datetime.date):
-        return SeriesType(datetime_date_type)
-    else:
-        raise NotImplementedError("unsupported pd.Index type")
 
 
 @unbox(DataFrameType)
@@ -162,10 +148,6 @@ def _infer_series_dtype(S):
             return _infer_series_list_dtype(S)
         elif isinstance(first_val, str):
             return string_type
-        elif isinstance(S.values[0], datetime.date):
-            # XXX: using .values to check date type since DatetimeIndex returns
-            # Timestamp which is subtype of datetime.date
-            return datetime_date_type
         else:
             raise ValueError(
                 "object dtype infer: data type for column {} not supported".format(S.name))
@@ -246,8 +228,6 @@ def box_dataframe(typ, val, c):
         elif isinstance(dtype, PDCategoricalDtype):
             arr_obj = box_categorical_array(arr_typ, arr, c)
             # context.nrt.incref(builder, arr_typ, arr)
-        elif arr_typ == string_array_split_view_type:
-            arr_obj = box_str_arr_split_view(arr_typ, arr, c)
         elif dtype == types.List(string_type):
             arr_obj = box_list(list_string_array_type, arr, c)
             # context.nrt.incref(builder, arr_typ, arr)  # TODO required?
@@ -332,14 +312,8 @@ def unbox_series(typ, val, c):
 def _unbox_series_data(dtype, data_typ, arr_obj, c):
     if data_typ == string_array_type:
         return unbox_str_series(string_array_type, arr_obj, c)
-    elif dtype == datetime_date_type:
-        return unbox_datetime_date_array(data_typ, arr_obj, c)
     elif data_typ == list_string_array_type:
         return _unbox_array_list_str(arr_obj, c)
-    elif data_typ == string_array_split_view_type:
-        # XXX dummy unboxing to avoid errors in _get_dataframe_data()
-        out_view = c.context.make_helper(c.builder, string_array_split_view_type)
-        return NativeValue(out_view._getvalue())
     elif isinstance(dtype, PDCategoricalDtype):
         return unbox_categorical_array(data_typ, arr_obj, c)
 
@@ -389,12 +363,8 @@ def _box_series_data(dtype, data_typ, val, c):
 
     if dtype == string_type:
         arr = box_str_arr(string_array_type, val, c)
-    elif dtype == datetime_date_type:
-        arr = box_datetime_date_array(data_typ, val, c)
     elif isinstance(dtype, PDCategoricalDtype):
         arr = box_categorical_array(data_typ, val, c)
-    elif data_typ == string_array_split_view_type:
-        arr = box_str_arr_split_view(data_typ, val, c)
     elif dtype == types.List(string_type):
         arr = box_list(list_string_array_type, val, c)
     else:

@@ -29,7 +29,6 @@
 | Also, it contains Numba internal operators which are required for DataFrame type handling
 '''
 
-
 import numba
 import numpy
 import operator
@@ -38,7 +37,7 @@ import sdc
 
 from pandas.core.indexing import IndexingError
 
-from numba import types
+from numba import types, prange
 from numba.special import literally
 from numba.typed import List, Dict
 from numba.errors import TypingError
@@ -65,6 +64,8 @@ from sdc.hiframes.api import isna
 from sdc.functions.numpy_like import getitem_by_mask
 from sdc.datatypes.common_functions import _sdc_take, sdc_reindex_series
 from sdc.utilities.prange_utils import parallel_chunks
+from sdc.functions.numpy_like import find_idx
+
 
 @sdc_overload_attribute(DataFrameType, 'index')
 def hpat_pandas_dataframe_index(df):
@@ -105,6 +106,7 @@ def hpat_pandas_dataframe_index(df):
 
         return hpat_pandas_df_index_none_impl
     else:
+
         def hpat_pandas_df_index_impl(df):
             return df._index
 
@@ -403,7 +405,6 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=False, verify_integrity=
         return _append_impl
 
     return sdc_pandas_dataframe_append_impl(df, other, _func_name, ignore_index, indexes_comparable, args)
-
 
 # Example func_text for func_name='count' columns=('A', 'B'):
 #
@@ -1454,13 +1455,16 @@ def df_length_expr(self):
     return '0'
 
 
-def df_index_expr(self, length_expr=None):
+def df_index_expr(self, length_expr=None, as_range=False):
     """Generate expression to get or create index of DF"""
     if isinstance(self.index, types.NoneType):
         if length_expr is None:
             length_expr = df_length_expr(self)
 
-        return f'numpy.arange({length_expr})'
+        if as_range:
+            return f'range({length_expr})'
+        else:
+            return f'numpy.arange({length_expr})'
 
     return 'self._index'
 
@@ -1507,12 +1511,13 @@ def df_getitem_bool_series_idx_main_codelines(self, idx):
     # optimization for default indexes in df and idx when index alignment is trivial
     if (isinstance(self.index, types.NoneType) and isinstance(idx.index, types.NoneType)):
         func_lines = [f'  length = {df_length_expr(self)}',
+                      f'  self_index = {df_index_expr(self, as_range=True)}',
                       f'  if length > len(idx):',
                       f'    msg = "Unalignable boolean Series provided as indexer " + \\',
                       f'          "(index of the boolean Series and of the indexed object do not match)."',
                       f'    raise IndexingError(msg)',
                       f'  # do not trim idx._data to length as getitem_by_mask handles such case',
-                      f'  res_index = getitem_by_mask(self.index, idx._data)',
+                      f'  res_index = getitem_by_mask(self_index, idx._data)',
                       f'  # df index is default, same as positions so it can be used in take']
         results = []
         for i, col in enumerate(self.columns):
@@ -1530,9 +1535,9 @@ def df_getitem_bool_series_idx_main_codelines(self, idx):
     else:
         func_lines = [f'  length = {df_length_expr(self)}',
                       f'  self_index = self.index',
-                      f'  idx_reindexed = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)',
-                      f'  res_index = getitem_by_mask(self_index, idx_reindexed._data)',
-                      f'  selected_pos = getitem_by_mask(numpy.arange(length), idx_reindexed._data)']
+                      f'  reindexed_idx = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)',
+                      f'  res_index = getitem_by_mask(self_index, reindexed_idx._data)',
+                      f'  selected_pos = getitem_by_mask(numpy.arange(length), reindexed_idx._data)']
 
         results = []
         for i, col in enumerate(self.columns):
@@ -1553,11 +1558,13 @@ def df_getitem_bool_series_idx_main_codelines(self, idx):
 
 def df_getitem_bool_array_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem"""
+
     func_lines = [f'  length = {df_length_expr(self)}',
                   f'  if length != len(idx):',
                   f'    raise ValueError("Item wrong length.")',
-                  f'  taken_pos = getitem_by_mask(numpy.arange(length), idx)',
-                  f'  res_index = sdc_take(self.index, taken_pos)']
+                  f'  self_index = {df_index_expr(self, as_range=True)}',
+                  f'  taken_pos = getitem_by_mask(self_index, idx)',
+                  f'  res_index = sdc_take(self_index, taken_pos)']
     results = []
     for i, col in enumerate(self.columns):
         res_data = f'res_data_{i}'
@@ -1635,12 +1642,13 @@ def df_getitem_bool_series_idx_codegen(self, idx):
     Example of generated implementation with provided index:
         def _df_getitem_bool_series_idx_impl(self, idx):
           length = len(self._data[0])
+          self_index = range(len(self._data[0]))
           if length > len(idx):
             msg = "Unalignable boolean Series provided as indexer " + \
                   "(index of the boolean Series and of the indexed object do not match)."
             raise IndexingError(msg)
           # do not trim idx._data to length as getitem_by_mask handles such case
-          res_index = getitem_by_mask(self.index, idx._data)
+          res_index = getitem_by_mask(self_index, idx._data)
           # df index is default, same as positions so it can be used in take
           data_0 = self._data[0]
           res_data_0 = sdc_take(data_0, res_index)
@@ -1667,8 +1675,9 @@ def df_getitem_bool_array_idx_codegen(self, idx):
           length = len(self._data[0])
           if length != len(idx):
             raise ValueError("Item wrong length.")
-          taken_pos = getitem_by_mask(numpy.arange(length), idx)
-          res_index = sdc_take(self.index, taken_pos)
+          self_index = range(len(self._data[0]))
+          taken_pos = getitem_by_mask(self_index, idx)
+          res_index = sdc_take(self_index, taken_pos)
           data_0 = self._data[0]
           res_data_0 = sdc_take(data_0, taken_pos)
           data_1 = self._data[1]
@@ -1827,6 +1836,7 @@ def sdc_pandas_dataframe_getitem(self, idx):
         return _df_getitem_str_literal_idx_impl
 
     if isinstance(idx, types.UnicodeType):
+
         def _df_getitem_unicode_idx_impl(self, idx):
             # http://numba.pydata.org/numba-doc/dev/developer/literal.html#specifying-for-literal-typing
             # literally raises special exception to call getitem with literal idx value got from unicode
@@ -1867,6 +1877,246 @@ def sdc_pandas_dataframe_getitem(self, idx):
     ty_checker.raise_exc(idx, expected_types, 'idx')
 
 
+def df_getitem_tuple_at_codegen(self, row, col):
+    """
+    Example of generated implementation:
+        def _df_getitem_tuple_at_impl(self, idx):
+            row, _ = idx
+            data = self._dataframe._data[1]
+            res_data = pandas.Series(data, index=self._dataframe.index)
+            return res_data.at[row]
+    """
+    func_lines = ['def _df_getitem_tuple_at_impl(self, idx):',
+                  '  row, _ = idx']
+    check = False
+    for i in range(len(self.columns)):
+        if self.columns[i] == col:
+            check = True
+            func_lines += [
+                f'  data = self._dataframe._data[{i}]',
+                f'  res_data = pandas.Series(data, index=self._dataframe.index)',
+                '  return res_data.at[row]',
+            ]
+    if check == False:  # noqa
+        raise KeyError('Column is not in the DataFrame')
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas}
+
+    return func_text, global_vars
+
+
+def df_getitem_single_label_loc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_single_label_loc_impl(self, idx):
+            idx_list = find_idx(self._dataframe._index, idx)
+            data_0 = _sdc_take(self._dataframe._data[0], idx_list)
+            res_data_0 = pandas.Series(data_0)
+            data_1 = _sdc_take(self._dataframe._data[1], idx_list)
+            res_data_1 = pandas.Series(data_1)
+            if len(idx_list) < 1:
+                raise KeyError('Index is not in the DataFrame')
+            new_index = _sdc_take(self._dataframe._index, idx_list)
+            return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=new_index)
+    """
+    if isinstance(self.index, types.NoneType):
+        fill_list = ['  idx_list =  numpy.array([idx])']
+        new_index = ['  new_index = numpy.array([idx])']
+
+    else:
+        fill_list = ['  idx_list = find_idx(self._dataframe._index, idx)']
+        new_index = ['  new_index = _sdc_take(self._dataframe._index, idx_list)']
+
+    fill_list_text = '\n'.join(fill_list)
+    new_index_text = '\n'.join(new_index)
+    func_lines = ['def _df_getitem_single_label_loc_impl(self, idx):',
+                  f'{fill_list_text}']
+    results = []
+    for i, c in enumerate(self.columns):
+        data = f'data_{i}'
+        index_in_list = f'index_in_list_{i}'
+        res_data = f'res_data_{i}'
+        func_lines += [f'  {data} = _sdc_take(self._dataframe._data[{i}], idx_list)',
+                       f'  {res_data} = pandas.Series({data})']
+        results.append((c, res_data))
+
+    func_lines += ['  if len(idx_list) < 1:',
+                   "    raise KeyError('Index is not in the DataFrame')"]
+
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f'{new_index_text}',
+                   f'  return pandas.DataFrame({{{data}}}, index=new_index)']
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy,
+                   'numba': numba,
+                   '_sdc_take': _sdc_take,
+                   'find_idx': find_idx,
+                   'KeyError': KeyError}
+
+    return func_text, global_vars
+
+
+def df_getitem_int_iloc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_int_iloc_impl(self, idx):
+        if -1 < idx < len(self._dataframe.index):
+            data_0 = pandas.Series(self._dataframe._data[0])
+            result_0 = data_0.iat[idx]
+            data_1 = pandas.Series(self._dataframe._data[1])
+            result_1 = data_1.iat[idx]
+            return pandas.Series(data=[result_0, result_1], index=['A', 'B'], name=str(idx))
+        raise IndexingError('Index is out of bounds for axis')
+    """
+    func_lines = ['def _df_getitem_int_iloc_impl(self, idx):',
+                  '  if -1 < idx < len(self._dataframe.index):']
+    results = []
+    index = []
+    name = 'self._dataframe._index[idx]'
+    if isinstance(self.index, types.NoneType):
+        name = 'idx'
+    for i, c in enumerate(self.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{i}])",
+                       f"    {result_c} = data_{i}.iat[idx]"]
+        results.append(result_c)
+        index.append(c)
+    data = ', '.join(col for col in results)
+    func_lines += [f"    return pandas.Series(data=[{data}], index={index}, name=str({name}))",
+                   f"  raise IndexingError('Index is out of bounds for axis')"]
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy, 'IndexingError': IndexingError}
+
+    return func_text, global_vars
+
+
+def df_getitem_slice_iloc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_slice_iloc_impl(self, idx):
+            data_0 = pandas.Series(self._dataframe._data[0])
+            result_0 = data_0.iloc[idx]
+            data_1 = pandas.Series(self._dataframe._data[1])
+            result_1 = data_1.iloc[idx]
+            return pandas.DataFrame(data={"A": result_0, "B": result_1}, index=self._dataframe.index[idx])
+    """
+    func_lines = ['def _df_getitem_slice_iloc_impl(self, idx):']
+    results = []
+    for i, c in enumerate(self.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"  data_{i} = pandas.Series(self._dataframe._data[{i}])",
+                       f"  {result_c} = data_{i}.iloc[idx]"]
+        results.append((c, result_c))
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f"  return pandas.DataFrame(data={{{data}}}, index=self._dataframe.index[idx])"]
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy}
+
+    return func_text, global_vars
+
+
+def df_getitem_list_iloc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_list_iloc_impl(self, idx):
+            check_idx = False
+            for i in idx:
+                if -1 < i < len(self._dataframe.index):
+                    check_idx = True
+            if check_idx == True:
+                data_0 = pandas.Series(self._dataframe._data[0])
+                result_0 = data_0.iloc[numpy.array(idx)]
+                data_1 = pandas.Series(self._dataframe._data[1])
+                result_1 = data_1.iloc[numpy.array(idx)]
+                return pandas.DataFrame(data={"A": result_0, "B": result_1}, index=idx)
+            raise IndexingError('Index is out of bounds for axis')
+    """
+    func_lines = ['def _df_getitem_list_iloc_impl(self, idx):',
+                  '  check_idx = False',
+                  '  for i in idx:',
+                  '    if -1 < i < len(self._dataframe.index):',
+                  '      check_idx = True',
+                  '  if check_idx == True:']
+    results = []
+    index = '[self._dataframe._index[i] for i in idx]'
+    if isinstance(self.index, types.NoneType):
+        index = 'idx'
+    for i, c in enumerate(self.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{i}])",
+                       f"    {result_c} = data_{i}.iloc[numpy.array(idx)]"]
+        results.append((c, result_c))
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f"    return pandas.DataFrame(data={{{data}}}, index={index})",
+                   f"  raise IndexingError('Index is out of bounds for axis')"]
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy, 'IndexingError': IndexingError}
+
+    return func_text, global_vars
+
+
+def df_getitem_list_bool_iloc_codegen(self, idx):
+    """
+    Example of generated implementation:
+        def _df_getitem_list_bool_iloc_impl(self, idx):
+            if len(self._dataframe.index) == len(idx):
+                data_0 = self._dataframe._data[0]
+                result_0 = pandas.Series(data_0[numpy.array(idx)])
+                data_1 = self._dataframe._data[1]
+                result_1 = pandas.Series(data_1[numpy.array(idx)])
+                return pandas.DataFrame(data={"A": result_0, "B": result_1},
+                    index=self._dataframe.index[numpy.array(idx)])
+            raise IndexingError('Item wrong length')
+    """
+    func_lines = ['def _df_getitem_list_bool_iloc_impl(self, idx):']
+    results = []
+    index = 'self._dataframe.index[numpy.array(idx)]'
+    func_lines += ['  if len(self._dataframe.index) == len(idx):']
+    for i, c in enumerate(self.columns):
+        result_c = f"result_{i}"
+        func_lines += [f"    data_{i} = self._dataframe._data[{i}]",
+                       f"    {result_c} = pandas.Series(data_{i}[numpy.array(idx)])"]
+        results.append((c, result_c))
+    data = ', '.join(f'"{col}": {data}' for col, data in results)
+    func_lines += [f"    return pandas.DataFrame(data={{{data}}}, index={index})",
+                   f"  raise IndexingError('Item wrong length')"]
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas, 'numpy': numpy, 'IndexingError': IndexingError}
+
+    return func_text, global_vars
+
+
+def gen_df_getitem_tuple_at_impl(self, row, col):
+    func_text, global_vars = df_getitem_tuple_at_codegen(self, row, col)
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _reduce_impl = loc_vars['_df_getitem_tuple_at_impl']
+
+    return _reduce_impl
+
+
+gen_df_getitem_loc_single_label_impl = gen_impl_generator(
+    df_getitem_single_label_loc_codegen, '_df_getitem_single_label_loc_impl')
+
+gen_df_getitem_iloc_int_impl = gen_impl_generator(
+    df_getitem_int_iloc_codegen, '_df_getitem_int_iloc_impl')
+
+gen_df_getitem_iloc_slice_impl = gen_impl_generator(
+    df_getitem_slice_iloc_codegen, '_df_getitem_slice_iloc_impl')
+
+gen_df_getitem_iloc_list_impl = gen_impl_generator(
+    df_getitem_list_iloc_codegen, '_df_getitem_list_iloc_impl')
+
+gen_df_getitem_iloc_list_bool_impl = gen_impl_generator(
+    df_getitem_list_bool_iloc_codegen, '_df_getitem_list_bool_iloc_impl')
+
+
 @sdc_overload(operator.getitem)
 def sdc_pandas_dataframe_accessor_getitem(self, idx):
     if not isinstance(self, DataFrameGetitemAccessorType):
@@ -1874,10 +2124,33 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
 
     accessor = self.accessor.literal_value
 
+    if accessor == 'at':
+        num_idx = isinstance(idx[0], types.Number) and isinstance(self.dataframe.index, (types.Array, types.NoneType))
+        str_idx = (isinstance(idx[0], (types.UnicodeType, types.StringLiteral))
+                   and isinstance(self.dataframe.index, StringArrayType))
+        if isinstance(idx, types.Tuple) and isinstance(idx[1], types.StringLiteral):
+            if num_idx or str_idx:
+                row = idx[0]
+                col = idx[1].literal_value
+                return gen_df_getitem_tuple_at_impl(self.dataframe, row, col)
+
+            raise TypingError('Attribute at(). The row parameter type ({}) is different from the index type\
+                              ({})'.format(type(idx[0]), type(self.dataframe.index)))
+
+        raise TypingError('Attribute at(). The index must be a row and literal column. Given: {}'.format(idx))
+
+    if accessor == 'loc':
+        if isinstance(idx, (types.Integer, types.UnicodeType, types.StringLiteral)):
+            return gen_df_getitem_loc_single_label_impl(self.dataframe, idx)
+
+        ty_checker = TypeChecker('Attribute loc().')
+        ty_checker.raise_exc(idx, 'int or str', 'idx')
+
     if accessor == 'iat':
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
             col = idx[1].literal_value
             if -1 < col < len(self.dataframe.columns):
+
                 def df_getitem_iat_tuple_impl(self, idx):
                     row, _ = idx
                     if -1 < row < len(self._dataframe.index):
@@ -1893,8 +2166,88 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
 
         raise TypingError('Operator getitem(). The index must be a row and literal column. Given: {}'.format(idx))
 
+    if accessor == 'iloc':
+        if isinstance(idx, types.SliceType):
+            return gen_df_getitem_iloc_slice_impl(self.dataframe, idx)
+
+        if (
+            isinstance(idx, (types.List, types.Array)) and
+            isinstance(idx.dtype, (types.Boolean, bool))
+        ):
+            return gen_df_getitem_iloc_list_bool_impl(self.dataframe, idx)
+
+        if isinstance(idx, types.List):
+            return gen_df_getitem_iloc_list_impl(self.dataframe, idx)
+
+        if isinstance(idx, types.Integer):
+            return gen_df_getitem_iloc_int_impl(self.dataframe, idx)
+
+        if isinstance(idx, (types.Tuple, types.UniTuple)):
+            def df_getitem_tuple_iat_impl(self, idx):
+                return self._dataframe.iat[idx]
+
+            return df_getitem_tuple_iat_impl
+
+        raise TypingError('Attribute iloc(). The index must be an integer, a list or array of integers,\
+                          a slice object with ints or a boolean array.\
+                          Given: {}'.format(idx))
+
     raise TypingError('Operator getitem(). Unknown accessor. Only "loc", "iloc", "at", "iat" are supported.\
                       Given: {}'.format(accessor))
+
+
+@sdc_overload_attribute(DataFrameType, 'iloc')
+def sdc_pandas_dataframe_iloc(self):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.DataFrame.iloc
+
+    Limitations
+    -----------
+    - Parameter ``'name'`` in new DataFrame can be String only
+    - Column can be literal value only, in DataFrame.iloc[row, column]
+    - Iloc works with basic cases only: an integer, a list or array of integers,
+        a slice object with ints, a boolean array
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_iloc.py
+       :language: python
+       :lines: 36-
+       :caption: Get value at specified index position.
+       :name: ex_dataframe_iloc
+
+    .. command-output:: python ./dataframe/dataframe_iloc.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Fast integer location scalar accessor.
+
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Purely label-location based indexer for selection by label.
+
+        :ref:`Series.iloc <pandas.Series.iloc>`
+            Purely integer-location based indexing for selection by position.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.DataFrame.iloc` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_iloc*
+    """
+
+    ty_checker = TypeChecker('Attribute iloc().')
+    ty_checker.check(self, DataFrameType)
+
+    def sdc_pandas_dataframe_iloc_impl(self):
+        return dataframe_getitem_accessor_init(self, 'iloc')
+
+    return sdc_pandas_dataframe_iloc_impl
 
 
 @sdc_overload_attribute(DataFrameType, 'iat')
@@ -1944,6 +2297,109 @@ def sdc_pandas_dataframe_iat(self):
     return sdc_pandas_dataframe_iat_impl
 
 
+@sdc_overload_attribute(DataFrameType, 'at')
+def sdc_pandas_dataframe_at(self):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Limitations
+    -----------
+    - ``Dataframe.at`` always returns ``array``.
+    - Parameter ``column`` in ``idx`` must be a literal value.
+
+    Pandas API: pandas.DataFrame.at
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_at.py
+       :language: python
+       :lines: 28-
+       :caption: Access a single value for a row/column label pair.
+       :name: ex_dataframe_at
+
+    .. command-output:: python ./dataframe/dataframe_at.py
+       :cwd: ../../../examples
+
+    .. seealso::
+
+        :ref:`DataFrame.iat <pandas.DataFrame.iat>`
+            Access a single value for a row/column pair by integer position.
+
+        :ref:`DataFrame.loc <pandas.DataFrame.loc>`
+            Access a group of rows and columns by label(s).
+
+        :ref:`Series.at <pandas.Series.at>`
+            Access a single value using a label.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.DataFrame.at` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_at*
+    """
+
+    ty_checker = TypeChecker('Attribute at().')
+    ty_checker.check(self, DataFrameType)
+
+    def sdc_pandas_dataframe_at_impl(self):
+        return dataframe_getitem_accessor_init(self, 'at')
+
+    return sdc_pandas_dataframe_at_impl
+
+
+@sdc_overload_attribute(DataFrameType, 'loc')
+def sdc_pandas_dataframe_loc(self):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.DataFrame.loc
+
+    Limitations
+    -----------
+    - Loc always returns Dataframe.
+    - Parameter ``idx`` is supported only to be a single value, e.g. :obj:`df.loc['A']`.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_loc.py
+       :language: python
+       :lines: 36-
+       :caption: Access a group of rows and columns by label(s) or a boolean array.
+       :name: ex_dataframe_loc
+
+    .. command-output:: python ./dataframe/dataframe_loc.py
+       :cwd: ../../../examples
+
+    .. seealso::
+        :ref:`DataFrame.at <pandas.DataFrame.at>`
+            Access a single value for a row/column label pair.
+        :ref:`DataFrame.iloc <pandas.DataFrame.iloc>`
+            Access group of rows and columns by integer position(s).
+        :ref:`DataFrame.xs <pandas.DataFrame.xs>`
+            Returns a cross-section (row(s) or column(s)) from the Series/DataFrame.
+        :ref:`Series.loc <pandas.Series.loc>`
+            Access group of values using labels.
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.DataFrame.loc` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_loc*
+    """
+
+    ty_checker = TypeChecker('Attribute loc().')
+    ty_checker.check(self, DataFrameType)
+
+    def sdc_pandas_dataframe_loc_impl(self):
+        return sdc.datatypes.hpat_pandas_dataframe_getitem_types.dataframe_getitem_accessor_init(self, 'loc')
+
+    return sdc_pandas_dataframe_loc_impl
+
+
 @sdc_overload_method(DataFrameType, 'pct_change')
 def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None):
     """
@@ -1954,7 +2410,7 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
 
     Limitations
     -----------
-    Parameters ``limit`` and ``freq`` are unsupported.
+    Parameters ``limit`` and ``freq`` are supported only with default value ``None``.
 
     Examples
     --------
@@ -1995,16 +2451,16 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     ty_checker = TypeChecker('Method {}().'.format(name))
     ty_checker.check(df, DataFrameType)
 
-    if not isinstance(periods, (types.Integer, types.Omitted)):
+    if not isinstance(periods, (types.Integer, types.Omitted)) and periods != 1:
         ty_checker.raise_exc(periods, 'int64', 'periods')
 
     if not isinstance(fill_method, (str, types.UnicodeType, types.StringLiteral, types.NoneType, types.Omitted)):
         ty_checker.raise_exc(fill_method, 'string', 'fill_method')
 
-    if not isinstance(limit, (types.Omitted, types.NoneType)):
+    if not isinstance(limit, (types.Omitted, types.NoneType)) and limit is not None:
         ty_checker.raise_exc(limit, 'None', 'limit')
 
-    if not isinstance(freq, (types.Omitted, types.NoneType)):
+    if not isinstance(freq, (types.Omitted, types.NoneType)) and freq is not None:
         ty_checker.raise_exc(freq, 'None', 'freq')
 
     params = {'periods': 1, 'fill_method': '"pad"', 'limit': None, 'freq': None}
@@ -2327,6 +2783,7 @@ def df_set_column_overload(self, key, value):
             return gen_df_replace_column_impl(self, key)
 
     if isinstance(key, types.UnicodeType):
+
         def _df_set_column_unicode_key_impl(self, key, value):
             # http://numba.pydata.org/numba-doc/dev/developer/literal.html#specifying-for-literal-typing
             # literally raises special exception to call df._set_column with literal idx value got from unicode
@@ -2336,3 +2793,169 @@ def df_set_column_overload(self, key, value):
 
     ty_checker = TypeChecker('Method _set_column().')
     ty_checker.raise_exc(key, 'str', 'key')
+
+
+def sdc_pandas_dataframe_reset_index_codegen(drop, all_params, columns):
+    """
+    Example of generated implementation:
+        def _df_reset_index_impl(self, level=None, drop=False, inplace=False, col_level=0, col_fill=""):
+          old_index = self.index
+          result_0 = get_dataframe_data(self, 0)
+          result_1 = get_dataframe_data(self, 1)
+          result_2 = get_dataframe_data(self, 2)
+          return pandas.DataFrame({"index": old_index, "A": result_0, "B": result_1, "C": result_2})
+    """
+    result_name = []
+    all_params_str = ', '.join(all_params)
+    func_lines = [f'def _df_reset_index_impl({all_params_str}):']
+    df = all_params[0]
+    if not drop.literal_value:
+        old_index = 'old_index'
+        func_lines += [f'  {old_index} = {df}.index']
+        result_name.append((old_index, 'index'))
+    for i, c in enumerate(columns):
+        result_c = f'result_{i}'
+        func_lines += [
+            f'  result_{i} = get_dataframe_data({df}, {i})'
+        ]
+        result_name.append((result_c, c))
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
+    func_lines += [f'  return pandas.DataFrame({{{data}}})']
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas,
+                   'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_reset_index_impl(self, drop=False):
+    all_params = ['self', 'level=None', 'drop=False', 'inplace=False', 'col_level=0', 'col_fill=""']
+
+    func_text, global_vars = sdc_pandas_dataframe_reset_index_codegen(drop, all_params, self.columns)
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _apply_impl = loc_vars[f'_df_reset_index_impl']
+
+    return _apply_impl
+
+
+def sdc_pandas_dataframe_reset_index_default_codegen(drop, all_params, columns):
+    """
+    Example of generated implementation:
+        def _df_reset_index_impl(self, level=None, drop=False, inplace=False, col_level=0, col_fill=""):
+          old_index = self.index
+          result_0 = get_dataframe_data(self, 0)
+          result_1 = get_dataframe_data(self, 1)
+          return pandas.DataFrame({"index": old_index, "A": result_0, "B": result_1})
+    """
+    result_name = []
+    all_params_str = ', '.join(all_params)
+    func_lines = [f'def _df_reset_index_impl({all_params_str}):']
+    df = all_params[0]
+    if not drop:
+        old_index = 'old_index'
+        func_lines += [f'  {old_index} = {df}.index']
+        result_name.append((old_index, 'index'))
+    for i, c in enumerate(columns):
+        result_c = f'result_{i}'
+        func_lines += [
+            f'  result_{i} = get_dataframe_data({df}, {i})'
+        ]
+        result_name.append((result_c, c))
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
+    func_lines += [f'  return pandas.DataFrame({{{data}}})']
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas,
+                   'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_reset_index_impl_default(self, drop=False):
+    all_params = ['self', 'level=None', 'drop=False', 'inplace=False', 'col_level=0', 'col_fill=""']
+
+    func_text, global_vars = sdc_pandas_dataframe_reset_index_default_codegen(drop, all_params, self.columns)
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _apply_impl = loc_vars[f'_df_reset_index_impl']
+
+    return _apply_impl
+
+
+@sdc_overload_method(DataFrameType, 'reset_index')
+def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False, col_level=0, col_fill=''):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.reset_index
+
+    Limitations
+    -----------
+    - Reset the index of the DataFrame, and use the default one instead.
+    - Parameters level, inplacem col_level, col_fill unsupported.
+    - Parameter drop can be only literal value or default value.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_reset_index_drop_False.py
+        :language: python
+        :lines: 36-
+        :caption: Reset the index of the DataFrame, and use the default one instead.
+                  The old index becomes the first column.
+        :name: ex_dataframe_reset_index
+
+    .. command-output:: python ./dataframe/dataframe_reset_index_drop_False.py
+        :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/dataframe_reset_index_drop_True.py
+        :language: python
+        :lines: 36-
+        :caption: Reset the index of the DataFrame, and use the default one instead.
+        :name: ex_dataframe_reset_index
+
+    .. command-output:: python ./dataframe/dataframe_reset_index_drop_True.py
+        :cwd: ../../../examples
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.DataFrame.reset_index` implementation.
+
+   .. only:: developer
+
+       Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_df_reset_index*
+   """
+
+    func_name = 'reset_index'
+
+    ty_checker = TypeChecker('Method {}().'.format(func_name))
+    ty_checker.check(self, DataFrameType)
+
+    if not (level is None or isinstance(level, types.Omitted)):
+        raise TypingError('{} Unsupported parameter level. Given: {}'.format(func_name, level))
+
+    if not (isinstance(drop, (types.Omitted, types.Boolean)) or drop is False):
+        ty_checker.raise_exc(drop, 'bool', 'drop')
+
+    if isinstance(drop, types.Omitted):
+        drop = False
+
+    if not (inplace is False or isinstance(inplace, types.Omitted)):
+        raise TypingError('{} Unsupported parameter inplace. Given: {}'.format(func_name, inplace))
+
+    if not (col_level == 0 or isinstance(col_level, types.Omitted)):
+        raise TypingError('{} Unsupported parameter col_level. Given: {}'.format(func_name, col_level))
+
+    if not (col_fill == '' or isinstance(col_fill, types.Omitted)):
+        raise TypingError('{} Unsupported parameter col_fill. Given: {}'.format(func_name, col_fill))
+
+    if not isinstance(drop, types.Literal):
+        if isinstance(drop, bool):
+            return sdc_pandas_dataframe_reset_index_impl_default(self, drop=drop)
+        else:
+            raise SDCLimitation('{} only work with Boolean literals drop.'.format(func_name))
+
+    return sdc_pandas_dataframe_reset_index_impl(self, drop=drop)
