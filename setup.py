@@ -315,7 +315,7 @@ setup(name=SDC_NAME_STR,
       install_requires=[
           'numpy>=1.16',
           'pandas==0.25.3',
-          'pyarrow==0.15.1',
+          'pyarrow==0.17.0',
           'numba>=0.48'
           ],
       cmdclass=sdc_build_commands,
