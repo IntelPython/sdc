@@ -24,17 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-import numpy as np
 import pandas as pd
 from numba import njit
 
 
 @njit
-def series_copy():
+def series_combine():
     s1 = pd.Series([1, 5, 2])
     s2 = pd.Series([0, 3, 7, 8, 0])
 
     return s1.combine(s2, max, fill_value=0)  # Expect series of 1, 5, 7, 8, 0
 
 
-print(series_copy())
+print(series_combine())
