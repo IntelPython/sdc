@@ -242,7 +242,7 @@ def box_dataframe(typ, val, c):
         pyapi.decref(cname_obj)
 
     df_obj = pyapi.call_method(class_obj, "DataFrame", (df_dict,))
-    pyapi.decref(df_obj)
+    pyapi.decref(df_dict)
 
     # set df.index if necessary
     if typ.index != types.none:
