@@ -138,7 +138,7 @@ class SDC_Build_Utilities:
         print(f'{time.strftime("%d/%m/%Y %H:%M:%S")}: {msg}', flush=True)
 
     def get_sdc_version_from_channel(self):
-        python_version = f'py{self.python.replace('.', '')}'
+        python_version = 'py' + self.python.replace('.', '')
 
         # Get Intel SDC version from first channel in channel_list
         search_args = ['sdc', '-c', self.channel_list[1], '--override-channels', '--json']
