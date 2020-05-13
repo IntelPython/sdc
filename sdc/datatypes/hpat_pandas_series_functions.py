@@ -4930,17 +4930,23 @@ def sdc_pandas_series_combine(self, other, func, fill_value=None):
         if fill_value is None:
             fill_value = numpy.nan
 
-        len_val = max(len(self), len(other))
+        indexes, self_indexes, other_indexes = sdc_join_series_indexes(self.index, other.index)
+        len_val = len(indexes)
         result = numpy.empty(len_val, self._data.dtype)
-        for ind in range(len_val):
-            val_self = self._data[ind]
-            val_other = other._data[ind]
-            if len(self) < ind + 1:
-                val_self = fill_value
-            if len(other) < ind + 1:
-                val_other = fill_value
-            result[ind] = func(val_self, val_other)
 
-        return pandas.Series(result)
+        for i in range(len_val):
+            if self_indexes[i] == -1:
+                val_self = fill_value
+            else:
+                ind_self = self_indexes[i]
+                val_self = self._data[ind_self]
+            if other_indexes[i] == -1:
+                val_other = fill_value
+            else:
+                ind_other = other_indexes[i]
+                val_other = other._data[ind_other]
+            result[i] = func(val_self, val_other)
+
+        return pandas.Series(result, index=indexes)
 
     return sdc_pandas_series_combine_impl
