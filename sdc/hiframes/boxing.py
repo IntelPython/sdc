@@ -240,7 +240,7 @@ def box_dataframe(typ, val, c):
             # context.nrt.incref(builder, arr_typ, arr)
         pyapi.dict_setitem(df_dict, cname_obj, arr_obj)
 
-        # pyapi.decref(arr_obj)
+        pyapi.decref(arr_obj)
         pyapi.decref(cname_obj)
 
     df_obj = pyapi.call_method(class_obj, "DataFrame", (df_dict,))
@@ -250,6 +250,7 @@ def box_dataframe(typ, val, c):
     if typ.index != types.none:
         arr_obj = _box_series_data(typ.index.dtype, typ.index, dataframe.index, c)
         pyapi.object_setattr_string(df_obj, 'index', arr_obj)
+        pyapi.decref(arr_obj)
 
     pyapi.decref(class_obj)
     # pyapi.gil_release(gil_state)    # release GIL
@@ -355,6 +356,10 @@ def box_series(typ, val, c):
     res = c.pyapi.call_method(
         pd_class_obj, "Series", (arr, index, dtype, name))
 
+    c.pyapi.decref(arr)
+    c.pyapi.decref(index)
+    c.pyapi.decref(dtype)
+    c.pyapi.decref(name)
     c.pyapi.decref(pd_class_obj)
     return res
 
