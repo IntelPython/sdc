@@ -215,7 +215,7 @@ def box_dataframe(typ, val, c):
 
     mod_name = context.insert_const_string(c.builder.module, "pandas")
     class_obj = pyapi.import_module_noblock(mod_name)
-    df_obj = pyapi.call_method(class_obj, "DataFrame", ())
+    df_dict = pyapi.dict_new()
 
     for i, cname, arr, arr_typ, dtype in zip(range(n_cols), col_names, col_arrs, arr_typs, dtypes):
         # df['cname'] = boxed_arr
@@ -236,10 +236,13 @@ def box_dataframe(typ, val, c):
             arr_obj = box_array(arr_typ, arr, c)
             # TODO: is incref required?
             # context.nrt.incref(builder, arr_typ, arr)
-        pyapi.object_setitem(df_obj, cname_obj, arr_obj)
+        pyapi.dict_setitem(df_dict, cname_obj, arr_obj)
 
         pyapi.decref(arr_obj)
         pyapi.decref(cname_obj)
+
+    df_obj = pyapi.call_method(class_obj, "DataFrame", (df_dict,))
+    pyapi.decref(df_dict)
 
     # set df.index if necessary
     if typ.index != types.none:
