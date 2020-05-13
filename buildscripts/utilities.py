@@ -81,11 +81,11 @@ class SDC_Build_Utilities:
         self.log_info(f'Create {self.env_name} conda environment')
 
         # Clear Intel SDC environment
-        remove_args = ['-q', '-y', '--name', self.env_name, '--all']
+        remove_args = ['-y', '--name', self.env_name, '--all']
         self.__run_conda_command(Conda_Commands.REMOVE, remove_args)
 
         # Create Intel SDC environment
-        create_args = ['-q', '-y', '-n', self.env_name, f'python={self.python}']
+        create_args = ['-y', '-n', self.env_name, f'python={self.python}']
         create_args += packages_list + self.channel_list + ['--override-channels']
         self.__run_conda_command(Conda_Commands.CREATE, create_args)
 
@@ -96,7 +96,7 @@ class SDC_Build_Utilities:
 
         self.log_info(f'Install {" ".join(packages_list)} to {self.env_name} conda environment')
         install_args = ['-n', self.env_name]
-        install_args += self.channel_list + ['--override-channels', '-q', '-y'] + packages_list
+        install_args += self.channel_list + ['--override-channels', '-y'] + packages_list
         self.__run_conda_command(Conda_Commands.INSTALL, install_args)
 
         return
