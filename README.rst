@@ -23,9 +23,6 @@ the code by leveraging modern hardware instructions and by utilizing all availab
 
 Intel® SDC documentation can be found `here <https://intelpython.github.io/sdc-doc/>`_.
 
-Intel® SDC uses special Numba build based on ``0.48.0`` tag for build and run.
-Required Numba version can be installed from ``intel/label/beta`` channel from the Anaconda Cloud.
-
 .. note::
     For maximum performance and stability, please use numba from ``intel/label/beta`` channel.
 
@@ -61,9 +58,6 @@ If you do not have conda, we recommend using Miniconda3::
     ./miniconda.sh -b
     export PATH=$HOME/miniconda3/bin:$PATH
 
-Intel® SDC uses special Numba build based on ``0.48.0`` tag for build and run.
-Required Numba version can be installed from ``intel/label/beta`` channel from the Anaconda Cloud.
-
 .. note::
     For maximum performance and stability, please use numba from ``intel/label/beta`` channel.
 
@@ -88,7 +82,7 @@ Building on Linux with setuptools
 
     PYVER=<3.6 or 3.7>
     NUMPYVER=<1.16 or 1.17>
-    conda create -n sdc-env -q -y -c intel/label/beta -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER numba=0.48.0 pandas=0.25.3 pyarrow=0.17.0 gcc_linux-64 gxx_linux-64
+    conda create -n sdc-env -q -y -c intel/label/beta -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER numba=0.49 pandas=0.25.3 pyarrow=0.17.0 gcc_linux-64 gxx_linux-64
     source activate sdc-env
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
@@ -126,7 +120,7 @@ Building on Windows with setuptools
 
     set PYVER=<3.6 or 3.7>
     set NUMPYVER=<1.16 or 1.17>
-    conda create -n sdc-env -c intel/label/beta -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% numba=0.48.0 pandas=0.25.3 pyarrow=0.17.0
+    conda create -n sdc-env -c intel/label/beta -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% numba=0.49 pandas=0.25.3 pyarrow=0.17.0
     conda activate sdc-env
     set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
     set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
