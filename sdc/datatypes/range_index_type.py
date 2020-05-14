@@ -1,5 +1,6 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,29 +25,43 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+from numba import types
+from numba.extending import (
+    models,
+    register_model,
+    make_attribute_wrapper
+)
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
+RangeIndexDataType = types.range_state64_type
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
 
-from sdc.tests.test_ml import *
+class RangeIndexType(types.IterableType):
 
-from sdc.tests.test_io import *
+    dtype = types.int64
 
-from sdc.tests.test_hpat_jit import *
-from sdc.tests.test_indexes import *
+    def __init__(self, is_named=False):
+        self.is_named = is_named
+        super(RangeIndexType, self).__init__(
+            name='RangeIndexType({})'.format(is_named))
 
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
+    # TODO: provide iteration support by adding getiter and iternext
+    @property
+    def iterator_type(self):
+        return RangeIndexDataType.iterator_type()
 
-# performance tests
-import sdc.tests.tests_perf
+
+@register_model(RangeIndexType)
+class RangeIndexModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+
+        name_type = types.unicode_type if fe_type.is_named else types.none
+        members = [
+            ('data', RangeIndexDataType),
+            ('name', name_type)
+        ]
+        models.StructModel.__init__(self, dmm, fe_type, members)
+
+
+make_attribute_wrapper(RangeIndexType, 'data', '_data')
+make_attribute_wrapper(RangeIndexType, 'name', '_name')
