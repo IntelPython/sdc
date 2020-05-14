@@ -34,18 +34,18 @@ from sdc.hiframes.hiframes_untyped import HiFramesPass
 from sdc.hiframes.hiframes_typed import HiFramesTypedPass
 from sdc.hiframes.dataframe_pass import DataFramePass
 import numba
-import numba.compiler
-from numba.compiler import DefaultPassBuilder
+import numba.core.compiler
+from numba.core.compiler import DefaultPassBuilder
 from numba import ir_utils, ir, postproc
-from numba.targets.registry import CPUDispatcher
-from numba.ir_utils import guard, get_definition
-from numba.inline_closurecall import inline_closure_call
+from numba.core.registry import CPUDispatcher
+from numba.core.ir_utils import guard, get_definition
+from numba.core.inline_closurecall import inline_closure_call
 from numba.typed_passes import (NopythonTypeInference, AnnotateTypes, ParforPass, IRLegalization)
 from numba.untyped_passes import (DeadBranchPrune, InlineInlinables, InlineClosureLikes)
 from sdc import config
 from sdc.distributed import DistributedPass
 
-from numba.compiler_machinery import FunctionPass, register_pass
+from numba.core.compiler_machinery import FunctionPass, register_pass
 
 # workaround for Numba #3876 issue with large labels in mortgage benchmark
 binding.set_option("tmp", "-non-global-value-max-name-size=2048")
@@ -143,7 +143,7 @@ class PostprocessorPass(FunctionPass):
         return True
 
 
-class SDCPipeline(numba.compiler.CompilerBase):
+class SDCPipeline(numba.core.compiler.CompilerBase):
     """SDC compiler pipeline
     """
 
@@ -170,7 +170,7 @@ class ParforSeqPass(FunctionPass):
         pass
 
     def run_pass(self, state):
-        numba.parfor.lower_parfor_sequential(
+        numba.parfors.parfor.lower_parfor_sequential(
             state.typingctx, state.func_ir, state.typemap, state.calltypes)
 
         return True
