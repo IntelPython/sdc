@@ -47,6 +47,7 @@ from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype,
                                               box_categorical_array, unbox_categorical_array)
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.hiframes.pd_series_type import _get_series_array_type
+from vtune import vtune_profiling_boxing
 
 from .. import hstr_ext
 import llvmlite.binding as ll
@@ -76,6 +77,7 @@ def typeof_pd_str_series(val, c):
 
 
 @unbox(DataFrameType)
+@vtune_profiling_boxing(name_handle="Dataframe_unbox")
 def unbox_dataframe(typ, val, c):
     """unbox dataframe to an empty DataFrame struct
     columns will be extracted later if necessary.
@@ -198,6 +200,7 @@ def _infer_index_type(index):
 
 
 @box(DataFrameType)
+@vtune_profiling_boxing(name_handle="Dataframe_box")
 def box_dataframe(typ, val, c):
     context = c.context
     builder = c.builder
@@ -292,6 +295,7 @@ def unbox_dataframe_column(typingctx, df, i=None):
 
 
 @unbox(SeriesType)
+@vtune_profiling_boxing(name_handle="Series_unbox")
 def unbox_series(typ, val, c):
     arr_obj = c.pyapi.object_getattr_string(val, "values")
     series = cgutils.create_struct_proxy(typ)(c.context, c.builder)
@@ -328,6 +332,7 @@ def _unbox_series_data(dtype, data_typ, arr_obj, c):
 
 
 @box(SeriesType)
+@vtune_profiling_boxing(name_handle="Series_box")
 def box_series(typ, val, c):
     """
     """
