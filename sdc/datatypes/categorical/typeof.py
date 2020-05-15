@@ -31,7 +31,7 @@ pandas.CategoricalDtype
 import pandas as pd
 
 from numba.extending import typeof_impl
-from numba import numpy_support
+from numba.np import numpy_support
 from numba import typeof
 
 from . import pandas_support

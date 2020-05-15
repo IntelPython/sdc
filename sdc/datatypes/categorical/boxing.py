@@ -25,9 +25,9 @@
 # *****************************************************************************
 
 from numba.extending import box, unbox, NativeValue
-from numba.targets import boxing
-from numba.targets.imputils import lower_constant
-from numba.targets import arrayobj
+from numba.core import boxing
+from numba.core.imputils import lower_constant
+from numba.np import arrayobj
 from numba import types
 
 from . import pandas_support

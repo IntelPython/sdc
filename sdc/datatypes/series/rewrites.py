@@ -27,8 +27,8 @@
 import pandas as pd
 from sdc.datatypes.common.rewriteutils import register_tuplify
 
-from numba import ir
-from numba.ir_utils import guard, get_definition
+from numba.core import ir
+from numba.core.ir_utils import guard, get_definition
 
 
 def check_dtype_is_categorical(self, expr, func_ir, block, typemap, calltypes):

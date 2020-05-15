@@ -184,7 +184,7 @@ def _Categorical(values, categories=None, ordered=None, dtype=None, fastpath=Fal
 #     Similar to @infer_global(np.array).
 #     """
 #     def typer(values, categories=None, ordered=None, dtype=None, fastpath=False):
-#         # from numba.typing import npydecl
+#         # from numba.core.typing import npydecl
 #         # codes = npydecl.NpArray(context).generic()(values)
 #         categorical = _reconstruct_Categorical(values)
 #         return typeof(categorical)
@@ -198,7 +198,7 @@ def _Categorical(values, categories=None, ordered=None, dtype=None, fastpath=Fal
 #     """
 #     Similar to @lower_builtin(np.array, ...).
 #     """
-#     from numba.targets import arrayobj
+#     from numba.np import arrayobj
 #     codes = sig.return_type.codes
 #     return arrayobj.np_array(context, builder, sig.replace(return_type=codes), args)
 

@@ -24,8 +24,8 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from numba.targets.imputils import lower_constant
-from numba import cgutils
+from numba.core.imputils import lower_constant
+from numba.core import cgutils
 
 from .types import SeriesType
 
