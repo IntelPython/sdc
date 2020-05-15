@@ -23,14 +23,3 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
-
-"""
-Numba extension for Pandas Categorical.
-"""
-
-from . import types
-from . import typeof
-from . import models
-from . import boxing
-from . import pdimpl
-from . import rewrites

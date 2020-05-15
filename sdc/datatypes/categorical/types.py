@@ -121,8 +121,3 @@ class Categorical(types.Type):
     @property
     def dtype(self):
         return self.codes.dtype
-
-
-# register new types in numba.types for using in objmode
-setattr(types, "CategoricalDtype", CategoricalDtypeType)
-setattr(types, "Categorical", Categorical)

@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -23,3 +23,21 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
+
+"""
+Init Numba extension for Pandas Categorical.
+"""
+
+from . import types
+from . import typeof
+from . import models
+from . import boxing
+from . import pdimpl
+from . import rewrites
+
+import numba
+
+
+# register new types in numba.types for using in objmode
+setattr(numba.types, "CategoricalDtype", types.CategoricalDtypeType)
+setattr(numba.types, "Categorical", types.Categorical)
