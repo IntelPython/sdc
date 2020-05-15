@@ -90,6 +90,7 @@ if __name__ == '__main__':
     sdc_utils.log_info('Run Intel(R) SDC examples', separate=True)
     sdc_utils.log_info(sdc_utils.line_double)
     sdc_utils.create_environment()
-    sdc_utils.install_conda_package(['sdc'])
+    sdc_package = f'sdc={sdc_utils.get_sdc_version_from_channel()}'
+    sdc_utils.install_conda_package([sdc_package])
 
     run_examples(sdc_utils)

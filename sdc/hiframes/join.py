@@ -27,7 +27,7 @@
 
 import numpy as np
 
-from numba import generated_jit, ir, ir_utils, typeinfer, types
+from numba import types
 from numba.extending import overload
 
 

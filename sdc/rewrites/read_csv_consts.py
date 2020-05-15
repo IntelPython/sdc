@@ -24,18 +24,20 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from numba.rewrites import register_rewrite, Rewrite
-from numba.ir_utils import find_callname, guard, mk_unique_var
-from numba import ir, errors, consts
+from numba.core.rewrites import register_rewrite, Rewrite
+from numba.core.ir_utils import find_callname, guard, mk_unique_var
+from numba import errors
+from numba.core import ir
+from numba.core import consts
 
 from sdc.rewrites.ir_utils import remove_unused_recursively, make_assign, find_operations
 
 
 def find_build_sequence(func_ir, var):
-    """Reimplemented from numba.ir_utils.find_build_sequence
+    """Reimplemented from numba.core.ir_utils.find_build_sequence
     Added 'build_map' to build_ops list.
     """
-    from numba.ir_utils import (require, get_definition)
+    from numba.core.ir_utils import (require, get_definition)
 
     require(isinstance(var, ir.Var))
     var_def = get_definition(func_ir, var)

@@ -25,9 +25,9 @@
 # *****************************************************************************
 
 
-from numba.rewrites import (register_rewrite, Rewrite)
-from numba.ir_utils import (guard, find_callname)
-from numba.ir import (Expr)
+from numba.core.rewrites import (register_rewrite, Rewrite)
+from numba.core.ir_utils import (guard, find_callname)
+from numba.core.ir import (Expr)
 from numba.extending import overload
 
 from pandas import DataFrame

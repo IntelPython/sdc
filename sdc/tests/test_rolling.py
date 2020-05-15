@@ -35,7 +35,7 @@ from itertools import product
 import numpy as np
 import pandas as pd
 
-from numba.errors import TypingError
+from numba.core.errors import TypingError
 from sdc.hiframes.rolling import supported_rolling_funcs
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_series import gen_frand_array

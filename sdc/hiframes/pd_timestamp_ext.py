@@ -29,7 +29,7 @@ from numba import types
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
                              make_attribute_wrapper, lower_builtin, box, unbox, lower_cast,
                              lower_getattr, infer_getattr, overload_method, overload, intrinsic)
-from numba import cgutils
+from numba.core import cgutils
 
 from llvmlite import ir as lir
 
