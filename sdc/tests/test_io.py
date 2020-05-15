@@ -31,7 +31,7 @@ import platform
 import pyarrow.parquet as pq
 import unittest
 import numba
-from numba.config import IS_32BITS
+from numba.core.config import IS_32BITS
 from pandas.api.types import CategoricalDtype
 
 import sdc
@@ -301,7 +301,7 @@ class TestCSV(TestIO):
 
         cfunc = self.jit(pyfunc)
 
-        with self.assertRaises(numba.errors.TypingError) as cm:
+        with self.assertRaises(numba.core.errors.TypingError) as cm:
             cfunc("csv_data1.csv")
 
         self.assertIn("Cannot infer resulting DataFrame", cm.exception.msg)

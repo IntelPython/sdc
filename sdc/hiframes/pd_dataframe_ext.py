@@ -28,13 +28,14 @@
 import operator
 
 import numba
-from numba import types, cgutils
+from numba import types
+from numba.core import cgutils
 from numba.extending import (models, register_model, lower_cast, infer_getattr,
                              type_callable, infer, overload, intrinsic,
                              lower_builtin, overload_method)
-from numba.typing.templates import (infer_global, AbstractTemplate, signature,
+from numba.core.typing.templates import (infer_global, AbstractTemplate, signature,
                                     AttributeTemplate, bound_function)
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
+from numba.core.imputils import impl_ret_new_ref, impl_ret_borrowed
 
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.hiframes.pd_dataframe_type import DataFrameType
@@ -70,7 +71,7 @@ def init_dataframe(typingctx, *args):
         in_tup = args[0]
         data_arrs = [builder.extract_value(in_tup, i) for i in range(n_cols)]
         index = builder.extract_value(in_tup, n_cols)
-        column_strs = [numba.unicode.make_string_from_constant(
+        column_strs = [numba.cpython.unicode.make_string_from_constant(
             context, builder, string_type, c) for c in column_names]
         # create dataframe struct and store values
         dataframe = cgutils.create_struct_proxy(

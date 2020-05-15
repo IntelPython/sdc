@@ -35,12 +35,12 @@ import operator
 import sdc
 
 from numba import types
-from numba import cgutils
+from numba.core import cgutils
 from numba.extending import intrinsic
-from numba.targets.registry import cpu_target
+from numba.core.registry import cpu_target
 from numba.typed import List, Dict
-from numba.typing import signature
-from numba.special import literally
+from numba.core.typing import signature
+from numba import literally
 
 from sdc.datatypes.common_functions import (sdc_arrays_argsort, _sdc_asarray,
                                             _sdc_take, SDCLimitation)
@@ -100,7 +100,7 @@ def init_dataframe_groupby(typingctx, parent, column_id, sort, target_columns=No
         groupby_obj.sort = sort_val
         groupby_obj.target_default = context.get_constant(types.bool_, target_not_specified)
 
-        column_strs = [numba.unicode.make_string_from_constant(
+        column_strs = [numba.cpython.unicode.make_string_from_constant(
             context, builder, string_type, c) for c in selected_col_names]
         column_tup = context.make_tuple(
             builder, types.UniTuple(string_type, n_target_cols), column_strs)

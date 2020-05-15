@@ -1,8 +1,8 @@
 trigger:
-- master
+- feature/groupby_optimization
 
 pr:
-- master
+- feature/groupby_optimization
 
 jobs:
 - template: buildscripts/azure/template-windows.yml
