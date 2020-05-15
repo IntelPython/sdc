@@ -28,18 +28,12 @@
 import numpy as np
 
 import numba
-from numba import cgutils, types
-import numba.array_analysis
-from numba.typing import signature
-from numba.typing.templates import infer_global, AbstractTemplate, CallableTemplate
-from numba.extending import overload, intrinsic, register_model, models
-from numba.targets.imputils import (
-    lower_builtin,
-    impl_ret_untracked,
-    impl_ret_new_ref,
-    impl_ret_borrowed,
-    iternext_impl,
-    RefType)
+from numba.core import cgutils, types
+from numba.parfors import array_analysis
+from numba.core.typing import signature
+from numba.core.typing.templates import infer_global, AbstractTemplate, CallableTemplate
+from numba.extending import overload, intrinsic
+from numba.core.imputils import (lower_builtin, impl_ret_borrowed)
 
 import sdc
 from sdc.str_ext import string_type, list_string_array_type
@@ -49,7 +43,7 @@ from sdc.str_arr_ext import (
 from sdc.hiframes.pd_series_ext import (
     SeriesType,
     if_series_to_array_type)
-from numba.errors import TypingError
+from numba.core.errors import TypingError
 
 
 def isna(arr, i):
@@ -263,7 +257,7 @@ def init_series(typingctx, data, index=None, name=None):
         series.index = index_val
         if is_named:
             if isinstance(name, types.StringLiteral):
-                series.name = numba.unicode.make_string_from_constant(
+                series.name = numba.cpython.unicode.make_string_from_constant(
                     context, builder, string_type, name.literal_value)
             else:
                 series.name = name_val

@@ -28,21 +28,22 @@
 from sdc.config import _has_pyarrow
 import llvmlite.binding as ll
 from llvmlite import ir as lir
-from numba.targets.arrayobj import make_array
-from numba.targets.imputils import lower_builtin
-from numba import cgutils
+from numba.np.arrayobj import make_array
+from numba.core.imputils import lower_builtin
+from numba.core import cgutils
 import numba
-from numba import ir, config, ir_utils, types
-from numba.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
+from numba import config, types
+from numba.core import ir, ir_utils
+from numba.core.ir_utils import (mk_unique_var, replace_vars_inner, find_topo_order,
                             dprint_func_ir, remove_dead, mk_alloc, remove_dels,
                             get_name_var_table, replace_var_names,
                             add_offset_to_labels, get_ir_of_code,
                             compile_to_numba_ir, replace_arg_nodes,
                             find_callname, guard, require, get_definition)
 
-from numba.typing.templates import infer_global, AbstractTemplate
-from numba.typing import signature
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_borrowed
+from numba.core.typing.templates import infer_global, AbstractTemplate
+from numba.core.typing import signature
+from numba.core.imputils import impl_ret_new_ref, impl_ret_borrowed
 import numpy as np
 import sdc
 from sdc.str_ext import string_type, unicode_to_char_ptr
@@ -90,7 +91,7 @@ def remove_parquet(rhs, lives, call_list):
     return False
 
 
-numba.ir_utils.remove_call_handlers.append(remove_parquet)
+numba.core.ir_utils.remove_call_handlers.append(remove_parquet)
 
 
 class ParquetHandler(object):

@@ -40,8 +40,10 @@ from collections import defaultdict
 import numpy as np
 
 import numba
-from numba import ir, ir_utils, postproc, types
-from numba.ir_utils import (
+from numba import types
+from numba.core import ir, ir_utils
+from numba.core import postproc
+from numba.core.ir_utils import (
     mk_unique_var,
     replace_vars_inner,
     find_topo_order,
@@ -64,8 +66,8 @@ from numba.ir_utils import (
     find_build_sequence,
     find_const,
     is_get_setitem)
-from numba.inline_closurecall import inline_closure_call
-from numba.parfor import (
+from numba.core.inline_closurecall import inline_closure_call
+from numba.parfors.parfor import (
     Parfor,
     lower_parfor_sequential,
     get_parfor_reductions,
@@ -73,7 +75,7 @@ from numba.parfor import (
     wrap_parfor_blocks,
     unwrap_parfor_blocks)
 
-from numba.compiler_machinery import FunctionPass, register_pass
+from numba.core.compiler_machinery import FunctionPass, register_pass
 
 import sdc
 import sdc.utilities.utils
@@ -983,7 +985,7 @@ class DistributedPassImpl(object):
             arg_typs = tuple(arg_typs)
             # self.state.calltypes[rhs] = self.state.typemap[rhs.func.name].get_call_type(
             #      self.state.typingctx, arg_typs, {})
-            self.state.calltypes[rhs] = numba.typing.Signature(
+            self.state.calltypes[rhs] = numba.core.typing.Signature(
                 string_type, arg_typs, new_df_typ,
                 call_type.pysig)
 
@@ -1960,11 +1962,11 @@ class DistributedPassImpl(object):
         if rhs.op == 'call':
             func = find_callname(self.state.func_ir, rhs, self.state.typemap)
             if func == ('min', 'builtins'):
-                if isinstance(self.state.typemap[rhs.args[0].name], numba.typing.builtins.IndexValueType):
+                if isinstance(self.state.typemap[rhs.args[0].name], numba.core.typing.builtins.IndexValueType):
                     return Reduce_Type.Argmin
                 return Reduce_Type.Min
             if func == ('max', 'builtins'):
-                if isinstance(self.state.typemap[rhs.args[0].name], numba.typing.builtins.IndexValueType):
+                if isinstance(self.state.typemap[rhs.args[0].name], numba.core.typing.builtins.IndexValueType):
                     return Reduce_Type.Argmax
                 return Reduce_Type.Max
 

@@ -35,11 +35,11 @@ import pandas
 from pandas.core.indexing import IndexingError
 
 import numba
-from numba.targets import quicksort
+from numba.misc import quicksort
 from numba import types
-from numba.errors import TypingError
+from numba.core.errors import TypingError
 from numba.extending import register_jitable
-from numba import numpy_support
+from numba.np import numpy_support
 from numba.typed import Dict
 
 import sdc

@@ -28,10 +28,10 @@
 from __future__ import print_function, division, absolute_import
 
 import numba
-from numba import compiler, ir, ir_utils, typed_passes, typeinfer, types
-from numba.typing import signature
-from numba.typing.templates import infer_global, AbstractTemplate
-from numba.extending import overload, lower_builtin
+from numba.core import types
+from numba.core.typing import signature
+from numba.core.typing.templates import infer_global, AbstractTemplate
+from numba.extending import lower_builtin
 
 
 @infer_global(bool)

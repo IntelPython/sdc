@@ -27,7 +27,8 @@
 import pandas as pd
 
 import numba
-from numba import types, cgutils
+from numba import types
+from numba.core import cgutils
 from numba.extending import (
     models,
     register_model,

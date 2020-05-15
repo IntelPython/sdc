@@ -33,14 +33,15 @@ from sdc.utilities.utils import to_array
 import sdc
 import operator
 import numba
-from numba import types, typing, generated_jit
+from numba import types, generated_jit
+from numba.core import typing
 from numba.extending import box, unbox, NativeValue
 from numba.extending import models, register_model
 from numba.extending import lower_builtin, overload_method, overload, intrinsic
-from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed,
+from numba.core.imputils import (impl_ret_new_ref, impl_ret_borrowed,
                                     iternext_impl, impl_ret_untracked, RefType)
-from numba import cgutils
-from numba.typing.templates import signature, AbstractTemplate, infer, infer_global
+from numba.core import cgutils
+from numba.core.typing.templates import signature, AbstractTemplate, infer, infer_global
 
 from llvmlite import ir as lir
 import llvmlite.binding as ll
@@ -278,11 +279,11 @@ def iternext_setiter(context, builder, sig, args, result):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer()])
     fn = builder.module.get_or_insert_function(fnty, name="set_nextval_string")
-    kind = numba.unicode.PY_UNICODE_1BYTE_KIND
+    kind = numba.cpython.unicode.PY_UNICODE_1BYTE_KIND
 
     def std_str_to_unicode(std_str):
         length = sdc.str_ext.get_std_str_len(std_str)
-        ret = numba.unicode._empty_string(kind, length)
+        ret = numba.cpython.unicode._empty_string(kind, length)
         sdc.str_arr_ext._memcpy(
             ret._data, sdc.str_ext.get_c_str(std_str), length, 1)
         sdc.str_ext.del_str(std_str)

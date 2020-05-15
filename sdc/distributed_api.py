@@ -39,8 +39,8 @@ import numpy as np
 import numba
 from numba import types
 from numba.extending import models, overload, register_model
-from numba.typing import signature
-from numba.typing.templates import AbstractTemplate, infer_global
+from numba.core.typing import signature
+from numba.core.typing.templates import AbstractTemplate, infer_global
 
 import sdc
 from sdc.str_arr_ext import (string_array_type, num_total_chars, StringArray,
