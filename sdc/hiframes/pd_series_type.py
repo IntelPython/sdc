@@ -118,6 +118,10 @@ class SeriesType(types.IterableType):
         return SeriesIterator(self)
 
 
+# register Series in numba.types for using in objmode
+setattr(types, 'series', SeriesType)
+
+
 # register_model(SeriesType)(models.ArrayModel)
 # need to define model since fix_df_array overload goes to native code
 @register_model(SeriesType)

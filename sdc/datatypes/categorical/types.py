@@ -51,9 +51,11 @@ class CategoricalDtypeType(types.Opaque):
     def __init__(self, categories=None, ordered=None):
         self.categories = categories
         self.ordered = ordered
-        name = 'CategoricalDtype(categories={}, ordered={})'.format(
+        super().__init__(name=self.__repr__())
+
+    def __repr__(self):
+        return 'CategoricalDtype(categories={}, ordered={})'.format(
             self.categories, self.ordered)
-        super().__init__(name=name)
 
     def __len__(self):
         return len(self.categories) if self.categories else 0
@@ -119,3 +121,8 @@ class Categorical(types.Type):
     @property
     def dtype(self):
         return self.codes.dtype
+
+
+# register new types in numba.types for using in objmode
+setattr(types, "CategoricalDtype", CategoricalDtypeType)
+setattr(types, "Categorical", Categorical)

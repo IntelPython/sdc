@@ -46,13 +46,11 @@ def _Series_category(data=None, index=None, dtype=None, name=None, copy=False, f
     # TODO: support other parameters (only data and dtype now)
 
     ty = typeof(_reconstruct_Series(data, dtype))
-    tyname = ty.name
-    setattr(types, tyname, ty)
 
     from textwrap import dedent
     text = dedent(f"""
     def impl(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
-        with objmode(series='vars()["{tyname}"]'):
+        with objmode(series="{ty}"):
             series = pd.Series(data, index, dtype, name, copy, fastpath)
         return series
     """)

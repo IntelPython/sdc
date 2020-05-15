@@ -164,13 +164,11 @@ def _Categorical(values, categories=None, ordered=None, dtype=None, fastpath=Fal
     # TODO: support other parameters (only values now)
 
     ty = typeof(_reconstruct_Categorical(values))
-    tyname = ty.name
-    setattr(types, tyname, ty)
 
     from textwrap import dedent
     text = dedent(f"""
     def impl(values, categories=None, ordered=None, dtype=None, fastpath=False):
-        with objmode(categorical='vars()["{tyname}"]'):
+        with objmode(categorical="{ty}"):
             categorical = pd.Categorical(values, categories, ordered, dtype, fastpath)
         return categorical
     """)
