@@ -111,12 +111,19 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
     -----------
     - Parameters ``dtype`` and ``copy`` are currently unsupported.
     - Types iterable and dict as ``data`` parameter are currently unsupported.
+    - Categorical types (i.e. 'category' and ``CategoricalDtype``) are supported in ``dtype``
+    only if they are provided as constants in jitted code.
 
     Examples
     --------
     Create Series with data [1, 2, 3] and index ['A', 'B', 'C'].
 
     >>> pd.Series([1, 2, 3], ['A', 'B', 'C'])
+
+    Create Series with categorical data:
+
+    >>> pd.Series([1, 2, 3], dtype='category')
+    >>> pd.Series([1, 2, 3], dtype=CategoricalDtype([1, 2, 3]))
 
     .. seealso::
 
