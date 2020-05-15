@@ -28,7 +28,6 @@
 | :class:`pandas.DataFrame.GroupBy` functions and operators implementations in Intel SDC
 """
 
-import math
 import pandas
 import numba
 import numpy
@@ -329,26 +328,32 @@ def _sdc_pandas_groupby_sum_codegen(func_name, by_column, subject_columns,
         f'        _accums = _acc',
         f'        main_accums[label] = _accums',
         f'      else:',
-        f'        for i in range(len(_accums)):',
-        f'          _accums[i] += _acc[i]',
+        f'        chunks = parallel_chunks(len(_accums))',
+        f'        for i in prange(len(chunks)):',
+        f'          chunk = chunks[i]',
+        f'          for k in range(chunk.start, chunk.stop):',
+        f'            _accums[k] += _acc[k]',
         f'      accums[0] = _accums',
         f'  shift = 1',
         f'  while shift < chunks_num:',
         f'    step = shift * 2',
-        f'    stop = int(math.ceil((chunks_num - shift) / step))',
-        f'    for i in prange(stop):',
-        f'      main_idx = i * step',
-        f'      auxiliary_idx = main_idx + shift',
-        f'      main_labels = index_labels_parts[main_idx]',
-        f'      auxiliary_labels = index_labels_parts[auxiliary_idx]',
-        f'      main_indices = label_indices_parts[main_idx]',
-        f'      reduce_indices(main_labels, auxiliary_labels, main_indices)',
+        f'    stop = numpy.int(numpy.ceil((chunks_num - shift) / step))',
+        f'    reduce_chunks = parallel_chunks(stop)',
+        f'    for i in prange(len(reduce_chunks)):',
+        f'      reduce_chunk = reduce_chunks[i]',
+        f'      for k in range(reduce_chunk.start, reduce_chunk.stop):',
+        f'        main_idx = k * step',
+        f'        auxiliary_idx = main_idx + shift',
+        f'        main_labels = index_labels_parts[main_idx]',
+        f'        auxiliary_labels = index_labels_parts[auxiliary_idx]',
+        f'        main_indices = label_indices_parts[main_idx]',
+        f'        reduce_indices(main_labels, auxiliary_labels, main_indices)',
     ]
     func_lines += ['\n'.join([
-        f'      main_accums_{i} = label_accums_parts_{i}[main_idx]',
-        f'      auxiliary_accums_{i} = label_accums_parts_{i}[auxiliary_idx]',
-        f'      accums_{i} = accums_parts_{i}[main_idx]',
-        f'      reduce_accums(main_accums_{i}, auxiliary_accums_{i}, accums_{i})',
+        f'        main_accums_{i} = label_accums_parts_{i}[main_idx]',
+        f'        auxiliary_accums_{i} = label_accums_parts_{i}[auxiliary_idx]',
+        f'        accums_{i} = accums_parts_{i}[main_idx]',
+        f'        reduce_accums(main_accums_{i}, auxiliary_accums_{i}, accums_{i})',
     ]) for i, *_ in column_dtype_indices.values()]
     func_lines += [
         f'    shift *= 2',
@@ -396,8 +401,7 @@ def _sdc_pandas_groupby_sum_codegen(func_name, by_column, subject_columns,
                    'Dict': Dict,
                    'List': List,
                    'types': types,
-                   'prange': numba.prange,
-                   'math': math}
+                   'prange': numba.prange}
     global_vars.update({ty.name: ty for ty in column_dtype_indices})
 
     return func_text, global_vars
