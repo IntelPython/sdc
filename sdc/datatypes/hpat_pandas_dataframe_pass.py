@@ -32,9 +32,10 @@ import numpy
 import pandas
 
 import numba
-from numba import ir, types
-from numba.compiler_machinery import FunctionPass, register_pass
-from numba.ir_utils import find_topo_order, build_definitions, guard, find_callname
+from numba import types
+from numba.core import ir, ir_utils
+from numba.core.compiler_machinery import FunctionPass, register_pass
+from numba.core.ir_utils import find_topo_order, build_definitions, guard, find_callname
 
 import sdc
 
@@ -82,7 +83,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
                     inst.value = ir.Expr.call(ir.Var(block.scope, "dummy", inst.loc), rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
                     sdc.utilities.utils.update_globals(rp_func.func, rp_func.glbls)
-                    numba.inline_closurecall.inline_closure_call(self.state.func_ir,
+                    numba.core.inline_closurecall.inline_closure_call(self.state.func_ir,
                                                                  rp_func.glbls,
                                                                  block,
                                                                  len(new_body),
@@ -104,15 +105,15 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
                 blocks[label].body = new_body
 
         # XXX remove slice() of h5 read due to Numba's #3380 bug
-        self.state.func_ir.blocks = numba.ir_utils.simplify_CFG(self.state.func_ir.blocks)
-        while numba.ir_utils.remove_dead(self.state.func_ir.blocks,
-                                         self.state.func_ir.arg_names,
-                                         self.state.func_ir,
-                                         self.state.typemap):
+        self.state.func_ir.blocks = ir_utils.simplify_CFG(self.state.func_ir.blocks)
+        while ir_utils.remove_dead(self.state.func_ir.blocks,
+                                   self.state.func_ir.arg_names,
+                                   self.state.func_ir,
+                                   self.state.typemap):
             pass
 
         self.state.func_ir._definitions = build_definitions(self.state.func_ir.blocks)
-        numba.ir_utils.dprint_func_ir(self.state.func_ir, self._name)
+        ir_utils.dprint_func_ir(self.state.func_ir, self._name)
 
         return True
 
@@ -176,12 +177,12 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
             data, other = rhs.args
 
             def _isin_series(A, B):
-                numba.parfor.init_prange()
+                numba.parfors.parfor.init_prange()
                 n = len(A)
                 m = len(B)
                 S = numpy.empty(n, numpy.bool_)
 
-                for i in numba.parfor.internal_prange(n):
+                for i in numba.parfors.parfor.internal_prange(n):
                     S[i] = (A[i] == B[i] if i < m else False)
 
                 return S
@@ -193,11 +194,11 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
             data = rhs.args[0]
 
             def _isin_series(A, vals):
-                numba.parfor.init_prange()
+                numba.parfors.parfor.init_prange()
                 n = len(A)
                 S = numpy.empty(n, numpy.bool_)
 
-                for i in numba.parfor.internal_prange(n):
+                for i in numba.parfors.parfor.internal_prange(n):
                     S[i] = A[i] in vals
 
                 return S
@@ -221,7 +222,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
         return self._replace_func(sdc.hiframes.series_kernels._column_filter_impl, [in_arr, bool_arr], pre_nodes=nodes)
 
     def _get_series_data(self, series_var, nodes):
-        var_def = guard(numba.ir_utils.get_definition, self.state.func_ir, series_var)
+        var_def = guard(ir_utils.get_definition, self.state.func_ir, series_var)
         call_def = guard(find_callname, self.state.func_ir, var_def)
 
         if call_def == ('init_series', 'sdc.hiframes.api'):
@@ -230,13 +231,13 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
         def _get_series_data_lambda(S):
             return sdc.hiframes.api.get_series_data(S)
 
-        f_block = numba.ir_utils.compile_to_numba_ir(_get_series_data_lambda,
-                                                     {'sdc': sdc},
-                                                     self.state.typingctx,
-                                                     (self.state.typemap[series_var.name], ),
-                                                     self.state.typemap,
-                                                     self.state.calltypes).blocks.popitem()[1]
-        numba.ir_utils.replace_arg_nodes(f_block, [series_var])
+        f_block = ir_utils.compile_to_numba_ir(_get_series_data_lambda,
+                                               {'sdc': sdc},
+                                               self.state.typingctx,
+                                               (self.state.typemap[series_var.name], ),
+                                               self.state.typemap,
+                                               self.state.calltypes).blocks.popitem()[1]
+        ir_utils.replace_arg_nodes(f_block, [series_var])
         nodes += f_block.body[:-2]
         return nodes[-1].target
 
@@ -254,14 +255,14 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
                 return default
 
             def default_handler(index, param, default):
-                d_var = ir.Var(scope, numba.ir_utils.mk_unique_var('defaults'), loc)
+                d_var = ir.Var(scope, ir_utils.mk_unique_var('defaults'), loc)
                 self.state.typemap[d_var.name] = numba.typeof(default)
                 node = ir.Assign(ir.Const(default, loc), d_var, loc)
                 pre_nodes.append(node)
 
                 return d_var
 
-            args = numba.typing.fold_arguments(pysig, args, kws, normal_handler, default_handler, normal_handler)
+            args = numba.core.typing.fold_arguments(pysig, args, kws, normal_handler, default_handler, normal_handler)
 
         arg_typs = tuple(self.state.typemap[v.name] for v in args)
 
@@ -269,7 +270,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage2(FunctionPass):
             new_args = []
 
             for i, arg in enumerate(args):
-                val = guard(numba.ir_utils.find_const, self.state.func_ir, arg)
+                val = guard(ir_utils.find_const, self.state.func_ir, arg)
                 if val:
                     new_args.append(types.literal(val))
                 else:
@@ -308,11 +309,11 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         # df_var -> label where it is defined
         self.df_labels = {}
 
-        numba.ir_utils._max_label = max(self.state.func_ir.blocks.keys()) # shssf:  is it still needed?
+        ir_utils._max_label = max(self.state.func_ir.blocks.keys())  # shssf:  is it still needed?
 
         # FIXME: see why this breaks test_kmeans
         # remove_dels(self.state.func_ir.blocks)
-        numba.ir_utils.dprint_func_ir(self.state.func_ir, self._name)
+        ir_utils.dprint_func_ir(self.state.func_ir, self._name)
         blocks = self.state.func_ir.blocks
         # call build definition since rewrite pass doesn't update definitions
         # e.g. getitem to static_getitem in test_column_list_select2
@@ -334,7 +335,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                 if (isinstance(inst, ir.StaticSetItem)
                         and isinstance(inst.index, str)):
                     # cfg needed for set df column
-                    cfg = numba.ir_utils.compute_cfg_from_blocks(blocks)
+                    cfg = ir_utils.compute_cfg_from_blocks(blocks)
                     out_nodes = self._run_df_set_column(inst, label, cfg)
                 elif isinstance(inst, ir.Assign):
                     self.state.func_ir._definitions[inst.target.name].remove(inst.value)
@@ -350,14 +351,14 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                         new_body.extend(rp_func.pre_nodes)
                         self._update_definitions(rp_func.pre_nodes)
                     # replace inst.value to a call with target args
-                    # as expected by numba.inline_closurecall.inline_closure_call
+                    # as expected by numba.core.inline_closurecall.inline_closure_call
                     # TODO: inst other than Assign?
                     inst.value = ir.Expr.call(
                         ir.Var(block.scope, "dummy", inst.loc),
                         rp_func.args, (), inst.loc)
                     block.body = new_body + block.body[i:]
                     sdc.utilities.utils.update_globals(rp_func.func, rp_func.glbls)
-                    numba.inline_closurecall.inline_closure_call(self.state.func_ir, rp_func.glbls,
+                    numba.core.inline_closurecall.inline_closure_call(self.state.func_ir, rp_func.glbls,
                                         block, len(new_body), rp_func.func, work_list=work_list)
                     replaced = True
                     break
@@ -373,14 +374,14 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             if not replaced:
                 blocks[label].body = new_body
 
-        self.state.func_ir.blocks = numba.ir_utils.simplify_CFG(self.state.func_ir.blocks)
+        self.state.func_ir.blocks = ir_utils.simplify_CFG(self.state.func_ir.blocks)
         # self.state.func_ir._definitions = build_definitions(blocks)
         # XXX: remove dead here fixes h5 slice issue
         # iterative remove dead to make sure all extra code (e.g. df vars) is removed
         # while remove_dead(blocks, self.state.func_ir.arg_names, self.state.func_ir):
         #     pass
         self.state.func_ir._definitions = build_definitions(blocks)
-        numba.ir_utils.dprint_func_ir(self.state.func_ir, self._name)
+        ir_utils.dprint_func_ir(self.state.func_ir, self._name)
 
         return True
 
@@ -391,7 +392,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             lhs = inst.target.name
             self.state.func_ir._definitions[lhs].remove(inst.value)
 
-        numba.ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
+        ir_utils.replace_vars_stmt(inst, self.replace_var_dict)
 
         if sdc.utilities.utils.is_assign(inst):
             self.state.func_ir._definitions[lhs].append(inst.value)
@@ -410,7 +411,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             # HACK: delete pd.DataFrame({}) nodes to avoid typing errors
             # TODO: remove when dictionaries are implemented and typing works
             if rhs.op == 'getattr':
-                val_def = guard(numba.ir_utils.get_definition, self.state.func_ir, rhs.value)
+                val_def = guard(ir_utils.get_definition, self.state.func_ir, rhs.value)
                 if (isinstance(val_def, ir.Global) and val_def.value == pandas and rhs.attr in ('DataFrame', 'read_csv', 'read_parquet', 'to_numeric')):
                     # TODO: implement to_numeric in typed pass?
                     # put back the definition removed earlier but remove node
@@ -419,7 +420,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                     return []
 
             if rhs.op == 'getattr':
-                val_def = guard(numba.ir_utils.get_definition, self.state.func_ir, rhs.value)
+                val_def = guard(ir_utils.get_definition, self.state.func_ir, rhs.value)
                 if (isinstance(val_def, ir.Global) and val_def.value == numpy and rhs.attr == 'fromfile'):
                     # put back the definition removed earlier but remove node
                     self.state.func_ir._definitions[lhs].append(rhs)
@@ -508,11 +509,11 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                 if cname in arg_df_map:
                     other_colmap[cname] = arg_df_map[cname]
         else:
-            other_def = guard(numba.ir_utils.get_definition, self.state.func_ir, other)
+            other_def = guard(ir_utils.get_definition, self.state.func_ir, other)
             # dict case
             if isinstance(other_def, ir.Expr) and other_def.op == 'build_map':
                 for c, v in other_def.items:
-                    cname = guard(numba.ir_utils.find_const, self.state.func_ir, c)
+                    cname = guard(ir_utils.find_const, self.state.func_ir, c)
                     if not isinstance(cname, str):
                         raise ValueError("dictionary argument to isin() should have constant keys")
                     other_colmap[cname] = v
@@ -534,11 +535,11 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             data, other = rhs.args
 
             def _isin_series(A, B):
-                numba.parfor.init_prange()
+                numba.parfors.parfor.init_prange()
                 n = len(A)
                 m = len(B)
                 S = numpy.empty(n, np.bool_)
-                for i in numba.parfor.internal_prange(n):
+                for i in numba.parfors.parfor.internal_prange(n):
                     S[i] = (A[i] == B[i] if i < m else False)
                 return S
 
@@ -564,8 +565,8 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             else:
                 func = bool_arr_func
                 args = false_arr_args
-            f_block = numba.ir_utils.compile_to_numba_ir(func, {'sdc': sdc, 'numpy': numpy}).blocks.popitem()[1]
-            numba.ir_utils.replace_arg_nodes(f_block, args)
+            f_block = ir_utils.compile_to_numba_ir(func, {'sdc': sdc, 'numpy': numpy}).blocks.popitem()[1]
+            ir_utils.replace_arg_nodes(f_block, args)
             nodes += f_block.body[:-2]
             out_df_map[cname] = nodes[-1].target
 
@@ -581,14 +582,14 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         if self._is_df_var(other):
             return self._handle_concat_df(lhs, [df_var, other], label)
         # list of dfs
-        df_list = guard(numba.ir_utils.get_definition, self.state.func_ir, other)
+        df_list = guard(ir_utils.get_definition, self.state.func_ir, other)
         if len(df_list.items) > 0 and self._is_df_var(df_list.items[0]):
             return self._handle_concat_df(lhs, [df_var] + df_list.items, label)
         raise ValueError("invalid df.append() input. Only dataframe and list of dataframes supported")
 
     def _handle_df_fillna(self, lhs, rhs, df_var, label):
         nodes = []
-        inplace_default = ir.Var(lhs.scope, numba.ir_utils.mk_unique_var("fillna_default"), lhs.loc)
+        inplace_default = ir.Var(lhs.scope, ir_utils.mk_unique_var("fillna_default"), lhs.loc)
         nodes.append(ir.Assign(ir.Const(False, lhs.loc), inplace_default, lhs.loc))
         val_var = self._get_arg('fillna', rhs.args, dict(rhs.kws), 0, 'value')
         inplace_var = self._get_arg('fillna', rhs.args, dict(rhs.kws), 3, 'inplace', default=inplace_default)
@@ -598,26 +599,27 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
 
         out_col_map = {}
         for cname, in_var in self._get_df_cols(df_var).items():
-            f_block = numba.ir_utils.compile_to_numba_ir(_fillna_func, {}).blocks.popitem()[1]
-            numba.ir_utils.replace_arg_nodes(f_block, [in_var, val_var, inplace_var])
+            f_block = ir_utils.compile_to_numba_ir(_fillna_func, {}).blocks.popitem()[1]
+            ir_utils.replace_arg_nodes(f_block, [in_var, val_var, inplace_var])
             nodes += f_block.body[:-2]
             out_col_map[cname] = nodes[-1].target
 
         # create output df if not inplace
-        if (inplace_var.name == inplace_default.name or guard(numba.ir_utils.find_const, self.state.func_ir, inplace_var) == False):
+        if (inplace_var.name == inplace_default.name or
+                guard(ir_utils.find_const, self.state.func_ir, inplace_var) is False):
             self._create_df(lhs.name, out_col_map, label)
         return nodes
 
     def _handle_df_dropna(self, lhs, rhs, df_var, label):
         nodes = []
-        inplace_default = ir.Var(lhs.scope, numba.ir_utils.mk_unique_var("dropna_default"), lhs.loc)
+        inplace_default = ir.Var(lhs.scope, ir_utils.mk_unique_var("dropna_default"), lhs.loc)
         nodes.append(ir.Assign(ir.Const(False, lhs.loc), inplace_default, lhs.loc))
         inplace_var = self._get_arg('dropna', rhs.args, dict(rhs.kws), 4, 'inplace', default=inplace_default)
 
         col_names = self._get_df_col_names(df_var)
         col_vars = self._get_df_col_vars(df_var)
-        arg_names = ", ".join([numba.ir_utils.mk_unique_var(cname).replace('.', '_') for cname in col_names])
-        out_names = ", ".join([numba.ir_utils.mk_unique_var(cname).replace('.', '_') for cname in col_names])
+        arg_names = ", ".join([ir_utils.mk_unique_var(cname).replace('.', '_') for cname in col_names])
+        out_names = ", ".join([ir_utils.mk_unique_var(cname).replace('.', '_') for cname in col_names])
 
         func_text = "def _dropna_imp({}, inplace):\n".format(arg_names)
         func_text += "  ({},) = sdc.hiframes.api.dropna(({},), inplace)\n".format(
@@ -626,8 +628,8 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         exec(func_text, {'sdc': sdc}, loc_vars)
         _dropna_imp = loc_vars['_dropna_imp']
 
-        f_block = numba.ir_utils.compile_to_numba_ir(_dropna_imp, {'sdc': sdc}).blocks.popitem()[1]
-        numba.ir_utils.replace_arg_nodes(f_block, col_vars + [inplace_var])
+        f_block = ir_utils.compile_to_numba_ir(_dropna_imp, {'sdc': sdc}).blocks.popitem()[1]
+        ir_utils.replace_arg_nodes(f_block, col_vars + [inplace_var])
         nodes += f_block.body[:-3]
 
         # extract column vars from output
@@ -636,7 +638,8 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             out_col_map[cname] = nodes[-len(col_names) + i].target
 
         # create output df if not inplace
-        if (inplace_var.name == inplace_default.name or guard(numba.ir_utils.find_const, self.state.func_ir, inplace_var) == False):
+        if (inplace_var.name == inplace_default.name or
+                guard(ir_utils.find_const, self.state.func_ir, inplace_var) is False):
             self._create_df(lhs.name, out_col_map, label)
         else:
             # assign back to column vars for inplace case
@@ -653,23 +656,24 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         """
         kws = dict(rhs.kws)
         inplace_var = self._get_arg('drop', rhs.args, kws, 5, 'inplace', '')
-        inplace = guard(numba.ir_utils.find_const, self.state.func_ir, inplace_var)
+        inplace = guard(ir_utils.find_const, self.state.func_ir, inplace_var)
         if inplace is not None and inplace:
             # TODO: make sure call post dominates df_var definition or df_var
             # is not used in other code paths
             # replace func variable with drop_inplace
-            f_block = numba.ir_utils.compile_to_numba_ir(lambda: sdc.hiframes.api.drop_inplace, {'sdc': sdc}).blocks.popitem()[1]
+            f_block = ir_utils.compile_to_numba_ir(lambda: sdc.hiframes.api.drop_inplace, {'sdc': sdc}
+                                                   ).blocks.popitem()[1]
             nodes = f_block.body[:-2]
             new_func_var = nodes[-1].target
             rhs.func = new_func_var
             rhs.args.insert(0, df_var)
             # new tuple return
-            ret_tup = ir.Var(lhs.scope, numba.ir_utils.mk_unique_var('drop_ret'), lhs.loc)
+            ret_tup = ir.Var(lhs.scope, ir_utils.mk_unique_var('drop_ret'), lhs.loc)
             assign.target = ret_tup
             nodes.append(assign)
-            new_df_var = ir.Var(df_var.scope, numba.ir_utils.mk_unique_var(df_var.name), df_var.loc)
-            zero_var = ir.Var(df_var.scope, numba.ir_utils.mk_unique_var('zero'), df_var.loc)
-            one_var = ir.Var(df_var.scope, numba.ir_utils.mk_unique_var('one'), df_var.loc)
+            new_df_var = ir.Var(df_var.scope, ir_utils.mk_unique_var(df_var.name), df_var.loc)
+            zero_var = ir.Var(df_var.scope, ir_utils.mk_unique_var('zero'), df_var.loc)
+            one_var = ir.Var(df_var.scope, ir_utils.mk_unique_var('one'), df_var.loc)
             nodes.append(ir.Assign(ir.Const(0, lhs.loc), zero_var, lhs.loc))
             nodes.append(ir.Assign(ir.Const(1, lhs.loc), one_var, lhs.loc))
             getitem0 = ir.Expr.static_getitem(ret_tup, 0, zero_var, lhs.loc)
@@ -687,7 +691,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         labels_var = self._get_arg('drop', rhs.args, kws, 0, 'labels', '')
         axis_var = self._get_arg('drop', rhs.args, kws, 1, 'axis', '')
         labels = self._get_str_or_list(labels_var, default='')
-        axis = guard(numba.ir_utils.find_const, self.state.func_ir, axis_var)
+        axis = guard(ir_utils.find_const, self.state.func_ir, axis_var)
 
         if labels != '' and axis is not None:
             if axis != 1:
@@ -700,11 +704,11 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             columns = self._get_str_or_list(columns_var, err_msg=err_msg)
 
         inplace_var = self._get_arg('drop', rhs.args, kws, 5, 'inplace', '')
-        inplace = guard(numba.ir_utils.find_const, self.state.func_ir, inplace_var)
+        inplace = guard(ir_utils.find_const, self.state.func_ir, inplace_var)
 
         if inplace is not None and inplace:
             df_label = self.df_labels[df_var.name]
-            cfg = numba.ir_utils.compute_cfg_from_blocks(self.state.func_ir.blocks)
+            cfg = ir_utils.compute_cfg_from_blocks(self.state.func_ir.blocks)
             # dropping columns inplace possible only when it dominates the df
             # creation to keep schema consistent
             if label not in cfg.backbone() and label not in cfg.post_dominators()[df_label]:
@@ -739,7 +743,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                     "data argument in pd.DataFrame() expected")
             data = rhs.args[0]
 
-        arg_def = guard(numba.ir_utils.get_definition, self.state.func_ir, data)
+        arg_def = guard(ir_utils.get_definition, self.state.func_ir, data)
         if (not isinstance(arg_def, ir.Expr) or arg_def.op != 'build_map'):
             raise ValueError("Invalid DataFrame() arguments (constant dict of columns expected)")
 
@@ -760,7 +764,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         _init_df = loc_vars['_init_df']
 
         # TODO: support index var
-        index = ir.Var(lhs.scope, numba.ir_utils.mk_unique_var('df_index_none'), lhs.loc)
+        index = ir.Var(lhs.scope, ir_utils.mk_unique_var('df_index_none'), lhs.loc)
         nodes.append(ir.Assign(ir.Const(None, lhs.loc), index, lhs.loc))
         data_vars = [a[1] for a in items]
         col_vars = [a[0] for a in items]
@@ -771,7 +775,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
     def _get_csv_col_info(self, dtype_map, date_cols, col_names, lhs):
         if isinstance(dtype_map, types.Type):
             typ = dtype_map
-            data_arrs = [ir.Var(lhs.scope, numba.ir_utils.mk_unique_var(cname), lhs.loc)
+            data_arrs = [ir.Var(lhs.scope, ir_utils.mk_unique_var(cname), lhs.loc)
                          for cname in col_names]
             return col_names, data_arrs, [typ] * len(col_names)
 
@@ -786,12 +790,12 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             out_types.append(typ)
             # output array variable
             data_arrs.append(
-                ir.Var(lhs.scope, numba.ir_utils.mk_unique_var(col_name), lhs.loc))
+                ir.Var(lhs.scope, ir_utils.mk_unique_var(col_name), lhs.loc))
 
         return columns, data_arrs, out_types
 
     def _get_const_dtype(self, dtype_var):
-        dtype_def = guard(numba.ir_utils.get_definition, self.state.func_ir, dtype_var)
+        dtype_def = guard(ir_utils.get_definition, self.state.func_ir, dtype_var)
         if isinstance(dtype_def, ir.Const) and isinstance(dtype_def.value, str):
             typ_name = dtype_def.value
             if typ_name == 'str':
@@ -819,7 +823,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             return CategoricalArray(typ)
         if not isinstance(dtype_def, ir.Expr) or dtype_def.op != 'getattr':
             raise ValueError("pd.read_csv() invalid dtype")
-        glob_def = guard(numba.ir_utils.get_definition, self.state.func_ir, dtype_def.value)
+        glob_def = guard(ir_utils.get_definition, self.state.func_ir, dtype_def.value)
         if not isinstance(glob_def, ir.Global) or glob_def.value != numpy:
             raise ValueError("pd.read_csv() invalid dtype")
         # TODO: extend to other types like string and date, check error
@@ -836,7 +840,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         kws = dict(rhs.kws)
         objs_arg = self._get_arg('concat', rhs.args, kws, 0, 'objs')
 
-        df_list = guard(numba.ir_utils.get_definition, self.state.func_ir, objs_arg)
+        df_list = guard(ir_utils.get_definition, self.state.func_ir, objs_arg)
         if not isinstance(df_list, ir.Expr) or not (df_list.op
                                                     in ['build_tuple', 'build_list']):
             raise ValueError("pd.concat input should be constant list or tuple")
@@ -886,17 +890,17 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                 if cname not in df_col_map:
                     # use a df column just for len()
                     len_arr = list(df_col_map.values())[0]
-                    f_block = numba.ir_utils.compile_to_numba_ir(gen_nan_func,
+                    f_block = ir_utils.compile_to_numba_ir(gen_nan_func,
                                                   {'sdc': sdc, 'numpy': numpy}).blocks.popitem()[1]
-                    numba.ir_utils.replace_arg_nodes(f_block, [len_arr])
+                    ir_utils.replace_arg_nodes(f_block, [len_arr])
                     nodes += f_block.body[:-2]
                     args.append(nodes[-1].target)
                 else:
                     args.append(df_col_map[cname])
 
-            f_block = numba.ir_utils.compile_to_numba_ir(_concat_imp,
+            f_block = ir_utils.compile_to_numba_ir(_concat_imp,
                                           {'sdc': sdc, 'numpy': numpy}).blocks.popitem()[1]
-            numba.ir_utils.replace_arg_nodes(f_block, args)
+            ir_utils.replace_arg_nodes(f_block, args)
             nodes += f_block.body[:-2]
             done_cols[cname] = nodes[-1].target
 
@@ -921,16 +925,16 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
 
             def f(arr):
                 df_arr = sdc.hiframes.api.fix_df_array(arr)
-            f_block = numba.ir_utils.compile_to_numba_ir(
+            f_block = ir_utils.compile_to_numba_ir(
                 f, {'sdc': sdc}).blocks.popitem()[1]
-            numba.ir_utils.replace_arg_nodes(f_block, [col_arr])
+            ir_utils.replace_arg_nodes(f_block, [col_arr])
             nodes += f_block.body[:-3]  # remove none return
             new_col_arr = nodes[-1].target
             new_list.append((col_varname, new_col_arr))
         return nodes, new_list
 
     def _fix_df_list_of_array(self, col_arr):
-        list_call = guard(numba.ir_utils.get_definition, self.state.func_ir, col_arr)
+        list_call = guard(ir_utils.get_definition, self.state.func_ir, col_arr)
         if guard(find_callname, self.state.func_ir, list_call) == ('list', 'builtins'):
             return list_call.args[0]
         return col_arr
@@ -951,9 +955,9 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
 
             def f(arr):
                 df_arr = sdc.hiframes.api.init_series(arr)
-            f_block = numba.ir_utils.compile_to_numba_ir(
+            f_block = ir_utils.compile_to_numba_ir(
                 f, {'sdc': sdc}).blocks.popitem()[1]
-            numba.ir_utils.replace_arg_nodes(f_block, [item[1]])
+            ir_utils.replace_arg_nodes(f_block, [item[1]])
             nodes += f_block.body[:-3]  # remove none return
             new_col_arr = nodes[-1].target
             df_cols[col_name] = new_col_arr
@@ -964,7 +968,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         determines whether variable is coming from groupby() or groupby()[], rolling(), rolling()[]
         """
 
-        var_def = guard(numba.ir_utils.get_definition, self.state.func_ir, call_var)
+        var_def = guard(ir_utils.get_definition, self.state.func_ir, call_var)
         # groupby()['B'] case
         if (isinstance(var_def, ir.Expr)
                 and var_def.op in ['getitem', 'static_getitem']):
@@ -980,9 +984,9 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
     def _get_str_arg(self, f_name, args, kws, arg_no, arg_name, default=None, err_msg=None):
         arg = None
         if len(args) > arg_no:
-            arg = guard(numba.ir_utils.find_const, self.state.func_ir, args[arg_no])
+            arg = guard(ir_utils.find_const, self.state.func_ir, args[arg_no])
         elif arg_name in kws:
-            arg = guard(numba.ir_utils.find_const, self.state.func_ir, kws[arg_name])
+            arg = guard(ir_utils.find_const, self.state.func_ir, kws[arg_name])
 
         if arg is None:
             if default is not None:
@@ -1041,10 +1045,10 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             if as_index is False:
                 out_key_vars = []
                 for k in key_colnames:
-                    out_key_var = ir.Var(lhs.scope, numba.ir_utils.mk_unique_var(k), lhs.loc)
+                    out_key_var = ir.Var(lhs.scope, ir_utils.mk_unique_var(k), lhs.loc)
                     out_df[k] = out_key_var
                     out_key_vars.append(out_key_var)
-            df_col_map = ({col: ir.Var(lhs.scope, numba.ir_utils.mk_unique_var(col), lhs.loc)
+            df_col_map = ({col: ir.Var(lhs.scope, ir_utils.mk_unique_var(col), lhs.loc)
                            for col in out_colnames})
             out_df.update(df_col_map)
 
@@ -1063,7 +1067,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         # sdc.jit() instead of numba.njit() to handle str arrs etc
         agg_func_dis = sdc.jit(agg_func)
         #agg_func_dis = numba.njit(agg_func)
-        agg_gb_var = ir.Var(lhs.scope, numba.ir_utils.mk_unique_var("agg_gb"), lhs.loc)
+        agg_gb_var = ir.Var(lhs.scope, ir_utils.mk_unique_var("agg_gb"), lhs.loc)
         nodes = [ir.Assign(ir.Global("agg_gb", agg_func_dis, lhs.loc), agg_gb_var, lhs.loc)]
         for out_cname in out_colnames:
             in_var = in_vars[out_cname]
@@ -1071,20 +1075,20 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
             def to_arr(a, _agg_f):
                 b = sdc.hiframes.api.to_arr_from_series(a)
                 res = sdc.hiframes.api.init_series(sdc.hiframes.api.agg_typer(b, _agg_f))
-            f_block = numba.ir_utils.compile_to_numba_ir(to_arr, {'sdc': sdc, 'numpy': numpy}).blocks.popitem()[1]
-            numba.ir_utils.replace_arg_nodes(f_block, [in_var, agg_gb_var])
+            f_block = ir_utils.compile_to_numba_ir(to_arr, {'sdc': sdc, 'numpy': numpy}).blocks.popitem()[1]
+            ir_utils.replace_arg_nodes(f_block, [in_var, agg_gb_var])
             nodes += f_block.body[:-3]  # remove none return
             out_tp_vars[out_cname] = nodes[-1].target
         return nodes, agg_func, out_tp_vars
 
     def _get_agg_obj_args(self, agg_var):
         # find groupby key and as_index
-        groubpy_call = guard(numba.ir_utils.get_definition, self.state.func_ir, agg_var)
+        groubpy_call = guard(ir_utils.get_definition, self.state.func_ir, agg_var)
         assert isinstance(groubpy_call, ir.Expr) and groubpy_call.op == 'call'
         kws = dict(groubpy_call.kws)
         as_index = True
         if 'as_index' in kws:
-            as_index = guard(numba.ir_utils.find_const, self.state.func_ir, kws['as_index'])
+            as_index = guard(ir_utils.find_const, self.state.func_ir, kws['as_index'])
             if as_index is None:
                 raise ValueError("groupby as_index argument should be constant")
         if len(groubpy_call.args) == 1:
@@ -1105,30 +1109,30 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
 
         if by_arg_def is None:
             # try add_consts_to_type
-            by_arg_call = guard(numba.ir_utils.get_definition, self.state.func_ir, by_arg)
+            by_arg_call = guard(ir_utils.get_definition, self.state.func_ir, by_arg)
             if guard(find_callname, self.state.func_ir, by_arg_call) == ('add_consts_to_type', 'sdc.hiframes.api'):
                 by_arg_def = guard(find_build_sequence, self.state.func_ir, by_arg_call.args[0])
 
         if by_arg_def is None:
             # try dict.keys()
-            by_arg_call = guard(numba.ir_utils.get_definition, self.state.func_ir, by_arg)
+            by_arg_call = guard(ir_utils.get_definition, self.state.func_ir, by_arg)
             call_name = guard(find_callname, self.state.func_ir, by_arg_call)
             if (call_name is not None and len(call_name) == 2
                     and call_name[0] == 'keys'
                     and isinstance(call_name[1], ir.Var)):
-                var_def = guard(numba.ir_utils.get_definition, self.state.func_ir, call_name[1])
+                var_def = guard(ir_utils.get_definition, self.state.func_ir, call_name[1])
                 if isinstance(var_def, ir.Expr) and var_def.op == 'build_map':
                     by_arg_def = [v[0] for v in var_def.items], 'build_map'
                     # HACK replace dict.keys getattr to avoid typing errors
                     keys_getattr = guard(
-                        numba.ir_utils.get_definition, self.state.func_ir, by_arg_call.func)
+                        ir_utils.get_definition, self.state.func_ir, by_arg_call.func)
                     assert isinstance(
                         keys_getattr, ir.Expr) and keys_getattr.attr == 'keys'
                     keys_getattr.attr = 'copy'
 
         if by_arg_def is None:
             # try single key column
-            by_arg_def = guard(numba.ir_utils.find_const, self.state.func_ir, by_arg)
+            by_arg_def = guard(ir_utils.find_const, self.state.func_ir, by_arg)
             if by_arg_def is None:
                 if default is not None:
                     return default
@@ -1139,7 +1143,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                 if default is not None:
                     return default
                 raise ValueError(err_msg)
-            key_colnames = [guard(numba.ir_utils.find_const, self.state.func_ir, v) for v in by_arg_def[0]]
+            key_colnames = [guard(ir_utils.find_const, self.state.func_ir, v) for v in by_arg_def[0]]
             if any(not isinstance(v, typ) for v in key_colnames):
                 if default is not None:
                     return default
@@ -1150,21 +1154,21 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         """analyze selection of columns in after groupby() or rolling()
         e.g. groupby('A')['B'], groupby('A')['B', 'C'], groupby('A')
         """
-        select_def = guard(numba.ir_utils.get_definition, self.state.func_ir, obj_var)
+        select_def = guard(ir_utils.get_definition, self.state.func_ir, obj_var)
         out_colnames = None
         explicit_select = False
         if isinstance(select_def, ir.Expr) and select_def.op in ('getitem', 'static_getitem'):
             obj_var = select_def.value
             out_colnames = (select_def.index
                             if select_def.op == 'static_getitem'
-                            else guard(numba.ir_utils.find_const, self.state.func_ir, select_def.index))
+                            else guard(ir_utils.find_const, self.state.func_ir, select_def.index))
             if not isinstance(out_colnames, (str, tuple)):
                 raise ValueError("{} output column names should be constant".format(obj_name))
             if isinstance(out_colnames, str):
                 out_colnames = [out_colnames]
             explicit_select = True
 
-        obj_call = guard(numba.ir_utils.get_definition, self.state.func_ir, obj_var)
+        obj_call = guard(ir_utils.get_definition, self.state.func_ir, obj_var)
         # find dataframe
         call_def = guard(find_callname, self.state.func_ir, obj_call)
         assert (call_def is not None and call_def[0] == obj_name
@@ -1183,15 +1187,15 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         nodes = []
         # find selected output columns
         df_var, out_colnames, explicit_select, obj_var = self._get_df_obj_select(obj_var, 'rolling')
-        rolling_call = guard(numba.ir_utils.get_definition, self.state.func_ir, obj_var)
+        rolling_call = guard(ir_utils.get_definition, self.state.func_ir, obj_var)
         window, center, on = get_rolling_setup_args(self.state.func_ir, rolling_call, False)
         on_arr = self.df_vars[df_var.name][on] if on is not None else None
         if not isinstance(center, ir.Var):
-            center_var = ir.Var(lhs.scope, numba.ir_utils.mk_unique_var("center"), lhs.loc)
+            center_var = ir.Var(lhs.scope, ir_utils.mk_unique_var("center"), lhs.loc)
             nodes.append(ir.Assign(ir.Const(center, lhs.loc), center_var, lhs.loc))
             center = center_var
         if not isinstance(window, ir.Var):
-            window_var = ir.Var(lhs.scope, numba.ir_utils.mk_unique_var("window"), lhs.loc)
+            window_var = ir.Var(lhs.scope, ir_utils.mk_unique_var("window"), lhs.loc)
             nodes.append(ir.Assign(ir.Const(window, lhs.loc), window_var, lhs.loc))
             window = window_var
         # TODO: get 'on' arg for offset case
@@ -1225,7 +1229,7 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         if len(out_colnames) == 1 and explicit_select:
             df_col_map = {out_colnames[0]: lhs}
         else:
-            df_col_map = ({col: ir.Var(lhs.scope, numba.ir_utils.mk_unique_var(col), lhs.loc)
+            df_col_map = ({col: ir.Var(lhs.scope, ir_utils.mk_unique_var(col), lhs.loc)
                            for col in out_colnames})
             if on is not None:
                 df_col_map[on] = on_arr
@@ -1246,8 +1250,8 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         for cname in nan_cols:
             def f(arr):
                 nan_arr = numpy.full(len(arr), np.nan)
-            f_block = numba.ir_utils.compile_to_numba_ir(f, {'numpy': numpy}).blocks.popitem()[1]
-            numba.ir_utils.replace_arg_nodes(f_block, [len_arr])
+            f_block = ir_utils.compile_to_numba_ir(f, {'numpy': numpy}).blocks.popitem()[1]
+            ir_utils.replace_arg_nodes(f_block, [len_arr])
             nodes += f_block.body[:-3]  # remove none return
             out_df[cname] = nodes[-1].target
         if out_df is not None:
@@ -1298,8 +1302,8 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
                     df_arr = sdc.hiframes.api.init_series(sdc.hiframes.rolling.rolling_fixed(arr, w, center, False, _func_name))
                 args = [in_col_var, window, center]
 
-        f_block = numba.ir_utils.compile_to_numba_ir(f, {'sdc': sdc, '_func_name': func_name}).blocks.popitem()[1]
-        numba.ir_utils.replace_arg_nodes(f_block, args)
+        f_block = ir_utils.compile_to_numba_ir(f, {'sdc': sdc, '_func_name': func_name}).blocks.popitem()[1]
+        ir_utils.replace_arg_nodes(f_block, args)
         nodes += f_block.body[:-3]  # remove none return
         nodes[-1].target = out_col_var
 
@@ -1315,18 +1319,18 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
 
         df_var = inst.target
         # create var for string index
-        cname_var = ir.Var(inst.value.scope, numba.ir_utils.mk_unique_var("$cname_const"), inst.loc)
+        cname_var = ir.Var(inst.value.scope, ir_utils.mk_unique_var("$cname_const"), inst.loc)
         nodes = [ir.Assign(ir.Const(inst.index, inst.loc), cname_var, inst.loc)]
 
         def func(df, cname, arr):
             return sdc.hiframes.api.set_df_col(df, cname, arr)
 
-        f_block = numba.ir_utils.compile_to_numba_ir(func, {'sdc': sdc}).blocks.popitem()[1]
-        numba.ir_utils.replace_arg_nodes(f_block, [df_var, cname_var, inst.value])
+        f_block = ir_utils.compile_to_numba_ir(func, {'sdc': sdc}).blocks.popitem()[1]
+        ir_utils.replace_arg_nodes(f_block, [df_var, cname_var, inst.value])
         nodes += f_block.body[:-2]
 
         # rename the dataframe variable to keep schema static
-        new_df_var = ir.Var(df_var.scope, numba.ir_utils.mk_unique_var(df_var.name), df_var.loc)
+        new_df_var = ir.Var(df_var.scope, ir_utils.mk_unique_var(df_var.name), df_var.loc)
         nodes[-1].target = new_df_var
         self.replace_var_dict[df_var.name] = new_df_var
 
@@ -1382,8 +1386,8 @@ class SDC_Pandas_DataFrame_TransformationPass_Stage1(FunctionPass):
         return
 
 def _gen_arr_copy(in_arr, nodes):
-    f_block = numba.ir_utils.compile_to_numba_ir(lambda A: A.copy(), {}).blocks.popitem()[1]
-    numba.ir_utils.replace_arg_nodes(f_block, [in_arr])
+    f_block = ir_utils.compile_to_numba_ir(lambda A: A.copy(), {}).blocks.popitem()[1]
+    ir_utils.replace_arg_nodes(f_block, [in_arr])
     nodes += f_block.body[:-2]
     return nodes[-1].target
 

@@ -34,10 +34,11 @@ import sdc
 import string
 import unittest
 from itertools import combinations, combinations_with_replacement, islice, permutations, product
+import numba
 from numba import types
-from numba.config import IS_32BITS
-from numba.errors import TypingError
-from numba.special import literally
+from numba.core.config import IS_32BITS
+from numba.core.errors import TypingError
+from numba import literally
 
 from sdc.tests.test_series_apply import TestSeries_apply
 from sdc.tests.test_series_map import TestSeries_map
@@ -200,9 +201,9 @@ def restore_series_sort_values(series, my_result_index, ascending):
     return 0
 
 
-def _make_func_from_text(func_text, func_name='test_impl'):
+def _make_func_from_text(func_text, func_name='test_impl', global_vars={}):
     loc_vars = {}
-    exec(func_text, {}, loc_vars)
+    exec(func_text, global_vars, loc_vars)
     test_impl = loc_vars[func_name]
     return test_impl
 
@@ -1477,6 +1478,7 @@ class TestSeries(
             S2 = pd.Series(np.ones(n - 1), name='B')
             pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
+    # SDC operator methods returns only float Series
     @skip_parallel
     def test_series_op5_integer_scalar(self):
         arithmetic_methods = ('add', 'sub', 'mul', 'div', 'truediv', 'floordiv', 'mod', 'pow')
@@ -1494,7 +1496,7 @@ class TestSeries(
             pd.testing.assert_series_equal(
                 hpat_func(operand_series, operand_scalar),
                 test_impl(operand_series, operand_scalar),
-                check_names=False)
+                check_names=False, check_dtype=False)
 
     @skip_parallel
     def test_series_op5_float_scalar(self):
@@ -3550,6 +3552,82 @@ class TestSeries(
         pd.testing.assert_series_equal(hpat_func(S1, S2, S3),
                                        test_impl(S1, S2, S3))
 
+    def sdc_join_series_indexes(self):
+        def test_impl(S1, S2):
+            return S1.add(S2)
+
+        sdc_func = self.jit(test_impl)
+
+        data = [0, 1, 2, 3, 4]
+        index1 = [3.3, 5.4, np.nan, 7.9, np.nan]
+        index2 = [3, 4, 3, 9, 2]
+        S1 = pd.Series(data, index1)
+        S2 = pd.Series(data, index2)
+        pd.testing.assert_series_equal(sdc_func(S1, S2), test_impl(S1, S2))
+
+    # SDC operator methods returns only float Series
+    def test_series_add(self):
+        def test_impl(S1, S2, value):
+            return S1.add(S2, fill_value=value)
+
+        sdc_func = self.jit(test_impl)
+
+        cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases_index = [[0, 1, 2, 3, 4], [3, 4, 3, 9, 2], None]
+        cases_value = [None, 4, 5.5]
+        for data, index, value in product(cases_data, cases_index, cases_value):
+            with self.subTest(data=data, index=index, value=value):
+                S1 = pd.Series(data, index)
+                S2 = pd.Series(index, data)
+                pd.testing.assert_series_equal(sdc_func(S1, S2, value), test_impl(S1, S2, value), check_dtype=False)
+
+    # SDC operator methods returns only float Series
+    def test_series_add_scalar(self):
+        def test_impl(S1, S2, value):
+            return S1.add(S2, fill_value=value)
+
+        sdc_func = self.jit(test_impl)
+
+        cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases_index = [[0, 1, 2, 3, 4], [3, 4, 3, 9, 2], None]
+        cases_scalar = [0, 1, 5.5, np.nan]
+        cases_value = [None, 4, 5.5]
+        for data, index, scalar, value in product(cases_data, cases_index, cases_scalar, cases_value):
+            with self.subTest(data=data, index=index, scalar=scalar, value=value):
+                S1 = pd.Series(data, index)
+                pd.testing.assert_series_equal(sdc_func(S1, scalar, value), test_impl(S1, scalar, value),
+                                               check_dtype=False)
+
+    def test_series_lt_fill_value(self):
+        def test_impl(S1, S2, value):
+            return S1.lt(S2, fill_value=value)
+
+        sdc_func = self.jit(test_impl)
+
+        cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases_index = [[3, 4, 3, 9, 2], None]
+        cases_value = [None, 4, 5.5]
+        for data, index, value in product(cases_data, cases_index, cases_value):
+            with self.subTest(data=data, index=index, value=value):
+                S1 = pd.Series(data, index)
+                S2 = pd.Series(data[::-1], index)
+                pd.testing.assert_series_equal(sdc_func(S1, S2, value), test_impl(S1, S2, value))
+
+    def test_series_lt_scalar_fill_value(self):
+        def test_impl(S1, S2, value):
+            return S1.lt(S2, fill_value=value)
+
+        sdc_func = self.jit(test_impl)
+
+        cases_data = [[0, 1, 2, 3, 4], [5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan]]
+        cases_index = [[0, 1, 2, 3, 4], [3, 4, 3, 9, 2], None]
+        cases_scalar = [0, 1, 5.5, np.nan]
+        cases_value = [None, 4, 5.5]
+        for data, index, scalar, value in product(cases_data, cases_index, cases_scalar, cases_value):
+            with self.subTest(data=data, index=index, scalar=scalar, value=value):
+                S1 = pd.Series(data, index)
+                pd.testing.assert_series_equal(sdc_func(S1, scalar, value), test_impl(S1, scalar, value))
+
     def test_series_isin_list1(self):
         def test_impl(S, values):
             return S.isin(values)
@@ -4876,7 +4954,6 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @unittest.skip("Fails when NUMA_PES>=2 due to unimplemented sync of such construction after distribution")
     def test_series_iterator_no_param(self):
         def test_impl():
             A = pd.Series([3, 2, 1, 5, 4])
@@ -5890,8 +5967,8 @@ class TestSeries(
         self.assertRaises(type(exception_ref), hpat_func, A, B)
 
     @skip_numba_jit('Numba propagates different exception:\n'
-                    'numba.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)\n'
-                    'Internal error at <numba.typeinfer.IntrinsicCallConstraint ...\n'
+                    'numba.core.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)\n'
+                    'Internal error at <numba.core.typeinfer.IntrinsicCallConstraint ...\n'
                     '\'Signature\' object is not iterable')
     @skip_sdc_jit('Typing checks not implemented for Series operators in old-style')
     def test_series_operator_lt_index_mismatch3(self):
@@ -5951,8 +6028,8 @@ class TestSeries(
                 pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
 
     @skip_numba_jit('Numba propagates different exception:\n'
-                    'numba.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)\n'
-                    'Internal error at <numba.typeinfer.IntrinsicCallConstraint ...\n'
+                    'numba.core.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)\n'
+                    'Internal error at <numba.core.typeinfer.IntrinsicCallConstraint ...\n'
                     '\'Signature\' object is not iterable')
     @skip_sdc_jit('Typing checks not implemented for Series operators in old-style')
     def test_series_operator_lt_unsupported_dtypes(self):
@@ -7110,6 +7187,73 @@ class TestSeries(
                     hpat_func(S, idx)
                 msg = 'The index of boolean indexer is not comparable to Series index.'
                 self.assertIn(msg, str(raises.exception))
+
+    def test_series_skew(self):
+        def test_impl(series, axis, skipna):
+            return series.skew(axis=axis, skipna=skipna)
+
+        hpat_func = self.jit(test_impl)
+        test_data = [[6, 6, 2, 1, 3, 3, 2, 1, 2],
+                     [1.1, 0.3, 2.1, 1, 3, 0.3, 2.1, 1.1, 2.2],
+                     [6, 6.1, 2.2, 1, 3, 3, 2.2, 1, 2],
+                     [],
+                     [6, 6, np.nan, 2, np.nan, 1, 3, 3, np.inf, 2, 1, 2, np.inf],
+                     [1.1, 0.3, np.nan, 1.0, np.inf, 0.3, 2.1, np.nan, 2.2, np.inf],
+                     [1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2],
+                     [np.nan, np.nan, np.nan],
+                     [np.nan, np.nan, np.inf],
+                     [np.inf, 0, np.inf, 1, 2, 3, 4, 5]
+                     ]
+        all_test_data = test_data + test_global_input_data_float64
+        for data in all_test_data:
+            with self.subTest(data=data):
+                s = pd.Series(data)
+                for axis in [0, None]:
+                    with self.subTest(axis=axis):
+                        for skipna in [None, False, True]:
+                            with self.subTest(skipna=skipna):
+                                res1 = test_impl(s, axis, skipna)
+                                res2 = hpat_func(s, axis, skipna)
+                                np.testing.assert_allclose(res1, res2)
+
+    def test_series_skew_default(self):
+        def test_impl():
+            s = pd.Series([np.nan, -2., 3., 9.1])
+            return s.skew()
+
+        hpat_func = self.jit(test_impl)
+        np.testing.assert_allclose(test_impl(), hpat_func())
+
+    def test_series_skew_not_supported(self):
+        def test_impl(series, axis=None, skipna=None, level=None, numeric_only=None):
+            return series.skew(axis=axis, skipna=skipna, level=level, numeric_only=numeric_only)
+
+        hpat_func = self.jit(test_impl)
+        s = pd.Series([1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2])
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, axis=0.75)
+        msg = 'TypingError: Method Series.skew() The object axis\n given: float64\n expected: int64'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, skipna=0)
+        msg = 'TypingError: Method Series.skew() The object skipna\n given: int64\n expected: bool'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, level=0)
+        msg = 'TypingError: Method Series.skew() The object level\n given: int64\n expected: None'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(TypingError) as raises:
+            hpat_func(s, numeric_only=0)
+        msg = 'TypingError: Method Series.skew() The object numeric_only\n given: int64\n expected: None'
+        self.assertIn(msg, str(raises.exception))
+
+        with self.assertRaises(ValueError) as raises:
+            hpat_func(s, axis=5)
+        msg = 'Parameter axis must be only 0 or None.'
+        self.assertIn(msg, str(raises.exception))
 
 
 if __name__ == "__main__":

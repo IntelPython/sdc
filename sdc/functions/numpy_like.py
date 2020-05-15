@@ -38,12 +38,13 @@ import sys
 import pandas
 import numpy as np
 
-from numba import types, jit, prange, numpy_support, literally
-from numba.errors import TypingError
-from numba.targets.arraymath import get_isnan
+from numba import types, prange, literally
+from numba.np import numpy_support
+from numba.np.arraymath import get_isnan
 from numba.typed import List
 
 import sdc
+from sdc.functions.statistics import skew_formula
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
@@ -646,7 +647,7 @@ def nanprod(a):
 @sdc_overload(nanprod)
 def np_nanprod(a):
     """
-    Reimplemented with parfor from numba.targets.arraymath.
+    Reimplemented with parfor from numba.np.arraymath.
     """
     if not isinstance(a, types.Array):
         return
@@ -765,7 +766,10 @@ def corr_overload(self, other, method='pearson', min_periods=None):
         if method not in ('pearson', ''):
             raise ValueError("Method corr(). Unsupported parameter. Given method != 'pearson'")
 
-        if min_periods is None or min_periods < 1:
+        if min_periods is None:
+            min_periods = 1
+
+        if min_periods < 1:
             min_periods = 1
 
         min_len = min(len(self._data), len(other._data))
@@ -988,3 +992,65 @@ def getitem_by_mask_overload(arr, idx):
             return result_data
 
     return getitem_by_mask_impl
+
+
+def skew(a):
+    pass
+
+
+def nanskew(a):
+    pass
+
+
+@sdc_overload(skew)
+def np_skew(arr):
+    if not isinstance(arr, types.Array):
+        return
+
+    def skew_impl(arr):
+        len_val = len(arr)
+        n = 0
+        _sum = 0.
+        square_sum = 0.
+        cube_sum = 0.
+
+        for idx in numba.prange(len_val):
+            if not numpy.isnan(arr[idx]):
+                n += 1
+                _sum += arr[idx]
+                square_sum += arr[idx] ** 2
+                cube_sum += arr[idx] ** 3
+
+        if n == 0 or n < len_val:
+            return numpy.nan
+
+        return skew_formula(n, _sum, square_sum, cube_sum)
+
+    return skew_impl
+
+
+@sdc_overload(nanskew)
+def np_nanskew(arr):
+    if not isinstance(arr, types.Array):
+        return
+
+    def nanskew_impl(arr):
+        len_val = len(arr)
+        n = 0
+        _sum = 0.
+        square_sum = 0.
+        cube_sum = 0.
+
+        for idx in numba.prange(len_val):
+            if not numpy.isnan(arr[idx]):
+                n += 1
+                _sum += arr[idx]
+                square_sum += arr[idx] ** 2
+                cube_sum += arr[idx] ** 3
+
+        if n == 0:
+            return numpy.nan
+
+        return skew_formula(n, _sum, square_sum, cube_sum)
+
+    return nanskew_impl
