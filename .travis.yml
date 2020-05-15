@@ -4,7 +4,7 @@ dist: trusty
 
 branches:
   only:
-  - master
+  - feature/dataframe_model_refactoring
 
 env:
     global:
