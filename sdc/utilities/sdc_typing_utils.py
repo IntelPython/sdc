@@ -35,8 +35,8 @@ import numba
 import sdc
 
 from numba import types
-from numba.errors import TypingError
-from numba import numpy_support
+from numba.core.errors import TypingError
+from numba.np import numpy_support
 
 from sdc.str_arr_type import string_array_type
 

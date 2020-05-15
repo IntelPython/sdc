@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -25,28 +25,15 @@
 # *****************************************************************************
 
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
+import pandas as pd
+from numba import njit
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
+@njit
+def dataframe_at():
+    df = pd.DataFrame({'A': [1.0, 2.0, 3.0, 1.0], 'B': [4, 5, 6, 7], 'C': ['a', 'b', 'c', 'd']})
 
-from sdc.tests.test_ml import *
+    return df.at[1, 'C']  # ['b']
 
-from sdc.tests.test_io import *
 
-from sdc.tests.test_hpat_jit import *
-from sdc.tests.test_indexes import *
-
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
-
-# performance tests
-import sdc.tests.tests_perf
+print(dataframe_at())

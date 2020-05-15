@@ -36,13 +36,15 @@ import pandas
 import math
 import sys
 
-from numba.errors import TypingError
-from numba.typing import signature
+from numba.core.errors import TypingError
+from numba.core.typing import signature
 from numba.extending import intrinsic
-from numba import (types, numpy_support, cgutils)
+from numba import types
+from numba.core import cgutils
+from numba.np import numpy_support
 from numba.typed import List, Dict
 from numba import prange
-from numba.targets.arraymath import get_isnan
+from numba.np.arraymath import get_isnan
 from pandas.core.indexing import IndexingError
 
 import sdc
@@ -245,9 +247,14 @@ def hpat_pandas_series_accessor_getitem(self, idx):
         if isinstance(idx, (int, types.Integer, types.UnicodeType, types.StringLiteral)):
             def hpat_pandas_series_at_impl(self, idx):
                 index = self._series.index
+                count = 0
                 mask = numpy.empty(len(self._series._data), numpy.bool_)
                 for i in numba.prange(len(index)):
                     mask[i] = index[i] == idx
+                    if mask[i] == True:  # noqa
+                        count += 1
+                if count == 0:  # noqa
+                    raise ValueError("Index is not in the Series")
                 return self._series._data[mask]
 
             return hpat_pandas_series_at_impl
@@ -2500,196 +2507,6 @@ def hpat_pandas_series_notna(self):
         return hpat_pandas_series_notna_impl
 
 
-@sdc_overload_method(SeriesType, 'ne')
-def hpat_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.ne
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is supported only with default value ``0``.
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_ne.py
-       :language: python
-       :lines: 27-
-       :caption: Element-wise not equal of one Series by another (binary operator ne)
-       :name: ex_series_ne
-
-    .. command-output:: python ./series/series_ne.py
-       :cwd: ../../../examples
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series method :meth:`pandas.Series.ne` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
-    """
-
-    _func_name = 'Method ne().'
-
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not (isinstance(level, types.Omitted) or level is None):
-        ty_checker.raise_exc(level, 'None', 'level')
-
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_ne_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data != other._data)
-
-        return hpat_pandas_series_ne_impl
-
-    if isinstance(other, types.Number):
-        def hpat_pandas_series_ne_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data != other)
-
-        return hpat_pandas_series_ne_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
-
-
-@sdc_overload_method(SeriesType, 'add')
-def hpat_pandas_series_add(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.add
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is supported only with default value ``0``.
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_add.py
-       :language: python
-       :lines: 27-
-       :caption: Getting the addition of Series and other
-       :name: ex_series_add
-
-    .. command-output:: python ./series/series_add.py
-       :cwd: ../../../examples
-
-    .. seealso::
-
-        :ref:`Series.radd <pandas.Series.radd>`
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series method :meth:`pandas.Series.add` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
-    """
-
-    _func_name = 'Method add().'
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_add_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data + other._data)
-
-        return hpat_pandas_series_add_impl
-
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_add_number_impl(self, other, level=None, fill_value=None, axis=0):
-            if axis != 0:
-                raise ValueError('Method add(). The object axis\n expected: 0')
-
-            return pandas.Series(self._data + other)
-
-        return hpat_pandas_series_add_number_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
-
-
-@sdc_overload_method(SeriesType, 'sub')
-def hpat_pandas_series_sub(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.sub
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is supported only with default value ``0``.
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_sub.py
-       :language: python
-       :lines: 27-
-       :caption: Return Subtraction of series and other, element-wise (binary operator sub).
-       :name: ex_series_sub
-
-    .. command-output:: python ./series/series_sub.py
-       :cwd: ../../../examples
-
-    .. seealso::
-
-        :ref:`Series.rsub <pandas.Series.rsub>`
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series method :meth:`pandas.Series.sub` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-    """
-
-    _func_name = 'Method sub().'
-
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not (isinstance(level, types.Omitted) or level is None):
-        ty_checker.raise_exc(level, 'None', 'level')
-
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_sub_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data - other._data)
-
-        return hpat_pandas_series_sub_impl
-
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_sub_number_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data - other)
-
-        return hpat_pandas_series_sub_number_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
-
-
 @sdc_overload_method(SeriesType, 'sum')
 def hpat_pandas_series_sum(
     self,
@@ -2967,358 +2784,6 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
         return numpy_like.argmax(self._data)
 
     return hpat_pandas_series_idxmax_impl
-
-
-@sdc_overload_method(SeriesType, 'mul')
-def hpat_pandas_series_mul(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.mul
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is supported only with default value ``0``.
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_mul.py
-       :language: python
-       :lines: 27-
-       :caption: Element-wise multiplication of two Series
-       :name: ex_series_mul
-
-    .. command-output:: python ./series/series_mul.py
-       :cwd: ../../../examples
-
-    .. seealso::
-
-        :ref:`Series.rmul <pandas.Series.rmul>`
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series method :meth:`pandas.Series.mul` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-    """
-
-    _func_name = 'Method mul().'
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not isinstance(level, types.Omitted) and level is not None:
-        ty_checker.raise_exc(level, 'None', 'level')
-
-    if not isinstance(fill_value, types.Omitted) and fill_value is not None:
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not isinstance(axis, types.Omitted) and axis != 0:
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_mul_impl(self, other, level=None, fill_value=None, axis=0):
-
-            if axis != 0:
-                raise ValueError('Method mul(). The object axis\n expected: 0')
-
-            return pandas.Series(self._data * other._data)
-
-        return hpat_pandas_series_mul_impl
-
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_mul_number_impl(self, other, level=None, fill_value=None, axis=0):
-
-            if axis != 0:
-                raise ValueError('Method mul(). The object axis\n expected: 0')
-
-            return pandas.Series(self._data * other)
-
-        return hpat_pandas_series_mul_number_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
-
-
-@sdc_overload_method(SeriesType, 'div')
-def hpat_pandas_series_div(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.div
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is supported only with default value ``0``.
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_div.py
-       :language: python
-       :lines: 27-
-       :caption: Element-wise division of one Series by another (binary operator div)
-       :name: ex_series_div
-
-    .. command-output:: python ./series/series_div.py
-       :cwd: ../../../examples
-
-    .. seealso::
-
-        :ref:`Series.rdiv <pandas.Series.rdiv>`
-            Return Floating division of series and other, element-wise (binary operator rtruediv).
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series method :meth:`pandas.Series.div` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-    """
-
-    _func_name = 'Method div().'
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not (isinstance(level, types.Omitted) or level is None):
-        ty_checker.raise_exc(level, 'None', 'level')
-
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_div_impl(self, other, level=None, fill_value=None, axis=0):
-
-            if axis != 0:
-                raise ValueError('Method div(). The object axis\n expected: 0')
-
-            return pandas.Series(self._data / other._data)
-
-        return hpat_pandas_series_div_impl
-
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_div_number_impl(self, other, level=None, fill_value=None, axis=0):
-
-            if axis != 0:
-                raise ValueError('Method div(). The object axis\n expected: 0')
-
-            return pandas.Series(self._data / other)
-
-        return hpat_pandas_series_div_number_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
-
-
-@sdc_overload_method(SeriesType, 'truediv')
-def hpat_pandas_series_truediv(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.truediv
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is c
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_truediv.py
-       :language: python
-       :lines: 27-
-       :caption: Element-wise division of one Series by another (binary operator truediv)
-       :name: ex_series_truediv
-
-    .. command-output:: python ./series/series_truediv.py
-       :cwd: ../../../examples
-
-    .. seealso::
-
-        :ref:`Series.rtruediv <pandas.Series.rtruediv>`
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series :meth:`pandas.Series.truediv` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-    """
-
-    _func_name = 'Method truediv().'
-
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not (isinstance(level, types.Omitted) or level is None):
-        ty_checker.raise_exc(level, 'None', 'level')
-
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_truediv_impl(self, other, level=None, fill_value=None, axis=0):
-
-            if axis != 0:
-                raise ValueError('Method truediv(). The object axis\n expected: 0')
-
-            return pandas.Series(self._data / other._data)
-
-        return hpat_pandas_series_truediv_impl
-
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_truediv_number_impl(self, other, level=None, fill_value=None, axis=0):
-
-            if axis != 0:
-                raise ValueError('Method truediv(). The object axis\n expected: 0')
-
-            return pandas.Series(self._data / other)
-
-        return hpat_pandas_series_truediv_number_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
-
-
-@sdc_overload_method(SeriesType, 'floordiv')
-def hpat_pandas_series_floordiv(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.floordiv
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is supported only with default value ``0``.
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_floordiv.py
-       :language: python
-       :lines: 27-
-       :caption: Return Integer division of series and other, element-wise (binary operator floordiv).
-       :name: ex_series_floordiv
-
-    .. command-output:: python ./series/series_floordiv.py
-       :cwd: ../../../examples
-
-    .. seealso::
-
-        :ref:`Series.rfloordiv <pandas.Series.rfloordiv>`
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series method :meth:`pandas.Series.floordiv` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-    """
-
-    _func_name = 'Method floordiv().'
-
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not (isinstance(level, types.Omitted) or level is None):
-        ty_checker.raise_exc(level, 'None', 'level')
-
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_floordiv_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data // other._data)
-
-        return hpat_pandas_series_floordiv_impl
-
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_floordiv_number_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data // other)
-
-        return hpat_pandas_series_floordiv_number_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
-
-
-@sdc_overload_method(SeriesType, 'pow')
-def hpat_pandas_series_pow(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.pow
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is supported only with default value ``0``.
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_pow.py
-       :language: python
-       :lines: 27-
-       :caption: Element-wise power of one Series by another (binary operator pow)
-       :name: ex_series_pow
-
-    .. command-output:: python ./series/series_pow.py
-       :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
-    .. seealso::
-
-        :ref:`Series.rpow <pandas.Series.rpow>`
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series method :meth:`pandas.Series.pow` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-    """
-
-    _func_name = 'Method pow().'
-
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not (isinstance(level, types.Omitted) or level is None):
-        ty_checker.raise_exc(level, 'None', 'level')
-
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_pow_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data ** other._data)
-
-        return hpat_pandas_series_pow_impl
-
-    if isinstance(other, types.Number):
-        def hpat_pandas_series_pow_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data ** other)
-
-        return hpat_pandas_series_pow_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
 @sdc_overload_method(SeriesType, 'prod')
@@ -3763,193 +3228,6 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
     return hpat_pandas_series_mean_impl
 
 
-@sdc_overload_method(SeriesType, 'mod')
-def hpat_pandas_series_mod(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.mod
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is supported only with default value ``0``.
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_mod.py
-       :language: python
-       :lines: 27-
-       :caption: Return Modulo of series and other, element-wise (binary operator mod).
-       :name: ex_series_mod
-
-    .. command-output:: python ./series/series_mod.py
-       :cwd: ../../../examples
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series method :meth:`pandas.Series.mod` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op5*
-    """
-
-    _func_name = 'Method mod().'
-
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not (isinstance(level, types.Omitted) or level is None):
-        ty_checker.raise_exc(level, 'None', 'level')
-
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_mod_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data % other._data)
-
-        return hpat_pandas_series_mod_impl
-
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_mod_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data % other)
-
-        return hpat_pandas_series_mod_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
-
-
-@sdc_overload_method(SeriesType, 'eq')
-def hpat_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.eq
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is supported only with default value ``0``.
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_eq.py
-       :language: python
-       :lines: 27-
-       :caption: Element-wise equal of one Series by another (binary operator eq)
-       :name: ex_series_eq
-
-    .. command-output:: python ./series/series_mod.py
-       :cwd: ../../../examples
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series method :meth:`pandas.Series.eq` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
-    """
-
-    _func_name = 'Method eq().'
-
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not (isinstance(level, types.Omitted) or level is None):
-        ty_checker.raise_exc(level, 'None', 'level')
-
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_eq_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data == other._data)
-
-        return hpat_pandas_series_eq_impl
-
-    if isinstance(other, types.Integer) or isinstance(other, types.Float):
-        def hpat_pandas_series_eq_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data == other)
-
-        return hpat_pandas_series_eq_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
-
-
-@sdc_overload_method(SeriesType, 'ge')
-def hpat_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.ge
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is supported only with default value ``0``.
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_ge.py
-       :language: python
-       :lines: 27-
-       :caption: Element-wise greater than or equal of one Series by another (binary operator ge)
-       :name: ex_series_ge
-
-    .. command-output:: python ./series/series_ge.py
-       :cwd: ../../../examples
-
-    .. note::
-
-        Parameter axis is currently unsupported by Intel Scalable Dataframe Compiler
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series method :meth:`pandas.Series.ge` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
-    """
-
-    _func_name = 'Method ge().'
-
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not (isinstance(level, types.Omitted) or level is None):
-        ty_checker.raise_exc(level, 'None', 'level')
-
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_ge_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data >= other._data)
-
-        return hpat_pandas_series_ge_impl
-
-    if isinstance(other, types.Number):
-        def hpat_pandas_series_ge_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data >= other)
-
-        return hpat_pandas_series_ge_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
-
-
 @sdc_overload_method(SeriesType, 'idxmin')
 def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
     """
@@ -4043,189 +3321,6 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
         return numpy_like.argmin(self._data)
 
     return hpat_pandas_series_idxmin_impl
-
-
-@sdc_overload_method(SeriesType, 'lt')
-def hpat_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.lt
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is supported only with default value ``0``.
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_lt.py
-       :language: python
-       :lines: 27-
-       :caption: Element-wise less than of one Series by another (binary operator lt)
-       :name: ex_series_lt
-
-    .. command-output:: python ./series/series_lt.py
-       :cwd: ../../../examples
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series method :meth:`pandas.Series.lt` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
-    """
-
-    _func_name = 'Method lt().'
-
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not (isinstance(level, types.Omitted) or level is None):
-        ty_checker.raise_exc(level, 'None', 'level')
-
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_lt_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data < other._data)
-
-        return hpat_pandas_series_lt_impl
-
-    if isinstance(other, types.Number):
-        def hpat_pandas_series_lt_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data < other)
-
-        return hpat_pandas_series_lt_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
-
-
-@sdc_overload_method(SeriesType, 'gt')
-def hpat_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.gt
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is supported only with default value ``0``.
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_gt.py
-       :language: python
-       :lines: 27-
-       :caption: Element-wise greater than of one Series by another (binary operator gt)
-       :name: ex_series_gt
-
-    .. command-output:: python ./series/series_gt.py
-       :cwd: ../../../examples
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series method :meth:`pandas.Series.gt` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
-    """
-
-    _func_name = 'Method gt().'
-
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not (isinstance(level, types.Omitted) or level is None):
-        ty_checker.raise_exc(level, 'None', 'level')
-
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_gt_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data > other._data)
-
-        return hpat_pandas_series_gt_impl
-
-    if isinstance(other, types.Number):
-        def hpat_pandas_series_gt_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data > other)
-
-        return hpat_pandas_series_gt_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
-
-
-@sdc_overload_method(SeriesType, 'le')
-def hpat_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
-    """
-    Intel Scalable Dataframe Compiler User Guide
-    ********************************************
-
-    Pandas API: pandas.Series.le
-
-    Limitations
-    -----------
-    * Parameter ``axis`` is supported only with default value ``0``.
-    * Parameters ``level`` and ``fill_value`` are supported only with default value ``None``.
-
-    Examples
-    --------
-    .. literalinclude:: ../../../examples/series/series_le.py
-       :language: python
-       :lines: 27-
-       :caption: Element-wise less than or equal of one Series by another (binary operator le)
-       :name: ex_series_le
-
-    .. command-output:: python ./series/series_le.py
-       :cwd: ../../../examples
-
-    Intel Scalable Dataframe Compiler Developer Guide
-    *************************************************
-    Pandas Series method :meth:`pandas.Series.le` implementation.
-
-    .. only:: developer
-        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_op8*
-    """
-
-    _func_name = 'Method le().'
-
-    ty_checker = TypeChecker(_func_name)
-    ty_checker.check(self, SeriesType)
-
-    if not (isinstance(level, types.Omitted) or level is None):
-        ty_checker.raise_exc(level, 'None', 'level')
-
-    if not (isinstance(fill_value, types.Omitted) or fill_value is None):
-        ty_checker.raise_exc(fill_value, 'None', 'fill_value')
-
-    if not (isinstance(axis, types.Omitted) or axis == 0):
-        ty_checker.raise_exc(axis, 'int', 'axis')
-
-    if isinstance(other, SeriesType):
-        def hpat_pandas_series_le_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data <= other._data)
-
-        return hpat_pandas_series_le_impl
-
-    if isinstance(other, types.Number):
-        def hpat_pandas_series_le_impl(self, other, level=None, fill_value=None, axis=0):
-            return pandas.Series(self._data <= other)
-
-        return hpat_pandas_series_le_impl
-
-    ty_checker.raise_exc(other, 'Series, int, float', 'other')
 
 
 @sdc_overload_method(SeriesType, 'abs')
@@ -5090,7 +4185,10 @@ def hpat_pandas_series_cov(self, other, min_periods=None):
 
     def hpat_pandas_series_cov_impl(self, other, min_periods=None):
 
-        if min_periods is None or min_periods < 2:
+        if min_periods is None:
+            min_periods = 2
+
+        if min_periods < 2:
             min_periods = 2
 
         min_len = min(len(self._data), len(other._data))
@@ -5725,3 +4823,67 @@ are currently unsupported by Intel Scalable Dataframe Compiler
         return init_series_groupby(self, by, grouped, sort)
 
     return sdc_pandas_series_groupby_impl
+
+
+@sdc_overload_method(SeriesType, 'skew')
+def sdc_pandas_series_skew(self, axis=None, skipna=None, level=None, numeric_only=None):
+    """
+        Intel Scalable Dataframe Compiler User Guide
+        ********************************************
+
+        Pandas API: pandas.Series.skew
+
+        Limitations
+        -----------
+        - Parameters ``level`` and ``numeric_only`` are supported only with default value ``None``.
+
+        Examples
+        --------
+        .. literalinclude:: ../../../examples/series/series_skew.py
+           :language: python
+           :lines: 27-
+           :caption: Unbiased rolling skewness.
+           :name: ex_series_skew
+
+        .. command-output:: python ./series/series_skew.py
+           :cwd: ../../../examples
+
+        Intel Scalable Dataframe Compiler Developer Guide
+        *************************************************
+        Pandas Series method :meth:`pandas.Series.skew` implementation.
+
+        .. only:: developer
+            Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_skew*
+        """
+    _func_name = 'Method Series.skew()'
+
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
+
+    if not isinstance(axis, (types.Integer, types.NoneType, types.Omitted)) and axis is not None:
+        ty_checker.raise_exc(axis, 'int64', 'axis')
+
+    if not isinstance(skipna, (types.Boolean, types.NoneType, types.Omitted)) and skipna is not None:
+        ty_checker.raise_exc(skipna, 'bool', 'skipna')
+
+    if not isinstance(level, (types.Omitted, types.NoneType)) and level is not None:
+        ty_checker.raise_exc(level, 'None', 'level')
+
+    if not isinstance(numeric_only, (types.Omitted, types.NoneType)) and numeric_only is not None:
+        ty_checker.raise_exc(numeric_only, 'None', 'numeric_only')
+
+    def sdc_pandas_series_skew_impl(self, axis=None, skipna=None, level=None, numeric_only=None):
+        if axis != 0 and axis is not None:
+            raise ValueError('Parameter axis must be only 0 or None.')
+
+        if skipna is None:
+            _skipna = True
+        else:
+            _skipna = skipna
+
+        if _skipna:
+            return numpy_like.nanskew(self._data)
+
+        return numpy_like.skew(self._data)
+
+    return sdc_pandas_series_skew_impl

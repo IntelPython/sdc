@@ -31,13 +31,15 @@ import copy
 import warnings
 
 import numba
-from numba import ir, ir_utils, types
-from numba.ir_utils import (find_topo_order, guard, get_definition, require,
+from numba import types
+from numba.core import ir, ir_utils
+from numba.core.ir_utils import (find_topo_order, guard, get_definition, require,
                             find_callname, mk_unique_var, compile_to_numba_ir,
                             replace_arg_nodes, build_definitions,
                             find_build_sequence, find_const)
-from numba.parfor import Parfor
-from numba.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
+from numba.parfors.parfor import Parfor
+from numba.parfors.parfor import wrap_parfor_blocks, unwrap_parfor_blocks
+from numba.core import analysis
 
 import sdc
 import sdc.io
@@ -489,7 +491,7 @@ class DistributedAnalysis(object):
 
         # TODO: make sure assert_equiv is not generated unnecessarily
         # TODO: fix assert_equiv for np.stack from df.value
-        if fdef == ('assert_equiv', 'numba.array_analysis'):
+        if fdef == ('assert_equiv', 'numba.parfors.parfor.array_analysis'):
             return
 
         # we perform call-analysis from external at the end
@@ -873,7 +875,7 @@ class DistributedAnalysis(object):
         # arrays or is in a loop
 
         # find sequential loop bodies
-        cfg = numba.analysis.compute_cfg_from_blocks(self.func_ir.blocks)
+        cfg = analysis.compute_cfg_from_blocks(self.func_ir.blocks)
         loop_bodies = set()
         for loop in cfg.loops().values():
             loop_bodies |= loop.body

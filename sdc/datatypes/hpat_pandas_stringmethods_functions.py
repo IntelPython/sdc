@@ -45,7 +45,7 @@
         ty_checker.check(self, StringMethodsType)
 
         def hpat_pandas_stringmethods_upper_parallel_impl(self):
-            from numba.parfor import (init_prange, min_checker, internal_prange)
+            from numba.parfors.parfor import (init_prange, min_checker, internal_prange)
 
             init_prange()
             result = []
@@ -81,7 +81,7 @@ import numpy
 import pandas
 
 import numba
-from numba.types import (Boolean, Integer, NoneType,
+from numba.core.types import (Boolean, Integer, NoneType,
                          Omitted, StringLiteral, UnicodeType)
 
 from sdc.utilities.sdc_typing_utils import TypeChecker

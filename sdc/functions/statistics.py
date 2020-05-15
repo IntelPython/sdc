@@ -1,5 +1,6 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,29 +25,17 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numpy
+from sdc.utilities.utils import sdc_register_jitable
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
+@sdc_register_jitable
+def skew_formula(n, _sum, square_sum, cube_sum):
+    m2 = (square_sum - _sum * _sum / n) / n
+    m3 = (cube_sum - 3. * _sum * square_sum / n + 2. * _sum * _sum * _sum / n / n) / n
+    res = numpy.nan if m2 == 0 else m3 / m2 ** 1.5
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
+    if (n > 2) & (m2 > 0):
+        res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
 
-from sdc.tests.test_ml import *
-
-from sdc.tests.test_io import *
-
-from sdc.tests.test_hpat_jit import *
-from sdc.tests.test_indexes import *
-
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
-
-# performance tests
-import sdc.tests.tests_perf
+    return res
