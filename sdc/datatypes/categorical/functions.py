@@ -24,21 +24,15 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-"""
-Init Numba extension for Pandas Categorical.
-"""
+from sdc.utilities.utils import sdc_overload_attribute
 
-from . import types
-from . import typeof
-from . import models
-from . import boxing
-from . import pdimpl
-from . import rewrites
-from . import functions
-
-import numba
+from .types import CategoricalDtypeType
 
 
-# register new types in numba.types for using in objmode
-setattr(numba.types, "CategoricalDtype", types.CategoricalDtypeType)
-setattr(numba.types, "Categorical", types.Categorical)
+@sdc_overload_attribute(CategoricalDtypeType, 'ordered')
+def pd_CategoricalDtype_categories_overload(self):
+    ordered = self.ordered
+
+    def impl(self):
+        return ordered
+    return impl

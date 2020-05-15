@@ -115,6 +115,15 @@ class CategoricalDtypeTest(TestCase):
         assert(boxed.categories == expected.categories)
         assert(boxed.ordered == expected.ordered)
 
+    def test_attribute_ordered(self):
+        @nb.njit
+        def func(c):
+            return c.ordered
+
+        pd_dtype = self._pd_dtype()
+        ordered = func(pd_dtype)
+        assert(ordered == pd_dtype.ordered)
+
 
 if __name__ == "__main__":
     import unittest
