@@ -30,10 +30,11 @@ import numpy as np
 import operator
 import pandas as pd
 
-from numba import types, cgutils
+from numba import types
+from numba.core import cgutils
 from numba.extending import (typeof_impl, NativeValue, intrinsic, box, unbox, lower_builtin)
-from numba.typing.templates import signature
-from numba.targets.imputils import impl_ret_new_ref, impl_ret_untracked, iterator_impl
+from numba.core.typing.templates import signature
+from numba.core.imputils import impl_ret_new_ref, impl_ret_untracked, iterator_impl
 
 from sdc.datatypes.range_index_type import RangeIndexType, RangeIndexDataType
 from sdc.datatypes.common_functions import SDCLimitation
