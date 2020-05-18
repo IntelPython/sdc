@@ -54,9 +54,9 @@ class DataFrameAttribute(AttributeTemplate):
             return SeriesType(arr_typ.dtype, arr_typ, df.index, True)
 
 
-class ColumnId(NamedTuple):
+class ColumnLoc(NamedTuple):
     type_id: int
-    col_type_id: int
+    col_id: int
 
 
 @intrinsic
@@ -73,26 +73,26 @@ def init_dataframe(typingctx, *args):
     index_typ = args[n_cols]
     column_names = tuple(a.literal_value for a in args[n_cols + 1:])
 
-    # Define df structure, map column name to column position ex. {'A': (0,0), 'B': (1,0), 'C': (0,1)}
-    df_structure = {}
+    # Define map column name to column location ex. {'A': (0,0), 'B': (1,0), 'C': (0,1)}
+    column_loc = {}
     # Store unique types of columns ex. {'int64': (0, [0, 2]), 'float64': (1, [1])}
     data_typs_map = {}
     types_order = []
     type_id = 0
-    for col_id, col_typ in enumerate(data_typs):
-        col_name = column_names[col_id]
+    for i, col_typ in enumerate(data_typs):
+        col_name = column_names[i]
 
         if col_typ not in data_typs_map:
-            data_typs_map[col_typ] = (type_id, [col_id])
+            data_typs_map[col_typ] = (type_id, [i])
             # The first column in each type always has 0 index
-            df_structure[col_name] = ColumnId(type_id, 0)
+            column_loc[col_name] = ColumnLoc(type_id, col_id=0)
             types_order.append(col_typ)
             type_id += 1
         else:
             # Get index of column in list of types
-            type_idx, col_indices = data_typs_map[col_typ]
-            col_idx_list = len(col_indices)
-            df_structure[col_name] = ColumnId(type_idx, col_idx_list)
+            type_id, col_indices = data_typs_map[col_typ]
+            col_id = len(col_indices)
+            column_loc[col_name] = ColumnLoc(type_id, col_id)
             col_indices.append(col_id)
 
     def codegen(context, builder, signature, args):
@@ -134,7 +134,7 @@ def init_dataframe(typingctx, *args):
 
         return dataframe._getvalue()
 
-    ret_typ = DataFrameType(data_typs, index_typ, column_names, df_structure=df_structure)
+    ret_typ = DataFrameType(data_typs, index_typ, column_names, column_loc=column_loc)
     sig = signature(ret_typ, types.Tuple(args))
     return sig, codegen
 

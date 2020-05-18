@@ -37,7 +37,7 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
     """Temporary type class for DataFrame objects.
     """
 
-    def __init__(self, data=None, index=None, columns=None, has_parent=False, df_structure=None):
+    def __init__(self, data=None, index=None, columns=None, has_parent=False, column_loc=None):
         self.data = data
         if index is None:
             index = types.none
@@ -46,7 +46,7 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
         # keeping whether it is unboxed from Python to enable reflection of new
         # columns
         self.has_parent = has_parent
-        self.df_structure = df_structure
+        self.column_loc = column_loc
         super(DataFrameType, self).__init__(
             name="dataframe({}, {}, {}, {})".format(data, index, columns, has_parent))
 

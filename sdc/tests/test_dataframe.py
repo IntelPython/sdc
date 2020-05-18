@@ -83,7 +83,6 @@ class TestDataFrame(TestCase):
         B = np.random.ranf(n)
         pd.testing.assert_frame_equal(hpat_func(A, B), test_impl(A, B))
 
-    @dfRefactoringNotImplemented
     def test_create2(self):
         def test_impl():
             df = pd.DataFrame({'A': [1, 2, 3]})
@@ -92,7 +91,6 @@ class TestDataFrame(TestCase):
 
         self.assertEqual(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def test_create3(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n)})
@@ -102,7 +100,6 @@ class TestDataFrame(TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
-    @dfRefactoringNotImplemented
     def test_create_str(self):
         def test_impl():
             df = pd.DataFrame({'A': ['a', 'b', 'c']})
@@ -123,7 +120,6 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
-    @dfRefactoringNotImplemented
     def test_create_with_series2(self):
         # test creating dataframe from passed series
         def test_impl(A):
@@ -335,7 +331,6 @@ class TestDataFrame(TestCase):
             {'A': np.arange(n), 'B': np.ones(n), 'C': np.random.ranf(n)})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
     def test_filter1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + n, 'B': np.arange(n)**2})
@@ -2365,7 +2360,6 @@ class TestDataFrame(TestCase):
                 result = hpat_func(df, periods, method)
                 pd.testing.assert_frame_equal(result, result_ref)
 
-    @dfRefactoringNotImplemented
     def test_list_convert(self):
         def test_impl():
             df = pd.DataFrame({'one': np.array([-1, np.nan, 2.5]),
@@ -2417,19 +2411,17 @@ class TestDataFrame(TestCase):
         result = jitted_func()
         np.testing.assert_array_equal(result, expected)
 
-    @dfRefactoringNotImplemented
     def test_df_create_str_with_none(self):
         """ Verifies creation of a dataframe with a string column from a list of Optional values. """
         def test_impl():
             df = pd.DataFrame({
-                        'A': ['a', 'b', None, 'a', '', None, 'b'],
-                        'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
-                        'C': [np.nan, 1, 2, 1, np.nan, 2, 1]
+                'A': ['a', 'b', None, 'a', '', None, 'b'],
+                'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
+                'C': [np.nan, 1, 2, 1, np.nan, 2, 1]
             })
-
             return df['A'].isna()
-        hpat_func = self.jit(test_impl)
 
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
     @dfRefactoringNotImplemented
