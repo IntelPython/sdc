@@ -34,10 +34,11 @@ import sdc
 import string
 import unittest
 from itertools import combinations, combinations_with_replacement, islice, permutations, product
+import numba
 from numba import types
-from numba.config import IS_32BITS
-from numba.errors import TypingError
-from numba.special import literally
+from numba.core.config import IS_32BITS
+from numba.core.errors import TypingError
+from numba import literally
 
 from sdc.tests.test_series_apply import TestSeries_apply
 from sdc.tests.test_series_map import TestSeries_map
@@ -200,9 +201,9 @@ def restore_series_sort_values(series, my_result_index, ascending):
     return 0
 
 
-def _make_func_from_text(func_text, func_name='test_impl'):
+def _make_func_from_text(func_text, func_name='test_impl', global_vars={}):
     loc_vars = {}
-    exec(func_text, {}, loc_vars)
+    exec(func_text, global_vars, loc_vars)
     test_impl = loc_vars[func_name]
     return test_impl
 
@@ -4945,7 +4946,6 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @unittest.skip("Fails when NUMA_PES>=2 due to unimplemented sync of such construction after distribution")
     def test_series_iterator_no_param(self):
         def test_impl():
             A = pd.Series([3, 2, 1, 5, 4])
@@ -5959,8 +5959,8 @@ class TestSeries(
         self.assertRaises(type(exception_ref), hpat_func, A, B)
 
     @skip_numba_jit('Numba propagates different exception:\n'
-                    'numba.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)\n'
-                    'Internal error at <numba.typeinfer.IntrinsicCallConstraint ...\n'
+                    'numba.core.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)\n'
+                    'Internal error at <numba.core.typeinfer.IntrinsicCallConstraint ...\n'
                     '\'Signature\' object is not iterable')
     @skip_sdc_jit('Typing checks not implemented for Series operators in old-style')
     def test_series_operator_lt_index_mismatch3(self):
@@ -6020,8 +6020,8 @@ class TestSeries(
                 pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B))
 
     @skip_numba_jit('Numba propagates different exception:\n'
-                    'numba.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)\n'
-                    'Internal error at <numba.typeinfer.IntrinsicCallConstraint ...\n'
+                    'numba.core.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)\n'
+                    'Internal error at <numba.core.typeinfer.IntrinsicCallConstraint ...\n'
                     '\'Signature\' object is not iterable')
     @skip_sdc_jit('Typing checks not implemented for Series operators in old-style')
     def test_series_operator_lt_unsupported_dtypes(self):

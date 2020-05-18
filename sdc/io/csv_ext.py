@@ -33,11 +33,13 @@ from llvmlite import ir as lir
 from .. import hio
 from collections import defaultdict
 import numba
-from numba import typeinfer, ir, ir_utils, config, types, cgutils
-from numba.typing.templates import signature
+from numba.core import typeinfer, ir, ir_utils, types
+from numba.core.typing.templates import signature
 from numba.extending import overload, intrinsic, register_model, models, box
-from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
+from numba.core.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
+from numba.core import analysis
+from numba.parfors import array_analysis
 import sdc
 from sdc import distributed, distributed_analysis
 from sdc.utilities.utils import (debug_prints, alloc_arr_tup, empty_like_type,
@@ -104,7 +106,7 @@ def csv_array_analysis(csv_node, equiv_set, typemap, array_analysis):
     return [], post
 
 
-numba.array_analysis.array_analysis_extensions[CsvReader] = csv_array_analysis
+array_analysis.array_analysis_extensions[CsvReader] = csv_array_analysis
 
 
 def csv_distributed_analysis(csv_node, array_dists):
@@ -185,10 +187,10 @@ def csv_usedefs(csv_node, use_set=None, def_set=None):
     def_set.update({v.name for v in csv_node.out_vars})
     use_set.add(csv_node.file_name.name)
 
-    return numba.analysis._use_defs_result(usemap=use_set, defmap=def_set)
+    return analysis._use_defs_result(usemap=use_set, defmap=def_set)
 
 
-numba.analysis.ir_extension_usedefs[CsvReader] = csv_usedefs
+analysis.ir_extension_usedefs[CsvReader] = csv_usedefs
 
 
 def get_copies_csv(csv_node, typemap):

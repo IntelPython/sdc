@@ -28,10 +28,10 @@ from sys import modules
 
 from types import FunctionType
 
-from numba.ir import (Const, Global, Var, FreeVar,
+from numba.core.ir import (Const, Global, Var, FreeVar,
                       Expr, Assign, Del,
                       unknown_loc)
-from numba.ir_utils import (guard, find_const, mk_unique_var)
+from numba.core.ir_utils import (guard, find_const, mk_unique_var)
 from numba.extending import _Intrinsic
 
 
@@ -270,8 +270,10 @@ def _remove_unused_internal(var, block, func_ir):
 
     for stmt in find_usage(var, block):
         usage_list.append(stmt)
-        if isinstance(stmt, Del):
-            use_count -= 1
+        if isinstance(stmt, Assign) and var == stmt.target:
+            continue
+        elif isinstance(stmt, Del):
+            continue
         else:
             use_count += 1
 
