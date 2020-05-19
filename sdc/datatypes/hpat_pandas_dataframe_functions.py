@@ -416,13 +416,13 @@ def sdc_pandas_dataframe_append(df, other, ignore_index=False, verify_integrity=
 #           return pandas.Series([result_A, result_B], ['A', 'B'])
 
 
-def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, columns, df_structure):
+def _dataframe_reduce_columns_codegen(func_name, func_params, series_params, columns, column_loc):
     result_name_list = []
     joined = ', '.join(func_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     for i, c in enumerate(columns):
-        type_id = df_structure[c].type_id
-        col_id = df_structure[c].col_type_id
+        col_loc = column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f'result_{i}'
         func_lines += [f'  series_{i} = pandas.Series({func_params[0]}._data[{type_id}][{col_id}])',
                        f'  {result_c} = series_{i}.{func_name}({series_params})']
@@ -452,7 +452,7 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
     df_func_name = f'_df_{func_name}_impl'
 
     func_text, global_vars = _dataframe_reduce_columns_codegen(func_name, all_params, s_par, df.columns,
-                                                               df.df_structure)
+                                                               df.column_loc)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
@@ -1453,7 +1453,7 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
 def df_length_expr(self):
     """Generate expression to get length of DF"""
     if self.columns:
-        return 'len(self._data[0])'
+        return 'len(self._data[0][0])'
 
     return '0'
 
@@ -1475,16 +1475,22 @@ def df_index_expr(self, length_expr=None, as_range=False):
 def df_getitem_slice_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem with idx of slice"""
     results = []
-    func_lines = [f'  res_index = {df_index_expr(self)}']
+    func_lines = [
+        f'  self_index = {df_index_expr(self)}',
+        f'  index = self_index[idx]',
+    ]
     for i, col in enumerate(self.columns):
+        col_loc = self.column_loc[col]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         res_data = f'res_data_{i}'
         func_lines += [
-            f'  {res_data} = pandas.Series((self._data[{i}])[idx], index=res_index[idx], name="{col}")'
+            f'  data_{i} = self._data[{type_id}][{col_id}][idx]',
+            f'  {res_data} = pandas.Series(data_{i}, index=index, name="{col}")',
         ]
         results.append((col, res_data))
 
     data = ', '.join(f'"{col}": {data}' for col, data in results)
-    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index[idx])']
+    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=index)']
 
     return func_lines
 
@@ -1495,9 +1501,11 @@ def df_getitem_tuple_idx_main_codelines(self, literal_idx):
     func_lines = [f'  res_index = {df_index_expr(self)}']
     needed_cols = {col: i for i, col in enumerate(self.columns) if col in literal_idx}
     for col, i in needed_cols.items():
+        col_loc = self.column_loc[col]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         res_data = f'res_data_{i}'
         func_lines += [
-            f'  data_{i} = self._data [{i}]',
+            f'  data_{i} = self._data[{type_id}][{col_id}]',
             f'  {res_data} = pandas.Series(data_{i}, index=res_index, name="{col}")'
         ]
         results.append((col, res_data))
@@ -1510,23 +1518,28 @@ def df_getitem_tuple_idx_main_codelines(self, literal_idx):
 
 def df_getitem_bool_series_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem"""
+    length_expr = df_length_expr(self)
 
     # optimization for default indexes in df and idx when index alignment is trivial
-    if (isinstance(self.index, types.NoneType) and isinstance(idx.index, types.NoneType)):
-        func_lines = [f'  length = {df_length_expr(self)}',
-                      f'  self_index = {df_index_expr(self, as_range=True)}',
-                      f'  if length > len(idx):',
-                      f'    msg = "Unalignable boolean Series provided as indexer " + \\',
-                      f'          "(index of the boolean Series and of the indexed object do not match)."',
-                      f'    raise IndexingError(msg)',
-                      f'  # do not trim idx._data to length as getitem_by_mask handles such case',
-                      f'  res_index = getitem_by_mask(self_index, idx._data)',
-                      f'  # df index is default, same as positions so it can be used in take']
+    if isinstance(self.index, types.NoneType) and isinstance(idx.index, types.NoneType):
+        func_lines = [
+            f'  length = {length_expr}',
+            f'  self_index = {df_index_expr(self, length_expr=length_expr, as_range=True)}',
+            f'  if length > len(idx):',
+            f'    msg = "Unalignable boolean Series provided as indexer " + \\',
+            f'          "(index of the boolean Series and of the indexed object do not match)."',
+            f'    raise IndexingError(msg)',
+            f'  # do not trim idx._data to length as getitem_by_mask handles such case',
+            f'  res_index = getitem_by_mask(self_index, idx._data)',
+            f'  # df index is default, same as positions so it can be used in take'
+        ]
         results = []
         for i, col in enumerate(self.columns):
+            col_loc = self.column_loc[col]
+            type_id, col_id = col_loc.type_id, col_loc.col_id
             res_data = f'res_data_{i}'
             func_lines += [
-                f'  data_{i} = self._data[{i}]',
+                f'  data_{i} = self._data[{type_id}][{col_id}]',
                 f'  {res_data} = sdc_take(data_{i}, res_index)'
             ]
             results.append((col, res_data))
@@ -1536,17 +1549,20 @@ def df_getitem_bool_series_idx_main_codelines(self, idx):
             f'  return pandas.DataFrame({{{data}}}, index=res_index)'
         ]
     else:
-        func_lines = [f'  length = {df_length_expr(self)}',
-                      f'  self_index = self.index',
-                      f'  reindexed_idx = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)',
-                      f'  res_index = getitem_by_mask(self_index, reindexed_idx._data)',
-                      f'  selected_pos = getitem_by_mask(numpy.arange(length), reindexed_idx._data)']
-
+        func_lines = [
+            f'  length = {length_expr}',
+            f'  self_index = self.index',
+            f'  reindexed_idx = sdc_reindex_series(idx._data, idx.index, idx._name, self_index)',
+            f'  res_index = getitem_by_mask(self_index, reindexed_idx._data)',
+            f'  selected_pos = getitem_by_mask(numpy.arange(length), reindexed_idx._data)'
+        ]
         results = []
         for i, col in enumerate(self.columns):
+            col_loc = self.column_loc[col]
+            type_id, col_id = col_loc.type_id, col_loc.col_id
             res_data = f'res_data_{i}'
             func_lines += [
-                f'  data_{i} = self._data[{i}]',
+                f'  data_{i} = self._data[{type_id}][{col_id}]',
                 f'  {res_data} = sdc_take(data_{i}, selected_pos)'
             ]
             results.append((col, res_data))
@@ -1570,9 +1586,11 @@ def df_getitem_bool_array_idx_main_codelines(self, idx):
                   f'  res_index = sdc_take(self_index, taken_pos)']
     results = []
     for i, col in enumerate(self.columns):
+        col_loc = self.column_loc[col]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         res_data = f'res_data_{i}'
         func_lines += [
-            f'  data_{i} = self._data[{i}]',
+            f'  data_{i} = self._data[{type_id}][{col_id}]',
             f'  {res_data} = sdc_take(data_{i}, taken_pos)'
         ]
         results.append((col, res_data))
@@ -1593,13 +1611,13 @@ def df_getitem_key_error_codelines():
 def df_getitem_slice_idx_codegen(self, idx):
     """
     Example of generated implementation with provided index:
-        def _df_getitem_slice_idx_impl(self, idx)
-          res_index = self._index
-          data_0 = self._data[0]
-          res_data_0 = pandas.Series(data_0[idx], index=res_index[idx], name="A")
-          data_1 = self._data [1]
-          res_data_1 = pandas.Series(data_1[idx], index=res_index, name="B")
-          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index[idx])
+        def _df_getitem_slice_idx_impl(self, idx):
+          self_index = numpy.arange(len(self._data[0][0]))
+          index = self_index[idx]
+          data_0 = self._data[0][0][idx]
+          res_data_0 = pandas.Series(data_0, index=index, name="A")
+          data_1 = self._data[1][0][idx]
+          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=index)
     """
     func_lines = ['def _df_getitem_slice_idx_impl(self, idx):']
     if self.columns:
@@ -1616,13 +1634,13 @@ def df_getitem_slice_idx_codegen(self, idx):
 def df_getitem_tuple_idx_codegen(self, idx):
     """
     Example of generated implementation with provided index:
-        def _df_getitem_tuple_idx_impl(self, idx)
-          res_index = self._index
-          data_1 = self._data[1]
-          res_data_1 = pandas.Series(data_1, index=res_index, name="B")
-          data_2 = self._data[2]
+        def _df_getitem_tuple_idx_impl(self, idx):
+          res_index = numpy.arange(len(self._data[0][0]))
+          data_0 = self._data[0][0]
+          res_data_0 = pandas.Series(data_0, index=res_index, name="A")
+          data_2 = self._data[0][1]
           res_data_2 = pandas.Series(data_2, index=res_index, name="C")
-          return pandas.DataFrame({"B": res_data_1, "C": res_data_2}, index=res_index)
+          return pandas.DataFrame({"A": res_data_0, "C": res_data_2}, index=res_index)
     """
     func_lines = ['def _df_getitem_tuple_idx_impl(self, idx):']
     literal_idx = {col.literal_value for col in idx}
@@ -1644,8 +1662,8 @@ def df_getitem_bool_series_idx_codegen(self, idx):
     """
     Example of generated implementation with provided index:
         def _df_getitem_bool_series_idx_impl(self, idx):
-          length = len(self._data[0])
-          self_index = range(len(self._data[0]))
+          length = len(self._data[0][0])
+          self_index = range(len(self._data[0][0]))
           if length > len(idx):
             msg = "Unalignable boolean Series provided as indexer " + \
                   "(index of the boolean Series and of the indexed object do not match)."
@@ -1653,9 +1671,9 @@ def df_getitem_bool_series_idx_codegen(self, idx):
           # do not trim idx._data to length as getitem_by_mask handles such case
           res_index = getitem_by_mask(self_index, idx._data)
           # df index is default, same as positions so it can be used in take
-          data_0 = self._data[0]
+          data_0 = self._data[0][0]
           res_data_0 = sdc_take(data_0, res_index)
-          data_1 = self._data[1]
+          data_1 = self._data[1][0]
           res_data_1 = sdc_take(data_1, res_index)
           return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index)
     """
@@ -1675,15 +1693,15 @@ def df_getitem_bool_array_idx_codegen(self, idx):
     """
     Example of generated implementation with provided index:
         def _df_getitem_bool_array_idx_impl(self, idx):
-          length = len(self._data[0])
+          length = len(self._data[0][0])
           if length != len(idx):
             raise ValueError("Item wrong length.")
-          self_index = range(len(self._data[0]))
+          self_index = range(len(self._data[0][0]))
           taken_pos = getitem_by_mask(self_index, idx)
           res_index = sdc_take(self_index, taken_pos)
-          data_0 = self._data[0]
+          data_0 = self._data[0][0]
           res_data_0 = sdc_take(data_0, taken_pos)
-          data_1 = self._data[1]
+          data_1 = self._data[1][0]
           res_data_1 = sdc_take(data_1, taken_pos)
           return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index)
     """
@@ -1823,15 +1841,16 @@ def sdc_pandas_dataframe_getitem(self, idx):
         return None
 
     if isinstance(idx, types.StringLiteral):
-        try:
-            col_idx = self.columns.index(idx.literal_value)
-            key_error = False
-        except ValueError:
+        col_loc = self.column_loc.get(idx.literal_value)
+        if col_loc is None:
             key_error = True
+        else:
+            type_id, col_id = col_loc.type_id, col_loc.col_id
+            key_error = False
 
         def _df_getitem_str_literal_idx_impl(self, idx):
             if key_error == False:  # noqa
-                data = self._data[col_idx]
+                data = self._data[type_id][col_id]
                 return pandas.Series(data, index=self._index, name=idx)
             else:
                 raise KeyError('Column is not in the DataFrame')
