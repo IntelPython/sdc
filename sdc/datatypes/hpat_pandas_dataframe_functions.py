@@ -640,13 +640,15 @@ def copy_overload(df, deep=True):
     return sdc_pandas_dataframe_copy_codegen(df, params, series_params)
 
 
-def _dataframe_apply_columns_codegen(func_name, func_params, series_params, columns):
+def _dataframe_apply_columns_codegen(func_name, func_params, series_params, columns, column_loc):
     result_name = []
     joined = ', '.join(func_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     for i, c in enumerate(columns):
+        col_loc = column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f'result_{i}'
-        func_lines += [f'  series_{i} = pandas.Series({func_params[0]}._data[{i}])',
+        func_lines += [f'  series_{i} = pandas.Series({func_params[0]}._data[{type_id}][{col_id}])',
                        f'  {result_c} = series_{i}.{func_name}({series_params})']
         result_name.append((result_c, c))
 
@@ -673,8 +675,8 @@ def sdc_pandas_dataframe_apply_columns(df, func_name, params, ser_params):
 
     df_func_name = f'_df_{func_name}_impl'
 
-    func_text, global_vars = _dataframe_apply_columns_codegen(func_name, all_params, s_par, df.columns)
-
+    func_text, global_vars = _dataframe_apply_columns_codegen(func_name, all_params, s_par,
+                                                              df.columns, df.column_loc)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
