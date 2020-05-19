@@ -1812,6 +1812,21 @@ class TestDataFrame(TestCase):
         sdc_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(sdc_func(df, arr), test_impl(df, arr))
 
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_getitem_bool_array_even_idx_no_unboxing(self):
+        def test_impl(arr):
+            df = pd.DataFrame({
+                'A': [1., -1., 0.1, -0.1],
+                'B': list(range(4)),
+                'C': [1., np.nan, np.inf, np.inf],
+            })
+            return df[arr]
+
+        arr = np.array([i % 2 for i in range(4)], dtype=np.bool_)
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(arr), test_impl(arr))
+
     @skip_sdc_jit('DF.getitem unsupported exceptions')
     @dfRefactoringNotImplemented
     def test_df_getitem_str_literal_idx_exception_key_error(self):
@@ -1874,6 +1889,89 @@ class TestDataFrame(TestCase):
                 self._test_df_getitem_unbox_slice_idx(df, 1, 3)
                 self._test_df_getitem_tuple_idx(df)
                 self._test_df_getitem_bool_series_idx(df)
+
+    def test_df_getitem_str_literal_idx_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [1., -1., 0.1, -0.1],
+                'B': list(range(4)),
+                'C': [1., np.nan, np.inf, np.inf],
+            })
+            return df['A']
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_series_equal(sdc_func(), test_impl())
+
+    def test_df_getitem_unicode_idx_no_unboxing(self):
+        def test_impl(idx):
+            df = pd.DataFrame({
+                'A': [1., -1., 0.1, -0.1],
+                'B': list(range(4)),
+                'C': [1., np.nan, np.inf, np.inf],
+            })
+            return df[idx]
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_series_equal(sdc_func('A'), test_impl('A'))
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_getitem_slice_idx_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [1., -1., 0.1, -0.1],
+                'B': list(range(4)),
+                'C': [1., np.nan, np.inf, np.inf],
+            })
+            return df[1:3]
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_series_equal(sdc_func(), test_impl())
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_getitem_unbox_slice_idx_no_unboxing(self):
+        def test_impl(start, end):
+            df = pd.DataFrame({
+                'A': [1., -1., 0.1, -0.1],
+                'B': list(range(4)),
+                'C': [1., np.nan, np.inf, np.inf],
+            })
+            return df[start:end]
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_series_equal(sdc_func(1, 3), test_impl(1, 3))
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_getitem_tuple_idx_no_unboxing(self):
+        def gen_test_impl(do_jit=False):
+            def test_impl():
+                df = pd.DataFrame({
+                    'A': [1., -1., 0.1, -0.1],
+                    'B': list(range(4)),
+                    'C': [1., np.nan, np.inf, np.inf],
+                })
+                if do_jit == True:  # noqa
+                    return df[('A', 'C')]
+                else:
+                    return df[['A', 'C']]
+
+            return test_impl
+
+        test_impl = gen_test_impl()
+        sdc_func = self.jit(gen_test_impl(do_jit=True))
+        pd.testing.assert_series_equal(sdc_func(), test_impl())
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_getitem_bool_series_idx_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [1., -1., 0.1, -0.1],
+                'B': list(range(4)),
+                'C': [1., np.nan, np.inf, np.inf],
+            })
+            return df[df['A'] == -1.]
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_series_equal(sdc_func(), test_impl())
 
     @skip_sdc_jit('DF.getitem unsupported Series name')
     @dfRefactoringNotImplemented

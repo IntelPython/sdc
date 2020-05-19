@@ -93,7 +93,7 @@ def init_dataframe(typingctx, *args):
             type_id, col_indices = data_typs_map[col_typ]
             col_id = len(col_indices)
             column_loc[col_name] = ColumnLoc(type_id, col_id)
-            col_indices.append(col_id)
+            col_indices.append(i)
 
     def codegen(context, builder, signature, args):
         in_tup = args[0]
