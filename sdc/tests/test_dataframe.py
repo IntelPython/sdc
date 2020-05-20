@@ -706,7 +706,6 @@ class TestDataFrame(TestCase):
                 df = pd.DataFrame({'A': A, 'B': B, 'C D E': values})
                 self._test_df_values_unboxing(df)
 
-    @dfRefactoringNotImplemented
     def test_df_values(self):
         def test_impl(n, values):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n), 'C': values})
