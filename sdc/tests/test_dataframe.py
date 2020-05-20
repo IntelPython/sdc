@@ -1616,7 +1616,7 @@ class TestDataFrame(TestCase):
                                   index=index)
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_drop_one_column(self):
         def test_impl(index):
             df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
@@ -1658,7 +1658,7 @@ class TestDataFrame(TestCase):
                                   index=index)
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_drop_tuple_column(self):
         def gen_test_impl(do_jit=False):
             def test_impl(index):

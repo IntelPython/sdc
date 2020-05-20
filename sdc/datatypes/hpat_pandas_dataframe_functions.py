@@ -1308,22 +1308,14 @@ def isna_overload(df):
 
 def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
     """
-    Input:
-    df.drop(columns='M', errors='ignore')
-
-    Func generated:
-    def sdc_pandas_dataframe_drop_impl(df, labels=None, axis=0, index=None, columns=None, level=None, inplace=False,
-     errors="raise"):
-        if errors == "raise":
-          raise ValueError("The label M is not found in the selected axis")
-        new_col_A_data_df = df._data[0]
-        new_col_B_data_df = df._data[1]
-        new_col_C_data_df = df._data[2]
-        return pandas.DataFrame({"A": new_col_A_data_df, "B": new_col_B_data_df, "C": new_col_C_data_df})
-
+    Example of generated implementation:
+        def sdc_pandas_dataframe_drop_impl(df, labels=None, axis=0, index=None, columns=None,
+                                           level=None, inplace=False, errors="raise"):
+            new_col_0_data_df = df._data[1][0]
+            new_col_1_data_df = df._data[0][1]
+            return pandas.DataFrame({"B": new_col_0_data_df, "C": new_col_1_data_df}, index=df.index)
     """
     indent = 4 * ' '
-    df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
     saved_df_columns = [column for column in df.columns if column not in drop_cols]
     func_definition = [f'def sdc_pandas_dataframe_{func_name}_impl({", ".join(func_args)}):']
     func_text = []
@@ -1336,8 +1328,9 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
             break
 
     for column_id, column_name in enumerate(saved_df_columns):
-        func_text.append(f'new_col_{column_id}_data_{"df"} = get_dataframe_data({"df"}, '
-                         f'{df_columns_indx[column_name]})')
+        col_loc = df.column_loc[column_name]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
+        func_text.append(f'new_col_{column_id}_data_df = df._data[{type_id}][{col_id}]')
         column_list.append((f'new_col_{column_id}_data_df', column_name))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
@@ -1346,7 +1339,7 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols):
     func_definition.extend([indent + func_line for func_line in func_text])
     func_def = '\n'.join(func_definition)
 
-    global_vars = {'pandas': pandas, 'get_dataframe_data': sdc.hiframes.pd_dataframe_ext.get_dataframe_data}
+    global_vars = {'pandas': pandas}
 
     return func_def, global_vars
 
