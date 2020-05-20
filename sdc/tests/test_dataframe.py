@@ -1346,7 +1346,7 @@ class TestDataFrame(TestCase):
                 with self.subTest(index=idx, deep=deep):
                     pd.testing.assert_frame_equal(sdc_func(df, deep), test_impl(df, deep))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_pct_change1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
