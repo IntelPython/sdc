@@ -2809,7 +2809,7 @@ def df_set_column_overload(self, key, value):
     ty_checker.raise_exc(key, 'str', 'key')
 
 
-def sdc_pandas_dataframe_reset_index_codegen(drop, all_params, columns):
+def sdc_pandas_dataframe_reset_index_codegen(drop, all_params, columns, column_loc):
     """
     Example of generated implementation:
         def _df_reset_index_impl(self, level=None, drop=False, inplace=False, col_level=0, col_fill=""):
@@ -2822,15 +2822,16 @@ def sdc_pandas_dataframe_reset_index_codegen(drop, all_params, columns):
     result_name = []
     all_params_str = ', '.join(all_params)
     func_lines = [f'def _df_reset_index_impl({all_params_str}):']
-    df = all_params[0]
-    if not drop.literal_value:
+    if not drop:
         old_index = 'old_index'
-        func_lines += [f'  {old_index} = {df}.index']
+        func_lines += [f'  {old_index} = self.index']
         result_name.append((old_index, 'index'))
     for i, c in enumerate(columns):
+        col_loc = column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f'result_{i}'
         func_lines += [
-            f'  result_{i} = get_dataframe_data({df}, {i})'
+            f'  result_{i} = self._data[{type_id}][{col_id}]'
         ]
         result_name.append((result_c, c))
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
@@ -2838,61 +2839,15 @@ def sdc_pandas_dataframe_reset_index_codegen(drop, all_params, columns):
     func_text = '\n'.join(func_lines)
 
     global_vars = {'pandas': pandas,
-                   'numpy': numpy,
-                   'get_dataframe_data': get_dataframe_data}
+                   'numpy': numpy}
 
     return func_text, global_vars
 
 
 def sdc_pandas_dataframe_reset_index_impl(self, drop=False):
     all_params = ['self', 'level=None', 'drop=False', 'inplace=False', 'col_level=0', 'col_fill=""']
-
-    func_text, global_vars = sdc_pandas_dataframe_reset_index_codegen(drop, all_params, self.columns)
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _apply_impl = loc_vars[f'_df_reset_index_impl']
-
-    return _apply_impl
-
-
-def sdc_pandas_dataframe_reset_index_default_codegen(drop, all_params, columns):
-    """
-    Example of generated implementation:
-        def _df_reset_index_impl(self, level=None, drop=False, inplace=False, col_level=0, col_fill=""):
-          old_index = self.index
-          result_0 = get_dataframe_data(self, 0)
-          result_1 = get_dataframe_data(self, 1)
-          return pandas.DataFrame({"index": old_index, "A": result_0, "B": result_1})
-    """
-    result_name = []
-    all_params_str = ', '.join(all_params)
-    func_lines = [f'def _df_reset_index_impl({all_params_str}):']
-    df = all_params[0]
-    if not drop:
-        old_index = 'old_index'
-        func_lines += [f'  {old_index} = {df}.index']
-        result_name.append((old_index, 'index'))
-    for i, c in enumerate(columns):
-        result_c = f'result_{i}'
-        func_lines += [
-            f'  result_{i} = get_dataframe_data({df}, {i})'
-        ]
-        result_name.append((result_c, c))
-    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
-    func_lines += [f'  return pandas.DataFrame({{{data}}})']
-    func_text = '\n'.join(func_lines)
-
-    global_vars = {'pandas': pandas,
-                   'numpy': numpy,
-                   'get_dataframe_data': get_dataframe_data}
-
-    return func_text, global_vars
-
-
-def sdc_pandas_dataframe_reset_index_impl_default(self, drop=False):
-    all_params = ['self', 'level=None', 'drop=False', 'inplace=False', 'col_level=0', 'col_fill=""']
-
-    func_text, global_vars = sdc_pandas_dataframe_reset_index_default_codegen(drop, all_params, self.columns)
+    func_text, global_vars = sdc_pandas_dataframe_reset_index_codegen(drop, all_params,
+                                                                      self.columns, self.column_loc)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _apply_impl = loc_vars[f'_df_reset_index_impl']
@@ -2951,11 +2906,8 @@ def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False
     if not (level is None or isinstance(level, types.Omitted)):
         raise TypingError('{} Unsupported parameter level. Given: {}'.format(func_name, level))
 
-    if not (isinstance(drop, (types.Omitted, types.Boolean)) or drop is False):
+    if not isinstance(drop, (types.Omitted, types.Boolean, bool)):
         ty_checker.raise_exc(drop, 'bool', 'drop')
-
-    if isinstance(drop, types.Omitted):
-        drop = False
 
     if not (inplace is False or isinstance(inplace, types.Omitted)):
         raise TypingError('{} Unsupported parameter inplace. Given: {}'.format(func_name, inplace))
@@ -2966,10 +2918,13 @@ def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False
     if not (col_fill == '' or isinstance(col_fill, types.Omitted)):
         raise TypingError('{} Unsupported parameter col_fill. Given: {}'.format(func_name, col_fill))
 
-    if not isinstance(drop, types.Literal):
-        if isinstance(drop, bool):
-            return sdc_pandas_dataframe_reset_index_impl_default(self, drop=drop)
-        else:
-            raise SDCLimitation('{} only work with Boolean literals drop.'.format(func_name))
+    if isinstance(drop, types.Literal):
+        literal_drop = drop.literal_value
+        return sdc_pandas_dataframe_reset_index_impl(self, drop=literal_drop)
+    elif isinstance(drop, types.Omitted):
+        return sdc_pandas_dataframe_reset_index_impl(self, drop=drop.value)
+    elif isinstance(drop, bool):
+        return sdc_pandas_dataframe_reset_index_impl(self, drop=drop)
 
-    return sdc_pandas_dataframe_reset_index_impl(self, drop=drop)
+    raise SDCLimitation('Method {}(). Parameter drop is only supported as a literal.'.format(func_name))
+
