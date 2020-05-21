@@ -741,7 +741,7 @@ class TestDataFrame(TestCase):
         np.testing.assert_array_equal(sdc_func(df), test_impl(df))
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_index_attribute(self):
         index_to_test = [[1, 2, 3, 4, 5],
                          [.1, .2, .3, .4, .5],
@@ -757,7 +757,7 @@ class TestDataFrame(TestCase):
                 self._test_df_index(df)
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_index_attribute_empty(self):
         n = 5
         np.random.seed(0)
@@ -768,10 +768,44 @@ class TestDataFrame(TestCase):
         self._test_df_index(df)
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_index_attribute_empty_df(self):
         df = pd.DataFrame()
         self._test_df_index(df)
+
+    def test_index_attribute_no_unboxing(self):
+        def test_impl(n, index):
+            np.random.seed(0)
+            df = pd.DataFrame({
+                'A': np.ones(n),
+                'B': np.random.ranf(n)
+            }, index=index)
+            return df.index
+
+        sdc_impl = self.jit(test_impl)
+        index_to_test = [
+            [1, 2, 3, 4, 5],
+            [.1, .2, .3, .4, .5],
+            ['a', 'b', 'c', 'd', 'e']
+        ]
+        for index in index_to_test:
+            with self.subTest(index=index):
+                n = len(index)
+                jit_result = sdc_impl(n, index)
+                ref_result = test_impl(n, index)
+                np.testing.assert_array_equal(jit_result, ref_result)
+
+    def test_index_attribute_default_no_unboxing(self):
+        def test_impl(n):
+            np.random.seed(0)
+            df = pd.DataFrame({
+                'A': np.ones(n),
+                'B': np.random.ranf(n)
+            })
+            return df.index
+
+        sdc_impl = self.jit(test_impl)
+        np.testing.assert_array_equal(sdc_impl(10), test_impl(10))
 
     @skip_sdc_jit
     @skip_numba_jit
