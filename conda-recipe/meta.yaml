@@ -7,7 +7,7 @@ package:
   version: {{ GIT_DESCRIBE_TAG }}
 
 source:
-   path: ../..
+   path: ../
 
 build:
   number: {{ GIT_DESCRIBE_NUMBER|int }}
