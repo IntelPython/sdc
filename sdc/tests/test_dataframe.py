@@ -1101,7 +1101,7 @@ class TestDataFrame(TestCase):
                 with self.subTest(n=n, index=idx):
                     pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_iloc_slice(self):
         def test_impl(df, n, k):
             return df.iloc[n:k]
@@ -1116,7 +1116,23 @@ class TestDataFrame(TestCase):
                 with self.subTest(index=idx, n=n, k=k):
                     pd.testing.assert_frame_equal(sdc_func(df, n, k), test_impl(df, n, k))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_iloc_slice_no_unboxing(self):
+        def test_impl(n, k):
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [5.5, np.nan, 3, 0, 7.7],
+                'C': [3, 4, 1, 0, 222],
+            }, index=[3, 4, 2, 6, 1])
+            return df.iloc[n:k]
+
+        sdc_func = sdc.jit(test_impl)
+        cases_n = [-10, 0, 8, None]
+        for n, k in product(cases_n, cases_n[::-1]):
+            with self.subTest(n=n, k=k):
+                pd.testing.assert_frame_equal(sdc_func(n, k), test_impl(n, k))
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_iloc_values(self):
         def test_impl(df, n):
             return df.iloc[n, 1]
@@ -1132,7 +1148,22 @@ class TestDataFrame(TestCase):
                     if not (np.isnan(sdc_func(df, n)) and np.isnan(test_impl(df, n))):
                         self.assertEqual(sdc_func(df, n), test_impl(df, n))
 
-    @dfRefactoringNotImplemented
+    def test_df_iloc_values_no_unboxing(self):
+        def test_impl(n):
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [5.5, np.nan, 3, 0, 7.7],
+                'C': [3, 4, 1, 0, 222],
+            }, index=[3, 4, 2, 6, 1])
+            return df.iloc[n, 1]
+
+        sdc_func = sdc.jit(test_impl)
+        for n in [1, 0, 2]:
+            with self.subTest(n=n):
+                if not (np.isnan(sdc_func(n)) and np.isnan(test_impl(n))):
+                    self.assertEqual(sdc_func(n), test_impl(n))
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_iloc_value_error(self):
         def int_impl(df):
             return df.iloc[11]
@@ -1157,7 +1188,7 @@ class TestDataFrame(TestCase):
                     func(df)
                 self.assertIn(msg, str(raises.exception))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_iloc_int(self):
         def test_impl(df, n):
             return df.iloc[n]
@@ -1172,7 +1203,21 @@ class TestDataFrame(TestCase):
                 with self.subTest(index=idx, n=n):
                     pd.testing.assert_series_equal(sdc_func(df, n), test_impl(df, n), check_names=False)
 
-    @dfRefactoringNotImplemented
+    def test_df_iloc_int_no_unboxing(self):
+        def test_impl(n):
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [5.5, np.nan, 3, 0, 7.7],
+                'C': [3, 4, 1, 0, 222],
+            }, index=[3, 4, 2, 6, 1])
+            return df.iloc[n]
+
+        sdc_func = sdc.jit(test_impl)
+        for n in [0, 1, 2]:
+            with self.subTest(n=n):
+                pd.testing.assert_series_equal(sdc_func(n), test_impl(n), check_names=False)
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_iloc_list(self):
         def test_impl(df, n):
             return df.iloc[n]
@@ -1187,7 +1232,22 @@ class TestDataFrame(TestCase):
                 with self.subTest(index=idx, n=n):
                     pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_iloc_list_no_unboxing(self):
+        def test_impl(n):
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [5.5, np.nan, 3, 0, 7.7],
+                'C': [3, 4, 1, 0, 222]
+            }, index=[3, 4, 2, 6, 1])
+            return df.iloc[n]
+
+        sdc_func = sdc.jit(test_impl)
+        for n in [[0, 1], [2, 0]]:
+            with self.subTest(n=n):
+                pd.testing.assert_frame_equal(sdc_func(n), test_impl(n))
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_iloc_list_bool(self):
         def test_impl(df, n):
             return df.iloc[n]
@@ -1202,7 +1262,22 @@ class TestDataFrame(TestCase):
                 with self.subTest(index=idx, n=n):
                     pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_iloc_list_bool_no_unboxing(self):
+        def test_impl(n):
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [5.5, np.nan, 3, 0, 7.7],
+                'C': [3, 4, 1, 0, 222]
+            }, index=[3, 4, 2, 6, 1])
+            return df.iloc[n]
+
+        sdc_func = sdc.jit(test_impl)
+        for n in [[True, False, True, False, True]]:
+            with self.subTest(n=n):
+                pd.testing.assert_frame_equal(sdc_func(n), test_impl(n))
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_iat(self):
         def test_impl(df):
             return df.iat[0, 1]
@@ -1212,6 +1287,18 @@ class TestDataFrame(TestCase):
                            "B": [3, 4, 1, 0, 222],
                            "C": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
         self.assertEqual(sdc_func(df), test_impl(df))
+
+    def test_df_iat_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [3, 4, 1, 0, 222],
+                'C': ['a', 'dd', 'c', '12', 'ddf']
+            }, index=[3, 4, 2, 6, 1])
+            return df.iat[0, 1]
+
+        sdc_func = sdc.jit(test_impl)
+        self.assertEqual(sdc_func(), test_impl())
 
     def test_df_iat_value_error(self):
         def test_impl(df):
@@ -1226,7 +1313,7 @@ class TestDataFrame(TestCase):
         msg = 'Index is out of bounds for axis'
         self.assertIn(msg, str(raises.exception))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_at(self):
         def test_impl(df, n):
             return df.at[n, 'C']
@@ -1240,7 +1327,20 @@ class TestDataFrame(TestCase):
         for n in n_cases:
             np.testing.assert_array_equal(sdc_func(df, n), test_impl(df, n))
 
-    @dfRefactoringNotImplemented
+    def test_df_at_no_unboxing(self):
+        def test_impl(n):
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [3, 4, 1, 0, 222],
+                'C': ['a', 'dd', 'c', '12', 'ddf']
+            }, index=[3, 0, 1, 2, 0])
+            return df.at[n, 'C']
+
+        sdc_func = sdc.jit(test_impl)
+        for n in [0, 2]:
+            np.testing.assert_array_equal(sdc_func(n), test_impl(n))
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_at_type(self):
         def test_impl(df, n, k):
             return df.at[n, "B"]
@@ -1254,7 +1354,7 @@ class TestDataFrame(TestCase):
         for n in n_cases:
             self.assertEqual(sdc_func(df, n, "B"), test_impl(df, n, "B"))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_at_value_error(self):
         def test_impl(df):
             return df.at[5, 'C']
@@ -1269,7 +1369,7 @@ class TestDataFrame(TestCase):
         msg = 'Index is not in the Series'
         self.assertIn(msg, str(raises.exception))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_loc(self):
         def test_impl(df):
             return df.loc[4]
@@ -1281,7 +1381,20 @@ class TestDataFrame(TestCase):
                            "C": [3.1, 8.4, 7.1, 3.2, 1]}, index=idx)
         pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_loc_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [3, 4, 1, 0, 222],
+                'C': [3.1, 8.4, 7.1, 3.2, 1]
+            }, index=[3, 4, 1, 4, 0])
+            return df.loc[4]
+
+        sdc_func = sdc.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_loc_str(self):
         def test_impl(df):
             return df.loc['c']
@@ -1293,7 +1406,7 @@ class TestDataFrame(TestCase):
                            "C": ['3.1', '8.4', '7.1', '3.2', '1']}, index=idx)
         pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_loc_no_idx(self):
         def test_impl(df):
             return df.loc[2]
