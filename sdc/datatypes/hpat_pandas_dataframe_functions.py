@@ -2813,11 +2813,9 @@ def sdc_pandas_dataframe_reset_index_codegen(drop, all_params, columns, column_l
     """
     Example of generated implementation:
         def _df_reset_index_impl(self, level=None, drop=False, inplace=False, col_level=0, col_fill=""):
-          old_index = self.index
-          result_0 = get_dataframe_data(self, 0)
-          result_1 = get_dataframe_data(self, 1)
-          result_2 = get_dataframe_data(self, 2)
-          return pandas.DataFrame({"index": old_index, "A": result_0, "B": result_1, "C": result_2})
+          result_0 = self._data[0][0]
+          result_1 = self._data[0][1]
+          return pandas.DataFrame({"A": result_0, "B": result_1})
     """
     result_name = []
     all_params_str = ', '.join(all_params)
