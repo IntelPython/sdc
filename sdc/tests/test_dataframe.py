@@ -1088,7 +1088,7 @@ class TestDataFrame(TestCase):
         n = 11
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_head_unbox(self):
         def test_impl(df, n):
             return df.head(n)
@@ -1304,7 +1304,7 @@ class TestDataFrame(TestCase):
                            "C": [3.1, 8.4, 7.1, 3.2, 1]})
         pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_head(self):
         def get_func(n):
             def impl(a):
@@ -1327,6 +1327,21 @@ class TestDataFrame(TestCase):
                         index=[3, 4, 2, 6, 1]
                     )
                     pd.testing.assert_frame_equal(sdc_func(df), ref_impl(df))
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_head_no_unboxing(self):
+        def test_impl(n):
+            df = pd.DataFrame({
+                'float': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'int': [3, 4, 1, 0, 222],
+                'string': ['a', 'dd', 'c', '12', 'ddf']
+            }, index=[3, 4, 2, 6, 1])
+            return df.head(n)
+
+        sdc_impl = self.jit(test_impl)
+        for n in [-3, 0, 3, 5, None]:
+            with self.subTest(n=n):
+                pd.testing.assert_frame_equal(sdc_impl(n), test_impl(n))
 
     @dfRefactoringNotImplemented
     def test_df_copy(self):

@@ -457,29 +457,34 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
     return _reduce_impl
 
 
-def _dataframe_reduce_columns_codegen_head(func_name, func_params, series_params, columns, df):
+def _dataframe_reduce_columns_codegen_head(func_name, func_params, series_params, df):
     """
     Example func_text for func_name='head' columns=('float', 'int', 'string'):
-
         def _df_head_impl(df, n=5):
-            series_float = pandas.Series(df._data[0])
-            result_float = series_float.head(n=n)
-            series_int = pandas.Series(df._data[1])
-            result_int = series_int.head(n=n)
-            series_string = pandas.Series(df._data[2])
-            result_string = series_string.head(n=n)
-            return pandas.DataFrame({"float": result_float, "int": result_int, "string": result_string},
-                                    index = df._index[:n])
+          data_0 = df._data[0][0]
+          series_0 = pandas.Series(data_0)
+          result_0 = series_0.head(n=n)
+          data_1 = df._data[1][0]
+          series_1 = pandas.Series(data_1)
+          result_1 = series_1.head(n=n)
+          data_2 = df._data[2][0]
+          series_2 = pandas.Series(data_2)
+          result_2 = series_2.head(n=n)
+          return pandas.DataFrame({"float": result_0, "int": result_1, "string": result_2},
+                                  index=df._index[:n])
     """
     results = []
     joined = ', '.join(func_params)
     func_lines = [f'def _df_{func_name}_impl(df, {joined}):']
     ind = df_index_codegen_head(df)
-    for i, c in enumerate(columns):
-        result_c = f'result_{c}'
-        func_lines += [f'  series_{c} = pandas.Series(df._data[{i}])',
-                       f'  {result_c} = series_{c}.{func_name}({series_params})']
-        results.append((columns[i], result_c))
+    for i, c in enumerate(df.columns):
+        col_loc = df.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
+        result_c = f'result_{i}'
+        func_lines += [f'  data_{i} = df._data[{type_id}][{col_id}]',
+                       f'  series_{i} = pandas.Series(data_{i})',
+                       f'  {result_c} = series_{i}.{func_name}({series_params})']
+        results.append((df.columns[i], result_c))
 
     data = ', '.join(f'"{col}": {data}' for col, data in results)
     func_lines += [f'  return pandas.DataFrame({{{data}}}, {ind})']
@@ -495,7 +500,7 @@ def sdc_pandas_dataframe_head_codegen(df, func_name, params, ser_params):
     s_par = ', '.join(ser_par)
 
     df_func_name = f'_df_{func_name}_impl'
-    func_text, global_vars = _dataframe_reduce_columns_codegen_head(func_name, all_params, s_par, df.columns, df)
+    func_text, global_vars = _dataframe_reduce_columns_codegen_head(func_name, all_params, s_par, df)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _reduce_impl = loc_vars[df_func_name]
