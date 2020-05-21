@@ -553,13 +553,15 @@ def head_overload(df, n=5):
 
 def _dataframe_codegen_copy(func_params, series_params, df):
     """
-    Example func_text for func_name='copy' columns=('A', 'B', 'C'):
+    Example func_text for func_name='copy' columns=('A', 'B'):
         def _df_copy_impl(df, deep=True):
-            series_0 = pandas.Series(df._data[0])
-            result_0 = series_0.copy(deep=deep)
-            series_1 = pandas.Series(df._data[1])
-            result_1 = series_1.copy(deep=deep)
-            return pandas.DataFrame({"A": result_0, "B": result_1}, index=df._index)
+          data_0 = df._data[0][0]
+          series_0 = pandas.Series(data_0, name='A')
+          result_0 = series_0.copy(deep=deep)
+          data_1 = df._data[1][0]
+          series_1 = pandas.Series(data_1, name='B')
+          result_1 = series_1.copy(deep=deep)
+          return pandas.DataFrame({"A": result_0, "B": result_1}, index=df._index)
     """
     results = []
     series_params_str = ', '.join(kwsparams2list(series_params))
@@ -567,8 +569,11 @@ def _dataframe_codegen_copy(func_params, series_params, df):
     func_lines = [f"def _df_copy_impl(df, {func_params_str}):"]
     index = df_index_codegen_all(df)
     for i, c in enumerate(df.columns):
+        col_loc = df.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f"result_{i}"
-        func_lines += [f"  series_{i} = pandas.Series(df._data[{i}], name='{c}')",
+        func_lines += [f"  data_{i} = df._data[{type_id}][{col_id}]",
+                       f"  series_{i} = pandas.Series(data_{i}, name='{c}')",
                        f"  {result_c} = series_{i}.copy({series_params_str})"]
         results.append((c, result_c))
 

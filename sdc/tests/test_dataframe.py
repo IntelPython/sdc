@@ -1328,7 +1328,7 @@ class TestDataFrame(TestCase):
                     )
                     pd.testing.assert_frame_equal(sdc_func(df), ref_impl(df))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_copy(self):
         def test_impl(df, deep):
             return df.copy(deep=deep)
@@ -1345,6 +1345,26 @@ class TestDataFrame(TestCase):
             for deep in cases_deep:
                 with self.subTest(index=idx, deep=deep):
                     pd.testing.assert_frame_equal(sdc_func(df, deep), test_impl(df, deep))
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_copy_no_unboxing(self):
+        def test_impl(idx, deep):
+            df = pd.DataFrame({
+                'A': [3.2, np.nan, 7.0, 3.3, np.nan],
+                'B': [3, 4, 1, 0, 222],
+                'C': [True, True, False, False, True],
+                'D': ['a', 'dd', 'c', '12', None]
+            }, index=idx)
+            return df.copy(deep=deep)
+
+        sdc_impl = sdc.jit(test_impl)
+        indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e'], None]
+        cases_deep = [None, True, False]
+        for idx, deep in product(indexes, cases_deep):
+            with self.subTest(index=idx, deep=deep):
+                jit_result = sdc_impl(idx, deep)
+                ref_result = test_impl(idx, deep)
+                pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_pct_change1(self):
