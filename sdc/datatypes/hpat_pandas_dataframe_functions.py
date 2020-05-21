@@ -227,29 +227,19 @@ def hpat_pandas_dataframe_values(self):
 
 def sdc_pandas_dataframe_append_codegen(df, other, _func_name, ignore_index_value, indexes_comparable, args):
     """
-    Input:
-    df = pd.DataFrame({'A': ['cat', 'dog', np.nan], 'B': [.2, .3, np.nan]})
-    other = pd.DataFrame({'A': ['bird', 'fox', 'mouse'], 'C': ['a', np.nan, '']})
-    ignore_index=True
-
-    Func generated:
+    Example of generated implementation:
     def sdc_pandas_dataframe_append_impl(df, other, ignore_index=False, verify_integrity=False, sort=None):
-        len_df = len(df._data[0])
-        len_other = len(other._data[0])
-        new_col_A_data_df = df._data[0]
-        new_col_A_data_other = other._data[0]
-        new_col_A = init_series(new_col_A_data_df).append(init_series(new_col_A_data_other))._data
-        new_col_B_data_df = df._data[1]
-        new_col_B_data = init_series(new_col_B_data_df)._data
-        new_col_B = fill_array(new_col_B_data, len_df+len_other)
-        new_col_C_data_other = other._data[0]
-        new_col_C_data = init_series(new_col_C_data_other)._data
-        new_col_C = fill_str_array(new_col_C_data, len_df+len_other, push_back=False)
-        return pandas.DataFrame({"A": new_col_A, "B": new_col_B, "C": new_col_C)
+        len_df = len(df._data[0][0])
+        len_other = len(other._data[0][0])
+        new_col_0_data_df = df._data[0][0]
+        new_col_0_data_other = other._data[0][0]
+        new_col_0 = init_series(new_col_0_data_df).append(init_series(new_col_0_data_other))._data
+        new_col_1_data_df = df._data[0][1]
+        new_col_1_data_other = other._data[0][1]
+        new_col_1 = init_series(new_col_1_data_df).append(init_series(new_col_1_data_other))._data
+        return pandas.DataFrame({"A": new_col_0, "B": new_col_1})
     """
     indent = 4 * ' '
-    func_args = ['df', 'other']
-
     func_args = ['df', 'other'] + kwsparams2list(args)
 
     df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
@@ -267,38 +257,43 @@ def sdc_pandas_dataframe_append_codegen(df, other, _func_name, ignore_index_valu
     func_text = []
     column_list = []
 
-    func_text.append(f'len_df = len(df._data[0])')
-    func_text.append(f'len_other = len(other._data[0])')
+    func_text.append(f'len_df = len(df._data[0][0])')
+    func_text.append(f'len_other = len(other._data[0][0])')
 
-    for col_name, col_id in df_columns_indx.items():
-        func_text.append(f'new_col_{col_id}_data_{"df"} = {"df"}._data[{col_id}]')
+    for col_name, idx in df_columns_indx.items():
+        col_loc = df.column_loc[col_name]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
+        func_text.append(f'new_col_{idx}_data_df = df._data[{type_id}][{col_id}]')
         if col_name in other_columns_indx:
-            other_col_id = other_columns_indx.get(col_name)
-            func_text.append(f'new_col_{col_id}_data_{"other"} = '
-                             f'{"other"}._data[{other_columns_indx.get(col_name)}]')
-            s1 = f'init_series(new_col_{col_id}_data_{"df"})'
-            s2 = f'init_series(new_col_{col_id}_data_{"other"})'
-            func_text.append(f'new_col_{col_id} = {s1}.append({s2})._data')
+            other_col_loc = other.column_loc[col_name]
+            other_type_id, other_col_id = other_col_loc.type_id, other_col_loc.col_id
+            func_text.append(f'new_col_{idx}_data_other = '
+                             f'other._data[{other_type_id}][{other_col_id}]')
+            s1 = f'init_series(new_col_{idx}_data_df)'
+            s2 = f'init_series(new_col_{idx}_data_other)'
+            func_text.append(f'new_col_{idx} = {s1}.append({s2})._data')
         else:
-            func_text.append(f'new_col_{col_id}_data = init_series(new_col_{col_id}_data_df)._data')
+            func_text.append(f'new_col_{idx}_data = init_series(new_col_{idx}_data_df)._data')
             if col_name in string_type_columns:
-                func_text.append(f'new_col_{col_id} = fill_str_array(new_col_{col_id}_data, len_df+len_other)')
+                func_text.append(f'new_col_{idx} = fill_str_array(new_col_{idx}_data, len_df+len_other)')
             else:
-                func_text.append(f'new_col_{col_id} = fill_array(new_col_{col_id}_data, len_df+len_other)')
-        column_list.append((f'new_col_{col_id}', col_name))
+                func_text.append(f'new_col_{idx} = fill_array(new_col_{idx}_data, len_df+len_other)')
+        column_list.append((f'new_col_{idx}', col_name))
 
-    for col_name, col_id in other_columns_indx.items():
+    for col_name, idx in other_columns_indx.items():
         if col_name not in df_columns_indx:
-            func_text.append(f'new_col_{col_id}_data_{"other"} = {"other"}._data[{col_id}]')
-            func_text.append(f'new_col_{col_id}_data = init_series(new_col_{col_id}_data_other)._data')
+            other_col_loc = other.column_loc[col_name]
+            other_type_id, other_col_id = other_col_loc.type_id, other_col_loc.col_id
+            func_text.append(f'new_col_{idx}_data_other = other._data[{other_type_id}][{other_col_id}]')
+            func_text.append(f'new_col_{idx}_data = init_series(new_col_{idx}_data_other)._data')
             if col_name in string_type_columns:
                 func_text.append(
-                    f'new_col_{col_id}_other = '
-                    f'fill_str_array(new_col_{col_id}_data, len_df+len_other, push_back=False)')
+                    f'new_col_{idx}_other = '
+                    f'fill_str_array(new_col_{idx}_data, len_df+len_other, push_back=False)')
             else:
-                func_text.append(f'new_col_{col_id}_other = '
-                                 f'fill_array(new_col_{col_id}_data, len_df+len_other, push_back=False)')
-            column_list.append((f'new_col_{col_id}_other', col_name))
+                func_text.append(f'new_col_{idx}_other = '
+                                 f'fill_array(new_col_{idx}_data, len_df+len_other, push_back=False)')
+            column_list.append((f'new_col_{idx}_other', col_name))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
 

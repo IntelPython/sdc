@@ -2057,7 +2057,7 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_append_df_same_cols_no_index(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)
@@ -2069,7 +2069,19 @@ class TestDataFrame(TestCase):
         df2.A[n // 2:] = n
         pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_append_df_same_cols_no_index_no_unboxing(self):
+        def test_impl():
+            n = 11
+            df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+            df2 = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+            df2.A[n // 2:] = n
+            return df.append(df2, ignore_index=True)
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_append_df_same_cols_index_default(self):
         def test_impl(df, df2):
             return df.append(df2)
@@ -2082,7 +2094,7 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_append_df_diff_cols_index_ignore_false(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=False)
@@ -2096,7 +2108,22 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_append_df_diff_cols_index_ignore_false_no_unboxing(self):
+        def test_impl():
+            n1 = 11
+            n2 = n1 * 2
+            df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1) ** 2},
+                              index=np.arange(n1) ** 4)
+            df2 = pd.DataFrame({'C': np.arange(n2), 'D': np.arange(n2) ** 2,
+                                'E S D': np.arange(n2) + 100},
+                               index=np.arange(n2) ** 8)
+            return df.append(df2, ignore_index=False)
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_append_df_diff_cols_index_ignore_index(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)
@@ -2110,7 +2137,7 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_append_df_diff_cols_no_index(self):
         def test_impl(df, df2):
             return df.append(df2)
@@ -2123,7 +2150,7 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_append_df_cross_cols_no_index(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)
@@ -2136,7 +2163,7 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_append_df_exception_incomparable_index_type(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=False)
@@ -2157,7 +2184,7 @@ class TestDataFrame(TestCase):
         self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_append_df_diff_types_no_index(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)
