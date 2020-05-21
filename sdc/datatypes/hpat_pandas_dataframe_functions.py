@@ -2620,9 +2620,11 @@ def df_add_column_codelines(self, key):
 
     results = []
     for i, col in enumerate(self.columns):
+        col_loc = self.column_loc[col]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         res_data = f'res_data_{i}'
         func_lines += [
-            f'  data_{i} = self._data[{i}]',
+            f'  data_{i} = self._data[{type_id}][{col_id}]',
             f'  {res_data} = pandas.Series(data_{i}, index=res_index, name="{col}")',
         ]
         results.append((col, res_data))
@@ -2648,7 +2650,9 @@ def df_replace_column_codelines(self, key):
         if literal_key == col:
             func_lines += [f'  data_{i} = value']
         else:
-            func_lines += [f'  data_{i} = self._data[{i}]']
+            col_loc = self.column_loc[col]
+            type_id, col_id = col_loc.type_id, col_loc.col_id
+            func_lines += [f'  data_{i} = self._data[{type_id}][{col_id}]']
 
         res_data = f'res_data_{i}'
         func_lines += [

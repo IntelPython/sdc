@@ -638,21 +638,21 @@ class TestDataFrame(TestCase):
         msg = 'Could not set item for DataFrame with empty columns'
         self.assertIn(msg, str(raises.exception))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_add_column(self):
         all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
         key, value = 'B', np.array([1., -1., 0.])
 
         self._test_df_set_column(all_data, key, value)
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_add_column_str(self):
         all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
         key, value = 'B', pd.Series(test_global_input_data_unicode_kind4)
 
         self._test_df_set_column(all_data, key, value)
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_add_column_exception_invalid_length(self):
         df = pd.DataFrame({'A': [0, 1, 2], 'C': [3., 4., 5.]})
         key, value = 'B', np.array([1., np.nan, -1., 0.])
@@ -661,21 +661,21 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': []})
         self._test_df_set_column_exception_empty_columns(df, key, value)
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_replace_column(self):
         all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}]
         key, value = 'A', np.array([1., -1., 0.])
 
         self._test_df_set_column(all_data, key, value)
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_replace_column_str(self):
         all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}]
         key, value = 'A', pd.Series(test_global_input_data_unicode_kind4)
 
         self._test_df_set_column(all_data, key, value)
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_replace_column_exception_invalid_length(self):
         df = pd.DataFrame({'A': [0, 1, 2], 'C': [3., 4., 5.]})
         key, value = 'A', np.array([1., np.nan, -1., 0.])
