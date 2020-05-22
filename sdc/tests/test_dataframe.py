@@ -1495,32 +1495,50 @@ class TestDataFrame(TestCase):
             with self.subTest(drop=drop):
                 with self.assertRaises(Exception) as raises:
                     hpat_func(df, drop)
-                msg = 'only work with Boolean literals drop'
-                self.assertIn(msg.format(types.bool_), str(raises.exception))
+                msg = 'drop is only supported as a literal'
+                self.assertIn(msg, str(raises.exception))
 
-    @dfRefactoringNotImplemented
-    def test_df_reset_index_drop_false_index_int(self):
-        def test_impl(df):
-            return df.reset_index(drop=False)
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
+    def test_df_reset_index_drop_literal_index_int(self):
+        def gen_test_impl(drop):
+            def test_impl(df):
+                if drop == False:  # noqa
+                    return df.reset_index(drop=False)
+                else:
+                    return df.reset_index(drop=True)
+            return test_impl
 
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0],
-                           'B': np.arange(4.0)}, index=[5, 8, 4, 6])
-        hpat_func = self.jit(test_impl)
+        df = pd.DataFrame({
+            'A': [1.0, 2.0, np.nan, 1.0],
+            'B': np.arange(4.0)
+        }, index=[5, 8, 4, 6])
+        for drop in [True, False]:
+            with self.subTest(drop=drop):
+                test_impl = gen_test_impl(drop)
+                hpat_func = self.jit(test_impl)
+                pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_reset_index_drop_literal_index_int_no_unboxing(self):
+        def gen_test_impl(drop):
+            def test_impl():
+                df = pd.DataFrame({
+                    'A': [1.0, 2.0, np.nan, 1.0],
+                    'B': np.arange(4.0)
+                }, index=[5, 8, 4, 6])
+                if drop == False:  # noqa
+                    return df.reset_index(drop=False)
+                else:
+                    return df.reset_index(drop=True)
+            return test_impl
 
-    @dfRefactoringNotImplemented
-    def test_df_reset_index_drop_true_index_int(self):
-        def test_impl(df):
-            return df.reset_index(drop=True)
+        for drop in [True, False]:
+            with self.subTest(drop=drop):
+                test_impl = gen_test_impl(drop)
+                hpat_func = self.jit(test_impl)
+                pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0],
-                           'B': np.arange(4.0)}, index=[5, 8, 4, 6])
-        hpat_func = self.jit(test_impl)
-
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
-
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_reset_index_drop_default_index_int(self):
         def test_impl(df):
             return df.reset_index()
@@ -1530,6 +1548,18 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
 
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_reset_index_drop_default_index_int_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [1.0, 2.0, np.nan, 1.0],
+                'B': np.arange(4.0)
+            }, index=[5, 8, 4, 6])
+            return df.reset_index()
+
+        hpat_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     @skip_numba_jit
     def test_df_reset_index_empty_df(self):
