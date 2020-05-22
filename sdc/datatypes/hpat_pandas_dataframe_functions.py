@@ -1897,7 +1897,7 @@ def df_getitem_tuple_at_codegen(self, row, col):
     Example of generated implementation:
         def _df_getitem_tuple_at_impl(self, idx):
             row, _ = idx
-            data = self._dataframe._data[1]
+            data = self._dataframe._data[1][0]
             res_data = pandas.Series(data, index=self._dataframe.index)
             return res_data.at[row]
     """
@@ -1906,9 +1906,11 @@ def df_getitem_tuple_at_codegen(self, row, col):
     check = False
     for i in range(len(self.columns)):
         if self.columns[i] == col:
+            col_loc = self.column_loc[col]
+            type_id, col_id = col_loc.type_id, col_loc.col_id
             check = True
             func_lines += [
-                f'  data = self._dataframe._data[{i}]',
+                f'  data = self._dataframe._data[{type_id}][{col_id}]',
                 f'  res_data = pandas.Series(data, index=self._dataframe.index)',
                 '  return res_data.at[row]',
             ]
@@ -1926,9 +1928,9 @@ def df_getitem_single_label_loc_codegen(self, idx):
     Example of generated implementation:
         def _df_getitem_single_label_loc_impl(self, idx):
             idx_list = find_idx(self._dataframe._index, idx)
-            data_0 = _sdc_take(self._dataframe._data[0], idx_list)
+            data_0 = _sdc_take(self._dataframe._data[0][0], idx_list)
             res_data_0 = pandas.Series(data_0)
-            data_1 = _sdc_take(self._dataframe._data[1], idx_list)
+            data_1 = _sdc_take(self._dataframe._data[1][0], idx_list)
             res_data_1 = pandas.Series(data_1)
             if len(idx_list) < 1:
                 raise KeyError('Index is not in the DataFrame')
@@ -1949,10 +1951,11 @@ def df_getitem_single_label_loc_codegen(self, idx):
                   f'{fill_list_text}']
     results = []
     for i, c in enumerate(self.columns):
+        col_loc = self.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         data = f'data_{i}'
-        index_in_list = f'index_in_list_{i}'
         res_data = f'res_data_{i}'
-        func_lines += [f'  {data} = _sdc_take(self._dataframe._data[{i}], idx_list)',
+        func_lines += [f'  {data} = _sdc_take(self._dataframe._data[{type_id}][{col_id}], idx_list)',
                        f'  {res_data} = pandas.Series({data})']
         results.append((c, res_data))
 
@@ -1977,13 +1980,13 @@ def df_getitem_int_iloc_codegen(self, idx):
     """
     Example of generated implementation:
         def _df_getitem_int_iloc_impl(self, idx):
-        if -1 < idx < len(self._dataframe.index):
-            data_0 = pandas.Series(self._dataframe._data[0])
-            result_0 = data_0.iat[idx]
-            data_1 = pandas.Series(self._dataframe._data[1])
-            result_1 = data_1.iat[idx]
-            return pandas.Series(data=[result_0, result_1], index=['A', 'B'], name=str(idx))
-        raise IndexingError('Index is out of bounds for axis')
+            if -1 < idx < len(self._dataframe.index):
+                data_0 = pandas.Series(self._dataframe._data[0][0])
+                result_0 = data_0.iat[idx]
+                data_1 = pandas.Series(self._dataframe._data[0][1])
+                result_1 = data_1.iat[idx]
+                return pandas.Series(data=[result_0, result_1], index=['A', 'B'], name=str(idx))
+            raise IndexingError('Index is out of bounds for axis')
     """
     func_lines = ['def _df_getitem_int_iloc_impl(self, idx):',
                   '  if -1 < idx < len(self._dataframe.index):']
@@ -1993,8 +1996,10 @@ def df_getitem_int_iloc_codegen(self, idx):
     if isinstance(self.index, types.NoneType):
         name = 'idx'
     for i, c in enumerate(self.columns):
+        col_loc = self.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f"result_{i}"
-        func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{i}])",
+        func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{type_id}][{col_id}])",
                        f"    {result_c} = data_{i}.iat[idx]"]
         results.append(result_c)
         index.append(c)
@@ -2012,17 +2017,19 @@ def df_getitem_slice_iloc_codegen(self, idx):
     """
     Example of generated implementation:
         def _df_getitem_slice_iloc_impl(self, idx):
-            data_0 = pandas.Series(self._dataframe._data[0])
+            data_0 = pandas.Series(self._dataframe._data[0][0])
             result_0 = data_0.iloc[idx]
-            data_1 = pandas.Series(self._dataframe._data[1])
+            data_1 = pandas.Series(self._dataframe._data[1][0])
             result_1 = data_1.iloc[idx]
             return pandas.DataFrame(data={"A": result_0, "B": result_1}, index=self._dataframe.index[idx])
     """
     func_lines = ['def _df_getitem_slice_iloc_impl(self, idx):']
     results = []
     for i, c in enumerate(self.columns):
+        col_loc = self.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f"result_{i}"
-        func_lines += [f"  data_{i} = pandas.Series(self._dataframe._data[{i}])",
+        func_lines += [f"  data_{i} = pandas.Series(self._dataframe._data[{type_id}][{col_id}])",
                        f"  {result_c} = data_{i}.iloc[idx]"]
         results.append((c, result_c))
     data = ', '.join(f'"{col}": {data}' for col, data in results)
@@ -2043,9 +2050,9 @@ def df_getitem_list_iloc_codegen(self, idx):
                 if -1 < i < len(self._dataframe.index):
                     check_idx = True
             if check_idx == True:
-                data_0 = pandas.Series(self._dataframe._data[0])
+                data_0 = pandas.Series(self._dataframe._data[0][0])
                 result_0 = data_0.iloc[numpy.array(idx)]
-                data_1 = pandas.Series(self._dataframe._data[1])
+                data_1 = pandas.Series(self._dataframe._data[1][0])
                 result_1 = data_1.iloc[numpy.array(idx)]
                 return pandas.DataFrame(data={"A": result_0, "B": result_1}, index=idx)
             raise IndexingError('Index is out of bounds for axis')
@@ -2061,8 +2068,10 @@ def df_getitem_list_iloc_codegen(self, idx):
     if isinstance(self.index, types.NoneType):
         index = 'idx'
     for i, c in enumerate(self.columns):
+        col_loc = self.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f"result_{i}"
-        func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{i}])",
+        func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{type_id}][{col_id}])",
                        f"    {result_c} = data_{i}.iloc[numpy.array(idx)]"]
         results.append((c, result_c))
     data = ', '.join(f'"{col}": {data}' for col, data in results)
@@ -2080,9 +2089,9 @@ def df_getitem_list_bool_iloc_codegen(self, idx):
     Example of generated implementation:
         def _df_getitem_list_bool_iloc_impl(self, idx):
             if len(self._dataframe.index) == len(idx):
-                data_0 = self._dataframe._data[0]
+                data_0 = self._dataframe._data[0][0]
                 result_0 = pandas.Series(data_0[numpy.array(idx)])
-                data_1 = self._dataframe._data[1]
+                data_1 = self._dataframe._data[1][0]
                 result_1 = pandas.Series(data_1[numpy.array(idx)])
                 return pandas.DataFrame(data={"A": result_0, "B": result_1},
                     index=self._dataframe.index[numpy.array(idx)])
@@ -2093,8 +2102,10 @@ def df_getitem_list_bool_iloc_codegen(self, idx):
     index = 'self._dataframe.index[numpy.array(idx)]'
     func_lines += ['  if len(self._dataframe.index) == len(idx):']
     for i, c in enumerate(self.columns):
+        col_loc = self.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f"result_{i}"
-        func_lines += [f"    data_{i} = self._dataframe._data[{i}]",
+        func_lines += [f"    data_{i} = self._dataframe._data[{type_id}][{col_id}]",
                        f"    {result_c} = pandas.Series(data_{i}[numpy.array(idx)])"]
         results.append((c, result_c))
     data = ', '.join(f'"{col}": {data}' for col, data in results)
@@ -2165,11 +2176,13 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
             col = idx[1].literal_value
             if -1 < col < len(self.dataframe.columns):
+                col_loc = self.dataframe.column_loc[self.dataframe.columns[col]]
+                type_id, col_id = col_loc.type_id, col_loc.col_id
 
                 def df_getitem_iat_tuple_impl(self, idx):
                     row, _ = idx
                     if -1 < row < len(self._dataframe.index):
-                        data = self._dataframe._data[col]
+                        data = self._dataframe._data[type_id][col_id]
                         res_data = pandas.Series(data)
                         return res_data.iat[row]
 
