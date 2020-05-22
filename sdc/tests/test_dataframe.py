@@ -962,7 +962,7 @@ class TestDataFrame(TestCase):
                            'D': [None, 'dd', '', None]})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_isna(self):
         def test_impl(df):
             return df.isna()
@@ -977,6 +977,20 @@ class TestDataFrame(TestCase):
                                "D": ['a', 'dd', 'c', '12', None]}, index=idx)
             with self.subTest(index=idx):
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_df_isna_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                "A": [3.2, np.nan, 7.0, 3.3, np.nan],
+                "B": [3, 4, 1, 0, 222],
+                "C": [True, True, False, False, True],
+                "D": ['a', 'dd', 'c', '12', None]
+            }, index=[3, 4, 2, 6, 1])
+            return df.isna()
+
+        sdc_func = sdc.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
     @dfRefactoringNotImplemented
     def test_df_bool(self):

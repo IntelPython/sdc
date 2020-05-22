@@ -1217,25 +1217,26 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
 
 def _dataframe_codegen_isna(func_name, columns, df):
     """
-    Example func_text for func_name='isna' columns=('float', 'int', 'string'):
-
+    Example if generated implementation
         def _df_isna_impl(df):
-            series_float = pandas.Series(df._data[0])
-            result_float = series_float.isna()
-            series_int = pandas.Series(df._data[1])
-            result_int = series_int.isna()
-            series_string = pandas.Series(df._data[2])
-            result_string = series_string.isna()
-            return pandas.DataFrame({"float": result_float, "int": result_int, "string": result_string},
-                                    index = df._index)
+          data_0 = df._data[0][0]
+          series_0 = pandas.Series(data_0)
+          result_0 = series_0.isna()
+          data_1 = df._data[1][0]
+          series_1 = pandas.Series(data_1)
+          result_1 = series_1.isna()
+          return pandas.DataFrame({"A": result_0, "B": result_1}, index=df._index)
     """
     results = []
     func_lines = [f'def _df_{func_name}_impl(df):']
     index = df_index_codegen_all(df)
     for i, c in enumerate(columns):
-        result_c = f'result_{c}'
-        func_lines += [f'  series_{c} = pandas.Series(df._data[{i}])',
-                       f'  {result_c} = series_{c}.{func_name}()']
+        col_loc = df.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
+        result_c = f'result_{i}'
+        func_lines += [f'  data_{i} = df._data[{type_id}][{col_id}]',
+                       f'  series_{i} = pandas.Series(data_{i})',
+                       f'  {result_c} = series_{i}.{func_name}()']
         results.append((columns[i], result_c))
 
     data = ', '.join(f'"{col}": {data}' for col, data in results)
