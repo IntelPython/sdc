@@ -74,7 +74,7 @@ Building on Linux with conda-build
     source activate conda-build-env
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
-    conda build --python $PYVER --numpy $NUMPYVER --output-folder=<output_folder> -c intel/label/beta -c defaults -c intel -c conda-forge --override-channels buildscripts/sdc-conda-recipe
+    conda build --python $PYVER --numpy $NUMPYVER --output-folder=<output_folder> -c intel/label/beta -c defaults -c intel -c conda-forge --override-channels conda-recipe
 
 Building on Linux with setuptools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -112,7 +112,7 @@ Building on Windows with conda-build
     conda activate conda-build-env
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
-    conda build --python %PYVER% --numpy %NUMPYVER% --output-folder=<output_folder> -c intel/label/beta -c defaults -c intel -c conda-forge --override-channels buildscripts\sdc-conda-recipe
+    conda build --python %PYVER% --numpy %NUMPYVER% --output-folder=<output_folder> -c intel/label/beta -c defaults -c intel -c conda-forge --override-channels conda-recipe
 
 Building on Windows with setuptools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
