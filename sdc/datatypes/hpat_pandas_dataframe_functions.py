@@ -100,7 +100,7 @@ def hpat_pandas_dataframe_index(df):
         empty_df = not df.columns
 
         def hpat_pandas_df_index_none_impl(df):
-            df_len = len(df._data[0]) if empty_df == False else 0  # noqa
+            df_len = len(df._data[0][0]) if empty_df == False else 0  # noqa
 
             return numpy.arange(df_len)
 
@@ -227,29 +227,19 @@ def hpat_pandas_dataframe_values(self):
 
 def sdc_pandas_dataframe_append_codegen(df, other, _func_name, ignore_index_value, indexes_comparable, args):
     """
-    Input:
-    df = pd.DataFrame({'A': ['cat', 'dog', np.nan], 'B': [.2, .3, np.nan]})
-    other = pd.DataFrame({'A': ['bird', 'fox', 'mouse'], 'C': ['a', np.nan, '']})
-    ignore_index=True
-
-    Func generated:
+    Example of generated implementation:
     def sdc_pandas_dataframe_append_impl(df, other, ignore_index=False, verify_integrity=False, sort=None):
-        len_df = len(df._data[0])
-        len_other = len(other._data[0])
-        new_col_A_data_df = df._data[0]
-        new_col_A_data_other = other._data[0]
-        new_col_A = init_series(new_col_A_data_df).append(init_series(new_col_A_data_other))._data
-        new_col_B_data_df = df._data[1]
-        new_col_B_data = init_series(new_col_B_data_df)._data
-        new_col_B = fill_array(new_col_B_data, len_df+len_other)
-        new_col_C_data_other = other._data[0]
-        new_col_C_data = init_series(new_col_C_data_other)._data
-        new_col_C = fill_str_array(new_col_C_data, len_df+len_other, push_back=False)
-        return pandas.DataFrame({"A": new_col_A, "B": new_col_B, "C": new_col_C)
+        len_df = len(df._data[0][0])
+        len_other = len(other._data[0][0])
+        new_col_0_data_df = df._data[0][0]
+        new_col_0_data_other = other._data[0][0]
+        new_col_0 = init_series(new_col_0_data_df).append(init_series(new_col_0_data_other))._data
+        new_col_1_data_df = df._data[0][1]
+        new_col_1_data_other = other._data[0][1]
+        new_col_1 = init_series(new_col_1_data_df).append(init_series(new_col_1_data_other))._data
+        return pandas.DataFrame({"A": new_col_0, "B": new_col_1})
     """
     indent = 4 * ' '
-    func_args = ['df', 'other']
-
     func_args = ['df', 'other'] + kwsparams2list(args)
 
     df_columns_indx = {col_name: i for i, col_name in enumerate(df.columns)}
@@ -267,38 +257,43 @@ def sdc_pandas_dataframe_append_codegen(df, other, _func_name, ignore_index_valu
     func_text = []
     column_list = []
 
-    func_text.append(f'len_df = len(df._data[0])')
-    func_text.append(f'len_other = len(other._data[0])')
+    func_text.append(f'len_df = len(df._data[0][0])')
+    func_text.append(f'len_other = len(other._data[0][0])')
 
-    for col_name, col_id in df_columns_indx.items():
-        func_text.append(f'new_col_{col_id}_data_{"df"} = {"df"}._data[{col_id}]')
+    for col_name, idx in df_columns_indx.items():
+        col_loc = df.column_loc[col_name]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
+        func_text.append(f'new_col_{idx}_data_df = df._data[{type_id}][{col_id}]')
         if col_name in other_columns_indx:
-            other_col_id = other_columns_indx.get(col_name)
-            func_text.append(f'new_col_{col_id}_data_{"other"} = '
-                             f'{"other"}._data[{other_columns_indx.get(col_name)}]')
-            s1 = f'init_series(new_col_{col_id}_data_{"df"})'
-            s2 = f'init_series(new_col_{col_id}_data_{"other"})'
-            func_text.append(f'new_col_{col_id} = {s1}.append({s2})._data')
+            other_col_loc = other.column_loc[col_name]
+            other_type_id, other_col_id = other_col_loc.type_id, other_col_loc.col_id
+            func_text.append(f'new_col_{idx}_data_other = '
+                             f'other._data[{other_type_id}][{other_col_id}]')
+            s1 = f'init_series(new_col_{idx}_data_df)'
+            s2 = f'init_series(new_col_{idx}_data_other)'
+            func_text.append(f'new_col_{idx} = {s1}.append({s2})._data')
         else:
-            func_text.append(f'new_col_{col_id}_data = init_series(new_col_{col_id}_data_df)._data')
+            func_text.append(f'new_col_{idx}_data = init_series(new_col_{idx}_data_df)._data')
             if col_name in string_type_columns:
-                func_text.append(f'new_col_{col_id} = fill_str_array(new_col_{col_id}_data, len_df+len_other)')
+                func_text.append(f'new_col_{idx} = fill_str_array(new_col_{idx}_data, len_df+len_other)')
             else:
-                func_text.append(f'new_col_{col_id} = fill_array(new_col_{col_id}_data, len_df+len_other)')
-        column_list.append((f'new_col_{col_id}', col_name))
+                func_text.append(f'new_col_{idx} = fill_array(new_col_{idx}_data, len_df+len_other)')
+        column_list.append((f'new_col_{idx}', col_name))
 
-    for col_name, col_id in other_columns_indx.items():
+    for col_name, idx in other_columns_indx.items():
         if col_name not in df_columns_indx:
-            func_text.append(f'new_col_{col_id}_data_{"other"} = {"other"}._data[{col_id}]')
-            func_text.append(f'new_col_{col_id}_data = init_series(new_col_{col_id}_data_other)._data')
+            other_col_loc = other.column_loc[col_name]
+            other_type_id, other_col_id = other_col_loc.type_id, other_col_loc.col_id
+            func_text.append(f'new_col_{idx}_data_other = other._data[{other_type_id}][{other_col_id}]')
+            func_text.append(f'new_col_{idx}_data = init_series(new_col_{idx}_data_other)._data')
             if col_name in string_type_columns:
                 func_text.append(
-                    f'new_col_{col_id}_other = '
-                    f'fill_str_array(new_col_{col_id}_data, len_df+len_other, push_back=False)')
+                    f'new_col_{idx}_other = '
+                    f'fill_str_array(new_col_{idx}_data, len_df+len_other, push_back=False)')
             else:
-                func_text.append(f'new_col_{col_id}_other = '
-                                 f'fill_array(new_col_{col_id}_data, len_df+len_other, push_back=False)')
-            column_list.append((f'new_col_{col_id}_other', col_name))
+                func_text.append(f'new_col_{idx}_other = '
+                                 f'fill_array(new_col_{idx}_data, len_df+len_other, push_back=False)')
+            column_list.append((f'new_col_{idx}_other', col_name))
 
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in column_list)
 
@@ -558,13 +553,15 @@ def head_overload(df, n=5):
 
 def _dataframe_codegen_copy(func_params, series_params, df):
     """
-    Example func_text for func_name='copy' columns=('A', 'B', 'C'):
+    Example func_text for func_name='copy' columns=('A', 'B'):
         def _df_copy_impl(df, deep=True):
-            series_0 = pandas.Series(df._data[0])
-            result_0 = series_0.copy(deep=deep)
-            series_1 = pandas.Series(df._data[1])
-            result_1 = series_1.copy(deep=deep)
-            return pandas.DataFrame({"A": result_0, "B": result_1}, index=df._index)
+          data_0 = df._data[0][0]
+          series_0 = pandas.Series(data_0, name='A')
+          result_0 = series_0.copy(deep=deep)
+          data_1 = df._data[1][0]
+          series_1 = pandas.Series(data_1, name='B')
+          result_1 = series_1.copy(deep=deep)
+          return pandas.DataFrame({"A": result_0, "B": result_1}, index=df._index)
     """
     results = []
     series_params_str = ', '.join(kwsparams2list(series_params))
@@ -572,8 +569,11 @@ def _dataframe_codegen_copy(func_params, series_params, df):
     func_lines = [f"def _df_copy_impl(df, {func_params_str}):"]
     index = df_index_codegen_all(df)
     for i, c in enumerate(df.columns):
+        col_loc = df.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f"result_{i}"
-        func_lines += [f"  series_{i} = pandas.Series(df._data[{i}], name='{c}')",
+        func_lines += [f"  data_{i} = df._data[{type_id}][{col_id}]",
+                       f"  series_{i} = pandas.Series(data_{i}, name='{c}')",
                        f"  {result_c} = series_{i}.copy({series_params_str})"]
         results.append((c, result_c))
 
@@ -1222,25 +1222,26 @@ def count_overload(df, axis=0, level=None, numeric_only=False):
 
 def _dataframe_codegen_isna(func_name, columns, df):
     """
-    Example func_text for func_name='isna' columns=('float', 'int', 'string'):
-
+    Example if generated implementation
         def _df_isna_impl(df):
-            series_float = pandas.Series(df._data[0])
-            result_float = series_float.isna()
-            series_int = pandas.Series(df._data[1])
-            result_int = series_int.isna()
-            series_string = pandas.Series(df._data[2])
-            result_string = series_string.isna()
-            return pandas.DataFrame({"float": result_float, "int": result_int, "string": result_string},
-                                    index = df._index)
+          data_0 = df._data[0][0]
+          series_0 = pandas.Series(data_0)
+          result_0 = series_0.isna()
+          data_1 = df._data[1][0]
+          series_1 = pandas.Series(data_1)
+          result_1 = series_1.isna()
+          return pandas.DataFrame({"A": result_0, "B": result_1}, index=df._index)
     """
     results = []
     func_lines = [f'def _df_{func_name}_impl(df):']
     index = df_index_codegen_all(df)
     for i, c in enumerate(columns):
-        result_c = f'result_{c}'
-        func_lines += [f'  series_{c} = pandas.Series(df._data[{i}])',
-                       f'  {result_c} = series_{c}.{func_name}()']
+        col_loc = df.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
+        result_c = f'result_{i}'
+        func_lines += [f'  data_{i} = df._data[{type_id}][{col_id}]',
+                       f'  series_{i} = pandas.Series(data_{i})',
+                       f'  {result_c} = series_{i}.{func_name}()']
         results.append((columns[i], result_c))
 
     data = ', '.join(f'"{col}": {data}' for col, data in results)
@@ -1901,7 +1902,7 @@ def df_getitem_tuple_at_codegen(self, row, col):
     Example of generated implementation:
         def _df_getitem_tuple_at_impl(self, idx):
             row, _ = idx
-            data = self._dataframe._data[1]
+            data = self._dataframe._data[1][0]
             res_data = pandas.Series(data, index=self._dataframe.index)
             return res_data.at[row]
     """
@@ -1910,9 +1911,11 @@ def df_getitem_tuple_at_codegen(self, row, col):
     check = False
     for i in range(len(self.columns)):
         if self.columns[i] == col:
+            col_loc = self.column_loc[col]
+            type_id, col_id = col_loc.type_id, col_loc.col_id
             check = True
             func_lines += [
-                f'  data = self._dataframe._data[{i}]',
+                f'  data = self._dataframe._data[{type_id}][{col_id}]',
                 f'  res_data = pandas.Series(data, index=self._dataframe.index)',
                 '  return res_data.at[row]',
             ]
@@ -1930,9 +1933,9 @@ def df_getitem_single_label_loc_codegen(self, idx):
     Example of generated implementation:
         def _df_getitem_single_label_loc_impl(self, idx):
             idx_list = find_idx(self._dataframe._index, idx)
-            data_0 = _sdc_take(self._dataframe._data[0], idx_list)
+            data_0 = _sdc_take(self._dataframe._data[0][0], idx_list)
             res_data_0 = pandas.Series(data_0)
-            data_1 = _sdc_take(self._dataframe._data[1], idx_list)
+            data_1 = _sdc_take(self._dataframe._data[1][0], idx_list)
             res_data_1 = pandas.Series(data_1)
             if len(idx_list) < 1:
                 raise KeyError('Index is not in the DataFrame')
@@ -1953,10 +1956,11 @@ def df_getitem_single_label_loc_codegen(self, idx):
                   f'{fill_list_text}']
     results = []
     for i, c in enumerate(self.columns):
+        col_loc = self.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         data = f'data_{i}'
-        index_in_list = f'index_in_list_{i}'
         res_data = f'res_data_{i}'
-        func_lines += [f'  {data} = _sdc_take(self._dataframe._data[{i}], idx_list)',
+        func_lines += [f'  {data} = _sdc_take(self._dataframe._data[{type_id}][{col_id}], idx_list)',
                        f'  {res_data} = pandas.Series({data})']
         results.append((c, res_data))
 
@@ -1981,13 +1985,13 @@ def df_getitem_int_iloc_codegen(self, idx):
     """
     Example of generated implementation:
         def _df_getitem_int_iloc_impl(self, idx):
-        if -1 < idx < len(self._dataframe.index):
-            data_0 = pandas.Series(self._dataframe._data[0])
-            result_0 = data_0.iat[idx]
-            data_1 = pandas.Series(self._dataframe._data[1])
-            result_1 = data_1.iat[idx]
-            return pandas.Series(data=[result_0, result_1], index=['A', 'B'], name=str(idx))
-        raise IndexingError('Index is out of bounds for axis')
+            if -1 < idx < len(self._dataframe.index):
+                data_0 = pandas.Series(self._dataframe._data[0][0])
+                result_0 = data_0.iat[idx]
+                data_1 = pandas.Series(self._dataframe._data[0][1])
+                result_1 = data_1.iat[idx]
+                return pandas.Series(data=[result_0, result_1], index=['A', 'B'], name=str(idx))
+            raise IndexingError('Index is out of bounds for axis')
     """
     func_lines = ['def _df_getitem_int_iloc_impl(self, idx):',
                   '  if -1 < idx < len(self._dataframe.index):']
@@ -1997,8 +2001,10 @@ def df_getitem_int_iloc_codegen(self, idx):
     if isinstance(self.index, types.NoneType):
         name = 'idx'
     for i, c in enumerate(self.columns):
+        col_loc = self.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f"result_{i}"
-        func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{i}])",
+        func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{type_id}][{col_id}])",
                        f"    {result_c} = data_{i}.iat[idx]"]
         results.append(result_c)
         index.append(c)
@@ -2016,17 +2022,19 @@ def df_getitem_slice_iloc_codegen(self, idx):
     """
     Example of generated implementation:
         def _df_getitem_slice_iloc_impl(self, idx):
-            data_0 = pandas.Series(self._dataframe._data[0])
+            data_0 = pandas.Series(self._dataframe._data[0][0])
             result_0 = data_0.iloc[idx]
-            data_1 = pandas.Series(self._dataframe._data[1])
+            data_1 = pandas.Series(self._dataframe._data[1][0])
             result_1 = data_1.iloc[idx]
             return pandas.DataFrame(data={"A": result_0, "B": result_1}, index=self._dataframe.index[idx])
     """
     func_lines = ['def _df_getitem_slice_iloc_impl(self, idx):']
     results = []
     for i, c in enumerate(self.columns):
+        col_loc = self.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f"result_{i}"
-        func_lines += [f"  data_{i} = pandas.Series(self._dataframe._data[{i}])",
+        func_lines += [f"  data_{i} = pandas.Series(self._dataframe._data[{type_id}][{col_id}])",
                        f"  {result_c} = data_{i}.iloc[idx]"]
         results.append((c, result_c))
     data = ', '.join(f'"{col}": {data}' for col, data in results)
@@ -2047,9 +2055,9 @@ def df_getitem_list_iloc_codegen(self, idx):
                 if -1 < i < len(self._dataframe.index):
                     check_idx = True
             if check_idx == True:
-                data_0 = pandas.Series(self._dataframe._data[0])
+                data_0 = pandas.Series(self._dataframe._data[0][0])
                 result_0 = data_0.iloc[numpy.array(idx)]
-                data_1 = pandas.Series(self._dataframe._data[1])
+                data_1 = pandas.Series(self._dataframe._data[1][0])
                 result_1 = data_1.iloc[numpy.array(idx)]
                 return pandas.DataFrame(data={"A": result_0, "B": result_1}, index=idx)
             raise IndexingError('Index is out of bounds for axis')
@@ -2065,8 +2073,10 @@ def df_getitem_list_iloc_codegen(self, idx):
     if isinstance(self.index, types.NoneType):
         index = 'idx'
     for i, c in enumerate(self.columns):
+        col_loc = self.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f"result_{i}"
-        func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{i}])",
+        func_lines += [f"    data_{i} = pandas.Series(self._dataframe._data[{type_id}][{col_id}])",
                        f"    {result_c} = data_{i}.iloc[numpy.array(idx)]"]
         results.append((c, result_c))
     data = ', '.join(f'"{col}": {data}' for col, data in results)
@@ -2084,9 +2094,9 @@ def df_getitem_list_bool_iloc_codegen(self, idx):
     Example of generated implementation:
         def _df_getitem_list_bool_iloc_impl(self, idx):
             if len(self._dataframe.index) == len(idx):
-                data_0 = self._dataframe._data[0]
+                data_0 = self._dataframe._data[0][0]
                 result_0 = pandas.Series(data_0[numpy.array(idx)])
-                data_1 = self._dataframe._data[1]
+                data_1 = self._dataframe._data[1][0]
                 result_1 = pandas.Series(data_1[numpy.array(idx)])
                 return pandas.DataFrame(data={"A": result_0, "B": result_1},
                     index=self._dataframe.index[numpy.array(idx)])
@@ -2097,8 +2107,10 @@ def df_getitem_list_bool_iloc_codegen(self, idx):
     index = 'self._dataframe.index[numpy.array(idx)]'
     func_lines += ['  if len(self._dataframe.index) == len(idx):']
     for i, c in enumerate(self.columns):
+        col_loc = self.column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f"result_{i}"
-        func_lines += [f"    data_{i} = self._dataframe._data[{i}]",
+        func_lines += [f"    data_{i} = self._dataframe._data[{type_id}][{col_id}]",
                        f"    {result_c} = pandas.Series(data_{i}[numpy.array(idx)])"]
         results.append((c, result_c))
     data = ', '.join(f'"{col}": {data}' for col, data in results)
@@ -2169,11 +2181,13 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.Literal):
             col = idx[1].literal_value
             if -1 < col < len(self.dataframe.columns):
+                col_loc = self.dataframe.column_loc[self.dataframe.columns[col]]
+                type_id, col_id = col_loc.type_id, col_loc.col_id
 
                 def df_getitem_iat_tuple_impl(self, idx):
                     row, _ = idx
                     if -1 < row < len(self._dataframe.index):
-                        data = self._dataframe._data[col]
+                        data = self._dataframe._data[type_id][col_id]
                         res_data = pandas.Series(data)
                         return res_data.iat[row]
 
@@ -2625,9 +2639,11 @@ def df_add_column_codelines(self, key):
 
     results = []
     for i, col in enumerate(self.columns):
+        col_loc = self.column_loc[col]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         res_data = f'res_data_{i}'
         func_lines += [
-            f'  data_{i} = self._data[{i}]',
+            f'  data_{i} = self._data[{type_id}][{col_id}]',
             f'  {res_data} = pandas.Series(data_{i}, index=res_index, name="{col}")',
         ]
         results.append((col, res_data))
@@ -2653,7 +2669,9 @@ def df_replace_column_codelines(self, key):
         if literal_key == col:
             func_lines += [f'  data_{i} = value']
         else:
-            func_lines += [f'  data_{i} = self._data[{i}]']
+            col_loc = self.column_loc[col]
+            type_id, col_id = col_loc.type_id, col_loc.col_id
+            func_lines += [f'  data_{i} = self._data[{type_id}][{col_id}]']
 
         res_data = f'res_data_{i}'
         func_lines += [
@@ -2814,28 +2832,27 @@ def df_set_column_overload(self, key, value):
     ty_checker.raise_exc(key, 'str', 'key')
 
 
-def sdc_pandas_dataframe_reset_index_codegen(drop, all_params, columns):
+def sdc_pandas_dataframe_reset_index_codegen(drop, all_params, columns, column_loc):
     """
     Example of generated implementation:
         def _df_reset_index_impl(self, level=None, drop=False, inplace=False, col_level=0, col_fill=""):
-          old_index = self.index
-          result_0 = get_dataframe_data(self, 0)
-          result_1 = get_dataframe_data(self, 1)
-          result_2 = get_dataframe_data(self, 2)
-          return pandas.DataFrame({"index": old_index, "A": result_0, "B": result_1, "C": result_2})
+          result_0 = self._data[0][0]
+          result_1 = self._data[0][1]
+          return pandas.DataFrame({"A": result_0, "B": result_1})
     """
     result_name = []
     all_params_str = ', '.join(all_params)
     func_lines = [f'def _df_reset_index_impl({all_params_str}):']
-    df = all_params[0]
-    if not drop.literal_value:
+    if not drop:
         old_index = 'old_index'
-        func_lines += [f'  {old_index} = {df}.index']
+        func_lines += [f'  {old_index} = self.index']
         result_name.append((old_index, 'index'))
     for i, c in enumerate(columns):
+        col_loc = column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f'result_{i}'
         func_lines += [
-            f'  result_{i} = get_dataframe_data({df}, {i})'
+            f'  result_{i} = self._data[{type_id}][{col_id}]'
         ]
         result_name.append((result_c, c))
     data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
@@ -2843,61 +2860,15 @@ def sdc_pandas_dataframe_reset_index_codegen(drop, all_params, columns):
     func_text = '\n'.join(func_lines)
 
     global_vars = {'pandas': pandas,
-                   'numpy': numpy,
-                   'get_dataframe_data': get_dataframe_data}
+                   'numpy': numpy}
 
     return func_text, global_vars
 
 
 def sdc_pandas_dataframe_reset_index_impl(self, drop=False):
     all_params = ['self', 'level=None', 'drop=False', 'inplace=False', 'col_level=0', 'col_fill=""']
-
-    func_text, global_vars = sdc_pandas_dataframe_reset_index_codegen(drop, all_params, self.columns)
-    loc_vars = {}
-    exec(func_text, global_vars, loc_vars)
-    _apply_impl = loc_vars[f'_df_reset_index_impl']
-
-    return _apply_impl
-
-
-def sdc_pandas_dataframe_reset_index_default_codegen(drop, all_params, columns):
-    """
-    Example of generated implementation:
-        def _df_reset_index_impl(self, level=None, drop=False, inplace=False, col_level=0, col_fill=""):
-          old_index = self.index
-          result_0 = get_dataframe_data(self, 0)
-          result_1 = get_dataframe_data(self, 1)
-          return pandas.DataFrame({"index": old_index, "A": result_0, "B": result_1})
-    """
-    result_name = []
-    all_params_str = ', '.join(all_params)
-    func_lines = [f'def _df_reset_index_impl({all_params_str}):']
-    df = all_params[0]
-    if not drop:
-        old_index = 'old_index'
-        func_lines += [f'  {old_index} = {df}.index']
-        result_name.append((old_index, 'index'))
-    for i, c in enumerate(columns):
-        result_c = f'result_{i}'
-        func_lines += [
-            f'  result_{i} = get_dataframe_data({df}, {i})'
-        ]
-        result_name.append((result_c, c))
-    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
-    func_lines += [f'  return pandas.DataFrame({{{data}}})']
-    func_text = '\n'.join(func_lines)
-
-    global_vars = {'pandas': pandas,
-                   'numpy': numpy,
-                   'get_dataframe_data': get_dataframe_data}
-
-    return func_text, global_vars
-
-
-def sdc_pandas_dataframe_reset_index_impl_default(self, drop=False):
-    all_params = ['self', 'level=None', 'drop=False', 'inplace=False', 'col_level=0', 'col_fill=""']
-
-    func_text, global_vars = sdc_pandas_dataframe_reset_index_default_codegen(drop, all_params, self.columns)
+    func_text, global_vars = sdc_pandas_dataframe_reset_index_codegen(drop, all_params,
+                                                                      self.columns, self.column_loc)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _apply_impl = loc_vars[f'_df_reset_index_impl']
@@ -2956,11 +2927,8 @@ def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False
     if not (level is None or isinstance(level, types.Omitted)):
         raise TypingError('{} Unsupported parameter level. Given: {}'.format(func_name, level))
 
-    if not (isinstance(drop, (types.Omitted, types.Boolean)) or drop is False):
+    if not isinstance(drop, (types.Omitted, types.Boolean, bool)):
         ty_checker.raise_exc(drop, 'bool', 'drop')
-
-    if isinstance(drop, types.Omitted):
-        drop = False
 
     if not (inplace is False or isinstance(inplace, types.Omitted)):
         raise TypingError('{} Unsupported parameter inplace. Given: {}'.format(func_name, inplace))
@@ -2971,10 +2939,13 @@ def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False
     if not (col_fill == '' or isinstance(col_fill, types.Omitted)):
         raise TypingError('{} Unsupported parameter col_fill. Given: {}'.format(func_name, col_fill))
 
-    if not isinstance(drop, types.Literal):
-        if isinstance(drop, bool):
-            return sdc_pandas_dataframe_reset_index_impl_default(self, drop=drop)
-        else:
-            raise SDCLimitation('{} only work with Boolean literals drop.'.format(func_name))
+    if isinstance(drop, types.Literal):
+        literal_drop = drop.literal_value
+        return sdc_pandas_dataframe_reset_index_impl(self, drop=literal_drop)
+    elif isinstance(drop, types.Omitted):
+        return sdc_pandas_dataframe_reset_index_impl(self, drop=drop.value)
+    elif isinstance(drop, bool):
+        return sdc_pandas_dataframe_reset_index_impl(self, drop=drop)
 
-    return sdc_pandas_dataframe_reset_index_impl(self, drop=drop)
+    raise SDCLimitation('Method {}(). Parameter drop is only supported as a literal.'.format(func_name))
+

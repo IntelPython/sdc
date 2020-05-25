@@ -90,9 +90,9 @@ def init_dataframe(typingctx, *args):
             type_id += 1
         else:
             # Get index of column in list of types
-            type_id, col_indices = data_typs_map[col_typ]
+            existing_type_id, col_indices = data_typs_map[col_typ]
             col_id = len(col_indices)
-            column_loc[col_name] = ColumnLoc(type_id, col_id)
+            column_loc[col_name] = ColumnLoc(existing_type_id, col_id)
             col_indices.append(i)
 
     def codegen(context, builder, signature, args):
