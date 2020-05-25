@@ -2577,10 +2577,13 @@ are currently unsupported by Intel Scalable Dataframe Compiler
     list_type = types.ListType(types.int64)
     by_type = self.data[column_id].dtype
 
+    col_loc = self.column_loc[by.literal_value]
+    type_id, col_id = col_loc.type_id, col_loc.col_id
+
     def sdc_pandas_dataframe_groupby_impl(self, by=None, axis=0, level=None, as_index=True, sort=True,
                                           group_keys=True, squeeze=False, observed=False):
 
-        by_column_data = self._data[column_id]
+        by_column_data = self._data[type_id][col_id]
         chunks = parallel_chunks(len(by_column_data))
         dict_parts = [Dict.empty(by_type, list_type) for _ in range(len(chunks))]
 
