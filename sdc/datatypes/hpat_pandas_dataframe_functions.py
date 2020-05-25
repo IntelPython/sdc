@@ -454,7 +454,7 @@ def sdc_pandas_dataframe_reduce_columns(df, func_name, params, ser_params):
 
 def _dataframe_reduce_columns_codegen_head(func_name, func_params, series_params, df):
     """
-    Example func_text for func_name='head' columns=('float', 'int', 'string'):
+    Example func_text for func_name='head' columns=('float', 'string'):
         def _df_head_impl(df, n=5):
           data_0 = df._data[0][0]
           series_0 = pandas.Series(data_0)
@@ -462,11 +462,7 @@ def _dataframe_reduce_columns_codegen_head(func_name, func_params, series_params
           data_1 = df._data[1][0]
           series_1 = pandas.Series(data_1)
           result_1 = series_1.head(n=n)
-          data_2 = df._data[2][0]
-          series_2 = pandas.Series(data_2)
-          result_2 = series_2.head(n=n)
-          return pandas.DataFrame({"float": result_0, "int": result_1, "string": result_2},
-                                  index=df._index[:n])
+          return pandas.DataFrame({"float": result_0, "string": result_1}, index=df._index[:n])
     """
     results = []
     joined = ', '.join(func_params)
