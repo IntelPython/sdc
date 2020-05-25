@@ -45,6 +45,7 @@ from numba.np import numpy_support
 from numba.typed import List, Dict
 from numba import prange
 from numba.np.arraymath import get_isnan
+from numba.core.registry import cpu_target
 from pandas.core.indexing import IndexingError
 
 import sdc
@@ -4900,7 +4901,8 @@ def sdc_pandas_series_combine(self, other, func, fill_value=None):
 
     Limitations
     -----------
-    - Only supports the case when data in series of the same type
+    - Only supports the case when data in series of the same type.
+    - With the default fill_value parameter value, the type of the resulting series will be float.
 
     Examples
     --------
@@ -4918,10 +4920,9 @@ def sdc_pandas_series_combine(self, other, func, fill_value=None):
     Pandas Series method :meth:`pandas.Series.combine` implementation.
 
     .. only:: developer
-
-       Tests: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_combine*
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_combine*
     """
-    _func_name = 'Method Series.combine().'
+    _func_name = 'Method Series.combine()'
 
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
@@ -4931,31 +4932,40 @@ def sdc_pandas_series_combine(self, other, func, fill_value=None):
     if not isinstance(fill_value, (types.Omitted, types.NoneType, types.Number)) and fill_value is not None:
         ty_checker.raise_exc(fill_value, 'number', 'fill_value')
 
+    fill_is_default = isinstance(fill_value, (types.Omitted, types.NoneType)) or fill_value is None
+
+    sig = func.get_call_type(cpu_target.typing_context, [self.dtype, other.dtype], {})
+    ret_type = sig.return_type
+
+    fill_dtype = types.float64 if fill_is_default else fill_value
+    res_dtype = find_common_dtype_from_numpy_dtypes([], [ret_type, fill_dtype])
+
     def sdc_pandas_series_combine_impl(self, other, func, fill_value=None):
 
-        if fill_value is None:
-            fill_value = numpy.nan
+        if fill_value is not None:
+            _fill_value = fill_value
+        else:
+            _fill_value = numpy.nan
 
         indexes, self_indexes, other_indexes = sdc_join_series_indexes(self.index, other.index)
         len_val = len(indexes)
-        result = numpy.empty(len_val, self._data.dtype)
+
+        result = numpy.empty(len_val, res_dtype)
 
         chunks = parallel_chunks(len_val)
         for i in prange(len(chunks)):
             chunk = chunks[i]
-            for j in (chunk.start, chunk.stop):
+            for j in (chunk.start, chunk.stop-1):
+                val_self = _fill_value
+                val_other = _fill_value
 
-                if self_indexes[j] == -1:
-                    val_self = fill_value
-                else:
+                if self_indexes[j] != -1:
                     ind_self = self_indexes[j]
-                    val_self = self._data[ind_self]
+                    val_self = self[ind_self]._data[0]
 
-                if other_indexes[j] == -1:
-                    val_other = fill_value
-                else:
+                if other_indexes[j] != -1:
                     ind_other = other_indexes[j]
-                    val_other = other._data[ind_other]
+                    val_other = other[ind_other]._data[0]
 
                 result[j] = func(val_self, val_other)
 
