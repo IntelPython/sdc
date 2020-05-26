@@ -208,7 +208,7 @@ def box_dataframe(typ, val, c):
     dtypes = [a.dtype for a in arr_typs]  # TODO: check Categorical
 
     dataframe = cgutils.create_struct_proxy(typ)(context, builder, value=val)
-    col_arrs = [builder.extract_value(dataframe.data, i) for i in range(n_cols)]
+
     # df unboxed from Python
     has_parent = cgutils.is_not_null(builder, dataframe.parent)
 
@@ -219,11 +219,17 @@ def box_dataframe(typ, val, c):
     class_obj = pyapi.import_module_noblock(mod_name)
     df_dict = pyapi.dict_new()
 
-    for i, cname, arr, arr_typ, dtype in zip(range(n_cols), col_names, col_arrs, arr_typs, dtypes):
+    for i, cname, arr_typ, dtype in zip(range(n_cols), col_names, arr_typs, dtypes):
         # df['cname'] = boxed_arr
         # TODO: datetime.date, DatetimeIndex?
         name_str = context.insert_const_string(c.builder.module, cname)
         cname_obj = pyapi.string_from_string(name_str)
+
+        col_loc = typ.column_loc[cname]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
+        typ_arrs = listobj.ListInstance(c.context, c.builder, types.List(arr_typs[i]),
+                                        builder.extract_value(dataframe.data, type_id))
+        arr = typ_arrs.getitem(col_id)
 
         if dtype == string_type:
             arr_obj = box_str_arr(arr_typ, arr, c)

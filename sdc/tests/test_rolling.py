@@ -913,7 +913,6 @@ class TestRolling(TestCase):
 
         self._test_rolling_apply_mean(df)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_apply_mean_no_unboxing(self):
         def test_impl(window, min_periods):
             def func(x):
@@ -925,7 +924,7 @@ class TestRolling(TestCase):
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             return df.rolling(window, min_periods).apply(func)
 
@@ -983,14 +982,13 @@ class TestRolling(TestCase):
 
         self._test_rolling_corr(df, other)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_corr_no_unboxing(self):
         def test_impl(window, min_periods):
             df = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             other = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4, 5],
@@ -1064,14 +1062,13 @@ class TestRolling(TestCase):
 
         self._test_rolling_count(df)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_count_no_unboxing(self):
         def test_impl(window, min_periods):
             df = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             return df.rolling(window, min_periods).count()
 
@@ -1106,14 +1103,13 @@ class TestRolling(TestCase):
 
         self._test_rolling_cov(df, other)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_cov_no_unboxing(self):
         def test_impl(window, min_periods, ddof):
             df = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             other = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
@@ -1219,14 +1215,13 @@ class TestRolling(TestCase):
 
         self._test_rolling_kurt(df)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_kurt_no_unboxing(self):
         def test_impl(window, min_periods):
             df = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             return df.rolling(window, min_periods).kurt()
 
@@ -1248,14 +1243,13 @@ class TestRolling(TestCase):
 
         self._test_rolling_max(df)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_max_no_unboxing(self):
         def test_impl(window, min_periods):
             df = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             return df.rolling(window, min_periods).max()
 
@@ -1281,14 +1275,13 @@ class TestRolling(TestCase):
 
         self._test_rolling_mean(df)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_mean_no_unboxing(self):
         def test_impl(window, min_periods):
             df = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             return df.rolling(window, min_periods).mean()
 
@@ -1310,14 +1303,13 @@ class TestRolling(TestCase):
 
         self._test_rolling_median(df)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_median_no_unboxing(self):
         def test_impl(window, min_periods):
             df = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             return df.rolling(window, min_periods).median()
 
@@ -1339,14 +1331,13 @@ class TestRolling(TestCase):
 
         self._test_rolling_min(df)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_min_no_unboxing(self):
         def test_impl(window, min_periods):
             df = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             return df.rolling(window, min_periods).min()
 
@@ -1389,14 +1380,13 @@ class TestRolling(TestCase):
 
         self._test_rolling_quantile(df)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_quantile_no_unboxing(self):
         def test_impl(window, min_periods, quantile):
             df = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             return df.rolling(window, min_periods).quantile(quantile)
 
@@ -1439,14 +1429,13 @@ class TestRolling(TestCase):
 
         self._test_rolling_skew(df)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_skew_no_unboxing(self):
         def test_impl(window, min_periods):
             df = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             return df.rolling(window, min_periods).skew()
 
@@ -1472,14 +1461,13 @@ class TestRolling(TestCase):
 
         self._test_rolling_std(df)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_std_no_unboxing(self):
         def test_impl(window, min_periods, ddof):
             df = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             return df.rolling(window, min_periods).std(ddof)
 
@@ -1515,14 +1503,13 @@ class TestRolling(TestCase):
 
         self._test_rolling_sum(df)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_sum_no_unboxing(self):
         def test_impl(window, min_periods):
             df = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             return df.rolling(window, min_periods).sum()
 
@@ -1548,14 +1535,13 @@ class TestRolling(TestCase):
 
         self._test_rolling_var(df)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_rolling_var_no_unboxing(self):
         def test_impl(window, min_periods, ddof):
             df = pd.DataFrame({
                 'A': [0, 1, 2, 3, 4],
                 'B': [1., -1., 0., 0.1, -0.1],
                 'C': [1., np.inf, np.inf, -1., 0.],
-                'D': [np.nan, np.inf, np.inf, np.nan],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
             })
             return df.rolling(window, min_periods).var(ddof)
 

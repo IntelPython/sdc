@@ -27,6 +27,7 @@
 import numba
 import numpy as np
 import pandas as pd
+import platform
 import pyarrow.parquet as pq
 import unittest
 from itertools import product
@@ -139,7 +140,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_dataframe_groupby_count_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -171,7 +171,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_dataframe_groupby_max_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -184,10 +183,13 @@ class TestGroupBy(TestCase):
 
         sdc_impl = self.jit(test_impl)
 
-        result_jit = sdc_impl()
-        result_ref = test_impl()
         # TODO: implement index classes, as current indexes do not have names
-        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
+        kwargs = {'check_names': False}
+        if platform.system() == 'Windows':
+            # Attribute "dtype" are different on windows int64 vs int32
+            kwargs['check_dtype'] = False
+
+        pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
     @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
@@ -202,7 +204,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_dataframe_groupby_min_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -215,10 +216,13 @@ class TestGroupBy(TestCase):
 
         sdc_impl = self.jit(test_impl)
 
-        result_jit = sdc_impl()
-        result_ref = test_impl()
         # TODO: implement index classes, as current indexes do not have names
-        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
+        kwargs = {'check_names': False}
+        if platform.system() == 'Windows':
+            # Attribute "dtype" are different on windows int64 vs int32
+            kwargs['check_dtype'] = False
+
+        pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
     @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
@@ -233,7 +237,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_dataframe_groupby_mean_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -264,7 +267,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_dataframe_groupby_median_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -312,7 +314,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_dataframe_groupby_prod_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -325,10 +326,13 @@ class TestGroupBy(TestCase):
 
         sdc_impl = self.jit(test_impl)
 
-        result_jit = sdc_impl()
-        result_ref = test_impl()
         # TODO: implement index classes, as current indexes do not have names
-        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
+        kwargs = {'check_names': False}
+        if platform.system() == 'Windows':
+            # Attribute "dtype" are different on windows int64 vs int32
+            kwargs['check_dtype'] = False
+
+        pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
     @skip_numba_jit("BUG: SDC impl of Series.sum returns float64 on as series of ints")
@@ -343,7 +347,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_dataframe_groupby_sum_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -356,10 +359,13 @@ class TestGroupBy(TestCase):
 
         sdc_impl = self.jit(test_impl)
 
-        result_jit = sdc_impl()
-        result_ref = test_impl()
         # TODO: implement index classes, as current indexes do not have names
-        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
+        kwargs = {'check_names': False}
+        if platform.system() == 'Windows':
+            # Attribute "dtype" are different on windows int64 vs int32
+            kwargs['check_dtype'] = False
+
+        pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
     @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
@@ -374,7 +380,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_dataframe_groupby_std_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -405,7 +410,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_dataframe_groupby_var_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
