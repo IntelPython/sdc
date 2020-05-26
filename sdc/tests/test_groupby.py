@@ -360,11 +360,8 @@ class TestGroupBy(TestCase):
         sdc_impl = self.jit(test_impl)
 
         # TODO: implement index classes, as current indexes do not have names
-        kwargs = {'check_names': False}
-        if platform.system() == 'Windows':
-            # Attribute "dtype" are different on windows int64 vs int32
-            kwargs['check_dtype'] = False
-
+        # Attribute "dtype" are different int64 vs int32
+        kwargs = {'check_names': False, 'check_dtype': False}
         pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
