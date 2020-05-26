@@ -71,7 +71,6 @@ class TestDataFrame(TestCase):
 
     # TODO: Data generator for DataFrames
 
-    @dfRefactoringNotImplemented
     def test_create1(self):
         def test_impl(A, B):
             df = pd.DataFrame({'A': A, 'B': B})
@@ -108,7 +107,6 @@ class TestDataFrame(TestCase):
 
         self.assertEqual(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def test_create_with_series1(self):
         def test_impl(n):
             A = pd.Series(np.ones(n, dtype=np.int64))
@@ -132,7 +130,6 @@ class TestDataFrame(TestCase):
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented
     def test_create_string_index(self):
         def test_impl(a):
             data = {'A': ['a', 'b'], 'B': [2, 3]}
@@ -142,7 +139,6 @@ class TestDataFrame(TestCase):
         hpat_func = sdc.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(True), test_impl(True))
 
-    @dfRefactoringNotImplemented
     def test_create_cond1(self):
         def test_impl(A, B, c):
             if c:
@@ -232,7 +228,6 @@ class TestDataFrame(TestCase):
         do_check = False if platform.system() == 'Windows' and not IS_32BITS else True
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n), check_dtype=do_check)
 
-    @dfRefactoringNotImplemented
     def test_box2(self):
         def test_impl():
             df = pd.DataFrame({'A': [1, 2, 3], 'B': ['a', 'bb', 'ccc']})
@@ -1484,7 +1479,6 @@ class TestDataFrame(TestCase):
                     )
                     pd.testing.assert_frame_equal(sdc_func(df), ref_impl(df))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_head_no_unboxing(self):
         def test_impl(n):
             df = pd.DataFrame({
