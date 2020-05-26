@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,30 +24,33 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import pandas as pd
+from sdc.datatypes.common.rewriteutils import register_tuplify
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
-from .categorical import *
+from numba.core import ir
+from numba.core.ir_utils import guard, get_definition
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
+def check_dtype_is_categorical(self, expr, func_ir, block, typemap, calltypes):
+    dtype_var = None
+    for name, var in expr.kws:
+        if name == 'dtype':
+            dtype_var = var
+    if not dtype_var:
+        return False
 
-from sdc.tests.test_ml import *
+    dtype_var_def = guard(get_definition, func_ir, dtype_var)
+    is_alias = isinstance(dtype_var_def, ir.Const) and dtype_var_def.value == 'category'
+    is_categoricaldtype = (hasattr(dtype_var_def, 'func') and
+                           func_ir.infer_constant(dtype_var_def.func) == pd.CategoricalDtype)
+    if not (is_alias or is_categoricaldtype):
+        return False
 
-from sdc.tests.test_io import *
+    return True
 
-from sdc.tests.test_hpat_jit import *
-from sdc.tests.test_indexes import *
 
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
+def expr_checker(self, expr, func_ir, block, typemap, calltypes):
+    return check_dtype_is_categorical(self, expr, func_ir, block, typemap, calltypes)
 
-# performance tests
-import sdc.tests.tests_perf
+
+register_tuplify(pd.Series, 'data', expr_checker)

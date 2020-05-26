@@ -46,6 +46,8 @@ from sdc.str_arr_ext import string_array_type
 from sdc.str_ext import string_type, list_string_array_type
 
 from sdc.hiframes.pd_series_type import SeriesType
+from sdc.datatypes.categorical.pdimpl import is_categoricaldtype
+from sdc.datatypes.series.pdimpl import _Series_category
 
 
 def is_str_series_typ(t):
@@ -109,12 +111,19 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
     -----------
     - Parameters ``dtype`` and ``copy`` are currently unsupported.
     - Types iterable and dict as ``data`` parameter are currently unsupported.
+    - Categorical types (i.e. 'category' and ``CategoricalDtype``) are supported in ``dtype``
+    only if they are provided as constants in jitted code.
 
     Examples
     --------
     Create Series with data [1, 2, 3] and index ['A', 'B', 'C'].
 
     >>> pd.Series([1, 2, 3], ['A', 'B', 'C'])
+
+    Create Series with categorical data:
+
+    >>> pd.Series([1, 2, 3], dtype='category')
+    >>> pd.Series([1, 2, 3], dtype=CategoricalDtype([1, 2, 3]))
 
     .. seealso::
 
@@ -123,6 +132,9 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
     """
 
     is_index_none = isinstance(index, types.NoneType) or index is None
+
+    if is_categoricaldtype(dtype):
+        return _Series_category(data, index, dtype, name, copy, fastpath)
 
     def hpat_pandas_series_ctor_impl(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
 
