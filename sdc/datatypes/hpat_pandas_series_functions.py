@@ -4956,14 +4956,15 @@ def sdc_pandas_series_combine(self, other, func, fill_value=None):
         for i in prange(len(chunks)):
             chunk = chunks[i]
             for j in (chunk.start, chunk.stop-1):
-                val_self = _fill_value
-                val_other = _fill_value
-
-                if self_indexes[j] != -1:
+                if self_indexes[j] == -1:
+                    val_self = _fill_value
+                else:
                     ind_self = self_indexes[j]
                     val_self = self[ind_self]._data[0]
 
-                if other_indexes[j] != -1:
+                if other_indexes[j] == -1:
+                    val_other = _fill_value
+                else:
                     ind_other = other_indexes[j]
                     val_other = other[ind_other]._data[0]
 
