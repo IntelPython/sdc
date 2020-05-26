@@ -59,8 +59,8 @@ def _generate_range_indexes_fixed(size, start=1, step=3):
     yield pd.RangeIndex(size, name='abc')
     yield pd.RangeIndex(stop=step * size, step=step)
     yield pd.RangeIndex(stop=2*step*size, step=2*step)
-    yield pd.RangeIndex(start=start, stop=start + size * step - step // 2 , step=step)
-    yield pd.RangeIndex(start=start + step, stop=start + (size + 1)* step , step=step)
+    yield pd.RangeIndex(start=start, stop=start + size*step - step//2, step=step)
+    yield pd.RangeIndex(start=start + step, stop=start + (size + 1)*step, step=step)
 
 
 def _generate_index_param_values(n):
@@ -717,7 +717,7 @@ class TestRangeIndex(TestCase):
         for index in _generate_range_indexes_fixed(n):
             result = sdc_func(index, mask)
             result_ref = test_impl(index, mask)
-            # FIXME: replace with pd.testing.assert_index_equal when Int64Index is supported 
+            # FIXME: replace with pd.testing.assert_index_equal when Int64Index is supported
             np.testing.assert_array_equal(result, result_ref.values)
 
     def test_range_index_support_reindexing(self):
@@ -734,7 +734,7 @@ class TestRangeIndex(TestCase):
         n = 100
         np.random.seed(0)
         mask = np.random.choice([True, False], n)
-        name='asdf'
+        name = 'asdf'
         index1 = pd.RangeIndex(n)
         index2 = index1[::-1]
         result = sdc_func(mask, index1, name, index2)

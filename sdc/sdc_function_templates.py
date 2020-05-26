@@ -194,9 +194,9 @@ def sdc_pandas_series_binop(self, other, level=None, fill_value=None, axis=0):
                     result_data[:] = self._data + other._data
 
                     if index_dtypes_match == False:  # noqa
-                        result_index = astype(left_index, numba_index_common_dtype)
+                        result_index = numpy_like.astype(left_index, numba_index_common_dtype)
                     else:
-                        result_index = left_index.values if left_index_is_range == True else left_index
+                        result_index = left_index.values if left_index_is_range == True else left_index  # noqa
 
                     return pandas.Series(result_data, index=result_index)
 
@@ -334,7 +334,7 @@ def sdc_pandas_series_comp_binop(self, other, level=None, fill_value=None, axis=
                     if index_dtypes_match == False:  # noqa
                         new_index = numpy_like.astype(left_index, numba_index_common_dtype)
                     else:
-                        new_index = left_index.values if left_index_is_range == True else left_index
+                        new_index = left_index.values if left_index_is_range == True else left_index  # noqa
                     return pandas.Series(self._data < other._data,
                                          new_index)
                 else:

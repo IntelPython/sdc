@@ -42,7 +42,7 @@ from numba import types, prange, literally
 from numba.np import numpy_support
 from numba.np.arraymath import get_isnan
 from numba.typed import List
-from numba.errors import TypingError
+from numba.core.errors import TypingError
 
 import sdc
 from sdc.functions.statistics import skew_formula
@@ -156,7 +156,8 @@ def sdc_astype_overload(self, dtype):
 
         return sdc_astype_number_to_string_impl
 
-    if (isinstance(self, (types.Array, RangeIndexType)) and isinstance(dtype, (types.StringLiteral, types.functions.NumberClass))):
+    if (isinstance(self, (types.Array, RangeIndexType))
+            and isinstance(dtype, (types.StringLiteral, types.functions.NumberClass))):
         def sdc_astype_number_impl(self, dtype):
             arr = numpy.empty(len(self), dtype=numpy.dtype(dtype))
             for i in numba.prange(len(self)):
@@ -1055,7 +1056,6 @@ def np_nanskew(arr):
         return skew_formula(n, _sum, square_sum, cube_sum)
 
     return nanskew_impl
-
 
 
 def array_equal(A, B):

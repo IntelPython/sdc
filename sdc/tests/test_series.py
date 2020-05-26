@@ -359,7 +359,8 @@ class TestSeries(
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
-    @skip_numba_jit("Numba creates array with dtype=intp by default, and this fails with int32 vs int64 mismatch on Win")
+    @skip_numba_jit("Numba creates array with dtype=intp by default"
+                    "On Win this fails with int32 vs int64 dtype mismatch")
     def test_create_series2(self):
         def test_impl(n):
             return pd.Series(np.arange(n))
@@ -5638,7 +5639,8 @@ class TestSeries(
 
         with self.subTest(subtest="series data and value type mismatch"):
             idx, value = 5, 'ababa'
-            msg_tmpl = 'Operator setitem(). The value and Series data must be comparable. Given: self.dtype={}, value={}'
+            msg_tmpl = 'Operator setitem(). The value and Series data must be comparable. ' \
+                       'Given: self.dtype={}, value={}'
             with self.assertRaises(TypingError) as raises:
                 hpat_func(S, idx, value)
             msg = msg_tmpl.format(S.dtype, 'unicode_type')
@@ -5646,8 +5648,8 @@ class TestSeries(
 
         with self.subTest(subtest="series index and indexer type mismatch"):
             idx, value = '3', 101
-            msg_tmpl = 'Operator setitem(). The idx is not comparable to Series index, not a Boolean or integer indexer' \
-                       + ' or a Slice. Given: self.index={}, idx={}'
+            msg_tmpl = 'Operator setitem(). The idx is not comparable to Series index, ' \
+                       'not a Boolean or integer indexer or a Slice. Given: self.index={}, idx={}'
             with self.assertRaises(TypingError) as raises:
                 hpat_func(S, idx, value)
             msg = msg_tmpl.format('RangeIndexType(False)', 'unicode_type')

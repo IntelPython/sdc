@@ -46,7 +46,7 @@ from sdc.functions.numpy_like import getitem_by_mask
 
 
 def _check_dtype_param_type(dtype):
-    """ Returns True is dtype is a valid type for dtype parameter and False otherwise. 
+    """ Returns True is dtype is a valid type for dtype parameter and False otherwise.
         Used in RangeIndex ctor and other methods that take dtype parameter. """
 
     valid_dtype_types = (types.NoneType, types.Omitted, types.UnicodeType, types.NumberClass)
@@ -396,7 +396,7 @@ def pd_range_index_eq_overload(self, other):
 
     def pd_range_index_eq_impl(self, other):
 
-        if one_operand_is_scalar == False:
+        if one_operand_is_scalar == False:  # noqa
             if len(self) != len(other):
                 raise ValueError("Lengths must match to compare")
 

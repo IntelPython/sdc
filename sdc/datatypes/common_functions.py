@@ -76,8 +76,8 @@ def hpat_arrays_append_overload(A, B):
     if isinstance(A, (types.Array, RangeIndexType)):
         if isinstance(B, (types.Array, RangeIndexType)):
             def _append_single_numeric_impl(A, B):
-                _A = A.values if A_is_range_index == True else A
-                _B = B.values if B_is_range_index == True else B
+                _A = A.values if A_is_range_index == True else A  # noqa
+                _B = B.values if B_is_range_index == True else B  # noqa
                 return numpy.concatenate((_A, _B,))
 
             return _append_single_numeric_impl
@@ -92,10 +92,10 @@ def hpat_arrays_append_overload(A, B):
                 new_data = numpy.empty(total_length, numba_common_dtype)
 
                 stop = len(A)
-                _A = numpy.array(A) if A_is_range_index == True else A
+                _A = numpy.array(A) if A_is_range_index == True else A  # noqa
                 new_data[:stop] = _A
                 for arr in B:
-                    _arr = numpy.array(arr) if B_dtype_is_range_index == True else arr
+                    _arr = numpy.array(arr) if B_dtype_is_range_index == True else arr  # noqa
                     start = stop
                     stop = start + len(_arr)
                     new_data[start:stop] = _arr
@@ -224,9 +224,10 @@ def sdc_join_series_indexes_overload(left, right):
 
     convert_left = isinstance(left, RangeIndexType)
     convert_right = isinstance(right, RangeIndexType)
+
     def _convert_to_arrays_impl(left, right):
-        _left = left.values if convert_left == True else left
-        _right = right.values if convert_right == True else right
+        _left = left.values if convert_left == True else left  # noqa
+        _right = right.values if convert_right == True else right  # noqa
         return sdc_join_series_indexes(_left, _right)
 
     if isinstance(left, RangeIndexType) and isinstance(right, RangeIndexType):
@@ -767,8 +768,7 @@ def sdc_reindex_series_overload(arr, index, name, by_index):
                 map_index_to_position[value] = i
 
         index_mismatch = 0
-        # FIXME: TypingError in parfor step (wrong promotion to float64?) - see test_range_index_support_reindexing 
-        # for i in numba.prange(len(by_index)):
+        # FIXME: TypingError in parfor step (wrong promotion to float64?) if prange is used
         for i in numpy.arange(len(by_index)):
             if by_index[i] in map_index_to_position:
                 pos_in_self = map_index_to_position[by_index[i]]
