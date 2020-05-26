@@ -309,7 +309,6 @@ class TestCSV(TestIO):
 
     # inference from parameters
 
-    @dfRefactoringNotImplemented
     def test_csv_infer_params_default(self):
         read_csv = self._read_csv()
         int_type = self._int_type()
@@ -325,7 +324,6 @@ class TestCSV(TestIO):
             with self.subTest(fname=fname):
                 pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
 
-    @dfRefactoringNotImplemented
     def test_csv_infer_params_usecols_names(self):
         read_csv = self._read_csv()
         int_type = self._int_type()
@@ -340,7 +338,6 @@ class TestCSV(TestIO):
         cfunc = self.jit(pyfunc)
         pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
 
-    @dfRefactoringNotImplemented
     def test_csv_infer_params_usecols_no_names(self):
         read_csv = self._read_csv()
         int_type = self._int_type()
@@ -403,7 +400,6 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    @dfRefactoringNotImplemented
     def test_csv_infer_file_default(self):
         def test(file_name):
             test_impl = self.pd_csv_infer_file_default(file_name)
@@ -423,7 +419,6 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    @dfRefactoringNotImplemented
     def test_csv_infer_file_sep(self):
         test_impl = self.pd_csv_infer_file_sep()
         hpat_func = self.jit(test_impl)
@@ -438,7 +433,6 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    @dfRefactoringNotImplemented
     def test_csv_infer_file_delimiter(self):
         test_impl = self.pd_csv_infer_file_delimiter()
         hpat_func = self.jit(test_impl)
@@ -453,7 +447,6 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    @dfRefactoringNotImplemented
     def test_csv_infer_file_names(self):
         def test(file_name):
             test_impl = self.pd_csv_infer_file_names(file_name)
@@ -473,7 +466,6 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    @dfRefactoringNotImplemented
     def test_csv_infer_file_usecols(self):
         def test(file_name):
             test_impl = self.pd_csv_infer_file_usecols(file_name)
@@ -493,7 +485,6 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    @dfRefactoringNotImplemented
     def test_csv_infer_file_names_usecols(self):
         def test(file_name):
             test_impl = self.pd_csv_infer_file_names_usecols(file_name)
@@ -548,7 +539,6 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    @dfRefactoringNotImplemented
     def test_csv_infer_skip1(self):
         test_impl = self.pd_csv_infer_skip1()
         hpat_func = self.jit(test_impl)
