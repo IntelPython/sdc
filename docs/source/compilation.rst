@@ -35,7 +35,7 @@ Output:
 
     Traceback (most recent call last):
     ...
-    numba.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)
+    numba.core.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)
     Unknown attribute 'read_excel' of type Module(<module 'pandas' from ...)
 
 

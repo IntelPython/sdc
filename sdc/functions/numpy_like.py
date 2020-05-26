@@ -38,9 +38,9 @@ import sys
 import pandas
 import numpy as np
 
-from numba import types, jit, prange, numpy_support, literally
-from numba.errors import TypingError
-from numba.targets.arraymath import get_isnan
+from numba import types, prange, literally
+from numba.np import numpy_support
+from numba.np.arraymath import get_isnan
 from numba.typed import List
 
 import sdc
@@ -647,7 +647,7 @@ def nanprod(a):
 @sdc_overload(nanprod)
 def np_nanprod(a):
     """
-    Reimplemented with parfor from numba.targets.arraymath.
+    Reimplemented with parfor from numba.np.arraymath.
     """
     if not isinstance(a, types.Array):
         return
@@ -766,7 +766,10 @@ def corr_overload(self, other, method='pearson', min_periods=None):
         if method not in ('pearson', ''):
             raise ValueError("Method corr(). Unsupported parameter. Given method != 'pearson'")
 
-        if min_periods is None or min_periods < 1:
+        if min_periods is None:
+            min_periods = 1
+
+        if min_periods < 1:
             min_periods = 1
 
         min_len = min(len(self._data), len(other._data))

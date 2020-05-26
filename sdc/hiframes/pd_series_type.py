@@ -28,15 +28,16 @@ import llvmlite.llvmpy.core as lc
 
 import numpy as np
 
-from numba import types, cgutils
-from numba.numpy_support import from_dtype
+from numba import types
+from numba.core import cgutils
+from numba.np.numpy_support import from_dtype
 from numba.extending import (models, register_model, make_attribute_wrapper, lower_builtin)
-from numba.targets.imputils import (impl_ret_new_ref, iternext_impl, RefType)
-from numba.targets.arrayobj import (make_array, _getitem_array1d)
+from numba.core.imputils import (impl_ret_new_ref, iternext_impl, RefType)
+from numba.np.arrayobj import make_array, _getitem_array_single_int
 
 from sdc.str_ext import string_type, list_string_array_type
-from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype, CategoricalArray)
 from sdc.str_arr_ext import (string_array_type, iternext_str_array, StringArrayType)
+from sdc.datatypes.categorical.types import CategoricalDtypeType, Categorical
 
 
 class SeriesType(types.IterableType):
@@ -205,7 +206,7 @@ def getiter_series(context, builder, sig, args):
     return out
 
 
-# TODO: call it from numba.targets.arrayobj, need separate function in numba
+# TODO: call it from numba.np.arrayobj, need separate function in numba
 def iternext_series_array(context, builder, sig, args, result):
     """
     Implementation of iternext() for the ArrayIterator type
@@ -234,8 +235,9 @@ def iternext_series_array(context, builder, sig, args, result):
     result.set_valid(is_valid)
 
     with builder.if_then(is_valid):
-        value = _getitem_array1d(context, builder, arrayty, ary, index,
-                                 wraparound=False)
+        value = _getitem_array_single_int(
+            context, builder, iterty.yield_type, arrayty, ary, index
+        )
         result.yield_(value)
         nindex = cgutils.increment_index(builder, index)
         builder.store(nindex, iterobj.index)
@@ -269,8 +271,9 @@ def _get_series_array_type(dtype):
         return string_array_type
 
     # categorical
-    if isinstance(dtype, PDCategoricalDtype):
-        return CategoricalArray(dtype)
+    if isinstance(dtype, CategoricalDtypeType):
+        # TODO: pass codes array if exists
+        return Categorical(dtype)
 
     # use recarray data layout for series of tuples
     if isinstance(dtype, types.BaseTuple):

@@ -26,6 +26,7 @@
 
 
 
+import json
 import os
 import platform
 import re
@@ -45,13 +46,13 @@ class SDC_Build_Utilities:
         self.env_name = 'sdc_env'
         self.python = python
         self.output_folder = self.src_path / 'sdc-build'
-        self.recipe = self.src_path / 'buildscripts' / 'sdc-conda-recipe'
+        self.recipe = self.src_path / 'conda-recipe'
 
         self.line_double = '='*80
         self.line_single = '-'*80
 
         # Set channels
-        self.channel_list = ['-c', 'intel/label/beta', '-c', 'intel', '-c', 'defaults', '-c', 'conda-forge']
+        self.channel_list = ['-c', 'intel/label/beta', '-c', 'defaults', '-c', 'conda-forge']
         if sdc_local_channel:
             sdc_local_channel = Path(sdc_local_channel).resolve().as_uri()
             self.channel_list = ['-c', sdc_local_channel] + self.channel_list
@@ -87,7 +88,7 @@ class SDC_Build_Utilities:
         # Create Intel SDC environment
         create_args = ['-q', '-y', '-n', self.env_name, f'python={self.python}']
         create_args += packages_list + self.channel_list + ['--override-channels']
-        self.__run_conda_command(Conda_Commands.CREATE, create_args)
+        self.log_info(self.__run_conda_command(Conda_Commands.CREATE, create_args))
 
         return
 
@@ -97,7 +98,7 @@ class SDC_Build_Utilities:
         self.log_info(f'Install {" ".join(packages_list)} to {self.env_name} conda environment')
         install_args = ['-n', self.env_name]
         install_args += self.channel_list + ['--override-channels', '-q', '-y'] + packages_list
-        self.__run_conda_command(Conda_Commands.INSTALL, install_args)
+        self.log_info(self.__run_conda_command(Conda_Commands.INSTALL, install_args))
 
         return
 
@@ -135,3 +136,19 @@ class SDC_Build_Utilities:
         if separate:
             print(f'{time.strftime("%d/%m/%Y %H:%M:%S")}: {self.line_double}', flush=True)
         print(f'{time.strftime("%d/%m/%Y %H:%M:%S")}: {msg}', flush=True)
+
+    def get_sdc_version_from_channel(self):
+        python_version = 'py' + self.python.replace('.', '')
+
+        # Get Intel SDC version from first channel in channel_list
+        search_args = ['sdc', '-c', self.channel_list[1], '--override-channels', '--json']
+        search_result = self.__run_conda_command(Conda_Commands.SEARCH, search_args)
+
+        repo_data = json.loads(search_result)
+        for package_data in repo_data['sdc']:
+            sdc_version = package_data['version']
+            sdc_build = package_data['build']
+            if python_version in sdc_build:
+                break
+
+        return f'{sdc_version}={sdc_build}'

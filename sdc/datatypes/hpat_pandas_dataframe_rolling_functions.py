@@ -26,7 +26,7 @@
 import numpy
 import pandas
 
-from numba.types import (float64, Boolean, Integer, Number, Omitted,
+from numba.core.types import (float64, Boolean, Integer, Number, Omitted,
                          NoneType, StringLiteral, UnicodeType)
 from sdc.utilities.sdc_typing_utils import TypeChecker, kwsparams2list
 from sdc.datatypes.hpat_pandas_dataframe_rolling_types import DataFrameRollingType

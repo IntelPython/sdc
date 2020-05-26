@@ -32,8 +32,9 @@ import pandas as pd
 import numpy as np
 
 import numba
-from numba import types, numpy_support
-from numba.errors import TypingError
+from numba import types
+from numba.np import numpy_support
+from numba.core.errors import TypingError
 from numba.extending import overload
 
 from sdc.io.csv_ext import (
@@ -43,6 +44,7 @@ from sdc.io.csv_ext import (
 from sdc.str_arr_ext import string_array_type
 
 from sdc.hiframes import join, aggregate, sort
+from sdc.types import CategoricalDtypeType, Categorical
 
 
 def get_numba_array_types_for_csv(df):
@@ -54,7 +56,7 @@ def get_numba_array_types_for_csv(df):
         except NotImplementedError:
             numba_type = None
 
-        if numba_type:
+        if numba_type and numba_type != types.pyobject:
             array_type = types.Array(numba_type, 1, 'C')
         else:
             # default type for CSV is string
@@ -265,6 +267,7 @@ def sdc_pandas_read_csv(
             values = [types.Array(types.int_, 1, 'C') if v == int else v for v in values]
             values = [types.Array(types.float64, 1, 'C') if v == float else v for v in values]
             values = [string_array_type if v == str else v for v in values]
+            values = [Categorical(v) if isinstance(v, CategoricalDtypeType) else v for v in values]
 
             dtype = dict(zip(keys, values))
 

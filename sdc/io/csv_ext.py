@@ -33,11 +33,13 @@ from llvmlite import ir as lir
 from .. import hio
 from collections import defaultdict
 import numba
-from numba import typeinfer, ir, ir_utils, config, types, cgutils
-from numba.typing.templates import signature
+from numba.core import typeinfer, ir, ir_utils, types
+from numba.core.typing.templates import signature
 from numba.extending import overload, intrinsic, register_model, models, box
-from numba.ir_utils import (visit_vars_inner, replace_vars_inner,
+from numba.core.ir_utils import (visit_vars_inner, replace_vars_inner,
                             compile_to_numba_ir, replace_arg_nodes)
+from numba.core import analysis
+from numba.parfors import array_analysis
 import sdc
 from sdc import distributed, distributed_analysis
 from sdc.utilities.utils import (debug_prints, alloc_arr_tup, empty_like_type,
@@ -54,7 +56,7 @@ from sdc import objmode
 import pandas as pd
 import numpy as np
 
-from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype, CategoricalArray)
+from sdc.types import CategoricalDtypeType, Categorical
 
 import pyarrow
 import pyarrow.csv
@@ -104,7 +106,7 @@ def csv_array_analysis(csv_node, equiv_set, typemap, array_analysis):
     return [], post
 
 
-numba.array_analysis.array_analysis_extensions[CsvReader] = csv_array_analysis
+array_analysis.array_analysis_extensions[CsvReader] = csv_array_analysis
 
 
 def csv_distributed_analysis(csv_node, array_dists):
@@ -185,10 +187,10 @@ def csv_usedefs(csv_node, use_set=None, def_set=None):
     def_set.update({v.name for v in csv_node.out_vars})
     use_set.add(csv_node.file_name.name)
 
-    return numba.analysis._use_defs_result(usemap=use_set, defmap=def_set)
+    return analysis._use_defs_result(usemap=use_set, defmap=def_set)
 
 
-numba.analysis.ir_extension_usedefs[CsvReader] = csv_usedefs
+analysis.ir_extension_usedefs[CsvReader] = csv_usedefs
 
 
 def get_copies_csv(csv_node, typemap):
@@ -300,13 +302,12 @@ def box_stream_reader(typ, val, c):
 
 def _get_dtype_str(t):
     dtype = t.dtype
-    if isinstance(dtype, PDCategoricalDtype):
-        cat_arr = CategoricalArray(dtype)
-        # HACK: add cat type to numba.types
-        # FIXME: fix after Numba #3372 is resolved
-        cat_arr_name = 'CategoricalArray' + str(ir_utils.next_label())
-        setattr(types, cat_arr_name, cat_arr)
-        return cat_arr_name
+
+    if isinstance(t, Categorical):
+        # return categorical representation
+        # for some reason pandas and pyarrow read_csv() return CategoricalDtype with
+        # ordered=False in case when dtype is with ordered=None
+        return str(t).replace('ordered=None', 'ordered=False')
 
     if dtype == types.NPDatetime('ns'):
         dtype = 'NPDatetime("ns")'
@@ -320,8 +321,8 @@ def _get_dtype_str(t):
 
 def _get_pd_dtype_str(t):
     dtype = t.dtype
-    if isinstance(dtype, PDCategoricalDtype):
-        return 'pd.api.types.CategoricalDtype({})'.format(dtype.categories)
+    if isinstance(t, Categorical):
+        return 'pd.{}'.format(t.pd_dtype)
     if dtype == types.NPDatetime('ns'):
         dtype = 'str'
     if t == string_array_type:
@@ -428,83 +429,12 @@ def pandas_read_csv(
     This function has the same interface as pandas.read_csv.
     """
 
-    # Fallback to pandas
-    need_categorical = isinstance(dtype, pd.CategoricalDtype)
-    try:
-        need_categorical |= any(isinstance(v, pd.CategoricalDtype) for v in dtype.values())
-    except: pass
-
-    fallback_to_pandas = need_categorical
-
-    if fallback_to_pandas:
-        return pd.read_csv(
-            filepath_or_buffer=filepath_or_buffer,
-            sep=sep,
-            delimiter=delimiter,
-            # Column and Index Locations and Names
-            header=header,
-            names=names,
-            index_col=index_col,
-            usecols=usecols,
-            squeeze=squeeze,
-            prefix=prefix,
-            mangle_dupe_cols=mangle_dupe_cols,
-            # General Parsing Configuration
-            dtype=dtype,
-            engine=engine,
-            converters=converters,
-            true_values=true_values,
-            false_values=false_values,
-            skipinitialspace=skipinitialspace,
-            skiprows=skiprows,
-            skipfooter=skipfooter,
-            nrows=nrows,
-            # NA and Missing Data Handling
-            na_values=na_values,
-            keep_default_na=keep_default_na,
-            na_filter=na_filter,
-            verbose=verbose,
-            skip_blank_lines=skip_blank_lines,
-            # Datetime Handling
-            parse_dates=parse_dates,
-            infer_datetime_format=infer_datetime_format,
-            keep_date_col=keep_date_col,
-            date_parser=date_parser,
-            dayfirst=dayfirst,
-            cache_dates=cache_dates,
-            # Iteration
-            iterator=iterator,
-            chunksize=chunksize,
-            # Quoting, Compression, and File Format
-            compression=compression,
-            thousands=thousands,
-            decimal=decimal,
-            lineterminator=lineterminator,
-            quotechar=quotechar,
-            # quoting=csv.QUOTE_MINIMAL,  # not supported
-            doublequote=doublequote,
-            escapechar=escapechar,
-            comment=comment,
-            encoding=encoding,
-            dialect=dialect,
-            # Error Handling
-            error_bad_lines=error_bad_lines,
-            warn_bad_lines=warn_bad_lines,
-            # Internal
-            delim_whitespace=delim_whitespace,
-            # low_memory=_c_parser_defaults["low_memory"],  # not supported
-            memory_map=memory_map,
-            float_precision=float_precision,
-        )
-
     if delimiter is None:
         delimiter = sep
 
     autogenerate_column_names = bool(names)
 
     include_columns = None
-
-    # categories = None
 
     if usecols:
         if type(usecols[0]) == str:
@@ -527,30 +457,43 @@ def pandas_read_csv(
     #         categories = [f"f{names_list.index(k)}" for k in keys]
     # except: pass
 
+    categories = []
+
     if dtype:
         if names:
             names_list = list(names)
             if isinstance(dtype, dict):
-                dtype = {f"f{names_list.index(k)}": pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
+                column_types = {}
+                for k, v in dtype.items():
+                    column_name = "f{}".format(names_list.index(k))
+                    if isinstance(v, pd.CategoricalDtype):
+                        categories.append(column_name)
+                        column_type = pyarrow.string()
+                    else:
+                        column_type = pyarrow.from_numpy_dtype(v)
+                    column_types[column_name] = column_type
             else:
-                dtype = {f"f{names_list.index(k)}": pyarrow.from_numpy_dtype(dtype) for k in names}
+                pa_dtype = pyarrow.from_numpy_dtype(dtype)
+                column_types = {f"f{names_list.index(k)}": pa_dtype for k in names}
         elif usecols:
             if isinstance(dtype, dict):
-                dtype = {k: pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
+                column_types = {k: pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
             else:
-                dtype = {k: pyarrow.from_numpy_dtype(dtype) for k in usecols}
+                column_types = {k: pyarrow.from_numpy_dtype(dtype) for k in usecols}
         else:
             if isinstance(dtype, dict):
-                dtype = {k: pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
+                column_types = {k: pyarrow.from_numpy_dtype(v) for k, v in dtype.items()}
             else:
-                dtype = pyarrow.from_numpy_dtype(dtype)
+                column_types = pyarrow.from_numpy_dtype(dtype)
+    else:
+        column_types = None
 
     try:
         for column in parse_dates:
             name = f"f{column}"
             # TODO: Try to help pyarrow infer date type - set DateType.
             # dtype[name] = pyarrow.from_numpy_dtype(np.datetime64) # string
-            del dtype[name]
+            del column_types[name]
     except: pass
 
     parse_options = pyarrow.csv.ParseOptions(
@@ -564,7 +507,7 @@ def pandas_read_csv(
     )
 
     convert_options = pyarrow.csv.ConvertOptions(
-        column_types=dtype,
+        column_types=column_types,
         strings_can_be_null=True,
         include_columns=include_columns,
     )
@@ -577,7 +520,7 @@ def pandas_read_csv(
     )
 
     dataframe = table.to_pandas(
-        # categories=categories,
+        # categories=categories or None,
     )
 
     if names:
@@ -588,6 +531,12 @@ def pandas_read_csv(
                 dataframe.columns = [name for name in names if name in usecols]
         else:
             dataframe.columns = names
+
+    # fix when PyArrow will support predicted categories
+    if isinstance(dtype, dict):
+        for column_name, column_type in dtype.items():
+            if isinstance(column_type, pd.CategoricalDtype):
+                dataframe[column_name] = dataframe[column_name].astype(column_type)
 
     return dataframe
 
@@ -603,11 +552,11 @@ def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, dtype_present
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs) if t.dtype == types.NPDatetime('ns'))
     return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
     nb_objmode_vars = ", ".join([
-        "{}='{}'".format(to_varname(cname), _get_dtype_str(t))
+        '{}="{}"'.format(to_varname(cname), _get_dtype_str(t))
         for cname, t in zip(return_columns, col_typs)
     ])
     pd_dtype_strs = ", ".join([
-        "'{}':{}".format(cname, _get_pd_dtype_str(t))
+        "'{}': {}".format(cname, _get_pd_dtype_str(t))
         for cname, t in zip(return_columns, col_typs)
     ])
 
@@ -668,15 +617,10 @@ def _gen_csv_reader_py_pyarrow_func_text_dataframe(col_names, col_typs, dtype_pr
 
 
 def _gen_csv_reader_py_pyarrow_py_func(func_text, func_name):
-    # print(func_text)
-    glbls = globals()  # TODO: fix globals after Numba's #3355 is resolved
-    # {'objmode': objmode, 'csv_file_chunk_reader': csv_file_chunk_reader,
-    # 'pd': pd, 'np': np}
-    loc_vars = {}
-    exec(func_text, glbls, loc_vars)
-    csv_reader_py = loc_vars[func_name]
-
-    return csv_reader_py
+    locals = {}
+    exec(func_text, globals(), locals)
+    func = locals[func_name]
+    return func
 
 
 def _gen_csv_reader_py_pyarrow_jit_func(csv_reader_py):
