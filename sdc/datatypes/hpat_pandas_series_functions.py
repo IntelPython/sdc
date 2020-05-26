@@ -4955,7 +4955,7 @@ def sdc_pandas_series_combine(self, other, func, fill_value=None):
         chunks = parallel_chunks(len_val)
         for i in prange(len(chunks)):
             chunk = chunks[i]
-            for j in (chunk.start, chunk.stop):
+            for j in range(chunk.start, chunk.stop):
                 if self_indexes[j] == -1:
                     val_self = _fill_value
                 else:
@@ -4969,7 +4969,6 @@ def sdc_pandas_series_combine(self, other, func, fill_value=None):
                     val_other = other[ind_other]._data[0]
 
                 result[j] = func(val_self, val_other)
-
         return pandas.Series(result, index=indexes)
 
     return sdc_pandas_series_combine_impl
