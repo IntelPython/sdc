@@ -45,7 +45,9 @@ from numba.typed import Dict
 import sdc
 from sdc.hiframes.api import isna
 from sdc.hiframes.pd_series_type import SeriesType
-from sdc.str_arr_type import string_array_type
+from sdc.functions import numpy_like
+from sdc.str_arr_type import string_array_type, StringArrayType
+from sdc.datatypes.range_index_type import RangeIndexType
 from sdc.str_arr_ext import (num_total_chars, append_string_array_to,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na, string_array_type,
                              cp_str_list_to_array, create_str_arr_from_list, get_utf8_size,
@@ -69,15 +71,18 @@ def hpat_arrays_append(A, B):
 def hpat_arrays_append_overload(A, B):
     """Function for appending underlying arrays (A and B) or list/tuple of arrays B to an array A"""
 
-    if isinstance(A, types.Array):
-        if isinstance(B, types.Array):
+    A_is_range_index = isinstance(A, RangeIndexType)
+    B_is_range_index = isinstance(B, RangeIndexType)
+    if isinstance(A, (types.Array, RangeIndexType)):
+        if isinstance(B, (types.Array, RangeIndexType)):
             def _append_single_numeric_impl(A, B):
-                return numpy.concatenate((A, B,))
+                _A = A.values if A_is_range_index == True else A
+                _B = B.values if B_is_range_index == True else B
+                return numpy.concatenate((_A, _B,))
 
             return _append_single_numeric_impl
-        elif isinstance(B, (types.UniTuple, types.List)):
-            # TODO: this heavily relies on B being a homogeneous tuple/list - find a better way
-            # to resolve common dtype of heterogeneous sequence of arrays
+        elif isinstance(B, (types.UniTuple, types.List)) and isinstance(B.dtype, (types.Array, RangeIndexType)):
+            B_dtype_is_range_index = isinstance(B.dtype, RangeIndexType)
             numba_common_dtype = find_common_dtype_from_numpy_dtypes([A.dtype, B.dtype.dtype], [])
 
             # TODO: refactor to use numpy.concatenate when Numba supports building a tuple at runtime
@@ -87,11 +92,13 @@ def hpat_arrays_append_overload(A, B):
                 new_data = numpy.empty(total_length, numba_common_dtype)
 
                 stop = len(A)
-                new_data[:stop] = A
+                _A = numpy.array(A) if A_is_range_index == True else A
+                new_data[:stop] = _A
                 for arr in B:
+                    _arr = numpy.array(arr) if B_dtype_is_range_index == True else arr
                     start = stop
-                    stop = start + len(arr)
-                    new_data[start:stop] = arr
+                    stop = start + len(_arr)
+                    new_data[start:stop] = _arr
                 return new_data
 
             return _append_list_numeric_impl
@@ -210,9 +217,40 @@ def sdc_join_series_indexes(left, right):
 def sdc_join_series_indexes_overload(left, right):
     """Function for joining arrays left and right in a way similar to pandas.join 'outer' algorithm"""
 
-    # TODO: eliminate code duplication by merging implementations for numeric and StringArray
-    # requires equivalents of numpy.arsort and _hpat_ensure_array_capacity for StringArrays
-    if (isinstance(left, types.Array) and isinstance(right, types.Array)):
+    # check that both operands are of types used for representing Pandas indexes
+    if not (isinstance(left, (types.Array, StringArrayType, RangeIndexType))
+            and isinstance(right, (types.Array, StringArrayType, RangeIndexType))):
+        return None
+
+    convert_left = isinstance(left, RangeIndexType)
+    convert_right = isinstance(right, RangeIndexType)
+    def _convert_to_arrays_impl(left, right):
+        _left = left.values if convert_left == True else left
+        _right = right.values if convert_right == True else right
+        return sdc_join_series_indexes(_left, _right)
+
+    if isinstance(left, RangeIndexType) and isinstance(right, RangeIndexType):
+
+        def sdc_join_range_indexes_impl(left, right):
+            if (left is right or numpy_like.array_equal(left, right)):
+                joined = left.values
+                lidx = numpy.arange(len(joined))
+                ridx = lidx
+                return joined, lidx, ridx
+            else:
+                return sdc_join_series_indexes(left.values, right.values)
+
+        return sdc_join_range_indexes_impl
+
+    elif isinstance(left, RangeIndexType) and isinstance(right, types.Array):
+        return _convert_to_arrays_impl
+
+    elif isinstance(left, types.Array) and isinstance(right, RangeIndexType):
+        return _convert_to_arrays_impl
+
+    # TODO: remove code duplication below and merge numeric and StringArray impls into one
+    # needs equivalents of numpy.arsort and _hpat_ensure_array_capacity for StringArrays
+    elif isinstance(left, types.Array) and isinstance(right, types.Array):
 
         numba_common_dtype = find_common_dtype_from_numpy_dtypes([left.dtype, right.dtype], [])
         if isinstance(numba_common_dtype, types.Number):
@@ -321,8 +359,6 @@ def sdc_join_series_indexes_overload(left, right):
             return sdc_join_series_indexes_impl
 
         else:
-            # TODO: support joining indexes with common dtype=object - requires Numba
-            # support of such numpy arrays in nopython mode, for now just return None
             return None
 
     elif (left == string_array_type and right == string_array_type):
@@ -438,34 +474,6 @@ def sdc_join_series_indexes_overload(left, right):
         return sdc_join_series_indexes_impl
 
     return None
-
-
-def sdc_check_indexes_equal(left, right):
-    pass
-
-
-@sdc_overload(sdc_check_indexes_equal, jit_options={'parallel': False})
-def sdc_check_indexes_equal_overload(A, B):
-    """Function for checking arrays A and B of the same type are equal"""
-
-    if isinstance(A, types.Array):
-        def sdc_check_indexes_equal_numeric_impl(A, B):
-            return numpy.array_equal(A, B)
-        return sdc_check_indexes_equal_numeric_impl
-
-    elif A == string_array_type:
-        def sdc_check_indexes_equal_string_impl(A, B):
-            # TODO: replace with StringArrays comparison
-            is_index_equal = (len(A) == len(B)
-                              and num_total_chars(A) == num_total_chars(B))
-            for i in numpy.arange(len(A)):
-                if (A[i] != B[i]
-                        or str_arr_is_na(A, i) is not str_arr_is_na(B, i)):
-                    return False
-
-            return is_index_equal
-
-        return sdc_check_indexes_equal_string_impl
 
 
 @numba.njit
@@ -606,8 +614,14 @@ def _sdc_take(data, indexes):
     pass
 
 
-@sdc_overload(_sdc_take, jit_options={'parallel': True})
+@sdc_overload(_sdc_take)
 def _sdc_take_overload(data, indexes):
+
+    if not isinstance(data, (types.Array, StringArrayType, RangeIndexType)):
+        return None
+    if not (isinstance(indexes, (types.Array, types.List)) and isinstance(indexes.dtype, types.Integer)):
+        return None
+
     if isinstance(indexes.dtype, types.ListType) and isinstance(data, (types.Array, types.List)):
         arr_dtype = data.dtype
 
@@ -661,7 +675,7 @@ def _sdc_take_overload(data, indexes):
 
         return _sdc_take_list_str_impl
 
-    elif isinstance(data, types.Array):
+    elif isinstance(data, (types.Array, RangeIndexType)):
         arr_dtype = data.dtype
 
         def _sdc_take_array_impl(data, indexes):
@@ -673,7 +687,7 @@ def _sdc_take_overload(data, indexes):
 
         return _sdc_take_array_impl
 
-    elif data == string_array_type:
+    elif isinstance(data, StringArrayType):
         def _sdc_take_str_arr_impl(data, indexes):
             res_size = len(indexes)
             nan_mask = numpy.zeros(res_size, dtype=numpy.bool_)
@@ -692,24 +706,6 @@ def _sdc_take_overload(data, indexes):
             return res_arr
 
         return _sdc_take_str_arr_impl
-
-    elif (isinstance(data, types.RangeType) and isinstance(data.dtype, types.Integer)):
-        arr_dtype = data.dtype
-
-        def _sdc_take_array_impl(data, indexes):
-            res_size = len(indexes)
-            index_errors = 0
-            res_arr = numpy.empty(res_size, dtype=arr_dtype)
-            for i in numba.prange(res_size):
-                value = data.start + data.step * indexes[i]
-                if value >= data.stop:
-                    index_errors += 1
-                res_arr[i] = value
-            if index_errors:
-                raise IndexError("_sdc_take: index out-of-bounds")
-            return res_arr
-
-        return _sdc_take_array_impl
 
     return None
 
@@ -771,7 +767,9 @@ def sdc_reindex_series_overload(arr, index, name, by_index):
                 map_index_to_position[value] = i
 
         index_mismatch = 0
-        for i in numba.prange(len(by_index)):
+        # FIXME: TypingError in parfor step (wrong promotion to float64?) - see test_range_index_support_reindexing 
+        # for i in numba.prange(len(by_index)):
+        for i in numpy.arange(len(by_index)):
             if by_index[i] in map_index_to_position:
                 pos_in_self = map_index_to_position[by_index[i]]
                 _res_data[i] = arr[pos_in_self]

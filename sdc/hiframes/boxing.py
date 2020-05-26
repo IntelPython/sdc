@@ -30,13 +30,12 @@ import pandas as pd
 import pandas.api.types
 import numpy as np
 import numba
-from numba.extending import (typeof_impl, unbox, register_model, models,
-                             NativeValue, box, intrinsic)
+from numba.extending import (typeof_impl, unbox, NativeValue, box, intrinsic)
 from numba import types
-from numba.core import cgutils
 from numba.np import numpy_support
-from numba.core.typing import signature
-from numba.core.boxing import box_array, unbox_array, box_list
+from numba.core import cgutils
+from numba.core.typing.templates import signature
+from numba.core.boxing import box_array, unbox_array, box_list, unbox_none
 from numba.core.boxing import _NumbaTypeHelper
 from numba.cpython import listobj
 
@@ -52,6 +51,9 @@ from .. import hstr_ext
 import llvmlite.binding as ll
 from llvmlite import ir as lir
 from llvmlite.llvmpy.core import Type as LLType
+from sdc.datatypes.range_index_type import RangeIndexType
+from sdc.extensions.indexes.range_index_ext import box_range_index, unbox_range_index
+from sdc.str_arr_type import StringArrayType
 ll.add_symbol('array_size', hstr_ext.array_size)
 ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
 
@@ -68,7 +70,7 @@ def typeof_pd_dataframe(val, c):
 
 # register series types for import
 @typeof_impl.register(pd.Series)
-def typeof_pd_str_series(val, c):
+def typeof_pd_series(val, c):
     index_type = _infer_index_type(val.index)
     is_named = val.name is not None
     return SeriesType(
@@ -101,17 +103,8 @@ def unbox_dataframe(typ, val, c):
 
         dataframe.data = c.builder.insert_value(
             dataframe.data, native_val.value, col_ind)
-
-    # TODO: support unboxing index
-    if typ.index == types.none:
-        dataframe.index = c.context.get_constant(types.none, None)
-    if typ.index == string_array_type:
-        index_obj = c.pyapi.object_getattr_string(val, "index")
-        dataframe.index = unbox_str_series(string_array_type, index_obj, c).value
-    if isinstance(typ.index, types.Array):
-        index_obj = c.pyapi.object_getattr_string(val, "index")
-        index_data = c.pyapi.object_getattr_string(index_obj, "_data")
-        dataframe.index = unbox_array(typ.index, index_data, c).value
+    index_obj = c.pyapi.object_getattr_string(val, "index")
+    dataframe.index = _unbox_index_data(typ.index, index_obj, c).value
 
     dataframe.columns = column_tup
     dataframe.parent = val
@@ -180,18 +173,22 @@ def _infer_series_list_dtype(S):
 
 
 def _infer_index_type(index):
-    '''
-    Convertion input index type into Numba known type
-    need to return instance of the type class
-    '''
+    """ Deduces native Numba type used to represent index Python object """
+    if isinstance(index, pd.RangeIndex):
+        if index.name is None:
+            return RangeIndexType()
+        else:
+            return RangeIndexType(is_named=True)
 
-    if isinstance(index, (types.NoneType, pd.RangeIndex, pd.DatetimeIndex)) or index is None or len(index) == 0:
+    # for unsupported pandas indexes we explicitly unbox to None
+    if isinstance(index, pd.DatetimeIndex):
         return types.none
-
-    if index.dtype == np.dtype('O') and len(index) > 0:
-        first_val = index[0]
-        if isinstance(first_val, str):
+    if index.dtype == np.dtype('O'):
+        # TO-DO: should we check that all elements are strings?
+        if len(index) > 0 and isinstance(index[0], str):
             return string_array_type
+        else:
+            return types.none
 
     numba_index_type = numpy_support.from_dtype(index.dtype)
     return types.Array(numba_index_type, 1, 'C')
@@ -248,9 +245,9 @@ def box_dataframe(typ, val, c):
 
     # set df.index if necessary
     if typ.index != types.none:
-        arr_obj = _box_series_data(typ.index.dtype, typ.index, dataframe.index, c)
-        pyapi.object_setattr_string(df_obj, 'index', arr_obj)
-        pyapi.decref(arr_obj)
+        index_obj = _box_index_data(typ.index, dataframe.index, c)
+        pyapi.object_setattr_string(df_obj, 'index', index_obj)
+        pyapi.decref(index_obj)
 
     pyapi.decref(class_obj)
     # pyapi.gil_release(gil_state)    # release GIL
@@ -291,27 +288,46 @@ def unbox_dataframe_column(typingctx, df, i=None):
     return signature(df, df, i), codegen
 
 
+def _unbox_index_data(index_typ, index_obj, c):
+    """ Unboxes Pandas index object basing on the native type inferred previously.
+        Params:
+            index_typ: native Numba type the object is to be unboxed into
+            index_obj: Python object to be unboxed
+            c: LLVM context object
+        Returns: LLVM instructions to generate native value
+    """
+    if isinstance(index_typ, RangeIndexType):
+        return unbox_range_index(index_typ, index_obj, c)
+
+    if index_typ == string_array_type:
+        return unbox_str_series(index_typ, index_obj, c)
+
+    if isinstance(index_typ, types.Array):
+        index_data = c.pyapi.object_getattr_string(index_obj, "_data")
+        res = unbox_array(index_typ, index_data, c)
+        c.pyapi.decref(index_data)
+        return res
+
+    return unbox_none(index_typ, index_obj, c)
+
+
 @unbox(SeriesType)
 def unbox_series(typ, val, c):
     arr_obj = c.pyapi.object_getattr_string(val, "values")
     series = cgutils.create_struct_proxy(typ)(c.context, c.builder)
     series.data = _unbox_series_data(typ.dtype, typ.data, arr_obj, c).value
-    # TODO: other indices
-    if typ.index == string_array_type:
-        index_obj = c.pyapi.object_getattr_string(val, "index")
-        series.index = unbox_str_series(string_array_type, index_obj, c).value
 
-    if isinstance(typ.index, types.Array):
-        index_obj = c.pyapi.object_getattr_string(val, "index")
-        index_data = c.pyapi.object_getattr_string(index_obj, "_data")
-        series.index = unbox_array(typ.index, index_data, c).value
+    index_obj = c.pyapi.object_getattr_string(val, "index")
+    series.index = _unbox_index_data(typ.index, index_obj, c).value
 
     if typ.is_named:
         name_obj = c.pyapi.object_getattr_string(val, "name")
-        series.name = numba.cpython.unicode.unbox_unicode_str(
+        series.name = numba.unicode.unbox_unicode_str(
             string_type, name_obj, c).value
-    # TODO: handle index and name
+        c.pyapi.decref(name_obj)
+
     c.pyapi.decref(arr_obj)
+    c.pyapi.decref(index_obj)
     return NativeValue(series._getvalue())
 
 
@@ -343,9 +359,7 @@ def box_series(typ, val, c):
     if typ.index is types.none:
         index = c.pyapi.make_none()
     else:
-        # TODO: index-specific boxing like RangeIndex() etc.
-        index = _box_series_data(
-            typ.index.dtype, typ.index, series.index, c)
+        index = _box_index_data(typ.index, series.index, c)
 
     if typ.is_named:
         name = c.pyapi.from_native_value(string_type, series.name)
@@ -386,6 +400,28 @@ def _box_series_data(dtype, data_typ, val, c):
         arr = c.pyapi.call_method(arr, "astype", (o_str,))
 
     return arr
+
+
+def _box_index_data(index_typ, val, c):
+    """ Boxes native value used to represent Pandas index into appropriate Python object.
+        Params:
+            index_typ: Numba type of native value
+            val: native value
+            c: LLVM context object
+        Returns: Python object native value is boxed into
+    """
+    assert isinstance(index_typ, (RangeIndexType, StringArrayType, types.Array, types.NoneType))
+
+    if isinstance(index_typ, RangeIndexType):
+        index = box_range_index(index_typ, val, c)
+    elif isinstance(index_typ, types.Array):
+        index = box_array(index_typ, val, c)
+    elif isinstance(index_typ, StringArrayType):
+        index = box_str_arr(string_array_type, val, c)
+    else:  # index_typ is types.none
+        index = c.pyapi.make_none()
+
+    return index
 
 
 def _unbox_array_list_str(obj, c):
