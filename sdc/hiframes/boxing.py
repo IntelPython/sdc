@@ -228,9 +228,16 @@ def box_dataframe(typ, val, c):
         col_loc = typ.column_loc[cname]
         type_id, col_id = col_loc.type_id, col_loc.col_id
         list_type = types.List(arr_typs[i])
+
+        # dataframe.data looks like a tuple(list(array))
+        # e.g. ([array(int64, 1d, C), array(int64, 1d, C)], [array(float64, 1d, C)])
+
+        # extracting list from the tuple
         list_val = builder.extract_value(dataframe.data, type_id)
-        typ_arrs = listobj.ListInstance(c.context, c.builder, list_type, list_val)
+        typ_arrs = listobj.ListInstance(context, builder, list_type, list_val)
+        # getting array from the list to box it then
         arr = typ_arrs.getitem(col_id)
+        typ_arrs.incref_value(arr)
 
         if dtype == string_type:
             arr_obj = box_str_arr(arr_typ, arr, c)
@@ -247,7 +254,8 @@ def box_dataframe(typ, val, c):
             # context.nrt.incref(builder, arr_typ, arr)
         pyapi.dict_setitem(df_dict, cname_obj, arr_obj)
 
-        c.context.nrt.decref(c.builder, list_type, typ_arrs.value)
+        if c.context.enable_nrt:
+            c.context.nrt.decref(c.builder, list_type, list_val)
         pyapi.decref(arr_obj)
         pyapi.decref(cname_obj)
 

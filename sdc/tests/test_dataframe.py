@@ -2333,15 +2333,19 @@ class TestDataFrame(TestCase):
         def test_impl():
             n1 = 11
             n2 = n1 * 2
-            df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1) ** 2},
-                              index=np.arange(n1) ** 2)
-            df2 = pd.DataFrame({'C': np.arange(n2), 'D': np.arange(n2) ** 2,
-                                'E S D': np.arange(n2) + 100},
-                               index=np.arange(n2) ** 4)
+            df = pd.DataFrame({
+                'A': np.arange(n1), 'B': np.arange(n1) ** 2
+            }, index=np.arange(n1) ** 2)
+            df2 = pd.DataFrame({
+                'C': np.arange(n2), 'D': np.arange(n2) ** 2,
+                'E S D': np.arange(n2) + 100
+            }, index=np.arange(n2) ** 4)
             return df.append(df2, ignore_index=False)
 
         sdc_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+        res_jit = sdc_func()
+        res_ref = test_impl()
+        pd.testing.assert_frame_equal(res_jit, res_ref)
 
     @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_append_df_diff_cols_index_ignore_index(self):
