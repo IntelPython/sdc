@@ -2819,6 +2819,8 @@ class TestSeries(
 
     @unittest.expectedFailure
     def test_series_combine_integer_samelen(self):
+        """Result series type `int` is expected,
+        `float` is returned since this is the default fill_value type"""
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
         hpat_func = self.jit(test_impl)

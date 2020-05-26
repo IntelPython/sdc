@@ -4956,17 +4956,17 @@ def sdc_pandas_series_combine(self, other, func, fill_value=None):
         for i in prange(len(chunks)):
             chunk = chunks[i]
             for j in range(chunk.start, chunk.stop):
-                if self_indexes[j] == -1:
+                self_idx = self_indexes[j]
+                if self_idx == -1:
                     val_self = _fill_value
                 else:
-                    ind_self = self_indexes[j]
-                    val_self = self[ind_self]._data[0]
+                    val_self = self[self_idx]._data[0]
 
-                if other_indexes[j] == -1:
+                other_idx = other_indexes[j]
+                if other_idx == -1:
                     val_other = _fill_value
                 else:
-                    ind_other = other_indexes[j]
-                    val_other = other[ind_other]._data[0]
+                    val_other = other[other_idx]._data[0]
 
                 result[j] = func(val_self, val_other)
         return pandas.Series(result, index=indexes)
