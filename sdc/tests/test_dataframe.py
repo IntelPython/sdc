@@ -2621,7 +2621,6 @@ class TestDataFrame(TestCase):
                            "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
     def test_sum_default(self):
         def test_impl(df):
             return df.sum()

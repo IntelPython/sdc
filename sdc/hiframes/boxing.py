@@ -40,6 +40,7 @@ from numba.core.boxing import box_array, unbox_array, box_list
 from numba.core.boxing import _NumbaTypeHelper
 from numba.cpython import listobj
 
+from sdc.hiframes.pd_dataframe_ext import ColumnLoc
 from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
@@ -63,7 +64,27 @@ def typeof_pd_dataframe(val, c):
     col_types = get_hiframes_dtypes(val)
     index_type = _infer_index_type(val.index)
 
-    return DataFrameType(col_types, index_type, col_names, True)
+    # Define map column name to column location ex. {'A': (0,0), 'B': (1,0), 'C': (0,1)}
+    column_loc = {}
+    # Store unique types of columns ex. {'int64': (0, [0, 2]), 'float64': (1, [1])}
+    data_typs_map = {}
+    type_id = 0
+    for i, col_typ in enumerate(col_types):
+        col_name = col_names[i]
+
+        if col_typ not in data_typs_map:
+            data_typs_map[col_typ] = (type_id, [i])
+            # The first column in each type always has 0 index
+            column_loc[col_name] = ColumnLoc(type_id, col_id=0)
+            type_id += 1
+        else:
+            # Get index of column in list of types
+            existing_type_id, col_indices = data_typs_map[col_typ]
+            col_id = len(col_indices)
+            column_loc[col_name] = ColumnLoc(existing_type_id, col_id)
+            col_indices.append(i)
+
+    return DataFrameType(col_types, index_type, col_names, True, column_loc=column_loc)
 
 
 # register series types for import
@@ -86,21 +107,54 @@ def unbox_dataframe(typ, val, c):
     # create dataframe struct and store values
     dataframe = cgutils.create_struct_proxy(typ)(c.context, c.builder)
 
-    column_tup = c.context.make_tuple(
-        c.builder, types.UniTuple(string_type, n_cols), column_strs)
+    col_list_type = types.List(string_type)
+    _, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, col_list_type, n_cols)
+    inst.size = c.context.get_constant(types.intp, n_cols)
+    for i, column_str in enumerate(column_strs):
+        inst.setitem(c.context.get_constant(types.intp, i), column_str, incref=True)
 
-    # this unboxes all DF columns so that no column unboxing occurs later
-    for col_ind in range(n_cols):
-        series_obj = c.pyapi.object_getattr_string(val, typ.columns[col_ind])
-        arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
-        ty_series = typ.data[col_ind]
-        if isinstance(ty_series, types.Array):
-            native_val = unbox_array(typ.data[col_ind], arr_obj, c)
-        elif ty_series == string_array_type:
-            native_val = unbox_str_series(string_array_type, series_obj, c)
+    dataframe.columns = inst.value
 
-        dataframe.data = c.builder.insert_value(
-            dataframe.data, native_val.value, col_ind)
+    # Define map column name to column location ex. {'A': (0,0), 'B': (1,0), 'C': (0,1)}
+    column_loc = {}
+    # Store unique types of columns ex. {'int64': (0, [0, 2]), 'float64': (1, [1])}
+    data_typs_map = {}
+    types_order = []
+    type_id = 0
+    for i, col in enumerate(typ.data):
+        col_name = typ.columns[i]
+
+        if col.dtype not in data_typs_map:
+            data_typs_map[col.dtype] = (type_id, [i])
+            # The first column in each type always has 0 index
+            column_loc[col_name] = ColumnLoc(type_id, col_id=0)
+            types_order.append(col.dtype)
+            type_id += 1
+        else:
+            # Get index of column in list of types
+            existing_type_id, col_indices = data_typs_map[col.dtype]
+            col_id = len(col_indices)
+            column_loc[col_name] = ColumnLoc(existing_type_id, col_id)
+            col_indices.append(i)
+
+    for typ_id, col_typ in enumerate(types_order):
+        type_id, col_indices = data_typs_map[col_typ]
+        n_type_cols = len(col_indices)
+        list_type = types.List(typ.data[col_indices[0]])
+        _, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, list_type, n_type_cols)
+        inst.size = c.context.get_constant(types.intp, n_type_cols)
+        for i, col_idx in enumerate(col_indices):
+            series_obj = c.pyapi.object_getattr_string(val, typ.columns[col_idx])
+            arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
+            ty_series = typ.data[col_idx]
+            if isinstance(ty_series, types.Array):
+                native_val = unbox_array(typ.data[col_idx], arr_obj, c)
+            elif ty_series == string_array_type:
+                native_val = unbox_str_series(string_array_type, series_obj, c)
+
+            inst.setitem(c.context.get_constant(types.intp, i), native_val.value, incref=True)
+
+        dataframe.data = c.builder.insert_value(dataframe.data, inst.value, typ_id)
 
     # TODO: support unboxing index
     if typ.index == types.none:
@@ -113,7 +167,6 @@ def unbox_dataframe(typ, val, c):
         index_data = c.pyapi.object_getattr_string(index_obj, "_data")
         dataframe.index = unbox_array(typ.index, index_data, c).value
 
-    dataframe.columns = column_tup
     dataframe.parent = val
 
     # increase refcount of stored values
