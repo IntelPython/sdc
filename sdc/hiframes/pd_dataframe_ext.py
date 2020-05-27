@@ -59,6 +59,32 @@ class ColumnLoc(NamedTuple):
     col_id: int
 
 
+def get_columns_loc(col_types, col_names):
+    # Define df structure, map column name to column position ex. {'A': (0,0), 'B': (1,0), 'C': (0,1)}
+    column_loc = {}
+    # Store unique types of columns ex. {'int64': (0, [0, 2]), 'float64': (1, [1])}
+    data_typs_map = {}
+    types_order = []
+    type_id = 0
+    for col_id, col_typ in enumerate(col_types):
+        col_name = col_names[col_id]
+
+        if col_typ not in data_typs_map:
+            data_typs_map[col_typ] = (type_id, [col_id])
+            # The first column in each type always has 0 index
+            column_loc[col_name] = ColumnLoc(type_id, 0)
+            types_order.append(col_typ)
+            type_id += 1
+        else:
+            # Get index of column in list of types
+            type_idx, col_indices = data_typs_map[col_typ]
+            col_idx_list = len(col_indices)
+            column_loc[col_name] = ColumnLoc(type_idx, col_idx_list)
+            col_indices.append(col_id)
+
+    return column_loc, data_typs_map, types_order
+
+
 @intrinsic
 def init_dataframe(typingctx, *args):
     """Create a DataFrame with provided data, index and columns values.
@@ -73,27 +99,7 @@ def init_dataframe(typingctx, *args):
     index_typ = args[n_cols]
     column_names = tuple(a.literal_value for a in args[n_cols + 1:])
 
-    # Define map column name to column location ex. {'A': (0,0), 'B': (1,0), 'C': (0,1)}
-    column_loc = {}
-    # Store unique types of columns ex. {'int64': (0, [0, 2]), 'float64': (1, [1])}
-    data_typs_map = {}
-    types_order = []
-    type_id = 0
-    for i, col_typ in enumerate(data_typs):
-        col_name = column_names[i]
-
-        if col_typ not in data_typs_map:
-            data_typs_map[col_typ] = (type_id, [i])
-            # The first column in each type always has 0 index
-            column_loc[col_name] = ColumnLoc(type_id, col_id=0)
-            types_order.append(col_typ)
-            type_id += 1
-        else:
-            # Get index of column in list of types
-            existing_type_id, col_indices = data_typs_map[col_typ]
-            col_id = len(col_indices)
-            column_loc[col_name] = ColumnLoc(existing_type_id, col_id)
-            col_indices.append(i)
+    column_loc, data_typs_map, types_order = get_columns_loc(data_typs, column_names)
 
     def codegen(context, builder, signature, args):
         in_tup = args[0]

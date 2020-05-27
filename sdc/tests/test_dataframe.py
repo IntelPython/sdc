@@ -169,7 +169,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def test_pass_df1(self):
         def test_impl(df):
             return (df.A == 2).sum()
@@ -179,7 +178,6 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
     def test_pass_df_str(self):
         def test_impl(df):
             return (df.A == 'a').sum()
@@ -188,7 +186,7 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': ['a', 'b', 'c']})
         self.assertEqual(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # Need boxing
     def test_unbox1(self):
         def test_impl(df):
             return df
@@ -661,7 +659,7 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': []})
         self._test_df_set_column_exception_empty_columns(df, key, value)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
+    # @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_replace_column(self):
         all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}]
         key, value = 'A', np.array([1., -1., 0.])
@@ -691,7 +689,6 @@ class TestDataFrame(TestCase):
         sdc_func = self.jit(test_impl)
         np.testing.assert_array_equal(sdc_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
     def test_df_values_unboxing(self):
         values_to_test = [[1, 2, 3, 4, 5],
                           [.1, .2, .3, .4, .5],
@@ -768,7 +765,6 @@ class TestDataFrame(TestCase):
         self._test_df_index(df)
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_index_attribute_empty_df(self):
         df = pd.DataFrame()
         self._test_df_index(df)
@@ -1388,7 +1384,6 @@ class TestDataFrame(TestCase):
         for n in [0, 2]:
             np.testing.assert_array_equal(sdc_func(n), test_impl(n))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_at_type(self):
         def test_impl(df, n, k):
             return df.at[n, "B"]
@@ -1402,7 +1397,6 @@ class TestDataFrame(TestCase):
         for n in n_cases:
             self.assertEqual(sdc_func(df, n, "B"), test_impl(df, n, "B"))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_at_value_error(self):
         def test_impl(df):
             return df.at[5, 'C']
@@ -1504,7 +1498,7 @@ class TestDataFrame(TestCase):
             with self.subTest(n=n):
                 pd.testing.assert_frame_equal(sdc_impl(n), test_impl(n))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_copy(self):
         def test_impl(df, deep):
             return df.copy(deep=deep)
@@ -2066,7 +2060,6 @@ class TestDataFrame(TestCase):
                     sdc_func(df)
 
     @skip_sdc_jit('DF.getitem unsupported exceptions')
-    @dfRefactoringNotImplemented
     def test_df_getitem_unicode_idx_exception_key_error(self):
         def test_impl(df, idx):
             return df[idx]
@@ -2079,7 +2072,6 @@ class TestDataFrame(TestCase):
                     sdc_func(df, 'ABC')
 
     @skip_sdc_jit('DF.getitem unsupported exceptions')
-    @dfRefactoringNotImplemented
     def test_df_getitem_tuple_idx_exception_key_error(self):
         sdc_func = self.jit(lambda df: df[('A', 'Z')])
 
@@ -2239,7 +2231,6 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
     def test_df_getitem_attr(self):
         def test_impl(df):
             return df.A
@@ -2536,7 +2527,6 @@ class TestDataFrame(TestCase):
         pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented
     def test_median_default(self):
         def test_impl(df):
             return df.median()
@@ -2550,7 +2540,6 @@ class TestDataFrame(TestCase):
                            "F": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
     def test_mean_default(self):
         def test_impl(df):
             return df.mean()
@@ -2564,7 +2553,6 @@ class TestDataFrame(TestCase):
                            "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
     def test_std_default(self):
         def test_impl(df):
             return df.std()
@@ -2578,7 +2566,6 @@ class TestDataFrame(TestCase):
                            "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
     def test_var_default(self):
         def test_impl(df):
             return df.var()
@@ -2592,7 +2579,6 @@ class TestDataFrame(TestCase):
                            "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
     def test_max_default(self):
         def test_impl(df):
             return df.max()
@@ -2607,7 +2593,6 @@ class TestDataFrame(TestCase):
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented
     def test_min_default(self):
         def test_impl(df):
             return df.min()
@@ -2621,7 +2606,6 @@ class TestDataFrame(TestCase):
                            "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
     def test_sum_default(self):
         def test_impl(df):
             return df.sum()
@@ -2635,7 +2619,6 @@ class TestDataFrame(TestCase):
                            "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
     def test_prod_default(self):
         def test_impl(df):
             return df.prod()
@@ -2649,7 +2632,6 @@ class TestDataFrame(TestCase):
                            "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
     def test_count2_default(self):
         def test_impl(df):
             return df.count()
