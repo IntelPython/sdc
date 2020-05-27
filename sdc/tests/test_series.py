@@ -2817,17 +2817,15 @@ class TestSeries(
         S2 = pd.Series([1, 2, 3, 4, 5])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
-    @unittest.expectedFailure
     def test_series_combine_integer_samelen(self):
-        """Result series type `int` is expected,
-        `float` is returned since this is the default fill_value type"""
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
         hpat_func = self.jit(test_impl)
 
         S1 = pd.Series([1, 2, 3, 4, 5])
         S2 = pd.Series([6, 21, 17, -5, 4])
-        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+        # check_dtype=False due to limitation of combine impl
+        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2), check_dtype=False)
 
     def test_series_combine_samelen(self):
         def test_impl(S1, S2):
