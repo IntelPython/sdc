@@ -49,8 +49,8 @@ from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric,
                                             check_types_comparable, kwsparams2list,
                                             gen_impl_generator, find_common_dtype_from_numpy_dtypes)
 from sdc.str_arr_ext import StringArrayType
+from sdc.datatypes.range_index_type import RangeIndexType
 
-from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.datatypes.hpat_pandas_dataframe_getitem_types import (DataFrameGetitemAccessorType,
                                                                dataframe_getitem_accessor_init)
 from sdc.datatypes.common_functions import SDCLimitation
@@ -61,11 +61,9 @@ from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby, 
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
 from sdc.hiframes.api import isna
-from sdc.functions.numpy_like import getitem_by_mask
+from sdc.functions.numpy_like import getitem_by_mask, find_idx
 from sdc.datatypes.common_functions import _sdc_take, sdc_reindex_series
 from sdc.utilities.prange_utils import parallel_chunks
-from sdc.functions.numpy_like import find_idx
-
 
 @sdc_overload_attribute(DataFrameType, 'index')
 def hpat_pandas_dataframe_index(df):
@@ -2110,7 +2108,8 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
     accessor = self.accessor.literal_value
 
     if accessor == 'at':
-        num_idx = isinstance(idx[0], types.Number) and isinstance(self.dataframe.index, (types.Array, types.NoneType))
+        num_idx = (isinstance(idx[0], types.Number)
+            and isinstance(self.dataframe.index, (types.Array, types.NoneType, RangeIndexType)))
         str_idx = (isinstance(idx[0], (types.UnicodeType, types.StringLiteral))
                    and isinstance(self.dataframe.index, StringArrayType))
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.StringLiteral):

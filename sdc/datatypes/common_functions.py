@@ -620,10 +620,11 @@ def _sdc_take_overload(data, indexes):
 
     if not isinstance(data, (types.Array, StringArrayType, RangeIndexType)):
         return None
-    if not (isinstance(indexes, (types.Array, types.List)) and isinstance(indexes.dtype, types.Integer)):
+    if not (isinstance(indexes, (types.Array, types.List))
+            and isinstance(indexes.dtype, (types.Integer, types.ListType))):
         return None
 
-    if isinstance(indexes.dtype, types.ListType) and isinstance(data, (types.Array, types.List)):
+    if isinstance(indexes.dtype, types.ListType) and isinstance(data, (types.Array, types.List, RangeIndexType)):
         arr_dtype = data.dtype
 
         def _sdc_take_list_impl(data, indexes):
