@@ -2070,11 +2070,8 @@ def hpat_pandas_series_isin(self, values):
             values = set(values)
             data_len = len(self._data)
             result = numpy.empty(data_len, dtype=numpy.bool_)
-            chunks = parallel_chunks(data_len)
-            for i in prange(len(chunks)):
-                chunk = chunks[i]
-                for j in range(chunk.start, chunk.stop):
-                    result[j] = self._data[j] in values
+            for i in prange(data_len):
+                result[i] = self._data[i] in values
 
             return pandas.Series(data=result, index=self._index, name=self._name)
     else:
@@ -2085,11 +2082,8 @@ def hpat_pandas_series_isin(self, values):
             values = set(values)
             data_len = len(self._data)
             result = numpy.empty(data_len, dtype=numpy.bool_)
-            chunks = parallel_chunks(data_len)
-            for i in prange(len(chunks)):
-                chunk = chunks[i]
-                for j in range(chunk.start, chunk.stop):
-                    result[j] = self._data[j] in values
+            for i in prange(data_len):
+                result[i] = self._data[i] in values
 
             return pandas.Series(data=result, index=self._index, name=self._name)
 
