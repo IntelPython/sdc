@@ -83,7 +83,7 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(result, result_ref)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_by_all_dtypes(self):
         def test_impl(df):
             return df.groupby('A').count()
@@ -104,7 +104,7 @@ class TestGroupBy(TestCase):
                 pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_sort(self):
         def test_impl(df, param):
             return df.groupby('A', sort=param).min()
@@ -127,7 +127,7 @@ class TestGroupBy(TestCase):
                 pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_count(self):
         def test_impl(df):
             return df.groupby('A').count()
@@ -139,8 +139,27 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_dataframe_groupby_count_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').count()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
+
+
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_max(self):
         def test_impl(df):
             return df.groupby('A').max()
@@ -152,8 +171,26 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_dataframe_groupby_max_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').max()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
+
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_min(self):
         def test_impl(df):
             return df.groupby('A').min()
@@ -165,8 +202,26 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_dataframe_groupby_min_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').min()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
+
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_mean(self):
         def test_impl(df):
             return df.groupby('A').mean()
@@ -178,8 +233,26 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_dataframe_groupby_mean_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').mean()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
+
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_median(self):
         def test_impl(df):
             return df.groupby('A').median()
@@ -190,6 +263,24 @@ class TestGroupBy(TestCase):
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_dataframe_groupby_median_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').median()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
     @unittest.expectedFailure   # pandas groupby.median returns unstable dtype (int or float) unlike series.median
@@ -209,7 +300,7 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_prod(self):
         def test_impl(df):
             return df.groupby('A').prod()
@@ -220,6 +311,24 @@ class TestGroupBy(TestCase):
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_dataframe_groupby_prod_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').prod()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
     @skip_numba_jit("BUG: SDC impl of Series.sum returns float64 on as series of ints")
@@ -234,8 +343,26 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_dataframe_groupby_sum_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').sum()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
+
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_std(self):
         def test_impl(df):
             return df.groupby('A').std()
@@ -247,8 +374,26 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_dataframe_groupby_std_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').std()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
+
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_var(self):
         def test_impl(df):
             return df.groupby('A').var()
@@ -259,6 +404,24 @@ class TestGroupBy(TestCase):
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    def test_dataframe_groupby_var_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').var()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
 
     @skip_sdc_jit
     @skip_numba_jit
@@ -284,7 +447,7 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_count(self):
         def test_impl(df):
             return df.groupby('A')['B'].count()
@@ -296,7 +459,7 @@ class TestGroupBy(TestCase):
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_mean(self):
         def test_impl(df):
             return df.groupby('A')['B'].mean()
@@ -308,7 +471,7 @@ class TestGroupBy(TestCase):
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_median(self):
         def test_impl(df):
             return df.groupby('A')['B'].median()
@@ -320,7 +483,7 @@ class TestGroupBy(TestCase):
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_min(self):
         def test_impl(df):
             return df.groupby('A')['B'].min()
@@ -342,7 +505,7 @@ class TestGroupBy(TestCase):
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
     @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_max(self):
         def test_impl(df):
             return df.groupby('A')['B'].max()
@@ -364,7 +527,7 @@ class TestGroupBy(TestCase):
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
     @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_prod(self):
         def test_impl(df):
             return df.groupby('A')['B'].prod()
@@ -376,7 +539,7 @@ class TestGroupBy(TestCase):
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_var(self):
         def test_impl(df):
             return df.groupby('A')['B'].var()
@@ -388,7 +551,7 @@ class TestGroupBy(TestCase):
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_std(self):
         def test_impl(df):
             return df.groupby('A')['B'].std()
@@ -679,7 +842,7 @@ class TestGroupBy(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_getitem_literal_tuple(self):
         def test_impl(df):
             return df.groupby('A')['B', 'C'].count()
@@ -691,7 +854,7 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_getitem_literal_str(self):
         def test_impl(df):
             return df.groupby('C')['B'].count()
@@ -703,7 +866,7 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_getitem_unicode_str(self):
         def test_impl(df, col_name):
             return df.groupby('A')[col_name].count()
@@ -717,7 +880,7 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_getitem_repeated(self):
         def test_impl(df):
             return df.groupby('A')['B', 'C']['D']
