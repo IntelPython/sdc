@@ -4942,10 +4942,7 @@ def sdc_pandas_series_combine(self, other, func, fill_value=None):
 
     def sdc_pandas_series_combine_impl(self, other, func, fill_value=None):
 
-        if fill_value is not None:
-            _fill_value = fill_value
-        else:
-            _fill_value = numpy.nan
+        _fill_value = numpy.nan if fill_value is None else fill_value
 
         indexes, self_indexes, other_indexes = sdc_join_series_indexes(self.index, other.index)
         len_val = len(indexes)
@@ -4957,16 +4954,10 @@ def sdc_pandas_series_combine(self, other, func, fill_value=None):
             chunk = chunks[i]
             for j in range(chunk.start, chunk.stop):
                 self_idx = self_indexes[j]
-                if self_idx == -1:
-                    val_self = _fill_value
-                else:
-                    val_self = self[self_idx]._data[0]
+                val_self = _fill_value if self_idx == -1 else self._data[self_idx]
 
                 other_idx = other_indexes[j]
-                if other_idx == -1:
-                    val_other = _fill_value
-                else:
-                    val_other = other[other_idx]._data[0]
+                val_other = _fill_value if other_idx == -1 else other._data[other_idx]
 
                 result[j] = func(val_self, val_other)
         return pandas.Series(result, index=indexes)
