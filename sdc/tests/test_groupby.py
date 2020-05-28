@@ -447,7 +447,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_count(self):
         def test_impl(df):
             return df.groupby('A')['B'].count()
@@ -459,7 +458,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_mean(self):
         def test_impl(df):
             return df.groupby('A')['B'].mean()
@@ -471,7 +469,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_median(self):
         def test_impl(df):
             return df.groupby('A')['B'].median()
@@ -483,7 +480,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_min(self):
         def test_impl(df):
             return df.groupby('A')['B'].min()
@@ -505,7 +501,6 @@ class TestGroupBy(TestCase):
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
     @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_max(self):
         def test_impl(df):
             return df.groupby('A')['B'].max()
@@ -527,7 +522,6 @@ class TestGroupBy(TestCase):
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
     @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_prod(self):
         def test_impl(df):
             return df.groupby('A')['B'].prod()
@@ -539,7 +533,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_var(self):
         def test_impl(df):
             return df.groupby('A')['B'].var()
@@ -551,7 +544,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_agg_seq_std(self):
         def test_impl(df):
             return df.groupby('A')['B'].std()
@@ -854,7 +846,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_getitem_literal_str(self):
         def test_impl(df):
             return df.groupby('C')['B'].count()
@@ -866,7 +857,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_getitem_unicode_str(self):
         def test_impl(df, col_name):
             return df.groupby('A')[col_name].count()
@@ -880,7 +870,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_getitem_repeated(self):
         def test_impl(df):
             return df.groupby('A')['B', 'C']['D']
