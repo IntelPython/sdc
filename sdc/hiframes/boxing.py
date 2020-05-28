@@ -94,10 +94,10 @@ def unbox_dataframe(typ, val, c):
 
     col_list_type = types.List(string_type)
     ok, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, col_list_type, n_cols)
-    inst.size = c.context.get_constant(types.intp, n_cols)
 
     with c.builder.if_else(ok, likely=True) as (if_ok, if_not_ok):
         with if_ok:
+            inst.size = c.context.get_constant(types.intp, n_cols)
             for i, column_str in enumerate(column_strs):
                 inst.setitem(c.context.get_constant(types.intp, i), column_str, incref=True)
             dataframe.columns = inst.value
@@ -116,10 +116,10 @@ def unbox_dataframe(typ, val, c):
         n_type_cols = len(col_indices)
         list_type = types.List(col_typ)
         ok, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, list_type, n_type_cols)
-        inst.size = c.context.get_constant(types.intp, n_type_cols)
 
         with c.builder.if_else(ok, likely=True) as (if_ok, if_not_ok):
             with if_ok:
+                inst.size = c.context.get_constant(types.intp, n_type_cols)
                 for i, col_idx in enumerate(col_indices):
                     series_obj = c.pyapi.object_getattr_string(val, typ.columns[col_idx])
                     arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
