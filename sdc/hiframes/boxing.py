@@ -159,7 +159,7 @@ def unbox_dataframe(typ, val, c):
         for var in column_strs:
             c.context.nrt.incref(c.builder, string_type, var)
 
-    return NativeValue(dataframe._getvalue())
+    return NativeValue(dataframe._getvalue(), is_error=c.builder.load(errorptr))
 
 
 def get_hiframes_dtypes(df):
