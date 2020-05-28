@@ -738,7 +738,6 @@ class TestDataFrame(TestCase):
         np.testing.assert_array_equal(sdc_func(df), test_impl(df))
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_index_attribute(self):
         index_to_test = [[1, 2, 3, 4, 5],
                          [.1, .2, .3, .4, .5],
@@ -754,7 +753,6 @@ class TestDataFrame(TestCase):
                 self._test_df_index(df)
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_index_attribute_empty(self):
         n = 5
         np.random.seed(0)
@@ -1176,7 +1174,6 @@ class TestDataFrame(TestCase):
             with self.subTest(n=n, k=k):
                 pd.testing.assert_frame_equal(sdc_func(n, k), test_impl(n, k))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_iloc_values(self):
         def test_impl(df, n):
             return df.iloc[n, 1]
@@ -1232,7 +1229,6 @@ class TestDataFrame(TestCase):
                     func(df)
                 self.assertIn(msg, str(raises.exception))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_iloc_int(self):
         def test_impl(df, n):
             return df.iloc[n]
@@ -1321,7 +1317,6 @@ class TestDataFrame(TestCase):
             with self.subTest(n=n):
                 pd.testing.assert_frame_equal(sdc_func(n), test_impl(n))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_iat(self):
         def test_impl(df):
             return df.iat[0, 1]
@@ -1357,7 +1352,6 @@ class TestDataFrame(TestCase):
         msg = 'Index is out of bounds for axis'
         self.assertIn(msg, str(raises.exception))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_at(self):
         def test_impl(df, n):
             return df.at[n, 'C']
@@ -2047,7 +2041,6 @@ class TestDataFrame(TestCase):
         pd.testing.assert_frame_equal(sdc_func(arr), test_impl(arr))
 
     @skip_sdc_jit('DF.getitem unsupported exceptions')
-    @dfRefactoringNotImplemented
     def test_df_getitem_str_literal_idx_exception_key_error(self):
         def test_impl(df):
             return df['ABC']
@@ -2380,7 +2373,6 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_append_df_exception_incomparable_index_type(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=False)
