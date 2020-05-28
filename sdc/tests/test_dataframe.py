@@ -659,7 +659,7 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': []})
         self._test_df_set_column_exception_empty_columns(df, key, value)
 
-    # @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
+    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_replace_column(self):
         all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}]
         key, value = 'A', np.array([1., -1., 0.])

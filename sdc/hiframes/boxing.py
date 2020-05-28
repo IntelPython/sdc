@@ -48,7 +48,7 @@ from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype,
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.hiframes.pd_series_type import _get_series_array_type
 
-from sdc.hiframes.pd_dataframe_ext import get_columns_loc
+from sdc.hiframes.pd_dataframe_ext import get_structure_maps
 
 from .. import hstr_ext
 import llvmlite.binding as ll
@@ -65,7 +65,7 @@ def typeof_pd_dataframe(val, c):
     # TODO: support other types like string and timestamp
     col_types = get_hiframes_dtypes(val)
     index_type = _infer_index_type(val.index)
-    column_loc, _, _ = get_columns_loc(col_types, col_names)
+    column_loc, _, _ = get_structure_maps(col_types, col_names)
 
     return DataFrameType(col_types, index_type, col_names, True, column_loc=column_loc)
 
@@ -90,35 +90,55 @@ def unbox_dataframe(typ, val, c):
     # create dataframe struct and store values
     dataframe = cgutils.create_struct_proxy(typ)(c.context, c.builder)
 
+    errorptr = cgutils.alloca_once_value(c.builder, cgutils.false_bit)
+
     col_list_type = types.List(string_type)
-    _, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, col_list_type, n_cols)
+    ok, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, col_list_type, n_cols)
     inst.size = c.context.get_constant(types.intp, n_cols)
-    for i, column_str in enumerate(column_strs):
-        inst.setitem(c.context.get_constant(types.intp, i), column_str, incref=True)
 
-    dataframe.columns = inst.value
+    with c.builder.if_else(ok, likely=True) as (if_ok, if_not_ok):
+        with if_ok:
+            for i, column_str in enumerate(column_strs):
+                inst.setitem(c.context.get_constant(types.intp, i), column_str, incref=True)
+            dataframe.columns = inst.value
 
-    _, data_typs_map, types_order = get_columns_loc(typ.data, typ.columns)
+        with if_not_ok:
+            c.builder.store(cgutils.true_bit, errorptr)
+
+    # If an error occurred, drop the whole native list
+    with c.builder.if_then(c.builder.load(errorptr)):
+        c.context.nrt.decref(c.builder, col_list_type, inst.value)
+
+    _, data_typs_map, types_order = get_structure_maps(typ.data, typ.columns)
 
     for col_typ in types_order:
         type_id, col_indices = data_typs_map[col_typ]
         n_type_cols = len(col_indices)
         list_type = types.List(col_typ)
-        _, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, list_type, n_type_cols)
+        ok, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, list_type, n_type_cols)
         inst.size = c.context.get_constant(types.intp, n_type_cols)
 
-        for i, col_idx in enumerate(col_indices):
-            series_obj = c.pyapi.object_getattr_string(val, typ.columns[col_idx])
-            arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
-            ty_series = typ.data[col_idx]
-            if isinstance(ty_series, types.Array):
-                native_val = unbox_array(typ.data[col_idx], arr_obj, c)
-            elif ty_series == string_array_type:
-                native_val = unbox_str_series(string_array_type, series_obj, c)
+        with c.builder.if_else(ok, likely=True) as (if_ok, if_not_ok):
+            with if_ok:
+                for i, col_idx in enumerate(col_indices):
+                    series_obj = c.pyapi.object_getattr_string(val, typ.columns[col_idx])
+                    arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
+                    ty_series = typ.data[col_idx]
+                    if isinstance(ty_series, types.Array):
+                        native_val = unbox_array(typ.data[col_idx], arr_obj, c)
+                    elif ty_series == string_array_type:
+                        native_val = unbox_str_series(string_array_type, series_obj, c)
 
-            inst.setitem(c.context.get_constant(types.intp, i), native_val.value, incref=True)
+                    inst.setitem(c.context.get_constant(types.intp, i), native_val.value, incref=True)
 
-        dataframe.data = c.builder.insert_value(dataframe.data, inst.value, type_id)
+                dataframe.data = c.builder.insert_value(dataframe.data, inst.value, type_id)
+
+            with if_not_ok:
+                c.builder.store(cgutils.true_bit, errorptr)
+
+        # If an error occurred, drop the whole native list
+        with c.builder.if_then(c.builder.load(errorptr)):
+            c.context.nrt.decref(c.builder, list_type, inst.value)
 
     # TODO: support unboxing index
     if typ.index == types.none:
