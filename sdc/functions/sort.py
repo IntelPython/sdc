@@ -5,18 +5,23 @@ from numba.core import cgutils
 from numba import typed
 import ctypes as ct
 
-lib = ct.CDLL('./libsort.so')
+from sdc import concurrent_sort
 
 def bind(sym, sig):
     # Returns ctypes binding to symbol sym with signature sig
-    addr = getattr(lib, sym)
+    addr = getattr(concurrent_sort, sym)
     return ct.cast(addr, sig)
 
+parallel_sort_arithm_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_uint64)
 
 parallel_sort_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_uint64,
                                ct.c_uint64, ct.c_void_p,)
+
 parallel_sort_sym = bind('parallel_sort',
                          parallel_sort_sig)
+
+parallel_stable_sort_sym = bind('parallel_stable_sort',
+                                parallel_sort_sig)
 
 parallel_sort_t_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_uint64)
 
@@ -140,25 +145,8 @@ def load_symbols(name, sig, types):
     return result
 
 
-sort_map = load_symbols('parallel_sort', parallel_sort_f64_sig, types_to_postfix)
-
-
-@intrinsic
-def list_payload(tyctx, lst):
-    sig = types.voidptr(lst)
-
-    def codegen(cgctx, builder, sig, args):
-        _lst, = args
-        # get a struct proxy
-        proxy = cgutils.create_struct_proxy(sig.args[0])
-
-        # create a struct instance based on the incoming list
-        list_struct = proxy(cgctx, builder, value=_lst)
-
-        return list_struct.data
-
-    return sig, codegen
-
+sort_map = load_symbols('parallel_sort', parallel_sort_arithm_sig, types_to_postfix)
+stable_sort_map = load_symbols('parallel_stable_sort', parallel_sort_arithm_sig, types_to_postfix)
 
 @intrinsic
 def list_itemsize(tyctx, list_ty):
@@ -200,19 +188,49 @@ def parallel_sort(arr):
 
 
 @overload(parallel_sort)
-def parallel_sort_impl_overload(arr):
+def parallel_sort_overload(arr):
+
+    if not isinstance(arr, types.Array):
+        raise NotImplementedError
+
     dt = arr.dtype
 
     if dt in types_to_postfix.keys():
         sort_f = sort_map[dt]
 
-        def parallel_sort_t_impl(arr):
+        def parallel_sort_arithm_impl(arr):
             return sort_f(arr.ctypes, len(arr))
 
-        return parallel_sort_t_impl
+        return parallel_sort_arithm_impl
 
     def parallel_sort_impl(arr):
         item_size = itemsize(arr)
         return parallel_sort_sym(arr.ctypes, len(arr), item_size, adaptor(arr[0], arr[0]))
 
     return parallel_sort_impl
+
+def parallel_stable_sort(arr):
+    pass
+
+
+@overload(parallel_stable_sort)
+def parallel_stable_sort_overload(arr):
+
+    if not isinstance(arr, types.Array):
+        raise NotImplementedError
+
+    dt = arr.dtype
+
+    if dt in types_to_postfix.keys():
+        sort_f = stable_sort_map[dt]
+
+        def parallel_stable_sort_arithm_impl(arr):
+            return sort_f(arr.ctypes, len(arr))
+
+        return parallel_stable_sort_arithm_impl
+
+    def parallel_stable_sort_impl(arr):
+        item_size = itemsize(arr)
+        return parallel_stable_sort_sym(arr.ctypes, len(arr), item_size, adaptor(arr[0], arr[0]))
+
+    return parallel_stable_sort_impl

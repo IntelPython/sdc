@@ -36,6 +36,7 @@ from sdc.str_ext import std_str_to_unicode, unicode_to_std_str
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
 from sdc.functions import numpy_like
+from sdc.functions import sort
 
 
 class TestArrays(TestCase):
@@ -299,6 +300,27 @@ class TestArrays(TestCase):
             a = np.array(case)
             with self.subTest(data=case):
                 np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
+
+    def test_sort(self):
+        numpy.random.seed(0)
+
+        array0 = np.ranf(10**4)
+        array1 = np.empty_like(array0)
+        for i in range(len(array0)):
+            array1[i] = array0[i]
+
+        def ref_impl(a):
+            return np.sort(a)
+
+        def sdc_impl(a):
+            return sort.parallel_sort(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        ref_impl(array0)
+        sdc_func(array1)
+
+        np.testing.assert_array_equal(array0, array1)
 
 
 class TestArrayReductions(TestCase):

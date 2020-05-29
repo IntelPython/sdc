@@ -28,6 +28,7 @@
 from setuptools import setup, Extension, find_packages, Command
 import platform
 import os
+import sys
 from docs.source.buildscripts.sdc_build_doc import SDCBuildDoc
 
 
@@ -70,9 +71,46 @@ except ImportError:
 else:
     _has_pyarrow = True
 
+# Copypaste from numba
+def check_file_at_path(path2file):
+    """
+    Takes a list as a path, a single glob (*) is permitted as an entry which
+    indicates that expansion at this location is required (i.e. version
+    might not be known).
+    """
+    found = None
+    path2check = [os.path.split(os.path.split(sys.executable)[0])[0]]
+    path2check += [os.getenv(n, '') for n in ['CONDA_PREFIX', 'PREFIX']]
+    if sys.platform.startswith('win'):
+        path2check += [os.path.join(p, 'Library') for p in path2check]
+    for p in path2check:
+        if p:
+            if '*' in path2file:
+                globloc = path2file.index('*')
+                searchroot = os.path.join(*path2file[:globloc])
+                try:
+                    potential_locs = os.listdir(os.path.join(p, searchroot))
+                except BaseException:
+                    continue
+                searchfor = path2file[globloc + 1:]
+                for x in potential_locs:
+                    potpath = os.path.join(p, searchroot, x, *searchfor)
+                    if os.path.isfile(potpath):
+                        found = p  # the latest is used
+            elif os.path.isfile(os.path.join(p, *path2file)):
+                found = p  # the latest is used
+    return found
+
+# Search for Intel TBB, first check env var TBBROOT then conda locations
+tbb_root = os.getenv('TBBROOT')
+if not tbb_root:
+    tbb_root = check_file_at_path(['include', 'tbb', 'tbb.h'])
+
+print("tbb_root", tbb_root)
+
 ind = [PREFIX_DIR + '/include', ]
 lid = [PREFIX_DIR + '/lib', ]
-eca = ['-std=c++11', ]  # '-g', '-O0']
+eca = ['-std=c++11', "-O3"]  # '-g', '-O0']
 ela = ['-std=c++11', ]
 
 io_libs = []
@@ -125,6 +163,27 @@ ext_set = Extension(name="sdc.hset_ext",
                     library_dirs=lid,
                     )
 
+ext_sort = Extension(name="sdc.concurrent_sort",
+                     sources=[
+                        "sdc/native/sort.cpp",
+                        "sdc/native/stable_sort.cpp",
+                        "sdc/native/module.cpp",
+                        "sdc/native/utils.cpp"],
+                     extra_compile_args=eca,
+                     extra_link_args=ela,
+                     libraries=['tbb'],
+                     include_dirs=ind + ["sdc/native/", os.path.join(tbb_root, 'include')],
+                     library_dirs=lid + [
+                        # for Linux
+                        os.path.join(tbb_root, 'lib', 'intel64', 'gcc4.4'),
+                        # for MacOS
+                        os.path.join(tbb_root, 'lib'),
+                        # for Windows
+                        os.path.join(tbb_root, 'lib', 'intel64', 'vc_mt'),
+                     ],
+                     language="c++"
+                     )
+
 str_libs = np_compile_args['libraries']
 
 ext_str = Extension(name="sdc.hstr_ext",
@@ -160,7 +219,7 @@ ext_parquet = Extension(name="sdc.parquet_cpp",
                         library_dirs=lid,
                         )
 
-_ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq]
+_ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq, ext_sort]
 
 # Support of Parquet is disabled because HPAT pipeline does not work now
 # if _has_pyarrow:

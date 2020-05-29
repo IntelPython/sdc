@@ -1,37 +1,38 @@
-#include <algorithm>
+#pragma once
+
 #include <cstdint>
+#include <algorithm>
 
-#include <vector>
-
-#include <iostream>
-#include <chrono>
-#include "tbb/parallel_sort.h"
-
-#define TBB_PREVIEW_GLOBAL_CONTROL 1
-#include "tbb/global_control.h"
-#include "tbb/task_scheduler_init.h"
-#include <stdexcept>
-
-extern "C"
-{
-    void parallel_sort(void* begin, uint64_t len, uint64_t size, void* compare);
-
-    void parallel_sort_i8(void* begin, uint64_t len);
-    void parallel_sort_u8(void* begin, uint64_t len);
-    void parallel_sort_i16(void* begin, uint64_t len);
-    void parallel_sort_u16(void* begin, uint64_t len);
-    void parallel_sort_i32(void* begin, uint64_t len);
-    void parallel_sort_u32(void* begin, uint64_t len);
-    void parallel_sort_i64(void* begin, uint64_t len);
-    void parallel_sort_u64(void* begin, uint64_t len);
-
-    void parallel_sort_f32(void* begin, uint64_t len);
-    void parallel_sort_f64(void* begin, uint64_t len);
-}
-
-namespace
+namespace utils
 {
 using quant = uint8_t;
+
+template<class T>
+inline T* advance(T* ptr, int64_t pos, int64_t size)
+{
+    (void)size;
+    return ptr + pos;
+}
+
+template<>
+inline void* advance(void* ptr, int64_t pos, int64_t size)
+{
+    return reinterpret_cast<quant*>(ptr) + pos*size;
+}
+
+template<class T>
+inline uint64_t distance(T* start, T* end, int64_t size)
+{
+    (void)size;
+    return end - start;
+}
+
+
+template<>
+inline uint64_t distance(void* start, void* end, int64_t size)
+{
+    return (reinterpret_cast<quant*>(end) - reinterpret_cast<quant*>(start))/size;
+}
 
 template<uint64_t item_size> struct exact_void_data_type;
 
@@ -69,7 +70,7 @@ struct void_range
     void_range(void* begin, uint64_t len, uint64_t size)
     {
         _begin = begin;
-        _end   = reinterpret_cast<quant*>(begin) + len*size;
+        _end   = advance(begin, len, size);
         _size  = size;
     }
 
@@ -88,7 +89,7 @@ struct void_range
 
         iterator& operator ++()
         {
-            _ptr = static_cast<char*>(_ptr) + _size;
+            _ptr = advance(_ptr, 1, _size);
 
             return *this;
         }
@@ -96,14 +97,14 @@ struct void_range
         iterator operator ++(int)
         {
             iterator result(*this);
-            _ptr = static_cast<char*>(_ptr) + _size;
+            _ptr = advance(_ptr, 1, _size);
 
             return result;
         }
 
         iterator& operator --()
         {
-            _ptr = static_cast<char*>(_ptr) - _size;
+            _ptr = advance(_ptr, -1, _size);
 
             return *this;
         }
@@ -111,7 +112,7 @@ struct void_range
         iterator operator --(int)
         {
             iterator result(*this);
-            _ptr = static_cast<char*>(_ptr) - _size;
+            _ptr = advance(_ptr, -1, _size);
 
             return result;
         }
@@ -128,12 +129,12 @@ struct void_range
 
         size_t operator - (const iterator& other) const
         {
-            return (reinterpret_cast<quant*>(_ptr) - reinterpret_cast<quant*>(other._ptr))/_size;
+            return distance(other._ptr, _ptr, _size);
         }
 
         iterator& operator += (difference_type shift)
         {
-            _ptr = reinterpret_cast<quant*>(_ptr) + shift*_size;
+            _ptr = advance(_ptr, shift, _size);
             return *this;
         }
 
@@ -282,80 +283,47 @@ void swap(void_data<size> a, void_data<size> b)
     copy(tmp, b);
 }
 
-} // namespace
-
-template<typename T>
-void parallel_sort_(void* begin, uint64_t len)
+template<class T>
+T* upper_bound(T* first, T* last, T* value, int size, int item_size, void* compare)
 {
-    std::cout << "parallel_sort_" << " " << len << std::endl;
-    auto _begin = reinterpret_cast<T*>(begin);
-    auto _end   = _begin + len;
+    T* it = nullptr;
+    auto count = size;
 
-    for(int i = 0; i < len; ++i)
-        std::cout << (int64_t)(_begin[i]) << " ";
+    auto less = reinterpret_cast<compare_func>(compare);
 
-    std::cout << std::endl;
-    tbb::parallel_sort(_begin, _end);
-}
-
-#define declare_sort(prefix, ty) \
-void parallel_sort_##prefix(void* begin, uint64_t len) { parallel_sort_<ty>(begin, len); }
-
-#define declare_int_sort(bits) \
-declare_sort(i##bits, int##bits##_t) \
-declare_sort(u##bits, uint##bits##_t)
-
-declare_int_sort(8)
-declare_int_sort(16)
-declare_int_sort(32)
-declare_int_sort(64)
-
-declare_sort(f32, float)
-declare_sort(f64, double)
-
-#undef declare_int_sort
-#undef declare_sort
-
-void parallel_sort(void* begin, uint64_t len, uint64_t size, void* compare)
-{
-    auto compare_f = reinterpret_cast<compare_func>(compare);
-
-#define run_sort(range_type) \
-{ \
-    auto range  = range_type(begin, len, size); \
-    auto _begin = range.begin(); \
-    auto _end   = range.end(); \
-    tbb::parallel_sort(_begin, _end, compare_f); \
-}
-
-    switch(size)
+    if (less)
     {
-    case 1:
-        run_sort(exact_void_range<1>);
-        break;
-    case 2:
-        run_sort(exact_void_range<2>);
-        break;
-    case 4:
-        run_sort(exact_void_range<4>);
-        break;
-    case 8:
-        run_sort(exact_void_range<8>);
-        break;
-    default:
-        // fallback to c qsort?
-        if      (size < 4)    run_sort(_void_range<4>)
-        else if (size < 8)    run_sort(_void_range<8>)
-        else if (size < 16)   run_sort(_void_range<16>)
-        else if (size < 32)   run_sort(_void_range<32>)
-        else if (size < 64)   run_sort(_void_range<64>)
-        else if (size < 128)  run_sort(_void_range<128>)
-        else if (size < 256)  run_sort(_void_range<256>)
-        else if (size < 512)  run_sort(_void_range<512>)
-        else if (size < 1024) run_sort(_void_range<1024>)
-        else throw std::runtime_error(std::string("Unsupported item size " + size));
-        break;
+        while (count > 0) {
+            it = first;
+            auto step = count / 2;
+            it = advance(it, step, item_size);
+            if (!less(value, it)) {
+                first = advance(it, 1, item_size);
+                count -= step + 1;
+            }
+            else
+                count = step;
+        }
+    }
+    else
+    {
+        while (count > 0) {
+            it = first;
+            auto step = count / 2;
+            it = advance(it, step, item_size);
+            if (!(*value < *it)) {
+                first = advance(it, 1, item_size);
+                count -= step + 1;
+            }
+            else
+                count = step;
+        }
     }
 
-#undef run_sort
+    return first;
 }
+
+template<>
+void* upper_bound(void* first, void* last, void* value, int size, int item_size, void* compare);
+
+} // namespace
