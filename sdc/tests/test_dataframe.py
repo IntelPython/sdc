@@ -156,7 +156,7 @@ class TestDataFrame(TestCase):
         c = 2
         pd.testing.assert_frame_equal(hpat_func(A, B, c), test_impl(A, B, c))
 
-    @dfRefactoringNotImplemented
+    @unittest.skip('Implement feature to create DataFrame without column names')
     def test_create_without_column_names(self):
         def test_impl():
             df = pd.DataFrame([100, 200, 300, 400, 200, 100])
@@ -2658,7 +2658,6 @@ class TestDataFrame(TestCase):
         self.assertTrue(isinstance(two, np.ndarray))
         self.assertTrue(isinstance(three, np.ndarray))
 
-    @dfRefactoringNotImplemented
     def test_df_len(self):
         def test_impl(df):
             return len(df)

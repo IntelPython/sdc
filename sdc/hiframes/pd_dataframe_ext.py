@@ -160,7 +160,7 @@ def df_len_overload(df):
 
     if len(df.columns) == 0:  # empty df
         return lambda df: 0
-    return lambda df: len(df._data[0])
+    return lambda df: len(df._data[0][0])
 
 
 # handle getitem for Tuples because sometimes df._data[i] in
