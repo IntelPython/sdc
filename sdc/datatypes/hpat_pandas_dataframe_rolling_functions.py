@@ -212,7 +212,9 @@ def gen_df_rolling_method_other_none_codegen(rewrite_name=None):
                 f'    raise ValueError("Method rolling.{_method_name}(). The object pairwise\\n expected: False")'
             ]
         method_params = args + ['{}={}'.format(k, k) for k in kwargs if k != 'other']
-        func_lines += df_rolling_method_main_codegen(method_params, self.data.columns, method_name)
+        func_lines += df_rolling_method_main_codegen(method_params, self.data.columns, self.data.column_loc,
+                                                     method_name)
+
         func_text = '\n'.join(func_lines)
 
         global_vars = {'pandas': pandas}
