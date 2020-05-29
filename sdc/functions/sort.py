@@ -3,6 +3,7 @@ from numba.extending import intrinsic, overload
 from numba import types
 from numba.core import cgutils
 from numba import typed
+from numba import config
 import ctypes as ct
 
 from sdc import concurrent_sort
@@ -26,6 +27,11 @@ parallel_stable_sort_sym = bind('parallel_stable_sort',
                                 parallel_sort_sig)
 
 parallel_sort_t_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_uint64)
+
+set_threads_count_sig = ct.CFUNCTYPE(None, ct.c_uint64)
+set_threads_count_sym = bind('set_number_of_threads', set_threads_count_sig)
+
+set_threads_count_sym(config.NUMBA_NUM_THREADS)
 
 
 def less(left, right):

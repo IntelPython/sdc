@@ -1,5 +1,6 @@
 #include <Python.h>
 #include <cstdint>
+#include "utils.hpp"
 
 extern "C"
 {
@@ -30,6 +31,11 @@ extern "C"
 
     void parallel_stable_sort_f32(void* begin, uint64_t len);
     void parallel_stable_sort_f64(void* begin, uint64_t len);
+
+    void set_number_of_threads(uint64_t threads)
+    {
+        utils::set_threads_num(threads);
+    }
 }
 
 PyMODINIT_FUNC PyInit_concurrent_sort()
@@ -75,6 +81,8 @@ PyMODINIT_FUNC PyInit_concurrent_sort()
 
     REGISTER(parallel_stable_sort_f32)
     REGISTER(parallel_stable_sort_f64)
+
+    REGISTER(set_number_of_threads)
 #undef REGISTER
     return m;
 }

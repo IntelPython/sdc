@@ -6,6 +6,9 @@
 
 using namespace utils;
 
+namespace
+{
+
 template<typename T>
 void parallel_sort_(void* begin, uint64_t len)
 {
@@ -14,6 +17,8 @@ void parallel_sort_(void* begin, uint64_t len)
 
     tbb::parallel_sort(_begin, _end);
 }
+
+} // namespace
 
 #define declare_sort(prefix, ty) \
 void parallel_sort_##prefix(void* begin, uint64_t len) { parallel_sort_<ty>(begin, len); }
@@ -42,7 +47,10 @@ void parallel_sort(void* begin, uint64_t len, uint64_t size, void* compare)
     auto range  = range_type(begin, len, size); \
     auto _begin = range.begin(); \
     auto _end   = range.end(); \
-    tbb::parallel_sort(_begin, _end, compare_f); \
+    utils::get_arena().execute([&]() \
+    { \
+        tbb::parallel_sort(_begin, _end, compare_f); \
+    }); \
 }
 
     switch(size)

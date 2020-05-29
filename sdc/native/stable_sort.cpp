@@ -288,7 +288,12 @@ void parallel_stable_sort_(T* data, int size, int item_size, void* compare)
 {
     std::unique_ptr<quant[]> temp(new quant[size*item_size]);
 
-    auto result = stable_sort_impl<T>(data, reinterpret_cast<T*>(temp.get()), 0, size, item_size, compare);
+    T* result = nullptr;
+
+    get_arena().execute([&]()
+    {
+        result = stable_sort_impl<T>(data, reinterpret_cast<T*>(temp.get()), 0, size, item_size, compare);
+    });
 
     if (reinterpret_cast<quant*>(result) == temp.get())
     {

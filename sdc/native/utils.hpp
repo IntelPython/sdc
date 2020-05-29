@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <algorithm>
+#include "tbb/task_arena.h"
 
 namespace utils
 {
@@ -325,5 +326,9 @@ T* upper_bound(T* first, T* last, T* value, int size, int item_size, void* compa
 
 template<>
 void* upper_bound(void* first, void* last, void* value, int size, int item_size, void* compare);
+
+tbb::task_arena& get_arena();
+
+void set_threads_num(uint64_t);
 
 } // namespace

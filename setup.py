@@ -108,9 +108,6 @@ tbb_root = os.getenv('TBBROOT')
 if not tbb_root:
     tbb_root = check_file_at_path(['include', 'tbb', 'tbb.h'])
 
-if tbb_root is None:
-    raise RuntimeError("tbb headers were not found. Try to install tbb-devel package")
-
 ind = [PREFIX_DIR + '/include', ]
 lid = [PREFIX_DIR + '/lib', ]
 eca = ['-std=c++11', "-O3"]  # '-g', '-O0']

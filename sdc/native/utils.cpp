@@ -26,4 +26,19 @@ void* upper_bound(void* first, void* last, void* value, int size, int item_size,
     return first;
 }
 
+tbb::task_arena& get_arena()
+{
+    static tbb::task_arena arena;
+
+    if (!arena.is_active())
+        arena.initialize();
+
+    return arena;
+}
+
+void set_threads_num(uint64_t threads)
+{
+    get_arena().initialize(threads);
+}
+
 }
