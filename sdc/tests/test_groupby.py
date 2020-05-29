@@ -84,7 +84,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(result, result_ref)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_by_all_dtypes(self):
         def test_impl(df):
             return df.groupby('A').count()
@@ -105,7 +104,6 @@ class TestGroupBy(TestCase):
                 pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_sort(self):
         def test_impl(df, param):
             return df.groupby('A', sort=param).min()
@@ -128,7 +126,6 @@ class TestGroupBy(TestCase):
                 pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_count(self):
         def test_impl(df):
             return df.groupby('A').count()
@@ -159,7 +156,6 @@ class TestGroupBy(TestCase):
 
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_max(self):
         def test_impl(df):
             return df.groupby('A').max()
@@ -192,7 +188,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_min(self):
         def test_impl(df):
             return df.groupby('A').min()
@@ -225,7 +220,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_mean(self):
         def test_impl(df):
             return df.groupby('A').mean()
@@ -255,7 +249,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_median(self):
         def test_impl(df):
             return df.groupby('A').median()
@@ -302,7 +295,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_prod(self):
         def test_impl(df):
             return df.groupby('A').prod()
@@ -365,7 +357,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_std(self):
         def test_impl(df):
             return df.groupby('A').std()
@@ -395,7 +386,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_var(self):
         def test_impl(df):
             return df.groupby('A').var()
@@ -835,7 +825,6 @@ class TestGroupBy(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_dataframe_groupby_getitem_literal_tuple(self):
         def test_impl(df):
             return df.groupby('A')['B', 'C'].count()

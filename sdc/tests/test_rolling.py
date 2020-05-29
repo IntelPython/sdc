@@ -881,7 +881,6 @@ class TestRolling(TestCase):
         self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('DataFrame.rolling.min() unsupported exceptions')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_unsupported_values(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -900,7 +899,6 @@ class TestRolling(TestCase):
         self._test_rolling_unsupported_types(df)
 
     @skip_sdc_jit('DataFrame.rolling.apply() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_apply_mean(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -946,7 +944,6 @@ class TestRolling(TestCase):
         self._test_rolling_apply_unsupported_types(df)
 
     @unittest.skip('DataFrame.rolling.apply() unsupported args')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_apply_args(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -960,7 +957,6 @@ class TestRolling(TestCase):
         self._test_rolling_apply_args(df)
 
     @skip_sdc_jit('DataFrame.rolling.corr() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_corr(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1008,7 +1004,6 @@ class TestRolling(TestCase):
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.corr() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_corr_no_other(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1031,7 +1026,6 @@ class TestRolling(TestCase):
         self._test_rolling_corr_unsupported_types(df)
 
     @skip_sdc_jit('DataFrame.rolling.corr() unsupported exceptions')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_corr_unsupported_values(self):
         def test_impl(df, other, pairwise):
             return df.rolling(3, 3).corr(other=other, pairwise=pairwise)
@@ -1053,7 +1047,6 @@ class TestRolling(TestCase):
         self.assertIn(msg_tmpl.format('False, None'), str(raises.exception))
 
     @skip_sdc_jit('DataFrame.rolling.count() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_count(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -1081,7 +1074,6 @@ class TestRolling(TestCase):
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.cov() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_cov(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1130,7 +1122,6 @@ class TestRolling(TestCase):
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.cov() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_cov_no_other(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1153,7 +1144,6 @@ class TestRolling(TestCase):
         self._test_rolling_cov_unsupported_types(df)
 
     @skip_sdc_jit('DataFrame.rolling.cov() unsupported exceptions')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_cov_unsupported_values(self):
         def test_impl(df, other, pairwise):
             return df.rolling(3, 3).cov(other=other, pairwise=pairwise)
@@ -1206,7 +1196,6 @@ class TestRolling(TestCase):
         pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.kurt() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_kurt(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -1234,7 +1223,6 @@ class TestRolling(TestCase):
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.max() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_max(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -1262,7 +1250,6 @@ class TestRolling(TestCase):
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.mean() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_mean(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1294,7 +1281,6 @@ class TestRolling(TestCase):
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.median() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_median(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -1322,7 +1308,6 @@ class TestRolling(TestCase):
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.min() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_min(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -1367,7 +1352,6 @@ class TestRolling(TestCase):
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     @skip_sdc_jit('DataFrame.rolling.quantile() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_quantile(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1410,7 +1394,6 @@ class TestRolling(TestCase):
         self._test_rolling_quantile_exception_unsupported_types(df)
 
     @skip_sdc_jit('DataFrame.rolling.quantile() unsupported exceptions')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_quantile_exception_unsupported_values(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)
@@ -1420,7 +1403,6 @@ class TestRolling(TestCase):
         self._test_rolling_quantile_exception_unsupported_values(df)
 
     @skip_sdc_jit('DataFrame.rolling.skew() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_skew(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -1448,7 +1430,6 @@ class TestRolling(TestCase):
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.std() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_std(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1490,7 +1471,6 @@ class TestRolling(TestCase):
         self._test_rolling_std_exception_unsupported_ddof(df)
 
     @skip_sdc_jit('DataFrame.rolling.sum() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_sum(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1522,7 +1502,6 @@ class TestRolling(TestCase):
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.var() unsupported')
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_df_rolling_var(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
