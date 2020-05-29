@@ -99,7 +99,7 @@ def unbox_dataframe(typ, val, c):
         with if_ok:
             inst.size = c.context.get_constant(types.intp, n_cols)
             for i, column_str in enumerate(column_strs):
-                inst.setitem(c.context.get_constant(types.intp, i), column_str, incref=True)
+                inst.setitem(c.context.get_constant(types.intp, i), column_str, incref=False)
             dataframe.columns = inst.value
 
         with if_not_ok:
@@ -129,7 +129,7 @@ def unbox_dataframe(typ, val, c):
                     elif ty_series == string_array_type:
                         native_val = unbox_str_series(string_array_type, series_obj, c)
 
-                    inst.setitem(c.context.get_constant(types.intp, i), native_val.value, incref=True)
+                    inst.setitem(c.context.get_constant(types.intp, i), native_val.value, incref=False)
 
                 dataframe.data = c.builder.insert_value(dataframe.data, inst.value, type_id)
 
