@@ -156,6 +156,7 @@ class TestDataFrame(TestCase):
         c = 2
         pd.testing.assert_frame_equal(hpat_func(A, B, c), test_impl(A, B, c))
 
+    @dfRefactoringNotImplemented
     def test_create_without_column_names(self):
         def test_impl():
             df = pd.DataFrame([100, 200, 300, 400, 200, 100])
@@ -1404,6 +1405,7 @@ class TestDataFrame(TestCase):
         sdc_func = sdc.jit(test_impl)
         pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
+    @dfRefactoringNotImplemented
     def test_df_loc_str(self):
         def test_impl(df):
             return df.loc['c']
@@ -1415,6 +1417,7 @@ class TestDataFrame(TestCase):
                            "C": ['3.1', '8.4', '7.1', '3.2', '1']}, index=idx)
         pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
+    @dfRefactoringNotImplemented
     def test_df_loc_no_idx(self):
         def test_impl(df):
             return df.loc[2]
@@ -2655,6 +2658,7 @@ class TestDataFrame(TestCase):
         self.assertTrue(isinstance(two, np.ndarray))
         self.assertTrue(isinstance(three, np.ndarray))
 
+    @dfRefactoringNotImplemented
     def test_df_len(self):
         def test_impl(df):
             return len(df)
@@ -2705,6 +2709,7 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @dfRefactoringNotImplemented
     def test_df_iterate_over_columns2(self):
         """ Verifies iteration over unboxed df columns using literal unroll. """
         from sdc.hiframes.api import get_nan_mask
