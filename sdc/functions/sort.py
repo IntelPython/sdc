@@ -146,7 +146,7 @@ def load_symbols(name, sig, types):
     result = {}
 
     func_text = '\n'.join([f"result[{typ}] = bind('{name}_{pstfx}', sig)" for typ, pstfx in types.items()])
-    glbls = {f'{typ}' : typ for typ in types.keys()}
+    glbls = {f'{typ}': typ for typ in types.keys()}
     glbls.update({'result': result, 'sig': sig, 'bind': bind})
     exec(func_text, glbls)
 

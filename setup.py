@@ -71,6 +71,7 @@ except ImportError:
 else:
     _has_pyarrow = True
 
+
 # Copypaste from numba
 def check_file_at_path(path2file):
     """
@@ -100,6 +101,7 @@ def check_file_at_path(path2file):
             elif os.path.isfile(os.path.join(p, *path2file)):
                 found = p  # the latest is used
     return found
+
 
 # Search for Intel TBB, first check env var TBBROOT then conda locations
 tbb_root = os.getenv('TBBROOT')
