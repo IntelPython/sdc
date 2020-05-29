@@ -202,11 +202,49 @@ void stable_sort_inner_sort<void>(void* data, int begin, int end, int item_size,
         abort();
     }
 
-    auto range  = void_range<8, void_data<8>>(data, end, item_size);
-    auto _begin = range.begin() + begin;
-    auto _end   = range.end();
+    // TODO move this dispatch to upper level
+#define run_sort(range_type) \
+{ \
+    auto range  = range_type(data, end, item_size); \
+    auto _begin = range.begin() + begin; \
+    auto _end   = range.end(); \
+    std::stable_sort(_begin, _end, less); \
+}
 
-    std::stable_sort(_begin, _end, less);
+    switch(item_size)
+    {
+    case 1:
+        run_sort(exact_void_range<1>);
+        break;
+    case 2:
+        run_sort(exact_void_range<2>);
+        break;
+    case 4:
+        run_sort(exact_void_range<4>);
+        break;
+    case 8:
+        run_sort(exact_void_range<8>);
+        break;
+    default:
+        // fallback to own implementation?
+        if      (item_size < 4)    run_sort(_void_range<4>)
+        else if (item_size < 8)    run_sort(_void_range<8>)
+        else if (item_size < 16)   run_sort(_void_range<16>)
+        else if (item_size < 32)   run_sort(_void_range<32>)
+        else if (item_size < 64)   run_sort(_void_range<64>)
+        else if (item_size < 128)  run_sort(_void_range<128>)
+        else if (item_size < 256)  run_sort(_void_range<256>)
+        else if (item_size < 512)  run_sort(_void_range<512>)
+        else if (item_size < 1024) run_sort(_void_range<1024>)
+        else
+        {
+            std::cout << "Unsupported item size " << item_size << std::endl;
+            abort();
+        }
+        break;
+    }
+
+#undef run_sort
 }
 
 template<class T>
@@ -273,6 +311,9 @@ void parallel_stable_sort_##prefix(void* begin, uint64_t len) { parallel_stable_
 declare_sort(i##bits, int##bits##_t) \
 declare_sort(u##bits, uint##bits##_t)
 
+extern "C"
+{
+
 declare_int_sort(8)
 declare_int_sort(16)
 declare_int_sort(32)
@@ -287,4 +328,6 @@ declare_sort(f64, double)
 void parallel_stable_sort(void* begin, uint64_t len, uint64_t size, void* compare)
 {
     parallel_stable_sort_<void>(begin, len, size, compare);
+}
+
 }

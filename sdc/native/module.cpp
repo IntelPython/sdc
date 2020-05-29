@@ -1,4 +1,5 @@
 #include <Python.h>
+#include <cstdint>
 
 extern "C"
 {
@@ -31,7 +32,7 @@ extern "C"
     void parallel_stable_sort_f64(void* begin, uint64_t len);
 }
 
-PyMODINIT_FUNC PyInit_sort()
+PyMODINIT_FUNC PyInit_concurrent_sort()
 {
     static struct PyModuleDef moduledef = {
         PyModuleDef_HEAD_INIT,

@@ -22,6 +22,9 @@ void parallel_sort_##prefix(void* begin, uint64_t len) { parallel_sort_<ty>(begi
 declare_sort(i##bits, int##bits##_t) \
 declare_sort(u##bits, uint##bits##_t)
 
+extern "C"
+{
+
 declare_int_sort(8)
 declare_int_sort(16)
 declare_int_sort(32)
@@ -79,4 +82,6 @@ void parallel_sort(void* begin, uint64_t len, uint64_t size, void* compare)
     }
 
 #undef run_sort
+}
+
 }

@@ -302,25 +302,62 @@ class TestArrays(TestCase):
                 np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
 
     def test_sort(self):
-        numpy.random.seed(0)
-
-        array0 = np.ranf(10**4)
-        array1 = np.empty_like(array0)
-        for i in range(len(array0)):
-            array1[i] = array0[i]
+        np.random.seed(0)
 
         def ref_impl(a):
             return np.sort(a)
 
         def sdc_impl(a):
-            return sort.parallel_sort(a)
+            sort.parallel_sort(a)
+            return a
 
         sdc_func = self.jit(sdc_impl)
 
-        ref_impl(array0)
-        sdc_func(array1)
+        float_array = np.random.ranf(10**2)
+        int_arryay = np.random.randint(0, 127, 10**2)
 
-        np.testing.assert_array_equal(array0, array1)
+        float_cases = ['float32', 'float64']
+        for case in float_cases:
+            array0 = float_array.astype(case)
+            array1 = np.copy(array0)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(ref_impl(array0), sdc_func(array1))
+
+        int_cases = ['int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64']
+        for case in int_cases:
+            array0 = int_arryay.astype(case)
+            array1 = np.copy(array0)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(ref_impl(array0), sdc_func(array1))
+
+    def test_stable_sort(self):
+        np.random.seed(0)
+
+        def ref_impl(a):
+            return np.sort(a)
+
+        def sdc_impl(a):
+            sort.parallel_stable_sort(a)
+            return a
+
+        sdc_func = self.jit(sdc_impl)
+
+        float_array = np.random.ranf(10**2)
+        int_arryay = np.random.randint(0, 127, 10**2)
+
+        float_cases = ['float32', 'float64']
+        for case in float_cases:
+            array0 = float_array.astype(case)
+            array1 = np.copy(array0)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(ref_impl(array0), sdc_func(array1))
+
+        int_cases = ['int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64']
+        for case in int_cases:
+            array0 = int_arryay.astype(case)
+            array1 = np.copy(array0)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(ref_impl(array0), sdc_func(array1))
 
 
 class TestArrayReductions(TestCase):
