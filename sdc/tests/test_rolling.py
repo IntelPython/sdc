@@ -41,8 +41,7 @@ from sdc.tests.test_base import TestCase
 from sdc.tests.test_series import gen_frand_array
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                   skip_numba_jit, skip_sdc_jit,
-                                  test_global_input_data_float64,
-                                  dfRefactoringNotImplemented)
+                                  test_global_input_data_float64)
 
 
 LONG_TEST = (int(os.environ['SDC_LONG_ROLLING_TEST']) != 0
