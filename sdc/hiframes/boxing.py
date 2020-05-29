@@ -33,7 +33,7 @@ import numba
 from numba.extending import (typeof_impl, unbox, register_model, models,
                              NativeValue, box, intrinsic)
 from numba import types
-from numba.core import cgutils
+from numba.core import cgutils, typing
 from numba.np import numpy_support
 from numba.core.typing import signature
 from numba.core.boxing import box_array, unbox_array, box_list
@@ -48,6 +48,8 @@ from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype,
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.hiframes.pd_series_type import _get_series_array_type
 
+from sdc.hiframes.pd_dataframe_ext import get_structure_maps
+
 from .. import hstr_ext
 import llvmlite.binding as ll
 from llvmlite import ir as lir
@@ -58,12 +60,14 @@ ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
 
 @typeof_impl.register(pd.DataFrame)
 def typeof_pd_dataframe(val, c):
+
     col_names = tuple(val.columns.tolist())
     # TODO: support other types like string and timestamp
     col_types = get_hiframes_dtypes(val)
     index_type = _infer_index_type(val.index)
+    column_loc, _, _ = get_structure_maps(col_types, col_names)
 
-    return DataFrameType(col_types, index_type, col_names, True)
+    return DataFrameType(col_types, index_type, col_names, True, column_loc=column_loc)
 
 
 # register series types for import
@@ -86,21 +90,55 @@ def unbox_dataframe(typ, val, c):
     # create dataframe struct and store values
     dataframe = cgutils.create_struct_proxy(typ)(c.context, c.builder)
 
-    column_tup = c.context.make_tuple(
-        c.builder, types.UniTuple(string_type, n_cols), column_strs)
+    errorptr = cgutils.alloca_once_value(c.builder, cgutils.false_bit)
 
-    # this unboxes all DF columns so that no column unboxing occurs later
-    for col_ind in range(n_cols):
-        series_obj = c.pyapi.object_getattr_string(val, typ.columns[col_ind])
-        arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
-        ty_series = typ.data[col_ind]
-        if isinstance(ty_series, types.Array):
-            native_val = unbox_array(typ.data[col_ind], arr_obj, c)
-        elif ty_series == string_array_type:
-            native_val = unbox_str_series(string_array_type, series_obj, c)
+    col_list_type = types.List(string_type)
+    ok, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, col_list_type, n_cols)
 
-        dataframe.data = c.builder.insert_value(
-            dataframe.data, native_val.value, col_ind)
+    with c.builder.if_else(ok, likely=True) as (if_ok, if_not_ok):
+        with if_ok:
+            inst.size = c.context.get_constant(types.intp, n_cols)
+            for i, column_str in enumerate(column_strs):
+                inst.setitem(c.context.get_constant(types.intp, i), column_str, incref=False)
+            dataframe.columns = inst.value
+
+        with if_not_ok:
+            c.builder.store(cgutils.true_bit, errorptr)
+
+    # If an error occurred, drop the whole native list
+    with c.builder.if_then(c.builder.load(errorptr)):
+        c.context.nrt.decref(c.builder, col_list_type, inst.value)
+
+    _, data_typs_map, types_order = get_structure_maps(typ.data, typ.columns)
+
+    for col_typ in types_order:
+        type_id, col_indices = data_typs_map[col_typ]
+        n_type_cols = len(col_indices)
+        list_type = types.List(col_typ)
+        ok, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, list_type, n_type_cols)
+
+        with c.builder.if_else(ok, likely=True) as (if_ok, if_not_ok):
+            with if_ok:
+                inst.size = c.context.get_constant(types.intp, n_type_cols)
+                for i, col_idx in enumerate(col_indices):
+                    series_obj = c.pyapi.object_getattr_string(val, typ.columns[col_idx])
+                    arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
+                    ty_series = typ.data[col_idx]
+                    if isinstance(ty_series, types.Array):
+                        native_val = unbox_array(typ.data[col_idx], arr_obj, c)
+                    elif ty_series == string_array_type:
+                        native_val = unbox_str_series(string_array_type, series_obj, c)
+
+                    inst.setitem(c.context.get_constant(types.intp, i), native_val.value, incref=False)
+
+                dataframe.data = c.builder.insert_value(dataframe.data, inst.value, type_id)
+
+            with if_not_ok:
+                c.builder.store(cgutils.true_bit, errorptr)
+
+        # If an error occurred, drop the whole native list
+        with c.builder.if_then(c.builder.load(errorptr)):
+            c.context.nrt.decref(c.builder, list_type, inst.value)
 
     # TODO: support unboxing index
     if typ.index == types.none:
@@ -113,7 +151,6 @@ def unbox_dataframe(typ, val, c):
         index_data = c.pyapi.object_getattr_string(index_obj, "_data")
         dataframe.index = unbox_array(typ.index, index_data, c).value
 
-    dataframe.columns = column_tup
     dataframe.parent = val
 
     # increase refcount of stored values
@@ -122,7 +159,7 @@ def unbox_dataframe(typ, val, c):
         for var in column_strs:
             c.context.nrt.incref(c.builder, string_type, var)
 
-    return NativeValue(dataframe._getvalue())
+    return NativeValue(dataframe._getvalue(), is_error=c.builder.load(errorptr))
 
 
 def get_hiframes_dtypes(df):
