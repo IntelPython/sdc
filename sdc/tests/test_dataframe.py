@@ -71,7 +71,6 @@ class TestDataFrame(TestCase):
 
     # TODO: Data generator for DataFrames
 
-    @dfRefactoringNotImplemented
     def test_create1(self):
         def test_impl(A, B):
             df = pd.DataFrame({'A': A, 'B': B})
@@ -108,7 +107,6 @@ class TestDataFrame(TestCase):
 
         self.assertEqual(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def test_create_with_series1(self):
         def test_impl(n):
             A = pd.Series(np.ones(n, dtype=np.int64))
@@ -132,7 +130,6 @@ class TestDataFrame(TestCase):
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
     @skip_sdc_jit
-    @dfRefactoringNotImplemented
     def test_create_string_index(self):
         def test_impl(a):
             data = {'A': ['a', 'b'], 'B': [2, 3]}
@@ -142,7 +139,6 @@ class TestDataFrame(TestCase):
         hpat_func = sdc.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(True), test_impl(True))
 
-    @dfRefactoringNotImplemented
     def test_create_cond1(self):
         def test_impl(A, B, c):
             if c:
@@ -230,7 +226,6 @@ class TestDataFrame(TestCase):
         do_check = False if platform.system() == 'Windows' and not IS_32BITS else True
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n), check_dtype=do_check)
 
-    @dfRefactoringNotImplemented
     def test_box2(self):
         def test_impl():
             df = pd.DataFrame({'A': [1, 2, 3], 'B': ['a', 'bb', 'ccc']})
@@ -972,7 +967,6 @@ class TestDataFrame(TestCase):
             with self.subTest(index=idx):
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_isna_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -1158,7 +1152,6 @@ class TestDataFrame(TestCase):
                 with self.subTest(index=idx, n=n, k=k):
                     pd.testing.assert_frame_equal(sdc_func(df, n, k), test_impl(df, n, k))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_iloc_slice_no_unboxing(self):
         def test_impl(n, k):
             df = pd.DataFrame({
@@ -1272,7 +1265,6 @@ class TestDataFrame(TestCase):
                 with self.subTest(index=idx, n=n):
                     pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_iloc_list_no_unboxing(self):
         def test_impl(n):
             df = pd.DataFrame({
@@ -1302,7 +1294,6 @@ class TestDataFrame(TestCase):
                 with self.subTest(index=idx, n=n):
                     pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_iloc_list_bool_no_unboxing(self):
         def test_impl(n):
             df = pd.DataFrame({
@@ -1417,7 +1408,6 @@ class TestDataFrame(TestCase):
                            "C": [3.1, 8.4, 7.1, 3.2, 1]}, index=idx)
         pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_loc_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -1477,7 +1467,6 @@ class TestDataFrame(TestCase):
                     )
                     pd.testing.assert_frame_equal(sdc_func(df), ref_impl(df))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_head_no_unboxing(self):
         def test_impl(n):
             df = pd.DataFrame({
@@ -1510,7 +1499,6 @@ class TestDataFrame(TestCase):
                 with self.subTest(index=idx, deep=deep):
                     pd.testing.assert_frame_equal(sdc_func(df, deep), test_impl(df, deep))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_copy_no_unboxing(self):
         def test_impl(idx, deep):
             df = pd.DataFrame({
@@ -1522,7 +1510,7 @@ class TestDataFrame(TestCase):
             return df.copy(deep=deep)
 
         sdc_impl = sdc.jit(test_impl)
-        indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e'], None]
+        indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e']]
         cases_deep = [None, True, False]
         for idx, deep in product(indexes, cases_deep):
             with self.subTest(index=idx, deep=deep):
@@ -1530,7 +1518,20 @@ class TestDataFrame(TestCase):
                 ref_result = test_impl(idx, deep)
                 pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
+    @unittest.expectedFailure
+    def test_df_copy_no_unboxing_none_index_error(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [3.2, np.nan, 7.0, 3.3, np.nan],
+                'B': [3, 4, 1, 0, 222],
+                'C': [True, True, False, False, True],
+                'D': ['a', 'dd', 'c', '12', None]
+            }, index=None)
+            return df.copy(deep=True)
+
+        sdc_impl = sdc.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_impl(), test_impl())
+
     def test_pct_change1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(n) + 1.0, 'B': np.arange(n) + 1})
@@ -1702,7 +1703,6 @@ class TestDataFrame(TestCase):
                 hpat_func = self.jit(test_impl)
                 pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_reset_index_drop_literal_index_int_no_unboxing(self):
         def gen_test_impl(drop):
             def test_impl():
@@ -1733,7 +1733,6 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_reset_index_drop_default_index_int_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -1830,20 +1829,17 @@ class TestDataFrame(TestCase):
                                   index=index)
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_drop_one_column(self):
         def test_impl(index):
-            df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
-                              index=index)
+            df = pd.DataFrame({
+                'A': [1.0, 2.0, np.nan, 1.0],
+                'B': [4, 5, 6, 7],
+                'C': [1.0, 2.0, np.nan, 1.0]
+            }, index=index)
             return df.drop(columns='A')
 
-        index_to_test = [[1, 2, 3, 4],
-                         [.1, .2, .3, .4],
-                         ['a', 'b', 'c', 'd']]
-
         sdc_func = self.jit(test_impl)
-
-        for index in index_to_test:
+        for index in [[1, 2, 3, 4], [.1, .2, .3, .4], ['a', 'b', 'c', 'd']]:
             with self.subTest(index=index):
                 pd.testing.assert_frame_equal(sdc_func(index), test_impl(index))
 
@@ -1872,7 +1868,6 @@ class TestDataFrame(TestCase):
                                   index=index)
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_drop_tuple_column(self):
         def gen_test_impl(do_jit=False):
             def test_impl(index):
@@ -2025,7 +2020,6 @@ class TestDataFrame(TestCase):
         sdc_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(sdc_func(df, arr), test_impl(df, arr))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_getitem_bool_array_even_idx_no_unboxing(self):
         def test_impl(arr):
             df = pd.DataFrame({
@@ -2124,7 +2118,6 @@ class TestDataFrame(TestCase):
         sdc_func = self.jit(test_impl)
         pd.testing.assert_series_equal(sdc_func('A'), test_impl('A'))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_getitem_slice_idx_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -2135,9 +2128,8 @@ class TestDataFrame(TestCase):
             return df[1:3]
 
         sdc_func = self.jit(test_impl)
-        pd.testing.assert_series_equal(sdc_func(), test_impl())
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_getitem_unbox_slice_idx_no_unboxing(self):
         def test_impl(start, end):
             df = pd.DataFrame({
@@ -2148,9 +2140,8 @@ class TestDataFrame(TestCase):
             return df[start:end]
 
         sdc_func = self.jit(test_impl)
-        pd.testing.assert_series_equal(sdc_func(1, 3), test_impl(1, 3))
+        pd.testing.assert_frame_equal(sdc_func(1, 3), test_impl(1, 3))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_getitem_tuple_idx_no_unboxing(self):
         def gen_test_impl(do_jit=False):
             def test_impl():
@@ -2168,9 +2159,8 @@ class TestDataFrame(TestCase):
 
         test_impl = gen_test_impl()
         sdc_func = self.jit(gen_test_impl(do_jit=True))
-        pd.testing.assert_series_equal(sdc_func(), test_impl())
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_df_getitem_bool_series_idx_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -2181,7 +2171,7 @@ class TestDataFrame(TestCase):
             return df[df['A'] == -1.]
 
         sdc_func = self.jit(test_impl)
-        pd.testing.assert_series_equal(sdc_func(), test_impl())
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
     @skip_sdc_jit('DF.getitem unsupported Series name')
     @dfRefactoringNotImplemented
@@ -2279,7 +2269,6 @@ class TestDataFrame(TestCase):
         df2.A[n // 2:] = n
         pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_append_df_same_cols_no_index_no_unboxing(self):
         def test_impl():
             n = 11
@@ -2288,8 +2277,14 @@ class TestDataFrame(TestCase):
             df2.A[n // 2:] = n
             return df.append(df2, ignore_index=True)
 
-        sdc_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+        sdc_impl = self.jit(test_impl)
+
+        kwargs = {}
+        if platform.system() == 'Windows':
+            # Attribute "dtype" are different on windows int64 vs int32
+            kwargs['check_dtype'] = False
+
+        pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
     @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_append_df_same_cols_index_default(self):
@@ -2318,20 +2313,23 @@ class TestDataFrame(TestCase):
 
         pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
 
-    @dfRefactoringNotImplemented  # required re-implementing DataFrame boxing
     def test_append_df_diff_cols_index_ignore_false_no_unboxing(self):
         def test_impl():
             n1 = 11
             n2 = n1 * 2
-            df = pd.DataFrame({'A': np.arange(n1), 'B': np.arange(n1) ** 2},
-                              index=np.arange(n1) ** 4)
-            df2 = pd.DataFrame({'C': np.arange(n2), 'D': np.arange(n2) ** 2,
-                                'E S D': np.arange(n2) + 100},
-                               index=np.arange(n2) ** 8)
+            df = pd.DataFrame({
+                'A': np.arange(n1), 'B': np.arange(n1) ** 2
+            }, index=np.arange(n1) ** 2)
+            df2 = pd.DataFrame({
+                'C': np.arange(n2), 'D': np.arange(n2) ** 2,
+                'E S D': np.arange(n2) + 100
+            }, index=np.arange(n2) ** 4)
             return df.append(df2, ignore_index=False)
 
         sdc_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+        res_jit = sdc_func()
+        res_ref = test_impl()
+        pd.testing.assert_frame_equal(res_jit, res_ref)
 
     @dfRefactoringNotImplemented  # required re-implementing DataFrame unboxing
     def test_append_df_diff_cols_index_ignore_index(self):

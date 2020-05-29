@@ -239,15 +239,10 @@ def box_dataframe(typ, val, c):
     context = c.context
     builder = c.builder
 
-    n_cols = len(typ.columns)
     col_names = typ.columns
     arr_typs = typ.data
-    dtypes = [a.dtype for a in arr_typs]  # TODO: check Categorical
 
     dataframe = cgutils.create_struct_proxy(typ)(context, builder, value=val)
-    col_arrs = [builder.extract_value(dataframe.data, i) for i in range(n_cols)]
-    # df unboxed from Python
-    has_parent = cgutils.is_not_null(builder, dataframe.parent)
 
     pyapi = c.pyapi
     # gil_state = pyapi.gil_ensure()  # acquire GIL
@@ -256,28 +251,31 @@ def box_dataframe(typ, val, c):
     class_obj = pyapi.import_module_noblock(mod_name)
     df_dict = pyapi.dict_new()
 
-    for i, cname, arr, arr_typ, dtype in zip(range(n_cols), col_names, col_arrs, arr_typs, dtypes):
+    arrays_list_objs = {}
+    for cname, arr_typ in zip(col_names, arr_typs):
         # df['cname'] = boxed_arr
         # TODO: datetime.date, DatetimeIndex?
         name_str = context.insert_const_string(c.builder.module, cname)
         cname_obj = pyapi.string_from_string(name_str)
 
-        if dtype == string_type:
-            arr_obj = box_str_arr(arr_typ, arr, c)
-        elif isinstance(dtype, PDCategoricalDtype):
-            arr_obj = box_categorical_array(arr_typ, arr, c)
-            # context.nrt.incref(builder, arr_typ, arr)
-        elif dtype == types.List(string_type):
-            arr_obj = box_list(list_string_array_type, arr, c)
-            # context.nrt.incref(builder, arr_typ, arr)  # TODO required?
-            # pyapi.print_object(arr_obj)
-        else:
-            arr_obj = box_array(arr_typ, arr, c)
-            # TODO: is incref required?
-            # context.nrt.incref(builder, arr_typ, arr)
+        col_loc = typ.column_loc[cname]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
+
+        # dataframe.data looks like a tuple(list(array))
+        # e.g. ([array(int64, 1d, C), array(int64, 1d, C)], [array(float64, 1d, C)])
+        arrays_list_obj = arrays_list_objs.get(type_id)
+        if arrays_list_obj is None:
+            list_typ = types.List(arr_typ)
+            # extracting list from the tuple
+            list_val = builder.extract_value(dataframe.data, type_id)
+            # getting array from the list to box it then
+            arrays_list_obj = box_list(list_typ, list_val, c)
+            arrays_list_objs[type_id] = arrays_list_obj
+
+        # PyList_GetItem returns borrowed reference
+        arr_obj = pyapi.list_getitem(arrays_list_obj, col_id)
         pyapi.dict_setitem(df_dict, cname_obj, arr_obj)
 
-        pyapi.decref(arr_obj)
         pyapi.decref(cname_obj)
 
     df_obj = pyapi.call_method(class_obj, "DataFrame", (df_dict,))
@@ -288,6 +286,9 @@ def box_dataframe(typ, val, c):
         arr_obj = _box_series_data(typ.index.dtype, typ.index, dataframe.index, c)
         pyapi.object_setattr_string(df_obj, 'index', arr_obj)
         pyapi.decref(arr_obj)
+
+    for arrays_list_obj in arrays_list_objs.values():
+        pyapi.decref(arrays_list_obj)
 
     pyapi.decref(class_obj)
     # pyapi.gil_release(gil_state)    # release GIL
