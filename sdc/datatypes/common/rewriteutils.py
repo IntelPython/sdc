@@ -25,57 +25,68 @@
 # *****************************************************************************
 
 from numba.core.rewrites import register_rewrite, Rewrite
-from numba.core.ir_utils import guard, get_definition
 from numba import errors
 from numba.core import ir
-
-from sdc.rewrites.ir_utils import find_operations
-
-import pandas as pd
+from numba.core.ir_utils import guard, get_definition
 
 
-@register_rewrite('before-inference')
-class RewriteReadCsv(Rewrite):
+class TuplifyArgs(Rewrite):
     """
-    Searches for calls to Pandas read_csv() and replace its arguments with tuples.
+    Base rewrite calls to *callee*. Replaces *arg* from list and set to tuple.
+
+    Redefine callee and arg in subclass.
     """
 
-    _read_csv_const_args = ('names', 'dtype', 'usecols')
+    # need to be defined in subclasses
+    callee = None
+    arg = None
+    expr_checker = None
+
+    def match_expr(self, expr, func_ir, block, typemap, calltypes):
+        """For extended checks in supbclasses."""
+        if self.expr_checker:
+            return self.expr_checker(expr, func_ir, block, typemap, calltypes)
+        return True
 
     def match(self, func_ir, block, typemap, calltypes):
-        # TODO: check that vars are used only in read_csv
-
-        self.block = block
         self.args = args = []
+        self.block = block
+        for inst in block.find_insts(ir.Assign):
+            if isinstance(inst.value, ir.Expr) and inst.value.op == 'call':
+                expr = inst.value
+                try:
+                    callee = func_ir.infer_constant(expr.func)
+                except errors.ConstantInferenceError:
+                    continue
+                if callee is self.callee:
+                    if not self.match_expr(expr, func_ir, block, typemap, calltypes):
+                        continue
 
-        # Find all assignments with a right-hand read_csv() call
-        for inst in find_operations(block=block, op_name='call'):
-            expr = inst.value
-            try:
-                callee = func_ir.infer_constant(expr.func)
-            except errors.ConstantInferenceError:
-                continue
-            if callee is not pd.read_csv:
-                continue
-            # collect arguments with list, set and dict
-            # in order to replace with tuple
-            for key, var in expr.kws:
-                if key in self._read_csv_const_args:
-                    arg_def = guard(get_definition, func_ir, var)
-                    ops = ['build_list', 'build_set', 'build_map']
-                    if arg_def.op in ops:
-                        args.append(arg_def)
-
+                    arg_var = None
+                    if len(expr.args):
+                        arg_var = expr.args[0]
+                    elif len(expr.kws) and expr.kws[0][0] == self.arg:
+                        arg_var = expr.kws[0][1]
+                    if arg_var:
+                        arg_var_def = guard(get_definition, func_ir, arg_var)
+                        if arg_var_def and arg_var_def.op in ('build_list', 'build_set'):
+                            args.append(arg_var_def)
         return len(args) > 0
 
     def apply(self):
         """
-        Replace list, set and dict expressions with tuple.
+        Replace list expression with tuple.
         """
         block = self.block
         for inst in block.body:
             if isinstance(inst, ir.Assign) and inst.value in self.args:
-                if inst.value.op == 'build_map':
-                    inst.value.items = sum(map(list, inst.value.items), [])
                 inst.value.op = 'build_tuple'
         return block
+
+
+def register_tuplify(_callee, _arg, _expr_checker=None):
+    @register_rewrite('before-inference')
+    class Tuplifier(TuplifyArgs):
+        callee = _callee
+        arg = _arg
+        expr_checker = _expr_checker

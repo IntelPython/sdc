@@ -32,7 +32,7 @@ import pyarrow.parquet as pq
 import unittest
 import numba
 from numba.core.config import IS_32BITS
-from pandas.api.types import CategoricalDtype
+from pandas import CategoricalDtype
 
 import sdc
 from sdc.io.csv_ext import pandas_read_csv as pd_read_csv
@@ -596,7 +596,6 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    @skip_numba_jit
     def test_csv_str1(self):
         test_impl = self.pd_csv_str1()
         hpat_func = self.jit(test_impl)
@@ -658,24 +657,18 @@ class TestCSV(TestIO):
         read_csv = self._read_csv(use_pyarrow)
 
         def test_impl():
-            # names = ['C1', 'C2', 'C3']
+            names = ['C1', 'C2', 'C3']
             ct_dtype = CategoricalDtype(['A', 'B', 'C'])
             dtypes = {'C1': np.int, 'C2': ct_dtype, 'C3': str}
-            df = read_csv("csv_data_cat1.csv",
-                # names=names,  # Error: names should be constant list
-                names=['C1', 'C2', 'C3'],
-                dtype=dtypes
-            )
-            return df.C2
+            df = read_csv("csv_data_cat1.csv", names=names, dtype=dtypes)
+            return df
 
         return test_impl
 
-    @skip_numba_jit
     def test_csv_cat1(self):
         test_impl = self.pd_csv_cat1()
         hpat_func = self.jit(test_impl)
-        pd.testing.assert_series_equal(
-            hpat_func(), test_impl(), check_names=False)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl(), check_names=False)
 
     def pd_csv_cat2(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
@@ -691,7 +684,6 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    @skip_numba_jit
     def test_csv_cat2(self):
         test_impl = self.pd_csv_cat2()
         hpat_func = self.jit(test_impl)

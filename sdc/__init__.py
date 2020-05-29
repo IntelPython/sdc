@@ -44,6 +44,10 @@ import sdc.datatypes.hpat_pandas_series_functions
 import sdc.datatypes.hpat_pandas_series_rolling_functions
 import sdc.datatypes.hpat_pandas_stringmethods_functions
 import sdc.datatypes.hpat_pandas_groupby_functions
+import sdc.datatypes.categorical.init
+import sdc.datatypes.series.init
+
+import sdc.extensions.indexes.range_index_ext
 
 import sdc.extensions.indexes.range_index_ext
 
