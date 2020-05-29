@@ -45,8 +45,7 @@ from sdc.tests.test_utils import (count_array_OneDs,
                                   get_rank,
                                   get_start_end,
                                   skip_numba_jit,
-                                  skip_sdc_jit,
-                                  dfRefactoringNotImplemented)
+                                  skip_sdc_jit)
 
 
 kde_file = 'kde.parquet'
@@ -351,7 +350,6 @@ class TestCSV(TestIO):
         cfunc = self.jit(pyfunc)
         pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
 
-    @dfRefactoringNotImplemented
     def pd_csv_keys1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
         int_type = self._int_type()
@@ -391,7 +389,6 @@ class TestCSV(TestIO):
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     # inference from file
-    @dfRefactoringNotImplemented
     def pd_csv_infer_file_default(self, file_name="csv_data_infer1.csv", use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -410,7 +407,6 @@ class TestCSV(TestIO):
             with self.subTest(file_name=file_name):
                 test(file_name)
 
-    @dfRefactoringNotImplemented
     def pd_csv_infer_file_sep(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -424,7 +420,6 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def pd_csv_infer_file_delimiter(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -438,7 +433,6 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def pd_csv_infer_file_names(self, file_name="csv_data1.csv", use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -457,7 +451,6 @@ class TestCSV(TestIO):
             with self.subTest(file_name=file_name):
                 test(file_name)
 
-    @dfRefactoringNotImplemented
     def pd_csv_infer_file_usecols(self, file_name="csv_data_infer1.csv", use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -476,7 +469,6 @@ class TestCSV(TestIO):
             with self.subTest(file_name=file_name):
                 test(file_name)
 
-    @dfRefactoringNotImplemented
     def pd_csv_infer_file_names_usecols(self, file_name="csv_data1.csv", use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -495,7 +487,6 @@ class TestCSV(TestIO):
             with self.subTest(file_name=file_name):
                 test(file_name)
 
-    @dfRefactoringNotImplemented
     def pd_csv_infer_parallel1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -530,7 +521,6 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def pd_csv_infer_skip1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -544,7 +534,6 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def pd_csv_infer_skip_parallel1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -561,7 +550,6 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def pd_csv_rm_dead1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -579,7 +567,6 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def pd_csv_date1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
         int_type = self._int_type()
@@ -598,7 +585,6 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def pd_csv_str1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
         int_type = self._int_type()
@@ -616,7 +602,6 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def pd_csv_parallel1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -634,7 +619,6 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def pd_csv_str_parallel1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -652,7 +636,6 @@ class TestCSV(TestIO):
         hpat_func = self.jit(locals={'df:return': 'distributed'})(test_impl)
         self.assertEqual(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def pd_csv_usecols1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -671,7 +654,6 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def pd_csv_cat1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
@@ -695,7 +677,6 @@ class TestCSV(TestIO):
         pd.testing.assert_series_equal(
             hpat_func(), test_impl(), check_names=False)
 
-    @dfRefactoringNotImplemented
     def pd_csv_cat2(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
         int_type = self._int_type()
@@ -716,7 +697,6 @@ class TestCSV(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def pd_csv_single_dtype1(self, use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
