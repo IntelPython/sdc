@@ -33,9 +33,6 @@ declare_int_sort(64)
 declare_sort(f32, float)
 declare_sort(f64, double)
 
-#undef declare_int_sort
-#undef declare_sort
-
 void parallel_sort(void* begin, uint64_t len, uint64_t size, void* compare)
 {
     auto compare_f = reinterpret_cast<compare_func>(compare);
@@ -64,15 +61,15 @@ void parallel_sort(void* begin, uint64_t len, uint64_t size, void* compare)
         break;
     default:
         // fallback to c qsort?
-        if      (size < 4)    run_sort(_void_range<4>)
-        else if (size < 8)    run_sort(_void_range<8>)
-        else if (size < 16)   run_sort(_void_range<16>)
-        else if (size < 32)   run_sort(_void_range<32>)
-        else if (size < 64)   run_sort(_void_range<64>)
-        else if (size < 128)  run_sort(_void_range<128>)
-        else if (size < 256)  run_sort(_void_range<256>)
-        else if (size < 512)  run_sort(_void_range<512>)
-        else if (size < 1024) run_sort(_void_range<1024>)
+        if      (size <= 4)    run_sort(_void_range<4>)
+        else if (size <= 8)    run_sort(_void_range<8>)
+        else if (size <= 16)   run_sort(_void_range<16>)
+        else if (size <= 32)   run_sort(_void_range<32>)
+        else if (size <= 64)   run_sort(_void_range<64>)
+        else if (size <= 128)  run_sort(_void_range<128>)
+        else if (size <= 256)  run_sort(_void_range<256>)
+        else if (size <= 512)  run_sort(_void_range<512>)
+        else if (size <= 1024) run_sort(_void_range<1024>)
         else
         {
             std::cout << "Unsupported item size " << size << std::endl;
@@ -85,3 +82,6 @@ void parallel_sort(void* begin, uint64_t len, uint64_t size, void* compare)
 }
 
 }
+
+#undef declare_int_sort
+#undef declare_sort

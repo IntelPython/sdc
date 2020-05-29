@@ -7,15 +7,17 @@ import ctypes as ct
 
 from sdc import concurrent_sort
 
+
 def bind(sym, sig):
     # Returns ctypes binding to symbol sym with signature sig
     addr = getattr(concurrent_sort, sym)
     return ct.cast(addr, sig)
 
+
 parallel_sort_arithm_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_uint64)
 
 parallel_sort_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_uint64,
-                               ct.c_uint64, ct.c_void_p,)
+                                 ct.c_uint64, ct.c_void_p,)
 
 parallel_sort_sym = bind('parallel_sort',
                          parallel_sort_sig)
@@ -30,7 +32,7 @@ def less(left, right):
     pass
 
 
-@overload(less, jit_options={'locals':{'result':types.int8}})
+@overload(less, jit_options={'locals': {'result': types.int8}})
 def less_overload(left, right):
     def less_impl(left, right):
         result = left < right
@@ -74,12 +76,15 @@ def adaptor(tyctx, thing, another):
             # to deref the void * passed. TODO: nrt awareness
             catchthing = thing
             sig = catchthing(_x)
+
             def codegen(cgctx, builder, sig, args):
                 toty = cgctx.get_value_type(sig.return_type).as_pointer()
                 addressable = builder.bitcast(args[0], toty)
                 zero_intpt = cgctx.get_constant(types.intp, 0)
                 vref = builder.gep(addressable, [zero_intpt], inbounds=True)
+
                 return builder.load(vref)
+
             return sig, codegen
 
         @njit
@@ -103,11 +108,14 @@ def adaptor(tyctx, thing, another):
 @intrinsic
 def asvoidp(tyctx, thing):
     sig = types.voidptr(thing)
+
     def codegen(cgctx, builder, sig, args):
         dm_thing = cgctx.data_model_manager[sig.args[0]]
         data_thing = dm_thing.as_data(builder, args[0])
         ptr_thing = cgutils.alloca_once_value(builder, data_thing)
+
         return builder.bitcast(ptr_thing, cgutils.voidptr_t)
+
     return sig, codegen
 
 
@@ -116,22 +124,22 @@ def sizeof(context, t):
     sig = types.uint64(t)
 
     def codegen(cgctx, builder, sig, args):
-        size =  cgctx.get_abi_sizeof(t)
+        size = cgctx.get_abi_sizeof(t)
         return cgctx.get_constant(types.uint64, size)
 
     return sig, codegen
 
 
-types_to_postfix = {types.int8    : 'i8',
-                    types.uint8   : 'u8',
-                    types.int16   : 'i16',
-                    types.uint16  : 'u16',
-                    types.int32   : 'i32',
-                    types.uint32  : 'u32',
-                    types.int64   : 'i64',
-                    types.uint64  : 'u64',
-                    types.float32 : 'f32',
-                    types.float64 : 'f64' }
+types_to_postfix = {types.int8: 'i8',
+                    types.uint8: 'u8',
+                    types.int16: 'i16',
+                    types.uint16: 'u16',
+                    types.int32: 'i32',
+                    types.uint32: 'u32',
+                    types.int64: 'i64',
+                    types.uint64: 'u64',
+                    types.float32: 'f32',
+                    types.float64: 'f64'}
 
 
 def load_symbols(name, sig, types):
@@ -147,6 +155,7 @@ def load_symbols(name, sig, types):
 
 sort_map = load_symbols('parallel_sort', parallel_sort_arithm_sig, types_to_postfix)
 stable_sort_map = load_symbols('parallel_stable_sort', parallel_sort_arithm_sig, types_to_postfix)
+
 
 @intrinsic
 def list_itemsize(tyctx, list_ty):
@@ -208,6 +217,7 @@ def parallel_sort_overload(arr):
         return parallel_sort_sym(arr.ctypes, len(arr), item_size, adaptor(arr[0], arr[0]))
 
     return parallel_sort_impl
+
 
 def parallel_stable_sort(arr):
     pass

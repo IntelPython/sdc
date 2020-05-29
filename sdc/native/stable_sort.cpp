@@ -227,15 +227,15 @@ void stable_sort_inner_sort<void>(void* data, int begin, int end, int item_size,
         break;
     default:
         // fallback to own implementation?
-        if      (item_size < 4)    run_sort(_void_range<4>)
-        else if (item_size < 8)    run_sort(_void_range<8>)
-        else if (item_size < 16)   run_sort(_void_range<16>)
-        else if (item_size < 32)   run_sort(_void_range<32>)
-        else if (item_size < 64)   run_sort(_void_range<64>)
-        else if (item_size < 128)  run_sort(_void_range<128>)
-        else if (item_size < 256)  run_sort(_void_range<256>)
-        else if (item_size < 512)  run_sort(_void_range<512>)
-        else if (item_size < 1024) run_sort(_void_range<1024>)
+        if      (item_size <= 4)    run_sort(_void_range<4>)
+        else if (item_size <= 8)    run_sort(_void_range<8>)
+        else if (item_size <= 16)   run_sort(_void_range<16>)
+        else if (item_size <= 32)   run_sort(_void_range<32>)
+        else if (item_size <= 64)   run_sort(_void_range<64>)
+        else if (item_size <= 128)  run_sort(_void_range<128>)
+        else if (item_size <= 256)  run_sort(_void_range<256>)
+        else if (item_size <= 512)  run_sort(_void_range<512>)
+        else if (item_size <= 1024) run_sort(_void_range<1024>)
         else
         {
             std::cout << "Unsupported item size " << item_size << std::endl;
@@ -322,12 +322,12 @@ declare_int_sort(64)
 declare_sort(f32, float)
 declare_sort(f64, double)
 
-#undef declare_int_sort
-#undef declare_sort
-
 void parallel_stable_sort(void* begin, uint64_t len, uint64_t size, void* compare)
 {
     parallel_stable_sort_<void>(begin, len, size, compare);
 }
 
 }
+
+#undef declare_int_sort
+#undef declare_sort

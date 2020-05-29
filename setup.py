@@ -106,7 +106,8 @@ tbb_root = os.getenv('TBBROOT')
 if not tbb_root:
     tbb_root = check_file_at_path(['include', 'tbb', 'tbb.h'])
 
-print("tbb_root", tbb_root)
+if tbb_root is None:
+    raise RuntimeError("tbb headers were not found. Try to install tbb-devel package")
 
 ind = [PREFIX_DIR + '/include', ]
 lid = [PREFIX_DIR + '/lib', ]
@@ -375,7 +376,8 @@ setup(name=SDC_NAME_STR,
           'numpy>=1.16',
           'pandas==0.25.3',
           'pyarrow==0.17.0',
-          'numba>=0.49.1,<0.50.0'
+          'numba>=0.49.1,<0.50.0',
+          'tbb'
           ],
       cmdclass=sdc_build_commands,
       ext_modules=_ext_mods,
