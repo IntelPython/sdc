@@ -46,7 +46,7 @@ class SDC_Build_Utilities:
         self.env_name = 'sdc_env'
         self.python = python
         self.output_folder = self.src_path / 'sdc-build'
-        self.recipe = self.src_path / 'buildscripts' / 'sdc-conda-recipe'
+        self.recipe = self.src_path / 'conda-recipe'
 
         self.line_double = '='*80
         self.line_single = '-'*80

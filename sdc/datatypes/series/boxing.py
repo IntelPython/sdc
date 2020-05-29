@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,30 +24,36 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+from numba.core.imputils import lower_constant
+from numba.core import cgutils
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
-from .categorical import *
+from .types import SeriesType
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
+@lower_constant(SeriesType)
+def constant_Series(context, builder, ty, pyval):
+    """
+    Create a constant Series.
 
-from sdc.tests.test_ml import *
+    See @unbox(SeriesType)
+    """
+    series = cgutils.create_struct_proxy(ty)(context, builder)
+    series.data = _constant_Series_data(context, builder, ty, pyval)
+    # TODO: index and name
+    return series._getvalue()
 
-from sdc.tests.test_io import *
 
-from sdc.tests.test_hpat_jit import *
-from sdc.tests.test_indexes import *
+def _constant_Series_data(context, builder, ty, pyval):
+    """
+    Create a constant for Series data.
 
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
+    Mostly reuses constant creation for pandas arrays.
+    """
 
-# performance tests
-import sdc.tests.tests_perf
+    from ..categorical.types import CategoricalDtypeType
+
+    if isinstance(ty.dtype, CategoricalDtypeType):
+        from ..categorical.boxing import constant_Categorical
+        return constant_Categorical(context, builder, ty.data, pyval.array)
+
+    raise NotImplementedError()

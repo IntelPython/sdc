@@ -7,7 +7,7 @@ package:
   version: {{ GIT_DESCRIBE_TAG }}
 
 source:
-   path: ../..
+   path: ../
 
 build:
   number: {{ GIT_DESCRIBE_NUMBER|int }}
@@ -32,7 +32,7 @@ requirements:
 
   run:
     - python
-    - {{ pin_compatible('numpy') }}
+    - numpy
     - pandas  {{ PANDAS_VERSION }}
     - pyarrow {{ PYARROW_VERSION }}
     - numba   {{ NUMBA_VERSION }}

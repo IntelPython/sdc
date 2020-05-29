@@ -49,7 +49,7 @@ class CategoricalArray(types.Array):
             dtype, 1, 'C', name='CategoricalArray({})'.format(dtype))
 
 
-@unbox(CategoricalArray)
+# @unbox(CategoricalArray)
 def unbox_categorical_array(typ, val, c):
     arr_obj = c.pyapi.object_getattr_string(val, "codes")
     # c.pyapi.print_object(arr_obj)
@@ -71,7 +71,7 @@ def get_categories_int_type(cat_dtype):
     return dtype
 
 
-@box(CategoricalArray)
+# @box(CategoricalArray)
 def box_categorical_array(typ, val, c):
     dtype = typ.dtype
     mod_name = c.context.insert_const_string(c.builder.module, "pandas")
