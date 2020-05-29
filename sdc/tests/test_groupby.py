@@ -42,8 +42,7 @@ from sdc.tests.test_utils import (count_array_OneDs,
                                   get_start_end,
                                   skip_numba_jit,
                                   skip_sdc_jit,
-                                  sdc_limitation,
-                                  dfRefactoringNotImplemented)
+                                  sdc_limitation)
 from sdc.tests.test_series import gen_frand_array
 
 

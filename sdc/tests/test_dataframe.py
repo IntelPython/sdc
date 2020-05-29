@@ -53,8 +53,7 @@ from sdc.tests.test_utils import (check_numba_version,
                                   skip_numba_jit,
                                   skip_sdc_jit,
                                   test_global_input_data_float64,
-                                  test_global_input_data_unicode_kind4,
-                                  dfRefactoringNotImplemented)
+                                  test_global_input_data_unicode_kind4)
 
 
 @sdc.jit
@@ -1405,7 +1404,7 @@ class TestDataFrame(TestCase):
         sdc_func = sdc.jit(test_impl)
         pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-    @dfRefactoringNotImplemented
+    @unittest.skip("SDC Dataframe.loc[] always return Dataframe")
     def test_df_loc_str(self):
         def test_impl(df):
             return df.loc['c']
@@ -1417,7 +1416,7 @@ class TestDataFrame(TestCase):
                            "C": ['3.1', '8.4', '7.1', '3.2', '1']}, index=idx)
         pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    @dfRefactoringNotImplemented
+    @unittest.skip("SDC Dataframe.loc[] always return Dataframe")
     def test_df_loc_no_idx(self):
         def test_impl(df):
             return df.loc[2]
@@ -2708,27 +2707,27 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
-    @dfRefactoringNotImplemented
     def test_df_iterate_over_columns2(self):
         """ Verifies iteration over unboxed df columns using literal unroll. """
         from sdc.hiframes.api import get_nan_mask
 
         @self.jit
-        def jitted_func(df):
+        def jitted_func():
+            cols = ('A', 'B', 'C', 'D')
+            df = pd.DataFrame({
+                'A': ['a', 'b', None, 'a', '', None, 'b'],
+                'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
+                'C': [np.nan, 1, 2, 1, np.nan, 2, 1],
+                'D': [1, 2, 9, 5, 2, 1, 0]
+            })
             res_nan_mask = np.zeros(len(df), dtype=np.bool_)
-            for col in literal_unroll(df._data):
-                res_nan_mask += get_nan_mask(col)
+            for col in literal_unroll(cols):
+                res_nan_mask += get_nan_mask(df[col].values)
             return res_nan_mask
 
-        df = pd.DataFrame({
-                    'A': ['a', 'b', None, 'a', '', None, 'b'],
-                    'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
-                    'C': [np.nan, 1, 2, 1, np.nan, 2, 1],
-                    'D': [1, 2, 9, 5, 2, 1, 0]
-        })
         # expected is a boolean mask of df rows that have None values
         expected = np.asarray([True, False, True, False, True, True, False])
-        result = jitted_func(df)
+        result = jitted_func()
         np.testing.assert_array_equal(result, expected)
 
 
