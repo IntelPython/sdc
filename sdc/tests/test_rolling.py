@@ -1004,6 +1004,7 @@ class TestRolling(TestCase):
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.corr() unsupported')
+    @dfRefactoringNotImplemented
     def test_df_rolling_corr_no_other(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1026,6 +1027,7 @@ class TestRolling(TestCase):
         self._test_rolling_corr_unsupported_types(df)
 
     @skip_sdc_jit('DataFrame.rolling.corr() unsupported exceptions')
+    @dfRefactoringNotImplemented
     def test_df_rolling_corr_unsupported_values(self):
         def test_impl(df, other, pairwise):
             return df.rolling(3, 3).corr(other=other, pairwise=pairwise)
@@ -1122,6 +1124,7 @@ class TestRolling(TestCase):
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.cov() unsupported')
+    @dfRefactoringNotImplemented
     def test_df_rolling_cov_no_other(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1144,6 +1147,7 @@ class TestRolling(TestCase):
         self._test_rolling_cov_unsupported_types(df)
 
     @skip_sdc_jit('DataFrame.rolling.cov() unsupported exceptions')
+    @dfRefactoringNotImplemented
     def test_df_rolling_cov_unsupported_values(self):
         def test_impl(df, other, pairwise):
             return df.rolling(3, 3).cov(other=other, pairwise=pairwise)
