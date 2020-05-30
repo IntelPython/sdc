@@ -2466,7 +2466,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    @unittest.skip('New DataFrame structure: implement unboxing')
     def test_min_dataframe_default(self):
         def test_impl(df):
             return df.min()
