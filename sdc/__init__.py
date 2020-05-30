@@ -49,8 +49,6 @@ import sdc.datatypes.series.init
 
 import sdc.extensions.indexes.range_index_ext
 
-import sdc.extensions.indexes.range_index_ext
-
 from ._version import get_versions
 
 if not sdc.config.config_pipeline_hpat_default:

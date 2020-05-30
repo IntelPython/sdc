@@ -389,6 +389,7 @@ class TestCSV(TestIO):
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     # inference from file
+
     def pd_csv_infer_file_default(self, file_name="csv_data_infer1.csv", use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
 
