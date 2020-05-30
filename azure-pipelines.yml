@@ -1,8 +1,8 @@
 trigger:
-- feature/dataframe_model_refactoring
+- master
 
 pr:
-- feature/dataframe_model_refactoring
+- master
 
 jobs:
 - template: buildscripts/azure/template-windows.yml
