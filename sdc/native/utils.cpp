@@ -30,15 +30,14 @@ tbb::task_arena& get_arena()
 {
     static tbb::task_arena arena;
 
-    if (!arena.is_active())
-        arena.initialize();
-
     return arena;
 }
 
 void set_threads_num(uint64_t threads)
 {
-    get_arena().initialize(threads);
+    auto& arena = get_arena();
+    arena.terminate();
+    arena.initialize(threads);
 }
 
 }
