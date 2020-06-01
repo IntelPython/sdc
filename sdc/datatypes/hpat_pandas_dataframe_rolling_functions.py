@@ -123,19 +123,25 @@ def df_rolling_method_other_df_codegen(method_name, self, other, args=None, kws=
             f'    raise ValueError("Method rolling.{method_name}(). The object pairwise\\n expected: False, None")'
         ]
 
-    data_length = 'len(self._data._data[0])' if data_columns else '0'
-    other_length = 'len(other._data[0])' if other_columns else '0'
+    data_length = 'len(self._data._data[0][0])' if data_columns else '0'
+    other_length = 'len(other._data[0][0])' if other_columns else '0'
     func_lines += [f'  length = max([{data_length}, {other_length}])']
 
     for col in all_columns:
         res_data = f'result_data_{col}'
         if col in common_columns:
+            col_loc = self.data.column_loc[col]
+            type_id, col_id = col_loc.type_id, col_loc.col_id
+            other_col_loc = other.column_loc[col]
+            other_type_id = other_col_loc.type_id
+            other_col_id = other_col_loc.col_id
+
             other_series = f'other_series_{col}'
             method_kws['other'] = other_series
             method_params = ', '.join(args + kwsparams2list(method_kws))
             func_lines += [
-                f'  data_{col} = self._data._data[{data_columns[col]}]',
-                f'  other_data_{col} = other._data[{other_columns[col]}]',
+                f'  data_{col} = self._data._data[{type_id}][{col_id}]',
+                f'  other_data_{col} = other._data[{other_type_id}][{other_col_id}]',
                 f'  series_{col} = pandas.Series(data_{col})',
                 f'  {other_series} = pandas.Series(other_data_{col})',
                 f'  rolling_{col} = series_{col}.rolling({rolling_params})',
@@ -158,16 +164,18 @@ def df_rolling_method_other_df_codegen(method_name, self, other, args=None, kws=
     return func_text, global_vars
 
 
-def df_rolling_method_main_codegen(method_params, df_columns, method_name):
+def df_rolling_method_main_codegen(method_params, df_columns, column_loc, method_name):
     rolling_params = df_rolling_params_codegen()
     method_params_as_str = ', '.join(method_params)
 
     results = []
     func_lines = []
     for idx, col in enumerate(df_columns):
+        col_loc = column_loc[col]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         res_data = f'result_data_{col}'
         func_lines += [
-            f'  data_{col} = self._data._data[{idx}]',
+            f'  data_{col} = self._data._data[{type_id}][{col_id}]',
             f'  series_{col} = pandas.Series(data_{col})',
             f'  rolling_{col} = series_{col}.rolling({rolling_params})',
             f'  result_{col} = rolling_{col}.{method_name}({method_params_as_str})',
@@ -204,7 +212,9 @@ def gen_df_rolling_method_other_none_codegen(rewrite_name=None):
                 f'    raise ValueError("Method rolling.{_method_name}(). The object pairwise\\n expected: False")'
             ]
         method_params = args + ['{}={}'.format(k, k) for k in kwargs if k != 'other']
-        func_lines += df_rolling_method_main_codegen(method_params, self.data.columns, method_name)
+        func_lines += df_rolling_method_main_codegen(method_params, self.data.columns, self.data.column_loc,
+                                                     method_name)
+
         func_text = '\n'.join(func_lines)
 
         global_vars = {'pandas': pandas}
@@ -229,7 +239,8 @@ def df_rolling_method_codegen(method_name, self, args=None, kws=None):
     func_lines = [f'def {impl_name}({impl_params_as_str}):']
 
     method_params = args + ['{}={}'.format(k, k) for k in kwargs]
-    func_lines += df_rolling_method_main_codegen(method_params, self.data.columns, method_name)
+    func_lines += df_rolling_method_main_codegen(method_params, self.data.columns,
+                                                 self.data.column_loc, method_name)
     func_text = '\n'.join(func_lines)
 
     global_vars = {'pandas': pandas}

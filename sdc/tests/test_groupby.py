@@ -27,6 +27,7 @@
 import numba
 import numpy as np
 import pandas as pd
+import platform
 import pyarrow.parquet as pq
 import unittest
 from itertools import product
@@ -135,6 +136,24 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    def test_dataframe_groupby_count_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').count()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
+
+
     @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_max(self):
         def test_impl(df):
@@ -146,6 +165,26 @@ class TestGroupBy(TestCase):
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    def test_dataframe_groupby_max_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').max()
+
+        sdc_impl = self.jit(test_impl)
+
+        # TODO: implement index classes, as current indexes do not have names
+        kwargs = {'check_names': False}
+        if platform.system() == 'Windows':
+            # Attribute "dtype" are different on windows int64 vs int32
+            kwargs['check_dtype'] = False
+
+        pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_min(self):
@@ -159,6 +198,26 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    def test_dataframe_groupby_min_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').min()
+
+        sdc_impl = self.jit(test_impl)
+
+        # TODO: implement index classes, as current indexes do not have names
+        kwargs = {'check_names': False}
+        if platform.system() == 'Windows':
+            # Attribute "dtype" are different on windows int64 vs int32
+            kwargs['check_dtype'] = False
+
+        pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
+
     @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_mean(self):
         def test_impl(df):
@@ -171,6 +230,23 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    def test_dataframe_groupby_mean_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').mean()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
+
     @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_median(self):
         def test_impl(df):
@@ -182,6 +258,23 @@ class TestGroupBy(TestCase):
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    def test_dataframe_groupby_median_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').median()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
 
     @skip_sdc_jit('Fails with old-pipeline from the start')
     @unittest.expectedFailure   # pandas groupby.median returns unstable dtype (int or float) unlike series.median
@@ -212,6 +305,26 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    def test_dataframe_groupby_prod_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').prod()
+
+        sdc_impl = self.jit(test_impl)
+
+        # TODO: implement index classes, as current indexes do not have names
+        kwargs = {'check_names': False}
+        if platform.system() == 'Windows':
+            # Attribute "dtype" are different on windows int64 vs int32
+            kwargs['check_dtype'] = False
+
+        pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
+
     @skip_sdc_jit('Fails with old-pipeline from the start')
     @skip_numba_jit("BUG: SDC impl of Series.sum returns float64 on as series of ints")
     def test_dataframe_groupby_sum(self):
@@ -225,6 +338,23 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    def test_dataframe_groupby_sum_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').sum()
+
+        sdc_impl = self.jit(test_impl)
+
+        # TODO: implement index classes, as current indexes do not have names
+        # Attribute "dtype" are different int64 vs int32
+        kwargs = {'check_names': False, 'check_dtype': False}
+        pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
+
     @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_std(self):
         def test_impl(df):
@@ -237,6 +367,23 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    def test_dataframe_groupby_std_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').std()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
+
     @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_var(self):
         def test_impl(df):
@@ -248,6 +395,23 @@ class TestGroupBy(TestCase):
         result_ref = test_impl(df)
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
+
+    def test_dataframe_groupby_var_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [2, 1, 2, 1, 2, 2, 1, 0, 3, 1, 3],
+                'B': np.arange(11),
+                'C': [np.nan, 2., -1.3, np.nan, 3.5, 0, 10, 0.42, np.nan, -2.5, 23],
+                'D': [np.inf, 2., -1.3, -np.inf, 3.5, 0, 10, 0.42, np.nan, -2.5, 23]
+            })
+            return df.groupby('A').var()
+
+        sdc_impl = self.jit(test_impl)
+
+        result_jit = sdc_impl()
+        result_ref = test_impl()
+        # TODO: implement index classes, as current indexes do not have names
+        pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
 
     @skip_sdc_jit
     @skip_numba_jit
