@@ -2770,7 +2770,8 @@ class TestSeries(
         S2 = pd.Series([6.0, 21., 3.6, 5.])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
-    @unittest.expectedFailure #https://github.com/numba/numba/issues/5792
+    @unittest.expectedFailure
+    # https://github.com/numba/numba/issues/5792
     def test_series_combine_div(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: a/b, 0)
