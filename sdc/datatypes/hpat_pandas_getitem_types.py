@@ -27,10 +27,11 @@
 
 import pandas
 
-from numba import types, cgutils
+from numba import types
+from numba.core import cgutils
 from numba.extending import (models, overload, register_model, make_attribute_wrapper, intrinsic)
-from numba.datamodel import (register_default, StructModel)
-from numba.typing.templates import signature
+from numba.core.datamodel import (register_default, StructModel)
+from numba.core.typing.templates import signature
 
 
 class SeriesGetitemAccessorType(types.Type):

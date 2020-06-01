@@ -35,16 +35,17 @@ import sdc
 from sdc import hstr_ext
 from glob import glob
 from llvmlite import ir as lir
-from numba import types, cgutils
+from numba import types
+from numba.core import cgutils
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
                              lower_builtin, box, unbox, lower_getattr, intrinsic,
                              overload_method, overload, overload_attribute)
-from numba.targets.hashing import _Py_hash_t
-from numba.targets.imputils import (impl_ret_new_ref, impl_ret_borrowed, iternext_impl, RefType)
-from numba.targets.listobj import ListInstance
-from numba.typing.templates import (infer_global, AbstractTemplate, infer,
-                                    signature, AttributeTemplate, infer_getattr, bound_function)
-from numba.special import prange
+from numba.cpython.hashing import _Py_hash_t
+from numba.core.imputils import (impl_ret_new_ref, impl_ret_borrowed, iternext_impl, RefType)
+from numba.cpython.listobj import ListInstance
+from numba.core.typing.templates import (infer_global, AbstractTemplate, infer,
+                                         signature, AttributeTemplate, infer_getattr, bound_function)
+from numba import prange
 
 from sdc.str_ext import string_type
 from sdc.str_arr_type import (StringArray, string_array_type, StringArrayType,
@@ -109,8 +110,7 @@ class StrArrayIteratorModel(models.StructModel):
         super(StrArrayIteratorModel, self).__init__(dmm, fe_type, members)
 
 
-lower_builtin('getiter', string_array_type)(numba.targets.arrayobj.getiter_array)
-
+lower_builtin('getiter', string_array_type)(numba.np.arrayobj.getiter_array)
 lower_builtin('iternext', StringArrayIterator)(iternext_impl(RefType.NEW)(iternext_str_array))
 
 
@@ -1052,7 +1052,7 @@ def str_arr_getitem_int(A, arg):
             length = end_offset - start_offset
             ptr = get_data_ptr_ind(A, start_offset)
             ret = decode_utf8(ptr, length)
-            # ret = numba.unicode._empty_string(kind, length)
+            # ret = numba.cpython.unicode._empty_string(kind, length)
             # _memcpy(ret._data, ptr, length, 1)
             return ret
 
@@ -1118,12 +1118,12 @@ def decode_utf8(typingctx, ptr_t, len_t=None):
 # def lower_string_arr_getitem(context, builder, sig, args):
 #     # TODO: support multibyte unicode
 #     # TODO: support Null
-#     kind = numba.unicode.PY_UNICODE_1BYTE_KIND
+#     kind = numba.cpython.unicode.PY_UNICODE_1BYTE_KIND
 #     def str_arr_getitem_impl(A, i):
 #         start_offset = getitem_str_offset(A, i)
 #         end_offset = getitem_str_offset(A, i + 1)
 #         length = end_offset - start_offset
-#         ret = numba.unicode._empty_string(kind, length)
+#         ret = numba.cpython.unicode._empty_string(kind, length)
 #         ptr = get_data_ptr_ind(A, start_offset)
 #         _memcpy(ret._data, ptr, length, 1)
 #         return ret
@@ -1211,8 +1211,8 @@ if sdc.config.config_pipeline_hpat_default:
 def lower_string_arr_getitem_slice(context, builder, sig, args):
     def str_arr_slice_impl(str_arr, idx):
         n = len(str_arr)
-        slice_idx = numba.unicode._normalize_slice(idx, n)
-        span = numba.unicode._slice_span(slice_idx)
+        slice_idx = numba.cpython.unicode._normalize_slice(idx, n)
+        span = numba.cpython.unicode._slice_span(slice_idx)
 
         if slice_idx.step == 1:
             start_offset = getitem_str_offset(str_arr, slice_idx.start)
@@ -1278,7 +1278,7 @@ def _str_arr_item_to_numeric(typingctx, out_ptr_t, str_arr_t, ind_t,
 # TODO: support array of strings
 # @typeof_impl.register(np.ndarray)
 # def typeof_np_string(val, c):
-#     arr_typ = numba.typing.typeof._typeof_ndarray(val, c)
+#     arr_typ = numba.core.typing.typeof._typeof_ndarray(val, c)
 #     # match string dtype
 #     if isinstance(arr_typ.dtype, (types.UnicodeCharSeq, types.CharSeq)):
 #         return string_array_type
@@ -1543,3 +1543,14 @@ def sdc_str_arr_operator_mul(self, other):
         return res_arr
 
     return _sdc_str_arr_operator_mul_impl
+
+
+@lower_builtin(operator.is_, StringArrayType, StringArrayType)
+def sdc_str_arr_operator_is(context, builder, sig, args):
+
+    # meminfo ptr uniquely identifies each StringArray allocation
+    a = context.make_helper(builder, string_array_type, args[0])
+    b = context.make_helper(builder, string_array_type, args[1])
+    ma = builder.ptrtoint(a.meminfo, cgutils.intp_t)
+    mb = builder.ptrtoint(b.meminfo, cgutils.intp_t)
+    return builder.icmp_signed('==', ma, mb)

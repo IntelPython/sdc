@@ -27,20 +27,18 @@
 import string
 import time
 
-import numba
 import numpy
-import pandas
 
 from sdc.tests.test_utils import test_global_input_data_float64
+from sdc.tests.tests_perf.data_generator import gen_df
 from sdc.tests.tests_perf.test_perf_base import TestBase
-from sdc.tests.tests_perf.test_perf_utils import (calc_compilation, get_times,
-                                                  perf_data_gen_fixed_len)
 
 
 rolling_usecase_tmpl = """
 def df_rolling_{method_name}_usecase(data, {extra_usecase_params}):
     start_time = time.time()
-    res = data.rolling({rolling_params}).{method_name}({method_params})
+    for i in range({ncalls}):
+        res = data.rolling({rolling_params}).{method_name}({method_params})
     end_time = time.time()
     return end_time - start_time, res
 """
@@ -56,7 +54,7 @@ def get_rolling_params(window=100, min_periods=None):
 
 
 def gen_df_rolling_usecase(method_name, rolling_params=None,
-                           extra_usecase_params='', method_params=''):
+                           extra_usecase_params='', method_params='', ncalls=1):
     """Generate df rolling method use case"""
     if not rolling_params:
         rolling_params = get_rolling_params()
@@ -65,7 +63,8 @@ def gen_df_rolling_usecase(method_name, rolling_params=None,
         'method_name': method_name,
         'extra_usecase_params': extra_usecase_params,
         'rolling_params': rolling_params,
-        'method_params': method_params
+        'method_params': method_params,
+        'ncalls': ncalls
     })
 
     global_vars = {'np': numpy, 'time': time}
@@ -84,34 +83,31 @@ class TestDFRollingMethods(TestBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.total_data_length = {
-            'apply': [2 * 10 ** 5],
-            'corr': [10 ** 5],
-            'count': [8 * 10 ** 5],
-            'cov': [10 ** 5],
-            'kurt': [4 * 10 ** 5],
-            'max': [2 * 10 ** 5],
-            'mean': [2 * 10 ** 5],
-            'median': [2 * 10 ** 5],
-            'min': [2 * 10 ** 5],
-            'quantile': [2 * 10 ** 5],
-            'skew': [2 * 10 ** 5],
-            'std': [2 * 10 ** 5],
-            'sum': [2 * 10 ** 5],
-            'var': [2 * 10 ** 5],
+        cls.map_ncalls_dlength = {
+            'apply': (10, [10 ** 4]),
+            'corr': (10, [8 * 10 ** 5]),
+            'count': (10, [10 ** 6]),
+            'cov': (10, [8 * 10 ** 5]),
+            'kurt': (10, [4 * 10 ** 5]),
+            'max': (10, [4 * 10 ** 5]),
+            'mean': (10, [10 ** 6]),
+            'median': (10, [10 ** 4]),
+            'min': (10, [4 * 10 ** 5]),
+            'quantile': (10, [4 * 10 ** 3]),
+            'skew': (10, [2 * 10 ** 5]),
+            'std': (10, [8 * 10 ** 5]),
+            'sum': (10, [10 ** 6]),
+            'var': (10, [8 * 10 ** 5]),
         }
 
-    def _gen_df(self, data, columns_num=10):
-        """Generate DataFrame based on input data"""
-        return pandas.DataFrame({col: data for col in string.ascii_uppercase[:columns_num]})
-
-    def _test_case(self, pyfunc, name,
+    def _test_case(self, pyfunc, name, total_data_length,
                    input_data=test_global_input_data_float64,
                    columns_num=10, extra_data_num=0):
         """
         Test DataFrame.rolling method
         :param pyfunc: Python function to test which calls tested method inside
         :param name: name of the tested method, e.g. min
+        :param total_data_length: length of generating test data
         :param input_data: initial data used for generating test data
         :param columns_num: number of columns in generated DataFrame
         :param extra_data_num: number of additionally generated DataFrames
@@ -119,41 +115,34 @@ class TestDFRollingMethods(TestBase):
         if columns_num > self.max_columns_num:
             columns_num = self.max_columns_num
 
-        full_input_data_length = sum(len(i) for i in input_data)
-        for data_length in self.total_data_length[name]:
+        for data_length in total_data_length:
             base = {
                 'test_name': f'DataFrame.rolling.{name}',
                 'data_size': data_length,
             }
-            data = perf_data_gen_fixed_len(input_data, full_input_data_length,
-                                           data_length)
-            test_data = self._gen_df(data, columns_num=columns_num)
-
-            args = [test_data]
+            args = [gen_df(data_length, columns=columns_num,
+                           col_names=string.ascii_uppercase[:columns_num],
+                           random=False, input_data=input_data)]
             for i in range(extra_data_num):
-                numpy.random.seed(i)
-                extra_data = numpy.random.ranf(data_length)
-                args.append(self._gen_df(extra_data, columns_num=columns_num))
+                extra_data = gen_df(data_length, columns=columns_num,
+                                    col_names=string.ascii_uppercase[:columns_num],
+                                    seed=i)
+                args.append(extra_data)
 
-            record = base.copy()
-            record['test_type'] = 'SDC'
-            self._test_jitted(pyfunc, record, *args)
-            self.test_results.add(**record)
-
-            record = base.copy()
-            record['test_type'] = 'Python'
-            self._test_python(pyfunc, record, *args)
-            self.test_results.add(**record)
+            self._test_jit(pyfunc, base, *args)
+            self._test_py(pyfunc, base, *args)
 
     def _test_df_rolling_method(self, name, rolling_params=None,
                                 extra_usecase_params='', method_params=''):
+        ncalls, total_data_length = self.map_ncalls_dlength[name]
         usecase = gen_df_rolling_usecase(name, rolling_params=rolling_params,
                                          extra_usecase_params=extra_usecase_params,
-                                         method_params=method_params)
+                                         method_params=method_params, ncalls=ncalls)
         extra_data_num = 0
         if extra_usecase_params:
             extra_data_num += len(extra_usecase_params.split(', '))
-        self._test_case(usecase, name, extra_data_num=extra_data_num)
+        self._test_case(usecase, name, total_data_length,
+                        extra_data_num=extra_data_num)
 
     def test_df_rolling_apply_mean(self):
         method_params = 'lambda x: np.nan if len(x) == 0 else x.mean()'

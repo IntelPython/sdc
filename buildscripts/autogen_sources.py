@@ -77,6 +77,7 @@ docstring_header = '''\
 
 arithmetic_binops_symbols = {
     'add': '+',
+    'div': '/',
     'sub': '-',
     'mul': '*',
     'truediv': '/',
@@ -117,9 +118,11 @@ if __name__ == '__main__':
     import_section_text = ''.join(module_text_lines[imports_start_line: import_end_line + 1])
 
     # read function templates for arithmetic and comparison operators from templates module
-    template_series_arithmetic_binop = inspect.getsource(templates_module.sdc_pandas_series_operator_binop)
-    template_series_comparison_binop = inspect.getsource(templates_module.sdc_pandas_series_operator_comp_binop)
-    template_str_arr_comparison_binop = inspect.getsource(templates_module.sdc_str_arr_operator_comp_binop)
+    template_series_binop = inspect.getsource(templates_module.sdc_pandas_series_binop)
+    template_series_comp_binop = inspect.getsource(templates_module.sdc_pandas_series_comp_binop)
+    template_series_operator = inspect.getsource(templates_module.sdc_pandas_series_operator_binop)
+    template_series_comp_operator = inspect.getsource(templates_module.sdc_pandas_series_operator_comp_binop)
+    template_str_arr_comp_binop = inspect.getsource(templates_module.sdc_str_arr_operator_comp_binop)
 
     exit_status = -1
     try:
@@ -133,19 +136,32 @@ if __name__ == '__main__':
             # certaing modifications are needed to be applied for templates, so
             # verify correctness of produced code manually
             for name in arithmetic_binops_symbols:
-                func_text = template_series_arithmetic_binop.replace('binop', name)
+                func_text = template_series_binop.replace('binop', name)
                 func_text = func_text.replace(' + ', f' {arithmetic_binops_symbols[name]} ')
-                func_text = func_text.replace('def ', f'@sdc_overload(operator.{name})\ndef ', 1)
+                func_text = func_text.replace('def ', f"@sdc_overload_method(SeriesType, '{name}')\ndef ", 1)
                 file.write(f'\n\n{func_text}')
 
             for name in comparison_binops_symbols:
-                func_text = template_series_comparison_binop.replace('comp_binop', name)
+                func_text = template_series_comp_binop.replace('comp_binop', name)
+                func_text = func_text.replace(' < ', f' {comparison_binops_symbols[name]} ')
+                func_text = func_text.replace('def ', f"@sdc_overload_method(SeriesType, '{name}')\ndef ", 1)
+                file.write(f'\n\n{func_text}')
+
+            for name in arithmetic_binops_symbols:
+                if name != "div":
+                    func_text = template_series_operator.replace('binop', name)
+                    func_text = func_text.replace(' + ', f' {arithmetic_binops_symbols[name]} ')
+                    func_text = func_text.replace('def ', f'@sdc_overload(operator.{name})\ndef ', 1)
+                    file.write(f'\n\n{func_text}')
+
+            for name in comparison_binops_symbols:
+                func_text = template_series_comp_operator.replace('comp_binop', name)
                 func_text = func_text.replace(' < ', f' {comparison_binops_symbols[name]} ')
                 func_text = func_text.replace('def ', f'@sdc_overload(operator.{name})\ndef ', 1)
                 file.write(f'\n\n{func_text}')
 
             for name in comparison_binops_symbols:
-                func_text = template_str_arr_comparison_binop.replace('comp_binop', name)
+                func_text = template_str_arr_comp_binop.replace('comp_binop', name)
                 func_text = func_text.replace(' < ', f' {comparison_binops_symbols[name]} ')
                 if name == 'ne':
                     func_text = func_text.replace('and not', 'or')

@@ -36,7 +36,7 @@ from sdc.tests.tests_perf.test_perf_utils import calc_compilation, get_times, pe
 from sdc.tests.test_utils import test_global_input_data_float64
 from .generator import generate_test_cases
 from .generator import TestCase as TC
-from .data_generator import gen_df, gen_series, gen_arr_of_dtype
+from .data_generator import gen_df, gen_series, gen_arr_of_dtype, gen_unique_values
 
 
 # python -m sdc.runtests sdc.tests.tests_perf.test_perf_df.TestDataFrameMethods.test_df_{method_name}
@@ -80,6 +80,7 @@ cases = [
     TC(name='min', size=[10 ** 7], check_skipna=True),
     TC(name='pct_change', size=[10 ** 7]),
     TC(name='prod', size=[10 ** 7], check_skipna=True),
+    TC(name='reset_index', size=[10 ** 7], params='drop=False'),
     TC(name='std', size=[10 ** 7], check_skipna=True),
     TC(name='sum', size=[10 ** 7], check_skipna=True),
     TC(name='var', size=[10 ** 7], check_skipna=True),
@@ -89,6 +90,8 @@ cases = [
     TC(name='getitem_idx_bool_array', size=[10 ** 7], call_expr='df[idx]', usecase_params='df, idx',
        data_gens=(gen_df, partial(gen_arr_of_dtype, dtype='bool', random=False)),
        input_data=[None, [True, False, False, True, False, True]]),
+    TC(name='getitem_filter_by_value', size=[10 ** 7], call_expr='df[df.A > 0]', usecase_params='df',
+       data_gens=(partial(gen_df, index_gen=gen_unique_values), )),
 ]
 
 generate_test_cases(cases, TestDataFrameMethods, 'df')

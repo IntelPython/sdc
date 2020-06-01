@@ -32,9 +32,11 @@ import random
 import string
 import unittest
 from itertools import permutations, product
-from numba.config import IS_32BITS
-from numba.special import literal_unroll
-from numba.errors import TypingError
+from numba import types
+from numba.core.config import IS_32BITS
+from numba import literal_unroll
+from numba.core.errors import TypingError
+from pandas.core.indexing import IndexingError
 
 import sdc
 from sdc.datatypes.common_functions import SDCLimitation
@@ -751,6 +753,40 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame()
         self._test_df_index(df)
 
+    def test_index_attribute_no_unboxing(self):
+        def test_impl(n, index):
+            np.random.seed(0)
+            df = pd.DataFrame({
+                'A': np.ones(n),
+                'B': np.random.ranf(n)
+            }, index=index)
+            return df.index
+
+        sdc_impl = self.jit(test_impl)
+        index_to_test = [
+            [1, 2, 3, 4, 5],
+            [.1, .2, .3, .4, .5],
+            ['a', 'b', 'c', 'd', 'e']
+        ]
+        for index in index_to_test:
+            with self.subTest(index=index):
+                n = len(index)
+                jit_result = sdc_impl(n, index)
+                ref_result = test_impl(n, index)
+                np.testing.assert_array_equal(jit_result, ref_result)
+
+    def test_index_attribute_default_no_unboxing(self):
+        def test_impl(n):
+            np.random.seed(0)
+            df = pd.DataFrame({
+                'A': np.ones(n),
+                'B': np.random.ranf(n)
+            })
+            return df.index
+
+        sdc_impl = self.jit(test_impl)
+        np.testing.assert_array_equal(sdc_impl(10), test_impl(10))
+
     @skip_sdc_jit
     @skip_numba_jit
     def test_df_apply(self):
@@ -921,6 +957,19 @@ class TestDataFrame(TestCase):
             with self.subTest(index=idx):
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
+    def test_df_isna_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                "A": [3.2, np.nan, 7.0, 3.3, np.nan],
+                "B": [3, 4, 1, 0, 222],
+                "C": [True, True, False, False, True],
+                "D": ['a', 'dd', 'c', '12', None]
+            }, index=[3, 4, 2, 6, 1])
+            return df.isna()
+
+        sdc_func = sdc.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
     @unittest.skip('DF with column named "bool" Segmentation fault')
     def test_df_bool(self):
         def test_impl(df):
@@ -1077,6 +1126,173 @@ class TestDataFrame(TestCase):
                 with self.subTest(n=n, index=idx):
                     pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
 
+    def test_df_iloc_slice(self):
+        def test_impl(df, n, k):
+            return df.iloc[n:k]
+        sdc_func = sdc.jit(test_impl)
+        cases_idx = [[3, 4, 2, 6, 1], None]
+        cases_n = [-10, 0, 8, None]
+        for idx in cases_idx:
+            df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                               "B": [5.5, np.nan, 3, 0, 7.7],
+                               "C": [3, 4, 1, 0, 222]}, index=idx)
+            for n, k in product(cases_n, cases_n[::-1]):
+                with self.subTest(index=idx, n=n, k=k):
+                    pd.testing.assert_frame_equal(sdc_func(df, n, k), test_impl(df, n, k))
+
+    def test_df_iloc_slice_no_unboxing(self):
+        def test_impl(n, k):
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [5.5, np.nan, 3, 0, 7.7],
+                'C': [3, 4, 1, 0, 222],
+            }, index=[3, 4, 2, 6, 1])
+            return df.iloc[n:k]
+
+        sdc_func = sdc.jit(test_impl)
+        cases_n = [-10, 0, 8, None]
+        for n, k in product(cases_n, cases_n[::-1]):
+            with self.subTest(n=n, k=k):
+                pd.testing.assert_frame_equal(sdc_func(n, k), test_impl(n, k))
+
+    def test_df_iloc_values(self):
+        def test_impl(df, n):
+            return df.iloc[n, 1]
+        sdc_func = sdc.jit(test_impl)
+        cases_idx = [[3, 4, 2, 6, 1], None]
+        cases_n = [1, 0, 2]
+        for idx in cases_idx:
+            df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                               "B": [5.5, np.nan, 3, 0, 7.7],
+                               "C": [3, 4, 1, 0, 222]}, index=idx)
+            for n in cases_n:
+                with self.subTest(index=idx, n=n):
+                    if not (np.isnan(sdc_func(df, n)) and np.isnan(test_impl(df, n))):
+                        self.assertEqual(sdc_func(df, n), test_impl(df, n))
+
+    def test_df_iloc_values_no_unboxing(self):
+        def test_impl(n):
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [5.5, np.nan, 3, 0, 7.7],
+                'C': [3, 4, 1, 0, 222],
+            }, index=[3, 4, 2, 6, 1])
+            return df.iloc[n, 1]
+
+        sdc_func = sdc.jit(test_impl)
+        for n in [1, 0, 2]:
+            with self.subTest(n=n):
+                if not (np.isnan(sdc_func(n)) and np.isnan(test_impl(n))):
+                    self.assertEqual(sdc_func(n), test_impl(n))
+
+    def test_df_iloc_value_error(self):
+        def int_impl(df):
+            return df.iloc[11]
+
+        def list_impl(df):
+            return df.iloc[[7, 14]]
+
+        def list_bool_impl(df):
+            return df.iloc[[True, False]]
+
+        msg1 = 'Index is out of bounds for axis'
+        msg2 = 'Item wrong length'
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [5.5, np.nan, 3, 0, 7.7],
+                           "C": [3, 4, 1, 0, 222]})
+
+        impls = [(int_impl, msg1), (list_impl, msg1), (list_bool_impl, msg2)]
+        for impl, msg in impls:
+            with self.subTest(case=impl, msg=msg):
+                func = self.jit(impl)
+                with self.assertRaises(IndexingError) as raises:
+                    func(df)
+                self.assertIn(msg, str(raises.exception))
+
+    def test_df_iloc_int(self):
+        def test_impl(df, n):
+            return df.iloc[n]
+        sdc_func = sdc.jit(test_impl)
+        cases_idx = [[3, 4, 2, 6, 1], None]
+        cases_n = [0, 1, 2]
+        for idx in cases_idx:
+            df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                               "B": [5.5, np.nan, 3, 0, 7.7],
+                               "C": [3, 4, 1, 0, 222]}, index=idx)
+            for n in cases_n:
+                with self.subTest(index=idx, n=n):
+                    pd.testing.assert_series_equal(sdc_func(df, n), test_impl(df, n), check_names=False)
+
+    def test_df_iloc_int_no_unboxing(self):
+        def test_impl(n):
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [5.5, np.nan, 3, 0, 7.7],
+                'C': [3, 4, 1, 0, 222],
+            }, index=[3, 4, 2, 6, 1])
+            return df.iloc[n]
+
+        sdc_func = sdc.jit(test_impl)
+        for n in [0, 1, 2]:
+            with self.subTest(n=n):
+                pd.testing.assert_series_equal(sdc_func(n), test_impl(n), check_names=False)
+
+    def test_df_iloc_list(self):
+        def test_impl(df, n):
+            return df.iloc[n]
+        sdc_func = sdc.jit(test_impl)
+        cases_idx = [[3, 4, 2, 6, 1], None]
+        cases_n = [[0, 1], [2, 0]]
+        for idx in cases_idx:
+            df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                               "B": [5.5, np.nan, 3, 0, 7.7],
+                               "C": [3, 4, 1, 0, 222]}, index=idx)
+            for n in cases_n:
+                with self.subTest(index=idx, n=n):
+                    pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
+
+    def test_df_iloc_list_no_unboxing(self):
+        def test_impl(n):
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [5.5, np.nan, 3, 0, 7.7],
+                'C': [3, 4, 1, 0, 222]
+            }, index=[3, 4, 2, 6, 1])
+            return df.iloc[n]
+
+        sdc_func = sdc.jit(test_impl)
+        for n in [[0, 1], [2, 0]]:
+            with self.subTest(n=n):
+                pd.testing.assert_frame_equal(sdc_func(n), test_impl(n))
+
+    def test_df_iloc_list_bool(self):
+        def test_impl(df, n):
+            return df.iloc[n]
+        sdc_func = sdc.jit(test_impl)
+        cases_idx = [[3, 4, 2, 6, 1], None]
+        cases_n = [[True, False, True, False, True]]
+        for idx in cases_idx:
+            df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                               "B": [5.5, np.nan, 3, 0, 7.7],
+                               "C": [3, 4, 1, 0, 222]}, index=idx)
+            for n in cases_n:
+                with self.subTest(index=idx, n=n):
+                    pd.testing.assert_frame_equal(sdc_func(df, n), test_impl(df, n))
+
+    def test_df_iloc_list_bool_no_unboxing(self):
+        def test_impl(n):
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [5.5, np.nan, 3, 0, 7.7],
+                'C': [3, 4, 1, 0, 222]
+            }, index=[3, 4, 2, 6, 1])
+            return df.iloc[n]
+
+        sdc_func = sdc.jit(test_impl)
+        for n in [[True, False, True, False, True]]:
+            with self.subTest(n=n):
+                pd.testing.assert_frame_equal(sdc_func(n), test_impl(n))
+
     def test_df_iat(self):
         def test_impl(df):
             return df.iat[0, 1]
@@ -1086,6 +1302,18 @@ class TestDataFrame(TestCase):
                            "B": [3, 4, 1, 0, 222],
                            "C": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
         self.assertEqual(sdc_func(df), test_impl(df))
+
+    def test_df_iat_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [3, 4, 1, 0, 222],
+                'C': ['a', 'dd', 'c', '12', 'ddf']
+            }, index=[3, 4, 2, 6, 1])
+            return df.iat[0, 1]
+
+        sdc_func = sdc.jit(test_impl)
+        self.assertEqual(sdc_func(), test_impl())
 
     def test_df_iat_value_error(self):
         def test_impl(df):
@@ -1099,6 +1327,105 @@ class TestDataFrame(TestCase):
             sdc_func(df)
         msg = 'Index is out of bounds for axis'
         self.assertIn(msg, str(raises.exception))
+
+    def test_df_at(self):
+        def test_impl(df, n):
+            return df.at[n, 'C']
+
+        sdc_func = sdc.jit(test_impl)
+        idx = [3, 0, 1, 2, 0]
+        n_cases = [0, 2]
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
+        for n in n_cases:
+            np.testing.assert_array_equal(sdc_func(df, n), test_impl(df, n))
+
+    def test_df_at_no_unboxing(self):
+        def test_impl(n):
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [3, 4, 1, 0, 222],
+                'C': ['a', 'dd', 'c', '12', 'ddf']
+            }, index=[3, 0, 1, 2, 0])
+            return df.at[n, 'C']
+
+        sdc_func = sdc.jit(test_impl)
+        for n in [0, 2]:
+            np.testing.assert_array_equal(sdc_func(n), test_impl(n))
+
+    def test_df_at_type(self):
+        def test_impl(df, n, k):
+            return df.at[n, "B"]
+
+        sdc_func = sdc.jit(test_impl)
+        idx = ['3', '4', '1', '2', '0']
+        n_cases = ['2', '3']
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": ['a', 'dd', 'c', '12', 'ddf']}, index=idx)
+        for n in n_cases:
+            self.assertEqual(sdc_func(df, n, "B"), test_impl(df, n, "B"))
+
+    def test_df_at_value_error(self):
+        def test_impl(df):
+            return df.at[5, 'C']
+        sdc_func = sdc.jit(test_impl)
+        idx = [3, 4, 1, 2, 0]
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": [3, 4, 2, 6, 1]}, index=idx)
+
+        with self.assertRaises(ValueError) as raises:
+            sdc_func(df)
+        msg = 'Index is not in the Series'
+        self.assertIn(msg, str(raises.exception))
+
+    def test_df_loc(self):
+        def test_impl(df):
+            return df.loc[4]
+
+        sdc_func = sdc.jit(test_impl)
+        idx = [3, 4, 1, 4, 0]
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": [3.1, 8.4, 7.1, 3.2, 1]}, index=idx)
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    def test_df_loc_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'B': [3, 4, 1, 0, 222],
+                'C': [3.1, 8.4, 7.1, 3.2, 1]
+            }, index=[3, 4, 1, 4, 0])
+            return df.loc[4]
+
+        sdc_func = sdc.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+    @unittest.skip("SDC Dataframe.loc[] always return Dataframe")
+    def test_df_loc_str(self):
+        def test_impl(df):
+            return df.loc['c']
+
+        sdc_func = sdc.jit(test_impl)
+        idx = ['a', 'b', 'c', 'с', 'e']
+        df = pd.DataFrame({"A": ['3.2', '4.4', '7.0', '3.3', '1.0'],
+                           "B": ['3', '4', '1', '0', '222'],
+                           "C": ['3.1', '8.4', '7.1', '3.2', '1']}, index=idx)
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    @unittest.skip("SDC Dataframe.loc[] always return Dataframe")
+    def test_df_loc_no_idx(self):
+        def test_impl(df):
+            return df.loc[2]
+
+        sdc_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [3.2, 4.4, 7.0, 3.3, 1.0],
+                           "B": [3, 4, 1, 0, 222],
+                           "C": [3.1, 8.4, 7.1, 3.2, 1]})
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
     def test_df_head(self):
         def get_func(n):
@@ -1123,6 +1450,20 @@ class TestDataFrame(TestCase):
                     )
                     pd.testing.assert_frame_equal(sdc_func(df), ref_impl(df))
 
+    def test_df_head_no_unboxing(self):
+        def test_impl(n):
+            df = pd.DataFrame({
+                'float': [3.2, 4.4, 7.0, 3.3, 1.0],
+                'int': [3, 4, 1, 0, 222],
+                'string': ['a', 'dd', 'c', '12', 'ddf']
+            }, index=[3, 4, 2, 6, 1])
+            return df.head(n)
+
+        sdc_impl = self.jit(test_impl)
+        for n in [-3, 0, 3, 5, None]:
+            with self.subTest(n=n):
+                pd.testing.assert_frame_equal(sdc_impl(n), test_impl(n))
+
     def test_df_copy(self):
         def test_impl(df, deep):
             return df.copy(deep=deep)
@@ -1139,6 +1480,39 @@ class TestDataFrame(TestCase):
             for deep in cases_deep:
                 with self.subTest(index=idx, deep=deep):
                     pd.testing.assert_frame_equal(sdc_func(df, deep), test_impl(df, deep))
+
+    def test_df_copy_no_unboxing(self):
+        def test_impl(idx, deep):
+            df = pd.DataFrame({
+                'A': [3.2, np.nan, 7.0, 3.3, np.nan],
+                'B': [3, 4, 1, 0, 222],
+                'C': [True, True, False, False, True],
+                'D': ['a', 'dd', 'c', '12', None]
+            }, index=idx)
+            return df.copy(deep=deep)
+
+        sdc_impl = sdc.jit(test_impl)
+        indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e']]
+        cases_deep = [None, True, False]
+        for idx, deep in product(indexes, cases_deep):
+            with self.subTest(index=idx, deep=deep):
+                jit_result = sdc_impl(idx, deep)
+                ref_result = test_impl(idx, deep)
+                pd.testing.assert_frame_equal(jit_result, ref_result)
+
+    @unittest.expectedFailure
+    def test_df_copy_no_unboxing_none_index_error(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [3.2, np.nan, 7.0, 3.3, np.nan],
+                'B': [3, 4, 1, 0, 222],
+                'C': [True, True, False, False, True],
+                'D': ['a', 'dd', 'c', '12', None]
+            }, index=None)
+            return df.copy(deep=True)
+
+        sdc_impl = sdc.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_impl(), test_impl())
 
     def test_pct_change1(self):
         def test_impl(n):
@@ -1277,13 +1651,87 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
 
-    @skip_numba_jit
-    def test_df_reset_index1(self):
-        def test_impl(df):
-            return df.reset_index(drop=True)
+    def test_df_reset_index_drop(self):
+        def test_impl(df, drop):
+            return df.reset_index(drop=drop)
 
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0]})
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': np.arange(4.0)})
         hpat_func = self.jit(test_impl)
+
+        for drop in [True, False]:
+            with self.subTest(drop=drop):
+                with self.assertRaises(Exception) as raises:
+                    hpat_func(df, drop)
+                msg = 'drop is only supported as a literal'
+                self.assertIn(msg, str(raises.exception))
+
+    def test_df_reset_index_drop_literal_index_int(self):
+        def gen_test_impl(drop):
+            def test_impl(df):
+                if drop == False:  # noqa
+                    return df.reset_index(drop=False)
+                else:
+                    return df.reset_index(drop=True)
+            return test_impl
+
+        df = pd.DataFrame({
+            'A': [1.0, 2.0, np.nan, 1.0],
+            'B': np.arange(4.0)
+        }, index=[5, 8, 4, 6])
+        for drop in [True, False]:
+            with self.subTest(drop=drop):
+                test_impl = gen_test_impl(drop)
+                hpat_func = self.jit(test_impl)
+                pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_reset_index_drop_literal_index_int_no_unboxing(self):
+        def gen_test_impl(drop):
+            def test_impl():
+                df = pd.DataFrame({
+                    'A': [1.0, 2.0, np.nan, 1.0],
+                    'B': np.arange(4.0)
+                }, index=[5, 8, 4, 6])
+                if drop == False:  # noqa
+                    return df.reset_index(drop=False)
+                else:
+                    return df.reset_index(drop=True)
+            return test_impl
+
+        for drop in [True, False]:
+            with self.subTest(drop=drop):
+                test_impl = gen_test_impl(drop)
+                hpat_func = self.jit(test_impl)
+                pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    def test_df_reset_index_drop_default_index_int(self):
+        def test_impl(df):
+            return df.reset_index()
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0],
+                           'B': np.arange(4.0)}, index=[5, 8, 4, 6])
+        hpat_func = self.jit(test_impl)
+
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_reset_index_drop_default_index_int_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [1.0, 2.0, np.nan, 1.0],
+                'B': np.arange(4.0)
+            }, index=[5, 8, 4, 6])
+            return df.reset_index()
+
+        hpat_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+
+    @skip_numba_jit
+    def test_df_reset_index_empty_df(self):
+        def test_impl(df):
+            return df.reset_index()
+
+        df = pd.DataFrame({})
+        hpat_func = self.jit(test_impl)
+
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     @skip_numba_jit
@@ -1362,17 +1810,15 @@ class TestDataFrame(TestCase):
 
     def test_df_drop_one_column(self):
         def test_impl(index):
-            df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
-                              index=index)
+            df = pd.DataFrame({
+                'A': [1.0, 2.0, np.nan, 1.0],
+                'B': [4, 5, 6, 7],
+                'C': [1.0, 2.0, np.nan, 1.0]
+            }, index=index)
             return df.drop(columns='A')
 
-        index_to_test = [[1, 2, 3, 4],
-                         [.1, .2, .3, .4],
-                         ['a', 'b', 'c', 'd']]
-
         sdc_func = self.jit(test_impl)
-
-        for index in index_to_test:
+        for index in [[1, 2, 3, 4], [.1, .2, .3, .4], ['a', 'b', 'c', 'd']]:
             with self.subTest(index=index):
                 pd.testing.assert_frame_equal(sdc_func(index), test_impl(index))
 
@@ -1551,6 +1997,20 @@ class TestDataFrame(TestCase):
         sdc_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(sdc_func(df, arr), test_impl(df, arr))
 
+    def test_df_getitem_bool_array_even_idx_no_unboxing(self):
+        def test_impl(arr):
+            df = pd.DataFrame({
+                'A': [1., -1., 0.1, -0.1],
+                'B': list(range(4)),
+                'C': [1., np.nan, np.inf, np.inf],
+            })
+            return df[arr]
+
+        arr = np.array([i % 2 for i in range(4)], dtype=np.bool_)
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(arr), test_impl(arr))
+
     @skip_sdc_jit('DF.getitem unsupported exceptions')
     def test_df_getitem_str_literal_idx_exception_key_error(self):
         def test_impl(df):
@@ -1608,6 +2068,85 @@ class TestDataFrame(TestCase):
                 self._test_df_getitem_unbox_slice_idx(df, 1, 3)
                 self._test_df_getitem_tuple_idx(df)
                 self._test_df_getitem_bool_series_idx(df)
+
+    def test_df_getitem_str_literal_idx_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [1., -1., 0.1, -0.1],
+                'B': list(range(4)),
+                'C': [1., np.nan, np.inf, np.inf],
+            })
+            return df['A']
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_series_equal(sdc_func(), test_impl())
+
+    def test_df_getitem_unicode_idx_no_unboxing(self):
+        def test_impl(idx):
+            df = pd.DataFrame({
+                'A': [1., -1., 0.1, -0.1],
+                'B': list(range(4)),
+                'C': [1., np.nan, np.inf, np.inf],
+            })
+            return df[idx]
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_series_equal(sdc_func('A'), test_impl('A'))
+
+    def test_df_getitem_slice_idx_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [1., -1., 0.1, -0.1],
+                'B': list(range(4)),
+                'C': [1., np.nan, np.inf, np.inf],
+            })
+            return df[1:3]
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+    def test_df_getitem_unbox_slice_idx_no_unboxing(self):
+        def test_impl(start, end):
+            df = pd.DataFrame({
+                'A': [1., -1., 0.1, -0.1],
+                'B': list(range(4)),
+                'C': [1., np.nan, np.inf, np.inf],
+            })
+            return df[start:end]
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(1, 3), test_impl(1, 3))
+
+    def test_df_getitem_tuple_idx_no_unboxing(self):
+        def gen_test_impl(do_jit=False):
+            def test_impl():
+                df = pd.DataFrame({
+                    'A': [1., -1., 0.1, -0.1],
+                    'B': list(range(4)),
+                    'C': [1., np.nan, np.inf, np.inf],
+                })
+                if do_jit == True:  # noqa
+                    return df[('A', 'C')]
+                else:
+                    return df[['A', 'C']]
+
+            return test_impl
+
+        test_impl = gen_test_impl()
+        sdc_func = self.jit(gen_test_impl(do_jit=True))
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+    def test_df_getitem_bool_series_idx_no_unboxing(self):
+        def test_impl():
+            df = pd.DataFrame({
+                'A': [1., -1., 0.1, -0.1],
+                'B': list(range(4)),
+                'C': [1., np.nan, np.inf, np.inf],
+            })
+            return df[df['A'] == -1.]
+
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
     @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx_no_index(self):
@@ -1846,6 +2385,23 @@ class TestDataFrame(TestCase):
         df2.A[n // 2:] = n
         pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
 
+    def test_append_df_same_cols_no_index_no_unboxing(self):
+        def test_impl():
+            n = 11
+            df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+            df2 = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
+            df2.A[n // 2:] = n
+            return df.append(df2, ignore_index=True)
+
+        sdc_impl = self.jit(test_impl)
+
+        kwargs = {}
+        if platform.system() == 'Windows':
+            # Attribute "dtype" are different on windows int64 vs int32
+            kwargs['check_dtype'] = False
+
+        pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
+
     def test_append_df_same_cols_index_default(self):
         def test_impl(df, df2):
             return df.append(df2)
@@ -1870,6 +2426,24 @@ class TestDataFrame(TestCase):
                            index=np.arange(n2) ** 8)
 
         pd.testing.assert_frame_equal(sdc_func(df, df2), test_impl(df, df2))
+
+    def test_append_df_diff_cols_index_ignore_false_no_unboxing(self):
+        def test_impl():
+            n1 = 11
+            n2 = n1 * 2
+            df = pd.DataFrame({
+                'A': np.arange(n1), 'B': np.arange(n1) ** 2
+            }, index=np.arange(n1) ** 2)
+            df2 = pd.DataFrame({
+                'C': np.arange(n2), 'D': np.arange(n2) ** 2,
+                'E S D': np.arange(n2) + 100
+            }, index=np.arange(n2) ** 4)
+            return df.append(df2, ignore_index=False)
+
+        sdc_func = self.jit(test_impl)
+        res_jit = sdc_func()
+        res_ref = test_impl()
+        pd.testing.assert_frame_equal(res_jit, res_ref)
 
     def test_append_df_diff_cols_index_ignore_index(self):
         def test_impl(df, df2):
@@ -2183,6 +2757,18 @@ class TestDataFrame(TestCase):
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
     @skip_sdc_jit
+    def test_pct_change_with_parameters_limit_and_freq(self):
+        def test_impl(df, limit, freq):
+            return df.pct_change(limit=limit, freq=freq)
+
+        hpat_func = sdc.jit(test_impl)
+        df = pd.DataFrame({"A": [14, 4, 5, 4, 1, 55],
+                           "B": [5, 2, None, 3, 2, 32],
+                           "C": [20, 20, 7, 21, 8, None],
+                           "D": [14, None, 6, 2, 6, 4]})
+        pd.testing.assert_frame_equal(hpat_func(df, None, None), test_impl(df, None, None))
+
+    @skip_sdc_jit
     def test_pct_change_with_parametrs(self):
         def test_impl(df, periods, method):
             return df.pct_change(periods=periods, fill_method=method, limit=None, freq=None)
@@ -2256,14 +2842,13 @@ class TestDataFrame(TestCase):
         """ Verifies creation of a dataframe with a string column from a list of Optional values. """
         def test_impl():
             df = pd.DataFrame({
-                        'A': ['a', 'b', None, 'a', '', None, 'b'],
-                        'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
-                        'C': [np.nan, 1, 2, 1, np.nan, 2, 1]
+                'A': ['a', 'b', None, 'a', '', None, 'b'],
+                'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
+                'C': [np.nan, 1, 2, 1, np.nan, 2, 1]
             })
-
             return df['A'].isna()
-        hpat_func = self.jit(test_impl)
 
+        hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
     def test_df_iterate_over_columns2(self):
@@ -2271,21 +2856,22 @@ class TestDataFrame(TestCase):
         from sdc.hiframes.api import get_nan_mask
 
         @self.jit
-        def jitted_func(df):
+        def jitted_func():
+            cols = ('A', 'B', 'C', 'D')
+            df = pd.DataFrame({
+                'A': ['a', 'b', None, 'a', '', None, 'b'],
+                'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
+                'C': [np.nan, 1, 2, 1, np.nan, 2, 1],
+                'D': [1, 2, 9, 5, 2, 1, 0]
+            })
             res_nan_mask = np.zeros(len(df), dtype=np.bool_)
-            for col in literal_unroll(df._data):
-                res_nan_mask += get_nan_mask(col)
+            for col in literal_unroll(cols):
+                res_nan_mask += get_nan_mask(df[col].values)
             return res_nan_mask
 
-        df = pd.DataFrame({
-                    'A': ['a', 'b', None, 'a', '', None, 'b'],
-                    'B': ['a', 'b', 'd', 'a', '', 'c', 'b'],
-                    'C': [np.nan, 1, 2, 1, np.nan, 2, 1],
-                    'D': [1, 2, 9, 5, 2, 1, 0]
-        })
         # expected is a boolean mask of df rows that have None values
         expected = np.asarray([True, False, True, False, True, True, False])
-        result = jitted_func(df)
+        result = jitted_func()
         np.testing.assert_array_equal(result, expected)
 
 

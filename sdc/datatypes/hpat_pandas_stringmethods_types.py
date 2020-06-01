@@ -32,11 +32,11 @@
 
 import pandas
 
-from numba import types, cgutils
+from numba import types
+from numba.core import cgutils
 from numba.extending import (models, overload, register_model, make_attribute_wrapper, intrinsic)
-from numba.datamodel import (register_default, StructModel)
-from numba.typing.templates import signature
-from sdc.hiframes.split_impl import SplitViewStringMethodsType, StringArraySplitViewType
+from numba.core.datamodel import (register_default, StructModel)
+from numba.core.typing.templates import signature
 from sdc.utilities.utils import sdc_overload
 
 
@@ -116,8 +116,6 @@ def _gen_hpat_pandas_stringmethods_init(string_methods_type=None):
 
 _hpat_pandas_stringmethods_init = intrinsic(
     _gen_hpat_pandas_stringmethods_init(string_methods_type=StringMethodsType))
-_hpat_pandas_split_view_stringmethods_init = intrinsic(
-    _gen_hpat_pandas_stringmethods_init(string_methods_type=SplitViewStringMethodsType))
 
 
 @sdc_overload(pandas.core.strings.StringMethods)
@@ -126,11 +124,6 @@ def hpat_pandas_stringmethods(obj):
     Special Numba procedure to overload Python type pandas.core.strings.StringMethods::ctor()
     with Numba registered model
     """
-    if isinstance(obj.data, StringArraySplitViewType):
-        def hpat_pandas_split_view_stringmethods_impl(obj):
-            return _hpat_pandas_split_view_stringmethods_init(obj)
-
-        return hpat_pandas_split_view_stringmethods_impl
 
     def hpat_pandas_stringmethods_impl(obj):
         return _hpat_pandas_stringmethods_init(obj)

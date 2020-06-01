@@ -24,10 +24,10 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from numba import cgutils, types
-from numba.datamodel import StructModel
+from numba.core import cgutils, types
+from numba.core.datamodel import StructModel
 from numba.extending import make_attribute_wrapper, models
-from numba.typing.templates import signature
+from numba.core.typing.templates import signature
 from sdc.utilities.sdc_typing_utils import TypeChecker
 
 

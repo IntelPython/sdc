@@ -40,7 +40,8 @@ def series_groupby():
     S = pd.Series([390., 350., 30., 20.])
     by = np.asarray([0, 1, 0, 1])
 
+    # Expect Series of pd.Series([210.0, 185.0], index=[0, 1])
     return S.groupby(by).mean()
 
 
-# print(series_groupby())
+print(series_groupby())

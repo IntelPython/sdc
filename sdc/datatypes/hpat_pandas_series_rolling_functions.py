@@ -31,11 +31,12 @@ from functools import partial
 
 from numba import prange
 from numba.extending import register_jitable
-from numba.types import (float64, Boolean, Integer, NoneType, Number,
+from numba.core.types import (float64, Boolean, Integer, NoneType, Number,
                          Omitted, StringLiteral, UnicodeType)
 
 from sdc.datatypes.common_functions import _almost_equal
 from sdc.datatypes.hpat_pandas_series_rolling_types import SeriesRollingType
+from sdc.functions.statistics import skew_formula
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker
@@ -549,15 +550,7 @@ def skew_result_or_nan(nfinite, minp, result):
 
     _sum, square_sum, cube_sum = result
 
-    n = nfinite
-    m2 = (square_sum - _sum * _sum / n) / n
-    m3 = (cube_sum - 3.*_sum*square_sum/n + 2.*_sum*_sum*_sum/n/n) / n
-    res = 0 if m2 == 0 else m3 / m2 ** 1.5
-
-    if (n > 2) & (m2 > 0):
-        res = numpy.sqrt((n - 1.) * n) / (n - 2.) * m3 / m2 ** 1.5
-
-    return res
+    return skew_formula(nfinite, _sum, square_sum, cube_sum)
 
 
 @sdc_register_jitable
@@ -1154,8 +1147,10 @@ hpat_pandas_series_rolling_apply.__doc__ = hpat_pandas_series_rolling_docstring_
     """
     Limitations
     -----------
-    Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
-    DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
+    - This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    - Supported ``raw`` only can be `None` or `True`. Parameters ``args``, ``kwargs`` unsupported.
+    - DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,
     'extra_params':
     """
@@ -1243,7 +1238,13 @@ hpat_pandas_series_rolling_mean.__doc__ = hpat_pandas_series_rolling_docstring_t
 hpat_pandas_series_rolling_median.__doc__ = hpat_pandas_series_rolling_docstring_tmpl.format(**{
     'method_name': 'median',
     'example_caption': 'Calculate the rolling median.',
-    'limitations_block': '',
+    'limitations_block':
+    """
+    Limitations
+    -----------
+    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
+    """,
     'extra_params': ''
 })
 
@@ -1261,6 +1262,8 @@ hpat_pandas_series_rolling_quantile.__doc__ = hpat_pandas_series_rolling_docstri
     """
     Limitations
     -----------
+    This function may reveal slower performance than Pandas* on user system. Users should exercise a tradeoff
+    between staying in JIT-region with that function or going back to interpreter mode.
     Supported ``interpolation`` only can be `'linear'`.
     DataFrame/Series elements cannot be max/min float/integer. Otherwise SDC and Pandas results are different.
     """,

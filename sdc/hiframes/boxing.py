@@ -29,32 +29,30 @@
 import pandas as pd
 import pandas.api.types
 import numpy as np
-import datetime
 import numba
 from numba.extending import (typeof_impl, unbox, register_model, models,
                              NativeValue, box, intrinsic)
-from numba import numpy_support, types, cgutils
-from numba.typing import signature
-from numba.targets.boxing import box_array, unbox_array, box_list
-from numba.targets.boxing import _NumbaTypeHelper
-from numba.targets import listobj
+from numba import types
+from numba.core import cgutils
+from numba.np import numpy_support
+from numba.core.typing import signature
+from numba.core.boxing import box_array, unbox_array, box_list
+from numba.core.boxing import _NumbaTypeHelper
+from numba.cpython import listobj
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
-from sdc.hiframes.pd_timestamp_ext import (datetime_date_type,
-                                            unbox_datetime_date_array, box_datetime_date_array)
 from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
-from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype,
-                                              box_categorical_array, unbox_categorical_array)
-from sdc.hiframes.pd_series_ext import (SeriesType, arr_to_series_type,
-                                         _get_series_array_type)
-from sdc.hiframes.split_impl import (string_array_split_view_type,
-                                      box_str_arr_split_view)
+from sdc.datatypes.categorical.types import CategoricalDtypeType, Categorical
+from sdc.datatypes.categorical.boxing import unbox_Categorical, box_Categorical
+from sdc.hiframes.pd_series_ext import SeriesType
+from sdc.hiframes.pd_series_type import _get_series_array_type
+
+from sdc.hiframes.pd_dataframe_ext import get_structure_maps
 
 from .. import hstr_ext
 import llvmlite.binding as ll
 from llvmlite import ir as lir
-import llvmlite.llvmpy.core as lc
 from llvmlite.llvmpy.core import Type as LLType
 ll.add_symbol('array_size', hstr_ext.array_size)
 ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
@@ -62,12 +60,14 @@ ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
 
 @typeof_impl.register(pd.DataFrame)
 def typeof_pd_dataframe(val, c):
+
     col_names = tuple(val.columns.tolist())
     # TODO: support other types like string and timestamp
     col_types = get_hiframes_dtypes(val)
     index_type = _infer_index_type(val.index)
+    column_loc, _, _ = get_structure_maps(col_types, col_names)
 
-    return DataFrameType(col_types, index_type, col_names, True)
+    return DataFrameType(col_types, index_type, col_names, True, column_loc=column_loc)
 
 
 # register series types for import
@@ -79,40 +79,66 @@ def typeof_pd_str_series(val, c):
         _infer_series_dtype(val), index=index_type, is_named=is_named)
 
 
-@typeof_impl.register(pd.Index)
-def typeof_pd_index(val, c):
-    if len(val) > 0 and isinstance(val[0], datetime.date):
-        return SeriesType(datetime_date_type)
-    else:
-        raise NotImplementedError("unsupported pd.Index type")
-
-
 @unbox(DataFrameType)
 def unbox_dataframe(typ, val, c):
     """unbox dataframe to an empty DataFrame struct
     columns will be extracted later if necessary.
     """
     n_cols = len(typ.columns)
-    column_strs = [numba.unicode.make_string_from_constant(
+    column_strs = [numba.cpython.unicode.make_string_from_constant(
         c.context, c.builder, string_type, a) for a in typ.columns]
     # create dataframe struct and store values
     dataframe = cgutils.create_struct_proxy(typ)(c.context, c.builder)
 
-    column_tup = c.context.make_tuple(
-        c.builder, types.UniTuple(string_type, n_cols), column_strs)
+    errorptr = cgutils.alloca_once_value(c.builder, cgutils.false_bit)
 
-    # this unboxes all DF columns so that no column unboxing occurs later
-    for col_ind in range(n_cols):
-        series_obj = c.pyapi.object_getattr_string(val, typ.columns[col_ind])
-        arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
-        ty_series = typ.data[col_ind]
-        if isinstance(ty_series, types.Array):
-            native_val = unbox_array(typ.data[col_ind], arr_obj, c)
-        elif ty_series == string_array_type:
-            native_val = unbox_str_series(string_array_type, series_obj, c)
+    col_list_type = types.List(string_type)
+    ok, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, col_list_type, n_cols)
 
-        dataframe.data = c.builder.insert_value(
-            dataframe.data, native_val.value, col_ind)
+    with c.builder.if_else(ok, likely=True) as (if_ok, if_not_ok):
+        with if_ok:
+            inst.size = c.context.get_constant(types.intp, n_cols)
+            for i, column_str in enumerate(column_strs):
+                inst.setitem(c.context.get_constant(types.intp, i), column_str, incref=False)
+            dataframe.columns = inst.value
+
+        with if_not_ok:
+            c.builder.store(cgutils.true_bit, errorptr)
+
+    # If an error occurred, drop the whole native list
+    with c.builder.if_then(c.builder.load(errorptr)):
+        c.context.nrt.decref(c.builder, col_list_type, inst.value)
+
+    _, data_typs_map, types_order = get_structure_maps(typ.data, typ.columns)
+
+    for col_typ in types_order:
+        type_id, col_indices = data_typs_map[col_typ]
+        n_type_cols = len(col_indices)
+        list_type = types.List(col_typ)
+        ok, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, list_type, n_type_cols)
+
+        with c.builder.if_else(ok, likely=True) as (if_ok, if_not_ok):
+            with if_ok:
+                inst.size = c.context.get_constant(types.intp, n_type_cols)
+                for i, col_idx in enumerate(col_indices):
+                    series_obj = c.pyapi.object_getattr_string(val, typ.columns[col_idx])
+                    arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
+                    ty_series = typ.data[col_idx]
+                    if isinstance(ty_series, types.Array):
+                        native_val = unbox_array(typ.data[col_idx], arr_obj, c)
+                    elif ty_series == string_array_type:
+                        native_val = unbox_str_series(string_array_type, series_obj, c)
+
+                    inst.setitem(c.context.get_constant(types.intp, i), native_val.value, incref=False)
+
+                dataframe.data = c.builder.insert_value(dataframe.data, inst.value, type_id)
+
+            with if_not_ok:
+                c.builder.store(cgutils.true_bit, errorptr)
+
+        # If an error occurred, drop the whole native list
+        with c.builder.if_then(c.builder.load(errorptr)):
+            c.context.nrt.decref(c.builder, list_type, inst.value)
 
     # TODO: support unboxing index
     if typ.index == types.none:
@@ -125,7 +151,6 @@ def unbox_dataframe(typ, val, c):
         index_data = c.pyapi.object_getattr_string(index_obj, "_data")
         dataframe.index = unbox_array(typ.index, index_data, c).value
 
-    dataframe.columns = column_tup
     dataframe.parent = val
 
     # increase refcount of stored values
@@ -134,7 +159,7 @@ def unbox_dataframe(typ, val, c):
         for var in column_strs:
             c.context.nrt.incref(c.builder, string_type, var)
 
-    return NativeValue(dataframe._getvalue())
+    return NativeValue(dataframe._getvalue(), is_error=c.builder.load(errorptr))
 
 
 def get_hiframes_dtypes(df):
@@ -162,15 +187,11 @@ def _infer_series_dtype(S):
             return _infer_series_list_dtype(S)
         elif isinstance(first_val, str):
             return string_type
-        elif isinstance(S.values[0], datetime.date):
-            # XXX: using .values to check date type since DatetimeIndex returns
-            # Timestamp which is subtype of datetime.date
-            return datetime_date_type
         else:
             raise ValueError(
                 "object dtype infer: data type for column {} not supported".format(S.name))
-    elif isinstance(S.dtype, pandas.api.types.CategoricalDtype):
-        return PDCategoricalDtype(S.dtype.categories)
+    elif isinstance(S.dtype, pd.CategoricalDtype):
+        return numba.typeof(S.dtype)
     # regular numpy types
     try:
         return numpy_support.from_dtype(S.dtype)
@@ -218,53 +239,56 @@ def box_dataframe(typ, val, c):
     context = c.context
     builder = c.builder
 
-    n_cols = len(typ.columns)
     col_names = typ.columns
     arr_typs = typ.data
-    dtypes = [a.dtype for a in arr_typs]  # TODO: check Categorical
 
     dataframe = cgutils.create_struct_proxy(typ)(context, builder, value=val)
-    col_arrs = [builder.extract_value(dataframe.data, i) for i in range(n_cols)]
-    # df unboxed from Python
-    has_parent = cgutils.is_not_null(builder, dataframe.parent)
 
     pyapi = c.pyapi
     # gil_state = pyapi.gil_ensure()  # acquire GIL
 
     mod_name = context.insert_const_string(c.builder.module, "pandas")
     class_obj = pyapi.import_module_noblock(mod_name)
-    df_obj = pyapi.call_method(class_obj, "DataFrame", ())
+    df_dict = pyapi.dict_new()
 
-    for i, cname, arr, arr_typ, dtype in zip(range(n_cols), col_names, col_arrs, arr_typs, dtypes):
+    arrays_list_objs = {}
+    for cname, arr_typ in zip(col_names, arr_typs):
         # df['cname'] = boxed_arr
         # TODO: datetime.date, DatetimeIndex?
         name_str = context.insert_const_string(c.builder.module, cname)
         cname_obj = pyapi.string_from_string(name_str)
 
-        if dtype == string_type:
-            arr_obj = box_str_arr(arr_typ, arr, c)
-        elif isinstance(dtype, PDCategoricalDtype):
-            arr_obj = box_categorical_array(arr_typ, arr, c)
-            # context.nrt.incref(builder, arr_typ, arr)
-        elif arr_typ == string_array_split_view_type:
-            arr_obj = box_str_arr_split_view(arr_typ, arr, c)
-        elif dtype == types.List(string_type):
-            arr_obj = box_list(list_string_array_type, arr, c)
-            # context.nrt.incref(builder, arr_typ, arr)  # TODO required?
-            # pyapi.print_object(arr_obj)
-        else:
-            arr_obj = box_array(arr_typ, arr, c)
-            # TODO: is incref required?
-            # context.nrt.incref(builder, arr_typ, arr)
-        pyapi.object_setitem(df_obj, cname_obj, arr_obj)
+        col_loc = typ.column_loc[cname]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
 
-        # pyapi.decref(arr_obj)
+        # dataframe.data looks like a tuple(list(array))
+        # e.g. ([array(int64, 1d, C), array(int64, 1d, C)], [array(float64, 1d, C)])
+        arrays_list_obj = arrays_list_objs.get(type_id)
+        if arrays_list_obj is None:
+            list_typ = types.List(arr_typ)
+            # extracting list from the tuple
+            list_val = builder.extract_value(dataframe.data, type_id)
+            # getting array from the list to box it then
+            arrays_list_obj = box_list(list_typ, list_val, c)
+            arrays_list_objs[type_id] = arrays_list_obj
+
+        # PyList_GetItem returns borrowed reference
+        arr_obj = pyapi.list_getitem(arrays_list_obj, col_id)
+        pyapi.dict_setitem(df_dict, cname_obj, arr_obj)
+
         pyapi.decref(cname_obj)
+
+    df_obj = pyapi.call_method(class_obj, "DataFrame", (df_dict,))
+    pyapi.decref(df_dict)
 
     # set df.index if necessary
     if typ.index != types.none:
         arr_obj = _box_series_data(typ.index.dtype, typ.index, dataframe.index, c)
         pyapi.object_setattr_string(df_obj, 'index', arr_obj)
+        pyapi.decref(arr_obj)
+
+    for arrays_list_obj in arrays_list_objs.values():
+        pyapi.decref(arrays_list_obj)
 
     pyapi.decref(class_obj)
     # pyapi.gil_release(gil_state)    # release GIL
@@ -322,7 +346,7 @@ def unbox_series(typ, val, c):
 
     if typ.is_named:
         name_obj = c.pyapi.object_getattr_string(val, "name")
-        series.name = numba.unicode.unbox_unicode_str(
+        series.name = numba.cpython.unicode.unbox_unicode_str(
             string_type, name_obj, c).value
     # TODO: handle index and name
     c.pyapi.decref(arr_obj)
@@ -332,16 +356,10 @@ def unbox_series(typ, val, c):
 def _unbox_series_data(dtype, data_typ, arr_obj, c):
     if data_typ == string_array_type:
         return unbox_str_series(string_array_type, arr_obj, c)
-    elif dtype == datetime_date_type:
-        return unbox_datetime_date_array(data_typ, arr_obj, c)
     elif data_typ == list_string_array_type:
         return _unbox_array_list_str(arr_obj, c)
-    elif data_typ == string_array_split_view_type:
-        # XXX dummy unboxing to avoid errors in _get_dataframe_data()
-        out_view = c.context.make_helper(c.builder, string_array_split_view_type)
-        return NativeValue(out_view._getvalue())
-    elif isinstance(dtype, PDCategoricalDtype):
-        return unbox_categorical_array(data_typ, arr_obj, c)
+    elif isinstance(dtype, CategoricalDtypeType):
+        return unbox_Categorical(data_typ, arr_obj, c)
 
     # TODO: error handling like Numba callwrappers.py
     return unbox_array(data_typ, arr_obj, c)
@@ -376,6 +394,10 @@ def box_series(typ, val, c):
     res = c.pyapi.call_method(
         pd_class_obj, "Series", (arr, index, dtype, name))
 
+    c.pyapi.decref(arr)
+    c.pyapi.decref(index)
+    c.pyapi.decref(dtype)
+    c.pyapi.decref(name)
     c.pyapi.decref(pd_class_obj)
     return res
 
@@ -385,16 +407,12 @@ def _box_series_data(dtype, data_typ, val, c):
     if isinstance(dtype, types.BaseTuple):
         np_dtype = np.dtype(
             ','.join(str(t) for t in dtype.types), align=True)
-        dtype = numba.numpy_support.from_dtype(np_dtype)
+        dtype = numba.np.numpy_support.from_dtype(np_dtype)
 
     if dtype == string_type:
         arr = box_str_arr(string_array_type, val, c)
-    elif dtype == datetime_date_type:
-        arr = box_datetime_date_array(data_typ, val, c)
-    elif isinstance(dtype, PDCategoricalDtype):
-        arr = box_categorical_array(data_typ, val, c)
-    elif data_typ == string_array_split_view_type:
-        arr = box_str_arr_split_view(data_typ, val, c)
+    elif isinstance(dtype, CategoricalDtypeType):
+        arr = box_Categorical(data_typ, val, c)
     elif dtype == types.List(string_type):
         arr = box_list(list_string_array_type, val, c)
     else:

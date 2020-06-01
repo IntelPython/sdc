@@ -38,11 +38,13 @@ import sys
 import pandas
 import numpy as np
 
-from numba import types, jit, prange, numpy_support, literally
-from numba.errors import TypingError
-from numba.targets.arraymath import get_isnan
+from numba import types, prange, literally
+from numba.np import numpy_support
+from numba.np.arraymath import get_isnan
+from numba.typed import List
 
 import sdc
+from sdc.functions.statistics import skew_formula
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
@@ -645,7 +647,7 @@ def nanprod(a):
 @sdc_overload(nanprod)
 def np_nanprod(a):
     """
-    Reimplemented with parfor from numba.targets.arraymath.
+    Reimplemented with parfor from numba.np.arraymath.
     """
     if not isinstance(a, types.Array):
         return
@@ -710,6 +712,26 @@ def dropna_overload(arr, idx, name):
     return dropna_impl
 
 
+def find_idx(arr, idx):
+    pass
+
+
+@sdc_overload(find_idx)
+def find_idx_overload(arr, idx):
+    def find_idx_impl(arr, idx):
+        chunks = parallel_chunks(len(arr))
+        new_arr = [List.empty_list(types.int64) for i in range(len(chunks))]
+        for i in prange(len(chunks)):
+            chunk = chunks[i]
+            for j in range(chunk.start, chunk.stop):
+                if arr[j] == idx:
+                    new_arr[i].append(j)
+
+        return new_arr
+
+    return find_idx_impl
+
+
 def nanmean(a):
     pass
 
@@ -744,7 +766,10 @@ def corr_overload(self, other, method='pearson', min_periods=None):
         if method not in ('pearson', ''):
             raise ValueError("Method corr(). Unsupported parameter. Given method != 'pearson'")
 
-        if min_periods is None or min_periods < 1:
+        if min_periods is None:
+            min_periods = 1
+
+        if min_periods < 1:
             min_periods = 1
 
         min_len = min(len(self._data), len(other._data))
@@ -900,9 +925,30 @@ def getitem_by_mask(arr, idx):
 
 @sdc_overload(getitem_by_mask)
 def getitem_by_mask_overload(arr, idx):
-    dtype = arr.dtype
-    is_str_arr = arr == string_array_type
+    """
+    Creates a new array from arr by selecting elements indicated by Boolean mask idx.
 
+    Parameters
+    -----------
+    arr: :obj:`Array` or :obj:`Range`
+        Input array or range
+    idx: :obj:`Array` of dtype :class:`bool`
+        Boolean mask
+
+    Returns
+    -------
+    :obj:`Array` of the same dtype as arr
+        Array with only elements indicated by mask left
+
+    """
+
+    is_range = isinstance(arr, types.RangeType) and isinstance(arr.dtype, types.Integer)
+    is_str_arr = arr == string_array_type
+    if not (isinstance(arr, types.Array) or is_str_arr or is_range):
+        return
+
+    res_dtype = arr.dtype
+    is_str_arr = arr == string_array_type
     def getitem_by_mask_impl(arr, idx):
         chunks = parallel_chunks(len(arr))
         arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
@@ -921,7 +967,7 @@ def getitem_by_mask_overload(arr, idx):
             result_data = [''] * length
             result_nan_mask = numpy.empty(shape=length, dtype=types.bool_)
         else:
-            result_data = numpy.empty(shape=length, dtype=dtype)
+            result_data = numpy.empty(shape=length, dtype=res_dtype)
         for i in prange(len(chunks)):
             chunk = chunks[i]
             new_start = int(sum(arr_len[0:i]))
@@ -929,7 +975,11 @@ def getitem_by_mask_overload(arr, idx):
 
             for j in range(chunk.start, chunk.stop):
                 if idx[j]:
-                    result_data[current_pos] = arr[j]
+                    if is_range == True:  # noqa
+                        value = arr.start + arr.step * j
+                    else:
+                        value = arr[j]
+                    result_data[current_pos] = value
                     if is_str_arr == True:  # noqa
                         result_nan_mask[current_pos] = isna(arr, j)
                     current_pos += 1
@@ -942,3 +992,65 @@ def getitem_by_mask_overload(arr, idx):
             return result_data
 
     return getitem_by_mask_impl
+
+
+def skew(a):
+    pass
+
+
+def nanskew(a):
+    pass
+
+
+@sdc_overload(skew)
+def np_skew(arr):
+    if not isinstance(arr, types.Array):
+        return
+
+    def skew_impl(arr):
+        len_val = len(arr)
+        n = 0
+        _sum = 0.
+        square_sum = 0.
+        cube_sum = 0.
+
+        for idx in numba.prange(len_val):
+            if not numpy.isnan(arr[idx]):
+                n += 1
+                _sum += arr[idx]
+                square_sum += arr[idx] ** 2
+                cube_sum += arr[idx] ** 3
+
+        if n == 0 or n < len_val:
+            return numpy.nan
+
+        return skew_formula(n, _sum, square_sum, cube_sum)
+
+    return skew_impl
+
+
+@sdc_overload(nanskew)
+def np_nanskew(arr):
+    if not isinstance(arr, types.Array):
+        return
+
+    def nanskew_impl(arr):
+        len_val = len(arr)
+        n = 0
+        _sum = 0.
+        square_sum = 0.
+        cube_sum = 0.
+
+        for idx in numba.prange(len_val):
+            if not numpy.isnan(arr[idx]):
+                n += 1
+                _sum += arr[idx]
+                square_sum += arr[idx] ** 2
+                cube_sum += arr[idx] ** 3
+
+        if n == 0:
+            return numpy.nan
+
+        return skew_formula(n, _sum, square_sum, cube_sum)
+
+    return nanskew_impl

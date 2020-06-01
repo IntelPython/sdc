@@ -1,13 +1,13 @@
-{% set NUMBA_VERSION = "==0.48" %}
+{% set NUMBA_VERSION = "==0.49.1" %}
 {% set PANDAS_VERSION = "==0.25.3" %}
-{% set PYARROW_VERSION = "==0.15.1" %}
+{% set PYARROW_VERSION = "==0.17.0" %}
 
 package:
   name: sdc
   version: {{ GIT_DESCRIBE_TAG }}
 
 source:
-   path: ../..
+   path: ../
 
 build:
   number: {{ GIT_DESCRIBE_NUMBER|int }}
@@ -32,15 +32,13 @@ requirements:
 
   run:
     - python
-    - {{ pin_compatible('numpy') }}
+    - numpy
     - pandas  {{ PANDAS_VERSION }}
     - pyarrow {{ PYARROW_VERSION }}
     - numba   {{ NUMBA_VERSION }}
     - setuptools
 
 test:
-  requires:
-    - scipy
   imports:
     - sdc
 
