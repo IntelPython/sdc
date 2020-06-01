@@ -4891,7 +4891,7 @@ def sdc_pandas_series_skew(self, axis=None, skipna=None, level=None, numeric_onl
     return sdc_pandas_series_skew_impl
 
 
-@sdc_overload_method(SeriesType, 'combine')
+@sdc_overload_method(SeriesType, 'combine', jit_options={'error_model': 'numpy'})
 def sdc_pandas_series_combine(self, other, func, fill_value=None):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -4901,8 +4901,12 @@ def sdc_pandas_series_combine(self, other, func, fill_value=None):
 
     Limitations
     -----------
-    - Only supports the case when data in series of the same type.
-    - With the default fill_value parameter value, the type of the resulting series will be float.
+    - Resulting series dtype may be wider than in pandas due to
+      type-stability requirements and depends on fill_value dtype
+      and result of series indexes alignment.
+    - Indixes should be strictly ascending, as inside the function
+      they are sorted in ascending order and the answer becomes
+      different from the result of the pandas.
 
     Examples
     --------
@@ -4949,17 +4953,14 @@ def sdc_pandas_series_combine(self, other, func, fill_value=None):
 
         result = numpy.empty(len_val, res_dtype)
 
-        chunks = parallel_chunks(len_val)
-        for i in prange(len(chunks)):
-            chunk = chunks[i]
-            for j in range(chunk.start, chunk.stop):
-                self_idx = self_indexes[j]
-                val_self = _fill_value if self_idx == -1 else self._data[self_idx]
+        for i in prange(len_val):
+            self_idx, other_idx = self_indexes[i], other_indexes[i]
+            val_self = _fill_value if self_idx == -1 else self._data[self_idx]
 
-                other_idx = other_indexes[j]
-                val_other = _fill_value if other_idx == -1 else other._data[other_idx]
+            val_other = _fill_value if other_idx == -1 else other._data[other_idx]
 
-                result[j] = func(val_self, val_other)
+            result[i] = func(val_self, val_other)
+
         return pandas.Series(result, index=indexes)
 
     return sdc_pandas_series_combine_impl
