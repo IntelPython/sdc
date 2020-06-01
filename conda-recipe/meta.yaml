@@ -29,6 +29,7 @@ requirements:
     - pandas  {{ PANDAS_VERSION }}
     - pyarrow {{ PYARROW_VERSION }}
     - wheel
+    - tbb-devel
 
   run:
     - python
@@ -37,6 +38,7 @@ requirements:
     - pyarrow {{ PYARROW_VERSION }}
     - numba   {{ NUMBA_VERSION }}
     - setuptools
+    - tbb4py
 
 test:
   imports:
@@ -58,6 +60,7 @@ outputs:
         - numpy
         - pandas  {{ PANDAS_VERSION }}
         - pyarrow {{ PYARROW_VERSION }}
+        - tbb-devel
 
 about:
   home: https://github.com/IntelPython/sdc
