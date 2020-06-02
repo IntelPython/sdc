@@ -2536,12 +2536,15 @@ def sdc_pandas_dataframe_isin_dict_codegen(func_name, df_type, values, all_param
     joined = ', '.join(all_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     df = all_params[0]
+    column_loc = df_type.column_loc
     for i, c in enumerate(df_type.columns):
+        col_loc = column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f'result_{c}'
         func_lines += [
             f'  result_len=len({df})',
             f'  if "{c}" in list(values.keys()):',
-            f'    series_{c} = pandas.Series({df}._data[{i}])',
+            f'    series_{c} = pandas.Series({df}._data[{type_id}][{col_id}])',
             f'    val = list(values["{c}"])',
             f'    result_{c} = series_{c}.{func_name}(val)',
             f'  else:',
@@ -2603,10 +2606,13 @@ def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params
     joined = ', '.join(all_params)
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     df = all_params[0]
+    column_loc = df_type.column_loc
     for i, c in enumerate(df_type.columns):
+        col_loc = column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f'result_{c}'
         func_lines += [
-            f'  series_{c} = pandas.Series({df}._data[{i}])',
+            f'  series_{c} = pandas.Series({df}._data[{type_id}][{col_id}])',
             f'  result = numpy.empty(len(series_{c}._data), numpy.bool_)',
             f'  result_len = len(series_{c}._data)'
         ]
@@ -2731,9 +2737,12 @@ def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params):
     func_lines = [f'def _df_{func_name}_impl({joined}):']
     df = all_params[0]
     val = all_params[1]
+    column_loc = df_type.column_loc
     for i, c in enumerate(df_type.columns):
+        col_loc = column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
         result_c = f'result_{c}'
-        func_lines += [f'  series_{c} = pandas.Series({df}._data[{i}])']
+        func_lines += [f'  series_{c} = pandas.Series({df}._data[{type_id}][{col_id}])']
         if c in in_df.columns:
             func_lines += [
                 f'  series_{c}_values = pandas.Series({val}.{c})',
@@ -2834,8 +2843,8 @@ def sdc_pandas_dataframe_isin_dict(name, df, values, all_params):
     return gen_codegen(sdc_pandas_dataframe_isin_dict_codegen, name, df, values, all_params)
 
 
-def sdc_pandas_dataframe_isin_iter(name, all_params, ser_par, columns):
-    func_text, global_vars = _dataframe_apply_columns_codegen(name, all_params, ser_par, columns)
+def sdc_pandas_dataframe_isin_iter(name, all_params, ser_par, columns, column_loc):
+    func_text, global_vars = _dataframe_apply_columns_codegen(name, all_params, ser_par, columns, column_loc)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
     _apply_impl = loc_vars[f'_df_{name}_impl']
@@ -2895,17 +2904,6 @@ def isin_overload(df, values):
     .. only:: developer
 
         Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_isin*
-
-    Parameters
-    -----------
-    df: :class:`pandas.DataFrame`
-        input arg
-    values: iterable, Series, DataFrame or dict
-
-    Returns
-    -------
-    :obj:`pandas.Series` or `pandas.DataFrame`
-            Whether each element in the DataFrame is contained in values.
     """
 
     name = 'isin'
@@ -2920,7 +2918,7 @@ def isin_overload(df, values):
 
     if isinstance(values, (types.List, types.Set)):
         ser_par = 'values=values'
-        return sdc_pandas_dataframe_isin_iter(name, all_params, ser_par, df.columns)
+        return sdc_pandas_dataframe_isin_iter(name, all_params, ser_par, df.columns, df.column_loc)
 
     if isinstance(values, types.DictType):
         return sdc_pandas_dataframe_isin_dict(name, df, values, all_params)
