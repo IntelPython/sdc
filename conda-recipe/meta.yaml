@@ -29,7 +29,6 @@ requirements:
     - pandas  {{ PANDAS_VERSION }}
     - pyarrow {{ PYARROW_VERSION }}
     - wheel
-    - tbb
     - tbb-devel
 
   run:
@@ -39,7 +38,7 @@ requirements:
     - pyarrow {{ PYARROW_VERSION }}
     - numba   {{ NUMBA_VERSION }}
     - setuptools
-    - tbb
+    - tbb4py
 
 test:
   imports:
@@ -61,7 +60,6 @@ outputs:
         - numpy
         - pandas  {{ PANDAS_VERSION }}
         - pyarrow {{ PYARROW_VERSION }}
-        - tbb
         - tbb-devel
 
 about:
