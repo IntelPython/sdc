@@ -27,7 +27,7 @@
 import os
 import numpy as np
 import pyarrow as pa
-import pyarrow.parquet as pq
+# import pyarrow.parquet as pq
 import pandas as pd
 
 
@@ -158,8 +158,8 @@ def generate_other_data():
 
 if __name__ == "__main__":
     print(f'generation phase in {os.getcwd()}')
-    ParquetGenerator.gen_kde_pq()
-    ParquetGenerator.gen_pq_test()
-    generate_spark_data()
+    # ParquetGenerator.gen_kde_pq()
+    # ParquetGenerator.gen_pq_test()
+    # generate_spark_data()
     generate_csv_data()
-    generate_other_data()
+    # generate_other_data()
