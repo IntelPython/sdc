@@ -80,9 +80,9 @@ Building on Linux with setuptools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ::
 
-    PYVER=<3.6 or 3.7>
-    NUMPYVER=<1.16 or 1.17>
-    conda create -n sdc-env -q -y -c intel/label/beta -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER numba=0.49 pandas=0.25.3 pyarrow=0.17.0 gcc_linux-64 gxx_linux-64
+    export PYVER=<3.6 or 3.7>
+    export NUMPYVER=<1.16 or 1.17>
+    conda create -n sdc-env -q -y -c intel/label/beta -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER tbb-devel tbb4py numba=0.49 pandas=0.25.3 pyarrow=0.17.0 gcc_linux-64 gxx_linux-64
     source activate sdc-env
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
@@ -120,7 +120,7 @@ Building on Windows with setuptools
 
     set PYVER=<3.6 or 3.7>
     set NUMPYVER=<1.16 or 1.17>
-    conda create -n sdc-env -c intel/label/beta -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% numba=0.49 pandas=0.25.3 pyarrow=0.17.0
+    conda create -n sdc-env -c intel/label/beta -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% tbb-devel tbb4py numba=0.49 pandas=0.25.3 pyarrow=0.17.0
     conda activate sdc-env
     set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
     set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
