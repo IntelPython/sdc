@@ -5652,7 +5652,7 @@ class TestSeries(
                        'not a Boolean or integer indexer or a Slice. Given: self.index={}, idx={}'
             with self.assertRaises(TypingError) as raises:
                 hpat_func(S, idx, value)
-            msg = msg_tmpl.format('RangeIndexType(False)', 'unicode_type')
+            msg = msg_tmpl.format('none', 'unicode_type')
             self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')

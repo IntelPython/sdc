@@ -429,13 +429,15 @@ def hpat_pandas_series_getitem(self, idx):
 
         def _series_getitem_idx_bool_indexer_impl(self, idx):
 
+            # TO-DO: replace sdc_reindex_series with reindex methods and move this logic to impl
+            # for specific index types (needs proper index type instead of types.none as index)
             if none_indexes == True:  # noqa
                 if len(self) > len(idx):
                     msg = "Unalignable boolean Series provided as indexer " + \
                           "(index of the boolean Series and of the indexed object do not match)."
                     raise IndexingError(msg)
 
-                self_index = range(len(self))
+                self_index = self.index
                 reindexed_idx = idx
             else:
                 self_index = self.index
@@ -1648,9 +1650,9 @@ def hpat_pandas_series_index(self):
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if isinstance(self.index, types.NoneType) or self.index is None:
+    if isinstance(self.index, types.NoneType):
         def hpat_pandas_series_index_none_impl(self):
-            return numpy.arange(len(self._data))
+            return pandas.RangeIndex(len(self._data))
 
         return hpat_pandas_series_index_none_impl
     else:
@@ -2200,12 +2202,12 @@ def hpat_pandas_series_copy(self, deep=True):
     if not isinstance(deep, (types.Omitted, types.Boolean)) and not deep:
         ty_checker.raise_exc(deep, 'boolean', 'deep')
 
-    if isinstance(self.index, RangeIndexType):
+    if isinstance(self.index, types.NoneType):
         def hpat_pandas_series_copy_impl(self, deep=True):
             if deep:
-                return pandas.Series(data=numpy_like.copy(self._data), index=self._index.copy(), name=self._name)
+                return pandas.Series(data=numpy_like.copy(self._data), name=self._name)
             else:
-                return pandas.Series(data=self._data, index=self._index, name=self._name)
+                return pandas.Series(data=self._data, name=self._name)
         return hpat_pandas_series_copy_impl
     else:
         def hpat_pandas_series_copy_impl(self, deep=True):
@@ -4005,7 +4007,7 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
     if not (inplace is False or isinstance(inplace, types.Omitted)):
         ty_checker.raise_exc(inplace, 'bool', 'inplace')
 
-    if isinstance(self.data.dtype, types.Number) and isinstance(self.index, (types.Number, types.NoneType)):
+    if isinstance(self.data.dtype, types.Number) and isinstance(self.index, (types.Number, types.NoneType, RangeIndexType)):
         def hpat_pandas_series_dropna_impl(self, axis=0, inplace=False):
             index = self.index
             return numpy_like.dropna(self._data, index, self._name)

@@ -80,7 +80,9 @@ def sdc_pandas_series_binop(self, other, level=None, fill_value=None, axis=0):
         Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_series_op5
     """
 
-    ty_checker = TypeChecker('Method binop().')
+    _func_name = 'Method binop().'
+
+    ty_checker = TypeChecker(_func_name)
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
     if not (self_is_series or other_is_series):
         return None
@@ -171,28 +173,34 @@ def sdc_pandas_series_binop(self, other, level=None, fill_value=None, axis=0):
 
             return _series_binop_none_indexes_impl
         else:
-            left_index_is_range = isinstance(self.index, RangeIndexType)
-            index_dtypes_match = self.index.dtype == other.index.dtype
+            left_index_is_range = isinstance(self.index, (RangeIndexType, types.NoneType))
+            right_index_is_range = isinstance(other.index, (RangeIndexType, types.NoneType))
+            check_index_equal = left_index_is_range and right_index_is_range
+            self_index_dtype = RangeIndexType.dtype if isinstance(self.index, types.NoneType) else self.index.dtype
+            other_index_dtype = RangeIndexType.dtype if isinstance(other.index, types.NoneType) else other.index.dtype
+            index_dtypes_match = self_index_dtype == other_index_dtype
             if not index_dtypes_match:
                 numba_index_common_dtype = find_common_dtype_from_numpy_dtypes(
-                    [self.index.dtype, other.index.dtype], [])
+                    [self_index_dtype, other_index_dtype], [])
             else:
-                numba_index_common_dtype = self.index.dtype
+                numba_index_common_dtype = self_index_dtype
 
             def _series_binop_common_impl(self, other, level=None, fill_value=None, axis=0):
-                # TO-DO: coversion of RangeIndexType to np.array may happen several times here:
-                # in array_equal, in astype or left_index.values - need caching of array allocated once
 
-                left_index, right_index = self.index, other.index
                 _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
                 if not (fill_value is None or numpy.isnan(fill_value)):
                     numpy_like.fillna(self._data, inplace=True, value=fill_value)
                     numpy_like.fillna(other._data, inplace=True, value=fill_value)
-                # check if indexes are equal and series don't have to be aligned
-                if (left_index is right_index or numpy_like.array_equal(left_index, right_index)):
+
+                left_index, right_index = self.index, other.index
+                if check_index_equal == True:  # noqa
+                    equal_indexes = numpy_like.array_equal(left_index, right_index)
+                else:
+                    equal_indexes = False
+
+                if (left_index is right_index or equal_indexes):
                     result_data = numpy.empty(len(self._data), dtype=numpy.float64)
                     result_data[:] = self._data + other._data
-
                     if index_dtypes_match == False:  # noqa
                         result_index = numpy_like.astype(left_index, numba_index_common_dtype)
                     else:
@@ -315,8 +323,7 @@ def sdc_pandas_series_comp_binop(self, other, level=None, fill_value=None, axis=
 
             return _series_comp_binop_none_indexes_impl
         else:
-
-            left_index_is_range = isinstance(self.index, RangeIndexType)
+            left_index_is_range = isinstance(self.index, (RangeIndexType, types.NoneType))
             index_dtypes_match = self.index.dtype == other.index.dtype
             if not index_dtypes_match:
                 numba_index_common_dtype = find_common_dtype_from_numpy_dtypes(
@@ -328,8 +335,8 @@ def sdc_pandas_series_comp_binop(self, other, level=None, fill_value=None, axis=
                 if not (fill_value is None or numpy.isnan(fill_value)):
                     numpy_like.fillna(self._data, inplace=True, value=fill_value)
                     numpy_like.fillna(other._data, inplace=True, value=fill_value)
-                left_index, right_index = self.index, other.index
 
+                left_index, right_index = self.index, other.index
                 if (left_index is right_index or numpy_like.array_equal(left_index, right_index)):
                     if index_dtypes_match == False:  # noqa
                         new_index = numpy_like.astype(left_index, numba_index_common_dtype)
@@ -371,7 +378,8 @@ def sdc_pandas_series_operator_binop(self, other):
         The result of the operation
     """
 
-    ty_checker = TypeChecker('Operator binop().')
+    _func_name = 'Method comp_binop().'
+    ty_checker = TypeChecker(_func_name)
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
     if not (self_is_series or other_is_series):
         return None
@@ -430,7 +438,8 @@ def sdc_pandas_series_operator_comp_binop(self, other):
         The result of the operation
     """
 
-    ty_checker = TypeChecker('Operator comp_binop().')
+    _func_name = 'Operator comp_binop().'
+    ty_checker = TypeChecker(_func_name)
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
     if not (self_is_series or other_is_series):
         return None

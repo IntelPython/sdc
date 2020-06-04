@@ -98,8 +98,10 @@ def hpat_pandas_dataframe_index(df):
         empty_df = not df.columns
 
         def hpat_pandas_df_index_none_impl(df):
-            df_len = len(df._data[0]) if empty_df == False else 0  # noqa
-            return numpy.arange(df_len)
+            if empty_df == True:  # noqa
+                return numpy.arange(0)
+            else:
+                return pandas.RangeIndex(len(df._data[0]))
 
         return hpat_pandas_df_index_none_impl
     else:

@@ -739,16 +739,19 @@ def sdc_reindex_series(arr, index, name, by_index):
 def sdc_reindex_series_overload(arr, index, name, by_index):
     """ Reindexes series data by new index following the logic of pandas.core.indexing.check_bool_indexer """
 
-    same_index_types = index is by_index
+    range_indexes = isinstance(index, RangeIndexType) and isinstance(by_index, RangeIndexType)
     data_dtype, index_dtype = arr.dtype, index.dtype
     data_is_str_arr = isinstance(arr.dtype, types.UnicodeType)
 
     def sdc_reindex_series_impl(arr, index, name, by_index):
 
-        # if index types are the same, we may not reindex if indexes are the same
-        if same_index_types == True:  # noqa
-            if index is by_index:
-                return pandas.Series(data=arr, index=index, name=name)
+        # no reindexing is needed if indexes are equal
+        if range_indexes == True:  # noqa
+            equal_indexes = numpy_like.array_equal(index, by_index)
+        else:
+            equal_indexes = False
+        if (index is by_index or equal_indexes):
+            return pandas.Series(data=arr, index=index, name=name)
 
         if data_is_str_arr == True:  # noqa
             _res_data = [''] * len(by_index)

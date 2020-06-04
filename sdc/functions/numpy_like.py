@@ -24,7 +24,6 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
-from sdc.hiframes.api import isna
 
 """
 
@@ -55,7 +54,6 @@ from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size,
                              string_array_type, create_str_arr_from_list, str_arr_set_na_by_mask,
                              num_total_chars, str_arr_is_na)
-from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import check_types_comparable
 
@@ -344,12 +342,12 @@ def sdc_copy_overload(self):
        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k copy
     """
 
-    if not isinstance(self, (types.Array, StringArrayType)):
+    if not isinstance(self, (types.Array, StringArrayType, RangeIndexType)):
         return None
 
-    dtype = self.dtype
-    if isinstance(dtype, (types.Number, types.Boolean, bool)):
-        def sdc_copy_number_impl(self):
+    if isinstance(self, types.Array):
+        dtype = self.dtype
+        def sdc_copy_array_impl(self):
             length = len(self)
             res = numpy.empty(length, dtype=dtype)
             for i in prange(length):
@@ -357,13 +355,13 @@ def sdc_copy_overload(self):
 
             return res
 
-        return sdc_copy_number_impl
+        return sdc_copy_array_impl
 
-    if isinstance(dtype, (types.npytypes.UnicodeCharSeq, types.UnicodeType, types.StringLiteral)):
-        def sdc_copy_string_impl(self):
+    if isinstance(self, (StringArrayType, RangeIndexType)):
+        def sdc_copy_str_arr_impl(self):
             return self.copy()
 
-        return sdc_copy_string_impl
+        return sdc_copy_str_arr_impl
 
 
 @sdc_overload(notnan)
@@ -1066,8 +1064,8 @@ def array_equal(A, B):
 def sdc_array_equal_overload(A, B):
     """ Checks 1D sequences A and B of comparable dtypes are equal """
 
-    if not (isinstance(A, (types.Array, StringArrayType, RangeIndexType))
-            or isinstance(B, (types.Array, StringArrayType, RangeIndexType))):
+    if not (isinstance(A, (types.Array, StringArrayType, types.NoneType, RangeIndexType))
+            or isinstance(B, (types.Array, StringArrayType, types.NoneType, RangeIndexType))):
         return None
 
     _func_name = "numpy-like 'array_equal'"
@@ -1086,17 +1084,27 @@ def sdc_array_equal_overload(A, B):
             return is_index_equal
 
         return sdc_array_equal_str_arr_impl
-
     else:
+        both_range_indexes = isinstance(A, RangeIndexType) and isinstance(B, RangeIndexType)
         def sdc_array_equal_impl(A, B):
-            if len(A) != len(B):
-                return False
-            # FIXME_Numba#5157: change to simple A == B when issue is resolved
-            eq_res_size = len(A)
-            eq_res = numpy.empty(eq_res_size, dtype=types.bool_)
-            for i in numba.prange(eq_res_size):
-                eq_res[i] = A[i] == B[i]
-            return numpy.all(eq_res)
+            if both_range_indexes == True:
+                if len(A) != len(B):
+                    return False
+                if len(A) == 0:
+                    return True
+                if len(A) == 1:
+                    return A.start == B.start
+
+                return A.start == B.start and A.step == B.step
+            else:
+                if len(A) != len(B):
+                    return False
+                # FIXME_Numba#5157: change to simple A == B when issue is resolved
+                eq_res_size = len(A)
+                eq_res = numpy.empty(eq_res_size, dtype=types.bool_)
+                for i in numba.prange(eq_res_size):
+                    eq_res[i] = A[i] == B[i]
+                return numpy.all(eq_res)
 
         return sdc_array_equal_impl
 

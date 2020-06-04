@@ -432,7 +432,9 @@ class TestRangeIndex(TestCase):
     def test_range_index_unbox_series_with_index(self):
         @self.jit
         def test_impl(S):
-            return S._index
+            # TO-DO: this actually includes calling 'index' attribute overload, should really be S._index,
+            # but this requires separate type (e.g. DefaultIndexType) instead of types.none as native index
+            return S.index
 
         n = 11
         for index in _generate_index_param_values(n):
@@ -446,7 +448,7 @@ class TestRangeIndex(TestCase):
         @self.jit
         def test_impl(data, index):
             S = pd.Series(data=data, index=index)
-            return S._index
+            return S.index
 
         n = 11
         series_data = np.ones(n)
@@ -485,7 +487,7 @@ class TestRangeIndex(TestCase):
     def test_range_index_unbox_df_with_index(self):
         @self.jit
         def test_impl(df):
-            return df._index
+            return df.index
 
         n = 11
         for index in _generate_index_param_values(n):
@@ -499,7 +501,7 @@ class TestRangeIndex(TestCase):
         @self.jit
         def test_impl(A, B, index):
             df = pd.DataFrame({'A': A, 'B': B}, index=index)
-            return df._index
+            return df.index
 
         n = 11
         A, B = np.ones(n), np.arange(n)
@@ -810,6 +812,20 @@ class TestRangeIndex(TestCase):
                     result = sdc_func(index1, index2)
                     result_ref = pyfunc(index1, index2)
                     self.assertEqual(result, result_ref)
+
+    def test_range_index_support_copy(self):
+        from sdc.functions.numpy_like import copy
+
+        @self.jit
+        def sdc_func(index):
+            return copy(index)
+
+        for params in _generate_valid_range_params():
+            for name in test_global_index_names:
+                index = pd.RangeIndex(*params, name=name)
+                with self.subTest(index=index):
+                    result = sdc_func(index)
+                    pd.testing.assert_index_equal(result, index)
 
 
 if __name__ == "__main__":

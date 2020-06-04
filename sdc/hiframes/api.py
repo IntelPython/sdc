@@ -173,14 +173,10 @@ def fix_df_index(index, *columns):
 @overload(fix_df_index)
 def fix_df_index_overload(index, *columns):
 
+    # TO-DO: replace types.none index with separate type, e.g. DefaultIndex
     if (index is None or isinstance(index, types.NoneType)):
-        if len(columns) > 0:  # case of non empty df, transforms to pd.RangeIndex
-            def fix_df_index_impl(index, *columns):
-                return pd.RangeIndex(len(columns[0]))
-
-        else:  # case of empty df, None index transforms to pd.Index
-            def fix_df_index_impl(index, *columns):
-                return None
+        def fix_df_index_impl(index, *columns):
+            return None
 
     elif isinstance(index, RangeIndexType):
         def fix_df_index_impl(index, *columns):

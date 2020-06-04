@@ -175,10 +175,15 @@ def _infer_series_list_dtype(S):
 def _infer_index_type(index):
     """ Deduces native Numba type used to represent index Python object """
     if isinstance(index, pd.RangeIndex):
-        if index.name is None:
-            return RangeIndexType()
+        # depending on actual index value unbox to diff types: none-index if it matches
+        # positions or to RangeIndexType in general case
+        if (index.start == 0 and index.step == 1 and index.name is None):
+            return types.none
         else:
-            return RangeIndexType(is_named=True)
+            if index.name is None:
+                return RangeIndexType()
+            else:
+                return RangeIndexType(is_named=True)
 
     # for unsupported pandas indexes we explicitly unbox to None
     if isinstance(index, pd.DatetimeIndex):
@@ -308,7 +313,10 @@ def _unbox_index_data(index_typ, index_obj, c):
         c.pyapi.decref(index_data)
         return res
 
-    return unbox_none(index_typ, index_obj, c)
+    if isinstance(index_typ, types.NoneType):
+        return unbox_none(index_typ, index_obj, c)
+
+    assert False, f"_unbox_index_data: unexpected index type({index_typ}) while unboxing"
 
 
 @unbox(SeriesType)
