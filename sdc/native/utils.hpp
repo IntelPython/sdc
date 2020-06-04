@@ -110,8 +110,6 @@ struct void_range
         using pointer           = data_type*;
         using iterator_category = std::random_access_iterator_tag;
 
-        iterator() {}
-
         iterator(void* ptr, uint64_t size): _ptr(ptr), _size(size) {}
 
         iterator(const iterator& other): _ptr(other._ptr), _size(other._size) {}

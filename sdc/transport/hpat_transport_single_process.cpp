@@ -35,7 +35,7 @@
 #include <Windows.h>
 
 // no gettimeofday on Win32/Win64
-int gettimeofday(struct timeval* tp, void* tzp)
+int gettimeofday(struct timeval* tp, struct timezone* tzp)
 {
     static const uint64_t EPOCH = ((uint64_t)116444736000000000ULL);
 
