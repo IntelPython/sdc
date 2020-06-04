@@ -4030,7 +4030,8 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
     if not (inplace is False or isinstance(inplace, types.Omitted)):
         ty_checker.raise_exc(inplace, 'bool', 'inplace')
 
-    if isinstance(self.data.dtype, types.Number) and isinstance(self.index, (types.Number, types.NoneType, RangeIndexType)):
+    if (isinstance(self.data.dtype, types.Number)
+            and isinstance(self.index, (types.Number, types.NoneType, RangeIndexType))):
         def hpat_pandas_series_dropna_impl(self, axis=0, inplace=False):
             index = self.index
             return numpy_like.dropna(self._data, index, self._name)

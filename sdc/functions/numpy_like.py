@@ -347,6 +347,7 @@ def sdc_copy_overload(self):
 
     if isinstance(self, types.Array):
         dtype = self.dtype
+
         def sdc_copy_array_impl(self):
             length = len(self)
             res = numpy.empty(length, dtype=dtype)
@@ -1086,8 +1087,9 @@ def sdc_array_equal_overload(A, B):
         return sdc_array_equal_str_arr_impl
     else:
         both_range_indexes = isinstance(A, RangeIndexType) and isinstance(B, RangeIndexType)
+
         def sdc_array_equal_impl(A, B):
-            if both_range_indexes == True:
+            if both_range_indexes == True:  # noqa
                 if len(A) != len(B):
                     return False
                 if len(A) == 0:

@@ -2131,7 +2131,7 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
 
     if accessor == 'at':
         num_idx = (isinstance(idx[0], types.Number)
-            and isinstance(self.dataframe.index, (types.Array, types.NoneType, RangeIndexType)))
+                   and isinstance(self.dataframe.index, (types.Array, types.NoneType, RangeIndexType)))
         str_idx = (isinstance(idx[0], (types.UnicodeType, types.StringLiteral))
                    and isinstance(self.dataframe.index, StringArrayType))
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.StringLiteral):

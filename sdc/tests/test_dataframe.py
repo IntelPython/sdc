@@ -147,11 +147,11 @@ class TestDataFrame(TestCase):
 
         n = 11
         indexes_to_test = [
-#             None,
-#             list(np.arange(n)),
+            None,
+            list(np.arange(n)),
             np.arange(n),
-#             pd.RangeIndex(n),
-#             gen_strlist(n)
+            pd.RangeIndex(n),
+            gen_strlist(n)
         ]
         A, B = np.ones(n), np.arange(n)
         for index in indexes_to_test:
