@@ -751,7 +751,7 @@ def sdc_reindex_series_overload(arr, index, name, by_index):
         else:
             equal_indexes = False
         if (index is by_index or equal_indexes):
-            return pandas.Series(data=arr, index=index, name=name)
+            return pandas.Series(data=arr, index=by_index, name=name)
 
         if data_is_str_arr == True:  # noqa
             _res_data = [''] * len(by_index)

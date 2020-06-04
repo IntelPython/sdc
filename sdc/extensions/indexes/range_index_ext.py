@@ -25,7 +25,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
 import numba
 import numpy as np
 import operator
@@ -204,6 +203,7 @@ def unbox_range_index(typ, val, c):
         name_obj = c.pyapi.object_getattr_string(val, "name")
         range_index.name = numba.cpython.unicode.unbox_unicode_str(
             types.unicode_type, name_obj, c).value
+        c.pyapi.decref(name_obj)
 
     c.pyapi.decref(start_obj)
     c.pyapi.decref(stop_obj)
