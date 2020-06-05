@@ -1,8 +1,8 @@
 trigger:
-- master
+- '*'
 
 pr:
-- master
+- '*'
 
 jobs:
 - template: buildscripts/azure/template-windows.yml
