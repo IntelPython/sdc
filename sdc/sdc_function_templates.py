@@ -122,15 +122,16 @@ def sdc_pandas_series_binop(self, other, level=None, fill_value=None, axis=0):
     # specializations for numeric series only
     if not operands_are_series:
         def _series_binop_scalar_impl(self, other, level=None, fill_value=None, axis=0):
+            _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
             if self_is_series == True:  # noqa
                 if not (fill_value is None or numpy.isnan(fill_value)):
-                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(self._data, inplace=True, value=_fill_value)
                 result_data = numpy.empty(len(self._data), dtype=numpy.float64)
                 result_data[:] = self._data + numpy.float64(other)
                 return pandas.Series(result_data, index=self._index, name=self._name)
             else:
                 if not (fill_value is None or numpy.isnan(fill_value)):
-                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(other._data, inplace=True, value=_fill_value)
                 result_data = numpy.empty(len(other._data), dtype=numpy.float64)
                 result_data[:] = numpy.float64(self) + other._data
                 return pandas.Series(result_data, index=other._index, name=other._name)
@@ -143,8 +144,8 @@ def sdc_pandas_series_binop(self, other, level=None, fill_value=None, axis=0):
             def _series_binop_none_indexes_impl(self, other, level=None, fill_value=None, axis=0):
                 _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
                 if not (fill_value is None or numpy.isnan(fill_value)):
-                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
-                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(self._data, inplace=True, value=_fill_value)
+                    numpy_like.fillna(other._data, inplace=True, value=_fill_value)
 
                 if (len(self._data) == len(other._data)):
                     result_data = numpy_like.astype(self._data, numpy.float64)
@@ -181,8 +182,8 @@ def sdc_pandas_series_binop(self, other, level=None, fill_value=None, axis=0):
                 left_index, right_index = self.index, other.index
                 _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
                 if not (fill_value is None or numpy.isnan(fill_value)):
-                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
-                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(self._data, inplace=True, value=_fill_value)
+                    numpy_like.fillna(other._data, inplace=True, value=_fill_value)
                 # check if indexes are equal and series don't have to be aligned
                 if sdc_check_indexes_equal(left_index, right_index):
                     result_data = numpy.empty(len(self._data), dtype=numpy.float64)
@@ -283,13 +284,14 @@ def sdc_pandas_series_comp_binop(self, other, level=None, fill_value=None, axis=
     fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
     if not operands_are_series:
         def _series_comp_binop_scalar_impl(self, other, level=None, fill_value=None, axis=0):
+            _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
             if self_is_series == True:  # noqa
                 if not (fill_value is None or numpy.isnan(fill_value)):
-                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(self._data, inplace=True, value=_fill_value)
                 return pandas.Series(self._data < other, index=self._index, name=self._name)
             else:
                 if not (fill_value is None or numpy.isnan(fill_value)):
-                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(other._data, inplace=True, value=_fill_value)
                 return pandas.Series(self < other._data, index=other._index, name=other._name)
 
         return _series_comp_binop_scalar_impl
@@ -299,9 +301,10 @@ def sdc_pandas_series_comp_binop(self, other, level=None, fill_value=None, axis=
         # optimization for series with default indexes, that can be aligned differently
         if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
             def _series_comp_binop_none_indexes_impl(self, other, level=None, fill_value=None, axis=0):
+                _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
                 if not (fill_value is None or numpy.isnan(fill_value)):
-                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
-                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(self._data, inplace=True, value=_fill_value)
+                    numpy_like.fillna(other._data, inplace=True, value=_fill_value)
                 left_size, right_size = len(self._data), len(other._data)
                 if (left_size == right_size):
                     return pandas.Series(self._data < other._data)
@@ -318,9 +321,10 @@ def sdc_pandas_series_comp_binop(self, other, level=None, fill_value=None, axis=
                     [ty_left_index_dtype, ty_right_index_dtype], [])
 
             def _series_comp_binop_common_impl(self, other, level=None, fill_value=None, axis=0):
+                _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
                 if not (fill_value is None or numpy.isnan(fill_value)):
-                    numpy_like.fillna(self._data, inplace=True, value=fill_value)
-                    numpy_like.fillna(other._data, inplace=True, value=fill_value)
+                    numpy_like.fillna(self._data, inplace=True, value=_fill_value)
+                    numpy_like.fillna(other._data, inplace=True, value=_fill_value)
                 left_index, right_index = self.index, other.index
 
                 if sdc_check_indexes_equal(left_index, right_index):
