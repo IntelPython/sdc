@@ -33,7 +33,7 @@ from numba.parfors import array_analysis
 from numba.core.typing import signature
 from numba.core.typing.templates import infer_global, AbstractTemplate, CallableTemplate
 from numba.extending import overload, intrinsic
-from numba.core.imputils import (lower_builtin, impl_ret_borrowed)
+from numba.core.imputils import (lower_builtin, impl_ret_borrowed, impl_ret_new_ref)
 
 import sdc
 from sdc.str_ext import string_type, list_string_array_type
@@ -168,7 +168,7 @@ class FixDfArrayType(AbstractTemplate):
 def lower_fix_df_array(context, builder, sig, args):
     func = fix_df_array_overload(sig.args[0])
     res = context.compile_internal(builder, func, sig, args)
-    return impl_ret_borrowed(context, builder, sig.return_type, res)
+    return impl_ret_new_ref(context, builder, sig.return_type, res)
 
 
 def fix_df_array_overload(column):
