@@ -528,26 +528,61 @@ def sdc_fillna_overload(self, inplace=False, value=None):
 
     dtype = self.dtype
     isnan = get_isnan(dtype)
+
     if (
         (isinstance(inplace, types.Literal) and inplace.literal_value == True) or  # noqa
         (isinstance(inplace, bool) and inplace == True)  # noqa
     ):
-        if isinstance(dtype, (types.Integer, types.Boolean)):
-            def sdc_fillna_inplace_int_impl(self, inplace=False, value=None):
-                return None
 
-            return sdc_fillna_inplace_int_impl
-
-        def sdc_fillna_inplace_float_impl(self, inplace=False, value=None):
-            length = len(self)
-            for i in prange(length):
-                if isnan(self[i]):
-                    self[i] = value
+        def sdc_fillna_inplace_noop(self, inplace=False, value=None):
             return None
 
-        return sdc_fillna_inplace_float_impl
+        if isinstance(value, (types.NoneType, types.Omitted)) or value is None:
+            return sdc_fillna_inplace_noop
+
+        if isinstance(dtype, (types.Integer, types.Boolean)):
+            return sdc_fillna_inplace_noop
+
+        if isinstance(dtype, types.Float):
+            def sdc_fillna_inplace_float_impl(self, inplace=False, value=None):
+                _value = np.nan if value is None else value
+                length = len(self)
+                for i in prange(length):
+                    if isnan(self[i]):
+                        self[i] = _value
+                return None
+
+            return sdc_fillna_inplace_float_impl
+
+        if isinstance(dtype, types.UnicodeType):
+            # TO-DO: not supported, since no generic setitem for StringArray
+            return None
 
     else:
+
+        def sdc_fillna_noop(self, inplace=False, value=None):
+            return copy(self)
+
+        if isinstance(value, (types.NoneType, types.Omitted)) or value is None:
+            return sdc_fillna_noop
+
+        if isinstance(dtype, (types.Integer, types.Boolean)):
+            return sdc_fillna_noop
+
+        if isinstance(dtype, types.Float):
+            def sdc_fillna_impl(self, inplace=False, value=None):
+                _value = np.nan if value is None else value
+                length = len(self)
+                filled_data = numpy.empty(length, dtype=dtype)
+                for i in prange(length):
+                    if isnan(self[i]):
+                        filled_data[i] = _value
+                    else:
+                        filled_data[i] = self[i]
+                return filled_data
+
+            return sdc_fillna_impl
+
         if isinstance(self.dtype, types.UnicodeType):
             def sdc_fillna_str_impl(self, inplace=False, value=None):
                 n = len(self)
@@ -556,9 +591,9 @@ def sdc_fillna_overload(self, inplace=False, value=None):
                 for i in prange(n):
                     s = self[i]
                     if sdc.hiframes.api.isna(self, i):
-                        num_chars += len(value)
+                        num_chars += get_utf8_size(value)
                     else:
-                        num_chars += len(s)
+                        num_chars += get_utf8_size(s)
 
                 filled_data = pre_alloc_string_array(n, num_chars)
                 for i in prange(n):
@@ -569,24 +604,6 @@ def sdc_fillna_overload(self, inplace=False, value=None):
                 return filled_data
 
             return sdc_fillna_str_impl
-
-        if isinstance(dtype, (types.Integer, types.Boolean)):
-            def sdc_fillna_int_impl(self, inplace=False, value=None):
-                return copy(self)
-
-            return sdc_fillna_int_impl
-
-        def sdc_fillna_impl(self, inplace=False, value=None):
-            length = len(self)
-            filled_data = numpy.empty(length, dtype=dtype)
-            for i in prange(length):
-                if isnan(self[i]):
-                    filled_data[i] = value
-                else:
-                    filled_data[i] = self[i]
-            return filled_data
-
-        return sdc_fillna_impl
 
 
 def nanmin(a):
