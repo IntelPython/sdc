@@ -2388,12 +2388,12 @@ class TestSeries(
                     self.assertAlmostEqual(actual, expected)
 
     def test_series_prod_skipna_default(self):
+        @self.jit
         def test_impl(S):
             return S.prod()
-        hpat_func = self.jit(test_impl)
 
         S = pd.Series([np.nan, 2, 3.])
-        self.assertEqual(hpat_func(S), test_impl(S))
+        self.assertEqual(test_impl(S), test_impl.py_func(S))
 
     def test_series_count1(self):
         def test_impl(S):
