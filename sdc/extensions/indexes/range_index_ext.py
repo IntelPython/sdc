@@ -66,7 +66,7 @@ def init_range_index(typingctx, data, name=None):
 
         if is_named:
             if isinstance(name, types.StringLiteral):
-                range_index.name = numba.unicode.make_string_from_constant(
+                range_index.name = numba.cpython.unicode.make_string_from_constant(
                     context, builder, types.unicode_type, name.literal_value)
             else:
                 range_index.name = name_val
@@ -96,6 +96,7 @@ def pd_range_index_overload(start=None, stop=None, step=None, dtype=None, copy=F
         raise SDCLimitation(f"{_func_name} Unsupported parameter. Given 'fastpath': {fastpath}")
 
     dtype_is_np_int64 = dtype is types.NumberClass(types.int64)
+    dtype_is_unicode_str = isinstance(dtype, (types.UnicodeType, types.StringLiteral))
     if not _check_dtype_param_type(dtype):
         ty_checker.raise_exc(dtype, 'int64 dtype', 'dtype')
 
@@ -122,7 +123,7 @@ def pd_range_index_overload(start=None, stop=None, step=None, dtype=None, copy=F
     def pd_range_index_ctor_impl(start=None, stop=None, step=None, dtype=None, copy=False, name=None, fastpath=None):
 
         if not (dtype is None
-                or dtype == 'int64'
+                or dtype_is_unicode_str and dtype == 'int64'
                 or dtype_is_np_int64):
             raise TypeError("Invalid to pass a non-int64 dtype to RangeIndex")
 
@@ -154,9 +155,9 @@ def box_range_index(typ, val, c):
     mod_name = c.context.insert_const_string(c.builder.module, "pandas")
     pd_class_obj = c.pyapi.import_module_noblock(mod_name)
 
-    range_index = numba.cgutils.create_struct_proxy(
+    range_index = cgutils.create_struct_proxy(
         typ)(c.context, c.builder, val)
-    range_index_data = numba.cgutils.create_struct_proxy(
+    range_index_data = cgutils.create_struct_proxy(
         RangeIndexDataType)(c.context, c.builder, range_index.data)
 
     start = c.pyapi.from_native_value(types.int64, range_index_data.start)
@@ -202,7 +203,7 @@ def unbox_range_index(typ, val, c):
 
     if typ.is_named:
         name_obj = c.pyapi.object_getattr_string(val, "name")
-        range_index.name = numba.unicode.unbox_unicode_str(
+        range_index.name = numba.cpython.unicode.unbox_unicode_str(
             types.unicode_type, name_obj, c).value
         c.pyapi.decref(name_obj)
 

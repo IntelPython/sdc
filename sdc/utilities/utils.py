@@ -50,6 +50,7 @@ from enum import Enum
 import types as pytypes
 from numba.extending import overload, overload_method, overload_attribute
 from numba.extending import register_jitable, register_model
+from numba.core.datamodel.registry import register_default
 
 
 # int values for types to pass to C code
@@ -138,6 +139,15 @@ def unliteral_all(args):
 
 class BooleanLiteral(types.Literal, types.Boolean):
 
+    def __init__(self, value):
+        self._literal_init(value)
+        name = 'Literal[bool]({})'.format(value)
+        basetype = self.literal_type
+        types.Boolean.__init__(
+            self,
+            name=name
+            )
+
     def can_convert_to(self, typingctx, other):
         # similar to IntegerLiteral
         conv = typingctx.can_convert(self.literal_type, other)
@@ -146,11 +156,10 @@ class BooleanLiteral(types.Literal, types.Boolean):
 
 
 types.Literal.ctor_map[bool] = BooleanLiteral
+register_default(BooleanLiteral)(numba.core.datamodel.models.BooleanModel)
 
-register_model(BooleanLiteral)(numba.extending.models.BooleanModel)
 
-
-@lower_cast(BooleanLiteral, types.Boolean)
+@lower_cast(BooleanLiteral, types.boolean)
 def literal_bool_cast(context, builder, fromty, toty, val):
     lit = context.get_constant_generic(
         builder,
@@ -158,6 +167,11 @@ def literal_bool_cast(context, builder, fromty, toty, val):
         fromty.literal_value,
     )
     return context.cast(builder, lit, fromty.literal_type, toty)
+
+
+lower_builtin(operator.eq, BooleanLiteral, BooleanLiteral)(numba.cpython.builtins.const_eq_impl)
+lower_builtin(operator.ne, BooleanLiteral, BooleanLiteral)(numba.cpython.builtins.const_ne_impl)
+
 
 
 def get_constant(func_ir, var, default=NOT_CONSTANT):

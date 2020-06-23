@@ -4878,7 +4878,7 @@ def sdc_pandas_series_skew(self, axis=None, skipna=None, level=None, numeric_onl
         .. only:: developer
             Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_skew*
         """
-    _func_name = 'Method Series.skew()'
+    _func_name = 'Method Series.skew().'
 
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)

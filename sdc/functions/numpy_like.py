@@ -122,7 +122,7 @@ def sdc_astype_overload(self, dtype):
 
     if not isinstance(dtype, (types.functions.NumberClass, types.Function, types.Literal)):
         def impl(self, dtype):
-            return astype(self, literally(dtype))
+            return literally(dtype)
 
         return impl
 
@@ -894,11 +894,14 @@ def np_nancumsum(arr, like_pandas=False):
             partial_sum = numpy.zeros(len(chunks), dtype=retty)
             result = numpy.empty_like(arr)
 
+            # below line is only needed since Literal[bool] var cannot be converted to bool
+            # in a prange due to a bug related to absence of BooleanLiterals in Numba
+            _like_pandas = True if like_pandas else False
             for i in prange(len(chunks)):
                 chunk = chunks[i]
                 partial = zero
                 for j in range(chunk.start, chunk.stop):
-                    if like_pandas:
+                    if _like_pandas:
                         result[j] = partial + arr[j]
                         if ~is_nan(arr[j]):
                             partial = result[j]

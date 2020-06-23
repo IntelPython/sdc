@@ -34,7 +34,7 @@ from itertools import (combinations_with_replacement, product, filterfalse)
 from sdc.tests.test_base import TestCase
 from sdc.utilities.sdc_typing_utils import kwsparams2list
 from sdc.tests.test_series import _make_func_from_text
-from numba.errors import TypingError
+from numba.core.errors import TypingError
 
 
 test_global_index_names = [None, 'abc', 'index']
