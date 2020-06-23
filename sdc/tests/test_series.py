@@ -3010,9 +3010,9 @@ class TestSeries(
 
         series = pd.Series(test_global_input_data_unicode_kind4)
         self.assertRaisesRegex(TypingError,
-                               'Method find\(\)\. The object start\n'
-                               '\s+given: unicode_type\n'
-                               '\s+expected: None, int',
+                               r'Method find\(\)\. The object start\n'
+                               r'\s+given: unicode_type\n'
+                               r'\s+expected: None, int',
                                hpat_func,
                                series, '', '0')
 
@@ -3029,9 +3029,9 @@ class TestSeries(
         series = pd.Series(test_global_input_data_unicode_kind4)
 
         self.assertRaisesRegex(TypingError,
-                               'Method find\(\)\. The object end\n'
-                               '\s+given: unicode_type\n'
-                               '\s+expected: None, int',
+                               r'Method find\(\)\. The object end\n'
+                               r'\s+given: unicode_type\n'
+                               r'\s+expected: None, int',
                                hpat_func,
                                series, '', 0, 'None')
 
@@ -3088,9 +3088,9 @@ class TestSeries(
         for name, pyfunc in pyfuncs:
             cfunc = self.jit(pyfunc)
             self.assertRaisesRegex(TypingError,
-                                   f'Method {name}\(\)\. The object fillchar\n'
-                                   '\s+given: int64\n'
-                                   '\s+expected: str',
+                                   fr'Method {name}\(\)\. The object fillchar\n'
+                                   r'\s+given: int64\n'
+                                   r'\s+expected: str',
                                    cfunc,
                                    series, width, 5)
 
@@ -3525,9 +3525,9 @@ class TestSeries(
         S2 = pd.Series([-2., 5.0], ['a2', 'b2'])
 
         self.assertRaisesRegex(TypingError,
-                               'Method append\(\)\. The object ignore_index\n'
-                               '\s+given: bool\n'
-                               '\s+expected: literal Boolean constant',
+                               r'Method append\(\)\. The object ignore_index\n'
+                               r'\s+given: bool\n'
+                               r'\s+expected: literal Boolean constant',
                                hpat_func,
                                S1, S2, ignore_index)
 
@@ -3874,20 +3874,20 @@ class TestSeries(
         for n, ntype in [(True, types.boolean), (None, types.none),
                          (0.1, 'float64'), ('n', types.unicode_type)]:
             self.assertRaisesRegex(TypingError,
-                       'Method nlargest\(\)\. The object n\n'
-                       f'\s+given: {ntype}\n'
-                       '\s+expected: int',
-                       hpat_func,
-                       series, n=n, keep='first')
+                                   r'Method nlargest\(\)\. The object n\n'
+                                   fr'\s+given: {ntype}\n'
+                                   r'\s+expected: int',
+                                   hpat_func,
+                                   series, n=n, keep='first')
 
         for keep, dtype in [(True, types.boolean), (None, types.none),
                             (0.1, 'float64'), (1, 'int64')]:
             self.assertRaisesRegex(TypingError,
-                       'Method nlargest\(\)\. The object keep\n'
-                       f'\s+given: {dtype}\n'
-                       '\s+expected: str',
-                       hpat_func,
-                       series, n=5, keep=keep)
+                                   r'Method nlargest\(\)\. The object keep\n'
+                                   fr'\s+given: {dtype}\n'
+                                   r'\s+expected: str',
+                                   hpat_func,
+                                   series, n=5, keep=keep)
 
     @skip_sdc_jit('Series.nlargest() does not raise an exception')
     def test_series_nlargest_unsupported(self):
@@ -3999,20 +3999,20 @@ class TestSeries(
         for n, ntype in [(True, types.boolean), (None, types.none),
                          (0.1, 'float64'), ('n', types.unicode_type)]:
             self.assertRaisesRegex(TypingError,
-                       'Method nsmallest\(\)\. The object n\n'
-                       f'\s+given: {ntype}\n'
-                       '\s+expected: int',
-                       hpat_func,
-                       series, n=n, keep='first')
+                                   r'Method nsmallest\(\)\. The object n\n'
+                                   fr'\s+given: {ntype}\n'
+                                   r'\s+expected: int',
+                                   hpat_func,
+                                   series, n=n, keep='first')
 
         for keep, dtype in [(True, types.boolean), (None, types.none),
                             (0.1, 'float64'), (1, 'int64')]:
             self.assertRaisesRegex(TypingError,
-                       'Method nsmallest\(\)\. The object keep\n'
-                       f'\s+given: {dtype}\n'
-                       '\s+expected: str',
-                       hpat_func,
-                       series, n=5, keep=keep)
+                                   r'Method nsmallest\(\)\. The object keep\n'
+                                   fr'\s+given: {dtype}\n'
+                                   r'\s+expected: str',
+                                   hpat_func,
+                                   series, n=5, keep=keep)
 
     @skip_sdc_jit('Series.nsmallest() does not raise an exception')
     def test_series_nsmallest_unsupported(self):
@@ -4785,9 +4785,9 @@ class TestSeries(
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_unicode_kind4)
         self.assertRaisesRegex(TypingError,
-                               'Method shift\(\)\. The object self\.data\.dtype\n'
-                               '\s+given: unicode_type\n'
-                               '\s+expected: number',
+                               r'Method shift\(\)\. The object self\.data\.dtype\n'
+                               r'\s+given: unicode_type\n'
+                               r'\s+expected: number',
                                cfunc,
                                series)
 

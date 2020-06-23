@@ -233,8 +233,9 @@ def create_series_from_values(size, data_values, index_values=None, name=None, u
 
     return pandas.Series(series_data, series_index, name)
 
+
 def assert_raises_ty_checker(self, err_details, func, *args, **kwargs):
-    mapping = {'\n': '\n\s*', '(': '\(', ')': '\)'}
+    mapping = {'\n': r'\n\s*', '(': r'\(', ')': r'\)'}
     translation_dict = {ord(k): v for k, v in mapping.items()}
     regex_str = TypeChecker.msg_template.format(*err_details)
     regex_str = regex_str.translate(translation_dict)
