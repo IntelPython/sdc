@@ -338,16 +338,21 @@ def unbox_series(typ, val, c):
     if typ.index == string_array_type:
         index_obj = c.pyapi.object_getattr_string(val, "index")
         series.index = unbox_str_series(string_array_type, index_obj, c).value
+        c.pyapi.decref(index_obj)
 
     if isinstance(typ.index, types.Array):
         index_obj = c.pyapi.object_getattr_string(val, "index")
         index_data = c.pyapi.object_getattr_string(index_obj, "_data")
         series.index = unbox_array(typ.index, index_data, c).value
+        c.pyapi.decref(index_obj)
+        c.pyapi.decref(index_data)
 
     if typ.is_named:
         name_obj = c.pyapi.object_getattr_string(val, "name")
         series.name = numba.cpython.unicode.unbox_unicode_str(
             string_type, name_obj, c).value
+        c.pyapi.decref(name_obj)
+
     # TODO: handle index and name
     c.pyapi.decref(arr_obj)
     return NativeValue(series._getvalue())
