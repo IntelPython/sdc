@@ -37,7 +37,6 @@ RangeIndexDataType = types.range_state64_type
 
 
 class RangeIndexType(types.IterableType):
-
     dtype = types.int64
 
     def __init__(self, is_named=False):
@@ -45,10 +44,10 @@ class RangeIndexType(types.IterableType):
         super(RangeIndexType, self).__init__(
             name='RangeIndexType({})'.format(is_named))
 
-    # TODO: provide iteration support by adding getiter and iternext
     @property
     def iterator_type(self):
-        return RangeIndexDataType.iterator_type()
+        res = RangeIndexDataType.iterator_type
+        return res
 
 
 @register_model(RangeIndexType)
@@ -58,7 +57,7 @@ class RangeIndexModel(models.StructModel):
         name_type = types.unicode_type if fe_type.is_named else types.none
         members = [
             ('data', RangeIndexDataType),
-            ('name', name_type)
+            ('name', name_type),
         ]
         models.StructModel.__init__(self, dmm, fe_type, members)
 

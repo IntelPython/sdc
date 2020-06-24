@@ -190,18 +190,27 @@ class TestArrays(TestCase):
                 np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
 
     def test_copy(self):
+        from sdc.str_arr_ext import StringArray
+
         def ref_impl(a):
             return np.copy(a)
 
-        def sdc_impl(a):
-            return numpy_like.copy(a)
+        @self.jit
+        def sdc_func(a):
+            _a = StringArray(a) if as_str_arr == True else a  # noqa
+            return numpy_like.copy(_a)
 
-        sdc_func = self.jit(sdc_impl)
+        cases = {
+            'int': [5, 2, 0, 333, -4],
+            'float': [3.3, 5.4, np.nan, 7.9, np.nan],
+            'bool': [True, False, True],
+            'str': ['a', 'vv', 'o12oo']
+        }
 
-        cases = [[5, 2, 0, 333, -4], [3.3, 5.4, np.nan, 7.9, np.nan], [True, False, True], ['a', 'vv', 'o12oo']]
-        for case in cases:
-            a = np.array(case)
-            with self.subTest(data=case):
+        for dtype, data in cases.items():
+            a = data if dtype == 'str' else np.asarray(data)
+            as_str_arr = True if dtype == 'str' else False
+            with self.subTest(case=data):
                 np.testing.assert_array_equal(sdc_func(a), ref_impl(a))
 
     def test_copy_int(self):

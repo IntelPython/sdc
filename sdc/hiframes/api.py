@@ -26,20 +26,19 @@
 
 
 import numpy as np
+import pandas as pd
 
 import numba
 from numba.core import cgutils, types
-from numba.parfors import array_analysis
 from numba.core.typing import signature
 from numba.core.typing.templates import infer_global, AbstractTemplate, CallableTemplate
 from numba.extending import overload, intrinsic
-from numba.core.imputils import (lower_builtin, impl_ret_borrowed, impl_ret_new_ref)
+from numba.core.imputils import (lower_builtin, impl_ret_borrowed)
 
 import sdc
 from sdc.str_ext import string_type, list_string_array_type
-from sdc.str_arr_ext import (
-    StringArrayType,
-    string_array_type)
+from sdc.str_arr_ext import (StringArrayType, string_array_type)
+from sdc.datatypes.range_index_type import RangeIndexType
 from sdc.hiframes.pd_series_ext import (
     SeriesType,
     if_series_to_array_type)
@@ -103,9 +102,6 @@ def get_nan_mask_overload(arr):
         return get_nan_mask_via_isna_impl
 
 
-def fix_df_array(c):  # pragma: no cover
-    return c
-
 # the same as fix_df_array but can be parallel
 @numba.generated_jit(nopython=True)
 def parallel_fix_df_array(c):  # pragma: no cover
@@ -141,64 +137,57 @@ def get_series_data(S):
     return lambda S: S._data
 
 
-# XXX: use infer_global instead of overload, since overload fails if the same
-# user function is compiled twice
-@infer_global(fix_df_array)
-class FixDfArrayType(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args) == 1
-        column = types.unliteral(args[0])
-        ret_typ = column
-        if (isinstance(column, types.List)
-            and (isinstance(column.dtype, types.Number)
-                 or column.dtype == types.boolean)):
-            ret_typ = types.Array(column.dtype, 1, 'C')
-        if (isinstance(column, types.List)
-            and (column.dtype == string_type
-                 or isinstance(column.dtype, types.Optional) and column.dtype.type == string_type)):
-            ret_typ = string_array_type
-        if isinstance(column, SeriesType):
-            ret_typ = column.data
-        # TODO: add other types
-        return signature(ret_typ, column)
+def fix_df_array(column):
+    return column
 
 
-@lower_builtin(fix_df_array, types.Any)  # TODO: replace Any with types
-def lower_fix_df_array(context, builder, sig, args):
-    func = fix_df_array_overload(sig.args[0])
-    res = context.compile_internal(builder, func, sig, args)
-    return impl_ret_new_ref(context, builder, sig.return_type, res)
-
-
+@overload(fix_df_array)
 def fix_df_array_overload(column):
-    # convert list of numbers/bools to numpy array
-    if (isinstance(column, types.List)
-            and (isinstance(column.dtype, types.Number)
-                 or column.dtype == types.boolean)):
-        def fix_df_array_list_impl(column):  # pragma: no cover
-            return np.array(column)
-        return fix_df_array_list_impl
 
-    # convert list of strings to string array
-    if (isinstance(column, types.List)
-        and (column.dtype == string_type
-             or isinstance(column.dtype, types.Optional) and column.dtype.type == string_type)):
+    if (isinstance(column, types.List)):
+        dtype = column.dtype
+        if isinstance(dtype, (types.Number, types.Boolean)):
+            def fix_df_array_list_impl(column):
+                return np.array(column)
+            return fix_df_array_list_impl
 
-        def fix_df_array_str_impl(column):  # pragma: no cover
-            return sdc.str_arr_ext.StringArray(column)
-        return fix_df_array_str_impl
+        if (dtype == string_type or isinstance(dtype, types.Optional) and dtype.type == string_type):
+            def fix_df_array_list_str_impl(column):  # pragma: no cover
+                return sdc.str_arr_ext.StringArray(column)
+            return fix_df_array_list_str_impl
 
     if isinstance(column, SeriesType):
-        return lambda column: sdc.hiframes.api.get_series_data(column)
+        return lambda column: column._data
 
-    # column is array if not list
-    assert isinstance(column, (types.Array, StringArrayType, SeriesType))
+    if isinstance(column, RangeIndexType):
+        return lambda column: np.array(column)
 
-    def fix_df_array_impl(column):  # pragma: no cover
-        return column
-    # FIXME: np.array() for everything else?
-    return fix_df_array_impl
+    if isinstance(column, (types.Array, StringArrayType)):
+        return lambda column: column
+
+
+def fix_df_index(index, *columns):
+    return index
+
+
+@overload(fix_df_index)
+def fix_df_index_overload(index, *columns):
+
+    # TO-DO: replace types.none index with separate type, e.g. DefaultIndex
+    if (index is None or isinstance(index, types.NoneType)):
+        def fix_df_index_impl(index, *columns):
+            return None
+
+    elif isinstance(index, RangeIndexType):
+        def fix_df_index_impl(index, *columns):
+            return index
+
+    else:
+        # default case, transform index the same as df data
+        def fix_df_index_impl(index, *columns):
+            return fix_df_array(index)
+
+    return fix_df_index_impl
 
 
 @infer_global(fix_rolling_array)

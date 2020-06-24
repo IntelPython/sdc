@@ -24,7 +24,6 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
-from sdc.hiframes.api import isna
 
 """
 
@@ -42,18 +41,21 @@ from numba import types, prange, literally
 from numba.np import numpy_support
 from numba.np.arraymath import get_isnan
 from numba.typed import List
+from numba.core.errors import TypingError
 
 import sdc
 from sdc.functions.statistics import skew_formula
+from sdc.hiframes.api import isna
+from sdc.datatypes.range_index_type import RangeIndexType
 from sdc.utilities.sdc_typing_utils import TypeChecker
 from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
                                  max_dtype_float_val)
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size,
-                             string_array_type, create_str_arr_from_list, str_arr_set_na_by_mask)
-from sdc.utilities.utils import sdc_overload, sdc_register_jitable
+                             string_array_type, create_str_arr_from_list, str_arr_set_na_by_mask,
+                             num_total_chars, str_arr_is_na)
 from sdc.utilities.prange_utils import parallel_chunks
-
+from sdc.utilities.sdc_typing_utils import check_types_comparable
 
 def astype(self, dtype):
     pass
@@ -117,7 +119,7 @@ def sdc_astype_overload(self, dtype):
     """
 
     ty_checker = TypeChecker("numpy-like 'astype'")
-    if not isinstance(self, (types.Array, StringArrayType)):
+    if not isinstance(self, (types.Array, StringArrayType, RangeIndexType)):
         return None
 
     if not isinstance(dtype, (types.functions.NumberClass, types.Function, types.Literal)):
@@ -152,7 +154,8 @@ def sdc_astype_overload(self, dtype):
 
         return sdc_astype_number_to_string_impl
 
-    if (isinstance(self, types.Array) and isinstance(dtype, (types.StringLiteral, types.functions.NumberClass))):
+    if (isinstance(self, (types.Array, RangeIndexType))
+            and isinstance(dtype, (types.StringLiteral, types.functions.NumberClass))):
         def sdc_astype_number_impl(self, dtype):
             arr = numpy.empty(len(self), dtype=numpy.dtype(dtype))
             for i in numba.prange(len(self)):
@@ -339,12 +342,13 @@ def sdc_copy_overload(self):
        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k copy
     """
 
-    if not isinstance(self, (types.Array, StringArrayType)):
+    if not isinstance(self, (types.Array, StringArrayType, RangeIndexType)):
         return None
 
-    dtype = self.dtype
-    if isinstance(dtype, (types.Number, types.Boolean, bool)):
-        def sdc_copy_number_impl(self):
+    if isinstance(self, types.Array):
+        dtype = self.dtype
+
+        def sdc_copy_array_impl(self):
             length = len(self)
             res = numpy.empty(length, dtype=dtype)
             for i in prange(length):
@@ -352,13 +356,13 @@ def sdc_copy_overload(self):
 
             return res
 
-        return sdc_copy_number_impl
+        return sdc_copy_array_impl
 
-    if isinstance(dtype, (types.npytypes.UnicodeCharSeq, types.UnicodeType, types.StringLiteral)):
-        def sdc_copy_string_impl(self):
+    if isinstance(self, (StringArrayType, RangeIndexType)):
+        def sdc_copy_str_arr_impl(self):
             return self.copy()
 
-        return sdc_copy_string_impl
+        return sdc_copy_str_arr_impl
 
 
 @sdc_overload(notnan)
@@ -374,6 +378,7 @@ def sdc_notnan_overload(self):
     if not isinstance(self, types.Array):
         return None
 
+    ty_checker = TypeChecker("numpy-like 'notnan'")
     dtype = self.dtype
     isnan = get_isnan(dtype)
     if isinstance(dtype, (types.Integer, types.Boolean, bool)):
@@ -412,6 +417,7 @@ def sdc_isnan_overload(self):
     if not isinstance(self, types.Array):
         return None
 
+    ty_checker = TypeChecker("numpy-like 'isnan'")
     dtype = self.dtype
     isnan = get_isnan(dtype)
     if isinstance(dtype, (types.Integer, types.Boolean, bool)):
@@ -942,9 +948,7 @@ def getitem_by_mask_overload(arr, idx):
 
     """
 
-    is_range = isinstance(arr, types.RangeType) and isinstance(arr.dtype, types.Integer)
-    is_str_arr = arr == string_array_type
-    if not (isinstance(arr, types.Array) or is_str_arr or is_range):
+    if not isinstance(arr, (types.Array, StringArrayType, RangeIndexType)):
         return
 
     res_dtype = arr.dtype
@@ -975,10 +979,7 @@ def getitem_by_mask_overload(arr, idx):
 
             for j in range(chunk.start, chunk.stop):
                 if idx[j]:
-                    if is_range == True:  # noqa
-                        value = arr.start + arr.step * j
-                    else:
-                        value = arr[j]
+                    value = arr[j]
                     result_data[current_pos] = value
                     if is_str_arr == True:  # noqa
                         result_nan_mask[current_pos] = isna(arr, j)
@@ -1054,3 +1055,81 @@ def np_nanskew(arr):
         return skew_formula(n, _sum, square_sum, cube_sum)
 
     return nanskew_impl
+
+
+def array_equal(A, B):
+    pass
+
+
+@sdc_overload(array_equal)
+def sdc_array_equal_overload(A, B):
+    """ Checks 1D sequences A and B of comparable dtypes are equal """
+
+    if not (isinstance(A, (types.Array, StringArrayType, types.NoneType, RangeIndexType))
+            or isinstance(B, (types.Array, StringArrayType, types.NoneType, RangeIndexType))):
+        return None
+
+    _func_name = "numpy-like 'array_equal'"
+    if not check_types_comparable(A, B):
+        msg = '{} Not comparable arguments. Given: A={}, B={}'
+        raise TypingError(msg.format(_func_name, A, B))
+
+    if (A == string_array_type and A == B):
+        def sdc_array_equal_str_arr_impl(A, B):
+            is_index_equal = (len(A) == len(B)
+                              and num_total_chars(A) == num_total_chars(B))
+            for i in numpy.arange(len(A)):
+                if (A[i] != B[i]
+                        or str_arr_is_na(A, i) is not str_arr_is_na(B, i)):
+                    return False
+            return is_index_equal
+
+        return sdc_array_equal_str_arr_impl
+    else:
+        both_range_indexes = isinstance(A, RangeIndexType) and isinstance(B, RangeIndexType)
+
+        def sdc_array_equal_impl(A, B):
+            if both_range_indexes == True:  # noqa
+                if len(A) != len(B):
+                    return False
+                if len(A) == 0:
+                    return True
+                if len(A) == 1:
+                    return A.start == B.start
+
+                return A.start == B.start and A.step == B.step
+            else:
+                if len(A) != len(B):
+                    return False
+                # FIXME_Numba#5157: change to simple A == B when issue is resolved
+                eq_res_size = len(A)
+                eq_res = numpy.empty(eq_res_size, dtype=types.bool_)
+                for i in numba.prange(eq_res_size):
+                    eq_res[i] = A[i] == B[i]
+                return numpy.all(eq_res)
+
+        return sdc_array_equal_impl
+
+
+@sdc_overload(np.array)
+def sdc_np_array_overload(A):
+    if isinstance(A, types.Array):
+        return lambda A: A
+
+    if isinstance(A, RangeIndexType):
+        return lambda A: np.arange(A.start, A.stop, A.step)
+
+    if isinstance(A, types.containers.Set):
+        # TODO: naive implementation, data from set can probably
+        # be copied to array more efficienty
+        dtype = A.dtype
+
+        def f(A):
+            n = len(A)
+            arr = np.empty(n, dtype)
+            i = 0
+            for a in A:
+                arr[i] = a
+                i += 1
+            return arr
+        return f

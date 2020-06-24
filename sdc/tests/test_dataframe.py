@@ -54,6 +54,7 @@ from sdc.tests.test_utils import (check_numba_version,
                                   skip_sdc_jit,
                                   test_global_input_data_float64,
                                   test_global_input_data_unicode_kind4)
+from sdc.tests.test_series import gen_strlist
 
 
 @sdc.jit
@@ -128,15 +129,44 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
 
-    @skip_sdc_jit
-    def test_create_string_index(self):
-        def test_impl(a):
+    def test_df_create_param_index_default(self):
+        def test_impl():
             data = {'A': ['a', 'b'], 'B': [2, 3]}
-            df = pd.DataFrame(data=data, index=['A', 'B'])
-            return df
+            return pd.DataFrame(data=data)
 
         hpat_func = sdc.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(True), test_impl(True))
+        result = hpat_func()
+        result_ref = test_impl()
+        pd.testing.assert_frame_equal(result, result_ref)
+
+    def test_df_create_param_index(self):
+        def test_impl(A, B, index):
+            data = {'A': A, 'B': B}
+            return pd.DataFrame(data=data, index=index)
+        hpat_func = sdc.jit(test_impl)
+
+        n = 11
+        indexes_to_test = [
+            None,
+            list(np.arange(n)),
+            np.arange(n),
+            pd.RangeIndex(n),
+            gen_strlist(n)
+        ]
+        A, B = np.ones(n), np.arange(n)
+        for index in indexes_to_test:
+            with self.subTest(df_index=index):
+                result = hpat_func(A, B, index)
+                result_ref = test_impl(A, B, index)
+                pd.testing.assert_frame_equal(result, result_ref)
+
+    def test_create_empty_df(self):
+        def test_impl(df):
+            return df
+        sdc_func = self.jit(test_impl)
+
+        df = pd.DataFrame({})
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
     def test_create_cond1(self):
         def test_impl(A, B, c):
@@ -629,24 +659,32 @@ class TestDataFrame(TestCase):
         self.assertIn(msg, str(raises.exception))
 
     def test_df_add_column(self):
-        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
+        all_data = [
+            {'A': [0, 1, 2], 'C': [0., np.nan, np.inf]},
+            {}
+        ]
         key, value = 'B', np.array([1., -1., 0.])
 
         self._test_df_set_column(all_data, key, value)
 
     def test_df_add_column_str(self):
-        all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}, {}]
+        all_data = [
+            {'A': [0, 1, 2], 'C': [0., np.nan, np.inf]},
+            {}
+        ]
         key, value = 'B', pd.Series(test_global_input_data_unicode_kind4)
 
         self._test_df_set_column(all_data, key, value)
 
     def test_df_add_column_exception_invalid_length(self):
-        df = pd.DataFrame({'A': [0, 1, 2], 'C': [3., 4., 5.]})
-        key, value = 'B', np.array([1., np.nan, -1., 0.])
-        self._test_df_set_column_exception_invalid_length(df, key, value)
+        with self.subTest(case="non empty df"):
+            df = pd.DataFrame({'A': [0, 1, 2], 'C': [3., 4., 5.]})
+            key, value = 'B', np.array([1., np.nan, -1., 0.])
+            self._test_df_set_column_exception_invalid_length(df, key, value)
 
-        df = pd.DataFrame({'A': []})
-        self._test_df_set_column_exception_empty_columns(df, key, value)
+        with self.subTest(case="empty df"):
+            df = pd.DataFrame({'A': []})
+            self._test_df_set_column_exception_empty_columns(df, key, value)
 
     def test_df_replace_column(self):
         all_data = [{'A': [0, 1, 2], 'C': [0., np.nan, np.inf]}]
@@ -1492,27 +1530,18 @@ class TestDataFrame(TestCase):
             return df.copy(deep=deep)
 
         sdc_impl = sdc.jit(test_impl)
-        indexes = [[3, 4, 2, 6, 1], ['a', 'b', 'c', 'd', 'e']]
+        indexes = [
+            [3, 4, 2, 6, 1],
+            ['a', 'b', 'c', 'd', 'e'],
+            None,
+            pd.RangeIndex(5)
+        ]
         cases_deep = [None, True, False]
         for idx, deep in product(indexes, cases_deep):
             with self.subTest(index=idx, deep=deep):
                 jit_result = sdc_impl(idx, deep)
                 ref_result = test_impl(idx, deep)
                 pd.testing.assert_frame_equal(jit_result, ref_result)
-
-    @unittest.expectedFailure
-    def test_df_copy_no_unboxing_none_index_error(self):
-        def test_impl():
-            df = pd.DataFrame({
-                'A': [3.2, np.nan, 7.0, 3.3, np.nan],
-                'B': [3, 4, 1, 0, 222],
-                'C': [True, True, False, False, True],
-                'D': ['a', 'dd', 'c', '12', None]
-            }, index=None)
-            return df.copy(deep=True)
-
-        sdc_impl = sdc.jit(test_impl)
-        pd.testing.assert_frame_equal(sdc_impl(), test_impl())
 
     def test_pct_change1(self):
         def test_impl(n):
@@ -2057,9 +2086,11 @@ class TestDataFrame(TestCase):
 
     @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx(self):
-        dfs = [gen_df(test_global_input_data_float64),
-               gen_df(test_global_input_data_float64, with_index=True),
-               pd.DataFrame({'A': [], 'B': [], 'C': []})]
+        dfs = [
+            gen_df(test_global_input_data_float64),
+            gen_df(test_global_input_data_float64, with_index=True),
+            pd.DataFrame({'A': [], 'B': [], 'C': []})
+        ]
         for df in dfs:
             with self.subTest(df=df):
                 self._test_df_getitem_str_literal_idx(df)
