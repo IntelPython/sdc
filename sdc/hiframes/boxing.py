@@ -145,6 +145,7 @@ def unbox_dataframe(typ, val, c):
 
     index_obj = c.pyapi.object_getattr_string(val, "index")
     dataframe.index = _unbox_index_data(typ.index, index_obj, c).value
+    c.pyapi.decref(index_obj)
 
     dataframe.parent = val
 
@@ -370,7 +371,7 @@ def unbox_series(typ, val, c):
 
     if typ.is_named:
         name_obj = c.pyapi.object_getattr_string(val, "name")
-        series.name = numba.unicode.unbox_unicode_str(
+        series.name = numba.cpython.unicode.unbox_unicode_str(
             string_type, name_obj, c).value
         c.pyapi.decref(name_obj)
 
