@@ -42,14 +42,17 @@ from numba.typed import List, Dict
 from numba.core.typing import signature
 from numba import literally
 
-from sdc.datatypes.common_functions import sdc_arrays_argsort, _sdc_asarray, _sdc_take
+from sdc.datatypes.common_functions import (sdc_arrays_argsort, _sdc_asarray,
+                                            _sdc_take, SDCLimitation)
 from sdc.datatypes.hpat_pandas_groupby_types import DataFrameGroupByType, SeriesGroupByType
+from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker, kwsparams2list, sigparams2list
 from sdc.utilities.utils import (sdc_overload, sdc_overload_method, sdc_register_jitable,
                                  sdc_register_jitable)
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_ext import string_type
+from sdc.str_arr_ext import StringArrayType
 
 
 performance_limitation = "This function may reveal slower performance than Pandas* on user system.\
@@ -76,7 +79,7 @@ def merge_groupby_dicts_inplace(left, right):
 
 
 @intrinsic
-def init_dataframe_groupby(typingctx, parent, column_id, data, sort, target_columns=None):
+def init_dataframe_groupby(typingctx, parent, column_id, sort, target_columns=None):
 
     target_columns = types.none if target_columns is None else target_columns
     if isinstance(target_columns, types.NoneType):
@@ -88,13 +91,12 @@ def init_dataframe_groupby(typingctx, parent, column_id, data, sort, target_colu
 
     n_target_cols = len(selected_col_names)
     def codegen(context, builder, signature, args):
-        parent_val, column_id_val, data_val, sort_val, target_columns = args
+        parent_val, column_id_val, sort_val, target_columns = args
         # create series struct and store values
         groupby_obj = cgutils.create_struct_proxy(
             signature.return_type)(context, builder)
         groupby_obj.parent = parent_val
         groupby_obj.col_id = column_id_val
-        groupby_obj.data = data_val
         groupby_obj.sort = sort_val
         groupby_obj.target_default = context.get_constant(types.bool_, target_not_specified)
 
@@ -108,14 +110,13 @@ def init_dataframe_groupby(typingctx, parent, column_id, data, sort, target_colu
         # increase refcount of stored values
         if context.enable_nrt:
             context.nrt.incref(builder, signature.args[0], parent_val)
-            context.nrt.incref(builder, signature.args[2], data_val)
             for var in column_strs:
                 context.nrt.incref(builder, string_type, var)
 
         return groupby_obj._getvalue()
 
     ret_typ = DataFrameGroupByType(parent, column_id, selected_col_names)
-    sig = signature(ret_typ, parent, column_id, data, sort, target_columns)
+    sig = signature(ret_typ, parent, column_id, sort, target_columns)
     return sig, codegen
 
 
@@ -171,7 +172,7 @@ def sdc_pandas_dataframe_getitem(self, idx):
                 by_arr_data = self._parent._data[by_col_id_literal]
                 return init_series_groupby(target_series, by_arr_data, self._data, self._sort)
             else:
-                return init_dataframe_groupby(self._parent, by_col_id_literal, self._data, self._sort, idx)
+                return init_dataframe_groupby(self._parent, by_col_id_literal, self._sort, idx)
 
         return sdc_pandas_dataframe_getitem_common_impl
 
@@ -229,6 +230,176 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, de
                    '_sdc_asarray': _sdc_asarray,
                    '_sdc_take': _sdc_take,
                    'sdc_arrays_argsort': sdc_arrays_argsort}
+
+    return func_text, global_vars
+
+
+def _sdc_pandas_groupby_sum_codegen(func_name, by_column, subject_columns,
+                                    subject_column_dtypes, func_params):
+
+    all_params_as_str = ', '.join(func_params)
+
+    groupby_obj = f'{func_params[0]}'
+    df = f'{groupby_obj}._parent'
+    groupby_param_sort = f'{groupby_obj}._sort'
+    by_column_name, by_column_id = by_column
+    column_names = tuple(name for name, _ in subject_columns)
+    column_indices = tuple(i for _, i in subject_columns)
+    column_dtype_indices = {}
+    for i, ty in enumerate(subject_column_dtypes):
+        indices = column_dtype_indices.get(ty, [])
+        if not indices:
+            column_dtype_indices[ty] = indices
+        indices.append(i)
+
+    func_lines = [
+        f'def _dataframe_groupby_{func_name}_impl({all_params_as_str}):',
+        f'  by_column_data = {df}._data[{by_column_id}]',
+        f'  length = len(by_column_data)',
+        f'  chunks = parallel_chunks(length)',
+        f'  chunks_num = len(chunks)',
+    ]
+    func_lines += ['\n'.join([
+        f'  column_data_{i} = {df}._data[{column_indices[i]}]',
+    ]) for i in range(len(subject_columns))]
+    func_lines += [
+        f'  index_labels_parts = [Dict.empty(types.int64, by_type) for _ in range(chunks_num)]',
+        f'  label_indices_parts = [Dict.empty(by_type, types.int64) for _ in range(chunks_num)]',
+    ]
+    func_lines += ['\n'.join([
+        f'  accums_dtype_{i} = accums_dtypes[{i}]',
+        f'  label_accums_parts_{i} = [Dict.empty(by_type, accums_dtype_{i}) for _ in range(chunks_num)]',
+        f'  accums_parts_{i} = [List.empty_list(accums_dtype_{i}) for _ in range(chunks_num)]',
+    ]) for i, *_ in column_dtype_indices.values()]
+    func_lines += [
+        f'  for i in prange(chunks_num):',
+        f'    chunk = chunks[i]',
+        f'    idx = 0',
+        f'    index_labels = index_labels_parts[i]',
+        f'    label_indices = label_indices_parts[i]',
+    ]
+    func_lines += ['\n'.join([
+        f'    label_accums_{i} = label_accums_parts_{i}[i]',
+        f'    accums_{i} = accums_parts_{i}[i]',
+        f'    accums_{i}.append(numpy.zeros({len(tail)+1}, dtype={ty}))'
+    ]) for ty, (i, *tail) in column_dtype_indices.items()]
+    func_lines += [
+        f'    for k in range(chunk.start, chunk.stop):',
+        f'      label = by_column_data[k]',
+    ]
+    func_lines += ['\n'.join([
+        f'      _accums_{i} = label_accums_{i}.get(label)',
+    ]) for i, *_ in column_dtype_indices.values()]
+    func_lines += [
+        f'      if _accums_0 is None:',
+    ]
+    func_lines += ['\n'.join([
+        f'        new_accums_{i} = numpy.zeros({len(tail)+1}, dtype={ty})',
+        f'        _accums_{i} = new_accums_{i}',
+        f'        label_accums_{i}[label] = new_accums_{i}',
+    ]) for ty, (i, *tail) in column_dtype_indices.items()]
+    func_lines += [
+        f'        index_labels[idx] = label',
+        f'        label_indices[label] = idx',
+        f'        idx += 1',
+    ]
+    func_lines += ['\n'.join([
+        f'      val_{idx} = column_data_{idx}[k]',
+        f'      if not numpy.isnan(val_{idx}):',
+        f'        _accums_{indices[0]}[{i}] += val_{idx}',
+    ]) for indices in column_dtype_indices.values() for i, idx in enumerate(indices)]
+    func_lines += ['\n'.join([
+        f'      accums_{i}[0] = _accums_{i}',
+    ]) for i, *_ in column_dtype_indices.values()]
+    func_lines += [
+        f'  def reduce_indices(main_labels, auxiliary_labels, main_indices):',
+        f'    idx = len(main_indices)',
+        f'    for _idx in range(len(auxiliary_labels)):',
+        f'      label = auxiliary_labels[_idx]',
+        f'      if label in main_indices:',
+        f'        continue',
+        f'      main_labels[idx] = label',
+        f'      main_indices[label] = idx',
+        f'      idx += 1',
+        f'  def reduce_accums(main_accums, auxiliary_accums, accums):',
+        f'    for label, _acc in auxiliary_accums.items():',
+        f'      _accums = main_accums.get(label)',
+        f'      if _accums is None:',
+        f'        _accums = _acc',
+        f'        main_accums[label] = _accums',
+        f'      else:',
+        f'        for i in range(len(_accums)):',
+        f'          _accums[i] += _acc[i]',
+        f'      accums[0] = _accums',
+        f'  shift = 1',
+        f'  while shift < chunks_num:',
+        f'    step = shift * 2',
+        f'    stop = numpy.int(numpy.ceil((chunks_num - shift) / step))',
+        f'    reduce_chunks = parallel_chunks(stop)',
+        f'    for i in prange(len(reduce_chunks)):',
+        f'      reduce_chunk = reduce_chunks[i]',
+        f'      for k in range(reduce_chunk.start, reduce_chunk.stop):',
+        f'        main_idx = k * step',
+        f'        auxiliary_idx = main_idx + shift',
+        f'        main_labels = index_labels_parts[main_idx]',
+        f'        auxiliary_labels = index_labels_parts[auxiliary_idx]',
+        f'        main_indices = label_indices_parts[main_idx]',
+        f'        reduce_indices(main_labels, auxiliary_labels, main_indices)',
+    ]
+    func_lines += ['\n'.join([
+        f'        main_accums_{i} = label_accums_parts_{i}[main_idx]',
+        f'        auxiliary_accums_{i} = label_accums_parts_{i}[auxiliary_idx]',
+        f'        accums_{i} = accums_parts_{i}[main_idx]',
+        f'        reduce_accums(main_accums_{i}, auxiliary_accums_{i}, accums_{i})',
+    ]) for i, *_ in column_dtype_indices.values()]
+    func_lines += [
+        f'    shift *= 2',
+        f'  index_labels = index_labels_parts[0]',
+        f'  res_size = len(index_labels)',
+        f'  group_keys = _sdc_asarray([index_labels[i] for i in range(res_size)])',
+        f'  _sort = {groupby_param_sort}',
+        f'  if _sort:',
+        f'    argsorted_index = sdc_arrays_argsort(group_keys, kind="mergesort")',
+    ]
+    func_lines += ['\n'.join([
+        f'  label_accums_{i} = label_accums_parts_{i}[0]',
+    ]) for i, *_ in column_dtype_indices.values()]
+    func_lines += ['\n'.join([
+        f'  result_data_{i} = numpy.empty(res_size, dtype=subject_column_dtypes[{i}])',
+    ]) for i in range(len(subject_columns))]
+    func_lines += [
+        f'  res_chunks = parallel_chunks(res_size)',
+        f'  for i in prange(len(res_chunks)):',
+        f'    res_chunk = res_chunks[i]',
+        f'    for k in range(res_chunk.start, res_chunk.stop):',
+        f'      idx = argsorted_index[k] if _sort else k',
+        f'      label = index_labels[idx]',
+    ]
+    func_lines += ['\n'.join([
+        f'      _accums_{i} = label_accums_{i}[label]',
+    ]) for i, *_ in column_dtype_indices.values()]
+    func_lines += ['\n'.join([
+        f'      result_data_{idx}[k] = _accums_{indices[0]}[{i}]',
+    ]) for indices in column_dtype_indices.values() for i, idx in enumerate(indices)]
+
+    data = ', '.join(f'\'{column_names[i]}\': result_data_{i}' for i in range(len(subject_columns)))
+    func_lines += [
+        f'  res_index = _sdc_take(group_keys, argsorted_index) if _sort else group_keys',
+        f'  return pandas.DataFrame({{{data}}}, index=res_index)'
+    ]
+
+    func_text = '\n'.join(func_lines)
+    global_vars = {'pandas': pandas,
+                   'numpy': numpy,
+                   '_sdc_asarray': _sdc_asarray,
+                   '_sdc_take': _sdc_take,
+                   'sdc_arrays_argsort': sdc_arrays_argsort,
+                   'parallel_chunks': parallel_chunks,
+                   'Dict': Dict,
+                   'List': List,
+                   'types': types,
+                   'prange': numba.prange}
+    global_vars.update({ty.name: ty for ty in column_dtype_indices})
 
     return func_text, global_vars
 
@@ -318,6 +489,53 @@ def sdc_pandas_dataframe_groupby_apply_func(self, func_name, func_args, defaults
 
     # capture result column types into generated func context
     global_vars['res_arrays_dtypes'] = res_arrays_dtypes
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _groupby_method_impl = loc_vars[groupby_func_name]
+
+    return _groupby_method_impl
+
+
+def sdc_pandas_dataframe_groupby_apply_sum(self, func_name, func_args):
+
+    df_column_types = self.parent.data
+    df_column_names = self.parent.columns
+    by_column_id = self.col_id.literal_value
+
+    df_str_column_ids_set = set()
+    df_str_column_names_set = set()
+    target_column_ids_set = set()
+    target_column_names_set = set(self.target_columns)
+    for i, (name, ty) in enumerate(zip(df_column_names, df_column_types)):
+        if isinstance(ty, StringArrayType):
+            df_str_column_ids_set.add(i)
+            df_str_column_names_set.add(name)
+        if name in target_column_names_set:
+            target_column_ids_set.add(i)
+
+    selected_cols_set = target_column_names_set - df_str_column_names_set
+    selected_ids_set = target_column_ids_set - df_str_column_ids_set
+
+    by_column = (df_column_names[by_column_id], by_column_id)
+    subject_columns = [(name, i) for i, name in enumerate(df_column_names) if name in selected_cols_set]
+
+    if not subject_columns:
+        raise SDCLimitation('Method DataFrame.groupby.sum(). Given DataFrame has 0 columns for grouping.')
+
+    subject_column_dtypes = tuple(ty.dtype for i, ty in enumerate(df_column_types) if i in selected_ids_set)
+    accums_dtypes = tuple(types.Array(dtype=dtype, ndim=1, layout='C') for dtype in subject_column_dtypes)
+
+    groupby_func_name = f'_dataframe_groupby_{func_name}_impl'
+    func_text, global_vars = _sdc_pandas_groupby_sum_codegen(
+        func_name, by_column, subject_columns, subject_column_dtypes, func_args)
+
+    # capture result column types into generated func context
+    global_vars.update({
+        'by_type': df_column_types[by_column_id].dtype,
+        'subject_column_dtypes': subject_column_dtypes,
+        'accums_dtypes': accums_dtypes,
+    })
 
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
@@ -448,7 +666,7 @@ def sdc_pandas_dataframe_groupby_sum(self):
 
     method_args = ['self']
     applied_func_name = 'sum'
-    return sdc_pandas_dataframe_groupby_apply_func(self, applied_func_name, method_args)
+    return sdc_pandas_dataframe_groupby_apply_sum(self, applied_func_name, method_args)
 
 
 @sdc_overload_method(DataFrameGroupByType, 'var')

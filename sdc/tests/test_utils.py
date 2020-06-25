@@ -59,6 +59,9 @@ test_global_input_data_float64 = [
 ]
 
 
+optimizedGroupByNotImplemented = unittest.skip
+
+
 def gen_int_df_index(length):
     """Generate random integer index for DataFrame"""
     arr = np.arange(length)
