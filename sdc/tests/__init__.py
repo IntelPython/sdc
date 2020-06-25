@@ -29,6 +29,7 @@ from sdc.tests.test_basic import *
 from sdc.tests.test_series import *
 from sdc.tests.test_dataframe import *
 from sdc.tests.test_hiframes import *
+from .categorical import *
 
 # from sdc.tests.test_d4p import *
 from sdc.tests.test_date import *
