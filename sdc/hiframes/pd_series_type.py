@@ -36,8 +36,8 @@ from numba.core.imputils import (impl_ret_new_ref, iternext_impl, RefType)
 from numba.np.arrayobj import make_array, _getitem_array_single_int
 
 from sdc.str_ext import string_type, list_string_array_type
-from sdc.hiframes.pd_categorical_ext import (PDCategoricalDtype, CategoricalArray)
 from sdc.str_arr_ext import (string_array_type, iternext_str_array, StringArrayType)
+from sdc.datatypes.categorical.types import CategoricalDtypeType, Categorical
 
 
 class SeriesType(types.IterableType):
@@ -271,8 +271,9 @@ def _get_series_array_type(dtype):
         return string_array_type
 
     # categorical
-    if isinstance(dtype, PDCategoricalDtype):
-        return CategoricalArray(dtype)
+    if isinstance(dtype, CategoricalDtypeType):
+        # TODO: pass codes array if exists
+        return Categorical(dtype)
 
     # use recarray data layout for series of tuples
     if isinstance(dtype, types.BaseTuple):

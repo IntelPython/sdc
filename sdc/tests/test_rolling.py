@@ -910,6 +910,29 @@ class TestRolling(TestCase):
 
         self._test_rolling_apply_mean(df)
 
+    def test_df_rolling_apply_mean_no_unboxing(self):
+        def test_impl(window, min_periods):
+            def func(x):
+                if len(x) == 0:
+                    return np.nan
+                return x.mean()
+
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            return df.rolling(window, min_periods).apply(func)
+
+        hpat_func = self.jit(test_impl)
+        for window in range(0, 8, 2):
+            for min_periods in range(0, window + 1, 2):
+                with self.subTest(window=window, min_periods=min_periods):
+                    jit_result = hpat_func(window, min_periods)
+                    ref_result = test_impl(window, min_periods)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
+
     @skip_sdc_jit('DataFrame.rolling.apply() unsupported exceptions')
     def test_df_rolling_apply_unsupported_types(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
@@ -953,6 +976,31 @@ class TestRolling(TestCase):
         other = pd.DataFrame(other_data)
 
         self._test_rolling_corr(df, other)
+
+    def test_df_rolling_corr_no_unboxing(self):
+        def test_impl(window, min_periods):
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            other = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4, 5],
+                'B': [-1., 1., 0., -0.1, 0.1, 0.],
+                'C': [1., np.inf, np.inf, -1., 0., np.inf],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan],
+                'E': [9, 8, 7, 6, 5, 4],
+            })
+            return df.rolling(window, min_periods).corr(other)
+
+        hpat_func = self.jit(test_impl)
+        for window in range(0, 8, 2):
+            for min_periods in range(0, window, 2):
+                with self.subTest(window=window, min_periods=min_periods):
+                    jit_result = hpat_func(window, min_periods)
+                    ref_result = test_impl(window, min_periods)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.corr() unsupported')
     def test_df_rolling_corr_no_other(self):
@@ -1006,6 +1054,24 @@ class TestRolling(TestCase):
 
         self._test_rolling_count(df)
 
+    def test_df_rolling_count_no_unboxing(self):
+        def test_impl(window, min_periods):
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            return df.rolling(window, min_periods).count()
+
+        hpat_func = self.jit(test_impl)
+        for window in range(0, 8, 2):
+            for min_periods in range(0, window + 1, 2):
+                with self.subTest(window=window, min_periods=min_periods):
+                    jit_result = hpat_func(window, min_periods)
+                    ref_result = test_impl(window, min_periods)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
+
     @skip_sdc_jit('DataFrame.rolling.cov() unsupported')
     def test_df_rolling_cov(self):
         all_data = [
@@ -1027,6 +1093,32 @@ class TestRolling(TestCase):
         other = pd.DataFrame(other_data)
 
         self._test_rolling_cov(df, other)
+
+    def test_df_rolling_cov_no_unboxing(self):
+        def test_impl(window, min_periods, ddof):
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            other = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [-1., 1., 0., -0.1, 0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+                'E': [9, 8, 7, 6, 5],
+            })
+            return df.rolling(window, min_periods).cov(other, ddof=ddof)
+
+        hpat_func = self.jit(test_impl)
+        for window in range(0, 8, 2):
+            for min_periods, ddof in product(range(0, window, 2), [0, 1]):
+                with self.subTest(window=window, min_periods=min_periods,
+                                  ddof=ddof):
+                    jit_result = hpat_func(window, min_periods, ddof)
+                    ref_result = test_impl(window, min_periods, ddof)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.cov() unsupported')
     def test_df_rolling_cov_no_other(self):
@@ -1111,6 +1203,24 @@ class TestRolling(TestCase):
 
         self._test_rolling_kurt(df)
 
+    def test_df_rolling_kurt_no_unboxing(self):
+        def test_impl(window, min_periods):
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            return df.rolling(window, min_periods).kurt()
+
+        hpat_func = self.jit(test_impl)
+        for window in range(4, 6):
+            for min_periods in range(window + 1):
+                with self.subTest(window=window, min_periods=min_periods):
+                    jit_result = hpat_func(window, min_periods)
+                    ref_result = test_impl(window, min_periods)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
+
     @skip_sdc_jit('DataFrame.rolling.max() unsupported')
     def test_df_rolling_max(self):
         all_data = test_global_input_data_float64
@@ -1119,6 +1229,24 @@ class TestRolling(TestCase):
         df = pd.DataFrame(data)
 
         self._test_rolling_max(df)
+
+    def test_df_rolling_max_no_unboxing(self):
+        def test_impl(window, min_periods):
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            return df.rolling(window, min_periods).max()
+
+        hpat_func = self.jit(test_impl)
+        for window in range(1, 7):
+            for min_periods in range(window + 1):
+                with self.subTest(window=window, min_periods=min_periods):
+                    jit_result = hpat_func(window, min_periods)
+                    ref_result = test_impl(window, min_periods)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.mean() unsupported')
     def test_df_rolling_mean(self):
@@ -1133,6 +1261,24 @@ class TestRolling(TestCase):
 
         self._test_rolling_mean(df)
 
+    def test_df_rolling_mean_no_unboxing(self):
+        def test_impl(window, min_periods):
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            return df.rolling(window, min_periods).mean()
+
+        hpat_func = self.jit(test_impl)
+        for window in range(7):
+            for min_periods in range(window):
+                with self.subTest(window=window, min_periods=min_periods):
+                    jit_result = hpat_func(window, min_periods)
+                    ref_result = test_impl(window, min_periods)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
+
     @skip_sdc_jit('DataFrame.rolling.median() unsupported')
     def test_df_rolling_median(self):
         all_data = test_global_input_data_float64
@@ -1141,6 +1287,24 @@ class TestRolling(TestCase):
         df = pd.DataFrame(data)
 
         self._test_rolling_median(df)
+
+    def test_df_rolling_median_no_unboxing(self):
+        def test_impl(window, min_periods):
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            return df.rolling(window, min_periods).median()
+
+        hpat_func = self.jit(test_impl)
+        for window in range(0, 8, 2):
+            for min_periods in range(0, window + 1, 2):
+                with self.subTest(window=window, min_periods=min_periods):
+                    jit_result = hpat_func(window, min_periods)
+                    ref_result = test_impl(window, min_periods)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.min() unsupported')
     def test_df_rolling_min(self):
@@ -1151,8 +1315,25 @@ class TestRolling(TestCase):
 
         self._test_rolling_min(df)
 
-    @unittest.expectedFailure
-    @unittest.skipIf(platform.system() == 'Darwin', 'Segmentation fault on Mac')
+    def test_df_rolling_min_no_unboxing(self):
+        def test_impl(window, min_periods):
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            return df.rolling(window, min_periods).min()
+
+        hpat_func = self.jit(test_impl)
+        for window in range(1, 7):
+            for min_periods in range(window + 1):
+                with self.subTest(window=window, min_periods=min_periods):
+                    jit_result = hpat_func(window, min_periods)
+                    ref_result = test_impl(window, min_periods)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
+
+    @unittest.skip('Segmentation fault on Win/Lin/Mac')
     @skip_sdc_jit('DataFrame.rolling.min() unsupported')
     def test_df_rolling_min_exception_many_columns(self):
         def test_impl(df):
@@ -1181,6 +1362,26 @@ class TestRolling(TestCase):
 
         self._test_rolling_quantile(df)
 
+    def test_df_rolling_quantile_no_unboxing(self):
+        def test_impl(window, min_periods, quantile):
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            return df.rolling(window, min_periods).quantile(quantile)
+
+        hpat_func = self.jit(test_impl)
+        quantiles = [0, 0.25, 0.5, 0.75, 1]
+        for window in range(0, 8, 2):
+            for min_periods, q in product(range(0, window, 2), quantiles):
+                with self.subTest(window=window, min_periods=min_periods,
+                                  quantiles=q):
+                    jit_result = hpat_func(window, min_periods, q)
+                    ref_result = test_impl(window, min_periods, q)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
+
     @skip_sdc_jit('DataFrame.rolling.quantile() unsupported exceptions')
     def test_df_rolling_quantile_exception_unsupported_types(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
@@ -1208,6 +1409,24 @@ class TestRolling(TestCase):
 
         self._test_rolling_skew(df)
 
+    def test_df_rolling_skew_no_unboxing(self):
+        def test_impl(window, min_periods):
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            return df.rolling(window, min_periods).skew()
+
+        hpat_func = self.jit(test_impl)
+        for window in range(3, 6):
+            for min_periods in range(window + 1):
+                with self.subTest(window=window, min_periods=min_periods):
+                    jit_result = hpat_func(window, min_periods)
+                    ref_result = test_impl(window, min_periods)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
+
     @skip_sdc_jit('DataFrame.rolling.std() unsupported')
     def test_df_rolling_std(self):
         all_data = [
@@ -1220,6 +1439,25 @@ class TestRolling(TestCase):
         df = pd.DataFrame(data)
 
         self._test_rolling_std(df)
+
+    def test_df_rolling_std_no_unboxing(self):
+        def test_impl(window, min_periods, ddof):
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            return df.rolling(window, min_periods).std(ddof)
+
+        hpat_func = self.jit(test_impl)
+        for window in range(0, 8, 2):
+            for min_periods, ddof in product(range(0, window, 2), [0, 1]):
+                with self.subTest(window=window, min_periods=min_periods,
+                                  ddof=ddof):
+                    jit_result = hpat_func(window, min_periods, ddof)
+                    ref_result = test_impl(window, min_periods, ddof)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.std() unsupported exceptions')
     def test_df_rolling_std_exception_unsupported_ddof(self):
@@ -1243,6 +1481,24 @@ class TestRolling(TestCase):
 
         self._test_rolling_sum(df)
 
+    def test_df_rolling_sum_no_unboxing(self):
+        def test_impl(window, min_periods):
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            return df.rolling(window, min_periods).sum()
+
+        hpat_func = self.jit(test_impl)
+        for window in range(7):
+            for min_periods in range(window):
+                with self.subTest(window=window, min_periods=min_periods):
+                    jit_result = hpat_func(window, min_periods)
+                    ref_result = test_impl(window, min_periods)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
+
     @skip_sdc_jit('DataFrame.rolling.var() unsupported')
     def test_df_rolling_var(self):
         all_data = [
@@ -1255,6 +1511,25 @@ class TestRolling(TestCase):
         df = pd.DataFrame(data)
 
         self._test_rolling_var(df)
+
+    def test_df_rolling_var_no_unboxing(self):
+        def test_impl(window, min_periods, ddof):
+            df = pd.DataFrame({
+                'A': [0, 1, 2, 3, 4],
+                'B': [1., -1., 0., 0.1, -0.1],
+                'C': [1., np.inf, np.inf, -1., 0.],
+                'D': [np.nan, np.inf, np.inf, np.nan, np.nan],
+            })
+            return df.rolling(window, min_periods).var(ddof)
+
+        hpat_func = self.jit(test_impl)
+        for window in range(0, 8, 2):
+            for min_periods, ddof in product(range(0, window, 2), [0, 1]):
+                with self.subTest(window=window, min_periods=min_periods,
+                                  ddof=ddof):
+                    jit_result = hpat_func(window, min_periods, ddof)
+                    ref_result = test_impl(window, min_periods, ddof)
+                    pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @skip_sdc_jit('DataFrame.rolling.var() unsupported exceptions')
     def test_df_rolling_var_exception_unsupported_ddof(self):

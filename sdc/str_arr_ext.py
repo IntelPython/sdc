@@ -884,7 +884,7 @@ def box_str_arr(typ, val, c):
                                   string_array.data, string_array.null_bitmap])
 
     # TODO: double check refcounting here
-    # c.context.nrt.decref(c.builder, typ, val)
+    c.context.nrt.decref(c.builder, typ, val)
     return arr  # c.builder.load(arr)
 
 

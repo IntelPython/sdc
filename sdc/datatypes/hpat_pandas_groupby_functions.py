@@ -47,9 +47,7 @@ from sdc.datatypes.common_functions import (sdc_arrays_argsort, _sdc_asarray,
 from sdc.datatypes.hpat_pandas_groupby_types import DataFrameGroupByType, SeriesGroupByType
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import TypeChecker, kwsparams2list, sigparams2list
-from sdc.utilities.utils import (sdc_overload, sdc_overload_method, sdc_register_jitable,
-                                 sdc_register_jitable)
-from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
+from sdc.utilities.utils import (sdc_overload, sdc_overload_method, sdc_register_jitable)
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_ext import string_type
 from sdc.str_arr_ext import StringArrayType
@@ -156,7 +154,14 @@ def sdc_pandas_dataframe_getitem(self, idx):
             and all(isinstance(a, types.StringLiteral) for a in idx))):
 
         by_col_id_literal = self.col_id.literal_value
-        target_col_id_literal = self.parent.columns.index(idx.literal_value) if idx_is_literal_str else None
+        by_col_loc = self.parent.column_loc[self.parent.columns[by_col_id_literal]]
+        by_type_id, by_col_id = by_col_loc.type_id, by_col_loc.col_id
+
+        if idx_is_literal_str:
+            target_col_id_literal = self.parent.columns.index(idx.literal_value)
+            target_col_loc = self.parent.column_loc[self.parent.columns[target_col_id_literal]]
+            target_type_id, target_col_id = target_col_loc.type_id, target_col_loc.col_id
+
         def sdc_pandas_dataframe_getitem_common_impl(self, idx):
 
             # calling getitem twice raises IndexError, just as in pandas
@@ -166,10 +171,10 @@ def sdc_pandas_dataframe_getitem(self, idx):
             if idx_is_literal_str == True:  # noqa
                 # no need to pass index into this series, as we group by array
                 target_series = pandas.Series(
-                    data=self._parent._data[target_col_id_literal],
+                    data=self._parent._data[target_type_id][target_col_id],
                     name=self._parent._columns[target_col_id_literal]
                 )
-                by_arr_data = self._parent._data[by_col_id_literal]
+                by_arr_data = self._parent._data[by_type_id][by_col_id]
                 return init_series_groupby(target_series, by_arr_data, self._data, self._sort)
             else:
                 return init_dataframe_groupby(self._parent, by_col_id_literal, self._sort, idx)
@@ -185,8 +190,15 @@ def sdc_pandas_dataframe_getitem(self, idx):
     return None
 
 
-def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, defaults, impl_params):
+def df_data_getitem_expr(column_loc, col_name):
+    col_loc = column_loc[col_name]
+    type_id, col_id = col_loc.type_id, col_loc.col_id
 
+    return f'_data[{type_id}][{col_id}]'
+
+
+def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, column_loc,
+                                             func_params, defaults, impl_params):
     all_params_as_str = ', '.join(sigparams2list(func_params, defaults))
     extra_impl_params = ', '.join(kwsparams2list(impl_params))
 
@@ -205,15 +217,16 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, de
     ]
 
     # TODO: remove conversion from Numba typed.List to reflected one while creating group_arr_{i}
-    func_lines.extend(['\n'.join([
-        f'  result_data_{i} = numpy.empty(res_index_len, dtype=res_arrays_dtypes[{i}])',
-        f'  column_data_{i} = {df}._data[{column_ids[i]}]',
-        f'  for j in numpy.arange(res_index_len):',
-        f'    idx = argsorted_index[j] if {groupby_param_sort} else j',
-        f'    group_arr_{i} = _sdc_take(column_data_{i}, list({groupby_dict}[group_keys[idx]]))',
-        f'    group_series_{i} = pandas.Series(group_arr_{i})',
-        f'    result_data_{i}[j] = group_series_{i}.{func_name}({extra_impl_params})',
-    ]) for i in range(len(columns))])
+    for i in range(len(columns)):
+        func_lines += [
+            f'  result_data_{i} = numpy.empty(res_index_len, dtype=res_arrays_dtypes[{i}])',
+            f'  column_data_{i} = {df}.{df_data_getitem_expr(column_loc, column_names[i])}',
+            f'  for j in numpy.arange(res_index_len):',
+            f'    idx = argsorted_index[j] if {groupby_param_sort} else j',
+            f'    group_arr_{i} = _sdc_take(column_data_{i}, list({groupby_dict}[group_keys[idx]]))',
+            f'    group_series_{i} = pandas.Series(group_arr_{i})',
+            f'    result_data_{i}[j] = group_series_{i}.{func_name}({extra_impl_params})',
+        ]
 
     data = ', '.join(f'\'{column_names[i]}\': result_data_{i}' for i in range(len(columns)))
     func_lines.extend(['\n'.join([
@@ -234,7 +247,7 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, func_params, de
     return func_text, global_vars
 
 
-def _sdc_pandas_groupby_sum_codegen(func_name, by_column, subject_columns,
+def _sdc_pandas_groupby_sum_codegen(func_name, by_column, subject_columns, column_loc,
                                     subject_column_dtypes, func_params):
 
     all_params_as_str = ', '.join(func_params)
@@ -254,13 +267,13 @@ def _sdc_pandas_groupby_sum_codegen(func_name, by_column, subject_columns,
 
     func_lines = [
         f'def _dataframe_groupby_{func_name}_impl({all_params_as_str}):',
-        f'  by_column_data = {df}._data[{by_column_id}]',
+        f'  by_column_data = {df}.{df_data_getitem_expr(column_loc, by_column_name)}',
         f'  length = len(by_column_data)',
         f'  chunks = parallel_chunks(length)',
         f'  chunks_num = len(chunks)',
     ]
     func_lines += ['\n'.join([
-        f'  column_data_{i} = {df}._data[{column_indices[i]}]',
+        f'  column_data_{i} = {df}.{df_data_getitem_expr(column_loc, column_names[i])}',
     ]) for i in range(len(subject_columns))]
     func_lines += [
         f'  index_labels_parts = [Dict.empty(types.int64, by_type) for _ in range(chunks_num)]',
@@ -485,7 +498,7 @@ def sdc_pandas_dataframe_groupby_apply_func(self, func_name, func_args, defaults
 
     groupby_func_name = f'_dataframe_groupby_{func_name}_impl'
     func_text, global_vars = _sdc_pandas_groupby_generic_func_codegen(
-        func_name, subject_columns, func_args, defaults, impl_args)
+        func_name, subject_columns, self.parent.column_loc, func_args, defaults, impl_args)
 
     # capture result column types into generated func context
     global_vars['res_arrays_dtypes'] = res_arrays_dtypes
@@ -528,7 +541,7 @@ def sdc_pandas_dataframe_groupby_apply_sum(self, func_name, func_args):
 
     groupby_func_name = f'_dataframe_groupby_{func_name}_impl'
     func_text, global_vars = _sdc_pandas_groupby_sum_codegen(
-        func_name, by_column, subject_columns, subject_column_dtypes, func_args)
+        func_name, by_column, subject_columns, self.parent.column_loc, subject_column_dtypes, func_args)
 
     # capture result column types into generated func context
     global_vars.update({

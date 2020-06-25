@@ -359,6 +359,16 @@ class TestSeries(
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
+    @skip_numba_jit("Numba creates array with dtype=intp by default"
+                    "On Win this fails with int32 vs int64 dtype mismatch")
+    def test_create_series2(self):
+        def test_impl(n):
+            return pd.Series(np.arange(n))
+
+        hpat_func = self.jit(test_impl)
+        n = 11
+        pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
+
     def test_create_series_index1(self):
         # create and box an indexed Series
         def test_impl():
@@ -417,8 +427,18 @@ class TestSeries(
             return A
         hpat_func = self.jit(test_impl)
 
-        S = pd.Series([3, 5, 6], ['a', 'b', 'c'], name='A')
-        pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+        n = 11
+        indexes_to_test = [
+            None,
+            list(np.arange(n)),
+            np.arange(n),
+            pd.RangeIndex(n),
+            gen_strlist(n)
+        ]
+        for index in indexes_to_test:
+            with self.subTest(df_index=index):
+                S = pd.Series(np.arange(n), index, name='A')
+                pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_getattr_size(self):
         def test_impl(S):
@@ -2427,7 +2447,7 @@ class TestSeries(
         if np.isnan(actual) or np.isnan(expected):
             self.assertEqual(np.isnan(actual), np.isnan(expected))
         else:
-            self.assertEqual(actual, expected)
+            np.testing.assert_array_almost_equal(actual, expected)
 
     def test_series_mean(self):
         def test_impl(S):
@@ -5617,20 +5637,23 @@ class TestSeries(
 
         S = pd.Series([0, 1, 2, 3, 4, 5])
 
-        idx, value = 5, 'ababa'
-        msg_tmpl = 'Operator setitem(). The value and Series data must be comparable. Given: self.dtype={}, value={}'
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(S, idx, value)
-        msg = msg_tmpl.format(S.dtype, 'unicode_type')
-        self.assertIn(msg, str(raises.exception))
+        with self.subTest(subtest="series data and value type mismatch"):
+            idx, value = 5, 'ababa'
+            msg_tmpl = 'Operator setitem(). The value and Series data must be comparable. ' \
+                       'Given: self.dtype={}, value={}'
+            with self.assertRaises(TypingError) as raises:
+                hpat_func(S, idx, value)
+            msg = msg_tmpl.format(S.dtype, 'unicode_type')
+            self.assertIn(msg, str(raises.exception))
 
-        idx, value = '3', 101
-        msg_tmpl = 'Operator setitem(). The idx is not comparable to Series index, not a Boolean or integer indexer' \
-                   + ' or a Slice. Given: self.index={}, idx={}'
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(S, idx, value)
-        msg = msg_tmpl.format('none', 'unicode_type')
-        self.assertIn(msg, str(raises.exception))
+        with self.subTest(subtest="series index and indexer type mismatch"):
+            idx, value = '3', 101
+            msg_tmpl = 'Operator setitem(). The idx is not comparable to Series index, ' \
+                       'not a Boolean or integer indexer or a Slice. Given: self.index={}, idx={}'
+            with self.assertRaises(TypingError) as raises:
+                hpat_func(S, idx, value)
+            msg = msg_tmpl.format('none', 'unicode_type')
+            self.assertIn(msg, str(raises.exception))
 
     @skip_sdc_jit('Arithmetic operations on Series with non-default indexes are not supported in old-style')
     def test_series_operator_add_numeric_scalar(self):
@@ -5813,7 +5836,9 @@ class TestSeries(
         size_A, size_B = 7, 25
         A = pd.Series(np.arange(size_A))
         B = pd.Series(np.arange(size_B)**2)
-        pd.testing.assert_series_equal(hpat_func(A, B), test_impl(A, B), check_dtype=False, check_names=False)
+        result = hpat_func(A, B)
+        result_ref = test_impl(A, B)
+        pd.testing.assert_series_equal(result, result_ref, check_dtype=False, check_names=False)
 
     @skip_parallel
     @skip_sdc_jit('Arithmetic operations on Series requiring alignment of indexes are not supported in old-style')
