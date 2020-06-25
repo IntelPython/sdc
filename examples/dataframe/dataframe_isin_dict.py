@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2020, Intel Corporation All rights reserved.
 #
@@ -25,42 +24,28 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from numba import types
-from numba.extending import (
-    models,
-    register_model,
-    make_attribute_wrapper
-)
+"""
+   Expected result:
+           A      B      C
+    0   True  False   True
+    1  False   True  False
+    2   True  False  False
+    3  False   True   True
+"""
+
+import pandas as pd
+from numba import njit
 
 
-RangeIndexDataType = types.range_state64_type
+@njit
+def dataframe_isin():
+    df = pd.DataFrame({'A': [0, 1, 2, 3],
+                       'B': [4, 5, 6, 7],
+                       'C': [8, 9, 10, 11]})
+
+    val = {'A': (0, 2), 'B': (5, 7), 'C': (8, 11)}
+
+    return df.isin(val)
 
 
-class RangeIndexType(types.IterableType):
-    dtype = types.int64
-
-    def __init__(self, is_named=False):
-        self.is_named = is_named
-        super(RangeIndexType, self).__init__(
-            name='RangeIndexType({})'.format(is_named))
-
-    @property
-    def iterator_type(self):
-        res = RangeIndexDataType.iterator_type
-        return res
-
-
-@register_model(RangeIndexType)
-class RangeIndexModel(models.StructModel):
-    def __init__(self, dmm, fe_type):
-
-        name_type = types.unicode_type if fe_type.is_named else types.none
-        members = [
-            ('data', RangeIndexDataType),
-            ('name', name_type),
-        ]
-        models.StructModel.__init__(self, dmm, fe_type, members)
-
-
-make_attribute_wrapper(RangeIndexType, 'data', '_data')
-make_attribute_wrapper(RangeIndexType, 'name', '_name')
+print(dataframe_isin())

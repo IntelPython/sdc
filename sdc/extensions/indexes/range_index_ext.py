@@ -32,14 +32,16 @@ import pandas as pd
 
 from numba import types
 from numba.core import cgutils
-from numba.extending import (typeof_impl, NativeValue, intrinsic, box, unbox, lower_builtin)
+from numba.extending import (typeof_impl, NativeValue, intrinsic, box, unbox, lower_builtin, )
+
 from numba.core.typing.templates import signature
-from numba.core.imputils import impl_ret_new_ref, impl_ret_untracked, iterator_impl
+from numba.core.imputils import impl_ret_untracked, call_getiter
 
 from sdc.datatypes.range_index_type import RangeIndexType, RangeIndexDataType
-from sdc.datatypes.common_functions import SDCLimitation
+from sdc.datatypes.common_functions import SDCLimitation, _sdc_take
 from sdc.utilities.utils import sdc_overload, sdc_overload_attribute, sdc_overload_method
-from sdc.utilities.sdc_typing_utils import TypeChecker
+from sdc.utilities.sdc_typing_utils import TypeChecker, check_is_numeric_array
+from sdc.functions.numpy_like import getitem_by_mask
 
 
 def _check_dtype_param_type(dtype):
@@ -52,7 +54,6 @@ def _check_dtype_param_type(dtype):
 
 @intrinsic
 def init_range_index(typingctx, data, name=None):
-
     name = types.none if name is None else name
     is_named = False if name is types.none else True
 
@@ -253,7 +254,6 @@ def pd_range_index_name_overload(self):
         return None
 
     is_named_index = self.is_named
-
     def pd_range_index_name_impl(self):
         if is_named_index == True:  # noqa
             return self._name
@@ -282,7 +282,8 @@ def pd_range_index_values_overload(self):
         return None
 
     def pd_range_index_values_impl(self):
-        return np.arange(self.start, self.stop, self.step)
+        # TO-DO: add caching when Numba supports writable attributes?
+        return np.array(self)
 
     return pd_range_index_values_impl
 
@@ -344,10 +345,9 @@ def pd_range_index_getitem_overload(self, idx):
     _func_name = 'Operator getitem().'
     ty_checker = TypeChecker(_func_name)
 
-    # TO-DO: extend getitem to support other indexers (Arrays, Lists, etc)
-    # for Arrays and Lists it requires Int64Index class as return value
-    if not isinstance(idx, (types.Integer, types.SliceType)):
-        ty_checker.raise_exc(idx, 'integer', 'idx')
+    if not (isinstance(idx, (types.Integer, types.SliceType))
+            or isinstance(idx, (types.Array, types.List)) and isinstance(idx.dtype, (types.Integer, types.Boolean))):
+        ty_checker.raise_exc(idx, 'integer, slice, integer array or list', 'idx')
 
     if isinstance(idx, types.Integer):
         def pd_range_index_getitem_impl(self, idx):
@@ -370,3 +370,84 @@ def pd_range_index_getitem_overload(self, idx):
             )
 
         return pd_range_index_getitem_impl
+
+    # returns np.array which is used to represent pandas Int64Index now
+    if isinstance(idx, (types.Array, types.List)):
+
+        if isinstance(idx.dtype, types.Integer):
+            def pd_range_index_getitem_impl(self, idx):
+                return _sdc_take(self, idx)
+
+            return pd_range_index_getitem_impl
+        elif isinstance(idx.dtype, types.Boolean):
+            def pd_range_index_getitem_impl(self, idx):
+                return getitem_by_mask(self, idx)
+
+            return pd_range_index_getitem_impl
+
+
+@sdc_overload(operator.eq)
+def pd_range_index_eq_overload(self, other):
+
+    self_is_range_index = isinstance(self, RangeIndexType)
+    other_is_range_index = isinstance(other, RangeIndexType)
+
+    if not (self_is_range_index and other_is_range_index
+            or (self_is_range_index and (check_is_numeric_array(other) or isinstance(other, types.Number)))
+            or ((check_is_numeric_array(self) or isinstance(self, types.Number) and other_is_range_index))):
+        return None
+    one_operand_is_scalar = isinstance(self, types.Number) or isinstance(other, types.Number)
+
+    def pd_range_index_eq_impl(self, other):
+
+        if one_operand_is_scalar == False:  # noqa
+            if len(self) != len(other):
+                raise ValueError("Lengths must match to compare")
+
+        # names do not matter when comparing pd.RangeIndex
+        left = self.values if self_is_range_index == True else self  # noqa
+        right = other.values if other_is_range_index == True else other  # noqa
+        return list(left == right)  # FIXME_Numba#5157: result must be np.array, remove list when Numba is fixed
+
+    return pd_range_index_eq_impl
+
+
+@sdc_overload(operator.ne)
+def pd_range_index_ne_overload(self, other):
+
+    self_is_range_index = isinstance(self, RangeIndexType)
+    other_is_range_index = isinstance(other, RangeIndexType)
+
+    if not (self_is_range_index and other_is_range_index
+            or (self_is_range_index and (check_is_numeric_array(other) or isinstance(other, types.Number)))
+            or ((check_is_numeric_array(self) or isinstance(self, types.Number) and other_is_range_index))):
+        return None
+
+    def pd_range_index_ne_impl(self, other):
+
+        eq_res = np.asarray(self == other)  # FIXME_Numba#5157: remove np.asarray and return as list
+        return list(~eq_res)
+
+    return pd_range_index_ne_impl
+
+
+@lower_builtin(operator.is_, RangeIndexType, RangeIndexType)
+def pd_range_index_is_overload(context, builder, sig, args):
+
+    ty_lhs, ty_rhs = sig.args
+    if ty_lhs != ty_rhs:
+        return cgutils.false_bit
+
+    lhs, rhs = args
+    lhs_ptr = builder.ptrtoint(lhs.operands[0], cgutils.intp_t)
+    rhs_ptr = builder.ptrtoint(rhs.operands[0], cgutils.intp_t)
+    return builder.icmp_signed('==', lhs_ptr, rhs_ptr)
+
+
+@lower_builtin('getiter', RangeIndexType)
+def pd_range_index_getiter(context, builder, sig, args):
+    """ Returns a new iterator object for RangeIndexType by delegating to range.__iter__ """
+    (value,) = args
+    range_index = cgutils.create_struct_proxy(sig.args[0])(context, builder, value)
+    res = call_getiter(context, builder, types.range_state64_type, range_index.data)
+    return impl_ret_untracked(context, builder, RangeIndexType, res)

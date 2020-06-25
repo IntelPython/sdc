@@ -40,7 +40,7 @@ from sdc.rewrites.ir_utils import (find_operations, is_dict,
                                    insert_before)
 from sdc.hiframes.pd_dataframe_ext import (init_dataframe, DataFrameType)
 
-from sdc.hiframes.api import fix_df_array
+from sdc.hiframes.api import fix_df_array, fix_df_index
 
 from sdc.config import config_pipeline_hpat_default
 
@@ -130,30 +130,42 @@ if not config_pipeline_hpat_default:
 
             data_args = args['data']
             columns_args = args['columns']
-
             index_args = args.get('index')
 
-            if index_args is None:
+            data_args = RewriteDataFrame._replace_data_with_arrays(data_args, stmt, block, func_ir)
+
+            if index_args is None:  # index arg was omitted
                 none_stmt = declare_constant(None, block, func_ir, stmt.loc)
-                index_args = [none_stmt.target]
-            else:
-                index_args = RewriteDataFrame._replace_with_arrays([index_args], stmt, block, func_ir)
+                index_args = none_stmt.target
 
-            data_args = RewriteDataFrame._replace_with_arrays(data_args, stmt, block, func_ir)
+            index_and_data_args = [index_args] + data_args
+            index_args = RewriteDataFrame._replace_index_with_arrays(index_and_data_args, stmt, block, func_ir)
+
             all_args = data_args + index_args + columns_args
-
             call = Expr.call(new_call, all_args, {}, func.loc)
 
             stmt.value = call
 
         @staticmethod
-        def _replace_with_arrays(args, stmt, block, func_ir):
+        def _replace_data_with_arrays(args, stmt, block, func_ir):
             new_args = []
 
             for var in args:
                 call_stmt = make_call(fix_df_array, [var], {}, block, func_ir, var.loc)
                 insert_before(block, call_stmt, stmt)
                 new_args.append(call_stmt.target)
+
+            return new_args
+
+        @staticmethod
+        def _replace_index_with_arrays(args, stmt, block, func_ir):
+            new_args = []
+
+            call_stmt = make_call(fix_df_index, args, {}, block, func_ir, args[0].loc)
+            insert_before(block, call_stmt, stmt)
+            new_args.append(call_stmt.target)
+
+            return new_args
 
             return new_args
 
