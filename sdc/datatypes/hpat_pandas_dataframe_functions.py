@@ -52,6 +52,8 @@ from sdc.str_arr_ext import StringArrayType
 from sdc.datatypes.range_index_type import RangeIndexType
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
+from sdc.hiframes.pd_series_type import SeriesType
+
 from sdc.datatypes.hpat_pandas_dataframe_getitem_types import (DataFrameGetitemAccessorType,
                                                                dataframe_getitem_accessor_init)
 from sdc.datatypes.common_functions import SDCLimitation
@@ -658,10 +660,11 @@ def sdc_pandas_dataframe_apply_columns(df, func_name, params, ser_params):
     all_params = ['df']
     ser_par = []
 
-    for key, value in params.items():
-        all_params.append('{}={}'.format(key, value))
-    for key, value in ser_params.items():
-        ser_par.append('{}={}'.format(key, value))
+    def kwsparams2list(params):
+        return ['{}={}'.format(k, v) for k, v in params.items()]
+
+    all_params = ['df'] + kwsparams2list(params)
+    ser_par = kwsparams2list(ser_params)
 
     s_par = ', '.join(ser_par)
 
@@ -671,9 +674,9 @@ def sdc_pandas_dataframe_apply_columns(df, func_name, params, ser_params):
                                                               df.columns, df.column_loc)
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
-    _reduce_impl = loc_vars[df_func_name]
+    _apply_impl = loc_vars[df_func_name]
 
-    return _reduce_impl
+    return _apply_impl
 
 
 def check_type(name, df, axis=None, skipna=None, level=None, numeric_only=None, ddof=1, min_count=0):
@@ -2475,6 +2478,435 @@ def pct_change_overload(df, periods=1, fill_method='pad', limit=None, freq=None)
     ser_par = {'periods': 'periods', 'fill_method': 'fill_method', 'limit': 'limit', 'freq': 'freq'}
 
     return sdc_pandas_dataframe_apply_columns(df, name, params, ser_par)
+
+
+def df_index_codegen_isin(df_type, df, data):
+    if isinstance(df_type.index, types.NoneType):
+        func_lines = [f'  return pandas.DataFrame({{{data}}})']
+    else:
+        func_lines = [f'  return pandas.DataFrame({{{data}}}, index={df}._index)']
+    return func_lines
+
+
+def sdc_pandas_dataframe_isin_dict_codegen(func_name, df_type, values, all_params):
+    """
+    Example of generated implementation:
+
+    def _df_isin_impl(df, values):
+      result_len=len(df)
+      if "A" in list(values.keys()):
+        series_A = pandas.Series(df._data[0])
+        val = list(values["A"])
+        result_A = series_A.isin(val)
+      else:
+        result = numpy.repeat(False, result_len)
+        result_A = pandas.Series(result)
+      result_len=len(df)
+      if "C" in list(values.keys()):
+        series_C = pandas.Series(df._data[1])
+        val = list(values["C"])
+        result_C = series_C.isin(val)
+      else:
+        result = numpy.repeat(False, result_len)
+        result_C = pandas.Series(result)
+      return pandas.DataFrame({"A": result_A, "C": result_C})
+    """
+    result_name = []
+    joined = ', '.join(all_params)
+    func_lines = [f'def _df_{func_name}_impl({joined}):']
+    df = all_params[0]
+    column_loc = df_type.column_loc
+    for i, c in enumerate(df_type.columns):
+        col_loc = column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
+        result_c = f'result_{c}'
+        func_lines += [
+            f'  result_len=len({df})',
+            f'  if "{c}" in list(values.keys()):',
+            f'    series_{c} = pandas.Series({df}._data[{type_id}][{col_id}])',
+            f'    val = list(values["{c}"])',
+            f'    result_{c} = series_{c}.{func_name}(val)',
+            f'  else:',
+            f'    result = numpy.repeat(False, result_len)',
+            f'    result_{c} = pandas.Series(result)'
+        ]
+        result_name.append((result_c, c))
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
+    func_lines += df_index_codegen_isin(df_type, df, data)
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas,
+                   'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_isin_ser_codegen(func_name, df_type, values, all_params):
+    """
+    Example of generated implementation:
+
+    def _df_isin_impl(df, values):
+      series_A = pandas.Series(df._data[0])
+      result = numpy.empty(len(series_A._data), numpy.bool_)
+      result_len = len(series_A._data)
+      for i in range(result_len):
+        idx = df.index[i]
+        value = series_A._data[i]
+        result[i] = False
+        for j in numba.prange(len(values)):
+          if idx == j:
+            value_val = values._data[j]
+            if value == value_val:
+              result[i] = True
+            else:
+              result[i] = False
+            break
+      result_A = pandas.Series(result)
+      series_B = pandas.Series(df._data[1])
+      result = numpy.empty(len(series_B._data), numpy.bool_)
+      result_len = len(series_B._data)
+      for i in range(result_len):
+        idx = df.index[i]
+        value = series_B._data[i]
+        result[i] = False
+        for j in numba.prange(len(values)):
+          if idx == j:
+            value_val = values._data[j]
+            if value == value_val:
+              result[i] = True
+            else:
+              result[i] = False
+            break
+      result_B = pandas.Series(result)
+      return pandas.DataFrame({"A": result_A, "B": result_B}, index=df._index)
+    """
+    result_name = []
+    joined = ', '.join(all_params)
+    func_lines = [f'def _df_{func_name}_impl({joined}):']
+    df = all_params[0]
+    column_loc = df_type.column_loc
+    for i, c in enumerate(df_type.columns):
+        col_loc = column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
+        result_c = f'result_{c}'
+        func_lines += [
+            f'  series_{c} = pandas.Series({df}._data[{type_id}][{col_id}])',
+            f'  result = numpy.empty(len(series_{c}._data), numpy.bool_)',
+            f'  result_len = len(series_{c}._data)'
+        ]
+        if isinstance(values.index, types.NoneType) and isinstance(df_type.index, types.NoneType):
+            func_lines += [
+                f'  for i in range(result_len):',
+                f'    if i <= len(values._data):',
+                f'      if series_{c}._data[i] == values._data[i]:',
+                f'        result[i] = True',
+                f'      else:',
+                f'        result[i] = False',
+                f'    else:',
+                f'      result[i] = False'
+            ]
+        elif isinstance(values.index, types.NoneType):
+            func_lines += [
+                f'  for i in range(result_len):',
+                f'    idx = {df}.index[i]',
+                f'    value = series_{c}._data[i]',
+                f'    result[i] = False',
+                f'    for j in numba.prange(len(values)):',
+                f'      if idx == j:',
+                f'        value_val = values._data[j]',
+                f'        if value == value_val:',
+                f'          result[i] = True',
+                f'        else:',
+                f'          result[i] = False',
+                f'        break'
+            ]
+        elif isinstance(df_type.index, types.NoneType):
+            func_lines += [
+                f'  for i in range(result_len):',
+                f'    value = series_{c}._data[i]',
+                f'    result[i] = False',
+                f'    for j in numba.prange(len(values)):',
+                f'      idx_val = values.index[j]',
+                f'      if i == idx_val:',
+                f'        value_val = values._data[j]',
+                f'        if value == value_val:',
+                f'          result[i] = True',
+                f'        else:',
+                f'          result[i] = False',
+                f'        break'
+            ]
+        else:
+            func_lines += [
+                f'  for i in range(result_len):',
+                f'    idx = {df}.index[i]',
+                f'    value = series_{c}._data[i]',
+                f'    result[i] = False',
+                f'    for j in numba.prange(len(values)):',
+                f'      idx_val = values.index[j]',
+                f'      if idx == idx_val:',
+                f'        value_val = values._data[j]',
+                f'        if value == value_val:',
+                f'          result[i] = True',
+                f'        else:',
+                f'          result[i] = False',
+                f'        break'
+            ]
+
+        func_lines += [f'  {result_c} = pandas.Series(result)']
+        result_name.append((result_c, c))
+
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
+    func_lines += df_index_codegen_isin(df_type, df, data)
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas,
+                   'numba': numba,
+                   'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def sdc_pandas_dataframe_isin_df_codegen(func_name, df_type, in_df, all_params):
+    """
+    Example of generated implementation:
+
+    def _df_isin_impl(df, values):
+      series_A = pandas.Series(df._data[0])
+      series_A_values = pandas.Series(values.A)
+      result = numpy.empty(len(series_A._data), numpy.bool_)
+      result_len = len(series_A._data)
+      for i in range(result_len):
+        idx = df.index[i]
+        value = series_A._data[i]
+        result[i] = False
+        for j in numba.prange(len(series_A_values)):
+          idx_val = values.index[j]
+          if idx == idx_val:
+            value_val = series_A_values._data[j]
+            if value == value_val:
+              result[i] = True
+            else:
+              result[i] = False
+            break
+      result_A = pandas.Series(result)
+      series_B = pandas.Series(df._data[1])
+      series_B_values = pandas.Series(values.B)
+      result = numpy.empty(len(series_B._data), numpy.bool_)
+      result_len = len(series_B._data)
+      for i in range(result_len):
+        idx = df.index[i]
+        value = series_B._data[i]
+        result[i] = False
+        for j in numba.prange(len(series_B_values)):
+          idx_val = values.index[j]
+          if idx == idx_val:
+            value_val = series_B_values._data[j]
+            if value == value_val:
+              result[i] = True
+            else:
+              result[i] = False
+            break
+      result_B = pandas.Series(result)
+      return pandas.DataFrame({"A": result_A, "B": result_B}, index=df._index)
+    """
+    result_name = []
+    joined = ', '.join(all_params)
+    func_lines = [f'def _df_{func_name}_impl({joined}):']
+    df = all_params[0]
+    val = all_params[1]
+    column_loc = df_type.column_loc
+    for i, c in enumerate(df_type.columns):
+        col_loc = column_loc[c]
+        type_id, col_id = col_loc.type_id, col_loc.col_id
+        result_c = f'result_{c}'
+        func_lines += [f'  series_{c} = pandas.Series({df}._data[{type_id}][{col_id}])']
+        if c in in_df.columns:
+            func_lines += [
+                f'  series_{c}_values = pandas.Series({val}.{c})',
+                f'  result = numpy.empty(len(series_{c}._data), numpy.bool_)',
+                f'  result_len = len(series_{c}._data)'
+            ]
+            if isinstance(in_df.index, types.NoneType) and isinstance(df_type.index, types.NoneType):
+                func_lines += [
+                    f'  for i in range(result_len):',
+                    f'    if i <= len(series_{c}_values):',
+                    f'      if series_{c}._data[i] == series_{c}_values._data[i]:',
+                    f'        result[i] = True',
+                    f'      else:',
+                    f'        result[i] = False',
+                    f'    else:',
+                    f'      result[i] = False']
+            elif isinstance(df_type.index, types.NoneType):
+                func_lines += [
+                    f'  for i in range(result_len):',
+                    f'    value = series_{c}._data[i]',
+                    f'    result[i] = False',
+                    f'    for j in numba.prange(len(series_{c}_values)):',
+                    f'      idx_val = {val}.index[j]',
+                    f'      if i == idx_val:',
+                    f'        value_val = series_{c}_values._data[j]',
+                    f'        if value == value_val:',
+                    f'          result[i] = True',
+                    f'        else:',
+                    f'          result[i] = False',
+                    f'        break',
+                ]
+            elif isinstance(in_df.index, types.NoneType):
+                func_lines += [
+                    f'  for i in range(result_len):',
+                    f'    idx = {df}.index[i]',
+                    f'    value = series_{c}._data[i]',
+                    f'    result[i] = False',
+                    f'    for j in numba.prange(len(series_{c}_values)):',
+                    f'      if idx == j:',
+                    f'        value_val = series_{c}_values._data[j]',
+                    f'        if value == value_val:',
+                    f'          result[i] = True',
+                    f'        else:',
+                    f'          result[i] = False',
+                    f'        break',
+                    ]
+            else:
+                func_lines += [
+                    f'  for i in range(result_len):',
+                    f'    idx = {df}.index[i]',
+                    f'    value = series_{c}._data[i]',
+                    f'    result[i] = False',
+                    f'    for j in numba.prange(len(series_{c}_values)):',
+                    f'      idx_val = {val}.index[j]',
+                    f'      if idx == idx_val:',
+                    f'        value_val = series_{c}_values._data[j]',
+                    f'        if value == value_val:',
+                    f'          result[i] = True',
+                    f'        else:',
+                    f'          result[i] = False',
+                    f'        break',
+                    ]
+        else:
+            func_lines += [
+                f'  result = [False] * len(series_{c}._data)']
+        func_lines += [f'  {result_c} = pandas.Series(result)']
+        result_name.append((result_c, c))
+    data = ', '.join(f'"{column_name}": {column}' for column, column_name in result_name)
+    func_lines += df_index_codegen_isin(df_type, df, data)
+    func_text = '\n'.join(func_lines)
+
+    global_vars = {'pandas': pandas,
+                   'numba': numba,
+                   'numpy': numpy,
+                   'get_dataframe_data': get_dataframe_data}
+
+    return func_text, global_vars
+
+
+def gen_codegen(func, name, df, values, all_params):
+    func_text, global_vars = func(name, df, values, all_params)
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _apply_impl = loc_vars[f'_df_{name}_impl']
+
+    return _apply_impl
+
+
+def sdc_pandas_dataframe_isin_df(name, df, values, all_params):
+    return gen_codegen(sdc_pandas_dataframe_isin_df_codegen, name, df, values, all_params)
+
+
+def sdc_pandas_dataframe_isin_ser(name, df, values, all_params):
+    return gen_codegen(sdc_pandas_dataframe_isin_ser_codegen, name, df, values, all_params)
+
+
+def sdc_pandas_dataframe_isin_dict(name, df, values, all_params):
+    return gen_codegen(sdc_pandas_dataframe_isin_dict_codegen, name, df, values, all_params)
+
+
+def sdc_pandas_dataframe_isin_iter(name, all_params, ser_par, columns, column_loc):
+    func_text, global_vars = _dataframe_apply_columns_codegen(name, all_params, ser_par, columns, column_loc)
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    _apply_impl = loc_vars[f'_df_{name}_impl']
+
+    return _apply_impl
+
+
+@sdc_overload_method(DataFrameType, 'isin')
+def isin_overload(df, values):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.isin
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_isin_df.py
+        :language: python
+        :lines: 36-
+        :caption: Whether each element in the DataFrame is contained in values of another DataFrame.
+        :name: ex_dataframe_isin
+
+    .. command-output:: python ./dataframe/dataframe_isin_df.py
+        :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/dataframe_isin_ser.py
+        :language: python
+        :lines: 36-
+        :caption: Whether each element in the DataFrame is contained in values of Series.
+        :name: ex_dataframe_isin
+
+    .. command-output:: python ./dataframe/dataframe_isin_ser.py
+        :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/dataframe_isin_dict.py
+        :language: python
+        :lines: 36-
+        :caption: Whether each element in the DataFrame is contained in values of Dictionary.
+        :name: ex_dataframe_isin
+
+    .. command-output:: python ./dataframe/dataframe_isin_dict.py
+        :cwd: ../../../examples
+
+    .. literalinclude:: ../../../examples/dataframe/dataframe_isin.py
+        :language: python
+        :lines: 36-
+        :caption: Whether each element in the DataFrame is contained in values of List.
+        :name: ex_dataframe_isin
+
+    .. command-output:: python ./dataframe/dataframe_isin.py
+        :cwd: ../../../examples
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame method :meth:`pandas.DataFrame.isin` implementation.
+
+    .. only:: developer
+
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_isin*
+    """
+
+    name = 'isin'
+
+    ty_checker = TypeChecker('Method {}().'.format(name))
+    ty_checker.check(df, DataFrameType)
+
+    if not isinstance(values, (SeriesType, types.List, types.Set, DataFrameType, types.DictType)):
+        ty_checker.raise_exc(values, 'iterable, Series, DataFrame', 'values')
+
+    all_params = ['df', 'values']
+
+    if isinstance(values, (types.List, types.Set)):
+        ser_par = 'values=values'
+        return sdc_pandas_dataframe_isin_iter(name, all_params, ser_par, df.columns, df.column_loc)
+
+    if isinstance(values, types.DictType):
+        return sdc_pandas_dataframe_isin_dict(name, df, values, all_params)
+
+    if isinstance(values, SeriesType):
+        return sdc_pandas_dataframe_isin_ser(name, df, values, all_params)
+
+    if isinstance(values, DataFrameType):
+        return sdc_pandas_dataframe_isin_df(name, df, values, all_params)
 
 
 @sdc_overload_method(DataFrameType, 'groupby')
