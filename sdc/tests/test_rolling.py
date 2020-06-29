@@ -41,7 +41,8 @@ from sdc.tests.test_base import TestCase
 from sdc.tests.test_series import gen_frand_array
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                   skip_numba_jit, skip_sdc_jit,
-                                  test_global_input_data_float64)
+                                  test_global_input_data_float64,
+                                  assert_raises_ty_checker)
 
 
 LONG_TEST = (int(os.environ['SDC_LONG_ROLLING_TEST']) != 0
@@ -480,42 +481,42 @@ class TestRolling(TestCase):
                                win_type, on, axis, closed).min()
 
         hpat_func = self.jit(test_impl)
-        msg_tmpl = 'Method rolling(). The object {}\n given: {}\n expected: {}'
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, '1', None, False, None, None, 0, None)
-        msg = msg_tmpl.format('window', 'unicode_type', 'int')
-        self.assertIn(msg, str(raises.exception))
+        method_name = 'Method rolling().'
+        assert_raises_ty_checker(self,
+                                 [method_name, 'window', 'unicode_type', 'int'],
+                                 hpat_func,
+                                 obj, '1', None, False, None, None, 0, None)
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, 1, '1', False, None, None, 0, None)
-        msg = msg_tmpl.format('min_periods', 'unicode_type', 'None, int')
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'min_periods', 'unicode_type', 'None, int'],
+                                 hpat_func,
+                                 obj, 1, '1', False, None, None, 0, None)
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, 1, None, 0, None, None, 0, None)
-        msg = msg_tmpl.format('center', 'int64', 'bool')
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'center', 'int64', 'bool'],
+                                 hpat_func,
+                                 obj, 1, None, 0, None, None, 0, None)
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, 1, None, False, -1, None, 0, None)
-        msg = msg_tmpl.format('win_type', 'int64', 'str')
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'win_type', 'int64', 'str'],
+                                 hpat_func,
+                                 obj, 1, None, False, -1, None, 0, None)
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, 1, None, False, None, -1, 0, None)
-        msg = msg_tmpl.format('on', 'int64', 'str')
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'on', 'int64', 'str'],
+                                 hpat_func,
+                                 obj, 1, None, False, None, -1, 0, None)
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, 1, None, False, None, None, None, None)
-        msg = msg_tmpl.format('axis', 'none', 'int, str')
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'axis', 'none', 'int, str'],
+                                 hpat_func,
+                                 obj, 1, None, False, None, None, None, None)
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, 1, None, False, None, None, 0, -1)
-        msg = msg_tmpl.format('closed', 'int64', 'str')
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'closed', 'int64', 'str'],
+                                 hpat_func,
+                                 obj, 1, None, False, None, None, 0, -1)
 
     def _test_rolling_apply_mean(self, obj):
         def test_impl(obj, window, min_periods):
@@ -548,10 +549,10 @@ class TestRolling(TestCase):
 
         hpat_func = self.jit(test_impl)
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, 1)
-        msg = 'Method rolling.apply(). The object raw\n given: int64\n expected: bool'
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 ['Method rolling.apply().', 'raw', 'int64', 'bool'],
+                                 hpat_func,
+                                 obj, 1)
 
     def _test_rolling_apply_args(self, obj):
         def test_impl(obj, window, min_periods, q):
@@ -610,10 +611,10 @@ class TestRolling(TestCase):
 
         hpat_func = self.jit(test_impl)
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, 1)
-        msg = 'Method rolling.corr(). The object pairwise\n given: int64\n expected: bool'
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 ['Method rolling.corr().', 'pairwise', 'int64', 'bool'],
+                                 hpat_func,
+                                 obj, 1)
 
     def _test_rolling_count(self, obj):
         def test_impl(obj, window, min_periods):
@@ -666,17 +667,16 @@ class TestRolling(TestCase):
 
         hpat_func = self.jit(test_impl)
 
-        msg_tmpl = 'Method rolling.cov(). The object {}\n given: {}\n expected: {}'
+        method_name = 'Method rolling.cov().'
+        assert_raises_ty_checker(self,
+                                 [method_name, 'pairwise', 'int64', 'bool'],
+                                 hpat_func,
+                                 obj, 1, 1)
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, 1, 1)
-        msg = msg_tmpl.format('pairwise', 'int64', 'bool')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, None, '1')
-        msg = msg_tmpl.format('ddof', 'unicode_type', 'int')
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'ddof', 'unicode_type', 'int'],
+                                 hpat_func,
+                                 obj, None, '1')
 
     def _test_rolling_kurt(self, obj):
         def test_impl(obj, window, min_periods):
@@ -777,17 +777,16 @@ class TestRolling(TestCase):
 
         hpat_func = self.jit(test_impl)
 
-        msg_tmpl = 'Method rolling.quantile(). The object {}\n given: {}\n expected: {}'
+        method_name = 'Method rolling.quantile().'
+        assert_raises_ty_checker(self,
+                                 [method_name, 'quantile', 'unicode_type', 'float'],
+                                 hpat_func,
+                                 obj, '0.5', 'linear')
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, '0.5', 'linear')
-        msg = msg_tmpl.format('quantile', 'unicode_type', 'float')
-        self.assertIn(msg, str(raises.exception))
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, 0.5, None)
-        msg = msg_tmpl.format('interpolation', 'none', 'str')
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'interpolation', 'none', 'str'],
+                                 hpat_func,
+                                 obj, 0.5, None)
 
     def _test_rolling_quantile_exception_unsupported_values(self, obj):
         def test_impl(obj, quantile, interpolation):
@@ -836,10 +835,10 @@ class TestRolling(TestCase):
         hpat_func = self.jit(test_impl)
 
         window, min_periods, invalid_ddof = 3, 2, '1'
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, window, min_periods, invalid_ddof)
-        msg = 'Method rolling.std(). The object ddof\n given: unicode_type\n expected: int'
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 ['Method rolling.std().', 'ddof', 'unicode_type', 'int'],
+                                 hpat_func,
+                                 obj, window, min_periods, invalid_ddof)
 
     def _test_rolling_sum(self, obj):
         def test_impl(obj, window, min_periods):
@@ -874,10 +873,10 @@ class TestRolling(TestCase):
         hpat_func = self.jit(test_impl)
 
         window, min_periods, invalid_ddof = 3, 2, '1'
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(obj, window, min_periods, invalid_ddof)
-        msg = 'Method rolling.var(). The object ddof\n given: unicode_type\n expected: int'
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 ['Method rolling.var().', 'ddof', 'unicode_type', 'int'],
+                                 hpat_func,
+                                 obj, window, min_periods, invalid_ddof)
 
     @skip_sdc_jit('DataFrame.rolling.min() unsupported exceptions')
     def test_df_rolling_unsupported_values(self):

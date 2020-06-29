@@ -56,7 +56,7 @@ from sdc.tests.test_utils import (count_array_OneDs,
                                   take_k_elements)
 from sdc.tests.gen_test_data import ParquetGenerator
 
-from sdc.tests.test_utils import test_global_input_data_unicode_kind1
+from sdc.tests.test_utils import test_global_input_data_unicode_kind1, assert_raises_ty_checker
 from sdc.datatypes.common_functions import SDCLimitation
 
 
@@ -2945,11 +2945,10 @@ class TestSeries(
         series = pd.Series(data)
         width = max(len(s) for s in data) + 10
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, width, 10)
-        msg_tmpl = 'Method center(). The object fillchar\n {}'
-        msg = msg_tmpl.format('given: int64\n expected: str')
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 ['Method center().', 'fillchar', 'int64', 'str'],
+                                 hpat_func,
+                                 series, width, 10)
 
     @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2348
     def test_series_str_center_exception_unsupported_kind4(self):
@@ -2998,16 +2997,15 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         series = pd.Series(test_global_input_data_unicode_kind4)
-        msg_tmpl = 'Method endswith(). The object na\n {}'
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, '', 'None')
-        msg = msg_tmpl.format('given: unicode_type\n expected: bool')
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 ['Method endswith().', 'na', 'unicode_type', 'bool'],
+                                 hpat_func,
+                                 series, '', 'None')
 
         with self.assertRaises(ValueError) as raises:
             hpat_func(series, '', False)
-        msg = msg_tmpl.format('expected: None')
+        msg = 'Method endswith(). The object na\n expected: None'
         self.assertIn(msg, str(raises.exception))
 
     def test_series_str_find(self):
@@ -3031,16 +3029,16 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         series = pd.Series(test_global_input_data_unicode_kind4)
-        msg_tmpl = 'Method find(). The object start\n {}'
-
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, '', '0')
-        msg = msg_tmpl.format('given: unicode_type\n expected: None, int')
-        self.assertIn(msg, str(raises.exception))
+        self.assertRaisesRegex(TypingError,
+                               r'Method find\(\)\. The object start\n'
+                               r'\s+given: unicode_type\n'
+                               r'\s+expected: None, int',
+                               hpat_func,
+                               series, '', '0')
 
         with self.assertRaises(ValueError) as raises:
             hpat_func(series, '', 1)
-        msg = msg_tmpl.format('expected: 0')
+        msg = 'Method find(). The object start\n expected: 0'
         self.assertIn(msg, str(raises.exception))
 
     def test_series_str_find_exception_unsupported_end(self):
@@ -3049,16 +3047,17 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         series = pd.Series(test_global_input_data_unicode_kind4)
-        msg_tmpl = 'Method find(). The object end\n {}'
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, '', 0, 'None')
-        msg = msg_tmpl.format('given: unicode_type\n expected: None, int')
-        self.assertIn(msg, str(raises.exception))
+        self.assertRaisesRegex(TypingError,
+                               r'Method find\(\)\. The object end\n'
+                               r'\s+given: unicode_type\n'
+                               r'\s+expected: None, int',
+                               hpat_func,
+                               series, '', 0, 'None')
 
         with self.assertRaises(ValueError) as raises:
             hpat_func(series, '', 0, 0)
-        msg = msg_tmpl.format('expected: None')
+        msg = 'Method find(). The object end\n expected: None'
         self.assertIn(msg, str(raises.exception))
 
     def test_series_str_len1(self):
@@ -3103,15 +3102,17 @@ class TestSeries(
         data = test_global_input_data_unicode_kind1
         series = pd.Series(data)
         width = max(len(s) for s in data) + 5
-        msg_tmpl = 'Method {}(). The object fillchar\n given: int64\n expected: str'
 
         pyfuncs = [('ljust', ljust_with_fillchar_usecase),
                    ('rjust', rjust_with_fillchar_usecase)]
         for name, pyfunc in pyfuncs:
             cfunc = self.jit(pyfunc)
-            with self.assertRaises(TypingError) as raises:
-                cfunc(series, width, 5)
-            self.assertIn(msg_tmpl.format(name), str(raises.exception))
+            self.assertRaisesRegex(TypingError,
+                                   fr'Method {name}\(\)\. The object fillchar\n'
+                                   r'\s+given: int64\n'
+                                   r'\s+expected: str',
+                                   cfunc,
+                                   series, width, 5)
 
     @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2348
     def test_series_str_just_exception_unsupported_kind4(self):
@@ -3167,16 +3168,15 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         series = pd.Series(test_global_input_data_unicode_kind4)
-        msg_tmpl = 'Method startswith(). The object na\n {}'
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(series, '', 'None')
-        msg = msg_tmpl.format('given: unicode_type\n expected: bool')
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 ['Method startswith().', 'na', 'unicode_type', 'bool'],
+                                 hpat_func,
+                                 series, '', 'None')
 
         with self.assertRaises(ValueError) as raises:
             hpat_func(series, '', False)
-        msg = msg_tmpl.format('expected: None')
+        msg = 'Method startswith(). The object na\n expected: None'
         self.assertIn(msg, str(raises.exception))
 
     def test_series_str_zfill(self):
@@ -3543,10 +3543,13 @@ class TestSeries(
         ignore_index = True
         S1 = pd.Series([-2., 3., 9.1], ['a1', 'b1', 'c1'])
         S2 = pd.Series([-2., 5.0], ['a2', 'b2'])
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(S1, S2, ignore_index)
-        msg = 'Method append(). The object ignore_index\n given: bool\n expected: literal Boolean constant\n'
-        self.assertIn(msg.format(types.bool_), str(raises.exception))
+
+        self.assertRaisesRegex(TypingError,
+                               r'Method append\(\)\. The object ignore_index\n'
+                               r'\s+given: bool\n'
+                               r'\s+expected: literal Boolean constant',
+                               hpat_func,
+                               S1, S2, ignore_index)
 
     @skip_sdc_jit("BUG: old-style append implementation doesn't handle series index")
     def test_series_append_single_dtype_promotion(self):
@@ -3882,7 +3885,6 @@ class TestSeries(
 
     @skip_sdc_jit('Series.nlargest() does not raise an exception')
     def test_series_nlargest_typing(self):
-        _func_name = 'Method nlargest().'
 
         def test_impl(series, n, keep):
             return series.nlargest(n, keep)
@@ -3891,17 +3893,21 @@ class TestSeries(
         series = pd.Series(test_global_input_data_float64[0])
         for n, ntype in [(True, types.boolean), (None, types.none),
                          (0.1, 'float64'), ('n', types.unicode_type)]:
-            with self.assertRaises(TypingError) as raises:
-                hpat_func(series, n=n, keep='first')
-            msg = '{} The object n\n given: {}\n expected: int'
-            self.assertIn(msg.format(_func_name, ntype), str(raises.exception))
+            self.assertRaisesRegex(TypingError,
+                                   r'Method nlargest\(\)\. The object n\n'
+                                   fr'\s+given: {ntype}\n'
+                                   r'\s+expected: int',
+                                   hpat_func,
+                                   series, n=n, keep='first')
 
         for keep, dtype in [(True, types.boolean), (None, types.none),
                             (0.1, 'float64'), (1, 'int64')]:
-            with self.assertRaises(TypingError) as raises:
-                hpat_func(series, n=5, keep=keep)
-            msg = '{} The object keep\n given: {}\n expected: str'
-            self.assertIn(msg.format(_func_name, dtype), str(raises.exception))
+            self.assertRaisesRegex(TypingError,
+                                   r'Method nlargest\(\)\. The object keep\n'
+                                   fr'\s+given: {dtype}\n'
+                                   r'\s+expected: str',
+                                   hpat_func,
+                                   series, n=5, keep=keep)
 
     @skip_sdc_jit('Series.nlargest() does not raise an exception')
     def test_series_nlargest_unsupported(self):
@@ -4004,7 +4010,6 @@ class TestSeries(
 
     @skip_sdc_jit('Series.nsmallest() does not raise an exception')
     def test_series_nsmallest_typing(self):
-        _func_name = 'Method nsmallest().'
 
         def test_impl(series, n, keep):
             return series.nsmallest(n, keep)
@@ -4013,17 +4018,21 @@ class TestSeries(
         series = pd.Series(test_global_input_data_float64[0])
         for n, ntype in [(True, types.boolean), (None, types.none),
                          (0.1, 'float64'), ('n', types.unicode_type)]:
-            with self.assertRaises(TypingError) as raises:
-                hpat_func(series, n=n, keep='first')
-            msg = '{} The object n\n given: {}\n expected: int'
-            self.assertIn(msg.format(_func_name, ntype), str(raises.exception))
+            self.assertRaisesRegex(TypingError,
+                                   r'Method nsmallest\(\)\. The object n\n'
+                                   fr'\s+given: {ntype}\n'
+                                   r'\s+expected: int',
+                                   hpat_func,
+                                   series, n=n, keep='first')
 
         for keep, dtype in [(True, types.boolean), (None, types.none),
                             (0.1, 'float64'), (1, 'int64')]:
-            with self.assertRaises(TypingError) as raises:
-                hpat_func(series, n=5, keep=keep)
-            msg = '{} The object keep\n given: {}\n expected: str'
-            self.assertIn(msg.format(_func_name, dtype), str(raises.exception))
+            self.assertRaisesRegex(TypingError,
+                                   r'Method nsmallest\(\)\. The object keep\n'
+                                   fr'\s+given: {dtype}\n'
+                                   r'\s+expected: str',
+                                   hpat_func,
+                                   series, n=5, keep=keep)
 
     @skip_sdc_jit('Series.nsmallest() does not raise an exception')
     def test_series_nsmallest_unsupported(self):
@@ -4795,10 +4804,12 @@ class TestSeries(
 
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_unicode_kind4)
-        with self.assertRaises(TypingError) as raises:
-            cfunc(series)
-        msg = 'Method shift(). The object self.data.dtype\n given: unicode_type\n expected: number\n'
-        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+        self.assertRaisesRegex(TypingError,
+                               r'Method shift\(\)\. The object self\.data\.dtype\n'
+                               r'\s+given: unicode_type\n'
+                               r'\s+expected: number',
+                               cfunc,
+                               series)
 
     def test_series_shift_fill_str(self):
         def pyfunc(series, fill_value):
@@ -4806,10 +4817,11 @@ class TestSeries(
 
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_float64[0])
-        with self.assertRaises(TypingError) as raises:
-            cfunc(series, fill_value='unicode')
-        msg = 'Method shift(). The object fill_value\n given: unicode_type\n expected: number\n'
-        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+
+        assert_raises_ty_checker(self,
+                                 ['Method shift().', 'fill_value', 'unicode_type', 'number'],
+                                 cfunc,
+                                 series, fill_value='unicode')
 
     def test_series_shift_unsupported_params(self):
         def pyfunc(series, freq, axis):
@@ -4817,10 +4829,10 @@ class TestSeries(
 
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_float64[0])
-        with self.assertRaises(TypingError) as raises:
-            cfunc(series, freq='12H', axis=0)
-        msg = 'Method shift(). The object freq\n given: unicode_type\n expected: None\n'
-        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 ['Method shift().', 'freq', 'unicode_type', 'None'],
+                                 cfunc,
+                                 series, freq='12H', axis=0)
 
         with self.assertRaises(TypingError) as raises:
             cfunc(series, freq=None, axis=1)
@@ -5091,10 +5103,10 @@ class TestSeries(
 
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_unicode_kind4)
-        with self.assertRaises(TypingError) as raises:
-            cfunc(series)
-        msg = 'Method std(). The object self.data\n given: StringArrayType()\n expected: number\n'
-        self.assertIn(msg.format(types.unicode_type), str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 ['Method std().', 'self.data', 'StringArrayType()', 'number'],
+                                 cfunc,
+                                 series)
 
     @skip_sdc_jit('Series.std() parameters "axis", "level", "numeric_only" unsupported')
     def test_series_std_unsupported_params(self):
@@ -5103,20 +5115,21 @@ class TestSeries(
 
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_float64[0])
-        with self.assertRaises(TypingError) as raises:
-            cfunc(series, axis=1, level=None, numeric_only=None)
-        msg = 'Method std(). The object axis\n given: int64\n expected: None\n'
-        self.assertIn(msg, str(raises.exception))
+        method_name = 'Method std().'
+        assert_raises_ty_checker(self,
+                                 [method_name, 'axis', 'int64', 'None'],
+                                 cfunc,
+                                 series, axis=1, level=None, numeric_only=None)
 
-        with self.assertRaises(TypingError) as raises:
-            cfunc(series, axis=None, level=1, numeric_only=None)
-        msg = 'Method std(). The object level\n given: int64\n expected: None\n'
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'level', 'int64', 'None'],
+                                 cfunc,
+                                 series, axis=None, level=1, numeric_only=None)
 
-        with self.assertRaises(TypingError) as raises:
-            cfunc(series, axis=None, level=None, numeric_only=True)
-        msg = 'Method std(). The object numeric_only\n given: bool\n expected: None\n'
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'numeric_only', 'bool', 'None'],
+                                 cfunc,
+                                 series, axis=None, level=None, numeric_only=True)
 
     def test_series_nunique(self):
         def test_series_nunique_impl(s):
@@ -5215,10 +5228,11 @@ class TestSeries(
 
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_unicode_kind4)
-        with self.assertRaises(TypingError) as raises:
-            cfunc(series)
-        msg = 'Method var(). The object self.data\n given: StringArrayType()\n expected: number\n'
-        self.assertIn(msg, str(raises.exception))
+
+        assert_raises_ty_checker(self,
+                                 ['Method var().', 'self.data', 'StringArrayType()', 'number'],
+                                 cfunc,
+                                 series)
 
     @skip_sdc_jit('Series.var() parameters "axis", "level", "numeric_only" unsupported')
     def test_series_var_unsupported_params(self):
@@ -5227,20 +5241,22 @@ class TestSeries(
 
         cfunc = self.jit(pyfunc)
         series = pd.Series(test_global_input_data_float64[0])
-        with self.assertRaises(TypingError) as raises:
-            cfunc(series, axis=1, level=None, numeric_only=None)
-        msg = 'Method var(). The object axis\n given: int64\n expected: None\n'
-        self.assertIn(msg, str(raises.exception))
 
-        with self.assertRaises(TypingError) as raises:
-            cfunc(series, axis=None, level=1, numeric_only=None)
-        msg = 'Method var(). The object level\n given: int64\n expected: None\n'
-        self.assertIn(msg, str(raises.exception))
+        method_name = 'Method var().'
+        assert_raises_ty_checker(self,
+                                 [method_name, 'axis', 'int64', 'None'],
+                                 cfunc,
+                                 series, axis=1, level=None, numeric_only=None)
 
-        with self.assertRaises(TypingError) as raises:
-            cfunc(series, axis=None, level=None, numeric_only=True)
-        msg = 'Method var(). The object numeric_only\n given: bool\n expected: None\n'
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'level', 'int64', 'None'],
+                                 cfunc,
+                                 series, axis=None, level=1, numeric_only=None)
+
+        assert_raises_ty_checker(self,
+                                 [method_name, 'numeric_only', 'bool', 'None'],
+                                 cfunc,
+                                 series, axis=None, level=None, numeric_only=True)
 
     def test_series_count(self):
         def test_series_count_impl(S):
@@ -5336,10 +5352,10 @@ class TestSeries(
         hpat_func = self.jit(test_impl)
 
         S = pd.Series(test_global_input_data_unicode_kind4)
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(S)
-        msg = 'TypingError: Method cumsum(). The object self.data.dtype\n given: unicode_type\n expected: numeric\n'
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 ['Method cumsum().', 'self.data.dtype', 'unicode_type', 'numeric'],
+                                 hpat_func,
+                                 S)
 
     @skip_sdc_jit('Series.cumsum() parameter "axis" unsupported')
     def test_series_cumsum_unsupported_axis(self):
@@ -5350,10 +5366,10 @@ class TestSeries(
         S = pd.Series(test_global_input_data_float64[0])
         for axis in [0, 1]:
             with self.subTest(axis=axis):
-                with self.assertRaises(TypingError) as raises:
-                    hpat_func(S, axis=axis)
-                msg = 'TypingError: Method cumsum(). The object axis\n given: int64\n expected: None\n'
-                self.assertIn(msg, str(raises.exception))
+                assert_raises_ty_checker(self,
+                                         ['Method cumsum().', 'axis', 'int64', 'None'],
+                                         hpat_func,
+                                         S, axis=axis)
 
     def test_series_cov1(self):
         def test_impl(s1, s2):
@@ -6225,10 +6241,10 @@ class TestSeries(
         msg = "Method contains(). Unsupported parameter. Given 'flags' != 0"
         self.assertIn(msg, str(raises.exception))
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(s, pat, na=0)
-        msg = 'Method contains(). The object na\n given: int64\n expected: none'
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 ['Method contains().', 'na', 'int64', 'none'],
+                                 hpat_func,
+                                 s, pat, na=0)
 
         with self.assertRaises(SDCLimitation) as raises:
             hpat_func(s, pat, regex=False)
@@ -7255,25 +7271,26 @@ class TestSeries(
 
         hpat_func = self.jit(test_impl)
         s = pd.Series([1.1, 0.3, np.nan, 1, np.inf, 0, 1.1, np.nan, 2.2, np.inf, 2, 2])
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(s, axis=0.75)
-        msg = 'TypingError: Method Series.skew() The object axis\n given: float64\n expected: int64'
-        self.assertIn(msg, str(raises.exception))
+        method_name = 'Method Series.skew().'
+        assert_raises_ty_checker(self,
+                                 [method_name, 'axis', 'float64', 'int64'],
+                                 hpat_func,
+                                 s, axis=0.75)
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(s, skipna=0)
-        msg = 'TypingError: Method Series.skew() The object skipna\n given: int64\n expected: bool'
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'skipna', 'int64', 'bool'],
+                                 hpat_func,
+                                 s, skipna=0)
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(s, level=0)
-        msg = 'TypingError: Method Series.skew() The object level\n given: int64\n expected: None'
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'level', 'int64', 'None'],
+                                 hpat_func,
+                                 s, level=0)
 
-        with self.assertRaises(TypingError) as raises:
-            hpat_func(s, numeric_only=0)
-        msg = 'TypingError: Method Series.skew() The object numeric_only\n given: int64\n expected: None'
-        self.assertIn(msg, str(raises.exception))
+        assert_raises_ty_checker(self,
+                                 [method_name, 'numeric_only', 'int64', 'None'],
+                                 hpat_func,
+                                 s, numeric_only=0)
 
         with self.assertRaises(ValueError) as raises:
             hpat_func(s, axis=5)

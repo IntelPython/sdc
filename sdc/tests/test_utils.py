@@ -31,10 +31,11 @@ import unittest
 import numba
 import numpy as np
 import pandas
+from numba.core.errors import TypingError
 
 import sdc
 from sdc.config import config_inline_overloads, config_use_parallel_overloads
-
+from sdc.utilities.sdc_typing_utils import TypeChecker
 
 test_global_input_data_unicode_kind4 = [
     '¡Y tú quién te crees?',
@@ -231,3 +232,11 @@ def create_series_from_values(size, data_values, index_values=None, name=None, u
     series_index = take_k_elements(size, index_values, repeat) if index_values else None
 
     return pandas.Series(series_data, series_index, name)
+
+
+def assert_raises_ty_checker(self, err_details, func, *args, **kwargs):
+    mapping = {'\n': r'\n\s*', '(': r'\(', ')': r'\)'}
+    translation_dict = {ord(k): v for k, v in mapping.items()}
+    regex_str = TypeChecker.msg_template.format(*err_details)
+    regex_str = regex_str.translate(translation_dict)
+    self.assertRaisesRegex(TypingError, regex_str, func, *args, **kwargs)
