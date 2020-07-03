@@ -24,3 +24,7 @@ class TestCase(unittest.TestCase):
             return self.sdc_jit(*args, **kwargs)
         else:
             return self.numba_jit(*args, **kwargs)
+
+    def setUp(self):
+        print("Running:", self._testMethodName)
+        unittest.TestCase.setUp(self)

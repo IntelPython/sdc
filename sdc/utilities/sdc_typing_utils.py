@@ -39,6 +39,7 @@ from numba.core.errors import TypingError
 from numba.np import numpy_support
 
 from sdc.str_arr_type import string_array_type
+from sdc.datatypes.range_index_type import RangeIndexType
 
 
 class TypeChecker:
@@ -174,6 +175,20 @@ def find_common_dtype_from_numpy_dtypes(array_types, scalar_types):
 
     return numba_common_dtype
 
+
+def find_index_common_dtype(self, other):
+    """Used to find common dtype for indexes of two series and verify if index dtypes are equal"""
+
+    self_index_dtype = RangeIndexType.dtype if isinstance(self.index, types.NoneType) else self.index.dtype
+    other_index_dtype = RangeIndexType.dtype if isinstance(other.index, types.NoneType) else other.index.dtype
+    index_dtypes_match = self_index_dtype == other_index_dtype
+    if not index_dtypes_match:
+        numba_index_common_dtype = find_common_dtype_from_numpy_dtypes(
+            [self_index_dtype, other_index_dtype], [])
+    else:
+        numba_index_common_dtype = self_index_dtype
+
+    return index_dtypes_match, numba_index_common_dtype
 
 def gen_impl_generator(codegen, impl_name):
     """Generate generator of an implementation"""
