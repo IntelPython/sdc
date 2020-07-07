@@ -54,6 +54,7 @@ from sdc.datatypes.range_index_type import RangeIndexType
 def sdc_binop(self, other, fill_value=None):
     pass
 
+
 def sdc_binop_ovld(self, other, fill_value=None):
 
     self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
@@ -106,7 +107,7 @@ def sdc_binop_ovld(self, other, fill_value=None):
                 # check if indexes are equal and series don't have to be aligned
                 left_index, right_index = self.index, other.index
                 if (left_index is right_index
-                    or numpy_like.array_equal(left_index, right_index)):
+                        or numpy_like.array_equal(left_index, right_index)):
 
                     _left = pandas.Series(self._data)
                     _right = pandas.Series(other._data)
@@ -322,7 +323,8 @@ def sdc_pandas_series_comp_binop(self, other, level=None, fill_value=None, axis=
     if not (isinstance(level, types.Omitted) or level is None):
         ty_checker.raise_exc(level, 'None', 'level')
 
-    if not isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType)) and fill_value is not None:
+    if not (isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType))
+            or fill_value is None):
         ty_checker.raise_exc(fill_value, 'scalar', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):

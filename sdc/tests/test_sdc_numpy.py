@@ -30,7 +30,7 @@ import numpy as np
 import pandas as pd
 import sdc
 import unittest
-from itertools import  product
+from itertools import product
 
 from sdc.str_arr_ext import StringArray
 from sdc.str_ext import std_str_to_unicode, unicode_to_std_str

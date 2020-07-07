@@ -55,7 +55,7 @@ Data handling:
 
 def setup_logging():
     """Setup logger"""
-    stream_handler = logging.StreamHandler(stream=sys.stdout)
+    stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
     logger = logging.getLogger(__name__)

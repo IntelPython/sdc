@@ -155,16 +155,16 @@ cases = [
     TC(name='value_counts', size=[10 ** 6]),
     TC(name='var', size=[10 ** 8], check_skipna=True),
     TC(name='unique', size=[10 ** 5]),
-    TC(name='add_scalar', size=[2 * 10 ** 1],
+    TC(name='add_scalar', size=[6 * 10 ** 7],
        call_expr='s1.add(other=5.5, fill_value=2.1)', usecase_params='s1'),
-    TC(name='add_series_same_size', size=[2 * 10 ** 1],
+    TC(name='add_series_same_size', size=[6 * 10 ** 7],
        call_expr='s1.add(s2, fill_value=2.1)', usecase_params='s1, s2', data_num=2),
-    TC(name='add_series_diff_size', size=[2 * 10 ** 1],
+    TC(name='add_series_diff_size', size=[6 * 10 ** 7],
        call_expr='s1.add(s2)', usecase_params='s1, s2',
        data_gens=(partial(gen_series),
                   partial(gen_series,
-                          data_length=10 ** 1))),
-    TC(name='add_series_equal_indexes', size=[2 * 10 ** 1],
+                          data_length=3 * 10 ** 7))),
+    TC(name='add_series_equal_indexes', size=[6 * 10 ** 7],
        call_expr='s1.add(s2)', usecase_params='s1, s2',
        data_gens=(partial(gen_series,
                           index_gen=partial(
@@ -176,18 +176,18 @@ cases = [
                               gen_arr_of_dtype,
                               random=False,
                               input_data=[1, 2, 3, 4, 5])))),
-    TC(name='add_series_common_case', size=[2 * 10 ** 1],
+    TC(name='add_series_common_case', size=[6 * 10 ** 7],
        call_expr='s1.add(s2)', usecase_params='s1, s2',
        data_gens=(partial(gen_series,
                           index_gen=partial(
                               gen_arr_of_dtype,
                               random=True,
-                              input_data=np.arange(2 * 10 ** 1))),
+                              input_data=np.arange(6 * 10 ** 7))),
                   partial(gen_series,
                           index_gen=partial(
                               gen_arr_of_dtype,
                               random=True,
-                              input_data=np.arange(2 * 10 ** 1))))),
+                              input_data=np.arange(6 * 10 ** 7))))),
 ]
 
 

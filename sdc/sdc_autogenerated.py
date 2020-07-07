@@ -107,7 +107,7 @@ def sdc_add_ovld(self, other, fill_value=None):
                 # check if indexes are equal and series don't have to be aligned
                 left_index, right_index = self.index, other.index
                 if (left_index is right_index
-                    or numpy_like.array_equal(left_index, right_index)):
+                        or numpy_like.array_equal(left_index, right_index)):
 
                     _left = pandas.Series(self._data)
                     _right = pandas.Series(other._data)
@@ -275,7 +275,7 @@ def sdc_div_ovld(self, other, fill_value=None):
                 # check if indexes are equal and series don't have to be aligned
                 left_index, right_index = self.index, other.index
                 if (left_index is right_index
-                    or numpy_like.array_equal(left_index, right_index)):
+                        or numpy_like.array_equal(left_index, right_index)):
 
                     _left = pandas.Series(self._data)
                     _right = pandas.Series(other._data)
@@ -443,7 +443,7 @@ def sdc_sub_ovld(self, other, fill_value=None):
                 # check if indexes are equal and series don't have to be aligned
                 left_index, right_index = self.index, other.index
                 if (left_index is right_index
-                    or numpy_like.array_equal(left_index, right_index)):
+                        or numpy_like.array_equal(left_index, right_index)):
 
                     _left = pandas.Series(self._data)
                     _right = pandas.Series(other._data)
@@ -611,7 +611,7 @@ def sdc_mul_ovld(self, other, fill_value=None):
                 # check if indexes are equal and series don't have to be aligned
                 left_index, right_index = self.index, other.index
                 if (left_index is right_index
-                    or numpy_like.array_equal(left_index, right_index)):
+                        or numpy_like.array_equal(left_index, right_index)):
 
                     _left = pandas.Series(self._data)
                     _right = pandas.Series(other._data)
@@ -779,7 +779,7 @@ def sdc_truediv_ovld(self, other, fill_value=None):
                 # check if indexes are equal and series don't have to be aligned
                 left_index, right_index = self.index, other.index
                 if (left_index is right_index
-                    or numpy_like.array_equal(left_index, right_index)):
+                        or numpy_like.array_equal(left_index, right_index)):
 
                     _left = pandas.Series(self._data)
                     _right = pandas.Series(other._data)
@@ -947,7 +947,7 @@ def sdc_floordiv_ovld(self, other, fill_value=None):
                 # check if indexes are equal and series don't have to be aligned
                 left_index, right_index = self.index, other.index
                 if (left_index is right_index
-                    or numpy_like.array_equal(left_index, right_index)):
+                        or numpy_like.array_equal(left_index, right_index)):
 
                     _left = pandas.Series(self._data)
                     _right = pandas.Series(other._data)
@@ -1115,7 +1115,7 @@ def sdc_mod_ovld(self, other, fill_value=None):
                 # check if indexes are equal and series don't have to be aligned
                 left_index, right_index = self.index, other.index
                 if (left_index is right_index
-                    or numpy_like.array_equal(left_index, right_index)):
+                        or numpy_like.array_equal(left_index, right_index)):
 
                     _left = pandas.Series(self._data)
                     _right = pandas.Series(other._data)
@@ -1283,7 +1283,7 @@ def sdc_pow_ovld(self, other, fill_value=None):
                 # check if indexes are equal and series don't have to be aligned
                 left_index, right_index = self.index, other.index
                 if (left_index is right_index
-                    or numpy_like.array_equal(left_index, right_index)):
+                        or numpy_like.array_equal(left_index, right_index)):
 
                     _left = pandas.Series(self._data)
                     _right = pandas.Series(other._data)
@@ -1502,7 +1502,8 @@ def sdc_pandas_series_lt(self, other, level=None, fill_value=None, axis=0):
     if not (isinstance(level, types.Omitted) or level is None):
         ty_checker.raise_exc(level, 'None', 'level')
 
-    if not isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType)) and fill_value is not None:
+    if not (isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType))
+            or fill_value is None):
         ty_checker.raise_exc(fill_value, 'scalar', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
@@ -1647,7 +1648,8 @@ def sdc_pandas_series_gt(self, other, level=None, fill_value=None, axis=0):
     if not (isinstance(level, types.Omitted) or level is None):
         ty_checker.raise_exc(level, 'None', 'level')
 
-    if not isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType)) and fill_value is not None:
+    if not (isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType))
+            or fill_value is None):
         ty_checker.raise_exc(fill_value, 'scalar', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
@@ -1792,7 +1794,8 @@ def sdc_pandas_series_le(self, other, level=None, fill_value=None, axis=0):
     if not (isinstance(level, types.Omitted) or level is None):
         ty_checker.raise_exc(level, 'None', 'level')
 
-    if not isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType)) and fill_value is not None:
+    if not (isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType))
+            or fill_value is None):
         ty_checker.raise_exc(fill_value, 'scalar', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
@@ -1937,7 +1940,8 @@ def sdc_pandas_series_ge(self, other, level=None, fill_value=None, axis=0):
     if not (isinstance(level, types.Omitted) or level is None):
         ty_checker.raise_exc(level, 'None', 'level')
 
-    if not isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType)) and fill_value is not None:
+    if not (isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType))
+            or fill_value is None):
         ty_checker.raise_exc(fill_value, 'scalar', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
@@ -2082,7 +2086,8 @@ def sdc_pandas_series_ne(self, other, level=None, fill_value=None, axis=0):
     if not (isinstance(level, types.Omitted) or level is None):
         ty_checker.raise_exc(level, 'None', 'level')
 
-    if not isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType)) and fill_value is not None:
+    if not (isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType))
+            or fill_value is None):
         ty_checker.raise_exc(fill_value, 'scalar', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
@@ -2227,7 +2232,8 @@ def sdc_pandas_series_eq(self, other, level=None, fill_value=None, axis=0):
     if not (isinstance(level, types.Omitted) or level is None):
         ty_checker.raise_exc(level, 'None', 'level')
 
-    if not isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType)) and fill_value is not None:
+    if not (isinstance(fill_value, (types.Omitted, types.Number, types.UnicodeType, types.NoneType))
+            or fill_value is None):
         ty_checker.raise_exc(fill_value, 'scalar', 'fill_value')
 
     if not (isinstance(axis, types.Omitted) or axis == 0):
