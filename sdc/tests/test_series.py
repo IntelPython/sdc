@@ -2040,7 +2040,7 @@ class TestSeries(
         if np.isnan(actual) or np.isnan(expected):
             self.assertEqual(np.isnan(actual), np.isnan(expected))
         else:
-            np.testing.assert_array_almost_equal(actual, expected)
+            np.testing.assert_almost_equal(actual, expected)
 
     def test_series_mean(self):
         def test_impl(S):

@@ -369,17 +369,7 @@ class TestArrays(TestCase):
             with self.subTest(data=case):
                 np.testing.assert_array_equal(ref_impl(array0), sdc_func(array1))
 
-    def test_fillna_numeric_inplace_false(self):
-        def ref_impl(S, value):
-            if value is None:
-                return S.values.copy()
-            else:
-                return S.fillna(value=value, inplace=False).values
-
-        def sdc_impl(a, value):
-            return numpy_like.fillna(a, inplace=False, value=value)
-        sdc_func = self.jit(sdc_impl)
-
+    def _test_fillna_numeric(self, pyfunc, cfunc, inplace):
         data_to_test = [
             [True, False, False, True, True],
             [5, 2, 0, 333, -4],
@@ -392,12 +382,44 @@ class TestArrays(TestCase):
             2.1,
             2
         ]
+
         for data, value in product(data_to_test, values_to_test):
-            a = np.asarray(data)
+            a1 = np.asarray(data)
+            a2 = pd.Series(np.copy(a1)) if inplace else pd.Series(a1)
+
             with self.subTest(data=data, value=value):
-                result = sdc_func(a, value)
-                result_ref = ref_impl(pd.Series(a), value)
+                result = cfunc(a1, value)
+                result_ref = pyfunc(a2, value)
+                if inplace:
+                    result, result_ref = a1, a2
                 np.testing.assert_array_equal(result, result_ref)
+
+    def test_fillna_numeric_inplace_false(self):
+        def ref_impl(S, value):
+            if value is None:
+                return S.values.copy()
+            else:
+                return S.fillna(value=value, inplace=False).values
+
+        def sdc_impl(a, value):
+            return numpy_like.fillna(a, inplace=False, value=value)
+        sdc_func = self.jit(sdc_impl)
+
+        self._test_fillna_numeric(ref_impl, sdc_func, inplace=False)
+
+    def test_fillna_numeric_inplace_true(self):
+        def ref_impl(S, value):
+            if value is None:
+                return None
+            else:
+                S.fillna(value=value, inplace=True)
+                return None
+
+        def sdc_impl(a, value):
+            return numpy_like.fillna(a, inplace=True, value=value)
+        sdc_func = self.jit(sdc_impl)
+
+        self._test_fillna_numeric(ref_impl, sdc_func, inplace=True)
 
     def test_fillna_str_inplace_false(self):
         def ref_impl(S, value):
@@ -427,45 +449,13 @@ class TestArrays(TestCase):
                 result_ref = ref_impl(S, value)
 
                 # FIXME: str_arr unifies None with np.nan and StringArray boxing always return np.nan
-                # hence mismatch appears for fill value == None
+                # to avoid mismatch in results for fill value == None use custom comparing func
                 def is_same_unify_nones(a, b):
                     return a == b or ((a is None or np.isnan(a)) and (b is None or np.isnan(b)))
                 cmp_result = np.asarray(
                     list(map(is_same_unify_nones, result, result_ref))
                 )
                 self.assertEqual(np.all(cmp_result), True)
-
-    def test_fillna_numeric_inplace_true(self):
-        def ref_impl(S, value):
-            if value is None:
-                return S.values
-            else:
-                S.fillna(value=value, inplace=True)
-                return S.values
-
-        def sdc_impl(a, value):
-            return numpy_like.fillna(a, inplace=True, value=value)
-        sdc_func = self.jit(sdc_impl)
-
-        data_to_test = [
-            [True, False, False, True, True],
-            [5, 2, 0, 333, -4],
-            [3.3, 5.4, 7.9],
-            [3.3, 5.4, np.nan, 7.9, np.nan],
-        ]
-        values_to_test = [
-            None,
-            np.nan,
-            2.1,
-            2
-        ]
-        for data, value in product(data_to_test, values_to_test):
-            a1 = np.asarray(data)
-            a2 = np.copy(a1)
-            with self.subTest(data=data, value=value):
-                sdc_func(a1, value)
-                ref_impl(pd.Series(a2), value)
-                np.testing.assert_array_equal(a1, a2)
 
 
 class TestArrayReductions(TestCase):

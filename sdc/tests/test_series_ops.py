@@ -1107,7 +1107,7 @@ class TestSeries_ops(TestCase):
         hpat_func = self.jit(test_impl)
 
         S1 = pd.Series([1., -5., 2., 2., np.nan, 2., 1.])
-        S2 = pd.Series([0., -2., 3., 2., 0., 2., 2.,])
+        S2 = pd.Series([0., -2., 3., 2., 0., 2., 2.])
 
         fill_values = [
             None,
