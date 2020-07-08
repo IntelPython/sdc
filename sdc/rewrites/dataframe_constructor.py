@@ -42,161 +42,159 @@ from sdc.hiframes.pd_dataframe_ext import (init_dataframe, DataFrameType)
 
 from sdc.hiframes.api import fix_df_array, fix_df_index
 
-from sdc.config import config_pipeline_hpat_default
 
-if not config_pipeline_hpat_default:
-    @register_rewrite('before-inference')
-    class RewriteDataFrame(Rewrite):
-        """
-        Searches for calls of pandas.DataFrame and replace it with calls of init_dataframe.
-        """
+@register_rewrite('before-inference')
+class RewriteDataFrame(Rewrite):
+    """
+    Searches for calls of pandas.DataFrame and replace it with calls of init_dataframe.
+    """
 
-        _pandas_dataframe = ('DataFrame', 'pandas')
+    _pandas_dataframe = ('DataFrame', 'pandas')
 
-        _df_arg_list = ('data', 'index', 'columns', 'dtype', 'copy')
+    _df_arg_list = ('data', 'index', 'columns', 'dtype', 'copy')
 
-        def __init__(self, pipeline):
-            super().__init__(pipeline)
+    def __init__(self, pipeline):
+        super().__init__(pipeline)
 
-            self._reset()
+        self._reset()
 
-        def match(self, func_ir, block, typemap, calltypes):
-            self._reset()
+    def match(self, func_ir, block, typemap, calltypes):
+        self._reset()
 
-            self._block = block
-            self._func_ir = func_ir
-            self._calls_to_rewrite = set()
+        self._block = block
+        self._func_ir = func_ir
+        self._calls_to_rewrite = set()
 
-            for stmt in find_operations(block=block, op_name='call'):
-                expr = stmt.value
-                fdef = guard(find_callname, func_ir, expr)
-                if fdef == self._pandas_dataframe:
-                    args = get_call_parameters(call=expr, arg_names=self._df_arg_list)
+        for stmt in find_operations(block=block, op_name='call'):
+            expr = stmt.value
+            fdef = guard(find_callname, func_ir, expr)
+            if fdef == self._pandas_dataframe:
+                args = get_call_parameters(call=expr, arg_names=self._df_arg_list)
 
-                    if self._match_dict_case(args, func_ir):
-                        self._calls_to_rewrite.add(stmt)
-                    else:
-                        pass  # Forward this case to pd_dataframe_overload which will handle it
+                if self._match_dict_case(args, func_ir):
+                    self._calls_to_rewrite.add(stmt)
+                else:
+                    pass  # Forward this case to pd_dataframe_overload which will handle it
 
-            return len(self._calls_to_rewrite) > 0
+        return len(self._calls_to_rewrite) > 0
 
-        def apply(self):
-            init_df_stmt = import_function(init_dataframe, self._block, self._func_ir)
+    def apply(self):
+        init_df_stmt = import_function(init_dataframe, self._block, self._func_ir)
 
-            for stmt in self._calls_to_rewrite:
-                args = get_call_parameters(call=stmt.value, arg_names=self._df_arg_list)
+        for stmt in self._calls_to_rewrite:
+            args = get_call_parameters(call=stmt.value, arg_names=self._df_arg_list)
 
-                old_data = args['data']
+            old_data = args['data']
 
-                args['data'], args['columns'] = self._extract_dict_args(args, self._func_ir)
+            args['data'], args['columns'] = self._extract_dict_args(args, self._func_ir)
 
-                self._replace_call(stmt, init_df_stmt.target, args, self._block, self._func_ir)
+            self._replace_call(stmt, init_df_stmt.target, args, self._block, self._func_ir)
 
-                remove_unused_recursively(old_data, self._block, self._func_ir)
+            remove_unused_recursively(old_data, self._block, self._func_ir)
 
-            return self._block
+        return self._block
 
-        def _reset(self):
-            self._block = None
-            self._func_ir = None
-            self._calls_to_rewrite = None
+    def _reset(self):
+        self._block = None
+        self._func_ir = None
+        self._calls_to_rewrite = None
 
-        @staticmethod
-        def _match_dict_case(args, func_ir):
-            if 'data' in args and is_dict(args['data'], func_ir) and 'columns' not in args:
-                return True
+    @staticmethod
+    def _match_dict_case(args, func_ir):
+        if 'data' in args and is_dict(args['data'], func_ir) and 'columns' not in args:
+            return True
 
-            return False
+        return False
 
-        @staticmethod
-        def _extract_tuple_args(args, block, func_ir):
-            data_args = get_tuple_items(args['data'], block, func_ir) if 'data' in args else None
-            columns_args = get_tuple_items(args['columns'], block, func_ir) if 'columns' in args else None
+    @staticmethod
+    def _extract_tuple_args(args, block, func_ir):
+        data_args = get_tuple_items(args['data'], block, func_ir) if 'data' in args else None
+        columns_args = get_tuple_items(args['columns'], block, func_ir) if 'columns' in args else None
 
-            return data_args, columns_args
+        return data_args, columns_args
 
-        @staticmethod
-        def _extract_dict_args(args, func_ir):
-            dict_items = get_dict_items(args['data'], func_ir)
+    @staticmethod
+    def _extract_dict_args(args, func_ir):
+        dict_items = get_dict_items(args['data'], func_ir)
 
-            data_args = [item[1] for item in dict_items]
-            columns_args = [item[0] for item in dict_items]
+        data_args = [item[1] for item in dict_items]
+        columns_args = [item[0] for item in dict_items]
 
-            return data_args, columns_args
+        return data_args, columns_args
 
-        @staticmethod
-        def _replace_call(stmt, new_call, args, block, func_ir):
-            func = stmt.value
+    @staticmethod
+    def _replace_call(stmt, new_call, args, block, func_ir):
+        func = stmt.value
 
-            data_args = args['data']
-            columns_args = args['columns']
-            index_args = args.get('index')
+        data_args = args['data']
+        columns_args = args['columns']
+        index_args = args.get('index')
 
-            data_args = RewriteDataFrame._replace_data_with_arrays(data_args, stmt, block, func_ir)
+        data_args = RewriteDataFrame._replace_data_with_arrays(data_args, stmt, block, func_ir)
 
-            if index_args is None:  # index arg was omitted
-                none_stmt = declare_constant(None, block, func_ir, stmt.loc)
-                index_args = none_stmt.target
+        if index_args is None:  # index arg was omitted
+            none_stmt = declare_constant(None, block, func_ir, stmt.loc)
+            index_args = none_stmt.target
 
-            index_and_data_args = [index_args] + data_args
-            index_args = RewriteDataFrame._replace_index_with_arrays(index_and_data_args, stmt, block, func_ir)
+        index_and_data_args = [index_args] + data_args
+        index_args = RewriteDataFrame._replace_index_with_arrays(index_and_data_args, stmt, block, func_ir)
 
-            all_args = data_args + index_args + columns_args
-            call = Expr.call(new_call, all_args, {}, func.loc)
+        all_args = data_args + index_args + columns_args
+        call = Expr.call(new_call, all_args, {}, func.loc)
 
-            stmt.value = call
+        stmt.value = call
 
-        @staticmethod
-        def _replace_data_with_arrays(args, stmt, block, func_ir):
-            new_args = []
+    @staticmethod
+    def _replace_data_with_arrays(args, stmt, block, func_ir):
+        new_args = []
 
-            for var in args:
-                call_stmt = make_call(fix_df_array, [var], {}, block, func_ir, var.loc)
-                insert_before(block, call_stmt, stmt)
-                new_args.append(call_stmt.target)
-
-            return new_args
-
-        @staticmethod
-        def _replace_index_with_arrays(args, stmt, block, func_ir):
-            new_args = []
-
-            call_stmt = make_call(fix_df_index, args, {}, block, func_ir, args[0].loc)
+        for var in args:
+            call_stmt = make_call(fix_df_array, [var], {}, block, func_ir, var.loc)
             insert_before(block, call_stmt, stmt)
             new_args.append(call_stmt.target)
 
-            return new_args
+        return new_args
 
-            return new_args
+    @staticmethod
+    def _replace_index_with_arrays(args, stmt, block, func_ir):
+        new_args = []
 
-    @overload(DataFrame)
-    def pd_dataframe_overload(data, index=None, columns=None, dtype=None, copy=False):
-        """
-        Intel Scalable Dataframe Compiler User Guide
-        ********************************************
-        Pandas API: pandas.DataFrame
+        call_stmt = make_call(fix_df_index, args, {}, block, func_ir, args[0].loc)
+        insert_before(block, call_stmt, stmt)
+        new_args.append(call_stmt.target)
 
-        Limitations
-        -----------
-        - Parameters `dtype` and `copy` are currently unsupported by Intel Scalable Dataframe Compiler.
-        """
+        return new_args
 
-        ty_checker = TypeChecker('Method DataFrame')
-        ty_checker.check(self, DataFrameType)
+        return new_args
 
-        if not isinstance(data, dict):
-            ty_checker.raise_exc(pat, 'dict', 'data')
+@overload(DataFrame)
+def pd_dataframe_overload(data, index=None, columns=None, dtype=None, copy=False):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame
 
-        if not isinstance(index, (types.Ommited, types.Array, StringArray, types.NoneType)) and index is not None:
-            ty_checker.raise_exc(na, 'array-like', 'index')
+    Limitations
+    -----------
+    - Parameters `dtype` and `copy` are currently unsupported by Intel Scalable Dataframe Compiler.
+    """
 
-        if not isinstance(columns, (types.Ommited, types.NoneType)) and columns is not None:
-            ty_checker.raise_exc(na, 'None', 'columns')
+    ty_checker = TypeChecker('Method DataFrame')
+    ty_checker.check(self, DataFrameType)
 
-        if not isinstance(dtype, (types.Ommited, types.NoneType)) and dtype is not None:
-            ty_checker.raise_exc(na, 'None', 'dtype')
+    if not isinstance(data, dict):
+        ty_checker.raise_exc(pat, 'dict', 'data')
 
-        if not isinstance(copy, (types.Ommited, types.NoneType)) and columns is not False:
-            ty_checker.raise_exc(na, 'False', 'copy')
+    if not isinstance(index, (types.Ommited, types.Array, StringArray, types.NoneType)) and index is not None:
+        ty_checker.raise_exc(na, 'array-like', 'index')
 
-        return None
+    if not isinstance(columns, (types.Ommited, types.NoneType)) and columns is not None:
+        ty_checker.raise_exc(na, 'None', 'columns')
+
+    if not isinstance(dtype, (types.Ommited, types.NoneType)) and dtype is not None:
+        ty_checker.raise_exc(na, 'None', 'dtype')
+
+    if not isinstance(copy, (types.Ommited, types.NoneType)) and columns is not False:
+        ty_checker.raise_exc(na, 'False', 'copy')
+
+    return None

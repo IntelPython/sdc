@@ -40,14 +40,12 @@ from sdc.tests.test_utils import (check_numba_version,
                                   count_parfor_OneDs,
                                   count_parfor_REPs,
                                   dist_IR_contains,
-                                  skip_numba_jit,
-                                  skip_sdc_jit)
+                                  skip_numba_jit)
 
 
 class TestML(TestCase):
 
     @skip_numba_jit
-    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_logistic_regression(self):
         def test_impl(n, d):
             iterations = 3
@@ -67,7 +65,6 @@ class TestML(TestCase):
         self.assertEqual(count_parfor_OneDs(), 3)
 
     @skip_numba_jit
-    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_logistic_regression_acc(self):
         def test_impl(N, D):
             iterations = 3
@@ -90,7 +87,6 @@ class TestML(TestCase):
         self.assertEqual(count_parfor_OneDs(), 4)
 
     @skip_numba_jit
-    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_linear_regression(self):
         def test_impl(N, D):
             p = 2

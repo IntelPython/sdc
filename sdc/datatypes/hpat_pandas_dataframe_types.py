@@ -41,8 +41,6 @@ from numba.extending import (models, overload, register_model, make_attribute_wr
 from numba.core.datamodel import register_default, StructModel
 from numba.core.typing.templates import signature, infer_global, AbstractTemplate
 
-from sdc.config import config_pipeline_hpat_default
-
 
 class DataFrameTypeIterator(types.SimpleIteratorType):
     """
@@ -111,23 +109,22 @@ class DataFrameType(types.IterableType):
         return DataFrameTypeIterator(self)
 
 
-if not config_pipeline_hpat_default:
-    @register_model(DataFrameType)
-    class DataFrameTypeModel(StructModel):
-        """
-        Model for DataFrameType type
-        All members must be the same as main type for this model
+@register_model(DataFrameType)
+class DataFrameTypeModel(StructModel):
+    """
+    Model for DataFrameType type
+    All members must be the same as main type for this model
 
-        Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_create_numeric_column
-        """
+    Test: python -m sdc.runtests sdc.tests.test_dataframe.TestDataFrame.test_create_numeric_column
+    """
 
-        def __init__(self, dmm, fe_type):
-            members = [
-                ('data', fe_type.data)
-            ]
-            models.StructModel.__init__(self, dmm, fe_type, members)
+    def __init__(self, dmm, fe_type):
+        members = [
+            ('data', fe_type.data)
+        ]
+        models.StructModel.__init__(self, dmm, fe_type, members)
 
-    make_attribute_wrapper(DataFrameType, 'data', '_data')
+make_attribute_wrapper(DataFrameType, 'data', '_data')
 
 
 @intrinsic
@@ -164,65 +161,64 @@ def _hpat_pandas_dataframe_init(typingctx, data=None):
     return sig, _hpat_pandas_dataframe_init_codegen
 
 
-if not config_pipeline_hpat_default:
-    @overload(pandas.DataFrame)
-    def hpat_pandas_dataframe(data=None, index=None, columns=None, dtype=None, copy=False):
-        """
-        Special Numba procedure to overload Python type pandas.DataFrame::ctor() with Numba registered model
-        """
+@overload(pandas.DataFrame)
+def hpat_pandas_dataframe(data=None, index=None, columns=None, dtype=None, copy=False):
+    """
+    Special Numba procedure to overload Python type pandas.DataFrame::ctor() with Numba registered model
+    """
 
-        if isinstance(data, types.DictType):
-            def hpat_pandas_dataframe_impl(data=None, index=None, columns=None, dtype=None, copy=False):
-                series_dict = {}
-                series_list = []
+    if isinstance(data, types.DictType):
+        def hpat_pandas_dataframe_impl(data=None, index=None, columns=None, dtype=None, copy=False):
+            series_dict = {}
+            series_list = []
 
-                for key, value in data.items():
-                    """
-                    Convert input dictionary with:
-                        key - unicode string
-                        value - array
-                    into dictinary of pandas.Series with same names and values
-                    """
+            for key, value in data.items():
+                """
+                Convert input dictionary with:
+                    key - unicode string
+                    value - array
+                into dictinary of pandas.Series with same names and values
+                """
 
-                    series_item = pandas.Series(data=value, name=key)
-                    series_dict[key] = series_item
-                    series_list.append(series_item)
+                series_item = pandas.Series(data=value, name=key)
+                series_dict[key] = series_item
+                series_list.append(series_item)
 
-                # return _hpat_pandas_dataframe_init(series_dict)
-                return _hpat_pandas_dataframe_init(series_list)
+            # return _hpat_pandas_dataframe_init(series_dict)
+            return _hpat_pandas_dataframe_init(series_list)
 
-            return hpat_pandas_dataframe_impl
+        return hpat_pandas_dataframe_impl
 
-    @box(DataFrameType)
-    def hpat_pandas_dataframe_box(typ, val, c):
-        """
-        This method is to copy data from JITted region data structure
-        to new Python object data structure.
-        Python object data structure has creating in this procedure.
-        """
+@box(DataFrameType)
+def hpat_pandas_dataframe_box(typ, val, c):
+    """
+    This method is to copy data from JITted region data structure
+    to new Python object data structure.
+    Python object data structure has creating in this procedure.
+    """
 
-        dataframe = cgutils.create_struct_proxy(typ)(c.context, c.builder, value=val)
+    dataframe = cgutils.create_struct_proxy(typ)(c.context, c.builder, value=val)
 
-        ir_ptr_data = c.box(typ.data, dataframe.data)
+    ir_ptr_data = c.box(typ.data, dataframe.data)
 
-        dataframe_ctor_args = c.pyapi.tuple_pack([ir_ptr_data, ])
-        # dataframe_ctor_kwargs = c.pyapi.dict_pack([("data", ir_ptr_data), ])
-        """
-        It is better to use kwargs but it fails into SIGSEGV
-        """
+    dataframe_ctor_args = c.pyapi.tuple_pack([ir_ptr_data, ])
+    # dataframe_ctor_kwargs = c.pyapi.dict_pack([("data", ir_ptr_data), ])
+    """
+    It is better to use kwargs but it fails into SIGSEGV
+    """
 
-        dataframe_ctor_fn = c.pyapi.unserialize(c.pyapi.serialize_object(pandas.DataFrame))
-        """
-        Create a pandas.DataFrame ctor() function pointer
-        """
+    dataframe_ctor_fn = c.pyapi.unserialize(c.pyapi.serialize_object(pandas.DataFrame))
+    """
+    Create a pandas.DataFrame ctor() function pointer
+    """
 
-        df_obj = c.pyapi.call(dataframe_ctor_fn, dataframe_ctor_args)  # kws=dataframe_ctor_kwargs)
-        """
-        Call pandas.DataFrame function pointer with parameters
-        """
+    df_obj = c.pyapi.call(dataframe_ctor_fn, dataframe_ctor_args)  # kws=dataframe_ctor_kwargs)
+    """
+    Call pandas.DataFrame function pointer with parameters
+    """
 
-        c.pyapi.decref(ir_ptr_data)
-        c.pyapi.decref(dataframe_ctor_args)
-        c.pyapi.decref(dataframe_ctor_fn)
+    c.pyapi.decref(ir_ptr_data)
+    c.pyapi.decref(dataframe_ctor_args)
+    c.pyapi.decref(dataframe_ctor_fn)
 
-        return df_obj
+    return df_obj

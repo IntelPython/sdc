@@ -94,21 +94,11 @@ def gen_df_int_cols(input_data, with_index=False):
 
 
 def count_array_REPs():
-    if sdc.config.config_pipeline_hpat_default:
-        from sdc.distributed import Distribution
-        vals = sdc.distributed.dist_analysis.array_dists.values()
-        return sum([v == Distribution.REP for v in vals])
-    else:
-        return 0
+    return 0
 
 
 def count_parfor_REPs():
-    if sdc.config.config_pipeline_hpat_default:
-        from sdc.distributed import Distribution
-        vals = sdc.distributed.dist_analysis.parfor_dists.values()
-        return sum([v == Distribution.REP for v in vals])
-    else:
-        return 0
+    return 0
 
 
 def count_parfor_OneDs():
@@ -175,16 +165,7 @@ def msg_and_func(msg_or_func=None):
 
 def skip_numba_jit(msg_or_func=None):
     msg, func = msg_and_func(msg_or_func)
-    wrapper = unittest.skipUnless(sdc.config.config_pipeline_hpat_default, msg or "numba pipeline not supported")
-    if sdc.config.test_expected_failure:
-        wrapper = unittest.expectedFailure
-    # wrapper = lambda f: f  # disable skipping
-    return wrapper(func) if func else wrapper
-
-
-def skip_sdc_jit(msg_or_func=None):
-    msg, func = msg_and_func(msg_or_func)
-    wrapper = unittest.skipIf(sdc.config.config_pipeline_hpat_default, msg or "sdc pipeline not supported")
+    wrapper = unittest.skipUnless(False, msg or "numba pipeline not supported")
     if sdc.config.test_expected_failure:
         wrapper = unittest.expectedFailure
     # wrapper = lambda f: f  # disable skipping
