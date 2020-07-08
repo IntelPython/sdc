@@ -124,6 +124,7 @@ class DataFrameTypeModel(StructModel):
         ]
         models.StructModel.__init__(self, dmm, fe_type, members)
 
+
 make_attribute_wrapper(DataFrameType, 'data', '_data')
 
 
@@ -188,6 +189,7 @@ def hpat_pandas_dataframe(data=None, index=None, columns=None, dtype=None, copy=
             return _hpat_pandas_dataframe_init(series_list)
 
         return hpat_pandas_dataframe_impl
+
 
 @box(DataFrameType)
 def hpat_pandas_dataframe_box(typ, val, c):
