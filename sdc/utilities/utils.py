@@ -173,6 +173,12 @@ lower_builtin(operator.eq, BooleanLiteral, BooleanLiteral)(numba.cpython.builtin
 lower_builtin(operator.ne, BooleanLiteral, BooleanLiteral)(numba.cpython.builtins.const_ne_impl)
 
 
+@lower_builtin(bool, BooleanLiteral)
+def bool_as_bool(context, builder, sig, args):
+    [val] = args
+    return val
+
+
 def get_constant(func_ir, var, default=NOT_CONSTANT):
     def_node = guard(get_definition, func_ir, var)
     if def_node is None:
