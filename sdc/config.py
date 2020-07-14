@@ -66,14 +66,6 @@ config_inline_overloads = strtobool(os.getenv('SDC_AUTO_INLINE', 'False'))
 Default value used to select whether sdc functions would inline
 '''
 
-config_transport_mpi_default = False
-config_transport_mpi = config_transport_mpi_default
-
-numba_compiler_define_nopython_pipeline_orig = None
-'''
-Default value for a pointer intended to use as Numba.DefaultPassBuilder.define_nopython_pipeline() in overloaded function
-'''
-
 test_expected_failure = strtobool(os.getenv('SDC_TEST_EXPECTED_FAILURE', 'False'))
 '''
 If True then replaces skip decorators to expectedFailure decorator.

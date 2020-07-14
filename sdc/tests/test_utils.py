@@ -94,6 +94,9 @@ def gen_df_int_cols(input_data, with_index=False):
 
 
 def count_array_REPs():
+    # from sdc.distributed import Distribution
+    # vals = sdc.distributed.dist_analysis.array_dists.values()
+    # return sum([v == Distribution.REP for v in vals])
     return 0
 
 
@@ -165,7 +168,7 @@ def msg_and_func(msg_or_func=None):
 
 def skip_numba_jit(msg_or_func=None):
     msg, func = msg_and_func(msg_or_func)
-    wrapper = unittest.skipUnless(False, msg or "numba pipeline not supported")
+    wrapper = unittest.skip(msg or "numba pipeline not supported")
     if sdc.config.test_expected_failure:
         wrapper = unittest.expectedFailure
     # wrapper = lambda f: f  # disable skipping
