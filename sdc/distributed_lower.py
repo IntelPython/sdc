@@ -620,9 +620,3 @@ def lower_hpat_finalize(context, builder, sig, args):
 @numba.njit
 def call_finalize():
     hpat_finalize()
-
-
-if sdc.config.config_pipeline_hpat_default:
-    atexit.register(call_finalize)
-    # flush output before finalize
-    atexit.register(sys.stdout.flush)

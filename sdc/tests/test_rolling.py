@@ -40,7 +40,7 @@ from sdc.hiframes.rolling import supported_rolling_funcs
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_series import gen_frand_array
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
-                                  skip_numba_jit, skip_sdc_jit,
+                                  skip_numba_jit,
                                   test_global_input_data_float64,
                                   assert_raises_ty_checker)
 
@@ -878,7 +878,6 @@ class TestRolling(TestCase):
                                  hpat_func,
                                  obj, window, min_periods, invalid_ddof)
 
-    @skip_sdc_jit('DataFrame.rolling.min() unsupported exceptions')
     def test_df_rolling_unsupported_values(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -887,7 +886,6 @@ class TestRolling(TestCase):
 
         self._test_rolling_unsupported_values(df)
 
-    @skip_sdc_jit('DataFrame.rolling.min() unsupported exceptions')
     def test_df_rolling_unsupported_types(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -896,7 +894,6 @@ class TestRolling(TestCase):
 
         self._test_rolling_unsupported_types(df)
 
-    @skip_sdc_jit('DataFrame.rolling.apply() unsupported')
     def test_df_rolling_apply_mean(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -932,7 +929,6 @@ class TestRolling(TestCase):
                     ref_result = test_impl(window, min_periods)
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.apply() unsupported exceptions')
     def test_df_rolling_apply_unsupported_types(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)
@@ -954,7 +950,6 @@ class TestRolling(TestCase):
 
         self._test_rolling_apply_args(df)
 
-    @skip_sdc_jit('DataFrame.rolling.corr() unsupported')
     def test_df_rolling_corr(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1001,7 +996,6 @@ class TestRolling(TestCase):
                     ref_result = test_impl(window, min_periods)
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.corr() unsupported')
     def test_df_rolling_corr_no_other(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1014,7 +1008,6 @@ class TestRolling(TestCase):
 
         self._test_rolling_corr_with_no_other(df)
 
-    @skip_sdc_jit('DataFrame.rolling.corr() unsupported exceptions')
     def test_df_rolling_corr_unsupported_types(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)
@@ -1023,7 +1016,6 @@ class TestRolling(TestCase):
 
         self._test_rolling_corr_unsupported_types(df)
 
-    @skip_sdc_jit('DataFrame.rolling.corr() unsupported exceptions')
     def test_df_rolling_corr_unsupported_values(self):
         def test_impl(df, other, pairwise):
             return df.rolling(3, 3).corr(other=other, pairwise=pairwise)
@@ -1044,7 +1036,6 @@ class TestRolling(TestCase):
             hpat_func(df, other, True)
         self.assertIn(msg_tmpl.format('False, None'), str(raises.exception))
 
-    @skip_sdc_jit('DataFrame.rolling.count() unsupported')
     def test_df_rolling_count(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -1071,7 +1062,6 @@ class TestRolling(TestCase):
                     ref_result = test_impl(window, min_periods)
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.cov() unsupported')
     def test_df_rolling_cov(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1119,7 +1109,6 @@ class TestRolling(TestCase):
                     ref_result = test_impl(window, min_periods, ddof)
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.cov() unsupported')
     def test_df_rolling_cov_no_other(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1132,7 +1121,6 @@ class TestRolling(TestCase):
 
         self._test_rolling_cov_with_no_other(df)
 
-    @skip_sdc_jit('DataFrame.rolling.cov() unsupported exceptions')
     def test_df_rolling_cov_unsupported_types(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)
@@ -1141,7 +1129,6 @@ class TestRolling(TestCase):
 
         self._test_rolling_cov_unsupported_types(df)
 
-    @skip_sdc_jit('DataFrame.rolling.cov() unsupported exceptions')
     def test_df_rolling_cov_unsupported_values(self):
         def test_impl(df, other, pairwise):
             return df.rolling(3, 3).cov(other=other, pairwise=pairwise)
@@ -1162,7 +1149,6 @@ class TestRolling(TestCase):
             hpat_func(df, other, True)
         self.assertIn(msg_tmpl.format('False, None'), str(raises.exception))
 
-    @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
     @unittest.expectedFailure
     def test_df_rolling_cov_issue_floating_point_rounding(self):
         """
@@ -1193,7 +1179,6 @@ class TestRolling(TestCase):
         ref_result = test_impl(df, 2, 0, other, 1)
         pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.kurt() unsupported')
     def test_df_rolling_kurt(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -1220,7 +1205,6 @@ class TestRolling(TestCase):
                     ref_result = test_impl(window, min_periods)
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.max() unsupported')
     def test_df_rolling_max(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -1247,7 +1231,6 @@ class TestRolling(TestCase):
                     ref_result = test_impl(window, min_periods)
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.mean() unsupported')
     def test_df_rolling_mean(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1278,7 +1261,6 @@ class TestRolling(TestCase):
                     ref_result = test_impl(window, min_periods)
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.median() unsupported')
     def test_df_rolling_median(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -1305,7 +1287,6 @@ class TestRolling(TestCase):
                     ref_result = test_impl(window, min_periods)
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.min() unsupported')
     def test_df_rolling_min(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -1333,7 +1314,6 @@ class TestRolling(TestCase):
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
     @unittest.skip('Segmentation fault on Win/Lin/Mac')
-    @skip_sdc_jit('DataFrame.rolling.min() unsupported')
     def test_df_rolling_min_exception_many_columns(self):
         def test_impl(df):
             return df.rolling(3).min()
@@ -1348,7 +1328,6 @@ class TestRolling(TestCase):
 
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @skip_sdc_jit('DataFrame.rolling.quantile() unsupported')
     def test_df_rolling_quantile(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1381,7 +1360,6 @@ class TestRolling(TestCase):
                     ref_result = test_impl(window, min_periods, q)
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.quantile() unsupported exceptions')
     def test_df_rolling_quantile_exception_unsupported_types(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)
@@ -1390,7 +1368,6 @@ class TestRolling(TestCase):
 
         self._test_rolling_quantile_exception_unsupported_types(df)
 
-    @skip_sdc_jit('DataFrame.rolling.quantile() unsupported exceptions')
     def test_df_rolling_quantile_exception_unsupported_values(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)
@@ -1399,7 +1376,6 @@ class TestRolling(TestCase):
 
         self._test_rolling_quantile_exception_unsupported_values(df)
 
-    @skip_sdc_jit('DataFrame.rolling.skew() unsupported')
     def test_df_rolling_skew(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -1426,7 +1402,6 @@ class TestRolling(TestCase):
                     ref_result = test_impl(window, min_periods)
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.std() unsupported')
     def test_df_rolling_std(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1458,7 +1433,6 @@ class TestRolling(TestCase):
                     ref_result = test_impl(window, min_periods, ddof)
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.std() unsupported exceptions')
     def test_df_rolling_std_exception_unsupported_ddof(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)
@@ -1467,7 +1441,6 @@ class TestRolling(TestCase):
 
         self._test_rolling_std_exception_unsupported_ddof(df)
 
-    @skip_sdc_jit('DataFrame.rolling.sum() unsupported')
     def test_df_rolling_sum(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1498,7 +1471,6 @@ class TestRolling(TestCase):
                     ref_result = test_impl(window, min_periods)
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.var() unsupported')
     def test_df_rolling_var(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1530,7 +1502,6 @@ class TestRolling(TestCase):
                     ref_result = test_impl(window, min_periods, ddof)
                     pd.testing.assert_frame_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('DataFrame.rolling.var() unsupported exceptions')
     def test_df_rolling_var_exception_unsupported_ddof(self):
         all_data = [[1., -1., 0., 0.1, -0.1], [-1., 1., 0., -0.1, 0.1]]
         length = min(len(d) for d in all_data)
@@ -1539,17 +1510,14 @@ class TestRolling(TestCase):
 
         self._test_rolling_var_exception_unsupported_ddof(df)
 
-    @skip_sdc_jit('Series.rolling.min() unsupported exceptions')
     def test_series_rolling_unsupported_values(self):
         series = pd.Series(test_global_input_data_float64[0])
         self._test_rolling_unsupported_values(series)
 
-    @skip_sdc_jit('Series.rolling.min() unsupported exceptions')
     def test_series_rolling_unsupported_types(self):
         series = pd.Series(test_global_input_data_float64[0])
         self._test_rolling_unsupported_types(series)
 
-    @skip_sdc_jit('Series.rolling.apply() unsupported Series index')
     def test_series_rolling_apply_mean(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1561,7 +1529,6 @@ class TestRolling(TestCase):
             series = pd.Series(data, index, name='A')
             self._test_rolling_apply_mean(series)
 
-    @skip_sdc_jit('Series.rolling.apply() unsupported exceptions')
     def test_series_rolling_apply_unsupported_types(self):
         series = pd.Series([1., -1., 0., 0.1, -0.1])
         self._test_rolling_apply_unsupported_types(series)
@@ -1578,7 +1545,6 @@ class TestRolling(TestCase):
             series = pd.Series(data, index, name='A')
             self._test_rolling_apply_args(series)
 
-    @skip_sdc_jit('Series.rolling.corr() unsupported Series index')
     def test_series_rolling_corr(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1591,7 +1557,6 @@ class TestRolling(TestCase):
             other = pd.Series(other_data)
             self._test_rolling_corr(series, other)
 
-    @skip_sdc_jit('Series.rolling.corr() unsupported Series index')
     def test_series_rolling_corr_diff_length(self):
         def test_impl(series, window, other):
             return series.rolling(window).corr(other)
@@ -1605,7 +1570,6 @@ class TestRolling(TestCase):
         ref_result = test_impl(series, window, other)
         pd.testing.assert_series_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('Series.rolling.corr() unsupported Series index')
     def test_series_rolling_corr_with_no_other(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1616,12 +1580,10 @@ class TestRolling(TestCase):
             series = pd.Series(data)
             self._test_rolling_corr_with_no_other(series)
 
-    @skip_sdc_jit('Series.rolling.corr() unsupported exceptions')
     def test_series_rolling_corr_unsupported_types(self):
         series = pd.Series([1., -1., 0., 0.1, -0.1])
         self._test_rolling_corr_unsupported_types(series)
 
-    @skip_sdc_jit('Series.rolling.corr() unsupported Series index')
     @unittest.expectedFailure  # https://jira.devtools.intel.com/browse/SAT-2377
     def test_series_rolling_corr_index(self):
         def test_impl(S1, S2):
@@ -1642,7 +1604,6 @@ class TestRolling(TestCase):
         result_ref = test_impl(S1, S2)
         pd.testing.assert_series_equal(result, result_ref)
 
-    @skip_sdc_jit('Series.rolling.count() unsupported Series index')
     def test_series_rolling_count(self):
         all_data = test_global_input_data_float64
         indices = [list(range(len(data)))[::-1] for data in all_data]
@@ -1650,7 +1611,6 @@ class TestRolling(TestCase):
             series = pd.Series(data, index, name='A')
             self._test_rolling_count(series)
 
-    @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
     def test_series_rolling_cov(self):
         all_data = [
             list(range(5)), [1., -1., 0., 0.1, -0.1],
@@ -1662,7 +1622,6 @@ class TestRolling(TestCase):
             other = pd.Series(other_data)
             self._test_rolling_cov(series, other)
 
-    @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
     def test_series_rolling_cov_diff_length(self):
         def test_impl(series, window, other):
             return series.rolling(window).cov(other)
@@ -1676,7 +1635,6 @@ class TestRolling(TestCase):
         ref_result = test_impl(series, window, other)
         pd.testing.assert_series_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
     def test_series_rolling_cov_no_other(self):
         all_data = [
             list(range(5)), [1., -1., 0., 0.1, -0.1],
@@ -1687,7 +1645,6 @@ class TestRolling(TestCase):
             series = pd.Series(data)
             self._test_rolling_cov_with_no_other(series)
 
-    @skip_sdc_jit('Series.rolling.cov() unsupported Series index')
     @unittest.expectedFailure
     def test_series_rolling_cov_issue_floating_point_rounding(self):
         """Cover issue of different float rounding in Python and SDC/Numba"""
@@ -1702,12 +1659,10 @@ class TestRolling(TestCase):
         ref_result = test_impl(series, 6, 0, other, 1)
         pd.testing.assert_series_equal(jit_result, ref_result)
 
-    @skip_sdc_jit('Series.rolling.cov() unsupported exceptions')
     def test_series_rolling_cov_unsupported_types(self):
         series = pd.Series([1., -1., 0., 0.1, -0.1])
         self._test_rolling_cov_unsupported_types(series)
 
-    @skip_sdc_jit('Series.rolling.kurt() unsupported Series index')
     def test_series_rolling_kurt(self):
         all_data = test_global_input_data_float64
         indices = [list(range(len(data)))[::-1] for data in all_data]
@@ -1715,7 +1670,6 @@ class TestRolling(TestCase):
             series = pd.Series(data, index, name='A')
             self._test_rolling_kurt(series)
 
-    @skip_sdc_jit('Series.rolling.max() unsupported Series index')
     def test_series_rolling_max(self):
         all_data = test_global_input_data_float64
         indices = [list(range(len(data)))[::-1] for data in all_data]
@@ -1723,7 +1677,6 @@ class TestRolling(TestCase):
             series = pd.Series(data, index, name='A')
             self._test_rolling_max(series)
 
-    @skip_sdc_jit('Series.rolling.mean() unsupported Series index')
     def test_series_rolling_mean(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1735,7 +1688,6 @@ class TestRolling(TestCase):
             series = pd.Series(data, index, name='A')
             self._test_rolling_mean(series)
 
-    @skip_sdc_jit('Series.rolling.median() unsupported Series index')
     def test_series_rolling_median(self):
         all_data = test_global_input_data_float64
         indices = [list(range(len(data)))[::-1] for data in all_data]
@@ -1743,7 +1695,6 @@ class TestRolling(TestCase):
             series = pd.Series(data, index, name='A')
             self._test_rolling_median(series)
 
-    @skip_sdc_jit('Series.rolling.min() unsupported Series index')
     def test_series_rolling_min(self):
         all_data = test_global_input_data_float64
         indices = [list(range(len(data)))[::-1] for data in all_data]
@@ -1751,7 +1702,6 @@ class TestRolling(TestCase):
             series = pd.Series(data, index, name='A')
             self._test_rolling_min(series)
 
-    @skip_sdc_jit('Series.rolling.quantile() unsupported Series index')
     def test_series_rolling_quantile(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1763,17 +1713,14 @@ class TestRolling(TestCase):
             series = pd.Series(data, index, name='A')
             self._test_rolling_quantile(series)
 
-    @skip_sdc_jit('Series.rolling.quantile() unsupported exceptions')
     def test_series_rolling_quantile_exception_unsupported_types(self):
         series = pd.Series([1., -1., 0., 0.1, -0.1])
         self._test_rolling_quantile_exception_unsupported_types(series)
 
-    @skip_sdc_jit('Series.rolling.quantile() unsupported exceptions')
     def test_series_rolling_quantile_exception_unsupported_values(self):
         series = pd.Series([1., -1., 0., 0.1, -0.1])
         self._test_rolling_quantile_exception_unsupported_values(series)
 
-    @skip_sdc_jit('Series.rolling.skew() unsupported Series index')
     def test_series_rolling_skew(self):
         all_data = test_global_input_data_float64
         indices = [list(range(len(data)))[::-1] for data in all_data]
@@ -1781,7 +1728,6 @@ class TestRolling(TestCase):
             series = pd.Series(data, index, name='A')
             self._test_rolling_skew(series)
 
-    @skip_sdc_jit('Series.rolling.std() unsupported Series index')
     def test_series_rolling_std(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1793,12 +1739,10 @@ class TestRolling(TestCase):
             series = pd.Series(data, index, name='A')
             self._test_rolling_std(series)
 
-    @skip_sdc_jit('Series.rolling.std() unsupported exceptions')
     def test_series_rolling_std_exception_unsupported_ddof(self):
         series = pd.Series([1., -1., 0., 0.1, -0.1])
         self._test_rolling_std_exception_unsupported_ddof(series)
 
-    @skip_sdc_jit('Series.rolling.sum() unsupported Series index')
     def test_series_rolling_sum(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1810,7 +1754,6 @@ class TestRolling(TestCase):
             series = pd.Series(data, index, name='A')
             self._test_rolling_sum(series)
 
-    @skip_sdc_jit('Series.rolling.var() unsupported Series index')
     def test_series_rolling_var(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1822,7 +1765,6 @@ class TestRolling(TestCase):
             series = pd.Series(data, index, name='A')
             self._test_rolling_var(series)
 
-    @skip_sdc_jit('Series.rolling.var() unsupported exceptions')
     def test_series_rolling_var_exception_unsupported_ddof(self):
         series = pd.Series([1., -1., 0., 0.1, -0.1])
         self._test_rolling_var_exception_unsupported_ddof(series)

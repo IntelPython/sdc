@@ -51,27 +51,25 @@ import sdc.extensions.indexes.range_index_ext
 
 from ._version import get_versions
 
-if not sdc.config.config_pipeline_hpat_default:
-    """
-    Overload Numba function to allow call SDC pass in Numba compiler pipeline
-    Functions are:
-    - Numba DefaultPassBuilder define_nopython_pipeline()
+"""
+Overload Numba function to allow call SDC pass in Numba compiler pipeline
+Functions are:
+- Numba DefaultPassBuilder define_nopython_pipeline()
 
-    TODO: Needs to detect 'import Pandas' and align initialization according to it
-    """
+TODO: Needs to detect 'import Pandas' and align initialization according to it
+"""
 
-    # sdc.config.numba_compiler_define_nopython_pipeline_orig = \
-    # numba.core.compiler.DefaultPassBuilder.define_nopython_pipeline
-    # numba.core.compiler.DefaultPassBuilder.define_nopython_pipeline = \
-    # sdc.datatypes.hpat_pandas_dataframe_pass.sdc_nopython_pipeline_lite_register
+# sdc.config.numba_compiler_define_nopython_pipeline_orig = \
+# numba.core.compiler.DefaultPassBuilder.define_nopython_pipeline
+# numba.core.compiler.DefaultPassBuilder.define_nopython_pipeline = \
+# sdc.datatypes.hpat_pandas_dataframe_pass.sdc_nopython_pipeline_lite_register
 
-    import sdc.rewrites.dataframe_constructor
-    import sdc.rewrites.read_csv_consts
-    import sdc.rewrites.dataframe_getitem_attribute
-    import sdc.datatypes.hpat_pandas_functions
-    import sdc.datatypes.hpat_pandas_dataframe_functions
-else:
-    import sdc.compiler
+import sdc.rewrites.dataframe_constructor
+import sdc.rewrites.read_csv_consts
+import sdc.rewrites.dataframe_getitem_attribute
+import sdc.datatypes.hpat_pandas_functions
+import sdc.datatypes.hpat_pandas_dataframe_functions
+
 
 multithread_mode = False
 

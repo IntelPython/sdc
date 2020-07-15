@@ -45,8 +45,7 @@ from sdc.tests.test_utils import (count_array_OneDs,
                                   count_parfor_REPs,
                                   dist_IR_contains,
                                   get_start_end,
-                                  skip_numba_jit,
-                                  skip_sdc_jit)
+                                  skip_numba_jit)
 
 
 class TestHiFrames(TestCase):
@@ -173,7 +172,6 @@ class TestHiFrames(TestCase):
         np.testing.assert_equal(df1.B.values, df2.B.values)
 
     @skip_numba_jit
-    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_cumsum(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.random.ranf(n)})
@@ -190,7 +188,6 @@ class TestHiFrames(TestCase):
         self.assertTrue(dist_IR_contains('dist_cumsum'))
 
     @skip_numba_jit
-    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_column_distribution(self):
         # make sure all column calls are distributed
         def test_impl(n):
@@ -212,7 +209,6 @@ class TestHiFrames(TestCase):
         self.assertTrue(dist_IR_contains('dist_cumsum'))
 
     @skip_numba_jit
-    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_quantile_parallel(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float64)})
@@ -346,7 +342,6 @@ class TestHiFrames(TestCase):
         self.assertEqual(count_array_REPs(), 0)
 
     @skip_numba_jit
-    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_describe(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float64)})

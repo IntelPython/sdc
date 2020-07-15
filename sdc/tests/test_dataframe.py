@@ -51,7 +51,6 @@ from sdc.tests.test_utils import (check_numba_version,
                                   gen_df, gen_df_int_cols,
                                   get_start_end,
                                   skip_numba_jit,
-                                  skip_sdc_jit,
                                   test_global_input_data_float64,
                                   test_global_input_data_unicode_kind4)
 from sdc.tests.test_series import gen_strlist
@@ -262,7 +261,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @skip_sdc_jit("pending df filter support")
     def test_box3(self):
         def test_impl(df):
             df = df[df.A != 'dd']
@@ -761,7 +759,6 @@ class TestDataFrame(TestCase):
         sdc_func = self.jit(test_impl)
         np.testing.assert_array_equal(sdc_func(df), test_impl(df))
 
-    @skip_sdc_jit
     def test_index_attribute(self):
         index_to_test = [[1, 2, 3, 4, 5],
                          [.1, .2, .3, .4, .5],
@@ -776,7 +773,6 @@ class TestDataFrame(TestCase):
                 df = pd.DataFrame({'A': A, 'B': B}, index=index)
                 self._test_df_index(df)
 
-    @skip_sdc_jit
     def test_index_attribute_empty(self):
         n = 5
         np.random.seed(0)
@@ -786,7 +782,6 @@ class TestDataFrame(TestCase):
 
         self._test_df_index(df)
 
-    @skip_sdc_jit
     def test_index_attribute_empty_df(self):
         df = pd.DataFrame()
         self._test_df_index(df)
@@ -825,7 +820,6 @@ class TestDataFrame(TestCase):
         sdc_impl = self.jit(test_impl)
         np.testing.assert_array_equal(sdc_impl(10), test_impl(10))
 
-    @skip_sdc_jit
     @skip_numba_jit
     def test_df_apply(self):
         def test_impl(n):
@@ -837,7 +831,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
-    @skip_sdc_jit
     @skip_numba_jit
     def test_df_apply_branch(self):
         def test_impl(n):
@@ -850,7 +843,6 @@ class TestDataFrame(TestCase):
         np.testing.assert_almost_equal(hpat_func(n), test_impl(n))
 
     @skip_numba_jit
-    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_df_describe(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.arange(0, n, 1, np.float32),
@@ -2040,7 +2032,6 @@ class TestDataFrame(TestCase):
         sdc_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(sdc_func(arr), test_impl(arr))
 
-    @skip_sdc_jit('DF.getitem unsupported exceptions')
     def test_df_getitem_str_literal_idx_exception_key_error(self):
         def test_impl(df):
             return df['ABC']
@@ -2052,7 +2043,6 @@ class TestDataFrame(TestCase):
                 with self.assertRaises(KeyError):
                     sdc_func(df)
 
-    @skip_sdc_jit('DF.getitem unsupported exceptions')
     def test_df_getitem_unicode_idx_exception_key_error(self):
         def test_impl(df, idx):
             return df[idx]
@@ -2064,7 +2054,6 @@ class TestDataFrame(TestCase):
                 with self.assertRaises(KeyError):
                     sdc_func(df, 'ABC')
 
-    @skip_sdc_jit('DF.getitem unsupported exceptions')
     def test_df_getitem_tuple_idx_exception_key_error(self):
         sdc_func = self.jit(lambda df: df[('A', 'Z')])
 
@@ -2073,7 +2062,6 @@ class TestDataFrame(TestCase):
                 with self.assertRaises(KeyError):
                     sdc_func(df)
 
-    @skip_sdc_jit('DF.getitem unsupported exceptions')
     def test_df_getitem_bool_array_idx_exception_value_error(self):
         sdc_func = self.jit(lambda df, arr: df[arr])
 
@@ -2084,7 +2072,6 @@ class TestDataFrame(TestCase):
                     sdc_func(df, arr)
                 self.assertIn('Item wrong length', str(raises.exception))
 
-    @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx(self):
         dfs = [
             gen_df(test_global_input_data_float64),
@@ -2179,7 +2166,6 @@ class TestDataFrame(TestCase):
         sdc_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-    @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx_no_index(self):
         dfs = [gen_df(test_global_input_data_float64), pd.DataFrame({'A': []})]
         for df in dfs:
@@ -2187,7 +2173,6 @@ class TestDataFrame(TestCase):
                 self._test_df_getitem_bool_series_even_idx(df)
                 self._test_df_getitem_bool_array_even_idx(df)
 
-    @skip_sdc_jit('DF.getitem unsupported Series name')
     def test_df_getitem_idx_multiple_types(self):
         int_data = [-1, 1, 0]
         float_data = [0.1, 0., -0.1]
@@ -2237,7 +2222,6 @@ class TestDataFrame(TestCase):
         df2.A[n // 2:] = n
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
-    @skip_sdc_jit
     def test_isin_df_index_str(self):
         def test_impl(df, df2):
             return df.isin(df2)
@@ -2247,7 +2231,6 @@ class TestDataFrame(TestCase):
         df2 = pd.DataFrame({'A': [8, 2], 'B': [0, 2]}, index=[1, 2])
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
-    @skip_sdc_jit
     def test_isin_df_without_index(self):
         def test_impl(df, df2):
             return df.isin(df2)
@@ -2257,7 +2240,6 @@ class TestDataFrame(TestCase):
         df2 = pd.DataFrame({'A': [8, 2], 'B': [0, 2]}, index=[1, 2])
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
-    @skip_sdc_jit
     def test_isin_df_without_val_index(self):
         def test_impl(df, df2):
             return df.isin(df2)
@@ -2267,7 +2249,6 @@ class TestDataFrame(TestCase):
         df2 = pd.DataFrame({'num_legs': [8, 2], 'num_wings': [0, 2]})
         pd.testing.assert_frame_equal(hpat_func(df, df2), test_impl(df, df2))
 
-    @skip_sdc_jit
     def test_isin_dict1(self):
         def test_impl(df):
             vals = {'A': (2., 3., 4.), 'C': (4., 5., 6.)}
@@ -2278,7 +2259,6 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @skip_sdc_jit
     def test_isin_ser1(self):
         def test_impl(df):
             vals = pd.Series([2, 3, 4, 3, 4, 5, 8, 49])
@@ -2289,7 +2269,6 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n)**2})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @skip_sdc_jit
     def test_isin_ser2(self):
         def test_impl(df):
             vals = pd.Series([2, 3, 4, 3, 4, 5, 8, 49], index=[3, 4, 5, 6, 7, 8, 11, 0])
@@ -2300,7 +2279,6 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2}, index=np.arange(n) + 1)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @skip_sdc_jit
     def test_isin_ser_without_index(self):
         def test_impl(df):
             vals = pd.Series([2, 3, 4, 3, 4, 5, 8, 49], index=[3, 4, 5, 6, 7, 8, 11, 0])
@@ -2311,7 +2289,6 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': np.arange(n), 'B': np.arange(n) ** 2})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @skip_sdc_jit
     def test_isin_ser3(self):
         def test_impl(df):
             vals = pd.Series([2, 3, 4, 3, 4, 5, 8, 49])
@@ -2350,7 +2327,6 @@ class TestDataFrame(TestCase):
             with self.subTest(val=val):
                 pd.testing.assert_frame_equal(hpat_func(df, val), test_impl(df, val))
 
-    @skip_sdc_jit
     def test_isin_df_different_size(self):
         def test_impl():
             df = pd.DataFrame({'A': [0, 1, 2, 3],
@@ -2364,7 +2340,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @skip_sdc_jit
     def test_isin_df_different_size2(self):
         def test_impl():
             val = pd.DataFrame({'A': [0, 1, 2, 3],
@@ -2378,7 +2353,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @skip_sdc_jit
     def test_isin_dict_different_size(self):
         def test_impl():
             df = pd.DataFrame({'A': [0, 1, 2, 3],
@@ -2391,7 +2365,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @skip_sdc_jit
     def test_isin_dict_different_size2(self):
         def test_impl():
             val = {'A': (0, 1, 2, 3),
@@ -2532,7 +2505,6 @@ class TestDataFrame(TestCase):
               "if parameter ignore_index is set to False."
         self.assertIn(msg, str(raises.exception))
 
-    @skip_sdc_jit
     def test_append_df_diff_types_no_index(self):
         def test_impl(df, df2):
             return df.append(df2, ignore_index=True)
@@ -2656,7 +2628,6 @@ class TestDataFrame(TestCase):
         })
         pd.testing.assert_series_equal(sdc_func(df), test_impl(df))
 
-    @skip_sdc_jit
     def test_median_default(self):
         def test_impl(df):
             return df.median()
@@ -2722,7 +2693,6 @@ class TestDataFrame(TestCase):
                            "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    @skip_sdc_jit
     def test_min_default(self):
         def test_impl(df):
             return df.min()
@@ -2775,7 +2745,6 @@ class TestDataFrame(TestCase):
                            "F H": [np.nan, np.nan, np.inf, np.nan]})
         pd.testing.assert_series_equal(hpat_func(df), test_impl(df))
 
-    @skip_sdc_jit
     def test_pct_change(self):
         def test_impl(df):
             return df.pct_change()
@@ -2787,7 +2756,6 @@ class TestDataFrame(TestCase):
                            "D": [14, None, 6, 2, 6, 4]})
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @skip_sdc_jit
     def test_pct_change_with_parameters_limit_and_freq(self):
         def test_impl(df, limit, freq):
             return df.pct_change(limit=limit, freq=freq)
@@ -2799,7 +2767,6 @@ class TestDataFrame(TestCase):
                            "D": [14, None, 6, 2, 6, 4]})
         pd.testing.assert_frame_equal(hpat_func(df, None, None), test_impl(df, None, None))
 
-    @skip_sdc_jit
     def test_pct_change_with_parametrs(self):
         def test_impl(df, periods, method):
             return df.pct_change(periods=periods, fill_method=method, limit=None, freq=None)

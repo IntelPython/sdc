@@ -27,7 +27,7 @@
 import pandas as pd
 
 from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import skip_numba_jit, skip_sdc_jit
+from sdc.tests.test_utils import skip_numba_jit
 
 
 GLOBAL_VAL = 2
@@ -70,7 +70,6 @@ class TestSeries_map(object):
         S = pd.Series([1.0, 2., 3., 4., 5.])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
-    @skip_sdc_jit
     def test_series_map_dict(self):
         def test_impl(S):
             return S.map({2.: 42., 4.: 3.14})

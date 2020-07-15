@@ -409,36 +409,16 @@ def str_list_to_array_overload(str_list):
     return lambda str_list: str_list
 
 
-if sdc.config.config_pipeline_hpat_default:
-    @infer_global(operator.getitem)
-    class GetItemStringArray(AbstractTemplate):
-        key = operator.getitem
+@infer_global(operator.getitem)
+class GetItemStringArray(AbstractTemplate):
+    key = operator.getitem
 
-        def generic(self, args, kws):
-            assert not kws
-            [ary, idx] = args
-            if isinstance(ary, StringArrayType):
-                if isinstance(idx, types.SliceType):
-                    return signature(string_array_type, *args)
-                # elif isinstance(idx, types.Integer):
-                #     return signature(string_type, *args)
-
-                elif idx == types.Array(types.bool_, 1, 'C'):
-                    return signature(string_array_type, *args)
-                elif idx == types.Array(types.intp, 1, 'C'):
-                    return signature(string_array_type, *args)
-else:
-    # use old-implementation in the new pipeline if idx is of types.SliceType type
-    @infer_global(operator.getitem)
-    class GetItemStringArray(AbstractTemplate):
-        key = operator.getitem
-
-        def generic(self, args, kws):
-            assert not kws
-            [ary, idx] = args
-            if isinstance(ary, StringArrayType):
-                if isinstance(idx, types.SliceType):
-                    return signature(string_array_type, *args)
+    def generic(self, args, kws):
+        assert not kws
+        [ary, idx] = args
+        if isinstance(ary, StringArrayType):
+            if isinstance(idx, types.SliceType):
+                return signature(string_array_type, *args)
 
 
 @infer_global(operator.setitem)
@@ -449,48 +429,6 @@ class SetItemStringArray(AbstractTemplate):
         if (ary == string_array_type and isinstance(idx, types.Integer)
                 and val == string_type):
             return signature(types.none, *args)
-
-
-if sdc.config.config_pipeline_hpat_default:
-    @infer
-    @infer_global(operator.eq)
-    @infer_global(operator.ne)
-    @infer_global(operator.ge)
-    @infer_global(operator.gt)
-    @infer_global(operator.le)
-    @infer_global(operator.lt)
-    class CmpOpEqStringArray(AbstractTemplate):
-        key = operator.eq
-
-        def generic(self, args, kws):
-            assert not kws
-            [va, vb] = args
-            # if one of the inputs is string array
-            if va == string_array_type or vb == string_array_type:
-                # inputs should be either string array or string
-                assert is_str_arr_typ(va) or va == string_type
-                assert is_str_arr_typ(vb) or vb == string_type
-                return signature(types.Array(types.boolean, 1, 'C'), va, vb)
-
-    @infer
-    class CmpOpNEqStringArray(CmpOpEqStringArray):
-        key = '!='
-
-    @infer
-    class CmpOpGEStringArray(CmpOpEqStringArray):
-        key = '>='
-
-    @infer
-    class CmpOpGTStringArray(CmpOpEqStringArray):
-        key = '>'
-
-    @infer
-    class CmpOpLEStringArray(CmpOpEqStringArray):
-        key = '<='
-
-    @infer
-    class CmpOpLTStringArray(CmpOpEqStringArray):
-        key = '<'
 
 
 # def is_str_arr_typ(typ):
@@ -1154,57 +1092,6 @@ def decode_utf8(typingctx, ptr_t, len_t=None):
     #                                                    name="getitem_string_array_std")
     # return builder.call(fn_getitem, [string_array.offsets,
     #                                  string_array.data, args[1]])
-
-
-if sdc.config.config_pipeline_hpat_default:
-    # FIXME: old-style getitem implementations copy strings but not null bits
-    @lower_builtin(operator.getitem, StringArrayType, types.Array(types.bool_, 1, 'C'))
-    def lower_string_arr_getitem_bool(context, builder, sig, args):
-        def str_arr_bool_impl(str_arr, bool_arr):
-            n = len(str_arr)
-            if n != len(bool_arr):
-                raise IndexError("boolean index did not match indexed array along dimension 0")
-            n_strs = 0
-            n_chars = 0
-            for i in range(n):
-                if bool_arr[i]:
-                    # TODO: use get_cstr_and_len instead of getitem
-                    _str = str_arr[i]
-                    n_strs += 1
-                    n_chars += get_utf8_size(_str)
-            out_arr = pre_alloc_string_array(n_strs, n_chars)
-            str_ind = 0
-            for i in range(n):
-                if bool_arr[i]:
-                    _str = str_arr[i]
-                    out_arr[str_ind] = _str
-                    str_ind += 1
-            return out_arr
-        res = context.compile_internal(builder, str_arr_bool_impl, sig, args)
-        return res
-
-    @lower_builtin(operator.getitem, StringArrayType, types.Array(types.intp, 1, 'C'))
-    def lower_string_arr_getitem_arr(context, builder, sig, args):
-        def str_arr_arr_impl(str_arr, ind_arr):
-            n = len(ind_arr)
-            # get lengths
-            n_strs = 0
-            n_chars = 0
-            for i in range(n):
-                # TODO: use get_cstr_and_len instead of getitem
-                _str = str_arr[ind_arr[i]]
-                n_strs += 1
-                n_chars += get_utf8_size(_str)
-
-            out_arr = pre_alloc_string_array(n_strs, n_chars)
-            str_ind = 0
-            for i in range(n):
-                _str = str_arr[ind_arr[i]]
-                out_arr[str_ind] = _str
-                str_ind += 1
-            return out_arr
-        res = context.compile_internal(builder, str_arr_arr_impl, sig, args)
-        return res
 
 
 @lower_builtin(operator.getitem, StringArrayType, types.SliceType)

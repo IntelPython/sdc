@@ -19,8 +19,4 @@ class TestCase(unittest.TestCase):
         return sdc.jit(*args, **kwargs)
 
     def jit(self, *args, **kwargs):
-        from sdc import config
-        if config.config_pipeline_hpat_default:
-            return self.sdc_jit(*args, **kwargs)
-        else:
-            return self.numba_jit(*args, **kwargs)
+        return self.numba_jit(*args, **kwargs)
