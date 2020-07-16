@@ -22,7 +22,7 @@ class Analyzer(ast.NodeVisitor):
             self.visit(i)
 
     def visit_AnnAssign(self, node):
-        if self.flag == True:
+        if self.flag:
             # need to check for child functions
             if isinstance(node.annotation, ast.Subscript):  # containers and generics
                 container_name = node.annotation.value.id
