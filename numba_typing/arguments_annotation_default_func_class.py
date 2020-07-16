@@ -17,8 +17,7 @@ def get_arguments_annotation_default_func(method):
     for arg in argspec.args:
         if (sig.parameters[arg].default != sig.empty):
             defaults[arg] = sig.parameters[arg].default
-    
     return annotations, defaults
-        
 def get_arguments_annotation_class(cls):
     return get_type_hints(cls)
+    
