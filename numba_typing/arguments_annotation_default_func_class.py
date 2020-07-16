@@ -19,6 +19,6 @@ def get_arguments_annotation_default_func(method):
             defaults[arg] = sig.parameters[arg].default
     return annotations, defaults
 
-    
+   
 def get_arguments_annotation_class(cls):
     return get_type_hints(cls)
