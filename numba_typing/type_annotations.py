@@ -9,11 +9,11 @@ def get_func_annotations(func):
     defaults = {}
 
     for name, param in sig.parameters.items():
-        if (param.annotation == sig.empty):
-            raise SyntaxError
+        if param.annotation == sig.empty:
+            raise SyntaxError('Not found annotation')
 
         annotations[name] = param.annotation
-        if (param.default != sig.empty):
+        if param.default != sig.empty:
             defaults[name] = param.default
 
     return annotations, defaults
@@ -25,7 +25,7 @@ def get_cls_annotations(cls):
 
 
 if __name__ == '__main__':
-    def foo(a: int, b: int = 3,):
+    def foo(a: int, b: int = 3, **kwargs: str):
         pass
 
     print(get_func_annotations(foo))
