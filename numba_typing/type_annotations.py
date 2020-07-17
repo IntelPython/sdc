@@ -1,4 +1,4 @@
-from inspect import signature, getfullargspec
+from inspect import signature
 from typing import get_type_hints
 
 
