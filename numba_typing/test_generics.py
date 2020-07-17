@@ -1,4 +1,6 @@
+import inspect
 from typing import Optional, Any, Union, List, Tuple, Dict
+
 
 foo_int: int = 10
 foo_str: str = 'ten'
