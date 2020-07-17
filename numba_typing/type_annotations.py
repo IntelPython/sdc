@@ -10,7 +10,7 @@ def get_func_annotations(func):
 
     for name, param in sig.parameters.items():
         if param.annotation == sig.empty:
-            raise SyntaxError('Not found annotation')
+            raise SyntaxError(f'Not found annotation for parameter {name}')
 
         annotations[name] = param.annotation
         if param.default != sig.empty:
@@ -25,7 +25,7 @@ def get_cls_annotations(cls):
 
 
 if __name__ == '__main__':
-    def foo(a: int, b: int = 3, **kwargs: str):
+    def foo(a: int, b: int = 3):
         pass
 
     print(get_func_annotations(foo))
