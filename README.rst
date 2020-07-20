@@ -34,13 +34,13 @@ Distribution includes Intel® SDC for Python 3.6 and Python 3.7 for Windows and 
 
 Intel® SDC conda package can be installed using the steps below::
 
-    > conda create -n sdc-env python=<3.7 or 3.6>
+    > conda create -n sdc-env python=<3.7 or 3.6> pyarrow=0.17.0 pandas=0.25.3 -c anaconda -c conda-forge
     > conda activate sdc-env
     > conda install sdc -c intel/label/beta -c intel -c defaults -c conda-forge --override-channels
 
 Intel® SDC wheel package can be installed using the steps below::
 
-    > conda create -n sdc-env python=<3.7 or 3.6> pip
+    > conda create -n sdc-env python=<3.7 or 3.6> pip pyarrow=0.17.0 pandas=0.25.3 -c anaconda -c conda-forge
     > conda activate sdc-env
     > pip install --index-url https://pypi.anaconda.org/intel/label/beta/simple --extra-index-url https://pypi.anaconda.org/intel/simple --extra-index-url https://pypi.org/simple sdc
 
