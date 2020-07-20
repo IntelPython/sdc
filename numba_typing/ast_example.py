@@ -1,54 +1,50 @@
 import ast
 import inspect
+import test_generics
 
 
-def main():
-    with open('test_generics.py') as f:
+def get_variable_annotations(func):
+    path = inspect.getsourcefile(func)
+    with open(path) as f:
         tree = ast.parse(f.read())
     analyzer = Analyzer()
     analyzer.visit(tree)
-    print(analyzer.types)
-    print(analyzer.import_from)
+    print(analyzer.locals_parameter)
 
 
 class Analyzer(ast.NodeVisitor):
     def __init__(self):
         self.types = {}
-        self.import_from = []
-        self.module = None
+        self.locals_parameter = {}
         self.function_flag = False
 
-    def visit_ImportFrom(self, node):  # need a check "import module"
-        exec(f'import {node.module}', globals())
-        self.module = node.module
+    def visit_ImportFrom(self, node):
         for alias in node.names:
-            self.import_from.append(eval(f'{node.module}.{alias.name}'))
+            exec(f'from {node.module} import {alias.name}', None, self.locals_parameter)
 
-    def visit_FunctionDef(self, obj):
+    def visit_Import(self, node):
+        exec(f'import {node.names[0].name}', None, self.locals_parameter)
+
+    def visit_FunctionDef(self, node):
         self.function_flag = True
-        for i in obj.body:
+        for i in node.body:
             self.visit(i)
 
     def visit_AnnAssign(self, node):
         if self.function_flag:
+            target, annotation = node.target, node.annotation
             # need to check for child functions
-            if isinstance(node.annotation, ast.Subscript):  # containers and generics
-                container_name = node.annotation.value.id
-                if isinstance(node.annotation.slice.value, ast.Tuple):
-                    type_list = []
-                    for t in node.annotation.slice.value.elts:
-                        type_list.append(t.id)
-                    list_to_str = ','.join(type_list)
-                    self.types[node.target.id] = [eval(f'{self.module}.{container_name}[{list_to_str}]')]
+            if isinstance(annotation, ast.Subscript):  # containers and generics
+                container_name = annotation.value.id
+                if isinstance(annotation.slice.value, ast.Tuple):
+                    type_list_in_str = ','.join([elt.id for elt in annotation.slice.value.elts])
+                    exec(f'{target.id} = {container_name}[{type_list_in_str}]', None, self.locals_parameter)
                 else:
-                    self.types[node.target.id] = [
-                        eval(f'{self.module}.{container_name}[{node.annotation.slice.value.id}]')]
+                    exec(
+                        f'{target.id} = {container_name}[{annotation.slice.value.id}]', None, self.locals_parameter)
             else:
-                try:  # not containers
-                    self.types[node.target.id] = [eval(f'{node.annotation.id}')]
-                except NameError:
-                    self.types[node.target.id] = [eval(f'{self.module}.{node.annotation.id}')]  # if Any type
+                exec(f'{target.id} = {annotation.id}', None, self.locals_parameter)
 
 
 if __name__ == '__main__':
-    main()
+    get_variable_annotations(test_generics.qwe)

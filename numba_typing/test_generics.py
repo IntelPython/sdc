@@ -1,4 +1,5 @@
 import inspect
+import time
 from typing import Optional, Any, Union, List, Tuple, Dict
 
 
@@ -16,10 +17,9 @@ foo_dict: Dict[str, int] = {'Hello': 1}
 
 def qwe():
     qwe_int: int = 10
-    qwe_int_op_n: Optional[int]
+    qwe_list: List[int] = [1, 2, 3]
+    qwe_tuple: Tuple[str, int] = ("qqq", 1)
+    qwe_dict: Dict[str, str] = {'hello': 'world'}
     qwe_any: Any
-    qwe_l: List[int] = [1, 2, 3]
-    qwe_list: Optional[int] = [1, 2, 3]
-    qwe_list_u: Union[int, float]
-    qwe_tuple: Union[str, int] = ("qqq", 1)
-    qwe_dict: Union[str, str] = {'hello': 'world'}
+    qwe_int_op: Optional[int]
+    qwe_int_float_un: Union[int, float]
