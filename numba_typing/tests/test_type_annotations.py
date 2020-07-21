@@ -9,37 +9,42 @@ class TestTypeAnnotations(unittest.TestCase):
 
         def foo(a: int, b, c: str = "string"):
             pass
-        self.assertRaises(SyntaxError,  type_annotations.get_func_annotations, foo)
+        with self.assertRaises(SyntaxError) as raises:
+            type_annotations.get_func_annotations(foo)
+        self.assertIn('Not found annotation for parameter b', str(raises.exception))
 
     def test_get_cls_annotations(self):
-        class MyClass(object):
+        class TestClass(object):
             x: int = 3
             y: str = "string"
 
-            def __init__(self, x: str, y: int):
+            def __init__(self, x, y):
                 self.x = x
                 self.y = y
 
-        self.assertEqual(type_annotations.get_cls_annotations(MyClass), ({'x': int, 'y': str}, {}))
+        result = type_annotations.get_cls_annotations(TestClass)
+        expected = ({'x': [int], 'y': [str]}, {})
+        self.assertEqual(result, expected)
 
     def test_get_func_annotations(self):
+
         def func_one(a: int, b: Union[int, float], c: str):
             pass
-        with self.subTest("annotations"):
-            self.assertEqual(type_annotations.get_func_annotations(func_one),
-                             ({'a': int, 'b': [int, float], 'c': str}, {}))
 
         def func_two(a: int = 2, b: str = "string", c: List[int] = [1, 2, 3]):
             pass
-        with self.subTest("annotations and all default values"):
-            self.assertEqual(type_annotations.get_func_annotations(func_two),
-                             ({'a': int, 'b': str, 'c': List[int]}, {'a': 2, 'b': 'string', 'c': [1, 2, 3]}))
 
         def func_three(a: Dict[int, str], b: str = "string", c: int = 1):
             pass
-        with self.subTest("annotations and not all default values"):
-            self.assertEqual(type_annotations.get_func_annotations(func_three),
-                             ({'a': Dict[int, str], 'b': str, 'c': int}, {'b': 'string', 'c': 1}))
+
+        expected_results = {
+            func_one: ({'a': [int], 'b': [int, float], 'c': [str]}, {}),
+            func_two: ({'a': [int], 'b': [str], 'c': [List[int]]}, {'a': 2, 'b': 'string', 'c': [1, 2, 3]}),
+            func_three: ({'a': [Dict[int, str]], 'b': [str], 'c': [int]}, {'b': 'string', 'c': 1}),
+        }
+        for f, expected in expected_results.items():
+            with self.subTest(func=f.__name__):
+                self.assertEqual(type_annotations.get_func_annotations(f), expected)
 
 
 if __name__ == '__main__':
