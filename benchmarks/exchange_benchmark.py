@@ -78,16 +78,19 @@ def main():
     print("TOTAL Pandas time: ", time.time() - t_start)
 
     f = open(os.devnull, 'w')
-    t_start = time.time()
+
     with redirect_stdout(f):
+        t_start = time.time()
         sdc_process_data()  # Warming up
-    print("SDC WARM_UP time: ", time.time() - t_start)
+        t_end = time.time() - t_start
+    print("SDC WARM_UP time: ", t_end)
 
     print("Run SDC...")
     t_start = time.time()
     df1, res, end_time = sdc_process_data()
+    t_total = time.time() - t_start
     print("NO boxing SDC time: ", end_time)
-    print("TOTAL SDC time: ", time.time() - t_start)
+    print("TOTAL SDC time: ", t_total)
 
 
 if __name__ == "__main__":
