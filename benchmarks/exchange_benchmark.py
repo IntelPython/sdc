@@ -1,6 +1,5 @@
 # *****************************************************************************
 # Copyright (c) 2020, Intel Corporation All rights reserved.
-# 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -12,11 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# 
 # *****************************************************************************
 
 import pandas as pd
-import numpy as np
 import numba
 from contextlib import redirect_stdout
 import sys
@@ -40,7 +37,6 @@ def numba_jit(*args, **kwargs):
 
 def process_data():
     t_all = time.time()
-    
     df = pd.read_csv('prices.csv')
 
     res = (df['open'] + df['close']).sum()
@@ -56,7 +52,7 @@ def process_data():
     res = df['open'].max(skipna=True)
 
     abs_series = df['high'].abs()
-    
+
     res = abs_series.min(skipna=True)
 
     res = df['low'].floordiv(100000)
@@ -71,6 +67,7 @@ def process_data():
 
     return df, res, end_time
 
+
 sdc_process_data = numba_jit(process_data)
 
 
@@ -79,8 +76,7 @@ def main():
     t_start = time.time()
     process_data()
     print("TOTAL Pandas time: ", time.time() - t_start)
-    
-    
+
     f = open(os.devnull, 'w')
     t_start = time.time()
     with redirect_stdout(f):
@@ -94,6 +90,5 @@ def main():
     print("TOTAL SDC time: ", time.time() - t_start)
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main()
-
