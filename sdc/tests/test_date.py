@@ -39,8 +39,7 @@ from sdc.tests.test_utils import (count_array_OneD_Vars,
                                   count_parfor_OneDs,
                                   count_parfor_REPs,
                                   dist_IR_contains,
-                                  skip_numba_jit,
-                                  skip_sdc_jit)
+                                  skip_numba_jit)
 
 from datetime import datetime
 import random
@@ -114,7 +113,6 @@ class TestDate(TestCase):
         A = pd.DatetimeIndex(df['str_date']).to_series()
         np.testing.assert_array_equal(hpat_func(A), test_impl(A))
 
-    @skip_sdc_jit
     @skip_numba_jit
     def test_ts_map_date2(self):
         def test_impl(df):

@@ -44,8 +44,7 @@ from sdc.tests.test_utils import (count_array_OneDs,
                                   dist_IR_contains,
                                   get_rank,
                                   get_start_end,
-                                  skip_numba_jit,
-                                  skip_sdc_jit)
+                                  skip_numba_jit)
 
 
 kde_file = 'kde.parquet'
@@ -221,9 +220,6 @@ class TestParquet(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
-    @skip_sdc_jit('Error: Attribute "dtype" are different\n'
-                  '[left]:  datetime64[ns]\n'
-                  '[right]: object')
     @skip_numba_jit
     def test_pq_spark_date(self):
         def test_impl():
@@ -710,8 +706,6 @@ class TestCSV(TestIO):
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     @skip_numba_jit
-    @skip_sdc_jit('TypeError: to_csv() takes from 1 to 20 positional arguments but 21 were given)\n'
-                  'Notice: Not seen with Pandas 0.24.2')
     def test_write_csv1(self):
         def test_impl(df, fname):
             df.to_csv(fname)
@@ -727,8 +721,6 @@ class TestCSV(TestIO):
         pd.testing.assert_frame_equal(pd.read_csv(hp_fname), pd.read_csv(pd_fname))
 
     @skip_numba_jit
-    @skip_sdc_jit('AttributeError: Failed in hpat mode pipeline (step: convert to distributed)\n'
-                  'module \'sdc.hio\' has no attribute \'file_write_parallel\'')
     def test_write_csv_parallel1(self):
         def test_impl(n, fname):
             df = pd.DataFrame({'A': np.arange(n)})
@@ -760,7 +752,6 @@ class TestNumpy(TestIO):
         np.testing.assert_almost_equal(hpat_func(), test_impl())
 
     @skip_numba_jit
-    @skip_sdc_jit('Not implemented in sequential transport layer')
     def test_np_io2(self):
         # parallel version
         def test_impl():

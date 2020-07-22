@@ -41,7 +41,6 @@ from sdc.tests.test_utils import (count_array_OneDs,
                                   dist_IR_contains,
                                   get_start_end,
                                   skip_numba_jit,
-                                  skip_sdc_jit,
                                   sdc_limitation)
 from sdc.tests.test_series import gen_frand_array
 
@@ -65,7 +64,6 @@ _default_df_numeric_data = {
 
 class TestGroupBy(TestCase):
 
-    @skip_sdc_jit('Fails with old-pipeline from the start')
     @sdc_limitation
     def test_dataframe_groupby_index_name(self):
         """SDC indexes do not have names, so index created from a named Series looses it's name."""
@@ -82,7 +80,6 @@ class TestGroupBy(TestCase):
         result_ref = test_impl(df)
         pd.testing.assert_frame_equal(result, result_ref)
 
-    @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_by_all_dtypes(self):
         def test_impl(df):
             return df.groupby('A').count()
@@ -102,7 +99,6 @@ class TestGroupBy(TestCase):
                 # TODO: implement index classes, as current indexes do not have names
                 pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_sort(self):
         def test_impl(df, param):
             return df.groupby('A', sort=param).min()
@@ -124,7 +120,6 @@ class TestGroupBy(TestCase):
                 # TODO: implement index classes, as current indexes do not have names
                 pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_count(self):
         def test_impl(df):
             return df.groupby('A').count()
@@ -154,7 +149,6 @@ class TestGroupBy(TestCase):
         pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
 
 
-    @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_max(self):
         def test_impl(df):
             return df.groupby('A').max()
@@ -186,7 +180,6 @@ class TestGroupBy(TestCase):
 
         pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
-    @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_min(self):
         def test_impl(df):
             return df.groupby('A').min()
@@ -218,7 +211,6 @@ class TestGroupBy(TestCase):
 
         pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
-    @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_mean(self):
         def test_impl(df):
             return df.groupby('A').mean()
@@ -247,7 +239,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
 
-    @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_median(self):
         def test_impl(df):
             return df.groupby('A').median()
@@ -276,7 +267,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
 
-    @skip_sdc_jit('Fails with old-pipeline from the start')
     @unittest.expectedFailure   # pandas groupby.median returns unstable dtype (int or float) unlike series.median
     def test_dataframe_groupby_median_result_dtype(self):
         def test_impl(df):
@@ -293,7 +283,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_prod(self):
         def test_impl(df):
             return df.groupby('A').prod()
@@ -325,7 +314,6 @@ class TestGroupBy(TestCase):
 
         pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
-    @skip_sdc_jit('Fails with old-pipeline from the start')
     @skip_numba_jit("BUG: SDC impl of Series.sum returns float64 on as series of ints")
     def test_dataframe_groupby_sum(self):
         def test_impl(df):
@@ -355,7 +343,6 @@ class TestGroupBy(TestCase):
         kwargs = {'check_names': False, 'check_dtype': False}
         pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
-    @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_std(self):
         def test_impl(df):
             return df.groupby('A').std()
@@ -384,7 +371,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
 
-    @skip_sdc_jit('Fails with old-pipeline from the start')
     def test_dataframe_groupby_var(self):
         def test_impl(df):
             return df.groupby('A').var()
@@ -413,7 +399,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
 
-    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_seq(self):
         def test_impl(df):
@@ -436,7 +421,6 @@ class TestGroupBy(TestCase):
         result_ref = test_impl(df)
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
     def test_agg_seq_count(self):
         def test_impl(df):
             return df.groupby('A')['B'].count()
@@ -447,7 +431,6 @@ class TestGroupBy(TestCase):
         result_ref = test_impl(df)
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
-    @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
     def test_agg_seq_mean(self):
         def test_impl(df):
             return df.groupby('A')['B'].mean()
@@ -458,7 +441,6 @@ class TestGroupBy(TestCase):
         result_ref = test_impl(df)
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
-    @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
     def test_agg_seq_median(self):
         def test_impl(df):
             return df.groupby('A')['B'].median()
@@ -469,7 +451,6 @@ class TestGroupBy(TestCase):
         result_ref = test_impl(df)
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
-    @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
     def test_agg_seq_min(self):
         def test_impl(df):
             return df.groupby('A')['B'].min()
@@ -490,7 +471,6 @@ class TestGroupBy(TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': pd.date_range('2019-1-3', '2019-1-9')})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
-    @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
     def test_agg_seq_max(self):
         def test_impl(df):
             return df.groupby('A')['B'].max()
@@ -511,7 +491,6 @@ class TestGroupBy(TestCase):
         df = pd.DataFrame({'A': [2, 1, 1, 1, 2, 2, 1], 'B': [-8, 2, 3, 1, 5, 6, 7]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
-    @skip_sdc_jit("Old-style implementation returns ndarray, not a Series")
     def test_agg_seq_prod(self):
         def test_impl(df):
             return df.groupby('A')['B'].prod()
@@ -522,7 +501,6 @@ class TestGroupBy(TestCase):
         result_ref = test_impl(df)
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
-    @skip_sdc_jit
     def test_agg_seq_var(self):
         def test_impl(df):
             return df.groupby('A')['B'].var()
@@ -533,7 +511,6 @@ class TestGroupBy(TestCase):
         result_ref = test_impl(df)
         pd.testing.assert_series_equal(result, result_ref, check_names=False)
 
-    @skip_sdc_jit
     def test_agg_seq_std(self):
         def test_impl(df):
             return df.groupby('A')['B'].std()
@@ -555,7 +532,6 @@ class TestGroupBy(TestCase):
                            'C': [3, 5, 6, 5, 4, 4, 3]})
         self.assertEqual(set(hpat_func(df)), set(test_impl(df)))
 
-    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_multikey_parallel(self):
         def test_impl(in_A, in_B, in_C):
@@ -579,7 +555,6 @@ class TestGroupBy(TestCase):
         p_res = test_impl(p_A, p_B, p_C)
         self.assertEqual(h_res, p_res)
 
-    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_parallel(self):
         def test_impl(n):
@@ -658,7 +633,6 @@ class TestGroupBy(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_parallel_var(self):
         def test_impl(n):
@@ -672,7 +646,6 @@ class TestGroupBy(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_parallel_std(self):
         def test_impl(n):
@@ -725,7 +698,6 @@ class TestGroupBy(TestCase):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
-    @skip_sdc_jit
     @skip_numba_jit
     def test_muti_hiframes_node_filter_agg(self):
         def test_impl(df, cond):
@@ -741,7 +713,6 @@ class TestGroupBy(TestCase):
         self.assertEqual(set(res[1]), set(h_res[1]))
         np.testing.assert_array_equal(res[0], h_res[0])
 
-    @skip_sdc_jit
     @skip_numba_jit
     def test_agg_seq_str(self):
         def test_impl(df):
