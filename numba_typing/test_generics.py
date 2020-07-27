@@ -14,7 +14,7 @@ foo_tuple: Tuple[int] = (1,)
 foo_dict: Dict[str, int] = {'Hello': 1}
 
 T = TypeVar('T')
-S = TypeVar('S', int, str)
+S = TypeVar('S')
 G = Generic[T]
 UserId = NewType('UserId', int)
 
