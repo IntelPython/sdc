@@ -41,6 +41,7 @@ from sdc.tests.test_base import TestCase
 from sdc.tests.test_series import gen_frand_array
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                   skip_numba_jit,
+                                  skip_pandas1,
                                   test_global_input_data_float64,
                                   assert_raises_ty_checker)
 
@@ -894,6 +895,7 @@ class TestRolling(TestCase):
 
         self._test_rolling_unsupported_types(df)
 
+    @skip_pandas1
     def test_df_rolling_apply_mean(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -906,6 +908,7 @@ class TestRolling(TestCase):
 
         self._test_rolling_apply_mean(df)
 
+    @skip_pandas1
     def test_df_rolling_apply_mean_no_unboxing(self):
         def test_impl(window, min_periods):
             def func(x):
@@ -1036,6 +1039,7 @@ class TestRolling(TestCase):
             hpat_func(df, other, True)
         self.assertIn(msg_tmpl.format('False, None'), str(raises.exception))
 
+    @skip_pandas1
     def test_df_rolling_count(self):
         all_data = test_global_input_data_float64
         length = min(len(d) for d in all_data)
@@ -1044,6 +1048,7 @@ class TestRolling(TestCase):
 
         self._test_rolling_count(df)
 
+    @skip_pandas1
     def test_df_rolling_count_no_unboxing(self):
         def test_impl(window, min_periods):
             df = pd.DataFrame({
@@ -1518,6 +1523,7 @@ class TestRolling(TestCase):
         series = pd.Series(test_global_input_data_float64[0])
         self._test_rolling_unsupported_types(series)
 
+    @skip_pandas1
     def test_series_rolling_apply_mean(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -1604,6 +1610,7 @@ class TestRolling(TestCase):
         result_ref = test_impl(S1, S2)
         pd.testing.assert_series_equal(result, result_ref)
 
+    @skip_pandas1
     def test_series_rolling_count(self):
         all_data = test_global_input_data_float64
         indices = [list(range(len(data)))[::-1] for data in all_data]
