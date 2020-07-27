@@ -31,6 +31,7 @@ import unittest
 import numba
 import numpy as np
 import pandas
+from itertools import islice, permutations
 from numba.core.errors import TypingError
 
 import sdc
@@ -58,6 +59,33 @@ test_global_input_data_float64 = [
     [1., np.inf, np.inf, -1., 0., np.inf, np.NINF, np.NINF],
     [np.nan, np.inf, np.inf, np.nan, np.nan, np.nan, np.NINF, np.NZERO],
 ]
+
+
+def gen_srand_array(size, nchars=8):
+    """Generate array of strings of specified size based on [a-zA-Z] + [0-9]"""
+    accepted_chars = list(string.ascii_letters + string.digits)
+    rands_chars = np.array(accepted_chars, dtype=(np.str_, 1))
+
+    np.random.seed(100)
+    return np.random.choice(rands_chars, size=nchars * size).view((np.str_, nchars))
+
+
+def gen_frand_array(size, min=-100, max=100, nancount=0):
+    """Generate array of float of specified size based on [-100-100]"""
+    np.random.seed(100)
+    res = (max - min) * np.random.sample(size) + min
+    if nancount:
+        res[np.random.choice(np.arange(size), nancount)] = np.nan
+    return res
+
+
+def gen_strlist(size, nchars=8, accepted_chars=None):
+    """Generate list of strings of specified size based on accepted_chars"""
+    if not accepted_chars:
+        accepted_chars = string.ascii_letters + string.digits
+    generated_chars = islice(permutations(accepted_chars, nchars), size)
+
+    return [''.join(chars) for chars in generated_chars]
 
 
 def gen_int_df_index(length):
@@ -224,3 +252,10 @@ def assert_raises_ty_checker(self, err_details, func, *args, **kwargs):
     regex_str = TypeChecker.msg_template.format(*err_details)
     regex_str = regex_str.translate(translation_dict)
     self.assertRaisesRegex(TypingError, regex_str, func, *args, **kwargs)
+
+
+def _make_func_from_text(func_text, func_name='test_impl', global_vars={}):
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    test_impl = loc_vars[func_name]
+    return test_impl

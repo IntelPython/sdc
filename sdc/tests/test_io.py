@@ -76,6 +76,7 @@ class TestIO(TestCase):
             n = 111
             A = np.random.ranf(n)
             A.tofile("np_file1.dat")
+        super(TestIO, self).setUp()
 
 
 class TestParquet(TestIO):

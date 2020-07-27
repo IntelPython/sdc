@@ -62,15 +62,19 @@ class TestSeriesMethods(TestBase):
                 "data_size": data_length,
             }
 
-            args = tuple(gen(data_length, input_data=input_data[i]) for i, gen in enumerate(data_gens))
+            all_args = []
+            for i, gen in enumerate(data_gens):
+                if isinstance(gen, partial) and 'data_length' in gen.keywords:
+                    all_args.append(gen(input_data=input_data[i]))
+                else:
+                    all_args.append(gen(data_length, input_data=input_data[i]))
+            args = tuple(all_args)
             self._test_jit(pyfunc, base, *args)
             self._test_py(pyfunc, base, *args)
 
 
 cases = [
     TC(name='abs', size=[10 ** 8]),
-    TC(name='add', size=[10 ** 7], params='other',  data_num=2),
-    TC(name='add', size=[10 ** 7], params='other, fill_value=3',  data_num=2),
     TC(name='append', size=[10 ** 7], params='other', data_num=2),
     TC(name='apply', size=[10 ** 7], params='lambda x: x'),
     TC(name='argsort', size=[10 ** 4]),
@@ -98,8 +102,9 @@ cases = [
     TC(name='getitem_idx_bool_array', size=[10 ** 7], call_expr='A[B]', usecase_params='A, B',
        data_gens=(gen_series, partial(gen_arr_of_dtype, dtype='bool', random=False)),
        input_data=[None, [True, False, False, True, False, True]]),
-   #  TC(name='getitem_idx_int_series', size=[10 ** 7], call_expr='A[B]', usecase_params='A, B',
-   #     data_gens=(gen_series, partial(gen_series, dtype='int', limits=(0, 10 ** 7)))),
+    # TO-DO: fix below test that hangs due to inefficient impl
+    #  TC(name='getitem_idx_int_series', size=[10 ** 7], call_expr='A[B]', usecase_params='A, B',
+    #     data_gens=(gen_series, partial(gen_series, dtype='int', limits=(0, 10 ** 7)))),
     TC(name='gt',  size=[10 ** 7],params='other', data_num=2),
     TC(name='head', size=[10 ** 8]),
     TC(name='iat', size=[10 ** 7], call_expr='data.iat[100000]', usecase_params='data'),
@@ -150,6 +155,40 @@ cases = [
     TC(name='value_counts', size=[10 ** 6]),
     TC(name='var', size=[10 ** 8], check_skipna=True),
     TC(name='unique', size=[10 ** 5]),
+    TC(name='add_scalar', size=[6 * 10 ** 7],
+       call_expr='s1.add(other=5.5, fill_value=2.1)', usecase_params='s1'),
+    TC(name='add_series_same_size', size=[6 * 10 ** 7],
+       call_expr='s1.add(s2, fill_value=2.1)', usecase_params='s1, s2', data_num=2),
+    TC(name='add_series_diff_size', size=[6 * 10 ** 7],
+       call_expr='s1.add(s2)', usecase_params='s1, s2',
+       data_gens=(partial(gen_series),
+                  partial(gen_series,
+                          data_length=3 * 10 ** 7))),
+    TC(name='add_series_equal_indexes', size=[6 * 10 ** 7],
+       call_expr='s1.add(s2)', usecase_params='s1, s2',
+       data_gens=(partial(gen_series,
+                          index_gen=partial(
+                              gen_arr_of_dtype,
+                              random=False,
+                              input_data=[1, 2, 3, 4, 5])),
+                  partial(gen_series,
+                          index_gen=partial(
+                              gen_arr_of_dtype,
+                              random=False,
+                              input_data=[1, 2, 3, 4, 5])))),
+    TC(name='add_series_common_case', size=[6 * 10 ** 7],
+       call_expr='s1.add(s2)', usecase_params='s1, s2',
+       data_gens=(partial(gen_series,
+                          index_gen=partial(
+                              gen_arr_of_dtype,
+                              random=True,
+                              input_data=np.arange(6 * 10 ** 7))),
+                  partial(gen_series,
+                          index_gen=partial(
+                              gen_arr_of_dtype,
+                              random=True,
+                              input_data=np.arange(6 * 10 ** 7))))),
 ]
+
 
 generate_test_cases(cases, TestSeriesMethods, 'series')
