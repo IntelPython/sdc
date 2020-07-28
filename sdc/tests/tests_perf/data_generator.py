@@ -85,13 +85,21 @@ def gen_unique_values(data_length, dtype='int', seed=None):
     return gen_arr_from_input(data_length, values, repeat=False, seed=seed)
 
 
-def gen_series(data_length, dtype='float', random=True, limits=None, nunique=1000, input_data=None, seed=None):
+def gen_series(data_length,
+               dtype='float',
+               random=True,
+               limits=None,
+               nunique=1000,
+               input_data=None,
+               index_gen=None,
+               seed=None):
     """
     data_length: result series length,
     dtype: dtype of generated series,
     limits: a tuple of (min, max) limits for numeric series,
     nunique: number of unique values in generated series,
     input_data: 1D sequence of values used for generation of series data,
+    index_gen: callable that will generate index of needed size,
     seed: seed to initialize random state
     """
 
@@ -104,8 +112,8 @@ def gen_series(data_length, dtype='float', random=True, limits=None, nunique=100
     else:
         series_data = gen_arr_of_dtype(data_length, dtype=dtype, limits=limits, nunique=nunique)
 
-    # TODO: support index generation
-    return pd.Series(series_data)
+    index_data = index_gen(data_length) if index_gen is not None else None
+    return pd.Series(series_data, index=index_data)
 
 
 def gen_df(data_length,

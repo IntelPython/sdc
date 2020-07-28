@@ -27,6 +27,7 @@
 import numba
 import numpy as np
 import pandas as pd
+import unittest
 
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
@@ -45,7 +46,7 @@ def series_apply_square_usecase(S):
     return S.apply(square)
 
 
-class TestSeries_apply(object):
+class TestSeries_apply(TestCase):
 
     def test_series_apply(self):
         test_impl = series_apply_square_usecase
@@ -135,5 +136,5 @@ class TestSeries_apply(object):
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
 
-class _Test(TestSeries_apply, TestCase):
-    pass
+if __name__ == "__main__":
+    unittest.main()
