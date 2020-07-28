@@ -51,6 +51,7 @@ from sdc.tests.test_utils import (count_array_OneDs,
                                   sdc_limitation,
                                   skip_inline,
                                   skip_numba_jit,
+                                  skip_pandas1,
                                   skip_parallel,
                                   create_series_from_values,
                                   take_k_elements)
@@ -987,6 +988,7 @@ class TestSeries(
         pd.testing.assert_series_equal(result, result_ref)
         self.assertEqual(len(result), 1)
 
+    @skip_pandas1
     def test_series_getitem_idx_int2(self):
         def test_impl(A, i):
             return A[i]
@@ -1086,6 +1088,7 @@ class TestSeries(
         S = pd.Series([2, 4, 6, 5, 7], [1, 3, 5, 3, 3])
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @skip_pandas1
     def test_series_getitem_idx_int4(self):
         def test_impl(S, key):
             return S[key]
@@ -1151,6 +1154,7 @@ class TestSeries(
         S = pd.Series([2, 4, 6, 12, 0], [1, 3, 5, 3, 3], name='A')
         np.testing.assert_array_equal(hpat_func(S), test_impl(S))
 
+    @skip_pandas1
     def test_series_loc(self):
         def test_impl(S, key):
             return S.loc[key]
@@ -4029,6 +4033,7 @@ class TestSeries(
                         np.testing.assert_array_equal(ref_result.data, jit_result.data)
                         self.assertEqual(ref, jit)
 
+    @skip_pandas1
     def test_series_sort_values_full_unicode4(self):
         def test_impl(series, ascending, kind):
             return series.sort_values(axis=0, ascending=ascending, kind=literally(kind), na_position='last')
@@ -5728,6 +5733,7 @@ class TestSeries(
         idx = np.random.choice([True, False], n)
         self._test_series_getitem(data_to_test, idxs_to_test, [idx])
 
+    @skip_pandas1
     def test_series_getitem_idx_bool_array2(self):
         """ Verifies negative case of using Series.getitem by Boolean array indexer
         on a Series with different length than the indexer """

@@ -34,6 +34,7 @@ from itertools import (combinations_with_replacement, product, filterfalse, chai
 from sdc.tests.test_base import TestCase
 from sdc.utilities.sdc_typing_utils import kwsparams2list
 from sdc.tests.test_series import _make_func_from_text
+from sdc.tests.test_utils import skip_pandas1
 from numba.core.errors import TypingError
 
 
@@ -202,6 +203,7 @@ class TestRangeIndex(TestCase):
                 result_ref = test_impl(n, dtype)
                 pd.testing.assert_index_equal(result, result_ref)
 
+    @skip_pandas1
     def test_range_index_create_param_dtype_invalid(self):
         def test_impl(stop, dtype):
             return pd.RangeIndex(stop, dtype=dtype)
