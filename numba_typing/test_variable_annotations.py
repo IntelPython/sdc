@@ -83,6 +83,19 @@ class TestAst(unittest.TestCase):
         expected_result = {'t_class_a': [A], 't_class_b': [B], 't_class_c': [C]}
         self.assertEqual(result, expected_result)
 
+    def test_get_variable_annotations_non_locals(self):
+        def foo():
+            Q = TypeVar('Q')
+
+            def bar():
+                t_typevar: Q
+            ...
+            return bar
+        test_func = foo()
+        result = get_variable_annotations(test_func)
+        expected_result = {'t_typevar': [Q]}
+        self.assertEqual(result, expected_result)
+
 
 if __name__ == "__main__":
     unittest.main()
