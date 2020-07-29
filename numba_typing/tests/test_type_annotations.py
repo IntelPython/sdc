@@ -46,11 +46,11 @@ class TestTypeAnnotations(unittest.TestCase):
             with self.subTest(func=f.__name__):
                 self.assertEqual(type_annotations.get_func_annotations(f), expected)
 
-    def test_expend_annotations(self):
+    def test_product_annotations(self):
 
         S = TypeVar('S', float, str)
-        info = ({'a': [int], 'b': [int, float], 'c': [S]}, {})
-        result = type_annotations.expend_annotations(info)
+        annotations = ({'a': [int], 'b': [int, float], 'c': [S]}, {})
+        result = type_annotations.product_annotations(annotations)
         expected = [[{'a': int, 'b': int, 'c': float}, {}],
                     [{'a': int, 'b': int, 'c': str}, {}],
                     [{'a': int, 'b': float, 'c': float}, {}],

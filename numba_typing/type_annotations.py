@@ -40,10 +40,10 @@ def get_annotation_types(annotation):
     return [annotation, ]
 
 
-def expend_annotations(info):
+def product_annotations(annotations):
     """Get all variants of annotations."""
-    annot = info[0]
-    vals = info[1]
+    annot = annotations[0]
+    vals = annotations[1]
     list_of_annot = list(product(*annot.values()))
     tvs = {}
     tvs_unique = {}
