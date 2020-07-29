@@ -42,32 +42,28 @@ def get_annotation_types(annotation):
 
 def product_annotations(annotations):
     """Get all variants of annotations."""
-    annot = annotations[0]
-    vals = annotations[1]
-    list_of_annot = list(product(*annot.values()))
-    tvs = {}
-    tvs_unique = {}
+    types, vals = annotations
+    types_product = list(product(*types.values()))
+    typevars_unique = {}
     count = 1
-    for x in annot:
-        for y in annot[x]:
-            if isinstance(y, TypeVar) and y.__constraints__ != ():
-                if x in tvs:
-                    tvs[x].append(y)
-                else:
-                    tvs[x] = [y, ]
-                if y not in tvs_unique.keys():
-                    tvs_unique[y] = y.__constraints__
-                    count *= len(y.__constraints__)
+    for name, typs in types.items():
+        for typ in typs:
+            if not isinstance(typ, TypeVar) or not typ.__constraints__:
+                continue
 
-    prod = list(product(*tvs_unique.values()))
+            if typ not in typevars_unique:
+                typevars_unique[typ] = typ.__constraints__
+                count *= len(typ.__constraints__)
+
+    prod = list(product(*typevars_unique.values()))
     temp_res = []
 
-    for i in range(len(list_of_annot)):
+    for typs in types_product:
         temp = []
         temp_dict = {}
         num = 0
-        for attr in annot:
-            temp_dict[attr] = list_of_annot[i][num]
+        for attr in types:
+            temp_dict[attr] = typs[num]
             num += 1
         temp.append(temp_dict)
         temp.append(vals)
@@ -78,12 +74,12 @@ def product_annotations(annotations):
         for i in range(count):
             result.append(deepcopy(examp))
 
-    types = list(tvs_unique.keys())
+    name_of_typevars = list(typevars_unique.keys())
     for k in range(len(result)):
         pos = k % count
         for x in result[k][0]:
             for i in range(len(prod[pos])):
-                if result[k][0][x] == types[i]:
+                if result[k][0][x] == name_of_typevars[i]:
                     result[k][0][x] = prod[pos][i]
 
     return result
