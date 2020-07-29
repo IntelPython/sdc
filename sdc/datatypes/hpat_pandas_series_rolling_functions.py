@@ -625,6 +625,9 @@ def gen_sdc_pandas_series_rolling_impl(pop, put, get_result=result_or_nan,
                 nfinite, result = pop(pop_value, nfinite, result)
                 output_arr[idx] = get_result(nfinite, minp, result)
 
+        if minp > 1:
+            output_arr[:minp-1] = numpy.nan
+
         return pandas.Series(output_arr, input_series._index,
                              name=input_series._name)
     return impl
@@ -730,62 +733,7 @@ def gen_sdc_pandas_series_rolling_ddof_impl(pop, put, get_result=ddof_result,
     return impl
 
 
-def gen_sdc_pandas_series_rolling_count_impl(pop, put, get_result=result_or_nan,
-                                           init_result=numpy.nan):
-    """Generate series rolling count implementations based on pop/put funcs"""
-
-    def impl(self):
-        win = self._window
-        minp = self._min_periods
-
-        input_series = self._data
-        input_arr = input_series._data
-        length = len(input_arr)
-        output_arr = numpy.empty(length, dtype=float64)
-
-        chunks = parallel_chunks(length)
-        for i in prange(len(chunks)):
-            chunk = chunks[i]
-            nfinite = 0
-            result = init_result
-
-            if win == 0:
-                for idx in range(chunk.start, chunk.stop):
-                    output_arr[idx] = get_result(nfinite, minp, result)
-                continue
-
-            prelude_start = max(0, chunk.start - win + 1)
-            prelude_stop = chunk.start
-
-            interlude_start = prelude_stop
-            interlude_stop = min(prelude_start + win, chunk.stop)
-
-            for idx in range(prelude_start, prelude_stop):
-                value = input_arr[idx]
-                nfinite, result = put(value, nfinite, result)
-
-            for idx in range(interlude_start, interlude_stop):
-                value = input_arr[idx]
-                nfinite, result = put(value, nfinite, result)
-                output_arr[idx] = get_result(nfinite, minp, result)
-
-            for idx in range(interlude_stop, chunk.stop):
-                put_value = input_arr[idx]
-                pop_value = input_arr[idx - win]
-                nfinite, result = put(put_value, nfinite, result)
-                nfinite, result = pop(pop_value, nfinite, result)
-                output_arr[idx] = get_result(nfinite, minp, result)
-
-            if minp > 1:
-                output_arr[:minp-1] = numpy.nan
-
-        return pandas.Series(output_arr, input_series._index,
-                             name=input_series._name)
-
-    return impl
-
-
-sdc_pandas_series_rolling_count_impl = gen_sdc_pandas_series_rolling_count_impl(
+sdc_pandas_series_rolling_count_impl = gen_sdc_pandas_series_rolling_impl(
     pop_count, put_count, get_result=result, init_result=0.)
 sdc_pandas_series_rolling_kurt_impl = gen_sdc_pandas_series_rolling_impl(
     pop_kurt, put_kurt, get_result=kurt_result_or_nan,
