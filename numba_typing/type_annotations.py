@@ -1,5 +1,5 @@
 from inspect import signature
-from typing import get_type_hints, Union
+from typing import get_type_hints, Union, TypeVar
 from itertools import product
 from copy import deepcopy
 

@@ -1,17 +1,17 @@
 import unittest
 import type_annotations
-from typing import Union, Dict, List
+from typing import Union, Dict, List, TypeVar
 
 
 class TestTypeAnnotations(unittest.TestCase):
 
-    def test_get_func_annotations_exception(self):
+    def test_get_func_annotations_exceptions(self):
 
         def foo(a: int, b, c: str = "string"):
             pass
         with self.assertRaises(SyntaxError) as raises:
             type_annotations.get_func_annotations(foo)
-        self.assertIn('Not found annotation for parameter b', str(raises.exception))
+        self.assertIn('No annotation for parameter b', str(raises.exception))
 
     def test_get_cls_annotations(self):
         class TestClass(object):
@@ -45,6 +45,17 @@ class TestTypeAnnotations(unittest.TestCase):
         for f, expected in expected_results.items():
             with self.subTest(func=f.__name__):
                 self.assertEqual(type_annotations.get_func_annotations(f), expected)
+
+    def test_expend_annotations(self):
+
+        S = TypeVar('S', float, str)
+        info = ({'a': [int], 'b': [int, float], 'c': [S]}, {})
+        result = type_annotations.expend_annotations(info)
+        expected = [[{'a': int, 'b': int, 'c': float}, {}],
+                    [{'a': int, 'b': int, 'c': str}, {}],
+                    [{'a': int, 'b': float, 'c': float}, {}],
+                    [{'a': int, 'b': float, 'c': str}, {}]]
+        self.assertEqual(result, expected)
 
 
 if __name__ == '__main__':
