@@ -776,7 +776,11 @@ def hpat_pandas_series_rolling_apply(self, func, raw=None):
             if len(finite_arr) < minp:
                 return numpy.nan
             else:
-                return arr_apply(finite_arr, func)
+                if minp < 2:
+                    new_arr = finite_arr[~numpy.isnan(finite_arr)]
+                else:
+                    new_arr = finite_arr
+                return arr_apply(new_arr, func)
 
         boundary = min(win, length)
         for i in prange(boundary):
@@ -786,6 +790,9 @@ def hpat_pandas_series_rolling_apply(self, func, raw=None):
         for i in prange(boundary, length):
             arr_range = input_arr[i + 1 - win:i + 1]
             output_arr[i] = culc_apply(arr_range, func, minp)
+
+        if minp > 1:
+            output_arr[:minp-1] = numpy.nan
 
         return pandas.Series(output_arr, input_series._index, name=input_series._name)
 
