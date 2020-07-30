@@ -771,8 +771,7 @@ def hpat_pandas_series_rolling_apply(self, func, raw=None):
         output_arr = numpy.empty(length, dtype=float64)
 
         def culc_apply(arr, func, minp):
-            finite_arr = arr.copy()
-            finite_arr[numpy.isinf(arr)] = numpy.nan
+            finite_arr = arr[numpy.isfinite(arr)]
             if len(finite_arr) < minp:
                 return numpy.nan
             else:
