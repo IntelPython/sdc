@@ -895,7 +895,6 @@ class TestRolling(TestCase):
 
         self._test_rolling_unsupported_types(df)
 
-    @skip_pandas1
     def test_df_rolling_apply_mean(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
@@ -908,7 +907,6 @@ class TestRolling(TestCase):
 
         self._test_rolling_apply_mean(df)
 
-    @skip_pandas1
     def test_df_rolling_apply_mean_no_unboxing(self):
         def test_impl(window, min_periods):
             def func(x):
@@ -1521,7 +1519,6 @@ class TestRolling(TestCase):
         series = pd.Series(test_global_input_data_float64[0])
         self._test_rolling_unsupported_types(series)
 
-    @skip_pandas1
     def test_series_rolling_apply_mean(self):
         all_data = [
             list(range(10)), [1., -1., 0., 0.1, -0.1],
