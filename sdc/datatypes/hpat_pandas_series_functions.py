@@ -4137,6 +4137,8 @@ def hpat_pandas_series_fillna(self, value=None, method=None, axis=None, inplace=
     else:
         # non inplace implementations, copy array, fill the NA/NaN and return a new Series
         if isinstance(self.dtype, types.UnicodeType):
+            # For StringArrayType implementation is taken from _series_fillna_str_alloc_impl
+            # (can be called directly when it's index handling is fixed)
             def hpat_pandas_series_str_fillna_impl(self, value=None, method=None, axis=None,
                                                    inplace=False, limit=None, downcast=None):
                 return pandas.Series(data=numpy_like.fillna(self._data, inplace=inplace, value=value),

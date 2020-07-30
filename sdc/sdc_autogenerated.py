@@ -40,7 +40,7 @@ from numba.core.errors import TypingError
 from numba import types
 
 from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric, check_types_comparable,
-                                            find_common_dtype_from_numpy_dtypes, find_index_common_dtype)
+                                            find_common_dtype_from_numpy_dtypes)
 from sdc.datatypes.common_functions import (sdc_join_series_indexes, )
 from sdc.hiframes.api import isna
 from sdc.hiframes.pd_series_type import SeriesType
@@ -48,94 +48,6 @@ from sdc.str_arr_ext import (string_array_type, str_arr_is_na)
 from sdc.utilities.utils import sdc_overload, sdc_overload_method
 from sdc.functions import numpy_like
 from sdc.datatypes.range_index_type import RangeIndexType
-
-
-def sdc_add(self, other, fill_value=None):
-    pass
-
-
-@sdc_overload(sdc_add)
-def sdc_add_ovld(self, other, fill_value=None):
-
-    self_is_series, other_is_series = isinstance(self, SeriesType), isinstance(other, SeriesType)
-    operands_are_series = self_is_series and other_is_series
-    fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
-
-    # specializations for numeric series only
-    if not operands_are_series:
-        def sdc_add_impl(self, other, fill_value=None):
-
-            series = self if self_is_series == True else other  # noqa
-            result_data = numpy.empty(len(series._data), dtype=numpy.float64)
-            series_data = numpy_like.fillna(series._data, inplace=False, value=fill_value)
-            if self_is_series == True:  # noqa
-                _self, _other = series_data, numpy.float64(other)
-            else:
-                _self, _other = numpy.float64(self), series_data
-
-            result_data[:] = _self + _other
-            return pandas.Series(result_data, index=series._index, name=series._name)
-
-        return sdc_add_impl
-
-    else:   # both operands are numeric series
-        # optimization for series with default indexes, that can be aligned differently
-        if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
-            def sdc_add_impl(self, other, fill_value=None):
-
-                left_size, right_size = len(self._data), len(other._data)
-                max_data_size = max(left_size, right_size)
-                result_data = numpy.empty(max_data_size, dtype=numpy.float64)
-
-                _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
-                for i in numba.prange(max_data_size):
-                    left_nan = (i >= left_size or numpy.isnan(self._data[i]))
-                    right_nan = (i >= right_size or numpy.isnan(other._data[i]))
-                    _left = _fill_value if left_nan else self._data[i]
-                    _right = _fill_value if right_nan else other._data[i]
-                    result_data[i] = numpy.nan if (left_nan and right_nan) else _left + _right
-
-                return pandas.Series(result_data)
-
-            return sdc_add_impl
-        else:
-            left_index_is_range = isinstance(self.index, (RangeIndexType, types.NoneType))
-            index_dtypes_match, numba_index_common_dtype = find_index_common_dtype(self, other)
-
-            def sdc_add_impl(self, other, fill_value=None):
-
-                # check if indexes are equal and series don't have to be aligned
-                left_index, right_index = self.index, other.index
-                if (left_index is right_index
-                        or numpy_like.array_equal(left_index, right_index)):
-
-                    _left = pandas.Series(self._data)
-                    _right = pandas.Series(other._data)
-                    partial_res = _left.add(_right, fill_value=fill_value)
-
-                    if index_dtypes_match == False:  # noqa
-                        result_index = numpy_like.astype(left_index, numba_index_common_dtype)
-                    else:
-                        result_index = left_index.values if left_index_is_range == True else left_index  # noqa
-
-                    return pandas.Series(partial_res._data, index=result_index)
-
-                _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
-                # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
-                joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
-                result_size = len(joined_index)
-                result_data = numpy.empty(result_size, dtype=numpy.float64)
-                for i in numba.prange(result_size):
-                    left_pos, right_pos = left_indexer[i], right_indexer[i]
-                    left_nan = (left_pos == -1 or numpy.isnan(self._data[left_pos]))
-                    right_nan = (right_pos == -1 or numpy.isnan(other._data[right_pos]))
-                    _left = _fill_value if left_nan else self._data[left_pos]
-                    _right = _fill_value if right_nan else other._data[right_pos]
-                    result_data[i] = numpy.nan if (left_nan and right_nan) else _left + _right
-
-                return pandas.Series(result_data, index=joined_index)
-
-            return sdc_add_impl
 
 
 @sdc_overload_method(SeriesType, 'add')
