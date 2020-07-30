@@ -235,21 +235,24 @@ def put_corr(x, y, nfinite, result):
 
 
 @sdc_register_jitable
-def pop_count(value, nfinite, result):
+def pop_count(value, counter, result):
     """Calculate the window count without old value."""
     if numpy.isnan(value):
-        return nfinite, result
+        return counter, result
 
-    return nfinite, result - 1
+    return counter, result - 1
 
 
 @sdc_register_jitable
-def put_count(value, nfinite, result):
+def put_count(value, counter, result):
     """Calculate the window count with new value."""
+    # rolling.count() fills front of the resulting array by nans according to min_periods using counter
+    # Ex: s = pd.Series([1, 2, np.nan]) ->  s.rolling(window=3, min_periods=2).count() -> pd.Series([np.nan, 2.0, 2.0])
+    counter += 1
     if numpy.isnan(value):
-        return nfinite, result
+        return counter, result
 
-    return nfinite, result + 1
+    return counter, result + 1
 
 
 @sdc_register_jitable
@@ -731,7 +734,7 @@ def gen_sdc_pandas_series_rolling_ddof_impl(pop, put, get_result=ddof_result,
 
 
 sdc_pandas_series_rolling_count_impl = gen_sdc_pandas_series_rolling_impl(
-    pop_count, put_count, get_result=result, init_result=0.)
+    pop_count, put_count, init_result=0.)
 sdc_pandas_series_rolling_kurt_impl = gen_sdc_pandas_series_rolling_impl(
     pop_kurt, put_kurt, get_result=kurt_result_or_nan,
     init_result=(0., 0., 0., 0.))
