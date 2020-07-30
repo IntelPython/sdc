@@ -6725,7 +6725,6 @@ class TestSeries(
         idx = np.random.choice([True, False], n)
         self._test_series_getitem(data_to_test, idxs_to_test, [idx])
 
-    @skip_pandas1
     def test_series_getitem_idx_bool_array2(self):
         """ Verifies negative case of using Series.getitem by Boolean array indexer
         on a Series with different length than the indexer """
