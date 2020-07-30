@@ -196,21 +196,20 @@ class TestRangeIndex(TestCase):
         sdc_func = self.jit(test_impl)
 
         n = 11
-        supported_dtypes = [None, np.int64, 'int64']
+        supported_dtypes = [None, np.int64, 'int64', np.int32, 'int32']
         for dtype in supported_dtypes:
             with self.subTest(dtype=dtype):
                 result = sdc_func(n, dtype)
                 result_ref = test_impl(n, dtype)
                 pd.testing.assert_index_equal(result, result_ref)
 
-    @skip_pandas1
     def test_range_index_create_param_dtype_invalid(self):
         def test_impl(stop, dtype):
             return pd.RangeIndex(stop, dtype=dtype)
         sdc_func = self.jit(test_impl)
 
         n = 11
-        invalid_dtypes = ['float', np.int32, 'int32']
+        invalid_dtypes = ['float']
         for dtype in invalid_dtypes:
             with self.subTest(dtype=dtype):
                 with self.assertRaises(Exception) as context:
