@@ -1,5 +1,4 @@
 from local_variable_type_annotations import get_variable_annotations
-import test_generics
 import unittest
 from typing import Any, Union, List, Tuple, Dict, Iterable, Iterator, Generic, TypeVar
 import typing
@@ -23,16 +22,6 @@ class C():
 
 class TestAst(unittest.TestCase):
     maxDiff = None
-
-    def test_get_variable_annotations_with_test_generics(self):
-        result = get_variable_annotations(test_generics.qwe)
-        expected_result = {'qwe_int': [int], 'qwe_list': [test_generics.List[int]],
-                           'qwe_tuple': [test_generics.Tuple[str, int]], 'qwe_dict': [test_generics.Dict[str, str]],
-                           'qwe_any': [test_generics.Any], 'qwe_int_op': [test_generics.typing.Optional[int]],
-                           'qwe_int_float_un': [test_generics.Union[int, float]], 'T_func': [test_generics.T],
-                           'S_func': [test_generics.S], 'G_func': [test_generics.G],
-                           'User_func': [test_generics.UserId], 'class_func': [test_generics.A]}
-        self.assertEqual(result, expected_result)
 
     def test_get_variable_annotations_standard_types(self):
         def test_func():
