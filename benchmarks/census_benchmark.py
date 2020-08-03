@@ -128,7 +128,7 @@ def cod(y_test, y_pred):
     return 1 - (residuals / total)
 
 
-def train_and_test(X, y): 
+def train_and_test(X, y):
     clf = lm.Ridge()
 
     mse_values, cod_values = [], []
@@ -157,11 +157,8 @@ def run_ml(X, y):
     mean_mse = sum(mse_values) / len(mse_values)
     mean_cod = sum(cod_values) / len(cod_values)
     mse_dev = pow(
-        sum([(mse_value - mean_mse) ** 2 for mse_value in mse_values]) / (
-        len(mse_values) - 1), 0.5)
-    cod_dev = pow(
-        sum([(cod_value - mean_cod) ** 2 for cod_value in cod_values]) / (
-        len(cod_values) - 1), 0.5)
+        sum([(mse_value - mean_mse) ** 2 for mse_value in mse_values]) / (len(mse_values) - 1), 0.5)
+    cod_dev = pow(sum([(cod_value - mean_cod) ** 2 for cod_value in cod_values]) / (len(cod_values) - 1), 0.5)
     print('\nmean MSE ± deviation: {:.9f} ± {:.9f}'.format(mean_mse, mse_dev))
     print('mean COD ± deviation: {:.9f} ± {:.9f}'.format(mean_cod, cod_dev))
 
@@ -175,7 +172,7 @@ print('Pandas ETL TIME:', end_time - start_time)
 
 # SDC ETL PART
 run_etl_sdc()  # <-- compilation and execution
- 
+
 start_time = time.time()
 X, y = run_etl_sdc()  # <-- execution only
 end_time = time.time()
