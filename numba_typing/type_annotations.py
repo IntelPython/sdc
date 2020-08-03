@@ -40,46 +40,116 @@ def get_annotation_types(annotation):
     return [annotation, ]
 
 
-def product_annotations(annotations):
-    """Get all variants of annotations."""
+def product_annotatios(annotations):
+    '''Get all variants of annotations.'''
     types, vals = annotations
+    list_of_sig = convert_to_sig_list(types)
+    result_product = []
+    #unique_typevars = get_internal_typevars(list_of_sig)
+
+    for sig in list_of_sig:
+        result_product.extend(get_internal_typevars(sig))
+
+    return result_product
+
+
+def convert_to_sig_list(types):
+    '''Expands all Unions'''
     types_product = list(product(*types.values()))
-    typevars_unique = {}
-    count = 1
-    for name, typs in types.items():
-        for typ in typs:
-            if not isinstance(typ, TypeVar) or not typ.__constraints__:
-                continue
-
-            if typ not in typevars_unique:
-                typevars_unique[typ] = typ.__constraints__
-                count *= len(typ.__constraints__)
-
-    prod = list(product(*typevars_unique.values()))
-    temp_res = []
-
-    for typs in types_product:
-        temp = []
-        temp_dict = {}
-        num = 0
-        for attr in types:
-            temp_dict[attr] = typs[num]
-            num += 1
-        temp.append(temp_dict)
-        temp.append(vals)
-        temp_res.append(temp)
-
+    names = [name for name in types.keys()]
     result = []
-    for examp in temp_res:
-        for i in range(count):
-            result.append(deepcopy(examp))
 
-    name_of_typevars = list(typevars_unique.keys())
-    for k in range(len(result)):
-        pos = k % count
-        for x in result[k][0]:
-            for i in range(len(prod[pos])):
-                if result[k][0][x] == name_of_typevars[i]:
-                    result[k][0][x] = prod[pos][i]
+    for sig in types_product:
+        sig_result = {}
+        for i in range(len(sig)):
+            sig_result[names[i]] = sig[i]
+        result.append(sig_result)
 
     return result
+
+
+def get_internal_typevars(sig):
+    '''Get unique typevars in signature'''
+    unique_typevars = set()
+    for typ in sig.values():
+        unique_typevars.update(get_typevars(typ))
+
+    if len(unique_typevars) == 0:
+        return sig
+
+    return expand_typevars(sig, unique_typevars)
+
+
+def get_typevars(type):
+    '''Get unique typevars in type (container)'''
+    if isinstance(type, TypeVar) and type.__constraints__:
+        return {type, }
+    elif isinstance(type, _GenericAlias):
+        result = set()
+        for arg in type.__args__:
+            result.update(get_typevars(arg))
+        return result
+
+    return set()
+
+
+def expand_typevars(sig, unique_typevars):
+    '''Exstend all Typevars in signature'''
+    result = [sig]
+
+    for typevar in unique_typevars:
+        temp_result = []
+        for temp_sig in result:
+            temp_result.extend(update_sig(temp_sig, typevar))
+        result = temp_result
+
+    return result
+
+
+def update_sig(temp_sig, typevar):
+    '''Expand one typevar'''
+    result = []
+    for constr_type in typevar.__constraints__:
+        sig = {}
+        for name, typ in temp_sig.items():
+            if True in exsist_typevar(typ, typevar):
+                sig[name] = replace_typevar(typ, typevar, constr_type)
+            else:
+                sig[name] = typ
+
+        result.append(sig)
+
+    return result
+
+
+def exsist_typevar(typ, typevar):
+    '''Сheck if there is a typevar in type (container)'''
+    if typ == typevar:
+        return {True, }
+    elif isinstance(typ, _GenericAlias):
+        result = set()
+        for arg in typ.__args__:
+            result.update(exsist_typevar(arg, typevar))
+        return result
+
+    return {False, }
+
+
+def replace_typevar(typ, typevar, final_typ):
+    '''Replace typevar with type in container
+        For example:
+        # typ = Dict[T, V]
+        # typevar = T(int, str)
+        # final_typ = int
+    '''
+
+    if typ == typevar:
+        return (final_typ)
+    elif isinstance(typ, _GenericAlias):
+        result = list()
+        for arg in typ.__args__:
+            result.append(replace_typevar(arg, typevar, final_typ))
+        result_type = typ.copy_with(tuple(result))
+        return (result_type)
+
+    return (typ)
