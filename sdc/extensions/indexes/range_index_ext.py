@@ -97,6 +97,7 @@ def pd_range_index_overload(start=None, stop=None, step=None, dtype=None, copy=F
         raise SDCLimitation(f"{_func_name} Unsupported parameter. Given 'fastpath': {fastpath}")
 
     dtype_is_np_int64 = dtype is types.NumberClass(types.int64)
+    dtype_is_np_int32 = dtype is types.NumberClass(types.int32)
     dtype_is_unicode_str = isinstance(dtype, (types.UnicodeType, types.StringLiteral))
     if not _check_dtype_param_type(dtype):
         ty_checker.raise_exc(dtype, 'int64 dtype', 'dtype')
@@ -125,9 +126,12 @@ def pd_range_index_overload(start=None, stop=None, step=None, dtype=None, copy=F
 
         if not (dtype is None
                 or dtype_is_unicode_str and dtype == 'int64'
-                or dtype_is_np_int64):
-            raise TypeError("Invalid to pass a non-int64 dtype to RangeIndex")
+                or dtype_is_unicode_str and dtype == 'int32'
+                or dtype_is_np_int64
+                or dtype_is_np_int32):
+            raise ValueError("Incorrect `dtype` passed: expected signed integer")
 
+        # TODO: add support of int32 type
         _start = types.int64(start) if start is not None else types.int64(0)
 
         if stop is None:
