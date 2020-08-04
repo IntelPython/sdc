@@ -41,7 +41,3 @@ class Analyzer(ast.NodeVisitor):
             exec(exec_variables, self.global_parameter, self.locals_parameter)
         else:  # not containers
             exec(f'{target.id} = [{annotation.id}]', self.global_parameter, self.locals_parameter)
-
-
-if __name__ == '__main__':
-    ...
