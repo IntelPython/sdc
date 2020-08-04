@@ -197,15 +197,6 @@ def skip_inline(msg_or_func):
     return wrapper(func) if func else wrapper
 
 
-def skip_pandas1(msg_or_func):
-    msg, func = msg_and_func(msg_or_func)
-    wrapper = unittest.skipIf(pandas.__version__.startswith('1.0'), msg or "fails with Pandas 1.0")
-    if sdc.config.test_expected_failure:
-        wrapper = unittest.expectedFailure
-    # wrapper = lambda f: f  # disable skipping
-    return wrapper(func) if func else wrapper
-
-
 def take_k_elements(k, data, repeat=False, seed=None):
     if seed is not None:
         np.random.seed(seed)

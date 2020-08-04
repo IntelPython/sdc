@@ -41,7 +41,6 @@ from sdc.tests.test_base import TestCase
 from sdc.tests.test_series import gen_frand_array
 from sdc.tests.test_utils import (count_array_REPs, count_parfor_REPs,
                                   skip_numba_jit,
-                                  skip_pandas1,
                                   test_global_input_data_float64,
                                   assert_raises_ty_checker)
 
