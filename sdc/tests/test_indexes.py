@@ -34,7 +34,6 @@ from itertools import (combinations_with_replacement, product, filterfalse, chai
 from sdc.tests.test_base import TestCase
 from sdc.utilities.sdc_typing_utils import kwsparams2list
 from sdc.tests.test_series import _make_func_from_text
-from sdc.tests.test_utils import skip_pandas1
 from numba.core.errors import TypingError
 
 

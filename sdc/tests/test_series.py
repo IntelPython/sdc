@@ -50,7 +50,6 @@ from sdc.tests.test_utils import (count_array_OneDs,
                                   sdc_limitation,
                                   skip_inline,
                                   skip_numba_jit,
-                                  skip_pandas1,
                                   skip_parallel,
                                   create_series_from_values,
                                   take_k_elements)
