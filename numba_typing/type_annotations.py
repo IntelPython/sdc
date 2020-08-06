@@ -1,5 +1,5 @@
 from inspect import signature
-from typing import get_type_hints, Union, TypeVar
+from typing import get_type_hints, Union, TypeVar,_GenericAlias
 from itertools import product
 from copy import deepcopy
 
@@ -40,17 +40,27 @@ def get_annotation_types(annotation):
     return [annotation, ]
 
 
-def product_annotatios(annotations):
+def product_annotations(annotations):
     '''Get all variants of annotations.'''
     types, vals = annotations
-    list_of_sig = convert_to_sig_list(types)
-    result_product = []
+    list_of_sig = convert_to_sig_list(types) 
+    signature = []
     #unique_typevars = get_internal_typevars(list_of_sig)
 
     for sig in list_of_sig:
-        result_product.extend(get_internal_typevars(sig))
+        signature.extend(get_internal_typevars(sig))
+    
+    return add_vals_to_signature(signature, vals)
 
-    return result_product
+def add_vals_to_signature(signature, vals):
+    '''Add default values ​​to all signatures'''
+    result = []
+    for sig in signature:
+        annotation = []
+        annotation.append(sig)
+        annotation.append(vals)
+        result.append(annotation)
+    return result
 
 
 def convert_to_sig_list(types):
@@ -112,7 +122,7 @@ def update_sig(temp_sig, typevar):
     for constr_type in typevar.__constraints__:
         sig = {}
         for name, typ in temp_sig.items():
-            if True in exsist_typevar(typ, typevar):
+            if True in exist_typevar(typ, typevar):
                 sig[name] = replace_typevar(typ, typevar, constr_type)
             else:
                 sig[name] = typ
@@ -122,14 +132,14 @@ def update_sig(temp_sig, typevar):
     return result
 
 
-def exsist_typevar(typ, typevar):
+def exist_typevar(typ, typevar):
     '''Сheck if there is a typevar in type (container)'''
     if typ == typevar:
         return {True, }
     elif isinstance(typ, _GenericAlias):
         result = set()
         for arg in typ.__args__:
-            result.update(exsist_typevar(arg, typevar))
+            result.update(exist_typevar(arg, typevar))
         return result
 
     return {False, }
