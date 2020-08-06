@@ -148,7 +148,7 @@ def series_values_from_argsort_result(series, argsorted):
 def restore_series_sort_values(series, my_result_index, ascending):
     value_dict = {}
     nan_list = []
-    data = np.copy(series.data)
+    data = np.copy(series.values)
     index = np.copy(series.index)
     for value in range(len(data)):
         # if np.isnan(data[value]):
@@ -996,7 +996,7 @@ class TestSeries(
         S = pd.Series(np.arange(n), name='A')
         # SDC and pandas results differ due to type limitation requirements:
         # SDC returns Series of one element, whereas pandas returns scalar, hence we align result
-        result = hpat_func(S, i).data[0]
+        result = hpat_func(S, i).values[0]
         result_ref = test_impl(S, i)
         self.assertEqual(result, result_ref)
 
@@ -1096,7 +1096,7 @@ class TestSeries(
         indices = [[2, 3, 5], [2, 3, 5], [2, 3, 5]]
         for key, index in zip(keys, indices):
             S = pd.Series([11, 22, 33], index, name='A')
-            np.testing.assert_array_equal(jit_impl(S, key).data, np.array(test_impl(S, key)))
+            np.testing.assert_array_equal(jit_impl(S, key).values, np.array(test_impl(S, key)))
 
     def test_series_getitem_duplicate_index(self):
         def test_impl(A):
@@ -1162,7 +1162,7 @@ class TestSeries(
         indices = [[2, 3, 5], [2, 2, 2], [2, 4, 15]]
         for key, data, index in zip(keys, all_data, indices):
             S = pd.Series(data, index, name='A')
-            np.testing.assert_array_equal(jit_impl(S, key).data, np.array(test_impl(S, key)))
+            np.testing.assert_array_equal(jit_impl(S, key).values, np.array(test_impl(S, key)))
 
     def test_series_loc_str(self):
         def test_impl(A):
@@ -4048,7 +4048,7 @@ class TestSeries(
                     if kind == 'mergesort':
                         pd.testing.assert_series_equal(ref_result, jit_result)
                     else:
-                        np.testing.assert_array_equal(ref_result.data, jit_result.data)
+                        np.testing.assert_array_equal(ref_result.values, jit_result.values)
                         self.assertEqual(ref, jit)
 
     @skip_parallel

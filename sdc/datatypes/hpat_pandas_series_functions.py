@@ -407,7 +407,7 @@ def hpat_pandas_series_getitem(self, idx):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
 
             if len(self) != len(idx):
-                raise IndexError("Item wrong length")
+                raise IndexError('Boolean index has wrong length')
 
             return pandas.Series(
                 data=numpy_like.getitem_by_mask(self._data, idx),

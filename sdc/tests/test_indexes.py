@@ -195,7 +195,7 @@ class TestRangeIndex(TestCase):
         sdc_func = self.jit(test_impl)
 
         n = 11
-        supported_dtypes = [None, np.int64, 'int64']
+        supported_dtypes = [None, np.int64, 'int64', np.int32, 'int32']
         for dtype in supported_dtypes:
             with self.subTest(dtype=dtype):
                 result = sdc_func(n, dtype)
@@ -208,7 +208,7 @@ class TestRangeIndex(TestCase):
         sdc_func = self.jit(test_impl)
 
         n = 11
-        invalid_dtypes = ['float', np.int32, 'int32']
+        invalid_dtypes = ['float']
         for dtype in invalid_dtypes:
             with self.subTest(dtype=dtype):
                 with self.assertRaises(Exception) as context:
