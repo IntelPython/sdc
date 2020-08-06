@@ -3,6 +3,15 @@ import type_annotations
 from typing import Union, Dict, List, TypeVar
 
 
+def check_equal(result, expected):
+    if len(result) != len(expected):
+        return False
+    for sig in result:
+        if sig not in expected:
+            return False
+    return True
+
+
 class TestTypeAnnotations(unittest.TestCase):
 
     def test_get_func_annotations_exceptions(self):
@@ -45,17 +54,6 @@ class TestTypeAnnotations(unittest.TestCase):
         for f, expected in expected_results.items():
             with self.subTest(func=f.__name__):
                 self.assertEqual(type_annotations.get_func_annotations(f), expected)
-
-    '''    def test_product_annotations(self):
-
-        S = TypeVar('S', float, str)
-        annotations = ({'a': [int], 'b': [int, float], 'c': [S]}, {})
-        result = type_annotations.product_annotations(annotations)
-        expected = [[{'a': int, 'b': int, 'c': float}, {}],
-                    [{'a': int, 'b': int, 'c': str}, {}],
-                    [{'a': int, 'b': float, 'c': float}, {}],
-                    [{'a': int, 'b': float, 'c': str}, {}]]
-        self.assertEqual(result, expected)'''
 
     def test_convert_to_sig_list(self):
         T = TypeVar('T', int, str)
@@ -133,7 +131,8 @@ class TestTypeAnnotations(unittest.TestCase):
                     {'a': str, 'b': Dict[str, bool]}]
 
         result = type_annotations.get_internal_typevars(signature)
-        self.assertEqual(result, expected)
+
+        self.assertTrue(check_equal(result, expected))
 
     def test_update_sig(self):
         T = TypeVar('T', int, str)
@@ -158,7 +157,8 @@ class TestTypeAnnotations(unittest.TestCase):
                     {'a': str, 'b': Dict[str, bool], 'c': int}]
 
         result = type_annotations.expand_typevars(sig, unique_typevars)
-        self.assertEqual(result, expected)
+
+        self.assertTrue(check_equal(result, expected))
 
     def test_product_annotations(self):
 
@@ -176,12 +176,10 @@ class TestTypeAnnotations(unittest.TestCase):
                     [{'a': int, 'b': Dict[int, bool], 'c': bool, 'd': int}, {'d': 3}],
                     [{'a': str, 'b': Dict[str, float], 'c': bool, 'd': int}, {'d': 3}],
                     [{'a': str, 'b': Dict[str, bool], 'c': bool, 'd': int}, {'d': 3}]]
-        
 
         result = type_annotations.product_annotations(annotations)
-        #print(result)
-        
-        self.assertEqual(result, expected)
+
+        self.assertTrue(check_equal(result, expected))
 
 
 if __name__ == '__main__':

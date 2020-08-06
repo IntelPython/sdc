@@ -1,5 +1,5 @@
 from inspect import signature
-from typing import get_type_hints, Union, TypeVar,_GenericAlias
+from typing import get_type_hints, Union, TypeVar, _GenericAlias
 from itertools import product
 from copy import deepcopy
 
@@ -43,14 +43,15 @@ def get_annotation_types(annotation):
 def product_annotations(annotations):
     '''Get all variants of annotations.'''
     types, vals = annotations
-    list_of_sig = convert_to_sig_list(types) 
+    list_of_sig = convert_to_sig_list(types)
     signature = []
     #unique_typevars = get_internal_typevars(list_of_sig)
 
     for sig in list_of_sig:
         signature.extend(get_internal_typevars(sig))
-    
+
     return add_vals_to_signature(signature, vals)
+
 
 def add_vals_to_signature(signature, vals):
     '''Add default values ​​to all signatures'''
