@@ -1,6 +1,7 @@
 import unittest
 import type_annotations
 from typing import Union, Dict, List, TypeVar
+from collections import namedtuple
 
 
 def check_equal(result, expected):
@@ -9,6 +10,21 @@ def check_equal(result, expected):
     for sig in result:
         if sig not in expected:
             return False
+    return True
+
+
+def check_equal_annotations(result, expected):
+
+    if len(result.parameters) != len(expected.parameters):
+        return False
+
+    for sig in result.parameters:
+        if sig not in expected.parameters:
+            return False
+
+    if result.defaults != expected.defaults:
+        return False
+
     return True
 
 
@@ -92,22 +108,17 @@ class TestTypeAnnotations(unittest.TestCase):
                      {'a': Dict[str, str], 'b': int}]
         vals = {'a': {'name': 3}, 'b': 3}
 
+        Annotations = namedtuple('Annotations', ['parameters', 'defaults'])
+
+        expected = Annotations(parameters=[{'a': Dict[float, int], 'b': int},
+                                           {'a': Dict[str, int], 'b': int},
+                                           {'a': Dict[float, str], 'b': int},
+                                           {'a': Dict[str, str], 'b': int}],
+                               defaults={'a': {'name': 3}, 'b': 3})
+
         result = type_annotations.add_vals_to_signature(signature, vals)
-        expected = [[{'a': Dict[float, int], 'b': int}, {'a': {'name': 3}, 'b': 3}],
-                    [{'a': Dict[str, int], 'b': int}, {'a': {'name': 3}, 'b': 3}],
-                    [{'a': Dict[float, str], 'b': int}, {'a': {'name': 3}, 'b': 3}],
-                    [{'a': Dict[str, str], 'b': int}, {'a': {'name': 3}, 'b': 3}]]
+
         self.assertEqual(result, expected)
-
-    def test_exist_typevar(self):
-        T = TypeVar('T', float, str)
-        S = TypeVar('S', int, str)
-        types = [List[List[T]], Dict[T, S], int, T, S]
-        expected = [{True}, {False, True}, {False}, {True}, {False}]
-
-        for i in range(len(types)):
-            with self.subTest(types=i):
-                self.assertEqual(type_annotations.exist_typevar(types[i], T), expected[i])
 
     def test_replace_typevar(self):
         T = TypeVar('T', int, str)
@@ -168,18 +179,21 @@ class TestTypeAnnotations(unittest.TestCase):
         annotations = ({'a': [T], 'b': [Dict[T, S]],
                         'c': [T, bool], 'd': [int]}, {'d': 3})
 
-        expected = [[{'a': int, 'b': Dict[int, float], 'c': int, 'd': int}, {'d': 3}],
-                    [{'a': int, 'b': Dict[int, bool], 'c': int, 'd': int}, {'d': 3}],
-                    [{'a': str, 'b': Dict[str, float], 'c': str, 'd': int}, {'d': 3}],
-                    [{'a': str, 'b': Dict[str, bool], 'c': str, 'd': int}, {'d': 3}],
-                    [{'a': int, 'b': Dict[int, float], 'c': bool, 'd': int}, {'d': 3}],
-                    [{'a': int, 'b': Dict[int, bool], 'c': bool, 'd': int}, {'d': 3}],
-                    [{'a': str, 'b': Dict[str, float], 'c': bool, 'd': int}, {'d': 3}],
-                    [{'a': str, 'b': Dict[str, bool], 'c': bool, 'd': int}, {'d': 3}]]
+        Annotations = namedtuple('Annotations', ['parameters', 'defaults'])
+
+        expected = Annotations(parameters=[{'a': int, 'b': Dict[int, float], 'c': int, 'd': int},
+                                           {'a': str, 'b': Dict[str, float], 'c': str, 'd': int},
+                                           {'a': int, 'b': Dict[int, bool], 'c': int, 'd': int},
+                                           {'a': str, 'b': Dict[str, bool], 'c': str, 'd': int},
+                                           {'a': int, 'b': Dict[int, float], 'c': bool, 'd': int},
+                                           {'a': str, 'b': Dict[str, float], 'c': bool, 'd': int},
+                                           {'a': int, 'b': Dict[int, bool], 'c': bool, 'd': int},
+                                           {'a': str, 'b': Dict[str, bool], 'c': bool, 'd': int}],
+                               defaults={'d': 3})
 
         result = type_annotations.product_annotations(annotations)
 
-        self.assertTrue(check_equal(result, expected))
+        self.assertTrue(check_equal_annotations(result, expected))
 
 
 if __name__ == '__main__':

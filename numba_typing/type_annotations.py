@@ -2,6 +2,7 @@ from inspect import signature
 from typing import get_type_hints, Union, TypeVar, _GenericAlias
 from itertools import product
 from copy import deepcopy
+from collections import namedtuple
 
 
 def get_func_annotations(func):
@@ -45,7 +46,6 @@ def product_annotations(annotations):
     types, vals = annotations
     list_of_sig = convert_to_sig_list(types)
     signature = []
-    #unique_typevars = get_internal_typevars(list_of_sig)
 
     for sig in list_of_sig:
         signature.extend(get_internal_typevars(sig))
@@ -55,13 +55,10 @@ def product_annotations(annotations):
 
 def add_vals_to_signature(signature, vals):
     '''Add default values ​​to all signatures'''
-    result = []
-    for sig in signature:
-        annotation = []
-        annotation.append(sig)
-        annotation.append(vals)
-        result.append(annotation)
-    return result
+    Annotations = namedtuple('Annotations', ['parameters', 'defaults'])
+    annotations = Annotations(signature, vals)
+
+    return annotations
 
 
 def convert_to_sig_list(types):
@@ -123,7 +120,7 @@ def update_sig(temp_sig, typevar):
     for constr_type in typevar.__constraints__:
         sig = {}
         for name, typ in temp_sig.items():
-            if True in exist_typevar(typ, typevar):
+            if typevar in get_typevars(typ):
                 sig[name] = replace_typevar(typ, typevar, constr_type)
             else:
                 sig[name] = typ
@@ -131,19 +128,6 @@ def update_sig(temp_sig, typevar):
         result.append(sig)
 
     return result
-
-
-def exist_typevar(typ, typevar):
-    '''Сheck if there is a typevar in type (container)'''
-    if typ == typevar:
-        return {True, }
-    elif isinstance(typ, _GenericAlias):
-        result = set()
-        for arg in typ.__args__:
-            result.update(exist_typevar(arg, typevar))
-        return result
-
-    return {False, }
 
 
 def replace_typevar(typ, typevar, final_typ):
