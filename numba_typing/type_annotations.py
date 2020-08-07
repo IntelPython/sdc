@@ -63,7 +63,7 @@ def add_vals_to_signature(sign, vals):
 def convert_to_sig_list(types):
     '''Expands all Unions'''
     types_product = list(product(*types.values()))
-    names = [name for name in types.keys()]
+    names = list(types)
     result = []
 
     for sig in types_product:
@@ -138,12 +138,12 @@ def replace_typevar(typ, typevar, final_typ):
     '''
 
     if typ == typevar:
-        return (final_typ)
+        return final_typ
     elif isinstance(typ, _GenericAlias):
         result = list()
         for arg in typ.__args__:
             result.append(replace_typevar(arg, typevar, final_typ))
         result_type = typ.copy_with(tuple(result))
-        return (result_type)
+        return result_type
 
-    return (typ)
+    return typ
