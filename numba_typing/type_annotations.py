@@ -4,6 +4,7 @@ from itertools import product
 from copy import deepcopy
 from collections import namedtuple
 
+Signature = namedtuple('Signature', ['parameters', 'defaults'])
 
 def get_func_annotations(func):
     """Get annotations and default values of the fuction parameters."""
@@ -53,12 +54,10 @@ def product_annotations(annotations):
     return add_vals_to_signature(signature, vals)
 
 
-def add_vals_to_signature(signature, vals):
+def add_vals_to_signature(sign, vals):
     '''Add default values ​​to all signatures'''
-    Annotations = namedtuple('Annotations', ['parameters', 'defaults'])
-    annotations = Annotations(signature, vals)
-
-    return annotations
+    signature = Signature(sign, vals)
+    return signature
 
 
 def convert_to_sig_list(types):

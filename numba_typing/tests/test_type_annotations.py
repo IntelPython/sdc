@@ -108,9 +108,7 @@ class TestTypeAnnotations(unittest.TestCase):
                      {'a': Dict[str, str], 'b': int}]
         vals = {'a': {'name': 3}, 'b': 3}
 
-        Annotations = namedtuple('Annotations', ['parameters', 'defaults'])
-
-        expected = Annotations(parameters=[{'a': Dict[float, int], 'b': int},
+        expected = type_annotations.Signature(parameters=[{'a': Dict[float, int], 'b': int},
                                            {'a': Dict[str, int], 'b': int},
                                            {'a': Dict[float, str], 'b': int},
                                            {'a': Dict[str, str], 'b': int}],
@@ -179,9 +177,7 @@ class TestTypeAnnotations(unittest.TestCase):
         annotations = ({'a': [T], 'b': [Dict[T, S]],
                         'c': [T, bool], 'd': [int]}, {'d': 3})
 
-        Annotations = namedtuple('Annotations', ['parameters', 'defaults'])
-
-        expected = Annotations(parameters=[{'a': int, 'b': Dict[int, float], 'c': int, 'd': int},
+        expected = type_annotations.Signature(parameters=[{'a': int, 'b': Dict[int, float], 'c': int, 'd': int},
                                            {'a': str, 'b': Dict[str, float], 'c': str, 'd': int},
                                            {'a': int, 'b': Dict[int, bool], 'c': int, 'd': int},
                                            {'a': str, 'b': Dict[str, bool], 'c': str, 'd': int},
