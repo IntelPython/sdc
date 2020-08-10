@@ -24,6 +24,9 @@
 // EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // *****************************************************************************
 
+#include <cstdint>
+#include <array>
+
 #include "utils.hpp"
 #include "tbb/parallel_sort.h"
 
@@ -53,6 +56,8 @@ void parallel_sort_##prefix(void* begin, uint64_t len) { parallel_sort_<ty>(begi
 declare_sort(i##bits, int##bits##_t) \
 declare_sort(u##bits, uint##bits##_t)
 
+
+
 extern "C"
 {
 
@@ -78,6 +83,7 @@ void parallel_sort(void* begin, uint64_t len, uint64_t size, void* compare)
         tbb::parallel_sort(_begin, _end, compare_f); \
     }); \
 }
+
 
     switch(size)
     {
