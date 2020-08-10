@@ -82,7 +82,9 @@ def get_internal_typevars(sig):
         unique_typevars.update(get_typevars(typ))
 
     if len(unique_typevars) == 0:
-        return sig
+        result = []
+        result.append(sig)
+        return result
 
     return expand_typevars(sig, unique_typevars)
 
