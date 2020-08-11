@@ -75,7 +75,6 @@ class TestAst(unittest.TestCase):
     def test_get_variable_annotations_non_locals(self):
         def foo():
             Q = TypeVar('Q')
-
             def bar():
                 t_typevar: Q
             return bar
