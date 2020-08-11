@@ -291,7 +291,7 @@ def parallel_xargsort_overload_impl(dt, xargsort_map, xargsort_sym):
         sort_f = xargsort_map[dt]
 
         def parallel_xargsort_arithm_impl(arr):
-            index = numpy.empty(shape=len(arr), dtype="uint64")
+            index = numpy.empty(shape=len(arr), dtype=numpy.uint64)
             sort_f(index.ctypes, arr.ctypes, len(arr))
 
             return index
@@ -300,7 +300,7 @@ def parallel_xargsort_overload_impl(dt, xargsort_map, xargsort_sym):
 
     def parallel_xargsort_impl(arr):
         item_size = itemsize(arr)
-        index = numpy.empty(shape=len(arr), dtype="uint64")
+        index = numpy.empty(shape=len(arr), dtype=numpy.uint64)
         xargsort_sym(index.ctypes, arr.ctypes, len(arr), item_size, adaptor(arr[0], arr[0]))
 
         return index
@@ -320,7 +320,7 @@ def parallel_argsort_overload(arr):
 
     dt = arr.dtype
 
-    return parallel_xsort_overload_impl(dt, argsort_map, parallel_argsort_sym)
+    return parallel_xargsort_overload_impl(dt, argsort_map, parallel_argsort_sym)
 
 
 def parallel_stable_argsort(arr):
@@ -335,4 +335,4 @@ def parallel_argsort_overload(arr):
 
     dt = arr.dtype
 
-    return parallel_xsort_overload_impl(dt, stable_argsort_map, parallel_stable_argsort_sym)
+    return parallel_xargsort_overload_impl(dt, stable_argsort_map, parallel_stable_argsort_sym)

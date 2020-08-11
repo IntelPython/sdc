@@ -344,7 +344,7 @@ class TestArrays(TestCase):
         np.random.seed(0)
 
         def ref_impl(a):
-            return np.sort(a)
+            return np.sort(a, kind='stable')
 
         def sdc_impl(a):
             sort.parallel_stable_sort(a)
@@ -377,6 +377,40 @@ class TestArrays(TestCase):
 
         def sdc_impl(a):
             return sort.parallel_argsort(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        float_array = np.random.ranf(10**2)
+        int_arryay = np.random.randint(0, 127, 10**2)
+
+        float_cases = ['float32', 'float64']
+        for case in float_cases:
+            data = float_array.astype(case)
+            array0 = np.copy(data)
+            array1 = np.copy(data)
+            with self.subTest(data=case):
+                sorted_ref = data[ref_impl(array0)]
+                sorted_sdc = data[sdc_func(array1)]
+                np.testing.assert_array_equal(sorted_ref, sorted_sdc)
+
+        int_cases = ['int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64']
+        for case in int_cases:
+            data = int_arryay.astype(case)
+            array0 = np.copy(data)
+            array1 = np.copy(data)
+            with self.subTest(data=case):
+                sorted_ref = data[ref_impl(array0)]
+                sorted_sdc = data[sdc_func(array1)]
+                np.testing.assert_array_equal(sorted_ref, sorted_sdc)
+
+    def test_stable_argsort(self):
+        np.random.seed(0)
+
+        def ref_impl(a):
+            return np.argsort(a, kind='stable')
+
+        def sdc_impl(a):
+            return sort.parallel_stable_argsort(a)
 
         sdc_func = self.jit(sdc_impl)
 
