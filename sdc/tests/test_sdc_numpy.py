@@ -369,6 +369,34 @@ class TestArrays(TestCase):
             with self.subTest(data=case):
                 np.testing.assert_array_equal(ref_impl(array0), sdc_func(array1))
 
+    def test_argsort(self):
+        np.random.seed(0)
+
+        def ref_impl(a):
+            return np.argsort(a)
+
+        def sdc_impl(a):
+            return sort.parallel_argsort(a)
+
+        sdc_func = self.jit(sdc_impl)
+
+        float_array = np.random.ranf(10**2)
+        int_arryay = np.random.randint(0, 127, 10**2)
+
+        float_cases = ['float32', 'float64']
+        for case in float_cases:
+            array0 = float_array.astype(case)
+            array1 = np.copy(array0)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(ref_impl(array0), sdc_func(array1))
+
+        int_cases = ['int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64']
+        for case in int_cases:
+            array0 = int_arryay.astype(case)
+            array1 = np.copy(array0)
+            with self.subTest(data=case):
+                np.testing.assert_array_equal(ref_impl(array0), sdc_func(array1))
+
     def _test_fillna_numeric(self, pyfunc, cfunc, inplace):
         data_to_test = [
             [True, False, False, True, True],

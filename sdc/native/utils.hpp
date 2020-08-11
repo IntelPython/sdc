@@ -28,14 +28,17 @@
 
 #include <cstdint>
 #include <algorithm>
+#include <memory>
 #include "tbb/task_arena.h"
+#include "tbb/tbb.h"
 
 namespace utils
 {
 
 using quant = int8_t;
 
-using compare_func = bool (*)(const void*, const void*);
+using compare_func       = bool (*)(const void*, const void*);
+using parallel_sort_call = void (*)(void*, uint64_t, compare_func);
 
 template<uint64_t ItemSize>
 struct byte_range
@@ -78,7 +81,7 @@ struct IndexCompare
 {
     IndexCompare() {}
 
-    IndexCompare(Data* in_data, const Compare in_cmp = {}): cmp(in_cmp) {}
+    IndexCompare(Data* in_data, const Compare in_cmp = {}): data(in_data), cmp(in_cmp) {}
 
     template<typename index_type>
     bool operator() (const index_type& left, const index_type& right) const
@@ -88,6 +91,29 @@ struct IndexCompare
 
     Data* data  = nullptr;
     Compare cmp = {};
+};
+
+template<class Compare>
+struct IndexCompare<void, Compare>
+{
+    IndexCompare() {}
+
+    IndexCompare(void* in_data, uint64_t in_size, const Compare in_cmp):
+        data(in_data), size(in_size), cmp(in_cmp)
+    {
+    }
+
+    template<typename index_type>
+    bool operator() (const index_type& left, const index_type& right) const
+    {
+        void* left_data  = &reinterpret_cast<quant*>(data)[size*left];
+        void* right_data = &reinterpret_cast<quant*>(data)[size*right];
+        return cmp(left_data, right_data);
+    }
+
+    void*    data    = nullptr;
+    Compare  cmp   = {};
+    uint64_t size = 0;
 };
 
 tbb::task_arena& get_arena();
@@ -103,7 +129,7 @@ struct static_loop
     void operator()(Body&& body)
     {
         static_loop<N - 1>()(body);
-        body(index<N - 1>());
+        body(utils::index<N - 1>());
     }
 };
 
@@ -115,5 +141,110 @@ struct static_loop<0>
     {
     }
 };
+
+template<int N, template<int> typename function_call>
+struct fill_array_body
+{
+    fill_array_body(std::array<parallel_sort_call, N>& in_arr): arr(in_arr) {}
+
+    template<int K>
+    void operator() (utils::index<K>)
+    {
+        arr[K] = function_call<K+1>::call;
+    }
+
+    std::array<parallel_sort_call, N>& arr;
+};
+
+template<int N, template<int> typename function_call>
+std::array<parallel_sort_call, N> fill_parallel_sort_array()
+{
+    auto result = std::array<parallel_sort_call, N>();
+
+    static_loop<N>()(fill_array_body<N, function_call>(result));
+
+    return result;
+}
+
+template<typename T>
+void parallel_copy(T* src, T* dst, uint64_t len)
+{
+    using range_t = tbb::blocked_range<uint64_t>;
+    tbb::parallel_for(range_t(0,len), [src, dst](const range_t& range)
+    {
+        for (auto i = range.begin(); i < range.end(); ++i)
+            dst[i] = src[i];
+    });
+}
+
+void parallel_copy(void* src, void* dst, uint64_t len, uint64_t size);
+
+template<typename T>
+void fill_index_parallel(T* index, T len)
+{
+    using range_t = tbb::blocked_range<T>;
+
+    tbb::parallel_for(range_t(0,len), [index](const range_t& range)
+    {
+        for (auto i = range.begin(); i < range.end(); ++i)
+            index[i] = i;
+    });
+}
+
+template<typename I>
+void reorder(void* src, I* index, uint64_t len, uint64_t size, void* dst)
+{
+    using range_t = tbb::blocked_range<uint64_t>;
+    tbb::parallel_for(range_t(0,len), [src, index, dst, size](const range_t& range)
+    {
+        auto r_src = reinterpret_cast<quant*>(src) + range.begin()*size;
+        auto r_dst = reinterpret_cast<quant*>(dst) + range.begin()*size;
+
+        for (auto i = range.begin(); i < range.end(); ++i)
+            std::copy_n(&r_src[index[i]*size], size, &r_dst[i*size]);
+    });
+}
+
+template<typename T, typename I>
+void reorder(T* src, T* index, uint64_t len, T* dst)
+{
+    using range_t = tbb::blocked_range<uint64_t>;
+    tbb::parallel_for(range_t(0,len), [src, index, dst](const range_t& range)
+    {
+        for (auto i = range.begin(); i < range.end(); ++i)
+            dst[i] = src[index[i]];
+    });
+}
+
+template<typename T, typename I>
+void reorder(T* data, T* index, uint64_t len)
+{
+    using range_t = tbb::blocked_range<uint64_t>;
+
+    std::unique_ptr<T[]> temp(new T[len]);
+
+    parallel_copy(data, temp.get(), len);
+    reorder(temp.get(), index, len, data);
+}
+
+template<typename I>
+void reorder(void* data, I* index, uint64_t len, uint64_t size)
+{
+    using range_t = tbb::blocked_range<uint64_t>;
+
+    std::unique_ptr<quant[]> temp(new quant[len*size]);
+
+    parallel_copy(data, temp.get(), len, size);
+    reorder(temp.get(), index, len, size, data);
+}
+
+template<class I, typename Argsort>
+void sort_by_argsort(void* data, uint64_t len, uint64_t size, compare_func cmp, Argsort argsort)
+{
+    std::unique_ptr<I[]> index(new I[len]);
+
+    argsort(index.get(), data, len, size, cmp);
+    reorder(data, index.get(), len, size);
+}
 
 } // namespace

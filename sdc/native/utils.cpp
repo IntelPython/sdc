@@ -43,4 +43,15 @@ void set_threads_num(uint64_t threads)
     arena.initialize(threads);
 }
 
+void parallel_copy(void* src, void* dst, uint64_t len, uint64_t size)
+{
+    using range_t = tbb::blocked_range<uint64_t>;
+    tbb::parallel_for(range_t(0,len), [src, dst, size](const range_t& range)
+    {
+        auto r_src = reinterpret_cast<quant*>(src) + range.begin()*size;
+        auto r_dst = reinterpret_cast<quant*>(dst) + range.begin()*size;
+        std::copy_n(r_src, range.size()*size, r_dst);
+    });
+}
+
 }
