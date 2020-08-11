@@ -78,7 +78,6 @@ class TestAst(unittest.TestCase):
 
             def bar():
                 t_typevar: Q
-            ...
             return bar
         test_func = foo()
         result = get_variable_annotations(test_func)
