@@ -57,10 +57,11 @@ class TestAst(unittest.TestCase):
             t_tuple_typevar: Tuple[S]
             t_dict_typevar: Dict[T, S]
         result = get_variable_annotations(test_func)
-        expected_result = {'t_any': [Any], 't_union': [Union[str, bytes]], 't_optional': [typing.Optional[float]], 't_list': [List[int]],
-                           't_tuple': [Tuple[str]], 't_dict': [Dict[str, str]], 't_iterable': [Iterable[float]],
-                           't_iterator': [Iterator[int]], 't_generic': [G], 't_typevar_t': [T], 't_typevar_s': [S],
-                           't_list_typevar': [List[T]], 't_tuple_typevar': [Tuple[S]], 't_dict_typevar': [Dict[T, S]]}
+        expected_result = {'t_any': [Any], 't_union': [Union[str, bytes]], 't_optional': [typing.Optional[float]],
+                           't_list': [List[int]], 't_tuple': [Tuple[str]], 't_dict': [Dict[str, str]],
+                           't_iterable': [Iterable[float]], 't_iterator': [Iterator[int]], 't_generic': [G],
+                           't_typevar_t': [T], 't_typevar_s': [S], 't_list_typevar': [List[T]],
+                           't_tuple_typevar': [Tuple[S]], 't_dict_typevar': [Dict[T, S]]}
         self.assertEqual(result, expected_result)
 
     def test_get_variable_annotations_user_types(self):
@@ -75,6 +76,7 @@ class TestAst(unittest.TestCase):
     def test_get_variable_annotations_non_locals(self):
         def foo():
             Q = TypeVar('Q')
+
             def bar():
                 t_typevar: Q
             return bar
