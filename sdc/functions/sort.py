@@ -62,7 +62,7 @@ parallel_argsort_sym = bind('parallel_argsort_u64v',
                             parallel_argsort_sig)
 
 parallel_stable_argsort_sym = bind('parallel_stable_argsort_u64v',
-                                parallel_argsort_sig)
+                                   parallel_argsort_sig)
 
 parallel_sort_t_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_uint64)
 
