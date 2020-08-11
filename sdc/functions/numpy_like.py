@@ -602,7 +602,7 @@ def sdc_fillna_overload(self, inplace=False, value=None):
                         num_chars += get_utf8_size(s)
 
                 filled_data = pre_alloc_string_array(n, num_chars)
-                for i in prange(n):
+                for i in range(n):
                     if sdc.hiframes.api.isna(self, i):
                         filled_data[i] = value
                     else:
