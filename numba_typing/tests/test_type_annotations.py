@@ -109,10 +109,10 @@ class TestTypeAnnotations(unittest.TestCase):
         vals = {'a': {'name': 3}, 'b': 3}
 
         expected = type_annotations.Signature(parameters=[{'a': Dict[float, int], 'b': int},
-                                           {'a': Dict[str, int], 'b': int},
-                                           {'a': Dict[float, str], 'b': int},
-                                           {'a': Dict[str, str], 'b': int}],
-                               defaults={'a': {'name': 3}, 'b': 3})
+                                                          {'a': Dict[str, int], 'b': int},
+                                                          {'a': Dict[float, str], 'b': int},
+                                                          {'a': Dict[str, str], 'b': int}],
+                                              defaults={'a': {'name': 3}, 'b': 3})
 
         result = type_annotations.add_vals_to_signature(signature, vals)
 
@@ -178,14 +178,14 @@ class TestTypeAnnotations(unittest.TestCase):
                         'c': [T, bool], 'd': [int]}, {'d': 3})
 
         expected = type_annotations.Signature(parameters=[{'a': int, 'b': Dict[int, float], 'c': int, 'd': int},
-                                           {'a': str, 'b': Dict[str, float], 'c': str, 'd': int},
-                                           {'a': int, 'b': Dict[int, bool], 'c': int, 'd': int},
-                                           {'a': str, 'b': Dict[str, bool], 'c': str, 'd': int},
-                                           {'a': int, 'b': Dict[int, float], 'c': bool, 'd': int},
-                                           {'a': str, 'b': Dict[str, float], 'c': bool, 'd': int},
-                                           {'a': int, 'b': Dict[int, bool], 'c': bool, 'd': int},
-                                           {'a': str, 'b': Dict[str, bool], 'c': bool, 'd': int}],
-                               defaults={'d': 3})
+                                                          {'a': str, 'b': Dict[str, float], 'c': str, 'd': int},
+                                                          {'a': int, 'b': Dict[int, bool], 'c': int, 'd': int},
+                                                          {'a': str, 'b': Dict[str, bool], 'c': str, 'd': int},
+                                                          {'a': int, 'b': Dict[int, float], 'c': bool, 'd': int},
+                                                          {'a': str, 'b': Dict[str, float], 'c': bool, 'd': int},
+                                                          {'a': int, 'b': Dict[int, bool], 'c': bool, 'd': int},
+                                                          {'a': str, 'b': Dict[str, bool], 'c': bool, 'd': int}],
+                                              defaults={'d': 3})
 
         result = type_annotations.product_annotations(annotations)
 

@@ -6,6 +6,7 @@ from collections import namedtuple
 
 Signature = namedtuple('Signature', ['parameters', 'defaults'])
 
+
 def get_func_annotations(func):
     """Get annotations and default values of the fuction parameters."""
     sig = signature(func)
@@ -82,9 +83,7 @@ def get_internal_typevars(sig):
         unique_typevars.update(get_typevars(typ))
 
     if len(unique_typevars) == 0:
-        result = []
-        result.append(sig)
-        return result
+        return [sig]
 
     return expand_typevars(sig, unique_typevars)
 
