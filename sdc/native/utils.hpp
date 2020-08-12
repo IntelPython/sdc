@@ -29,6 +29,8 @@
 #include <cstdint>
 #include <algorithm>
 #include <memory>
+#include <cmath>
+#include <type_traits>
 #include "tbb/task_arena.h"
 #include "tbb/tbb.h"
 
@@ -246,5 +248,47 @@ void sort_by_argsort(void* data, uint64_t len, uint64_t size, compare_func cmp, 
     argsort(index.get(), data, len, size, cmp);
     reorder(data, index.get(), len, size);
 }
+
+template<typename T>
+bool nanless(const T& left, const T& right)
+{
+    return std::less<T>()(left, right);
+}
+
+template<>
+bool nanless<float>(const float& left, const float& right);
+
+template<>
+bool nanless<double>(const double& left, const double& right);
+
+template<typename T>
+bool stable_nanless(const T& left, const T& right)
+{
+    return std::less<T>()(left, right);
+}
+
+template<>
+bool stable_nanless<float>(const float& left, const float& right);
+
+template<>
+bool stable_nanless<double>(const double& left, const double& right);
+
+template<typename T>
+struct less
+{
+    bool operator() (const T& left, const T& right) const
+    {
+        return nanless<T>(left, right);
+    }
+};
+
+template<typename T>
+struct stable_less
+{
+    bool operator() (const T& left, const T& right) const
+    {
+        return stable_nanless<T>(left, right);
+    }
+};
 
 } // namespace

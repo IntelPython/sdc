@@ -38,7 +38,7 @@ using namespace utils;
 namespace
 {
 
-template<typename T, class Compare = std::less<T>>
+template<typename T, class Compare = utils::less<T>>
 void parallel_sort_(T* begin, uint64_t len, const Compare compare = Compare())
 {
     tbb::parallel_sort(begin, begin + len, compare);
@@ -66,7 +66,7 @@ void parallel_argsort__(I* index,
     parallel_sort_(index, len, compare);
 }
 
-template<class I, class T, class Compare = std::less<T>>
+template<class I, class T, class Compare = utils::less<T>>
 void parallel_argsort_(I* index,
                        T* data,
                        uint64_t len,

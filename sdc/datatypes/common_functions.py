@@ -277,8 +277,8 @@ def sdc_join_series_indexes_overload(left, right):
                         right_nan.append(i)
 
                 # sort arrays saving the old positions
-                sorted_left = numpy.argsort(left, kind='mergesort')
-                sorted_right = numpy.argsort(right, kind='mergesort')
+                sorted_left = numpy_like.argsort(left, kind='mergesort')
+                sorted_right = numpy_like.argsort(right, kind='mergesort')
                 # put the position of the nans in an increasing sequence
                 sorted_left[lsize-len(left_nan):] = left_nan
                 sorted_right[rsize-len(right_nan):] = right_nan
@@ -523,7 +523,7 @@ def sdc_arrays_argsort_overload(A, kind='quicksort'):
     if isinstance(A, types.Array):
         def _sdc_arrays_argsort_array_impl(A, kind='quicksort'):
             _kind = 'quicksort' if kind_is_default == True else kind  # noqa
-            return numpy.argsort(A, kind=_kind)
+            return numpy_like.argsort(A, kind=_kind)
 
         return _sdc_arrays_argsort_array_impl
 

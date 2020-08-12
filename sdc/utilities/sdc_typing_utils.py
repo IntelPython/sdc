@@ -107,7 +107,9 @@ def has_literal_value(var, value):
     if not isinstance(var, types.Literal):
         return False
 
-    if value is None or isinstance(value, type(bool)):
+    if value is None:
+        return isinstance(var, types.NoneType) or var.literal_value is value
+    elif isinstance(value, type(bool)):
         return var.literal_value is value
     else:
         return var.literal_value == value
@@ -123,6 +125,10 @@ def has_python_value(var, value):
         return var is value
     else:
         return var == value
+
+
+def is_default(var, value):
+    return has_literal_value(var, value) or has_python_value(var, value) or isinstance(var, types.Omitted)
 
 
 def check_is_numeric_array(type_var):

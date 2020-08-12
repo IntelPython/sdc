@@ -59,7 +59,7 @@ struct buffer_queue
     inline int copy_size() const { return size(); }
 };
 
-template<class T, class Compare = std::less<T>>
+template<class T, class Compare = utils::stable_less<T>>
 inline void merge_sorted_main_loop(buffer_queue<T>& left, buffer_queue<T>& right, buffer_queue<T>& out, const Compare& compare = Compare())
 {
     while (left.not_empty() && right.not_empty())
@@ -71,7 +71,7 @@ inline void merge_sorted_main_loop(buffer_queue<T>& left, buffer_queue<T>& right
     }
 }
 
-template<class T, class Compare = std::less<T>>
+template<class T, class Compare = utils::stable_less<T>>
 void merge_sorted(T* left, int left_size, T* right, int right_size, T* out, const Compare& compare = Compare())
 {
     auto left_buffer  = buffer_queue<T>(left,  left_size);
@@ -88,7 +88,7 @@ void merge_sorted(T* left, int left_size, T* right, int right_size, T* out, cons
         std::copy_n(right_buffer.head, right_buffer.copy_size(), out_buffer.tail);
 }
 
-template<class T, class Compare = std::less<T>>
+template<class T, class Compare = utils::stable_less<T>>
 void merge_sorted_parallel(T* left, int left_size, T* right, int right_size, T* out, const Compare& compare = Compare())
 {
     auto split = [](T* first, int f_size, T* second, int s_size, T* out, const Compare& compare = Compare())
@@ -125,14 +125,14 @@ void merge_sorted_parallel(T* left, int left_size, T* right, int right_size, T* 
     }
 }
 
-template<class T, class Compare = std::less<T>>
+template<class T, class Compare = utils::stable_less<T>>
 void stable_sort_inner_sort(T* data, int begin, int end, const Compare& compare = Compare())
 {
     std::stable_sort(data + begin, data + end, compare);
 }
 
 
-template<class T, class Compare = std::less<T>>
+template<class T, class Compare = utils::stable_less<T>>
 T* stable_sort_impl(T* data, T* temp, int begin, int end, const Compare& compare = Compare())
 {
     auto constexpr limit = 512;
@@ -167,7 +167,7 @@ T* stable_sort_impl(T* data, T* temp, int begin, int end, const Compare& compare
     return out;
 }
 
-template<class T, class Compare = std::less<T>>
+template<class T, class Compare = utils::stable_less<T>>
 void parallel_stable_sort_(T* data, uint64_t len, const Compare& compare = Compare())
 {
     std::unique_ptr<T[]> temp(new T[len]);
@@ -194,7 +194,7 @@ void parallel_stable_argsort__(I* index,
     parallel_stable_sort_(index, len, compare);
 }
 
-template<class I, class T, class Compare = std::less<T>>
+template<class I, class T, class Compare = utils::stable_less<T>>
 void parallel_stable_argsort_(I* index,
                               T* data,
                               uint64_t len,
