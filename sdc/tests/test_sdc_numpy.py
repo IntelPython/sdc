@@ -360,7 +360,7 @@ class TestArrays(TestCase):
         sdc_func = self.jit(sdc_impl)
 
         float_arrays = [np.random.ranf(10**5),
-                       np.random.ranf(10**4)]
+                        np.random.ranf(10**4)]
 
         # make second float array to contain nan in every second element
         for i in range(len(float_arrays[1])//2):
