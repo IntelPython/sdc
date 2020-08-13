@@ -359,23 +359,33 @@ class TestArrays(TestCase):
 
         sdc_func = self.jit(sdc_impl)
 
-        float_array = np.random.ranf(10**2)
-        int_arryay = np.random.randint(0, 127, 10**2)
+        float_arrays = [np.random.ranf(10**5),
+                       np.random.ranf(10**4)]
+
+        # make second float array to contain nan in every second element
+        for i in range(len(float_arrays[1])//2):
+            float_arrays[1][i*2] = np.nan
+
+        int_arrays = [np.random.randint(0, 2, 10**6 + 1),
+                      np.ones(10**5 + 1, dtype=np.int64),
+                      np.random.randint(0, 255, 10**4)]
 
         for kind in [None, 'quicksort', 'mergesort']:
             float_cases = ['float32', 'float64']
             for case in float_cases:
-                data = float_array.astype(case)
-                with self.subTest(data=case, kind=kind):
-                    run_test(ref_impl, sdc_func, data, kind)
+                for float_array in float_arrays:
+                    data = float_array.astype(case)
+                    with self.subTest(data=case, kind=kind, size=len(float_array)):
+                        run_test(ref_impl, sdc_func, data, kind)
 
             int_cases = ['int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64']
             for case in int_cases:
-                data = int_arryay.astype(case)
-                array0 = np.copy(data)
-                array1 = np.copy(data)
-                with self.subTest(data=case, kind=kind):
-                    run_test(ref_impl, sdc_func, data, kind)
+                for int_array in int_arrays:
+                    data = int_array.astype(case)
+                    array0 = np.copy(data)
+                    array1 = np.copy(data)
+                    with self.subTest(data=case, kind=kind, size=len(int_array)):
+                        run_test(ref_impl, sdc_func, data, kind)
 
     def _test_fillna_numeric(self, pyfunc, cfunc, inplace):
         data_to_test = [

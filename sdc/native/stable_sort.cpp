@@ -59,7 +59,7 @@ struct buffer_queue
     inline int copy_size() const { return size(); }
 };
 
-template<class T, class Compare = utils::stable_less<T>>
+template<class T, class Compare = utils::less<T>>
 inline void merge_sorted_main_loop(buffer_queue<T>& left, buffer_queue<T>& right, buffer_queue<T>& out, const Compare& compare = Compare())
 {
     while (left.not_empty() && right.not_empty())
@@ -71,7 +71,7 @@ inline void merge_sorted_main_loop(buffer_queue<T>& left, buffer_queue<T>& right
     }
 }
 
-template<class T, class Compare = utils::stable_less<T>>
+template<class T, class Compare = utils::less<T>>
 void merge_sorted(T* left, int left_size, T* right, int right_size, T* out, const Compare& compare = Compare())
 {
     auto left_buffer  = buffer_queue<T>(left,  left_size);
@@ -88,36 +88,78 @@ void merge_sorted(T* left, int left_size, T* right, int right_size, T* out, cons
         std::copy_n(right_buffer.head, right_buffer.copy_size(), out_buffer.tail);
 }
 
-template<class T, class Compare = utils::stable_less<T>>
+template<class T, class Compare = utils::less<T>>
 void merge_sorted_parallel(T* left, int left_size, T* right, int right_size, T* out, const Compare& compare = Compare())
 {
-    auto split = [](T* first, int f_size, T* second, int s_size, T* out, const Compare& compare = Compare())
+    auto split = [](T* first, int f_size, T* second, int s_size, T* out, const Compare& compare = Compare(), bool swap = false)
     {
         auto f_middle_pos = f_size/2;
 
         auto first_middle = std::next(first,  f_middle_pos);
+        auto first_end    = std::next(first,  f_size);
         auto second_end   = std::next(second, s_size);
 
-        auto second_middle = std::upper_bound(second, second_end, *first_middle, compare);
+        const auto& first_middle_value = *first_middle;
 
-        auto s_middle_pos = std::distance(second, second_middle);
+        auto equal = [](const T& left, const T& right, const Compare& compare)
+        {
+            return !compare(left, right) && !compare(left, right);
+        };
+
+        if (f_middle_pos != f_size && equal(first[f_middle_pos + 1], first[f_middle_pos], compare))
+        {
+            first_middle = std::upper_bound(first,  first_end, first_middle_value, compare);
+            f_middle_pos = std::distance(first, first_middle);
+        }
+
+        auto second_middle = std::upper_bound(second, second_end, first_middle_value, compare);
+
+        decltype(f_middle_pos) s_middle_pos = std::distance(second, second_middle);
 
         auto out_middle = std::next(out, f_middle_pos + s_middle_pos);
 
-        tbb::parallel_invoke(
-            [&] () { merge_sorted_parallel(first, f_middle_pos, second, s_middle_pos, out, compare); },
-            [&] () { merge_sorted_parallel(first_middle, f_size - f_middle_pos, second_middle, s_size - s_middle_pos, out_middle, compare); }
-        );
+        // in order to keep order, it is import to pass 'left' buffer as
+        // first parameter to merge_sorted_parallel.
+        // So, if 'first' is actually 'right' buffer, we must swap them back
+        if (swap)
+        {
+            std::swap(first, second);
+            std::swap(f_middle_pos, s_middle_pos);
+            std::swap(f_size, s_size);
+            std::swap(first_middle, second_middle);
+            std::swap(first_end, second_end);
+        }
+
+        if ((first_middle  == first_end  || first_middle  == first) &&
+            (second_middle == second_end || second_middle == second))
+        {
+            merge_sorted(first, f_size, second, s_size, out, compare);
+        }
+        else
+        {
+            tbb::parallel_invoke(
+                [&] () { merge_sorted_parallel(first, f_middle_pos, second, s_middle_pos, out, compare); },
+                [&] () { merge_sorted_parallel(first_middle, f_size - f_middle_pos, second_middle, s_size - s_middle_pos, out_middle, compare); }
+            );
+        }
     };
 
     auto constexpr limit = 512;
-    if (left_size >= right_size && left_size > limit)
+    if (left_size == 0)
+    {
+        parallel_copy(right, out, right_size);
+    }
+    else if (right_size == 0)
+    {
+        parallel_copy(left, out, left_size);
+    }
+    else if (left_size >= right_size && left_size > limit)
     {
         split(left, left_size, right, right_size, out, compare);
     }
     else if (left_size < right_size && right_size > limit)
     {
-        split(right, right_size, left, left_size, out, compare);
+        split(right, right_size, left, left_size, out, compare, true);
     }
     else
     {
@@ -125,14 +167,14 @@ void merge_sorted_parallel(T* left, int left_size, T* right, int right_size, T* 
     }
 }
 
-template<class T, class Compare = utils::stable_less<T>>
+template<class T, class Compare = utils::less<T>>
 void stable_sort_inner_sort(T* data, int begin, int end, const Compare& compare = Compare())
 {
     std::stable_sort(data + begin, data + end, compare);
 }
 
 
-template<class T, class Compare = utils::stable_less<T>>
+template<class T, class Compare = utils::less<T>>
 T* stable_sort_impl(T* data, T* temp, int begin, int end, const Compare& compare = Compare())
 {
     auto constexpr limit = 512;
@@ -157,17 +199,17 @@ T* stable_sort_impl(T* data, T* temp, int begin, int end, const Compare& compare
     if (left == data)
         out = temp;
 
-    merge_sorted_parallel<T>(std::next(left, begin),
-                             middle - begin,
-                             std::next(right, middle),
-                             end - middle,
-                             std::next(out, begin),
-                             compare);
+    merge_sorted<T>(std::next(left, begin),
+                    middle - begin,
+                    std::next(right, middle),
+                    end - middle,
+                    std::next(out, begin),
+                    compare);
 
     return out;
 }
 
-template<class T, class Compare = utils::stable_less<T>>
+template<class T, class Compare = utils::less<T>>
 void parallel_stable_sort_(T* data, uint64_t len, const Compare& compare = Compare())
 {
     std::unique_ptr<T[]> temp(new T[len]);
@@ -194,7 +236,7 @@ void parallel_stable_argsort__(I* index,
     parallel_stable_sort_(index, len, compare);
 }
 
-template<class I, class T, class Compare = utils::stable_less<T>>
+template<class I, class T, class Compare = utils::less<T>>
 void parallel_stable_argsort_(I* index,
                               T* data,
                               uint64_t len,

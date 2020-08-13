@@ -57,23 +57,11 @@ void parallel_copy(void* src, void* dst, uint64_t len, uint64_t size)
 template<>
 bool nanless<float>(const float& left, const float& right)
 {
-    return std::less<float>()(left, right) || isnan(right);
-}
-
-template<>
-bool nanless<double>(const double& left, const double& right)
-{
-    return std::less<double>()(left, right) || isnan(right);
-}
-
-template<>
-bool stable_nanless<float>(const float& left, const float& right)
-{
     return std::less<float>()(left, right) || (isnan(right) && !isnan(left));
 }
 
 template<>
-bool stable_nanless<double>(const double& left, const double& right)
+bool nanless<double>(const double& left, const double& right)
 {
     return std::less<double>()(left, right) || (isnan(right) && !isnan(left));
 }

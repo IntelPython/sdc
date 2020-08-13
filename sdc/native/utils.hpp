@@ -81,9 +81,9 @@ struct ExternalCompare
 template<class Data, class Compare>
 struct IndexCompare
 {
-    IndexCompare() {}
+    IndexCompare() { }
 
-    IndexCompare(Data* in_data, const Compare in_cmp = {}): data(in_data), cmp(in_cmp) {}
+    IndexCompare(Data* in_data, const Compare in_cmp = {}): data(in_data), cmp(in_cmp) { }
 
     template<typename index_type>
     bool operator() (const index_type& left, const index_type& right) const
@@ -262,32 +262,11 @@ template<>
 bool nanless<double>(const double& left, const double& right);
 
 template<typename T>
-bool stable_nanless(const T& left, const T& right)
-{
-    return std::less<T>()(left, right);
-}
-
-template<>
-bool stable_nanless<float>(const float& left, const float& right);
-
-template<>
-bool stable_nanless<double>(const double& left, const double& right);
-
-template<typename T>
 struct less
 {
     bool operator() (const T& left, const T& right) const
     {
         return nanless<T>(left, right);
-    }
-};
-
-template<typename T>
-struct stable_less
-{
-    bool operator() (const T& left, const T& right) const
-    {
-        return stable_nanless<T>(left, right);
     }
 };
 
