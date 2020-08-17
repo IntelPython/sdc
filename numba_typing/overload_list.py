@@ -62,22 +62,21 @@ class TypeChecker:
         return p_obj.__origin__
 
     def match(self, p_type, n_type):
-        if p_type == typing.Any:
-            return True
-        elif self._is_generic(p_type):
-            origin_type = self._get_origin(p_type)
-            if origin_type == typing.Generic:
-                return self.match_generic(p_type, n_type)
+        try:
+            if p_type == typing.Any:
+                return True
+            elif self._is_generic(p_type):
+                origin_type = self._get_origin(p_type)
+                if origin_type == typing.Generic:
+                    return self.match_generic(p_type, n_type)
+                else:
+                    return self._types_dict[origin_type](self, p_type, n_type)
+            elif isinstance(p_type, typing.TypeVar):
+                return self.match_typevar(p_type, n_type)
             else:
-                check = self._types_dict.get(origin_type)
-        elif isinstance(p_type, typing.TypeVar):
-            return self.match_typevar(p_type, n_type)
-        else:
-            check = self._types_dict.get(p_type)
-        if not check:
-            raise ValueError(f'A check for the {p_type} was not found')
-        # fix
-        return check(n_type) if check.__code__.co_argcount < 2 else check(self, p_type, n_type)
+                return self._types_dict[p_type](n_type)
+        except KeyError:
+            print((f'A check for the {p_type} was not found'))
 
     def match_typevar(self, p_type, n_type):
         if not self._typevars_dict.get(p_type) and n_type not in self._typevars_dict.values():
@@ -86,9 +85,9 @@ class TypeChecker:
         return self._typevars_dict.get(p_type) == n_type
 
     def match_generic(self, p_type, n_type):
-        res = False
+        res = True
         for arg in p_type.__args__:
-            res = res or self.match(arg, n_type)
+            res = res and self.match(arg, n_type)
         return res
 
 
@@ -117,7 +116,7 @@ def check_list_type(self, p_type, n_type):
     if isinstance(p_type, type):
         return res
     else:
-        return res and self.match(p_type.__args__[0], n_type.dtype)  # fix
+        return res and self.match(p_type.__args__[0], n_type.dtype)
 
 
 def check_tuple_type(self, p_type, n_type):
@@ -162,7 +161,6 @@ def choose_func_by_sig(sig_list, **kwargs):
                     if sig[0].defaults.get(name, False):
                         full_match = full_match and sig[0].defaults[name] == typ.literal_value
                 else:
-                    # full_match = True
                     full_match = full_match and checker.match(param[name], typ)
 
                 if not full_match:
@@ -210,17 +208,17 @@ def foo_ovld_list():
     def foo_optional(a: typing.Optional[int], b: int = 0):
         return('optional', a)
 
-    def foo_typevar(a: typing.List[typing.List[int]], b: int = 0):
+    def foo_list_in_list(a: typing.List[typing.List[int]], b: int = 0):
         return('typevar', a)
 
     def foo_typevars(a: T, b: K = 0):
         return('TypeVars', a, b)
 
-    def foo_generic(a: typing.Generic[T], b: typing.Generic[T] = 0):
+    def foo_generic(a: typing.Generic[T], b: typing.Generic[K, T] = 0):
         return('Generic', a, b)
 
     # return foo_int,foo_float, foo_bool, foo_str, foo_list, foo_tuple, foo_dict, foo_any
-    return foo_list, foo_typevar
+    return foo_list, foo_generic
 
 
 if __name__ == '__main__':
@@ -229,8 +227,9 @@ if __name__ == '__main__':
     def myfunc(a, b=0):
         return foo(a, b)
 
-    V = List()
-    V.append(List([1, 2]))
+    # V = List()
+    # V.append(List([1, 2]))
+    V = 5.0
     F = 7
 
     print(myfunc(V, F))
