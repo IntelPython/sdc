@@ -95,12 +95,17 @@ extern "C"
 PyMODINIT_FUNC PyInit_concurrent_sort()
 {
     static struct PyModuleDef moduledef = {
-        PyModuleDef_HEAD_INIT,
-        "sort",
-        "No docs",
-        -1,
-        NULL,
+        PyModuleDef_HEAD_INIT, /* m_base */
+        "sort",                /* m_name */
+        "No docs",             /* m_doc */
+        -1,                    /* m_size */
+        NULL,                  /* m_methods */
+        NULL,                  /* m_reload */
+        NULL,                  /* m_traverse */
+        NULL,                  /* m_clear */
+        utils::finalize_tbb,   /* m_free */
     };
+
     PyObject* m = PyModule_Create(&moduledef);
     if (m == NULL)
     {

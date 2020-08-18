@@ -103,20 +103,26 @@ void merge_sorted_parallel(T* left, int left_size, T* right, int right_size, T* 
 
         auto equal = [](const T& left, const T& right, const Compare& compare)
         {
-            return !compare(left, right) && !compare(left, right);
+            return !compare(left, right) && !compare(right, left);
         };
 
-        if (f_middle_pos != f_size && equal(first[f_middle_pos + 1], first[f_middle_pos], compare))
+        if (std::next(first_middle) != first_end && equal(*std::next(first_middle), *first_middle, compare))
         {
             first_middle = std::upper_bound(first,  first_end, first_middle_value, compare);
-            f_middle_pos = std::distance(first, first_middle);
         }
+        else
+        {
+            first_middle = std::next(first_middle);
+        }
+
+        f_middle_pos = std::distance(first, first_middle);
 
         auto second_middle = std::upper_bound(second, second_end, first_middle_value, compare);
 
         decltype(f_middle_pos) s_middle_pos = std::distance(second, second_middle);
 
         auto out_middle = std::next(out, f_middle_pos + s_middle_pos);
+        auto out_end    = std::next(out, f_size + s_size);
 
         // in order to keep order, it is import to pass 'left' buffer as
         // first parameter to merge_sorted_parallel.
@@ -130,8 +136,9 @@ void merge_sorted_parallel(T* left, int left_size, T* right, int right_size, T* 
             std::swap(first_end, second_end);
         }
 
-        if ((first_middle  == first_end  || first_middle  == first) &&
-            (second_middle == second_end || second_middle == second))
+        if (((first_middle == first_end) &&
+            (second_middle == second_end)) ||
+            (second >= out && second <= out_end))
         {
             merge_sorted(first, f_size, second, s_size, out, compare);
         }
@@ -199,12 +206,12 @@ T* stable_sort_impl(T* data, T* temp, int begin, int end, const Compare& compare
     if (left == data)
         out = temp;
 
-    merge_sorted<T>(std::next(left, begin),
-                    middle - begin,
-                    std::next(right, middle),
-                    end - middle,
-                    std::next(out, begin),
-                    compare);
+    merge_sorted_parallel<T>(std::next(left, begin),
+                             middle - begin,
+                             std::next(right, middle),
+                             end - middle,
+                             std::next(out, begin),
+                             compare);
 
     return out;
 }

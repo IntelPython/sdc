@@ -113,14 +113,16 @@ struct IndexCompare<void, Compare>
         return cmp(left_data, right_data);
     }
 
-    void*    data    = nullptr;
-    Compare  cmp   = {};
+    void*    data = nullptr;
     uint64_t size = 0;
+    Compare  cmp  = {};
 };
 
 tbb::task_arena& get_arena();
 
 void set_threads_num(uint64_t);
+
+void finalize_tbb(void*);
 
 template<int N> struct index {};
 
@@ -221,8 +223,6 @@ void reorder(T* src, T* index, uint64_t len, T* dst)
 template<typename T, typename I>
 void reorder(T* data, T* index, uint64_t len)
 {
-    using range_t = tbb::blocked_range<uint64_t>;
-
     std::unique_ptr<T[]> temp(new T[len]);
 
     parallel_copy(data, temp.get(), len);
@@ -232,8 +232,6 @@ void reorder(T* data, T* index, uint64_t len)
 template<typename I>
 void reorder(void* data, I* index, uint64_t len, uint64_t size)
 {
-    using range_t = tbb::blocked_range<uint64_t>;
-
     std::unique_ptr<quant[]> temp(new quant[len*size]);
 
     parallel_copy(data, temp.get(), len, size);
