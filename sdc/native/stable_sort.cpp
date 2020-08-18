@@ -219,19 +219,21 @@ T* stable_sort_impl(T* data, T* temp, int begin, int end, const Compare& compare
 template<class T, class Compare = utils::less<T>>
 void parallel_stable_sort_(T* data, uint64_t len, const Compare& compare = Compare())
 {
-    std::unique_ptr<T[]> temp(new T[len]);
+    // std::unique_ptr<T[]> temp(new T[len]);
 
-    T* result = nullptr;
+    // T* result = nullptr;
 
-    get_arena().execute([&]()
-    {
-        result = stable_sort_impl(data, temp.get(), 0, static_cast<int>(len), compare);
-    });
+    // get_arena().execute([&]()
+    // {
+    //     result = stable_sort_impl(data, temp.get(), 0, static_cast<int>(len), compare);
+    // });
 
-    if (result == temp.get())
-    {
-        parallel_copy(result, data, len);
-    }
+    // if (result == temp.get())
+    // {
+    //     parallel_copy(result, data, len);
+    // }
+
+    std::stable_sort(data, data + len, compare);
 }
 
 template<class I, class Compare>

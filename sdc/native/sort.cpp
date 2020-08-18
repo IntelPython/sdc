@@ -31,6 +31,7 @@
 #include "tbb/parallel_sort.h"
 
 #include <iostream>
+#include <algorithm>
 
 
 using namespace utils;
@@ -41,7 +42,8 @@ namespace
 template<typename T, class Compare = utils::less<T>>
 void parallel_sort_(T* begin, uint64_t len, const Compare compare = Compare())
 {
-    tbb::parallel_sort(begin, begin + len, compare);
+    // tbb::parallel_sort(begin, begin + len, compare);
+    std::sort(begin, begin + len, compare);
 }
 
 template<int ItemSize>
