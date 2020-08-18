@@ -104,9 +104,9 @@ struct tbb_context
 
 tbb_context& get_tbb_context()
 {
-    static tbb_context context;
+    static tbb_context* context = new tbb_context();
 
-    return context;
+    return *context;
 }
 
 tbb::task_arena& get_arena()
@@ -125,6 +125,7 @@ void finalize_tbb(void*)
 {
     auto& context = get_tbb_context();
     context.finalize();
+    delete &context;
 }
 
 void parallel_copy(void* src, void* dst, uint64_t len, uint64_t size)
