@@ -47,7 +47,7 @@ void ignore_assertion( const char*, int, const char*, const char * ) {}
 #elif HAS_TASK_SCHEDULER_HANDLE
 using tsh_ptr = tbb::task_scheduler_handle;
 #else
-        #error("Unsupported version of TBB")
+        #warning("Unsupported version of TBB. Parallel sorting is disabled")
 #endif
 
 struct tbb_context
@@ -57,7 +57,7 @@ struct tbb_context
 #elif HAS_TASK_SCHEDULER_HANDLE
     tsh       tsh;
 #else
-        #error("Unsupported version of TBB")
+        #warning("Unsupported version of TBB. Parallel sorting is disabled")
 #endif
 
     arena_ptr arena;
@@ -69,7 +69,7 @@ struct tbb_context
 #elif HAS_TASK_SCHEDULER_HANDLE
         tsh = tbb::task_scheduler_handle::get();
 #else
-        #error("Unsupported version of TBB")
+        #warning("Unsupported version of TBB. Parallel sorting is disabled")
 #endif
         arena.reset(new tbb::task_arena());
     }
@@ -95,7 +95,7 @@ struct tbb_context
 #elif HAS_TASK_SCHEDULER_HANDLE
         (void)tbb::finalize(tsh, std::nothrow);
 #else
-        #error("Unsupported version of TBB")
+        #warning("Unsupported version of TBB. Parallel sorting is disabled")
 #endif
     }
 
@@ -135,7 +135,7 @@ void set_threads_num(uint64_t threads)
     context->set_threads_num(threads);
 }
 
-void finalize(void*)
+void finalize()
 {
     auto& context_ptr = get_tbb_context();
     context_ptr->finalize();

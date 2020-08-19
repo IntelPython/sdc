@@ -39,7 +39,6 @@ requirements:
     - numba   {{ NUMBA_VERSION }}
     - setuptools
     - tbb4py
-    - gdb
 
 test:
   imports:

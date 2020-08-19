@@ -103,7 +103,10 @@ PyMODINIT_FUNC PyInit_concurrent_sort()
         NULL,                         /* m_reload */
         NULL,                         /* m_traverse */
         NULL,                         /* m_clear */
-        utils::tbb_control::finalize, /* m_free */
+        [](void*)                     /* m_free */
+        {
+            utils::tbb_control::finalize();
+        },
     };
 
     PyObject* m = PyModule_Create(&moduledef);

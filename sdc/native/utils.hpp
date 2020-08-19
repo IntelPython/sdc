@@ -274,7 +274,7 @@ namespace tbb_control
 
     void set_threads_num(uint64_t);
 
-    void finalize(void*);
+    void finalize();
 }
 
 } // namespace
