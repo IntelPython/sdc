@@ -31,6 +31,7 @@ from numba.core import cgutils
 from numba import typed
 from numba import config
 import ctypes as ct
+import numpy
 
 from sdc import concurrent_sort
 
@@ -46,13 +47,26 @@ parallel_sort_arithm_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_uint64)
 parallel_sort_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_uint64,
                                  ct.c_uint64, ct.c_void_p,)
 
+parallel_argsort_arithm_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_void_p, ct.c_uint64)
+
+parallel_argsort_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_void_p, ct.c_uint64,
+                                    ct.c_uint64, ct.c_void_p,)
+
 parallel_sort_sym = bind('parallel_sort',
                          parallel_sort_sig)
 
 parallel_stable_sort_sym = bind('parallel_stable_sort',
                                 parallel_sort_sig)
 
+parallel_argsort_sym = bind('parallel_argsort_u64v',
+                            parallel_argsort_sig)
+
+parallel_stable_argsort_sym = bind('parallel_stable_argsort_u64v',
+                                   parallel_argsort_sig)
+
 parallel_sort_t_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_uint64)
+
+parallel_argsort_t_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_void_p, ct.c_uint64)
 
 set_threads_count_sig = ct.CFUNCTYPE(None, ct.c_uint64)
 set_threads_count_sym = bind('set_number_of_threads', set_threads_count_sig)
@@ -75,7 +89,7 @@ def less_overload(left, right):
 
 @intrinsic
 def adaptor(tyctx, thing, another):
-    # This function creates a call specialisation on "custom_hash" based on the
+    # This function creates a call specialisation on "less" based on the
     # type of "thing" and its literal value
 
     # resolve to function type
@@ -177,7 +191,7 @@ types_to_postfix = {types.int8: 'i8',
 def load_symbols(name, sig, types):
     result = {}
 
-    func_text = '\n'.join([f"result[{typ}] = bind('{name}_{pstfx}', sig)" for typ, pstfx in types.items()])
+    func_text = '\n'.join([f"result[{typ}] = bind('{name}{pstfx}', sig)" for typ, pstfx in types.items()])
     glbls = {f'{typ}': typ for typ in types.keys()}
     glbls.update({'result': result, 'sig': sig, 'bind': bind})
     exec(func_text, glbls)
@@ -185,8 +199,10 @@ def load_symbols(name, sig, types):
     return result
 
 
-sort_map = load_symbols('parallel_sort', parallel_sort_arithm_sig, types_to_postfix)
-stable_sort_map = load_symbols('parallel_stable_sort', parallel_sort_arithm_sig, types_to_postfix)
+sort_map = load_symbols('parallel_sort_', parallel_sort_arithm_sig, types_to_postfix)
+stable_sort_map = load_symbols('parallel_stable_sort_', parallel_sort_arithm_sig, types_to_postfix)
+argsort_map = load_symbols('parallel_argsort_u64', parallel_argsort_arithm_sig, types_to_postfix)
+stable_argsort_map = load_symbols('parallel_stable_argsort_u64', parallel_argsort_arithm_sig, types_to_postfix)
 
 
 @intrinsic
@@ -224,6 +240,22 @@ def itemsize_overload(arr):
     raise NotImplementedError
 
 
+def parallel_xsort_overload_impl(dt, xsort_map, xsort_sym):
+    if dt in types_to_postfix.keys():
+        sort_f = xsort_map[dt]
+
+        def parallel_xsort_arithm_impl(arr):
+            return sort_f(arr.ctypes, len(arr))
+
+        return parallel_xsort_arithm_impl
+
+    def parallel_xsort_impl(arr):
+        item_size = itemsize(arr)
+        return xsort_sym(arr.ctypes, len(arr), item_size, adaptor(arr[0], arr[0]))
+
+    return parallel_xsort_impl
+
+
 def parallel_sort(arr):
     pass
 
@@ -236,19 +268,7 @@ def parallel_sort_overload(arr):
 
     dt = arr.dtype
 
-    if dt in types_to_postfix.keys():
-        sort_f = sort_map[dt]
-
-        def parallel_sort_arithm_impl(arr):
-            return sort_f(arr.ctypes, len(arr))
-
-        return parallel_sort_arithm_impl
-
-    def parallel_sort_impl(arr):
-        item_size = itemsize(arr)
-        return parallel_sort_sym(arr.ctypes, len(arr), item_size, adaptor(arr[0], arr[0]))
-
-    return parallel_sort_impl
+    return parallel_xsort_overload_impl(dt, sort_map, parallel_sort_sym)
 
 
 def parallel_stable_sort(arr):
@@ -263,16 +283,56 @@ def parallel_stable_sort_overload(arr):
 
     dt = arr.dtype
 
+    return parallel_xsort_overload_impl(dt, stable_sort_map, parallel_stable_sort_sym)
+
+
+def parallel_xargsort_overload_impl(dt, xargsort_map, xargsort_sym):
     if dt in types_to_postfix.keys():
-        sort_f = stable_sort_map[dt]
+        sort_f = xargsort_map[dt]
 
-        def parallel_stable_sort_arithm_impl(arr):
-            return sort_f(arr.ctypes, len(arr))
+        def parallel_xargsort_arithm_impl(arr):
+            index = numpy.empty(shape=len(arr), dtype=numpy.int64)
+            sort_f(index.ctypes, arr.ctypes, len(arr))
 
-        return parallel_stable_sort_arithm_impl
+            return index
 
-    def parallel_stable_sort_impl(arr):
+        return parallel_xargsort_arithm_impl
+
+    def parallel_xargsort_impl(arr):
         item_size = itemsize(arr)
-        return parallel_stable_sort_sym(arr.ctypes, len(arr), item_size, adaptor(arr[0], arr[0]))
+        index = numpy.empty(shape=len(arr), dtype=numpy.int64)
+        xargsort_sym(index.ctypes, arr.ctypes, len(arr), item_size, adaptor(arr[0], arr[0]))
 
-    return parallel_stable_sort_impl
+        return index
+
+    return parallel_xargsort_impl
+
+
+def parallel_argsort(arr):
+    pass
+
+
+@overload(parallel_argsort)
+def parallel_argsort_overload(arr):
+
+    if not isinstance(arr, types.Array):
+        raise NotImplementedError
+
+    dt = arr.dtype
+
+    return parallel_xargsort_overload_impl(dt, argsort_map, parallel_argsort_sym)
+
+
+def parallel_stable_argsort(arr):
+    pass
+
+
+@overload(parallel_stable_argsort)
+def parallel_argsort_overload(arr):
+
+    if not isinstance(arr, types.Array):
+        raise NotImplementedError
+
+    dt = arr.dtype
+
+    return parallel_xargsort_overload_impl(dt, stable_argsort_map, parallel_stable_argsort_sym)

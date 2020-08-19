@@ -58,21 +58,57 @@ extern "C"
     void parallel_stable_sort_f32(void* begin, uint64_t len);
     void parallel_stable_sort_f64(void* begin, uint64_t len);
 
+    void parallel_argsort_u64v(void* index, void* begin, uint64_t len, uint64_t size, void* compare);
+
+    void parallel_argsort_u64i8(void* index, void* begin, uint64_t len);
+    void parallel_argsort_u64u8(void* index, void* begin, uint64_t len);
+    void parallel_argsort_u64i16(void* index, void* begin, uint64_t len);
+    void parallel_argsort_u64u16(void* index, void* begin, uint64_t len);
+    void parallel_argsort_u64i32(void* index, void* begin, uint64_t len);
+    void parallel_argsort_u64u32(void* index, void* begin, uint64_t len);
+    void parallel_argsort_u64i64(void* index, void* begin, uint64_t len);
+    void parallel_argsort_u64u64(void* index, void* begin, uint64_t len);
+
+    void parallel_argsort_u64f32(void* index, void* begin, uint64_t len);
+    void parallel_argsort_u64f64(void* index, void* begin, uint64_t len);
+
+    void parallel_stable_argsort_u64v(void* index, void* begin, uint64_t len, uint64_t size, void* compare);
+
+    void parallel_stable_argsort_u64i8(void* index, void* begin, uint64_t len);
+    void parallel_stable_argsort_u64u8(void* index, void* begin, uint64_t len);
+    void parallel_stable_argsort_u64i16(void* index, void* begin, uint64_t len);
+    void parallel_stable_argsort_u64u16(void* index, void* begin, uint64_t len);
+    void parallel_stable_argsort_u64i32(void* index, void* begin, uint64_t len);
+    void parallel_stable_argsort_u64u32(void* index, void* begin, uint64_t len);
+    void parallel_stable_argsort_u64i64(void* index, void* begin, uint64_t len);
+    void parallel_stable_argsort_u64u64(void* index, void* begin, uint64_t len);
+
+    void parallel_stable_argsort_u64f32(void* index, void* begin, uint64_t len);
+    void parallel_stable_argsort_u64f64(void* index, void* begin, uint64_t len);
+
     void set_number_of_threads(uint64_t threads)
     {
-        utils::set_threads_num(threads);
+        utils::tbb_control::set_threads_num(threads);
     }
 }
 
 PyMODINIT_FUNC PyInit_concurrent_sort()
 {
     static struct PyModuleDef moduledef = {
-        PyModuleDef_HEAD_INIT,
-        "sort",
-        "No docs",
-        -1,
-        NULL,
+        PyModuleDef_HEAD_INIT,        /* m_base */
+        "sort",                       /* m_name */
+        "No docs",                    /* m_doc */
+        -1,                           /* m_size */
+        NULL,                         /* m_methods */
+        NULL,                         /* m_reload */
+        NULL,                         /* m_traverse */
+        NULL,                         /* m_clear */
+        [](void*)                     /* m_free */
+        {
+            utils::tbb_control::finalize();
+        },
     };
+
     PyObject* m = PyModule_Create(&moduledef);
     if (m == NULL)
     {
@@ -108,7 +144,38 @@ PyMODINIT_FUNC PyInit_concurrent_sort()
     REGISTER(parallel_stable_sort_f32)
     REGISTER(parallel_stable_sort_f64)
 
+    REGISTER(parallel_argsort_u64v)
+
+    REGISTER(parallel_argsort_u64i8)
+    REGISTER(parallel_argsort_u64u8)
+    REGISTER(parallel_argsort_u64i16)
+    REGISTER(parallel_argsort_u64u16)
+    REGISTER(parallel_argsort_u64i32)
+    REGISTER(parallel_argsort_u64u32)
+    REGISTER(parallel_argsort_u64i64)
+    REGISTER(parallel_argsort_u64u64)
+
+    REGISTER(parallel_argsort_u64f32)
+    REGISTER(parallel_argsort_u64f64)
+
+    REGISTER(parallel_stable_argsort_u64v)
+
+    REGISTER(parallel_stable_argsort_u64i8)
+    REGISTER(parallel_stable_argsort_u64u8)
+    REGISTER(parallel_stable_argsort_u64i16)
+    REGISTER(parallel_stable_argsort_u64u16)
+    REGISTER(parallel_stable_argsort_u64i32)
+    REGISTER(parallel_stable_argsort_u64u32)
+    REGISTER(parallel_stable_argsort_u64i64)
+    REGISTER(parallel_stable_argsort_u64u64)
+
+    REGISTER(parallel_stable_argsort_u64f32)
+    REGISTER(parallel_stable_argsort_u64f64)
+
     REGISTER(set_number_of_threads)
 #undef REGISTER
+
+    utils::tbb_control::init();
+
     return m;
 }

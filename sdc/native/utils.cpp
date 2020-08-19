@@ -25,45 +25,147 @@
 // *****************************************************************************
 
 #include "utils.hpp"
+#include "tbb/task_arena.h"
+#include "tbb/tbb.h"
+#include <memory>
+#include <iostream>
+
+#define HAS_TASK_SCHEDULER_INIT (TBB_INTERFACE_VERSION < 12002)
+#define HAS_TASK_SCHEDULER_HANDLE (TBB_INTERFACE_VERSION >= 12003)
 
 namespace utils
 {
 
-template<>
-void* upper_bound(void* first, void* last, void* value, int size, int item_size, void* compare)
+namespace tbb_control
 {
-    void* it = nullptr;
-    auto count = size;
 
-    auto less = reinterpret_cast<compare_func>(compare);
+using arena_ptr = std::unique_ptr<tbb::task_arena>;
 
-    while (count > 0) {
-        it = first;
-        auto step = count / 2;
-        it = advance(it, step, item_size);
-        if (!less(value, it)) {
-            first = advance(it, 1, item_size);
-            count -= step + 1;
-        }
-        else
-            count = step;
+#if HAS_TASK_SCHEDULER_INIT
+using tsi_ptr = std::unique_ptr<tbb::task_scheduler_init>;
+void ignore_assertion( const char*, int, const char*, const char * ) {}
+#elif HAS_TASK_SCHEDULER_HANDLE
+using tsh_ptr = tbb::task_scheduler_handle;
+#else
+        #pragma message("Unsupported version of TBB. Parallel sorting is disabled")
+#endif
+
+struct tbb_context
+{
+#if HAS_TASK_SCHEDULER_INIT
+    tsi_ptr   tsi;
+#elif HAS_TASK_SCHEDULER_HANDLE
+    tsh       tsh;
+#else
+        #pragma message("Unsupported version of TBB. Parallel sorting is disabled")
+#endif
+
+    arena_ptr arena;
+
+    tbb_context()
+    {
+#if HAS_TASK_SCHEDULER_INIT
+        tsi.reset(new tbb::task_scheduler_init(tbb::task_arena::automatic));
+#elif HAS_TASK_SCHEDULER_HANDLE
+        tsh = tbb::task_scheduler_handle::get();
+#else
+        #pragma message("Unsupported version of TBB. Parallel sorting is disabled")
+#endif
+        arena.reset(new tbb::task_arena());
     }
 
-    return first;
+    void set_threads_num(uint64_t threads)
+    {
+        arena->terminate();
+        arena->initialize(threads);
+    }
+
+    void finalize()
+    {
+        if (arena)
+            return;
+
+        arena->terminate();
+        arena.reset();
+#if HAS_TASK_SCHEDULER_INIT
+        auto orig = tbb::set_assertion_handler(ignore_assertion);
+        tsi->terminate(); // no blocking terminate is needed here
+        tsi.reset();
+        tbb::set_assertion_handler(orig);
+#elif HAS_TASK_SCHEDULER_HANDLE
+        (void)tbb::finalize(tsh, std::nothrow);
+#else
+        #pragma message("Unsupported version of TBB. Parallel sorting is disabled")
+#endif
+    }
+
+    ~tbb_context()
+    {
+        finalize();
+    }
+};
+
+using tbb_context_ptr = tbb_context*;
+
+tbb_context_ptr& get_tbb_context()
+{
+    static tbb_context_ptr context = nullptr;
+
+    return context;
+}
+
+void init()
+{
+    auto& ptr = get_tbb_context();
+    if (ptr)
+        return;
+
+    ptr = new tbb_context();
 }
 
 tbb::task_arena& get_arena()
 {
-    static tbb::task_arena arena;
-
-    return arena;
+    auto context = get_tbb_context();
+    return *context->arena;
 }
 
 void set_threads_num(uint64_t threads)
 {
-    auto& arena = get_arena();
-    arena.terminate();
-    arena.initialize(threads);
+    auto context = get_tbb_context();
+    context->set_threads_num(threads);
+}
+
+void finalize()
+{
+    auto& context_ptr = get_tbb_context();
+    context_ptr->finalize();
+    delete context_ptr;
+    context_ptr = nullptr;
+}
+
+} // tbb_control
+
+void parallel_copy(void* src, void* dst, uint64_t len, uint64_t size)
+{
+    using range_t = tbb::blocked_range<uint64_t>;
+    tbb::parallel_for(range_t(0,len), [src, dst, size](const range_t& range)
+    {
+        auto r_src = reinterpret_cast<quant*>(src) + range.begin()*size;
+        auto r_dst = reinterpret_cast<quant*>(dst) + range.begin()*size;
+        std::copy_n(r_src, range.size()*size, r_dst);
+    });
+}
+
+template<>
+bool nanless<float>(const float& left, const float& right)
+{
+    return std::less<float>()(left, right) || (isnan(right) && !isnan(left));
+}
+
+template<>
+bool nanless<double>(const double& left, const double& right)
+{
+    return std::less<double>()(left, right) || (isnan(right) && !isnan(left));
 }
 
 }

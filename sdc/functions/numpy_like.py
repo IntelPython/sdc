@@ -47,7 +47,7 @@ import sdc
 from sdc.functions.statistics import skew_formula
 from sdc.hiframes.api import isna
 from sdc.datatypes.range_index_type import RangeIndexType
-from sdc.utilities.sdc_typing_utils import TypeChecker
+from sdc.utilities.sdc_typing_utils import TypeChecker, is_default
 from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
                                  max_dtype_float_val)
@@ -56,6 +56,7 @@ from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_s
                              num_total_chars, str_arr_is_na)
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import check_types_comparable
+from sdc.functions.sort import parallel_sort, parallel_stable_sort, parallel_argsort, parallel_stable_argsort
 
 def astype(self, dtype):
     pass
@@ -1154,3 +1155,110 @@ def sdc_np_array_overload(A):
                 i += 1
             return arr
         return f
+
+
+def sort(a, axis=-1, kind=None, order=None):
+    """
+    Sort input array inplace.
+
+    Parameters
+    -----------
+    a: :obj:`Array`
+        Input array
+    axis: Unsupported
+    kind: {'quicksort', 'mergesort'}, optional
+        Sorting algorithm. Default is 'quicksort'.
+        In fact sorting algorithm is never niether 'quicksort' nor 'mergesort'.
+        It is just either nonstable or stable sort.
+    order: Unsupported
+
+    Returns
+    -------
+    None
+    """
+
+    pass
+
+
+@sdc_overload(sort)
+def sort_overload(a, axis=-1, kind=None, order=None):
+    _func_name = 'sort'
+    ty_checker = TypeChecker(_func_name)
+
+    ty_checker.check(a, types.Array)
+
+    if not is_default(axis, -1):
+        raise TypingError(f'{_func_name} Unsupported parameter axis')
+
+    if not is_default(order, None):
+        raise TypingError(f'{_func_name} Unsupported parameter order')
+
+    def sort_impl(a, axis=-1, kind=None, order=None):
+        _kind = 'quicksort'
+        if kind is not None:
+            _kind = kind
+
+        if _kind == 'quicksort':
+            return parallel_sort(a)
+        elif _kind == 'mergesort':
+            return parallel_stable_sort(a)
+        else:
+            raise ValueError("Unsupported value of 'kind' parameter")
+
+    return sort_impl
+
+
+def argsort(a, axis=-1, kind=None, order=None):
+    """
+    Returns the indices that would sort an array.
+
+    Perform an indirect sort along the given axis using the algorithm specified
+    by the `kind` keyword. It returns an array of indices of the same shape as
+    `a` that index data along the given axis in sorted order.
+
+    Parameters
+    ----------
+    a : :obj:`Array`
+        Array to sort.
+    axis: Unsupported
+    kind: {'quicksort', 'mergesort'}, optional
+        Sorting algorithm. Default is 'quicksort'.
+        In fact sorting algorithm is never niether 'quicksort' nor 'mergesort'.
+        It is just either nonstable or stable sort.
+    order: Unsupported
+
+    Returns
+    -------
+    index_array : ndarray, int
+        Array of indices that sort `a`.
+    """
+
+    pass
+
+
+@sdc_overload(argsort)
+def argsort_overload(a, axis=-1, kind=None, order=None):
+    _func_name = 'argsort'
+    ty_checker = TypeChecker(_func_name)
+
+    ty_checker.check(a, types.Array)
+
+    if not is_default(axis, -1):
+        raise TypingError(f'{_func_name} Unsupported parameter axis')
+
+    if not is_default(order, None):
+        raise TypingError(f'{_func_name} Unsupported parameter order')
+
+    def argsort_impl(a, axis=-1, kind=None, order=None):
+        _kind = 'quicksort'
+        if kind is not None:
+            _kind = kind
+
+        if _kind == 'quicksort':
+            return parallel_argsort(a)
+        elif _kind == 'mergesort':
+            return parallel_stable_argsort(a)
+        else:
+            raise ValueError("Unsupported value of 'kind' parameter")
+
+    return argsort_impl

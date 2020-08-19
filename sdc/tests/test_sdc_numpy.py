@@ -37,7 +37,6 @@ from sdc.str_ext import std_str_to_unicode, unicode_to_std_str
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
 from sdc.functions import numpy_like
-from sdc.functions import sort
 
 
 class TestArrays(TestCase):
@@ -314,11 +313,11 @@ class TestArrays(TestCase):
     def test_sort(self):
         np.random.seed(0)
 
-        def ref_impl(a):
-            return np.sort(a)
+        def ref_impl(a, kind):
+            return np.sort(a, kind=kind)
 
-        def sdc_impl(a):
-            sort.parallel_sort(a)
+        def sdc_impl(a, kind):
+            numpy_like.sort(a, kind=kind)
             return a
 
         sdc_func = self.jit(sdc_impl)
@@ -326,48 +325,67 @@ class TestArrays(TestCase):
         float_array = np.random.ranf(10**2)
         int_arryay = np.random.randint(0, 127, 10**2)
 
-        float_cases = ['float32', 'float64']
-        for case in float_cases:
-            array0 = float_array.astype(case)
-            array1 = np.copy(array0)
-            with self.subTest(data=case):
-                np.testing.assert_array_equal(ref_impl(array0), sdc_func(array1))
+        for kind in [None, 'quicksort', 'mergesort']:
+            float_cases = ['float32', 'float64']
+            for case in float_cases:
+                array0 = float_array.astype(case)
+                array1 = np.copy(array0)
+                with self.subTest(data=case, kind=kind):
+                    np.testing.assert_array_equal(ref_impl(array0, kind), sdc_func(array1, kind))
 
-        int_cases = ['int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64']
-        for case in int_cases:
-            array0 = int_arryay.astype(case)
-            array1 = np.copy(array0)
-            with self.subTest(data=case):
-                np.testing.assert_array_equal(ref_impl(array0), sdc_func(array1))
+            int_cases = ['int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64']
+            for case in int_cases:
+                array0 = int_arryay.astype(case)
+                array1 = np.copy(array0)
+                with self.subTest(data=case, kind=kind):
+                    np.testing.assert_array_equal(ref_impl(array0, kind), sdc_func(array1, kind))
 
-    def test_stable_sort(self):
+    def test_argsort(self):
         np.random.seed(0)
 
-        def ref_impl(a):
-            return np.sort(a)
+        def ref_impl(a, kind):
+            return np.argsort(a, kind=kind)
 
-        def sdc_impl(a):
-            sort.parallel_stable_sort(a)
-            return a
+        def sdc_impl(a, kind):
+            return numpy_like.argsort(a, kind=kind)
+
+        def run_test(ref_impl, sdc_impl, data, kind):
+            if kind == 'mergesort':
+                np.testing.assert_array_equal(ref_impl(data, kind), sdc_func(data, kind))
+            else:
+                sorted_ref = data[ref_impl(data, kind)]
+                sorted_sdc = data[sdc_impl(data, kind)]
+                np.testing.assert_array_equal(sorted_ref, sorted_sdc)
 
         sdc_func = self.jit(sdc_impl)
 
-        float_array = np.random.ranf(10**2)
-        int_arryay = np.random.randint(0, 127, 10**2)
+        float_arrays = [np.random.ranf(10**5),
+                        np.random.ranf(10**4)]
 
-        float_cases = ['float32', 'float64']
-        for case in float_cases:
-            array0 = float_array.astype(case)
-            array1 = np.copy(array0)
-            with self.subTest(data=case):
-                np.testing.assert_array_equal(ref_impl(array0), sdc_func(array1))
+        # make second float array to contain nan in every second element
+        for i in range(len(float_arrays[1])//2):
+            float_arrays[1][i*2] = np.nan
 
-        int_cases = ['int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64']
-        for case in int_cases:
-            array0 = int_arryay.astype(case)
-            array1 = np.copy(array0)
-            with self.subTest(data=case):
-                np.testing.assert_array_equal(ref_impl(array0), sdc_func(array1))
+        int_arrays = [np.random.randint(0, 2, 10**6 + 1),
+                      np.ones(10**5 + 1, dtype=np.int64),
+                      np.random.randint(0, 255, 10**4)]
+
+        for kind in [None, 'quicksort', 'mergesort']:
+            float_cases = ['float32', 'float64']
+            for case in float_cases:
+                for float_array in float_arrays:
+                    data = float_array.astype(case)
+                    with self.subTest(data=case, kind=kind, size=len(float_array)):
+                        run_test(ref_impl, sdc_func, data, kind)
+
+            int_cases = ['int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64']
+            for case in int_cases:
+                for int_array in int_arrays:
+                    data = int_array.astype(case)
+                    array0 = np.copy(data)
+                    array1 = np.copy(data)
+                    with self.subTest(data=case, kind=kind, size=len(int_array)):
+                        run_test(ref_impl, sdc_func, data, kind)
 
     def _test_fillna_numeric(self, pyfunc, cfunc, inplace):
         data_to_test = [

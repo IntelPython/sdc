@@ -28,335 +28,253 @@
 
 #include <cstdint>
 #include <algorithm>
+#include <memory>
+#include <cmath>
+#include <type_traits>
 #include "tbb/task_arena.h"
+#include "tbb/tbb.h"
+
+#define HAS_TASK_SCHEDULER_INIT (TBB_INTERFACE_VERSION < 12002)
+#define HAS_TASK_SCHEDULER_HANDLE (TBB_INTERFACE_VERSION >= 12003)
+#define SUPPORTED_TBB_VERSION (HAS_TASK_SCHEDULER_INIT || HAS_TASK_SCHEDULER_HANDLE)
 
 namespace utils
 {
-using quant = uint8_t;
 
-template<class T>
-inline T* advance(T* ptr, int64_t pos, int64_t size)
+using quant = int8_t;
+
+using compare_func       = bool (*)(const void*, const void*);
+using parallel_sort_call = void (*)(void*, uint64_t, compare_func);
+
+template<uint64_t ItemSize>
+struct byte_range
 {
-    (void)size;
-    return ptr + pos;
-}
+    using data_type = std::array<quant, ItemSize>;
 
-template<>
-inline void* advance(void* ptr, int64_t pos, int64_t size)
-{
-    return reinterpret_cast<quant*>(ptr) + pos*size;
-}
-
-template<class T>
-inline uint64_t distance(T* start, T* end, int64_t size)
-{
-    (void)size;
-    return end - start;
-}
-
-
-template<>
-inline uint64_t distance(void* start, void* end, int64_t size)
-{
-    return (reinterpret_cast<quant*>(end) - reinterpret_cast<quant*>(start))/size;
-}
-
-template<uint64_t item_size> struct exact_void_data_type;
-
-template<> struct exact_void_data_type<1> { using type = uint8_t;  };
-template<> struct exact_void_data_type<2> { using type = uint16_t; };
-template<> struct exact_void_data_type<4> { using type = uint32_t; };
-template<> struct exact_void_data_type<8> { using type = uint64_t; };
-
-template<uint64_t item_size> struct exact_void_data;
-template<uint64_t item_size> struct void_data;
-
-template<uint64_t item_size>
-exact_void_data<item_size>& copy(const exact_void_data<item_size>& src, exact_void_data<item_size>& dst)
-{
-    *dst.ptr = *src.ptr;
-    return dst;
-}
-
-template<uint64_t item_size>
-void_data<item_size>& copy(const void_data<item_size>& src, void_data<item_size>& dst)
-{
-    using data_type = typename void_data<item_size>::data_type;
-    std::copy_n(reinterpret_cast<data_type*>(src.ptr),
-                src.actual_size,
-                reinterpret_cast<data_type*>(dst.ptr));
-
-    dst.actual_size = src.actual_size;
-
-    return dst;
-}
-
-template<uint64_t item_size, class data_type>
-struct void_range
-{
-    void_range(void* begin, uint64_t len, uint64_t size)
+    byte_range(void* begin, uint64_t len)
     {
-        _begin = begin;
-        _end   = advance(begin, len, size);
-        _size  = size;
+        _begin = reinterpret_cast<data_type*>(begin);
+        _end   = std::next(_begin, len);
     }
 
-    class iterator
-    {
-    public:
-        using value_type        = data_type;
-        using difference_type   = int64_t;
-        using reference         = data_type&;
-        using pointer           = data_type*;
-        using iterator_category = std::random_access_iterator_tag;
-
-        iterator() {}
-
-        iterator(void* ptr, uint64_t size): _ptr(ptr), _size(size) {}
-
-        iterator(const iterator& other): _ptr(other._ptr), _size(other._size) {}
-
-        iterator& operator ++()
-        {
-            _ptr = advance(_ptr, 1, _size);
-
-            return *this;
-        }
-
-        iterator operator ++(int)
-        {
-            iterator result(*this);
-            _ptr = advance(_ptr, 1, _size);
-
-            return result;
-        }
-
-        iterator& operator --()
-        {
-            _ptr = advance(_ptr, -1, _size);
-
-            return *this;
-        }
-
-        iterator operator --(int)
-        {
-            iterator result(*this);
-            _ptr = advance(_ptr, -1, _size);
-
-            return result;
-        }
-
-        const data_type operator * () const
-        {
-            return data_type(_ptr, _size);
-        }
-
-        data_type operator * ()
-        {
-            return data_type(_ptr, _size);
-        }
-
-        size_t operator - (const iterator& other) const
-        {
-            return distance(other._ptr, _ptr, _size);
-        }
-
-        iterator& operator += (difference_type shift)
-        {
-            _ptr = advance(_ptr, shift, _size);
-            return *this;
-        }
-
-        iterator operator + (difference_type shift) const
-        {
-            auto r = iterator(_ptr, _size);
-            return r += shift;
-        }
-
-        iterator& operator -= (difference_type shift)
-        {
-            return *this += (-shift);
-        }
-
-        iterator operator - (difference_type shift) const
-        {
-            auto r = iterator(_ptr, _size);
-            return r -= shift;
-        }
-
-        bool operator > (const iterator& rhs) const
-        {
-            return _ptr > rhs._ptr;
-        }
-
-        bool operator < (const iterator& rhs) const
-        {
-            return _ptr < rhs._ptr;
-        }
-
-        bool operator == (const iterator& rhs) const
-        {
-            return _ptr == rhs._ptr;
-        }
-
-        bool operator != (const iterator& rhs) const
-        {
-            return !(*this == rhs);
-        }
-
-        bool operator >= (const iterator& rhs) const
-        {
-            return _ptr >= rhs._ptr;
-        }
-
-        bool operator <= (const iterator& rhs) const
-        {
-            return _ptr <= rhs._ptr;
-        }
-
-        data_type operator[] (int i)
-        {
-            return *(*this + i);
-        }
-
-        const data_type operator[] (int i) const
-        {
-            return *(*this + i);
-        }
-
-    private:
-        void*    _ptr  = nullptr;
-        uint64_t _size = 0;
-    };
-
-    iterator begin()
-    {
-        return iterator(_begin, _size);
-    }
-
-    iterator end()
-    {
-        return iterator(_end, _size);
-    }
+    data_type* begin() { return _begin; }
+    data_type* end()   { return _end; }
 
 private:
-
-    void*    _begin = nullptr;
-    void*    _end   = nullptr;
-    uint64_t _size  = 0;
+    data_type* _begin;
+    data_type* _end;
 };
 
-template<uint64_t item_size>
-struct exact_void_data
+template<class Compare, int ItemSize>
+struct ExternalCompare
 {
-    using data_type = typename exact_void_data_type<item_size>::type;
+    using data_type = typename byte_range<ItemSize>::data_type;
 
-    exact_void_data() { }
+    ExternalCompare() {}
 
-    explicit exact_void_data(void* in_ptr, uint64_t) { ptr = reinterpret_cast<data_type*>(in_ptr); }
+    ExternalCompare(const Compare in_cmp): cmp(in_cmp) {}
 
-    exact_void_data(const exact_void_data& other) { copy(other, *this); }
-
-    exact_void_data& operator = (const exact_void_data& rhs) { return copy(rhs, *this); }
-
-    operator void* () { return ptr; }
-
-    operator const void* () const { return ptr; }
-
-    data_type  data = 0;
-    data_type* ptr  = &data;
-};
-
-template<uint64_t item_size>
-struct void_data
-{
-    using data_type     = quant;
-    using data_type_arr = data_type[item_size];
-
-    void_data() { }
-
-    explicit void_data(void* in_ptr, uint64_t in_size)
+    bool operator() (const data_type& left, const data_type& right) const
     {
-        ptr = in_ptr;
-        actual_size = in_size;
+        return cmp(left.data(), right.data());
     }
 
-    void_data(const void_data& other) { copy(other, *this); }
-
-    void_data& operator = (const void_data& rhs) { return copy(rhs, *this); }
-
-    operator void* () { return ptr; }
-
-    operator const void* () const { return ptr; }
-
-    data_type_arr data        = {};
-    void*         ptr         = &data;
-    uint64_t      actual_size = 0;
+    const Compare cmp = {};
 };
 
-using compare_func = bool (*)(const void*, const void*);
-template<uint64_t size> using exact_void_range = void_range<size, exact_void_data<size>>;
-template<uint64_t size> using _void_range = void_range<size, void_data<size>>;
-
-template<uint64_t size>
-void swap(exact_void_data<size> a, exact_void_data<size> b)
+template<class Data, class Compare>
+struct IndexCompare
 {
-    std::swap(*a.ptr, *b.ptr);
+    IndexCompare() { }
+
+    IndexCompare(Data* in_data, const Compare in_cmp = {}): data(in_data), cmp(in_cmp) { }
+
+    template<typename index_type>
+    bool operator() (const index_type& left, const index_type& right) const
+    {
+        return cmp(data[left], data[right]);
+    }
+
+    Data* data  = nullptr;
+    Compare cmp = {};
+};
+
+template<class Compare>
+struct IndexCompare<void, Compare>
+{
+    IndexCompare() {}
+
+    IndexCompare(void* in_data, uint64_t in_size, const Compare in_cmp):
+        data(in_data), size(in_size), cmp(in_cmp)
+    {
+    }
+
+    template<typename index_type>
+    bool operator() (const index_type& left, const index_type& right) const
+    {
+        void* left_data  = &reinterpret_cast<quant*>(data)[size*left];
+        void* right_data = &reinterpret_cast<quant*>(data)[size*right];
+        return cmp(left_data, right_data);
+    }
+
+    void*    data = nullptr;
+    uint64_t size = 0;
+    Compare  cmp  = {};
+};
+
+template<int N> struct index {};
+
+template<int N>
+struct static_loop
+{
+    template<typename Body>
+    void operator()(Body&& body)
+    {
+        static_loop<N - 1>()(body);
+        body(utils::index<N - 1>());
+    }
+};
+
+template<>
+struct static_loop<0>
+{
+    template<typename Body>
+    void operator()(Body&& body)
+    {
+    }
+};
+
+template<int N, template<int> typename function_call>
+struct fill_array_body
+{
+    fill_array_body(std::array<parallel_sort_call, N>& in_arr): arr(in_arr) {}
+
+    template<int K>
+    void operator() (utils::index<K>)
+    {
+        arr[K] = function_call<K+1>::call;
+    }
+
+    std::array<parallel_sort_call, N>& arr;
+};
+
+template<int N, template<int> typename function_call>
+std::array<parallel_sort_call, N> fill_parallel_sort_array()
+{
+    auto result = std::array<parallel_sort_call, N>();
+
+    static_loop<N>()(fill_array_body<N, function_call>(result));
+
+    return result;
 }
 
-template<uint64_t size>
-void swap(void_data<size> a, void_data<size> b)
+template<typename T>
+void parallel_copy(T* src, T* dst, uint64_t len)
 {
-    auto tmp(a);
-    copy(b, a);
-    copy(tmp, b);
+    using range_t = tbb::blocked_range<uint64_t>;
+    tbb::parallel_for(range_t(0,len), [src, dst](const range_t& range)
+    {
+        for (auto i = range.begin(); i < range.end(); ++i)
+            dst[i] = src[i];
+    });
 }
 
-template<class T>
-T* upper_bound(T* first, T* last, T* value, int size, int item_size, void* compare)
+void parallel_copy(void* src, void* dst, uint64_t len, uint64_t size);
+
+template<typename T>
+void fill_index_parallel(T* index, T len)
 {
-    T* it = nullptr;
-    auto count = size;
+    using range_t = tbb::blocked_range<T>;
 
-    auto less = reinterpret_cast<compare_func>(compare);
-
-    if (less)
+    tbb::parallel_for(range_t(0,len), [index](const range_t& range)
     {
-        while (count > 0) {
-            it = first;
-            auto step = count / 2;
-            it = advance(it, step, item_size);
-            if (!less(value, it)) {
-                first = advance(it, 1, item_size);
-                count -= step + 1;
-            }
-            else
-                count = step;
-        }
-    }
-    else
-    {
-        while (count > 0) {
-            it = first;
-            auto step = count / 2;
-            it = advance(it, step, item_size);
-            if (!(*value < *it)) {
-                first = advance(it, 1, item_size);
-                count -= step + 1;
-            }
-            else
-                count = step;
-        }
-    }
+        for (auto i = range.begin(); i < range.end(); ++i)
+            index[i] = i;
+    });
+}
 
-    return first;
+template<typename I>
+void reorder(void* src, I* index, uint64_t len, uint64_t size, void* dst)
+{
+    using range_t = tbb::blocked_range<uint64_t>;
+    tbb::parallel_for(range_t(0,len), [src, index, dst, size](const range_t& range)
+    {
+        auto r_src = reinterpret_cast<quant*>(src) + range.begin()*size;
+        auto r_dst = reinterpret_cast<quant*>(dst) + range.begin()*size;
+
+        for (auto i = range.begin(); i < range.end(); ++i)
+            std::copy_n(&r_src[index[i]*size], size, &r_dst[i*size]);
+    });
+}
+
+template<typename T, typename I>
+void reorder(T* src, T* index, uint64_t len, T* dst)
+{
+    using range_t = tbb::blocked_range<uint64_t>;
+    tbb::parallel_for(range_t(0,len), [src, index, dst](const range_t& range)
+    {
+        for (auto i = range.begin(); i < range.end(); ++i)
+            dst[i] = src[index[i]];
+    });
+}
+
+template<typename T, typename I>
+void reorder(T* data, T* index, uint64_t len)
+{
+    std::unique_ptr<T[]> temp(new T[len]);
+
+    parallel_copy(data, temp.get(), len);
+    reorder(temp.get(), index, len, data);
+}
+
+template<typename I>
+void reorder(void* data, I* index, uint64_t len, uint64_t size)
+{
+    std::unique_ptr<quant[]> temp(new quant[len*size]);
+
+    parallel_copy(data, temp.get(), len, size);
+    reorder(temp.get(), index, len, size, data);
+}
+
+template<class I, typename Argsort>
+void sort_by_argsort(void* data, uint64_t len, uint64_t size, compare_func cmp, Argsort argsort)
+{
+    std::unique_ptr<I[]> index(new I[len]);
+
+    argsort(index.get(), data, len, size, cmp);
+    reorder(data, index.get(), len, size);
+}
+
+template<typename T>
+bool nanless(const T& left, const T& right)
+{
+    return std::less<T>()(left, right);
 }
 
 template<>
-void* upper_bound(void* first, void* last, void* value, int size, int item_size, void* compare);
+bool nanless<float>(const float& left, const float& right);
 
-tbb::task_arena& get_arena();
+template<>
+bool nanless<double>(const double& left, const double& right);
 
-void set_threads_num(uint64_t);
+template<typename T>
+struct less
+{
+    bool operator() (const T& left, const T& right) const
+    {
+        return nanless<T>(left, right);
+    }
+};
+
+namespace tbb_control
+{
+    void init();
+
+    tbb::task_arena& get_arena();
+
+    void set_threads_num(uint64_t);
+
+    void finalize();
+}
 
 } // namespace

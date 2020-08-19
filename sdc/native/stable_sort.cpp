@@ -27,6 +27,8 @@
 #include "utils.hpp"
 #include "tbb/parallel_invoke.h"
 #include <iostream>
+#include <array>
+#include <vector>
 
 using namespace utils;
 
@@ -40,117 +42,42 @@ struct buffer_queue
     v_type* head;
     v_type* tail;
 
-    buffer_queue(v_type* _head, int size, int _item_size)
+    buffer_queue(v_type* _head, int size)
     {
-        (void)_item_size;
-
         head = _head;
         tail = head + size;
     }
 
     inline v_type* pop() { return head++; }
 
-    inline bool not_empty() { return head < tail; }
+    inline bool not_empty() const { return head < tail; }
 
     inline void push(v_type* val) { *(tail++) = *val; }
 
-    inline int size() { return tail - head; }
+    inline uint64_t size() const { return tail - head; }
 
-    inline int copy_size() { return size(); }
+    inline int copy_size() const { return size(); }
 };
 
-template<>
-struct buffer_queue<void>
+template<class T, class Compare = utils::less<T>>
+inline void merge_sorted_main_loop(buffer_queue<T>& left, buffer_queue<T>& right, buffer_queue<T>& out, const Compare& compare = Compare())
 {
-    using v_type = void;
-    quant* head;
-    quant* tail;
-    const int item_size;
-
-    buffer_queue(v_type* _head, int size, int _item_size) : item_size(_item_size)
-    {
-        head = as_quant(_head);
-        tail = head + size*item_size;
-    }
-
-    inline v_type* pop()
-    {
-        auto _h = head;
-        head += item_size;
-        return _h;
-    }
-
-    inline bool not_empty() { return head < tail; }
-
-    inline void push(v_type* val)
-    {
-        std::copy_n(as_quant(val),
-                    item_size,
-                    tail);
-
-        tail += item_size;
-    }
-
-    inline int size() { return copy_size()/item_size; }
-
-    inline int copy_size() { return tail - head; }
-
-    inline quant* as_quant(v_type* data) { return reinterpret_cast<quant*>(data); }
-};
-
-template<class T>
-inline void merge_sorted_main_loop(buffer_queue<T>& left, buffer_queue<T>& right, buffer_queue<T>& out, void* compare = nullptr)
-{
-    if (compare)
-    {
-        auto less = reinterpret_cast<compare_func>(compare);
-        while (left.not_empty() && right.not_empty())
-        {
-            if (less(right.head, left.head))
-                out.push(right.pop());
-            else
-                out.push(left.pop());
-        }
-    }
-    else
-    {
-        while (left.not_empty() && right.not_empty())
-        {
-            if (*right.head < *left.head)
-                out.push(right.pop());
-            else
-                out.push(left.pop());
-        }
-    }
-}
-
-
-template<>
-inline void merge_sorted_main_loop<void>(buffer_queue<void>& left, buffer_queue<void>& right, buffer_queue<void>& out, void* compare)
-{
-    if (!compare)
-    {
-        std::cout << "compare is nullptr for non-aritmetic type" << std::endl;
-        abort();
-    }
-
-    auto less = reinterpret_cast<compare_func>(compare);
     while (left.not_empty() && right.not_empty())
     {
-        if (less(right.head, left.head))
+        if (compare(*right.head, *left.head))
             out.push(right.pop());
         else
             out.push(left.pop());
     }
 }
 
-template<class T>
-void merge_sorted(T* left, int left_size, T* right, int right_size, int item_size, T* out, void* compare = nullptr)
+template<class T, class Compare = utils::less<T>>
+void merge_sorted(T* left, int left_size, T* right, int right_size, T* out, const Compare& compare = Compare())
 {
-    auto left_buffer  = buffer_queue<T>(left,  left_size,  item_size);
-    auto right_buffer = buffer_queue<T>(right, right_size, item_size);
+    auto left_buffer  = buffer_queue<T>(left,  left_size);
+    auto right_buffer = buffer_queue<T>(right, right_size);
 
-    auto out_buffer = buffer_queue<T>(out, 0, item_size);
+    auto out_buffer = buffer_queue<T>(out, 0);
 
     merge_sorted_main_loop(left_buffer, right_buffer, out_buffer, compare);
 
@@ -161,125 +88,106 @@ void merge_sorted(T* left, int left_size, T* right, int right_size, int item_siz
         std::copy_n(right_buffer.head, right_buffer.copy_size(), out_buffer.tail);
 }
 
-template<class T>
-void merge_sorted_parallel(T* left, int left_size, T* right, int right_size, int item_size, T* out, void* compare = nullptr)
+template<class T, class Compare = utils::less<T>>
+void merge_sorted_parallel(T* left, int left_size, T* right, int right_size, T* out, const Compare& compare = Compare())
 {
-    auto split = [](T* first, int f_size, T* second, int s_size, int item_size, T* out, void* compare = nullptr)
+    auto split = [](T* first, int f_size, T* second, int s_size, T* out, const Compare& compare = Compare(), bool swap = false)
     {
         auto f_middle_pos = f_size/2;
 
-        auto first_middle = advance(first,  f_middle_pos, item_size);
-        auto second_end   = advance(second, s_size,  item_size);
+        auto first_middle = std::next(first,  f_middle_pos);
+        auto first_end    = std::next(first,  f_size);
+        auto second_end   = std::next(second, s_size);
 
-        auto second_middle = upper_bound(second, second_end, first_middle, s_size, item_size, compare);
+        const auto& first_middle_value = *first_middle;
 
-        auto s_middle_pos = distance(second, second_middle, item_size);
+        auto equal = [](const T& left, const T& right, const Compare& compare)
+        {
+            return !compare(left, right) && !compare(right, left);
+        };
 
-        auto out_middle = advance(out, f_middle_pos + s_middle_pos, item_size);
+        if (std::next(first_middle) != first_end && equal(*std::next(first_middle), *first_middle, compare))
+        {
+            first_middle = std::upper_bound(first,  first_end, first_middle_value, compare);
+        }
+        else
+        {
+            first_middle = std::next(first_middle);
+        }
 
-        tbb::parallel_invoke(
-            [&] () { merge_sorted_parallel<T>(first, f_middle_pos, second, s_middle_pos, item_size, out, compare); },
-            [&] () { merge_sorted_parallel<T>(first_middle, f_size - f_middle_pos, second_middle, s_size - s_middle_pos, item_size, out_middle, compare); }
-        );
+        f_middle_pos = std::distance(first, first_middle);
+
+        auto second_middle = std::upper_bound(second, second_end, first_middle_value, compare);
+
+        decltype(f_middle_pos) s_middle_pos = std::distance(second, second_middle);
+
+        auto out_middle = std::next(out, f_middle_pos + s_middle_pos);
+        auto out_end    = std::next(out, f_size + s_size);
+
+        // in order to keep order, it is import to pass 'left' buffer as
+        // first parameter to merge_sorted_parallel.
+        // So, if 'first' is actually 'right' buffer, we must swap them back
+        if (swap)
+        {
+            std::swap(first, second);
+            std::swap(f_middle_pos, s_middle_pos);
+            std::swap(f_size, s_size);
+            std::swap(first_middle, second_middle);
+            std::swap(first_end, second_end);
+        }
+
+        if (((first_middle == first_end) &&
+            (second_middle == second_end)) ||
+            (second >= out && second <= out_end))
+        {
+            merge_sorted(first, f_size, second, s_size, out, compare);
+        }
+        else
+        {
+            tbb::parallel_invoke(
+                [&] () { merge_sorted_parallel(first, f_middle_pos, second, s_middle_pos, out, compare); },
+                [&] () { merge_sorted_parallel(first_middle, f_size - f_middle_pos, second_middle, s_size - s_middle_pos, out_middle, compare); }
+            );
+        }
     };
 
     auto constexpr limit = 512;
-    if (left_size >= right_size && left_size > limit)
+    if (left_size == 0)
     {
-        split(left, left_size, right, right_size, item_size, out, compare);
+        parallel_copy(right, out, right_size);
+    }
+    else if (right_size == 0)
+    {
+        parallel_copy(left, out, left_size);
+    }
+    else if (left_size >= right_size && left_size > limit)
+    {
+        split(left, left_size, right, right_size, out, compare);
     }
     else if (left_size < right_size && right_size > limit)
     {
-        split(right, right_size, left, left_size, item_size, out, compare);
+        split(right, right_size, left, left_size, out, compare, true);
     }
     else
     {
-        merge_sorted<T>(left, left_size, right, right_size, item_size, out, compare);
+        merge_sorted(left, left_size, right, right_size, out, compare);
     }
 }
 
-template<class T>
-void stable_sort_inner_sort(T* data, int begin, int end, int item_size, void* compare)
+template<class T, class Compare = utils::less<T>>
+void stable_sort_inner_sort(T* data, int begin, int end, const Compare& compare = Compare())
 {
-    auto less = reinterpret_cast<compare_func>(compare);
-
-    if (less == nullptr)
-    {
-        std::stable_sort(data + begin, data + end);
-    }
-    else
-    {
-        auto range  = exact_void_range<sizeof(T)>(reinterpret_cast<void*>(data), end, sizeof(T));
-        auto _begin = range.begin() + begin;
-        auto _end   = range.end();
-
-        std::stable_sort(_begin, _end, less);
-    }
+    std::stable_sort(data + begin, data + end, compare);
 }
 
-template<>
-void stable_sort_inner_sort<void>(void* data, int begin, int end, int item_size, void* compare)
-{
-    auto less = reinterpret_cast<compare_func>(compare);
 
-    if (less == nullptr)
-    {
-        std::cout << "compare is nullptr for non-aritmetic type" << std::endl;
-        abort();
-    }
-
-    // TODO move this dispatch to upper level
-#define run_sort(range_type) \
-{ \
-    auto range  = range_type(data, end, item_size); \
-    auto _begin = range.begin() + begin; \
-    auto _end   = range.end(); \
-    std::stable_sort(_begin, _end, less); \
-}
-
-    switch(item_size)
-    {
-    case 1:
-        run_sort(exact_void_range<1>);
-        break;
-    case 2:
-        run_sort(exact_void_range<2>);
-        break;
-    case 4:
-        run_sort(exact_void_range<4>);
-        break;
-    case 8:
-        run_sort(exact_void_range<8>);
-        break;
-    default:
-        // fallback to own implementation?
-        if      (item_size <= 4)    run_sort(_void_range<4>)
-        else if (item_size <= 8)    run_sort(_void_range<8>)
-        else if (item_size <= 16)   run_sort(_void_range<16>)
-        else if (item_size <= 32)   run_sort(_void_range<32>)
-        else if (item_size <= 64)   run_sort(_void_range<64>)
-        else if (item_size <= 128)  run_sort(_void_range<128>)
-        else if (item_size <= 256)  run_sort(_void_range<256>)
-        else if (item_size <= 512)  run_sort(_void_range<512>)
-        else if (item_size <= 1024) run_sort(_void_range<1024>)
-        else
-        {
-            std::cout << "Unsupported item size " << item_size << std::endl;
-            abort();
-        }
-        break;
-    }
-
-#undef run_sort
-}
-
-template<class T>
-T* stable_sort_impl(T* data, T* temp, int begin, int end, int item_size, void* compare)
+template<class T, class Compare = utils::less<T>>
+T* stable_sort_impl(T* data, T* temp, int begin, int end, const Compare& compare = Compare())
 {
     auto constexpr limit = 512;
     if (end - begin <= limit)
     {
-        stable_sort_inner_sort<T>(data, begin, end, item_size, compare);
+        stable_sort_inner_sort(data, begin, end, compare);
 
         return data;
     }
@@ -289,8 +197,8 @@ T* stable_sort_impl(T* data, T* temp, int begin, int end, int item_size, void* c
     T* right = nullptr;
 
     tbb::parallel_invoke(
-        [&] () { left  = stable_sort_impl<T>(data, temp, begin,  middle, item_size, compare); },
-        [&] () { right = stable_sort_impl<T>(data, temp, middle, end,    item_size, compare); }
+        [&] () { left  = stable_sort_impl(data, temp, begin,  middle, compare); },
+        [&] () { right = stable_sort_impl(data, temp, middle, end,    compare); }
     );
 
     auto out = data;
@@ -298,45 +206,101 @@ T* stable_sort_impl(T* data, T* temp, int begin, int end, int item_size, void* c
     if (left == data)
         out = temp;
 
-    merge_sorted_parallel<T>(advance(left, begin, item_size),
+    merge_sorted_parallel<T>(std::next(left, begin),
                              middle - begin,
-                             advance(right, middle, item_size),
+                             std::next(right, middle),
                              end - middle,
-                             item_size,
-                             advance(out, begin, item_size),
+                             std::next(out, begin),
                              compare);
 
     return out;
 }
 
-template<class T>
-void parallel_stable_sort_(T* data, int size, int item_size, void* compare)
+template<class T, class Compare = utils::less<T>>
+void parallel_stable_sort_(T* data, uint64_t len, const Compare& compare = Compare())
 {
-    std::unique_ptr<quant[]> temp(new quant[size*item_size]);
+#if SUPPORTED_TBB_VERSION
+    std::unique_ptr<T[]> temp(new T[len]);
 
     T* result = nullptr;
 
-    get_arena().execute([&]()
+    tbb_control::get_arena().execute([&]()
     {
-        result = stable_sort_impl<T>(data, reinterpret_cast<T*>(temp.get()), 0, size, item_size, compare);
+        result = stable_sort_impl(data, temp.get(), 0, static_cast<int>(len), compare);
     });
 
-    if (reinterpret_cast<quant*>(result) == temp.get())
+    if (result == temp.get())
     {
-        std::copy_n(reinterpret_cast<quant*>(result), size*item_size, reinterpret_cast<quant*>(data));
+        parallel_copy(result, data, len);
     }
+#else
+    std::stable_sort(data, data + len, compare);
+#endif
 }
 
-template<class T>
-inline void parallel_stable_sort__(T* data, int size)
+template<class I, class Compare>
+void parallel_stable_argsort__(I* index,
+                               uint64_t len,
+                               const Compare& compare)
 {
-    return parallel_stable_sort_<T>(data, size, sizeof(T), nullptr);
+    fill_index_parallel(index, static_cast<I>(len));
+    parallel_stable_sort_(index, len, compare);
 }
+
+template<class I, class T, class Compare = utils::less<T>>
+void parallel_stable_argsort_(I* index,
+                              T* data,
+                              uint64_t len,
+                              const Compare& compare = Compare())
+{
+    parallel_stable_argsort__(index, len, IndexCompare<T, Compare>(data, compare));
+}
+
+template<class I>
+void parallel_stable_argsort_(I* index, void* data, uint64_t len, uint64_t size, compare_func compare)
+{
+    using comparator_t = IndexCompare<void, compare_func>;
+    auto comparator = comparator_t(data, size, compare);
+
+    parallel_stable_argsort__(index, len, comparator);
+}
+
+template<int ItemSize>
+struct parallel_sort_fixed_size
+{
+    static void call(void* begin, uint64_t len, compare_func cmp)
+    {
+        using comparator_t = ExternalCompare<compare_func, ItemSize>;
+
+        auto range      = byte_range<ItemSize>(begin, len);
+        auto comparator = comparator_t(cmp);
+        parallel_stable_sort_(range.begin(), len, comparator);
+    }
+};
 
 } // namespace
 
+#define declare_single_argsort(index_prefix, type_prefix, ity, ty) \
+void parallel_stable_argsort_##index_prefix##type_prefix(ity* index, void* begin, uint64_t len) \
+{ parallel_stable_argsort_(reinterpret_cast<ity*>(index), reinterpret_cast<ty*>(begin), len); }
+
+#define declare_argsort(prefix, ty) \
+declare_single_argsort(u8,  prefix, uint8_t,  ty) \
+declare_single_argsort(u16, prefix, uint16_t, ty) \
+declare_single_argsort(u32, prefix, uint32_t, ty) \
+declare_single_argsort(u64, prefix, uint64_t, ty)
+
+#define declare_generic_argsort(prefix, ity) \
+void parallel_stable_argsort_##prefix##v(void* index, void* begin, uint64_t len, uint64_t size, void* compare) \
+{ \
+    auto cmp = reinterpret_cast<compare_func>(compare); \
+    parallel_stable_argsort_(reinterpret_cast<ity*>(index), begin, len, size, cmp); \
+}
+
 #define declare_sort(prefix, ty) \
-void parallel_stable_sort_##prefix(void* begin, uint64_t len) { parallel_stable_sort__<ty>(reinterpret_cast<ty*>(begin), len); }
+void parallel_stable_sort_##prefix(void* begin, uint64_t len) \
+{ parallel_stable_sort_(reinterpret_cast<ty*>(begin), len); } \
+declare_argsort(prefix, ty)
 
 #define declare_int_sort(bits) \
 declare_sort(i##bits, int##bits##_t) \
@@ -353,12 +317,26 @@ declare_int_sort(64)
 declare_sort(f32, float)
 declare_sort(f64, double)
 
+declare_generic_argsort(u8,  uint8_t)
+declare_generic_argsort(u16, uint16_t)
+declare_generic_argsort(u32, uint32_t)
+declare_generic_argsort(u64, uint64_t)
+
 void parallel_stable_sort(void* begin, uint64_t len, uint64_t size, void* compare)
 {
-    parallel_stable_sort_<void>(begin, len, size, compare);
+    static const constexpr auto MaxFixSize = 32;
+    static const std::array<parallel_sort_call, MaxFixSize> fixed_size_sort = fill_parallel_sort_array<MaxFixSize, parallel_sort_fixed_size>();
+
+    auto cmp = reinterpret_cast<compare_func>(compare);
+    if (size <= MaxFixSize)
+        return fixed_size_sort[size - 1](begin, len, cmp);
+
+    return sort_by_argsort<uint64_t>(begin, len, size, cmp, parallel_stable_argsort_<uint64_t>);
 }
 
 }
 
 #undef declare_int_sort
 #undef declare_sort
+#undef declare_argsort
+#undef declare_single_argsort

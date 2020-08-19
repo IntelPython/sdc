@@ -1137,7 +1137,7 @@ def hpat_pandas_series_nsmallest(self, n=5, keep='first'):
             raise ValueError("Method nsmallest(). Unsupported parameter. Given 'keep' != 'first'")
 
         # mergesort is used for stable sorting of repeated values
-        indices = self._data.argsort(kind='mergesort')[:max(n, 0)]
+        indices = numpy_like.argsort(self._data, kind='mergesort')[:max(n, 0)]
 
         return self.take(indices)
 
@@ -1207,7 +1207,7 @@ def hpat_pandas_series_nlargest(self, n=5, keep='first'):
         # data: [0, 1, -1, 1, 0] -> [1, 1, 0, 0, -1]
         # index: [0, 1,  2, 3, 4] -> [1, 3, 0, 4,  2] (not [3, 1, 4, 0, 2])
         # subtract 1 to ensure reverse ordering at boundaries
-        indices = (-self._data - 1).argsort(kind='mergesort')[:max(n, 0)]
+        indices = numpy_like.argsort(-self._data - 1, kind='mergesort')[:max(n, 0)]
 
         return self.take(indices)
 
@@ -1457,7 +1457,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
             counts = numpy.asarray(counts_as_list, dtype=numpy.intp)
             indexes_order = numpy.arange(values_len)
             if sort:
-                indexes_order = counts.argsort()
+                indexes_order = numpy_like.argsort(counts)
                 if not ascending:
                     indexes_order = indexes_order[::-1]
 
@@ -1521,7 +1521,7 @@ def hpat_pandas_series_value_counts(self, normalize=False, sort=True, ascending=
 
             indexes_order = numpy.arange(len(value_counts))
             if sort:
-                indexes_order = value_counts.argsort()
+                indexes_order = numpy_like.argsort(value_counts)
                 if not ascending:
                     indexes_order = indexes_order[::-1]
 
@@ -3808,16 +3808,16 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
                 raise ValueError("Method argsort(). Unsupported parameter. Given 'kind' != 'quicksort' or 'mergesort'")
             if kind == 'mergesort':
                 #It is impossible to use numpy.argsort(self._data, kind=kind) since numba gives typing error
-                sort = numpy.argsort(self._data, kind='mergesort')
+                sort = numpy_like.argsort(self._data, kind='mergesort')
             else:
-                sort = numpy.argsort(self._data)
+                sort = numpy_like.argsort(self._data)
             na = self.isna().sum()
             result = numpy.empty(len(self._data), dtype=numpy.int64)
             na_data_arr = sdc.hiframes.api.get_nan_mask(self._data)
             if kind == 'mergesort':
-                sort_nona = numpy.argsort(self._data[~na_data_arr], kind='mergesort')
+                sort_nona = numpy_like.argsort(self._data[~na_data_arr], kind='mergesort')
             else:
-                sort_nona = numpy.argsort(self._data[~na_data_arr])
+                sort_nona = numpy_like.argsort(self._data[~na_data_arr])
             q = 0
             for id, i in enumerate(sort):
                 if id in set(sort[len(self._data) - na:]):
@@ -3835,16 +3835,16 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
         if kind != 'quicksort' and kind != 'mergesort':
             raise ValueError("Method argsort(). Unsupported parameter. Given 'kind' != 'quicksort' or 'mergesort'")
         if kind == 'mergesort':
-            sort = numpy.argsort(self._data, kind='mergesort')
+            sort = numpy_like.argsort(self._data, kind='mergesort')
         else:
-            sort = numpy.argsort(self._data)
+            sort = numpy_like.argsort(self._data)
         na = self.isna().sum()
         result = numpy.empty(len(self._data), dtype=numpy.int64)
         na_data_arr = sdc.hiframes.api.get_nan_mask(self._data)
         if kind == 'mergesort':
-            sort_nona = numpy.argsort(self._data[~na_data_arr], kind='mergesort')
+            sort_nona = numpy_like.argsort(self._data[~na_data_arr], kind='mergesort')
         else:
-            sort_nona = numpy.argsort(self._data[~na_data_arr])
+            sort_nona = numpy_like.argsort(self._data[~na_data_arr])
         q = 0
         for id, i in enumerate(sort):
             if id in set(sort[len(self._data) - na:]):

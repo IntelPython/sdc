@@ -24,10 +24,14 @@
 // EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // *****************************************************************************
 
+#include <cstdint>
+#include <array>
+
 #include "utils.hpp"
 #include "tbb/parallel_sort.h"
 
 #include <iostream>
+#include <algorithm>
 
 
 using namespace utils;
@@ -35,19 +39,79 @@ using namespace utils;
 namespace
 {
 
-template<typename T>
-void parallel_sort_(void* begin, uint64_t len)
+template<typename T, class Compare = utils::less<T>>
+void parallel_sort_(T* begin, uint64_t len, const Compare compare = Compare())
 {
-    auto _begin = reinterpret_cast<T*>(begin);
-    auto _end   = _begin + len;
+#if SUPPORTED_TBB_VERSION
+    tbb::parallel_sort(begin, begin + len, compare);
+#else
+    std::sort(begin, begin + len, compare);
+#endif
+}
 
-    tbb::parallel_sort(_begin, _end);
+template<int ItemSize>
+struct parallel_sort_fixed_size
+{
+    static void call(void* begin, uint64_t len, compare_func cmp)
+    {
+        using comparator_t = ExternalCompare<compare_func, ItemSize>;
+
+        auto range      = byte_range<ItemSize>(begin, len);
+        auto comparator = comparator_t(cmp);
+        parallel_sort_(range.begin(), len, comparator);
+    }
+};
+
+template<class I, class Compare>
+void parallel_argsort__(I* index,
+                        uint64_t len,
+                        const Compare& compare)
+{
+    fill_index_parallel(index, static_cast<I>(len));
+    parallel_sort_(index, len, compare);
+}
+
+template<class I, class T, class Compare = utils::less<T>>
+void parallel_argsort_(I* index,
+                       T* data,
+                       uint64_t len,
+                       const Compare& compare = Compare())
+{
+    parallel_argsort__(index, len, IndexCompare<T, Compare>(data, compare));
+}
+
+template<class I>
+void parallel_argsort_(I* index, void* data, uint64_t len, uint64_t size, compare_func compare)
+{
+    using comparator_t = IndexCompare<void, compare_func>;
+    auto comparator = comparator_t(data, size, compare);
+
+    parallel_argsort__(index, len, comparator);
 }
 
 } // namespace
 
+#define declare_single_argsort(index_prefix, type_prefix, ity, ty) \
+void parallel_argsort_##index_prefix##type_prefix(void* index, void* begin, uint64_t len) \
+{ parallel_argsort_(reinterpret_cast<ity*>(index), reinterpret_cast<ty*>(begin), len); }
+
+#define declare_argsort(prefix, ty) \
+declare_single_argsort(u8,  prefix, uint8_t,  ty) \
+declare_single_argsort(u16, prefix, uint16_t, ty) \
+declare_single_argsort(u32, prefix, uint32_t, ty) \
+declare_single_argsort(u64, prefix, uint64_t, ty)
+
+#define declare_generic_argsort(prefix, ity) \
+void parallel_argsort_##prefix##v(void* index, void* begin, uint64_t len, uint64_t size, void* compare) \
+{ \
+    auto cmp = reinterpret_cast<compare_func>(compare); \
+    parallel_argsort_(reinterpret_cast<ity*>(index), begin, len, size, cmp); \
+}
+
 #define declare_sort(prefix, ty) \
-void parallel_sort_##prefix(void* begin, uint64_t len) { parallel_sort_<ty>(begin, len); }
+void parallel_sort_##prefix(void* begin, uint64_t len) \
+{ parallel_sort_(reinterpret_cast<ty*>(begin), len); } \
+declare_argsort(prefix, ty)
 
 #define declare_int_sort(bits) \
 declare_sort(i##bits, int##bits##_t) \
@@ -64,58 +128,26 @@ declare_int_sort(64)
 declare_sort(f32, float)
 declare_sort(f64, double)
 
+declare_generic_argsort(u8,  uint8_t)
+declare_generic_argsort(u16, uint16_t)
+declare_generic_argsort(u32, uint32_t)
+declare_generic_argsort(u64, uint64_t)
+
 void parallel_sort(void* begin, uint64_t len, uint64_t size, void* compare)
 {
-    auto compare_f = reinterpret_cast<compare_func>(compare);
+    static const constexpr auto MaxFixSize = 32;
+    static const std::array<parallel_sort_call, MaxFixSize> fixed_size_sort = fill_parallel_sort_array<MaxFixSize, parallel_sort_fixed_size>();
 
-#define run_sort(range_type) \
-{ \
-    auto range  = range_type(begin, len, size); \
-    auto _begin = range.begin(); \
-    auto _end   = range.end(); \
-    utils::get_arena().execute([&]() \
-    { \
-        tbb::parallel_sort(_begin, _end, compare_f); \
-    }); \
-}
+    auto cmp = reinterpret_cast<compare_func>(compare);
+    if (size <= MaxFixSize)
+        return fixed_size_sort[size - 1](begin, len, cmp);
 
-    switch(size)
-    {
-    case 1:
-        run_sort(exact_void_range<1>);
-        break;
-    case 2:
-        run_sort(exact_void_range<2>);
-        break;
-    case 4:
-        run_sort(exact_void_range<4>);
-        break;
-    case 8:
-        run_sort(exact_void_range<8>);
-        break;
-    default:
-        // fallback to c qsort?
-        if      (size <= 4)    run_sort(_void_range<4>)
-        else if (size <= 8)    run_sort(_void_range<8>)
-        else if (size <= 16)   run_sort(_void_range<16>)
-        else if (size <= 32)   run_sort(_void_range<32>)
-        else if (size <= 64)   run_sort(_void_range<64>)
-        else if (size <= 128)  run_sort(_void_range<128>)
-        else if (size <= 256)  run_sort(_void_range<256>)
-        else if (size <= 512)  run_sort(_void_range<512>)
-        else if (size <= 1024) run_sort(_void_range<1024>)
-        else
-        {
-            std::cout << "Unsupported item size " << size << std::endl;
-            abort();
-        }
-        break;
-    }
-
-#undef run_sort
+    return sort_by_argsort<uint64_t>(begin, len, size, cmp, parallel_argsort_<uint64_t>);
 }
 
 }
 
 #undef declare_int_sort
 #undef declare_sort
+#undef declare_argsort
+#undef declare_single_argsort
