@@ -55,7 +55,7 @@ def run_examples(sdc_utils):
         sdc_example = str(sdc_example)
         try:
             sdc_utils.log_info(sdc_utils.line_double)
-            sdc_utils.run_command(f'gdb -batch -x gdb_cmd --args python {str(sdc_example)}')
+            sdc_utils.run_command(f'python {str(sdc_example)}')
         except Exception:
             failed += 1
             failed_examples.append(sdc_example)

@@ -34,6 +34,10 @@
 #include "tbb/task_arena.h"
 #include "tbb/tbb.h"
 
+#define HAS_TASK_SCHEDULER_INIT (TBB_INTERFACE_VERSION < 12002)
+#define HAS_TASK_SCHEDULER_HANDLE (TBB_INTERFACE_VERSION >= 12003)
+#define SUPPORTED_TBB_VERSION (HAS_TASK_SCHEDULER_INIT || HAS_TASK_SCHEDULER_HANDLE)
+
 namespace utils
 {
 
@@ -117,12 +121,6 @@ struct IndexCompare<void, Compare>
     uint64_t size = 0;
     Compare  cmp  = {};
 };
-
-tbb::task_arena& get_arena();
-
-void set_threads_num(uint64_t);
-
-void finalize_tbb(void*);
 
 template<int N> struct index {};
 
@@ -267,5 +265,16 @@ struct less
         return nanless<T>(left, right);
     }
 };
+
+namespace tbb_control
+{
+    void init();
+
+    tbb::task_arena& get_arena();
+
+    void set_threads_num(uint64_t);
+
+    void finalize(void*);
+}
 
 } // namespace

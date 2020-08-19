@@ -36,6 +36,9 @@
 namespace utils
 {
 
+namespace tbb_control
+{
+
 using arena_ptr = std::unique_ptr<tbb::task_arena>;
 
 #if HAS_TASK_SCHEDULER_INIT
@@ -102,31 +105,45 @@ struct tbb_context
     }
 };
 
-tbb_context& get_tbb_context()
-{
-    static tbb_context* context = new tbb_context();
+using tbb_context_ptr = tbb_context*;
 
-    return *context;
+tbb_context_ptr& get_tbb_context()
+{
+    static tbb_context_ptr context = nullptr;
+
+    return context;
+}
+
+void init()
+{
+    auto& ptr = get_tbb_context();
+    if (ptr)
+        return;
+
+    ptr = new tbb_context();
 }
 
 tbb::task_arena& get_arena()
 {
-    auto& context = get_tbb_context();
-    return *context.arena;
+    auto context = get_tbb_context();
+    return *context->arena;
 }
 
 void set_threads_num(uint64_t threads)
 {
-    auto& context = get_tbb_context();
-    context.set_threads_num(threads);
+    auto context = get_tbb_context();
+    context->set_threads_num(threads);
 }
 
-void finalize_tbb(void*)
+void finalize(void*)
 {
-    auto& context = get_tbb_context();
-    context.finalize();
-    delete &context;
+    auto& context_ptr = get_tbb_context();
+    context_ptr->finalize();
+    delete context_ptr;
+    context_ptr = nullptr;
 }
+
+} // tbb_control
 
 void parallel_copy(void* src, void* dst, uint64_t len, uint64_t size)
 {

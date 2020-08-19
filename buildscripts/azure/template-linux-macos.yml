@@ -26,11 +26,11 @@ jobs:
       displayName: 'Build Intel SDC'
       continueOnError: ${{ parameters.allowFailure }}
 
-    # - script: |
-    #     source $HOME/miniconda3/bin/activate
-    #     python buildscripts/test.py --python=$PYTHON_VER --sdc-channel=./sdc-build
-    #   displayName: 'Test Intel SDC conda package'
-    #   continueOnError: ${{ parameters.allowFailure }}
+    - script: |
+        source $HOME/miniconda3/bin/activate
+        python buildscripts/test.py --python=$PYTHON_VER --sdc-channel=./sdc-build
+      displayName: 'Test Intel SDC conda package'
+      continueOnError: ${{ parameters.allowFailure }}
 
     - script: |
         source $HOME/miniconda3/bin/activate

@@ -42,8 +42,11 @@ namespace
 template<typename T, class Compare = utils::less<T>>
 void parallel_sort_(T* begin, uint64_t len, const Compare compare = Compare())
 {
-    // tbb::parallel_sort(begin, begin + len, compare);
+#if SUPPORTED_TBB_VERSION
+    tbb::parallel_sort(begin, begin + len, compare);
+#else
     std::sort(begin, begin + len, compare);
+#endif
 }
 
 template<int ItemSize>

@@ -88,22 +88,22 @@ extern "C"
 
     void set_number_of_threads(uint64_t threads)
     {
-        utils::set_threads_num(threads);
+        utils::tbb_control::set_threads_num(threads);
     }
 }
 
 PyMODINIT_FUNC PyInit_concurrent_sort()
 {
     static struct PyModuleDef moduledef = {
-        PyModuleDef_HEAD_INIT, /* m_base */
-        "sort",                /* m_name */
-        "No docs",             /* m_doc */
-        -1,                    /* m_size */
-        NULL,                  /* m_methods */
-        NULL,                  /* m_reload */
-        NULL,                  /* m_traverse */
-        NULL,                  /* m_clear */
-        utils::finalize_tbb,   /* m_free */
+        PyModuleDef_HEAD_INIT,        /* m_base */
+        "sort",                       /* m_name */
+        "No docs",                    /* m_doc */
+        -1,                           /* m_size */
+        NULL,                         /* m_methods */
+        NULL,                         /* m_reload */
+        NULL,                         /* m_traverse */
+        NULL,                         /* m_clear */
+        utils::tbb_control::finalize, /* m_free */
     };
 
     PyObject* m = PyModule_Create(&moduledef);
@@ -171,5 +171,8 @@ PyMODINIT_FUNC PyInit_concurrent_sort()
 
     REGISTER(set_number_of_threads)
 #undef REGISTER
+
+    utils::tbb_control::init();
+
     return m;
 }
