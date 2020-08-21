@@ -29,6 +29,7 @@
 #include "tbb/tbb.h"
 #include <memory>
 #include <iostream>
+#include <cmath>
 
 #define HAS_TASK_SCHEDULER_INIT (TBB_INTERFACE_VERSION < 12002)
 #define HAS_TASK_SCHEDULER_HANDLE (TBB_INTERFACE_VERSION >= 12003)
@@ -159,13 +160,13 @@ void parallel_copy(void* src, void* dst, uint64_t len, uint64_t size)
 template<>
 bool nanless<float>(const float& left, const float& right)
 {
-    return std::less<float>()(left, right) || (isnan(right) && !isnan(left));
+    return std::less<float>()(left, right) || (std::isnan(right) && !std::isnan(left));
 }
 
 template<>
 bool nanless<double>(const double& left, const double& right)
 {
-    return std::less<double>()(left, right) || (isnan(right) && !isnan(left));
+    return std::less<double>()(left, right) || (std::isnan(right) && !std::isnan(left));
 }
 
 }
