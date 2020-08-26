@@ -45,7 +45,7 @@ using arena_ptr = std::unique_ptr<tbb::task_arena>;
 using tsi_ptr = std::unique_ptr<tbb::task_scheduler_init>;
 void ignore_assertion( const char*, int, const char*, const char * ) {}
 #elif HAS_TASK_SCHEDULER_HANDLE
-using tsh_ptr = tbb::task_scheduler_handle;
+using tsh = tbb::task_scheduler_handle;
 #else
         #pragma message("Unsupported version of TBB. Parallel sorting is disabled")
 #endif
