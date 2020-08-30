@@ -39,7 +39,7 @@ from numba.extending import overload
 
 from sdc.io.csv_ext import (
     _gen_csv_reader_py_pyarrow_py_func,
-    _gen_csv_reader_py_pyarrow_func_text_dataframe,
+    _gen_pandas_read_csv_func_text,
 )
 from sdc.str_arr_ext import string_array_type
 
@@ -255,29 +255,45 @@ def sdc_pandas_read_csv(
         usecols = [col.literal_value for col in usecols]
 
     if infer_from_params:
-        # dtype should be constants and is important only for inference from params
+        # dtype is a tuple of format ('A', A_dtype, 'B', B_dtype, ...)
+        # where column names should be constants and is important only for inference from params
         if isinstance(dtype, types.Tuple):
-            assert all(isinstance(key, types.Literal) for key in dtype[::2])
+            assert all(isinstance(key, types.StringLiteral) for key in dtype[::2])
             keys = (k.literal_value for k in dtype[::2])
 
-            values = dtype[1::2]
-            values = [v.typing_key if isinstance(v, types.Function) else v for v in values]
-            values = [types.Array(numba.from_dtype(np.dtype(v.literal_value)), 1, 'C')
-                      if isinstance(v, types.Literal) else v for v in values]
-            values = [types.Array(types.int_, 1, 'C') if v == int else v for v in values]
-            values = [types.Array(types.float64, 1, 'C') if v == float else v for v in values]
-            values = [string_array_type if v == str else v for v in values]
-            values = [Categorical(v) if isinstance(v, CategoricalDtypeType) else v for v in values]
+            def map_dtype_to_col_type(dtype):
+                if isinstance(dtype, types.Function):
+                    if dtype.typing_key == int:
+                        return types.Array(types.int_, 1, 'C')
+                    elif dtype.typing_key == float:
+                        return types.Array(types.float64, 1, 'C')
+                    elif dtype.typing_key == str:
+                        return string_array_type
+                    else:
+                        assert False, f"map_dtype_to_col_type: failing to infer column type for dtype={dtype}"
 
+                if isinstance(dtype, types.StringLiteral):
+                    if dtype.literal_value == 'str':
+                        return string_array_type
+                    else:
+                        return types.Array(numba.from_dtype(np.dtype(dtype.literal_value)), 1, 'C')
+
+                if isinstance(dtype, types.NumberClass):
+                    return types.Array(dtype.dtype, 1, 'C')
+
+                if isinstance(dtype, CategoricalDtypeType):
+                    return Categorical(dtype)
+
+            values = dtype[1::2]
+            values = map(map_dtype_to_col_type, values)
             dtype = dict(zip(keys, values))
 
     # in case of both are available
     # inferencing from params has priority over inferencing from file
     if infer_from_params:
-        col_names = names
         # all names should be in dtype
-        return_columns = usecols if usecols else names
-        col_typs = [dtype[n] for n in return_columns]
+        col_names = usecols if usecols else names
+        col_typs = [dtype[n] for n in col_names]
 
     elif infer_from_file:
         col_names, col_typs = infer_column_names_and_types_from_constant_filename(
@@ -289,7 +305,7 @@ def sdc_pandas_read_csv(
     dtype_present = not isinstance(dtype, (types.Omitted, type(None)))
 
     # generate function text with signature and returning DataFrame
-    func_text, func_name = _gen_csv_reader_py_pyarrow_func_text_dataframe(
+    func_text, func_name = _gen_pandas_read_csv_func_text(
         col_names, col_typs, dtype_present, usecols, signature)
 
     # compile with Python
