@@ -93,6 +93,7 @@ class Categorical(types.Type):
         assert(isinstance(dtype, CategoricalDtypeType))
         self.pd_dtype = dtype
         self.codes = codes or types.Array(self.pd_dtype.int_type(), ndim=1, layout='C')
+        self.addrspace = None
         # TODO: store dtype for categories values and use it for dtype
         super().__init__(name=self.__repr__())
 
