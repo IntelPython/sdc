@@ -144,6 +144,7 @@ ext_hdist = Extension(name="sdc.hdist",
                       extra_link_args=ela,
                       include_dirs=ind,
                       library_dirs=lid,
+                      language="c++"
                       )
 
 ext_chiframes = Extension(name="sdc.chiframes",
@@ -153,6 +154,7 @@ ext_chiframes = Extension(name="sdc.chiframes",
                           extra_link_args=ela,
                           include_dirs=ind,
                           library_dirs=lid,
+                          language="c++"
                           )
 
 ext_set = Extension(name="sdc.hset_ext",
@@ -161,6 +163,7 @@ ext_set = Extension(name="sdc.hset_ext",
                     extra_link_args=ela,
                     include_dirs=ind,
                     library_dirs=lid,
+                    language="c++"
                     )
 
 ext_sort = Extension(name="sdc.concurrent_sort",
@@ -194,6 +197,7 @@ ext_str = Extension(name="sdc.hstr_ext",
                     extra_link_args=ela,
                     include_dirs=np_compile_args['include_dirs'] + ind,
                     library_dirs=np_compile_args['library_dirs'] + lid,
+                    language="c++"
                     )
 
 ext_dt = Extension(name="sdc.hdatetime_ext",
@@ -217,6 +221,7 @@ ext_parquet = Extension(name="sdc.parquet_cpp",
                         extra_compile_args=eca,
                         extra_link_args=ela,
                         library_dirs=lid,
+                        language="c++"
                         )
 
 _ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq, ext_sort]
