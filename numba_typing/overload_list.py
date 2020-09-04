@@ -9,6 +9,8 @@ import typing
 from numba import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 import warnings
 from numba.typed import List, Dict
+from inspect import getfullargspec
+
 
 warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
@@ -16,34 +18,31 @@ warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
 
 def overload_list(orig_func):
     def overload_inner(ovld_list):
-        def wrapper(a, b=0):
+        def wrapper(*args):
             func_list = ovld_list()
             sig_list = []
             for func in func_list:
                 sig_list.append((product_annotations(
                     get_func_annotations(func)), func))
-            result = choose_func_by_sig(sig_list, a=a, b=b)
+            param = getfullargspec(orig_func).args
+            kwargs = {name: typ for name, typ in zip(param, args)}
+            result = choose_func_by_sig(sig_list, **kwargs)
 
             if result is None:
                 raise numba.TypingError(f'Unsupported types a={a}, b={b}')
 
-            result.__annotations__.clear()
             return result
 
-        return overload(orig_func)(wrapper)
+        return overload(orig_func, strict=False)(wrapper)
 
     return overload_inner
-
-
-T = typing.TypeVar('T')
-K = typing.TypeVar('K')
 
 
 class TypeChecker:
     def __init__(self):
         self._types_dict = {int: check_int_type, float: check_float_type, bool: check_bool_type,
                             str: check_str_type, list: check_list_type,
-                            tuple: check_tuple_type, dict: check_dict_type, T: check_T_type}
+                            tuple: check_tuple_type, dict: check_dict_type}
         self._typevars_dict = {}
 
     def add_type_check(self, type_check, func):
@@ -74,6 +73,8 @@ class TypeChecker:
             elif isinstance(p_type, typing.TypeVar):
                 return self.match_typevar(p_type, n_type)
             else:
+                if p_type in (list, tuple):
+                    return self._types_dict[p_type](self, p_type, n_type)
                 return self._types_dict[p_type](n_type)
         except KeyError:
             print((f'A check for the {p_type} was not found'))
@@ -93,10 +94,6 @@ class TypeChecker:
 
 def check_int_type(n_type):
     return isinstance(n_type, types.Integer)
-
-
-def check_T_type(n_type):
-    return True
 
 
 def check_float_type(n_type):
@@ -148,8 +145,8 @@ def check_dict_type(self, p_type, n_type):
 
 
 def choose_func_by_sig(sig_list, **kwargs):
-    checker = TypeChecker()
     for sig in sig_list:  # sig = (Signature,func)
+        checker = TypeChecker()
         for param in sig[0].parameters:  # param = {'a':int,'b':int}
             full_match = True
             for name, typ in kwargs.items():  # name,type = 'a',int64
@@ -165,71 +162,7 @@ def choose_func_by_sig(sig_list, **kwargs):
 
                 if not full_match:
                     break
-        if full_match:
-            return sig[1]
+            if full_match:
+                return sig[1]
 
     return None
-
-
-def foo(a, b=0):
-    ...
-
-
-@overload_list(foo)
-def foo_ovld_list():
-
-    def foo_int(a: int, b: int = 0):
-        return a+b
-
-    def foo_float(a: float, b: float = 0):
-        return a*b
-
-    def foo_bool(a: bool, b: int = 0):
-        return ('bool', a)
-
-    def foo_str(a: str, b: int = 0):
-        return ('str', a)
-
-    def foo_list(a: typing.List[int], b: int = 0):
-        return ('list', a)
-
-    def foo_tuple(a: typing.Tuple[float], b: int = 0):
-        return ('tuple', a)
-
-    def foo_dict(a: typing.Dict[str, int], b: int = 0):
-        return ('dict', a)
-
-    def foo_any(a: typing.Any, b: int = 0):
-        return('any', a)
-
-    def foo_union(a: typing.Union[int, str], b: int = 0):
-        return('union', a)
-
-    def foo_optional(a: typing.Optional[int], b: int = 0):
-        return('optional', a)
-
-    def foo_list_in_list(a: typing.List[typing.List[int]], b: int = 0):
-        return('typevar', a)
-
-    def foo_typevars(a: T, b: K = 0):
-        return('TypeVars', a, b)
-
-    def foo_generic(a: typing.Generic[T], b: typing.Generic[K, T] = 0):
-        return('Generic', a, b)
-
-    # return foo_int,foo_float, foo_bool, foo_str, foo_list, foo_tuple, foo_dict, foo_any
-    return foo_list, foo_generic
-
-
-if __name__ == '__main__':
-
-    @njit
-    def myfunc(a, b=0):
-        return foo(a, b)
-
-    # V = List()
-    # V.append(List([1, 2]))
-    V = 5.0
-    F = 7
-
-    print(myfunc(V, F))
