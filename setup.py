@@ -110,7 +110,7 @@ if not tbb_root:
 
 ind = [PREFIX_DIR + '/include', ]
 lid = [PREFIX_DIR + '/lib', ]
-eca = ['-std=c++11', "-O3", "-DTBB_PREVIEW_WAITING_FOR_WORKERS=1"]  # '-g', '-O0']
+eca = ['-std=c++11', "-O3", "-DTBB_PREVIEW_WAITING_FOR_WORKERS=1", '-v']  # '-g', '-O0']
 ela = ['-std=c++11', ]
 
 io_libs = []
