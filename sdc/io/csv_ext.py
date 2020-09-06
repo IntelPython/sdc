@@ -305,17 +305,6 @@ def box_stream_reader(typ, val, c):
     return val
 
 
-def _get_pd_dtype_str(t):
-    dtype = t.dtype
-    if isinstance(t, Categorical):
-        return 'pd.{}'.format(t.pd_dtype)
-    if dtype == types.NPDatetime('ns'):
-        dtype = 'str'
-    if t == string_array_type:
-        return 'str'
-    return 'np.{}'.format(dtype)
-
-
 # XXX: temporary fix pending Numba's #3378
 # keep the compiled functions around to make sure GC doesn't delete them and
 # the reference to the dynamic function inside them
@@ -529,8 +518,9 @@ def pandas_read_csv(
     return dataframe
 
 
-def _gen_pandas_read_csv_func_text(col_names, col_typs, dtype_present, usecols, signature=None):
+def _gen_pandas_read_csv_func_text(col_names, col_typs, py_col_dtypes, usecols, signature=None):
 
+    func_name = 'csv_reader_py'
     return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
 
     column_loc, _, _ = get_structure_maps(col_typs, return_columns)
@@ -549,11 +539,6 @@ def _gen_pandas_read_csv_func_text(col_names, col_typs, dtype_present, usecols, 
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs) if t.dtype == types.NPDatetime('ns'))
     return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
-
-    pd_dtype_strs = ", ".join([
-        "'{}': {}".format(cname, _get_pd_dtype_str(t))
-        for cname, t in zip(return_columns, col_typs)
-    ])
 
     if signature is None:
         signature = "filepath_or_buffer"
@@ -580,30 +565,34 @@ def _gen_pandas_read_csv_func_text(col_names, col_typs, dtype_present, usecols, 
         inner_call_params['names'] = str(col_names)
         inner_call_params['skiprows'] = "(skiprows and skiprows + 1) or 1"
 
-    # Python objects (e.g. str, np.float) could not be jitted and passed to objmode
-    # so they are hardcoded to function
-    # func_text += "        dtype={{{}}},\n".format(pd_dtype_strs) if dtype_present else \
-    #              "        dtype=dtype,\n"
-    # dtype is hardcoded because datetime should be read as string
-    inner_call_params['dtype'] = f"{{{pd_dtype_strs}}}"
+    # dtype parameter of compiled function is not used at all, instead a python dict
+    # of columns dtypes is captured at compile time, because some dtypes (like datetime)
+    # are converted and also to avoid penalty of creating dict in objmode
+    inner_call_params['dtype'] = 'read_as_dtypes'
 
     params_str = '\n'.join([
         f"      {param}={inner_call_params.get(param, param)}," for param in used_read_csv_params
     ])
     func_text = '\n'.join([
-        f"def csv_reader_py({signature}):",
+        f"def {func_name}({signature}):",
         f"  with objmode(df=\"{df_type_repr}\"):",
         f"    df = pandas_read_csv(\n{params_str}",
         f"    )",
         f"  return df"
     ])
 
-    return func_text, 'csv_reader_py'
+    global_vars = {
+        'read_as_dtypes': py_col_dtypes,
+        'objmode': objmode,
+        'pandas_read_csv': pandas_read_csv,
+    }
+
+    return func_text, func_name, global_vars
 
 
-def _gen_csv_reader_py_pyarrow_py_func(func_text, func_name):
+def _gen_csv_reader_py_pyarrow_py_func(func_text, func_name, global_vars):
     locals = {}
-    exec(func_text, globals(), locals)
+    exec(func_text, global_vars, locals)
     func = locals[func_name]
     return func
 

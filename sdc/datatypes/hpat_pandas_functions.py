@@ -260,8 +260,9 @@ def sdc_pandas_read_csv(
         if isinstance(dtype, types.Tuple):
             assert all(isinstance(key, types.StringLiteral) for key in dtype[::2])
             keys = (k.literal_value for k in dtype[::2])
+            values = dtype[1::2]
 
-            def map_dtype_to_col_type(dtype):
+            def _get_df_col_type(dtype):
                 if isinstance(dtype, types.Function):
                     if dtype.typing_key == int:
                         return types.Array(types.int_, 1, 'C')
@@ -284,32 +285,40 @@ def sdc_pandas_read_csv(
                 if isinstance(dtype, CategoricalDtypeType):
                     return Categorical(dtype)
 
-            values = dtype[1::2]
-            values = map(map_dtype_to_col_type, values)
-            dtype = dict(zip(keys, values))
+            col_types_map = dict(zip(keys, map(_get_df_col_type, values)))
 
     # in case of both are available
     # inferencing from params has priority over inferencing from file
     if infer_from_params:
         # all names should be in dtype
         col_names = usecols if usecols else names
-        col_typs = [dtype[n] for n in col_names]
+        col_types = [col_types_map[n] for n in col_names]
 
     elif infer_from_file:
-        col_names, col_typs = infer_column_names_and_types_from_constant_filename(
+        col_names, col_types = infer_column_names_and_types_from_constant_filename(
             filepath_or_buffer, delimiter, names, usecols, skiprows)
 
     else:
         return None
 
-    dtype_present = not isinstance(dtype, (types.Omitted, type(None)))
+    def _get_py_col_dtype(ctype):
+        """ Re-creates column dtype as python type to be used in read_csv call """
+        dtype = ctype.dtype
+        if ctype == string_array_type:
+            return str
+        if isinstance(ctype, Categorical):
+            return pd.CategoricalDtype(categories=ctype.pd_dtype.categories,
+                                       ordered=None)
+        return numpy_support.as_dtype(dtype)
+
+    py_col_dtypes = {cname: _get_py_col_dtype(ctype) for cname, ctype in zip(col_names, col_types)}
 
     # generate function text with signature and returning DataFrame
-    func_text, func_name = _gen_pandas_read_csv_func_text(
-        col_names, col_typs, dtype_present, usecols, signature)
+    func_text, func_name, global_vars = _gen_pandas_read_csv_func_text(
+        col_names, col_types, py_col_dtypes, usecols, signature)
 
     # compile with Python
-    csv_reader_py = _gen_csv_reader_py_pyarrow_py_func(func_text, func_name)
+    csv_reader_py = _gen_csv_reader_py_pyarrow_py_func(func_text, func_name, global_vars)
 
     return csv_reader_py
 
