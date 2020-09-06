@@ -64,6 +64,15 @@ outputs:
 
 about:
   home: https://github.com/IntelPython/sdc
-  license: BSD
+  license: BSD-2-Clause
   license_file: LICENSE.md
   summary: A compiler-based big data framework in Python
+  description: |
+    <strong>LEGAL NOTICE: Use of this software package is subject to the
+    software license agreement (as set forth above, in the license section of
+    the installed Conda package and/or the README file) and all notices,
+    disclaimers or license terms for third party or open source software
+    included in or with the software.</strong>
+    <br/><br/>
+    EULA: <a href="https://opensource.org/licenses/BSD-2-Clause" target="_blank">BSD-2-Clause</a>
+    <br/><br/>

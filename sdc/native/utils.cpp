@@ -29,6 +29,7 @@
 #include "tbb/tbb.h"
 #include <memory>
 #include <iostream>
+#include <cmath>
 
 #define HAS_TASK_SCHEDULER_INIT (TBB_INTERFACE_VERSION < 12002)
 #define HAS_TASK_SCHEDULER_HANDLE (TBB_INTERFACE_VERSION >= 12003)
@@ -45,7 +46,7 @@ using arena_ptr = std::unique_ptr<tbb::task_arena>;
 using tsi_ptr = std::unique_ptr<tbb::task_scheduler_init>;
 void ignore_assertion( const char*, int, const char*, const char * ) {}
 #elif HAS_TASK_SCHEDULER_HANDLE
-using tsh_ptr = tbb::task_scheduler_handle;
+using tsh_t = tbb::task_scheduler_handle;
 #else
         #pragma message("Unsupported version of TBB. Parallel sorting is disabled")
 #endif
@@ -55,7 +56,7 @@ struct tbb_context
 #if HAS_TASK_SCHEDULER_INIT
     tsi_ptr   tsi;
 #elif HAS_TASK_SCHEDULER_HANDLE
-    tsh       tsh;
+    tsh_t     tsh;
 #else
         #pragma message("Unsupported version of TBB. Parallel sorting is disabled")
 #endif
@@ -159,13 +160,13 @@ void parallel_copy(void* src, void* dst, uint64_t len, uint64_t size)
 template<>
 bool nanless<float>(const float& left, const float& right)
 {
-    return std::less<float>()(left, right) || (isnan(right) && !isnan(left));
+    return std::less<float>()(left, right) || (std::isnan(right) && !std::isnan(left));
 }
 
 template<>
 bool nanless<double>(const double& left, const double& right)
 {
-    return std::less<double>()(left, right) || (isnan(right) && !isnan(left));
+    return std::less<double>()(left, right) || (std::isnan(right) && !std::isnan(left));
 }
 
 }
