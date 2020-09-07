@@ -45,6 +45,7 @@ from sdc.str_arr_ext import string_array_type
 
 from sdc.hiframes import join, aggregate, sort
 from sdc.types import CategoricalDtypeType, Categorical
+from sdc.datatypes.categorical.pdimpl import _reconstruct_CategoricalDtype
 
 
 def get_numba_array_types_for_csv(df):
@@ -307,8 +308,7 @@ def sdc_pandas_read_csv(
         if ctype == string_array_type:
             return str
         if isinstance(ctype, Categorical):
-            return pd.CategoricalDtype(categories=ctype.pd_dtype.categories,
-                                       ordered=None)
+            return _reconstruct_CategoricalDtype(ctype.pd_dtype)
         return numpy_support.as_dtype(dtype)
 
     py_col_dtypes = {cname: _get_py_col_dtype(ctype) for cname, ctype in zip(col_names, col_types)}
