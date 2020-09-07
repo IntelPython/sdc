@@ -127,10 +127,11 @@ def unbox_dataframe(typ, val, c):
                     series_obj = c.pyapi.object_getattr_string(val, typ.columns[col_idx])
                     arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
                     ty_series = typ.data[col_idx]
-                    if isinstance(ty_series, types.Array):
-                        native_val = unbox_array(typ.data[col_idx], arr_obj, c)
-                    elif ty_series == string_array_type:
-                        native_val = unbox_str_series(string_array_type, series_obj, c)
+
+                    # FIXME: CategoricalType has wrong dtype attribute value (i.e. dtype of codes)
+                    # current implementation offers pd_dtype for this purpose, so use it
+                    column_dtype = ty_series.pd_dtype if isinstance(ty_series, Categorical) else ty_series.dtype
+                    native_val = _unbox_series_data(column_dtype, ty_series, arr_obj, c)
 
                     inst.setitem(c.context.get_constant(types.intp, i), native_val.value, incref=False)
 

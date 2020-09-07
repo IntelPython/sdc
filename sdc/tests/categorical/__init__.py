@@ -27,3 +27,4 @@
 from . import test_categorical
 from . import test_categoricaldtype
 from . import test_series_category
+from . import test_df_category
