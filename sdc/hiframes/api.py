@@ -43,6 +43,7 @@ from sdc.hiframes.pd_series_ext import (
     SeriesType,
     if_series_to_array_type)
 from numba.core.errors import TypingError
+from sdc.datatypes.categorical.types import Categorical
 
 
 def isna(arr, i):
@@ -162,7 +163,7 @@ def fix_df_array_overload(column):
     if isinstance(column, RangeIndexType):
         return lambda column: np.array(column)
 
-    if isinstance(column, (types.Array, StringArrayType)):
+    if isinstance(column, (types.Array, StringArrayType, Categorical)):
         return lambda column: column
 
 
