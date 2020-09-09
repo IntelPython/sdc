@@ -24,6 +24,8 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import re
+from typing import NamedTuple
 
 import numba
 from numba import types
@@ -48,7 +50,7 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
         self.has_parent = has_parent
         self.column_loc = column_loc
         super(DataFrameType, self).__init__(
-            name="dataframe({}, {}, {}, {})".format(data, index, columns, has_parent))
+            name="DataFrameType({}, {}, {}, {})".format(data, index, columns, has_parent))
 
     def copy(self, index=None, has_parent=None):
         # XXX is copy necessary?
@@ -83,6 +85,16 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
     def is_precise(self):
         return all(a.is_precise() for a in self.data) and self.index.is_precise()
 
+    def __repr__(self):
+
+        # To have correct repr of DataFrame we need some changes to what types.Type gives:
+        # (1) e.g. array(int64, 1d, C) should be Array(int64, 1, 'C')
+        # (2) ColumnLoc is not part of DataFrame name, so we need to add it
+        default_repr = super(DataFrameType, self).__repr__()
+        res = re.sub(r'array\((\w+), 1d, C\)', r'Array(\1, 1, \'C\')', default_repr)
+        res = re.sub(r'\)$', f', column_loc={self.column_loc})', res)
+        return res
+
 
 @register_model(DataFrameType)
 class DataFrameModel(models.StructModel):
@@ -103,6 +115,15 @@ class DataFrameModel(models.StructModel):
         ]
         super(DataFrameModel, self).__init__(dmm, fe_type, members)
 
+
+class ColumnLoc(NamedTuple):
+    type_id: int
+    col_id: int
+
+
+# FIXME_Numba#3372: add into numba.types to allow returning from objmode
+types.DataFrameType = DataFrameType
+types.ColumnLoc = ColumnLoc
 
 make_attribute_wrapper(DataFrameType, 'data', '_data')
 make_attribute_wrapper(DataFrameType, 'index', '_index')
