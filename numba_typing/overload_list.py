@@ -1,19 +1,12 @@
-import numpy
 import numba
 from numba import types
-from numba import typeof
 from numba.extending import overload
 from type_annotations import product_annotations, get_func_annotations
-from numba import njit
 import typing
 from numba import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 import warnings
 from numba.typed import List, Dict
 from inspect import getfullargspec
-
-
-warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
-warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
 
 
 def overload_list(orig_func):
@@ -106,10 +99,12 @@ class TypeChecker:
     def clear_typevars_dict(self):
         self._typevars_dict.clear()
 
-    def add_type_check(self, type_check, func):
-        self._types_dict[type_check] = func
+    @classmethod
+    def add_type_check(cls, type_check, func):
+        cls._types_dict[type_check] = func
 
-    def _is_generic(self, p_obj):
+    @staticmethod
+    def _is_generic(p_obj):
         if isinstance(p_obj, typing._GenericAlias):
             return True
 
@@ -118,7 +113,8 @@ class TypeChecker:
 
         return False
 
-    def _get_origin(self, p_obj):
+    @staticmethod
+    def _get_origin(p_obj):
         return p_obj.__origin__
 
     def match(self, p_type, n_type):
@@ -138,7 +134,8 @@ class TypeChecker:
                     return self._types_dict[p_type](self, p_type, n_type)
                 return self._types_dict[p_type](n_type)
         except KeyError:
-            print((f'A check for the {p_type} was not found. {n_type}'))
+            print((f'A check for the {p_type} was not found.'))
+            return None
 
     def match_typevar(self, p_type, n_type):
         if not self._typevars_dict.get(p_type) and n_type not in self._typevars_dict.values():
@@ -153,10 +150,10 @@ class TypeChecker:
         return res
 
 
-def choose_func_by_sig(sig_list, values_dict, defaults_dict={}):
+def choose_func_by_sig(sig_list, values_dict, defaults_dict):
     checker = TypeChecker()
-    for sig in sig_list:  # sig = (Signature,func)
-        for param in sig[0].parameters:  # param = {'a':int,'b':int}
+    for sig, func in sig_list:  # sig = (Signature,func)
+        for param in sig.parameters:  # param = {'a':int,'b':int}
             full_match = True
             for name, typ in values_dict.items():  # name,type = 'a',int64
                 if isinstance(typ, types.Literal):
@@ -164,8 +161,8 @@ def choose_func_by_sig(sig_list, values_dict, defaults_dict={}):
                     full_match = full_match and checker.match(
                         param[name], typ.literal_type)
 
-                    if sig[0].defaults.get(name, False):
-                        full_match = full_match and sig[0].defaults[name] == typ.literal_value
+                    if sig.defaults.get(name, False):
+                        full_match = full_match and sig.defaults[name] == typ.literal_value
                 else:
                     full_match = full_match and checker.match(param[name], typ)
 
@@ -173,11 +170,11 @@ def choose_func_by_sig(sig_list, values_dict, defaults_dict={}):
                     break
 
             for name, val in defaults_dict.items():
-                if sig[0].defaults.get(name) != None:
-                    full_match = full_match and sig[0].defaults[name] == val
+                if not sig.defaults.get(name) is None:
+                    full_match = full_match and sig.defaults[name] == val
 
             checker.clear_typevars_dict()
             if full_match:
-                return sig[1]
+                return func
 
     return None

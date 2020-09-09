@@ -3,7 +3,7 @@ from overload_list import List, Dict
 from overload_list import types
 import unittest
 import typing
-from numba import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+from numba import NumbaDeprecationWarning, NumbaPendingDeprecationWarning, njit
 import warnings
 
 
@@ -76,7 +76,7 @@ def foo_ovld_list():
         foo_typevars_list_dict, foo_typevars_list_dict_list, foo_typevars_T_K
 
 
-@overload_list.njit
+@njit
 def jit_func(a, b):
     return func(a, b)
 
@@ -96,7 +96,7 @@ class TestOverloadListDefault(unittest.TestCase):
 
             return (foo_int,)
 
-        @overload_list.njit
+        @njit
         def jit_func(a):
             return foo(a)
 
@@ -114,7 +114,7 @@ class TestOverloadListDefault(unittest.TestCase):
 
             return (foo_float,)
 
-        @overload_list.njit
+        @njit
         def jit_func(a):
             return foo(a)
 
@@ -132,7 +132,7 @@ class TestOverloadListDefault(unittest.TestCase):
 
             return (foo_bool,)
 
-        @overload_list.njit
+        @njit
         def jit_func(a):
             return foo(a)
 
@@ -150,7 +150,7 @@ class TestOverloadListDefault(unittest.TestCase):
 
             return (foo_str,)
 
-        @overload_list.njit
+        @njit
         def jit_func(a):
             return foo(a)
 
@@ -170,7 +170,7 @@ class TestOverloadListDefault(unittest.TestCase):
 
     #         return (foo_list,)
 
-    #     @overload_list.njit
+    #     @njit
     #     def jit_func(a):
     #         return foo(a)
 
@@ -188,7 +188,7 @@ class TestOverloadListDefault(unittest.TestCase):
 
             return (foo_tuple,)
 
-        @overload_list.njit
+        @njit
         def jit_func(a):
             return foo(a)
 
