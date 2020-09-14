@@ -79,10 +79,11 @@ class TestAst(unittest.TestCase):
 
             def bar():
                 t_typevar: Q
+                return Q
             return bar
         test_func = foo()
         result = get_variable_annotations(test_func)
-        expected_result = {'t_typevar': [Q]}
+        expected_result = {'t_typevar': [test_func()]}
         self.assertEqual(result, expected_result)
 
 

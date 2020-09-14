@@ -7,7 +7,7 @@ from pathlib import Path
 def get_variable_annotations(func):
     """Get local variable annotations from the function."""
     module_path = inspect.getfile(func)
-    func_global_variables = func.__globals__
+    func_global_variables = func.__globals__.copy()
     func_global_variables.update(inspect.getclosurevars(func).nonlocals)
     module_name = (Path(f'{module_path}').stem)
     func_code = inspect.getsource(func)
