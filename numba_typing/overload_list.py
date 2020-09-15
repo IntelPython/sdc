@@ -21,7 +21,8 @@ def overload_list(orig_func):
             if args_orig_func.defaults:
                 defaults_dict = {name: value for name, value in zip(
                     args_orig_func.args[::-1], args_orig_func.defaults[::-1])}
-            result = choose_func_by_sig(sig_list, values_dict, defaults_dict)
+            if valid_signature(sig_list, values_dict, defaults_dict):
+                result = choose_func_by_sig(sig_list, values_dict)
 
             if result is None:
                 raise TypeError(f'Unsupported types a={a}, b={b}')
@@ -31,6 +32,22 @@ def overload_list(orig_func):
         return overload(orig_func, strict=False)(wrapper)
 
     return overload_inner
+
+
+def valid_signature(list_signature, values_dict, defaults_dict):
+    def check_defaults(sig_def):
+        for name, val in defaults_dict.items():
+            if sig_def.get(name) is None:
+                raise AttributeError(f'{name} does not match the signature of the function passed to overload_list')
+            if not sig_def[name] == val:
+                raise ValueError(f'The default arguments are not equal: {name}: {val} != {sig_def[name]}')
+
+    for sig, _ in list_signature:
+        for param in sig.parameters:
+            if len(param) != len(values_dict.items()):
+                check_defaults(sig.defaults)
+
+    return True
 
 
 def check_int_type(n_type):
@@ -155,26 +172,20 @@ TypeChecker.add_type_check(tuple, check_tuple_type)
 TypeChecker.add_type_check(dict, check_dict_type)
 
 
-def choose_func_by_sig(sig_list, values_dict, defaults_dict):
-    checker = TypeChecker()
+def choose_func_by_sig(sig_list, values_dict):
+    def check_signature(sig_params, types_dict):
+        checker = TypeChecker()
+        for name, typ in types_dict.items():  # name,type = 'a',int64
+            if isinstance(typ, types.Literal):
+                typ = typ.literal_type
+            if not checker.match(sig_params[name], typ):
+                return False
+
+        return True
+
     for sig, func in sig_list:  # sig = (Signature,func)
         for param in sig.parameters:  # param = {'a':int,'b':int}
-            for name, typ in values_dict.items():  # name,type = 'a',int64
-                if isinstance(typ, types.Literal):
-                    typ = typ.literal_type
-
-                full_match = checker.match(param[name], typ)
-
-                if not full_match:
-                    break
-
-            if len(param) != len(values_dict.items()):
-                for name, val in defaults_dict.items():
-                    if not sig.defaults.get(name) is None:
-                        full_match = full_match and sig.defaults[name] == val
-
-            checker.clear_typevars_dict()
-            if full_match:
+            if check_signature(param, values_dict):
                 return func
 
     return None
