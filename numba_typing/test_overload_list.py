@@ -3,79 +3,14 @@ from overload_list import List, Dict
 from overload_list import types
 import unittest
 import typing
-from numba import NumbaDeprecationWarning, NumbaPendingDeprecationWarning, njit, core
-import warnings
-
-
-def func(a, b):
-    ...
+from numba import njit, core
 
 
 T = typing.TypeVar('T')
 K = typing.TypeVar('K')
 
 
-@overload_list.overload_list(func)
-def foo_ovld_list():
-
-    def foo_int(a: int, b: int = 0):
-        return ('int', a, b)
-
-    def foo_float(a: float, b: float = 0.0):
-        return ('float', a, b)
-
-    def foo_bool(a: bool, b: bool = False):
-        return ('bool', a, b)
-
-    def foo_str(a: str, b: str = '0'):
-        return ('str', a, b)
-
-    def foo_list(a: typing.List[int], b: list = [0, 0, 0]):
-        return ('list', a, b)
-
-    def foo_tuple(a: typing.Tuple[int, float], b: tuple = (0, 0)):
-        return ('tuple', a, b)
-
-    def foo_dict(a: typing.Dict[str, int], b: typing.Dict[int, bool] = {0: False}):
-        return ('dict', a, b)
-
-    def foo_union(a: typing.Union[int, str], b: typing.Union[float, bool] = None):
-        return('union', a, b)
-
-    def foo_list_in_list(a: typing.List[typing.List[int]],
-                         b: typing.List[typing.List[typing.List[float]]] = [[[0.0, 0.0]]]):
-        return('list_in_list', a, b)
-
-    def foo_tuple_in_tuple(a: typing.Tuple[typing.Tuple[int, int]],
-                           b: typing.Tuple[typing.Tuple[typing.Tuple[float, float]]] = ((0.0, 0.0))):
-        return('tuple_in_tuple', a, b)
-
-    def foo_typevars_T_T(a: T, b: T):
-        return('TypeVars_TT', a, b)
-
-    def foo_typevars_T_K(a: T, b: K):
-        return('TypeVars_TK', a, b)
-
-    def foo_typevars_list_T(a: typing.List[T], b: T):
-        return('TypeVars_ListT', a, b)
-
-    def foo_typevars_list_dict(a: typing.List[T], b: typing.Dict[K, T]):
-        return('TypeVars_List_Dict', a, b)
-
-    def foo_typevars_list_dict_list(a: typing.List[T], b: typing.Dict[K, typing.List[T]]):
-        return('TypeVars_List_Dict_List', a, b)
-
-    return foo_int, foo_float, foo_bool, foo_str, foo_list, foo_tuple, foo_dict, foo_union,\
-        foo_list_in_list, foo_tuple_in_tuple, foo_typevars_T_T, foo_typevars_list_T,\
-        foo_typevars_list_dict, foo_typevars_list_dict_list, foo_typevars_T_K
-
-
-@njit
-def jit_func(a, b):
-    return func(a, b)
-
-
-class TestOverloadListDefault(unittest.TestCase):
+class TestOverloadList(unittest.TestCase):
     maxDiff = None
 
     def test_myfunc_literal_type_default(self):
@@ -96,96 +31,6 @@ class TestOverloadListDefault(unittest.TestCase):
 
         self.assertEqual(jit_func(1), ('literal', 1, 2))
 
-    def test_myfunc_int_type_default(self):
-        def foo(a, b=0):
-            ...
-
-        @overload_list.overload_list(foo)
-        def foo_ovld_list():
-
-            def foo_int(a: int, b: int = 0):
-                return ('int', a, b)
-
-            return (foo_int,)
-
-        @njit
-        def jit_func(a):
-            return foo(a)
-
-        self.assertEqual(jit_func(1), ('int', 1, 0))
-
-    def test_myfunc_float_type_default(self):
-        def foo(a, b=0.0):
-            ...
-
-        @overload_list.overload_list(foo)
-        def foo_ovld_list():
-
-            def foo_float(a: float, b: float = 0.0):
-                return ('float', a, b)
-
-            return (foo_float,)
-
-        @njit
-        def jit_func(a):
-            return foo(a)
-
-        self.assertEqual(jit_func(1.0), ('float', 1.0, 0.0))
-
-    def test_myfunc_bool_type_default(self):
-        def foo(a, b=False):
-            ...
-
-        @overload_list.overload_list(foo)
-        def foo_ovld_list():
-
-            def foo_bool(a: bool, b: bool = False):
-                return ('bool', a, b)
-
-            return (foo_bool,)
-
-        @njit
-        def jit_func(a):
-            return foo(a)
-
-        self.assertEqual(jit_func(True), ('bool', True, False))
-
-    def test_myfunc_str_type_default(self):
-        def foo(a, b='0'):
-            ...
-
-        @overload_list.overload_list(foo)
-        def foo_ovld_list():
-
-            def foo_str(a: str, b: str = '0'):
-                return ('str', a, b)
-
-            return (foo_str,)
-
-        @njit
-        def jit_func(a):
-            return foo(a)
-
-        self.assertEqual(jit_func('qwe'), ('str', 'qwe', '0'))
-
-    def test_myfunc_tuple_type_default(self):
-        def foo(a, b=(0, 0)):
-            ...
-
-        @overload_list.overload_list(foo)
-        def foo_ovld_list():
-
-            def foo_tuple(a: tuple, b: tuple = (0, 0)):
-                return ('tuple', a, b)
-
-            return (foo_tuple,)
-
-        @njit
-        def jit_func(a):
-            return foo(a)
-
-        self.assertEqual(jit_func((1, 2)), ('tuple', (1, 2), (0, 0)))
-
     def test_myfunc_tuple_type_error(self):
         def foo(a, b=(0, 0)):
             ...
@@ -205,92 +50,96 @@ class TestOverloadListDefault(unittest.TestCase):
         self.assertRaises(core.errors.TypingError, jit_func, (1, 2, 3), ('3', False))
 
 
-class TestOverloadList(unittest.TestCase):
-    maxDiff = None
+def generator_test(func_name, param, values_dict, defaults_dict={}):
 
-    def test_myfunc_int_type(self):
-        self.assertEqual(jit_func(1, 2), ('int', 1, 2))
+    def check_type(typ):
+        if isinstance(typ, type):
+            return typ.__name__
+        return typ
 
-    def test_myfunc_float_type(self):
-        self.assertEqual(jit_func(1.0, 2.0), ('float', 1.0, 2.0))
+    value_keys = ", ".join("{}".format(key) for key in values_dict.keys())
+    defaults_keys = ", ".join("{}".format(key) for key in defaults_dict.keys())
+    value_str = ", ".join("{}: {}".format(key, check_type(val)) for key, val in values_dict.items())
+    defaults_str = ", ".join("{} = {}".format(key, val) if not isinstance(
+        val, str) else "{} = '{}'".format(key, val) for key, val in defaults_dict.items())
+    defaults_str_type = ", ".join("{}: {} = {}".format(key, check_type(type(val)), val) if not isinstance(val, str)
+                                  else "{}: {} = '{}'".format(key, check_type(type(val)), val)
+                                  for key, val in defaults_dict.items())
+    value_type = ", ".join("{}".format(val) for val in values_dict.values())
+    defaults_type = ", ".join("{}".format(type(val)) for val in defaults_dict.values())
+    param_qwe = ", ".join("{}".format(i) for i in param)
+    test = f"""
+def test_myfunc_{func_name}_type_default(self):
+    def foo({value_keys},{defaults_str}):
+        ...
 
-    def test_myfunc_bool_type(self):
-        self.assertEqual(jit_func(True, True), ('bool', True, True))
+    @overload_list.overload_list(foo)
+    def foo_ovld_list():
 
-    def test_myfunc_str_type(self):
-        self.assertEqual(jit_func('qwe', 'qaz'), ('str', 'qwe', 'qaz'))
+        def foo_{func_name}({value_str},{defaults_str_type}):
+            return ("{value_type}","{defaults_type}")
 
-    def test_myfunc_list_type(self):
-        self.assertEqual(jit_func([1, 2], [3, 4]), ('list', [1, 2], [3, 4]))
+        return (foo_{func_name},)
 
-    def test_myfunc_List_typed(self):
-        warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
-        warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
-        L = List([1, 2, 3])
-        self.assertEqual(jit_func(L, [3, 4]), ('list', L, [3, 4]))
+    @njit
+    def jit_func({value_keys},{defaults_str}):
+        return foo({value_keys},{defaults_keys})
 
-    def test_myfunc_tuple_type(self):
-        self.assertEqual(jit_func((1, 2.0), ('3', False)), ('tuple', (1, 2.0), ('3', False)))
+    self.assertEqual(jit_func({param_qwe}), ("{value_type}", "{defaults_type}"))
+"""
+    loc = {}
+    exec(test, globals(), loc)
+    return loc
 
-    def test_myfunc_dict_type(self):
-        D = Dict.empty(key_type=types.unicode_type, value_type=types.int64)
-        D_1 = Dict.empty(key_type=types.int64, value_type=types.boolean)
-        D['qwe'] = 1
-        D['qaz'] = 2
-        D_1[1] = True
-        D_1[0] = False
-        self.assertEqual(jit_func(D, D_1), ('dict', D, D_1))
 
-    def test_myfunc_union_typing_int_bool(self):
-        self.assertEqual(jit_func(1, False), ('union', 1, False))
+L = List([1, 2, 3])
+L_int = List([List([1, 2])])
+L_float = List([List([List([3.0, 4.0])])])
+L_f = List([1.0, 2.0])
+D = Dict.empty(key_type=types.unicode_type, value_type=types.int64)
+D_1 = Dict.empty(key_type=types.int64, value_type=types.boolean)
+D['qwe'] = 1
+D['qaz'] = 2
+D_1[1] = True
+D_1[0] = False
+list_type = types.ListType(types.int64)
+D_list = Dict.empty(key_type=types.unicode_type, value_type=list_type)
+D_list['qwe'] = List([3, 4, 5])
+str_1 = 'qwe'
+str_2 = 'qaz'
+test_cases = [('int', [1, 2], {'a': int, 'b': int}), ('float', [1.0, 2.0], {'a': float, 'b': float}),
+              ('bool', [True, True], {'a': bool, 'b': bool}), ('str', ['str_1', 'str_2'], {'a': str, 'b': str}),
+              ('list', [[1, 2], [3, 4]], {'a': typing.List[int], 'b':list}),
+              ('List_typed', [L, [3, 4]], {'a': typing.List[int], 'b':list}),
+              ('tuple', [(1, 2.0), ('3', False)], {'a': typing.Tuple[int, float], 'b':tuple}),
+              ('dict', ['D', 'D_1'], {'a': typing.Dict[str, int], 'b': typing.Dict[int, bool]}),
+              ('union_1', [1, False], {'a': typing.Union[int, str], 'b': typing.Union[float, bool]}),
+              ('union_2', ['str_1', False], {'a': typing.Union[int, str], 'b': typing.Union[float, bool]}),
+              ('nested_list', ['L_int', 'L_float'], {'a': typing.List[typing.List[int]],
+                                                     'b': typing.List[typing.List[typing.List[float]]]}),
+              ('TypeVar_TT', ['L_f', [3.0, 4.0]], {'a': 'T', 'b': 'T'}),
+              ('TypeVar_TK', [1.0, 2], {'a': 'T', 'b': 'K'}),
+              ('TypeVar_ListT_T', ['L', 5], {'a': 'typing.List[T]', 'b': 'T'}),
+              ('TypeVar_ListT_DictKT', ['L', 'D'], {'a': 'typing.List[T]', 'b': 'typing.Dict[K, T]'}),
+              ('TypeVar_ListT_DictK_ListT', ['L', 'D_list'], {'a': 'typing.List[T]',
+                                                              'b': 'typing.Dict[K, typing.List[T]]'})]
 
-    def test_myfunc_union_typing_str_bool(self):
-        self.assertEqual(jit_func('qwe', False), ('union', 'qwe', False))
+test_cases_default = [('int_defaults', [1], {'a': int}, {'b': 0}), ('float_defaults', [1.0], {'a': float}, {'b': 0.0}),
+                      ('bool_defaults', [True], {'a': bool}, {'b': False}),
+                      ('str_defaults', ['str_1'], {'a': str}, {'b': '0'}),
+                      ('tuple_defaults', [(1, 2)], {'a': tuple}, {'b': (0, 0)})]
 
-    def test_myfunc_union_typing_int_float(self):
-        self.assertEqual(jit_func(1, 2.0), ('union', 1, 2.0))
 
-    def test_myfunc_union_typing_str_float(self):
-        self.assertEqual(jit_func('qwe', 2.0), ('union', 'qwe', 2.0))
+for name, val, annotation in test_cases:
+    run_generator = generator_test(name, val, annotation)
+    test_name = list(run_generator.keys())[0]
+    setattr(TestOverloadList, test_name, run_generator[test_name])
 
-    def test_myfunc_list_in_list_type(self):
-        L_int = List([List([1, 2])])
-        L_float = List([List([List([3.0, 4.0])])])
 
-        self.assertEqual(jit_func(L_int, L_float), ('list_in_list', L_int, L_float))
-
-    def test_myfunc_tuple_in_tuple(self):
-        self.assertEqual(jit_func(((1, 2),), (((3.0, 4.0),),)), ('tuple_in_tuple', ((1, 2),), (((3.0, 4.0),),)))
-
-    def test_myfunc_typevar_T_T(self):
-        self.assertEqual(jit_func(((1, 2),), ((3, 4),)), ('TypeVars_TT', ((1, 2),), ((3, 4),)))
-
-    def test_myfunc_typevar_T_T_list(self):
-        warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
-        warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
-        V = List([1.0, 2.0])
-        self.assertEqual(jit_func(V, [3.0, 4.0]), ('TypeVars_TT', V, [3.0, 4.0]))
-
-    def test_myfunc_typevar_T_K(self):
-        self.assertEqual(jit_func(1.0, 2), ('TypeVars_TK', 1.0, 2))
-
-    def test_myfunc_typevar_List_T(self):
-        L_int = List([1, 2])
-        self.assertEqual(jit_func(L_int, 2), ('TypeVars_ListT', L_int, 2))
-
-    def test_myfunc_typevar_List_Dict(self):
-        D = Dict.empty(key_type=types.unicode_type, value_type=types.int64)
-        D['qwe'] = 0
-        L_int = List([1, 2])
-        self.assertEqual(jit_func(L_int, D), ('TypeVars_List_Dict', L_int, D))
-
-    def test_myfunc_typevar_List_Dict_List(self):
-        list_type = types.ListType(types.int64)
-        D = Dict.empty(key_type=types.unicode_type, value_type=list_type)
-        D['qwe'] = List([3, 4, 5])
-        L_int = List([1, 2])
-
-        self.assertEqual(jit_func(L_int, D), ('TypeVars_List_Dict_List', L_int, D))
+for name, val, annotation, defaults in test_cases_default:
+    run_generator = generator_test(name, val, annotation, defaults)
+    test_name = list(run_generator.keys())[0]
+    setattr(TestOverloadList, test_name, run_generator[test_name])
 
 
 if __name__ == "__main__":
