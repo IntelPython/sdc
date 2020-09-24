@@ -32,7 +32,7 @@ import pandas as pd
 
 from numba import types
 from numba.core import cgutils
-from numba.extending import (typeof_impl, NativeValue, intrinsic, box, unbox, lower_builtin, )
+from numba.extending import (typeof_impl, NativeValue, box, unbox, lower_builtin, )
 
 from numba.core.typing.templates import signature
 from numba.core.imputils import impl_ret_untracked, call_getiter
@@ -42,6 +42,7 @@ from sdc.datatypes.common_functions import SDCLimitation, _sdc_take
 from sdc.utilities.utils import sdc_overload, sdc_overload_attribute, sdc_overload_method
 from sdc.utilities.sdc_typing_utils import TypeChecker, check_is_numeric_array
 from sdc.functions.numpy_like import getitem_by_mask
+from sdc.utilities.utils import sdc_intrinsic
 
 
 def _check_dtype_param_type(dtype):
@@ -52,7 +53,7 @@ def _check_dtype_param_type(dtype):
     return isinstance(dtype, valid_dtype_types) or dtype is None
 
 
-@intrinsic
+@sdc_intrinsic
 def init_range_index(typingctx, data, name=None):
     name = types.none if name is None else name
     is_named = False if name is types.none else True

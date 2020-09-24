@@ -29,9 +29,10 @@ import pandas
 
 from numba import types
 from numba.core import cgutils
-from numba.extending import (models, overload, register_model, make_attribute_wrapper, intrinsic)
+from numba.extending import (models, register_model, make_attribute_wrapper)
 from numba.core.datamodel import (register_default, StructModel)
 from numba.core.typing.templates import signature
+from sdc.utilities.utils import sdc_intrinsic
 
 
 class SeriesGetitemAccessorType(types.Type):
@@ -54,7 +55,7 @@ class SeriesGetitemAccessorTypeModel(StructModel):
 make_attribute_wrapper(SeriesGetitemAccessorType, 'series', '_series')
 
 
-@intrinsic
+@sdc_intrinsic
 def series_getitem_accessor_init(typingctx, series, accessor):
     def series_getitem_accessor_init_codegen(context, builder, signature, args):
         series_val, accessor_val = args

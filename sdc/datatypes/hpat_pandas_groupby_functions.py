@@ -36,7 +36,6 @@ import sdc
 
 from numba import types
 from numba.core import cgutils
-from numba.extending import intrinsic
 from numba.core.registry import cpu_target
 from numba.core.typing import signature
 from numba import literally
@@ -47,6 +46,7 @@ from sdc.utilities.sdc_typing_utils import TypeChecker, kwsparams2list, sigparam
 from sdc.utilities.utils import (sdc_overload, sdc_overload_method, sdc_register_jitable)
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_ext import string_type
+from sdc.utilities.utils import sdc_intrinsic
 
 
 performance_limitation = "This function may reveal slower performance than Pandas* on user system.\
@@ -72,7 +72,7 @@ def merge_groupby_dicts_inplace(left, right):
     return left
 
 
-@intrinsic
+@sdc_intrinsic
 def init_dataframe_groupby(typingctx, parent, column_id, data, sort, target_columns=None):
 
     target_columns = types.none if target_columns is None else target_columns
@@ -116,7 +116,7 @@ def init_dataframe_groupby(typingctx, parent, column_id, data, sort, target_colu
     return sig, codegen
 
 
-@intrinsic
+@sdc_intrinsic
 def init_series_groupby(typingctx, parent, by_data, data, sort):
 
     def codegen(context, builder, signature, args):
