@@ -32,7 +32,7 @@ import numba
 from numba.core import cgutils, types
 from numba.core.typing import signature
 from numba.core.typing.templates import infer_global, AbstractTemplate, CallableTemplate
-from numba.extending import overload
+from numba.extending import overload, intrinsic
 from numba.core.imputils import (lower_builtin, impl_ret_borrowed)
 
 import sdc
@@ -44,7 +44,6 @@ from sdc.hiframes.pd_series_ext import (
     if_series_to_array_type)
 from numba.core.errors import TypingError
 from sdc.datatypes.categorical.types import Categorical
-from sdc.utilities.utils import sdc_intrinsic
 
 
 def isna(arr, i):
@@ -226,7 +225,7 @@ def fix_rolling_array_overload(column):
     return fix_rolling_array_impl
 
 
-@sdc_intrinsic
+@intrinsic
 def init_series(typingctx, data, index=None, name=None):
     """Create a Series with provided data, index and name values.
     Used as a single constructor for Series and assigning its data, so that

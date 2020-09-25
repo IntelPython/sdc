@@ -301,6 +301,40 @@ def box_dataframe(typ, val, c):
     return df_obj
 
 
+@intrinsic
+def unbox_dataframe_column(typingctx, df, i=None):
+
+    def codegen(context, builder, sig, args):
+        pyapi = context.get_python_api(builder)
+        c = numba.pythonapi._UnboxContext(context, builder, pyapi)
+
+        df_typ = sig.args[0]
+        col_ind = sig.args[1].literal_value
+        data_typ = df_typ.data[col_ind]
+        col_name = df_typ.columns[col_ind]
+        # TODO: refcounts?
+
+        dataframe = cgutils.create_struct_proxy(
+            sig.args[0])(context, builder, value=args[0])
+        series_obj = c.pyapi.object_getattr_string(dataframe.parent, col_name)
+        arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
+
+        # TODO: support column of tuples?
+        native_val = _unbox_series_data(
+            data_typ.dtype, data_typ, arr_obj, c)
+
+        c.pyapi.decref(series_obj)
+        c.pyapi.decref(arr_obj)
+        c.context.nrt.incref(builder, df_typ.index, dataframe.index)
+
+        # assign array and set unboxed flag
+        dataframe.data = builder.insert_value(
+            dataframe.data, native_val.value, col_ind)
+        return dataframe._getvalue()
+
+    return signature(df, df, i), codegen
+
+
 def _unbox_index_data(index_typ, index_obj, c):
     """ Unboxes Pandas index object basing on the native type inferred previously.
         Params:

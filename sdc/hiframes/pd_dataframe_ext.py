@@ -40,7 +40,6 @@ from numba.core.imputils import impl_ret_new_ref, impl_ret_borrowed
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.hiframes.pd_dataframe_type import DataFrameType, ColumnLoc
 from sdc.str_ext import string_type
-from sdc.utilities.utils import sdc_intrinsic
 
 
 @infer_getattr
@@ -81,7 +80,7 @@ def get_structure_maps(col_types, col_names):
     return column_loc, data_typs_map, types_order
 
 
-@sdc_intrinsic
+@intrinsic
 def init_dataframe(typingctx, *args):
     """Create a DataFrame with provided data, index and columns values.
     Used as a single constructor for DataFrame and assigning its data, so that

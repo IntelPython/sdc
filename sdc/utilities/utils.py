@@ -624,24 +624,13 @@ def update_jit_options(jit_options, parallel, config_flag):
     return jit_options
 
 
-def sdc_intrinsic(func, jit_options={}, parallel=None, strict=True, inline=None, prefer_literal=True):
+def sdc_overload(func, jit_options={}, parallel=None, strict=True, inline=None):
     jit_options = update_jit_options(jit_options, parallel, config_use_parallel_overloads)
 
     if inline is None:
         inline = 'always' if config_inline_overloads else 'never'
 
-    jit_options['prefer_literal'] = prefer_literal
-
-    return intrinsic(func, jit_options=jit_options)
-
-
-def sdc_overload(func, jit_options={}, parallel=None, strict=True, inline=None, prefer_literal=True):
-    jit_options = update_jit_options(jit_options, parallel, config_use_parallel_overloads)
-
-    if inline is None:
-        inline = 'always' if config_inline_overloads else 'never'
-
-    return overload(func, jit_options=jit_options, strict=strict, inline=inline, prefer_literal=prefer_literal)
+    return overload(func, jit_options=jit_options, strict=strict, inline=inline)
 
 
 def patched_register_jitable(*args, **kwargs):
@@ -677,19 +666,19 @@ def sdc_register_jitable(*args, **kwargs):
         return wrap(*args)
 
 
-def sdc_overload_method(typ, name, jit_options={}, parallel=None, strict=True, inline=None, prefer_literal=True):
+def sdc_overload_method(typ, name, jit_options={}, parallel=None, strict=True, inline=None):
     jit_options = update_jit_options(jit_options, parallel, config_use_parallel_overloads)
 
     if inline is None:
         inline = 'always' if config_inline_overloads else 'never'
 
-    return overload_method(typ, name, jit_options=jit_options, strict=strict, inline=inline, prefer_literal=prefer_literal)
+    return overload_method(typ, name, jit_options=jit_options, strict=strict, inline=inline)
 
 
-def sdc_overload_attribute(typ, name, jit_options={}, parallel=None, strict=True, inline=None, prefer_literal=True):
+def sdc_overload_attribute(typ, name, jit_options={}, parallel=None, strict=True, inline=None):
     jit_options = update_jit_options(jit_options, parallel, config_use_parallel_overloads)
 
     if inline is None:
         inline = 'always' if config_inline_overloads else 'never'
 
-    return overload_attribute(typ, name, jit_options=jit_options, strict=strict, inline=inline, prefer_literal=prefer_literal)
+    return overload_attribute(typ, name, jit_options=jit_options, strict=strict, inline=inline)
