@@ -20,10 +20,11 @@ def generator_test(param, values_dict, defaults_dict={}):
             return typ.__name__
         return typ
 
-    value_keys = ", ".join(f"{key}" if not key in defaults_dict.keys()
+    value_keys = ", ".join(f"{key}" if key not in defaults_dict.keys()
                            else f"{key} = {defaults_dict[key]}" for key in values_dict.keys())
-    value_annotation = ", ".join(f"{key}: {check_type(val)}" if not key in defaults_dict.keys()
-                                 else f"{key}: {check_type(val)} = {defaults_dict[key]}" for key, val in values_dict.items())
+    value_annotation = ", ".join(f"{key}: {check_type(val)}" if key not in defaults_dict.keys()
+                                 else f"{key}: {check_type(val)} = {defaults_dict[key]}"
+                                 for key, val in values_dict.items())
     value_type = ", ".join(f"{val}" for val in values_dict.values())
     return_value_keys = ", ".join("{}".format(key) for key in values_dict.keys())
     param_func = ", ".join(f"{val}" for val in param)
@@ -119,8 +120,8 @@ class TestOverload(unittest.TestCase):
         test_cases = [([1.0], {'a': 'T'}), ([False], {'a': 'T'}), (['list_numba', [1, 2]], {'a': 'T', 'b': 'T'}),
                       ([1, 2.0], {'a': 'T', 'b': 'K'}), ([1], {'a': 'S'}), ([1.0], {'a': 'S'}),
                       ([[True, True]], {'a': 'typing.List[T]'}), (['list_numba'], {'a': 'typing.List[T]'}),
-                      ([('str_variable', 2)], {'a': 'typing.Tuple[T,K]'}), (['dict_numba'], {'a': 'typing.Dict[K, T]'}),
-                      (['dict_numba_1'], {'a': 'typing.Dict[K, T]'}),
+                      ([('str_variable', 2)], {'a': 'typing.Tuple[T,K]'}),
+                      (['dict_numba_1'], {'a': 'typing.Dict[K, T]'}), (['dict_numba'], {'a': 'typing.Dict[K, T]'}),
                       (['list_in_dict_numba'], {'a': 'typing.Dict[K, typing.List[T]]'})]
 
         for case in test_cases:
