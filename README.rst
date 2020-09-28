@@ -181,6 +181,11 @@ Running unit tests
     python sdc/tests/gen_test_data.py
     python -m unittest
 
+Disable Numba performance warnings:
+::
+
+    export NUMBA_DISABLE_PERFORMANCE_WARNINGS=1
+
 References
 ##########
 
