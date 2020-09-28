@@ -25,7 +25,7 @@ def overload_list(orig_func):
                 result = choose_func_by_sig(sig_list, values_dict)
 
             if result is None:
-                raise TypeError(f'Unsupported types a={a}, b={b}')
+                raise TypeError(f'Unsupported types {args}')
 
             return result
 
@@ -35,17 +35,19 @@ def overload_list(orig_func):
 
 
 def valid_signature(list_signature, values_dict, defaults_dict):
-    def check_defaults(sig_def):
+    def check_defaults(list_param, sig_def):
         for name, val in defaults_dict.items():
             if sig_def.get(name) is None:
                 raise AttributeError(f'{name} does not match the signature of the function passed to overload_list')
-            if not sig_def[name] == val:
+            if sig_def[name] != val:
                 raise ValueError(f'The default arguments are not equal: {name}: {val} != {sig_def[name]}')
+            if type(sig_def[name]) != list_param[name]:
+                raise TypeError(f'The default value does not match the type: {list_param[name]}')
 
     for sig, _ in list_signature:
         for param in sig.parameters:
-            if len(param) != len(values_dict.items()):
-                check_defaults(sig.defaults)
+            if len(param) != len(values_dict):
+                check_defaults(param, sig.defaults)
 
     return True
 
