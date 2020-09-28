@@ -137,8 +137,8 @@ class TestOverload(unittest.TestCase):
                 self.assertEqual(*run_test(case))
 
     def test_overriding_default_types(self):
-        test_cases = [([5], {'a': int}, {'a': 1}), ([5.0], {'a': float}, {'a': 1.0}), ([False], {'a': bool}, {'a': True}),
-                      (['str_variable_1'], {'a': str}, {'a': 'str_variable'})]
+        test_cases = [([5], {'a': int}, {'a': 1}), ([5.0], {'a': float}, {'a': 1.0}),
+                      ([False], {'a': bool}, {'a': True}), (['str_variable_1'], {'a': str}, {'a': 'str_variable'})]
 
         for case in test_cases:
             with self.subTest(case=case):
