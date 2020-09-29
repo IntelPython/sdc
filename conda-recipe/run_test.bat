@@ -7,6 +7,8 @@ set PYTHONFAULTHANDLER=1
 python -m sdc.tests.gen_test_data
 if errorlevel 1 exit 1
 
+type *.csv
+
 @rem TODO investigate root cause of NumbaPerformanceWarning
 @rem http://numba.pydata.org/numba-doc/latest/user/parallel.html#diagnostics
 python -W ignore -u -m sdc.runtests -v sdc.tests.test_basic
