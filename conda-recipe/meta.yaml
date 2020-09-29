@@ -16,8 +16,8 @@ build:
 
 requirements:
   build:
-    - {{ compiler('c') }}
-    - {{ compiler('cxx') }}
+    - {{ compiler('c') }}      # [not osx]
+    - {{ compiler('cxx') }}    # [not osx]
     - wheel
     - python
 
