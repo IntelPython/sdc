@@ -92,7 +92,8 @@ class TestOverload(unittest.TestCase):
                 self.assertEqual(*run_test(case))
 
     def test_container_types(self):
-        test_cases = [([[1, 2]], {'a': list}), ([(1.0, 2.0)], {'a': tuple}), (['dict_numba'], {'a': dict})]
+        test_cases = [([[1, 2]], {'a': list}), (['list_numba'], {'a': list}), ([(1.0, 2.0)], {'a': tuple}),
+                      ([(1, 2.0)], {'a': tuple}), (['dict_numba'], {'a': dict})]
 
         for case in test_cases:
             with self.subTest(case=case):
@@ -101,8 +102,11 @@ class TestOverload(unittest.TestCase):
     def test_typing_types(self):
         test_cases = [([[1.0, 2.0]], {'a': typing.List[float]}), (['list_numba'], {'a': typing.List[int]}),
                       ([(1, 2.0)], {'a': typing.Tuple[int, float]}), (['dict_numba_1'], {'a': typing.Dict[int, bool]}),
+                      ([False], {'a': typing.Union[bool, str]}), (['str_variable'], {'a': typing.Union[bool, str]}),
                       ([True, 'str_variable'], {'a': typing.Union[bool, str], 'b': typing.Union[bool, str]}),
-                      ([1, False], {'a': typing.Any, 'b': typing.Any})]
+                      (['str_variable', True], {'a': typing.Union[bool, str], 'b': typing.Union[bool, str]}),
+                      ([1, False], {'a': typing.Any, 'b': typing.Any}),
+                      ([1.0, 'str_variable'], {'a': typing.Any, 'b': typing.Any})]
 
         for case in test_cases:
             with self.subTest(case=case):
@@ -117,7 +121,9 @@ class TestOverload(unittest.TestCase):
                 self.assertEqual(*run_test(case))
 
     def test_typevar_types(self):
-        test_cases = [([1.0], {'a': 'T'}), ([False], {'a': 'T'}), (['list_numba', [1, 2]], {'a': 'T', 'b': 'T'}),
+        test_cases = [([1.0], {'a': 'T'}), ([False], {'a': 'T'}), ([1, 2], {'a': 'T', 'b': 'T'}),
+                      ([1.0, 2.0], {'a': 'T', 'b': 'T'}), (['str_variable', 'str_variable'], {'a': 'T', 'b': 'T'}),
+                      (['list_numba', [1, 2]], {'a': 'T', 'b': 'T'}),
                       ([1, 2.0], {'a': 'T', 'b': 'K'}), ([1], {'a': 'S'}), ([1.0], {'a': 'S'}),
                       ([[True, True]], {'a': 'typing.List[T]'}), (['list_numba'], {'a': 'typing.List[T]'}),
                       ([('str_variable', 2)], {'a': 'typing.Tuple[T,K]'}),
@@ -164,9 +170,10 @@ class TestOverload(unittest.TestCase):
 
     def test_type_error(self):
         test_cases = [([1], {'a': float}), ([], {'a': float}, {'a': 1}), ([1], {'a': typing.Iterable[int]}),
-                      ([(1, 2, 3), (1.0, 2.0)], {'a': typing.Tuple[int, int],
-                                                 'b':tuple}), ([1, 2.0], {'a': 'T', 'b': 'T'}),
-                      ([1, True], {'a': 'T', 'b': 'S'})]
+                      ([(1, 2, 3)], {'a': typing.Tuple[int, int]}), ([(1.0, 2)], {'a': typing.Tuple[int, int]}),
+                      ([(1, 2.0)], {'a': typing.Tuple[int, int]}),  ([(1.0, 2.0)], {'a': typing.Tuple[int, int]}),
+                      ([1, 2.0], {'a': 'T', 'b': 'T'}), ([(1, 2), (1, 2.0)], {'a': 'T', 'b': 'T'}),
+                      ([True], {'a': 'S'}), (['str_variable'], {'a': 'S'})]
 
         for case in test_cases:
             with self.subTest(case=case):
