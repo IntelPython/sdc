@@ -123,13 +123,14 @@ def sdc_astype_overload(self, dtype):
     if not isinstance(self, (types.Array, StringArrayType, RangeIndexType)):
         return None
 
-    if not isinstance(dtype, (types.functions.NumberClass, types.Function, types.Literal)):
+    accepted_dtype_types = (types.functions.NumberClass, types.Function, types.StringLiteral)
+    if not isinstance(dtype, accepted_dtype_types):
         def impl(self, dtype):
             return literally(dtype)
 
         return impl
 
-    if not isinstance(dtype, (types.StringLiteral, types.UnicodeType, types.Function, types.functions.NumberClass)):
+    if not isinstance(dtype, accepted_dtype_types):
         ty_checker.raise_exc(dtype, 'string or type', 'dtype')
 
     if (
@@ -533,13 +534,13 @@ def sdc_fillna_overload(self, inplace=False, value=None):
     if not isinstance(self, (types.Array, StringArrayType)):
         return None
 
+    if not isinstance(inplace, (types.Literal, types.Omitted) or inplace is False):
+        return None
+
     dtype = self.dtype
     isnan = get_isnan(dtype)
 
-    if (
-        (isinstance(inplace, types.Literal) and inplace.literal_value == True) or  # noqa
-        (isinstance(inplace, bool) and inplace == True)  # noqa
-    ):
+    if (isinstance(inplace, types.Literal) and inplace.literal_value is True):
 
         def sdc_fillna_inplace_noop(self, inplace=False, value=None):
             return None

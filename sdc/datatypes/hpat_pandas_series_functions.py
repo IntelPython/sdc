@@ -1828,7 +1828,7 @@ def hpat_pandas_series_len(self):
     return hpat_pandas_series_len_impl
 
 
-@sdc_overload_method(SeriesType, 'astype', parallel=False)
+@sdc_overload_method(SeriesType, 'astype')
 def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -1884,6 +1884,9 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
 
     if not isinstance(copy, (types.Omitted, bool, types.Boolean)):
         ty_checker.raise_exc(copy, 'bool', 'copy')
+
+    if not (isinstance(dtype, (types.functions.NumberClass, types.Function, types.StringLiteral))):
+        return None
 
     if (not isinstance(errors, (types.Omitted, str, types.UnicodeType, types.StringLiteral)) and
         errors in ('raise', 'ignore')):
