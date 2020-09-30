@@ -663,8 +663,6 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    @skip_numba_jit("Lowering error while returning df from objmode:\n"
-                    "Can only insert i8* at [4] in {i8*, i8*, i64, i64, i8*, [1 x i64], [1 x i64]}: got i64*")
     def test_csv_cat1(self):
         test_impl = self.pd_csv_cat1()
         hpat_func = self.jit(test_impl)
@@ -684,8 +682,6 @@ class TestCSV(TestIO):
 
         return test_impl
 
-    @skip_numba_jit("Lowering error while returning df from objmode:\n"
-                    "Can only insert i8* at [4] in {i8*, i8*, i64, i64, i8*, [1 x i64], [1 x i64]}: got i64*")
     def test_csv_cat2(self):
         test_impl = self.pd_csv_cat2()
         hpat_func = self.jit(test_impl)
