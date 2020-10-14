@@ -32,7 +32,6 @@ import numba
 import sdc
 
 from functools import wraps
-from numba.core.registry import CPUDispatcher
 from sdc.utilities.utils import print_compile_times
 
 
@@ -51,7 +50,7 @@ def jit(signature_or_function=None, **options):
 
 
 def debug_compile_time(level=1, func_names=None):
-    """ Decorates Numba CPUDispatcher object to print compile stats after call.
+    """ Decorates Numba Dispatcher object to print compile stats after call.
         Usage:
             @debug_compile_time()
             @numba.njit
@@ -62,7 +61,6 @@ def debug_compile_time(level=1, func_names=None):
     """
 
     def get_wrapper(disp):
-        assert isinstance(disp, CPUDispatcher), disp
 
         @wraps(disp)
         def wrapper(*args, **kwargs):

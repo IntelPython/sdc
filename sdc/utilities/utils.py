@@ -53,7 +53,7 @@ from numba.extending import register_jitable, register_model
 from numba.core.datamodel.registry import register_default
 from functools import wraps
 from itertools import filterfalse, chain
-from numba.core.registry import CPUDispatcher
+
 
 # int values for types to pass to C code
 # XXX: _hpat_common.h
