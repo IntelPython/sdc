@@ -32,6 +32,7 @@ from numba.core import cgutils
 from numba.extending import (models, overload, register_model, make_attribute_wrapper, intrinsic)
 from numba.core.datamodel import (register_default, StructModel)
 from numba.core.typing.templates import signature
+from sdc.hiframes.pd_series_type import SeriesType
 
 
 class SeriesGetitemAccessorType(types.Type):
@@ -56,6 +57,11 @@ make_attribute_wrapper(SeriesGetitemAccessorType, 'series', '_series')
 
 @intrinsic
 def series_getitem_accessor_init(typingctx, series, accessor):
+
+    if not (isinstance(series, SeriesType)
+            and isinstance(accessor, types.StringLiteral)):
+        return None, None
+
     def series_getitem_accessor_init_codegen(context, builder, signature, args):
         series_val, accessor_val = args
         getitem_accessor = cgutils.create_struct_proxy(
