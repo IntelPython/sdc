@@ -49,6 +49,17 @@ from sdc.tests.test_utils import (count_array_OneDs,
 
 kde_file = 'kde.parquet'
 
+from functools import wraps
+def repeat(ntimes):
+    def wrapper(func):
+        @wraps(func)
+        def impl(*args, **kwargs):
+            for i in range(ntimes):
+                print(f"\titeration{i}")
+                func(*args, **kwargs)
+    
+        return impl
+    return wrapper
 
 class TestIO(TestCase):
 
@@ -229,9 +240,11 @@ class TestParquet(TestIO):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
+ntimes = 50
 
 class TestCSV(TestIO):
 
+    @repeat(ntimes)
     def test_pyarrow(self):
         tests = [
             "csv_keys1",
@@ -290,6 +303,7 @@ class TestCSV(TestIO):
 
     # inference errors
 
+    @repeat(ntimes)
     def test_csv_infer_error(self):
         read_csv = self._read_csv()
 
@@ -305,6 +319,7 @@ class TestCSV(TestIO):
 
     # inference from parameters
 
+    @repeat(ntimes)
     def test_csv_infer_params_default(self):
         read_csv = self._read_csv()
         int_type = self._int_type()
@@ -320,6 +335,7 @@ class TestCSV(TestIO):
             with self.subTest(fname=fname):
                 pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
 
+    @repeat(ntimes)
     def test_csv_infer_params_usecols_names(self):
         read_csv = self._read_csv()
         int_type = self._int_type()
@@ -334,6 +350,7 @@ class TestCSV(TestIO):
         cfunc = self.jit(pyfunc)
         pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
 
+    @repeat(ntimes)
     def test_csv_infer_params_usecols_no_names(self):
         read_csv = self._read_csv()
         int_type = self._int_type()
@@ -395,6 +412,7 @@ class TestCSV(TestIO):
 
         return test_impl
 
+    @repeat(ntimes)
     def test_csv_infer_file_default(self):
         def test(file_name):
             test_impl = self.pd_csv_infer_file_default(file_name)
@@ -413,6 +431,7 @@ class TestCSV(TestIO):
 
         return test_impl
 
+    @repeat(ntimes)
     def test_csv_infer_file_sep(self):
         test_impl = self.pd_csv_infer_file_sep()
         hpat_func = self.jit(test_impl)
@@ -422,14 +441,19 @@ class TestCSV(TestIO):
         read_csv = self._read_csv(use_pyarrow)
 
         def test_impl():
+            # return read_csv("csv_data_infer_sep.csv")
             return read_csv("csv_data_infer_sep.csv", delimiter=';')
 
         return test_impl
 
+    @repeat(ntimes)
     def test_csv_infer_file_delimiter(self):
         test_impl = self.pd_csv_infer_file_delimiter()
         hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+        result = hpat_func()
+        # print("DEBUG: result:\n", result)
+        result_ref = test_impl()
+        pd.testing.assert_frame_equal(result, result_ref)
 
     def pd_csv_infer_file_names(self, file_name="csv_data1.csv", use_pyarrow=False):
         read_csv = self._read_csv(use_pyarrow)
@@ -439,6 +463,7 @@ class TestCSV(TestIO):
 
         return test_impl
 
+    @repeat(ntimes)
     def test_csv_infer_file_names(self):
         def test(file_name):
             test_impl = self.pd_csv_infer_file_names(file_name)
@@ -457,6 +482,7 @@ class TestCSV(TestIO):
 
         return test_impl
 
+    @repeat(ntimes)
     def test_csv_infer_file_usecols(self):
         def test(file_name):
             test_impl = self.pd_csv_infer_file_usecols(file_name)
@@ -475,6 +501,7 @@ class TestCSV(TestIO):
 
         return test_impl
 
+    @repeat(ntimes)
     def test_csv_infer_file_names_usecols(self):
         def test(file_name):
             test_impl = self.pd_csv_infer_file_names_usecols(file_name)
@@ -527,6 +554,7 @@ class TestCSV(TestIO):
 
         return test_impl
 
+    @repeat(ntimes)
     def test_csv_infer_skip1(self):
         test_impl = self.pd_csv_infer_skip1()
         hpat_func = self.jit(test_impl)
@@ -594,6 +622,7 @@ class TestCSV(TestIO):
 
         return test_impl
 
+    @repeat(ntimes)
     def test_csv_str1(self):
         test_impl = self.pd_csv_str1()
         hpat_func = self.jit(test_impl)
@@ -763,6 +792,7 @@ class TestNumpy(TestIO):
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
 
+    @repeat(ntimes)
     def test_np_io3(self):
         def test_impl(A):
             if get_rank() == 0:
