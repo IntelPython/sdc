@@ -98,6 +98,15 @@ class TestDataFrame(TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
+    def test_create4(self):
+        """ Verifies empty DF can be created """
+        def test_impl():
+            df = pd.DataFrame({})
+            return len(df)
+        hpat_func = self.jit(test_impl)
+
+        self.assertEqual(hpat_func(), test_impl())
+
     def test_create_str(self):
         def test_impl():
             df = pd.DataFrame({'A': ['a', 'b', 'c']})

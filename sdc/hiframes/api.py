@@ -172,20 +172,20 @@ def fix_df_index(index, *columns):
 
 
 @overload(fix_df_index)
-def fix_df_index_overload(index, *columns):
+def fix_df_index_overload(index):
 
     # TO-DO: replace types.none index with separate type, e.g. DefaultIndex
     if (index is None or isinstance(index, types.NoneType)):
-        def fix_df_index_impl(index, *columns):
+        def fix_df_index_impl(index):
             return None
 
     elif isinstance(index, RangeIndexType):
-        def fix_df_index_impl(index, *columns):
+        def fix_df_index_impl(index):
             return index
 
     else:
         # default case, transform index the same as df data
-        def fix_df_index_impl(index, *columns):
+        def fix_df_index_impl(index):
             return fix_df_array(index)
 
     return fix_df_index_impl

@@ -85,66 +85,6 @@ def get_structure_maps(col_types, col_names):
     return column_loc, data_typs_map, types_order
 
 
-@intrinsic
-def init_dataframe(typingctx, *args):
-    """Create a DataFrame with provided data, index and columns values.
-    Used as a single constructor for DataFrame and assigning its data, so that
-    optimization passes can look for init_dataframe() to see if underlying
-    data has changed, and get the array variables from init_dataframe() args if
-    not changed.
-    """
-
-    n_cols = len(args) // 2
-    data_typs = tuple(args[:n_cols])
-    index_typ = args[n_cols]
-    column_names = tuple(a.literal_value for a in args[n_cols + 1:])
-
-    column_loc, data_typs_map, types_order = get_structure_maps(data_typs, column_names)
-
-    def codegen(context, builder, signature, args):
-        in_tup = args[0]
-        data_arrs = [builder.extract_value(in_tup, i) for i in range(n_cols)]
-        index = builder.extract_value(in_tup, n_cols)
-        column_strs = [numba.cpython.unicode.make_string_from_constant(
-            context, builder, string_type, c) for c in column_names]
-        # create dataframe struct and store values
-        dataframe = cgutils.create_struct_proxy(
-            signature.return_type)(context, builder)
-
-        data_list_type = [types.List(typ) for typ in types_order]
-
-        data_lists = []
-        for typ_id, typ in enumerate(types_order):
-            data_list_typ = context.build_list(builder, data_list_type[typ_id],
-                                               [data_arrs[data_id] for data_id in data_typs_map[typ][1]])
-            data_lists.append(data_list_typ)
-
-        data_tup = context.make_tuple(
-            builder, types.Tuple(data_list_type), data_lists)
-
-        col_list_type = types.List(string_type)
-        column_list = context.build_list(builder, col_list_type, column_strs)
-
-        dataframe.data = data_tup
-        dataframe.index = index
-        dataframe.columns = column_list
-        dataframe.parent = context.get_constant_null(types.pyobject)
-
-        # increase refcount of stored values
-        if context.enable_nrt:
-            context.nrt.incref(builder, index_typ, index)
-            for var, typ in zip(data_arrs, data_typs):
-                context.nrt.incref(builder, typ, var)
-            for var in column_strs:
-                context.nrt.incref(builder, string_type, var)
-
-        return dataframe._getvalue()
-
-    ret_typ = DataFrameType(data_typs, index_typ, column_names, column_loc=column_loc)
-    sig = signature(ret_typ, types.Tuple(args))
-    return sig, codegen
-
-
 # TODO: alias analysis
 # this function should be used for getting df._data for alias analysis to work
 # no_cpython_wrapper since Array(DatetimeDate) cannot be boxed
