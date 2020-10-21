@@ -5342,7 +5342,7 @@ class TestSeries(
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [-100,
                           np.array(assigned_values),
-                          pd.Series(assigned_values)]
+        ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, np.intp)
 
     def test_series_setitem_idx_float_series(self):
@@ -5358,7 +5358,6 @@ class TestSeries(
         values_to_test = [
                             -100,
                             np.array(assigned_values),
-                            pd.Series(assigned_values)
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
@@ -5375,9 +5374,10 @@ class TestSeries(
 
         idx = create_series_from_values(k, series_index, seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
-        values_to_test = [-100,
-                          np.array(assigned_values),
-                          pd.Series(assigned_values)]
+        values_to_test = [
+                            -100,
+                            np.array(assigned_values),
+        ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
     def test_series_setitem_idx_int_series2(self):
@@ -5390,9 +5390,10 @@ class TestSeries(
 
         idx = create_series_from_values(k, np.arange(n), seed=0)
         assigned_values = -10 + np.arange(k) * (-1)
-        values_to_test = [-100,
-                          np.array(assigned_values),
-                          pd.Series(assigned_values)]
+        values_to_test = [
+                            -100,
+                            np.array(assigned_values),
+        ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
     def test_series_setitem_idx_int_series3(self):
@@ -5445,7 +5446,6 @@ class TestSeries(
         values_to_test = [
                             -100,
                             np.array(assigned_values),
-                            pd.Series(assigned_values)
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
@@ -5462,7 +5462,6 @@ class TestSeries(
         values_to_test = [
                             -100,
                             np.array(assigned_values),
-                            pd.Series(assigned_values)
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test)
 
@@ -5662,8 +5661,8 @@ class TestSeries(
         idx = np.asarray([False, True, True, False, False, True, True])
         assigned_values = -10 + np.arange(k) * (-1)
         values_to_test = [
-                            pd.Series(assigned_values),
-                            pd.Series(assigned_values, index=[1, 6, 3, 5])
+                            -100,
+                            assigned_values
         ]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, dtype=np.float)
 

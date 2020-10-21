@@ -53,7 +53,8 @@ from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric,
                                             find_common_dtype_from_numpy_dtypes, has_literal_value,
                                             has_python_value)
 from sdc.datatypes.range_index_type import RangeIndexType
-from sdc.datatypes.common_functions import (sdc_join_series_indexes, sdc_arrays_argsort, sdc_reindex_series)
+from sdc.datatypes.common_functions import (sdc_join_series_indexes, sdc_arrays_argsort, sdc_reindex_series,
+                                            SDCLimitation)
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
 from sdc.datatypes.hpat_pandas_series_rolling_types import _hpat_pandas_series_rolling_init
@@ -595,6 +596,9 @@ def sdc_pandas_series_setitem(self, idx, value):
     value_is_series = isinstance(value, SeriesType)
     value_is_array = isinstance(value, types.Array)
 
+    if value_is_series:
+        raise SDCLimitation("Series setitem with set values being pd.Series is not supported.")
+
     # for many cases pandas setitem assigns values along positions in self._data
     # not considering Series index, so a common implementation exists
     idx_is_boolean_array = isinstance(idx, types.Array) and isinstance(idx.dtype, types.Boolean)
@@ -774,7 +778,7 @@ def sdc_pandas_series_setitem(self, idx, value):
                     raise ValueError("Reindexing only valid with uniquely valued Index objects")
 
                 if len(valid_indices_masked) != idx_size:
-                    raise ValueError("Reindexing not possible: idx has index not found in Series")
+                      raise KeyError("Reindexing not possible: idx has index not found in Series")
 
                 if value_is_scalar == True:  # noqa
                     self._data[valid_indices_positions] = _value
@@ -808,7 +812,7 @@ def sdc_pandas_series_setitem(self, idx, value):
                         set_positions[i] = map_index_to_position[index_value]
 
                 if number_of_found != idx_data_size:
-                    raise ValueError("Reindexing not possible: idx has index not found in Series")
+                    raise KeyError("Reindexing not possible: idx has index not found in Series")
 
                 if value_is_series == True:  # noqa
                     self._data[set_positions] = value._data
