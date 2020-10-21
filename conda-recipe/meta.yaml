@@ -1,3 +1,4 @@
+{% set NUMBA_VERSION = "==0.52.0rc1" %}
 {% set PANDAS_VERSION = "==1.0.5" %}
 {% set PYARROW_VERSION = "==0.17.0" %}
 
@@ -23,6 +24,7 @@ requirements:
   host:
     - python
     - setuptools
+    - numba   {{ NUMBA_VERSION }}
     - numpy
     - pandas  {{ PANDAS_VERSION }}
     - pyarrow {{ PYARROW_VERSION }}
@@ -34,6 +36,7 @@ requirements:
     - numpy
     - pandas  {{ PANDAS_VERSION }}
     - pyarrow {{ PYARROW_VERSION }}
+    - numba   {{ NUMBA_VERSION }}
     - setuptools
     - tbb4py
 
@@ -53,6 +56,7 @@ outputs:
         - python
         - wheel
         - setuptools
+        - numba   {{ NUMBA_VERSION }}
         - numpy
         - pandas  {{ PANDAS_VERSION }}
         - pyarrow {{ PYARROW_VERSION }}
