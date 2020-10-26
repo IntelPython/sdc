@@ -66,8 +66,6 @@ class StringArrayType(types.IterableType):
 
 
 string_array_type = StringArrayType()
-# FIXME_Numba#3372: add into numba.types to allow returning from objmode
-types.StringArrayType = StringArrayType
 
 
 class StringArrayPayloadType(types.Type):
