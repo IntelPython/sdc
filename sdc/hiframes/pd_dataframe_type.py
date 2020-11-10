@@ -110,7 +110,6 @@ class DataFrameModel(models.StructModel):
         members = [
             ('data', types.Tuple([types.List(typ) for typ in df_types])),
             ('index', fe_type.index),
-            ('columns', types.List(string_type)),
             ('parent', types.pyobject),
         ]
         super(DataFrameModel, self).__init__(dmm, fe_type, members)
@@ -127,6 +126,5 @@ types.ColumnLoc = ColumnLoc
 
 make_attribute_wrapper(DataFrameType, 'data', '_data')
 make_attribute_wrapper(DataFrameType, 'index', '_index')
-make_attribute_wrapper(DataFrameType, 'columns', '_columns')
 make_attribute_wrapper(DataFrameType, 'unboxed', '_unboxed')
 make_attribute_wrapper(DataFrameType, 'parent', '_parent')
