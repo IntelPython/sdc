@@ -53,7 +53,6 @@ class DataFrameAttribute(AttributeTemplate):
             return SeriesType(arr_typ.dtype, arr_typ, df.index, True)
 
 
-
 def get_structure_maps(col_types, col_names):
     # Define map column name to column location ex. {'A': (0,0), 'B': (1,0), 'C': (0,1)}
     column_loc = {}
@@ -137,6 +136,35 @@ def init_dataframe(typingctx, *args):
 
     ret_typ = DataFrameType(data_typs, index_typ, column_names, column_loc=column_loc)
     sig = signature(ret_typ, types.Tuple(args))
+    return sig, codegen
+
+
+@intrinsic
+def _internal_init_dataframe(typingctx, data, index, df_type):
+
+    ret_type = df_type.instance_type
+    print(f"DEBUG: data={data}")
+    print(f"DEBUG: ret_type={ret_type}")
+
+    def codegen(context, builder, sig, args):
+        data_val, index_val = args[:2]
+
+        dataframe = cgutils.create_struct_proxy(
+            sig.return_type)(context, builder)
+
+        dataframe.data = data_val
+        dataframe.index = index_val
+        dataframe.parent = context.get_constant_null(types.pyobject)
+
+        # FIXME: check if each array has to be increfed here, or whether only list has to be?
+        # increase refcount of stored values
+        if context.enable_nrt:
+            context.nrt.incref(builder, sig.args[0], data_val)
+            context.nrt.incref(builder, sig.args[1], index_val)
+
+        return dataframe._getvalue()
+
+    sig = signature(ret_type, data, index, df_type)
     return sig, codegen
 
 
