@@ -167,7 +167,7 @@ def fix_df_array_overload(column):
         return lambda column: column
 
 
-def fix_df_index(index, *columns):
+def fix_df_index(index):
     return index
 
 
