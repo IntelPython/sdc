@@ -1852,6 +1852,47 @@ class TestDataFrame(TestCase):
             with self.subTest(index=index):
                 pd.testing.assert_frame_equal(sdc_func(index), test_impl(index))
 
+    @unittest.skip("BUG: empty df cannot be unboxed")
+    def test_df_unbox_empty_df(self):
+        def test_impl(index):
+            df = pd.DataFrame({}, index=index)
+            return df
+
+        sdc_func = self.jit(test_impl)
+        for index in [
+            [1, 2, 3, 4],
+            [.1, .2, .3, .4],
+            ['a', 'b', 'c', 'd']
+        ]:
+            with self.subTest(index=index):
+                result = sdc_func(index)
+                result_ref = test_impl(index)
+                pd.testing.assert_frame_equal(result, result_ref)
+
+    @unittest.skip("BUG: empty df cannot be unboxed")
+    def test_df_drop_empty_df(self):
+        def test_impl(index, do_jit=False):
+            df = pd.DataFrame({
+                'A': [1.0, 2.0, np.nan, 1.0],
+                'B': [4, 5, 6, 7],
+                'C': [1.0, 2.0, np.nan, 1.0]
+            }, index=index)
+            if do_jit == True:  # noqa
+                return df.drop(columns=('A', 'B', 'C'))
+            else:
+                return df.drop(columns=['A', 'B', 'C'])
+
+        sdc_func = self.jit(test_impl)
+        for index in [
+            [1, 2, 3, 4],
+            [.1, .2, .3, .4],
+            ['a', 'b', 'c', 'd']
+        ]:
+            with self.subTest(index=index):
+                result = sdc_func(index, do_jit=True)
+                result_ref = test_impl(index)
+                pd.testing.assert_frame_equal(result, result_ref)
+
     def test_df_drop_tuple_column_unboxing(self):
         def gen_test_impl(do_jit=False):
             def test_impl(df):

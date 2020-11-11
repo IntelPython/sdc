@@ -1313,7 +1313,6 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_col_names):
     func_definition = [f'def sdc_pandas_dataframe_{func_name}_impl({", ".join(func_args)}):']
     func_text = []
 
-    # print(f"DEBUG: df={df}")
     old_column_loc, old_data_typs_map, old_types_order = get_structure_maps(df.data, df.columns)
 
     new_data_typs = tuple(t for i, t in enumerate(df.data) if df.columns[i] not in drop_col_names)
@@ -1323,8 +1322,6 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_col_names):
     old_types_idxs_map = dict(zip(old_types_order, range(len(old_types_order))))
     reorder_scheme = tuple(old_types_idxs_map[t] for t in new_types_order)
     df_type = DataFrameType(new_data_typs, df.index, new_column_names, column_loc=new_column_loc)
-    # print(f"DEBUG: new_data_typs={new_data_typs}")
-    # ret_typ = DataFrameType(data_typs, index_typ, column_names, column_loc=column_loc)
 
     old_scheme_drop_idxs = []
     for i, k in enumerate(old_types_order):
@@ -1344,8 +1341,8 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_col_names):
             func_text.append(f'for col_id in old_scheme_drop_idxs_{type_id}[::-1]:')
             func_text.append(indent + f'list_{type_id}.pop(col_id)')
 
-    # FIXME: add comment here?
-    # FIXME: check empty dataframe case works
+    # in new df the order of array lists (i.e. types_order) can be different, so
+    # making a new tuple of lists reorder as needed
     new_ntypes = len(new_types_order)
     data_lists_reordered = ', '.join(['list_' + str(reorder_scheme[i]) for i in range(new_ntypes)])
     data_val = data_lists_reordered + ', ' if new_ntypes > 0 else '()'
@@ -1414,7 +1411,6 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
 
     _func_name = 'drop'
 
-    print(f"DEBUG: drop: df={df}")
     ty_checker = TypeChecker(f'Method {_func_name}().')
     ty_checker.check(df, DataFrameType)
 
@@ -1449,70 +1445,21 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
                 if isinstance(value, types.Literal):
                     value = value.literal_value
                 func_args.append(f'{key}={value}')
-  
+
         if isinstance(columns, types.StringLiteral):
             drop_cols = (columns.literal_value,)
         elif isinstance(columns, types.Tuple):
             drop_cols = tuple(column.literal_value for column in columns)
         else:
             raise ValueError('Only drop by one column or tuple of columns is currently supported in df.drop()')
-  
+
         func_def, global_vars = sdc_pandas_dataframe_drop_codegen(_func_name, func_args, df, drop_cols)
-        print("DEBUG: func_text:\n", func_def)
         loc_vars = {}
         exec(func_def, global_vars, loc_vars)
         _drop_impl = loc_vars['sdc_pandas_dataframe_drop_impl']
         return _drop_impl
-  
+
     return sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns)
-
-    ### this compiles and works, but IR size still grows too fast
-#     from numba.typed import List
-#     list1_dtype = types.Array(types.int32, 1, 'A')
-#     list2_dtype = types.Array(types.float64, 1, 'A')
-#     def sdc_pandas_dataframe_drop_impl(df, labels=None, axis=0, index=None, columns=None, level=None, inplace=False, errors="raise"):
-#         list_0 = List.empty_list(list1_dtype)
-#         list_0.extend(df._data[0])
-#         list_1 = List.empty_list(list2_dtype)
-#         list_1.extend(df._data[1])
-#         new_col_0_data_df = list_0.getitem_unchecked(0)
-#         new_col_1_data_df = list_0.getitem_unchecked(1)
-#         new_col_2_data_df = list_0.getitem_unchecked(1)
-#         new_col_3_data_df = list_0.getitem_unchecked(2)
-#         new_col_4_data_df = list_0.getitem_unchecked(3)
-#         new_col_5_data_df = list_0.getitem_unchecked(3)
-#         new_col_6_data_df = list_0.getitem_unchecked(4)
-#         new_col_7_data_df = list_0.getitem_unchecked(4)
-#         return pandas.DataFrame({"col_0": new_col_0_data_df, "col_2": new_col_1_data_df, "col_3": new_col_2_data_df, "col_4": new_col_3_data_df, "col_6": new_col_4_data_df, "col_7": new_col_5_data_df, "col_8": new_col_6_data_df, "col_9": new_col_7_data_df}, index=df.index)
-
-#     n_cols = len(df.columns) - len(columns)
-#     data_typs = tuple()
-#     column_names = tuple(df.columns(c) for c in df.columns if c not in columns)
-#     new_column_loc, new_data_typs_map, new_types_order = get_structure_maps(data_typs, column_names)
-#     def sdc_pandas_dataframe_drop_impl(df, labels=None, axis=0, index=None, columns=None, level=None, inplace=False, errors="raise"):
-#         list_0 = list(df._data[0])
-#         list_1 = list(df._data[1])
-#         
-#         new_col_0_data_df = list_0.getitem_unchecked(0)
-#         new_col_1_data_df = list_0.getitem_unchecked(1)
-#         new_col_2_data_df = list_0.getitem_unchecked(1)
-#         new_col_3_data_df = list_0.getitem_unchecked(2)
-#         new_col_4_data_df = list_0.getitem_unchecked(3)
-#         new_col_5_data_df = list_0.getitem_unchecked(3)
-#         new_col_6_data_df = list_0.getitem_unchecked(4)
-#         new_col_7_data_df = list_0.getitem_unchecked(4)
-#         return pandas.DataFrame({
-#                                  "col_0": new_col_0_data_df,
-#                                  "col_2": new_col_1_data_df,
-#                                  "col_3": new_col_2_data_df,
-#                                  "col_4": new_col_3_data_df,
-#                                  "col_6": new_col_4_data_df,
-#                                  "col_7": new_col_5_data_df,
-#                                  "col_8": new_col_6_data_df,
-#                                  "col_9": new_col_7_data_df
-#                                  }, index=df.index)
-# 
-#     return sdc_pandas_dataframe_drop_impl
 
 
 def df_length_expr(self):
@@ -1542,7 +1489,7 @@ def df_getitem_slice_idx_main_codelines(self, idx):
         res_data = f'res_data_{i}'
         func_lines += [
             f'  data_{i} = self._data[{type_id}][{col_id}][idx]',
-            f'  {res_data} = data_{i}'
+            f'  {res_data} = pandas.Series(data_{i}, index=res_index, name="{col}")'
         ]
         results.append((col, res_data))
 
