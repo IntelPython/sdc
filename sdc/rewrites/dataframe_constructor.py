@@ -184,7 +184,7 @@ def gen_init_dataframe_text(func_name, n_cols):
     suffix = ('' if n_cols == 0 else ', ')
 
     func_text = dedent(
-    f'''
+        f'''
     @intrinsic
     def {func_name}(typingctx, {params}):
         """Create a DataFrame with provided data, index and columns values.
@@ -236,8 +236,8 @@ def gen_init_dataframe_text(func_name, n_cols):
 
             data_lists = []
             for typ_id, typ in enumerate(types_order):
-                data_list_typ = context.build_list(builder, data_list_type[typ_id],
-                                                   [data_arrs_transformed[data_id] for data_id in data_typs_map[typ][1]])
+                data_arrs_of_typ = [data_arrs_transformed[data_id] for data_id in data_typs_map[typ][1]]
+                data_list_typ = context.build_list(builder, data_list_type[typ_id], data_arrs_of_typ)
                 data_lists.append(data_list_typ)
 
             data_tup = context.make_tuple(
