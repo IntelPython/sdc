@@ -26,7 +26,6 @@
 
 
 import operator
-from typing import NamedTuple
 
 import numba
 from numba import types
@@ -39,7 +38,7 @@ from numba.core.typing.templates import (infer_global, AbstractTemplate, signatu
 from numba.core.imputils import impl_ret_new_ref, impl_ret_borrowed
 
 from sdc.hiframes.pd_series_ext import SeriesType
-from sdc.hiframes.pd_dataframe_type import DataFrameType
+from sdc.hiframes.pd_dataframe_type import DataFrameType, ColumnLoc
 from sdc.str_ext import string_type
 
 
@@ -53,10 +52,6 @@ class DataFrameAttribute(AttributeTemplate):
             arr_typ = df.data[ind]
             return SeriesType(arr_typ.dtype, arr_typ, df.index, True)
 
-
-class ColumnLoc(NamedTuple):
-    type_id: int
-    col_id: int
 
 
 def get_structure_maps(col_types, col_names):
