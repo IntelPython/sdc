@@ -98,7 +98,7 @@ class TestDataFrame(TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
-    def test_create4(self):
+    def test_create_empty_df(self):
         """ Verifies empty DF can be created """
         def test_impl():
             df = pd.DataFrame({})
@@ -106,6 +106,22 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
 
         self.assertEqual(hpat_func(), test_impl())
+
+    def test_create_multiple_dfs(self):
+        """ Verifies generated dataframe ctor is added to pd_dataframe_ext module
+        correctly (and numba global context is refreshed), so that subsequent
+        compilations are not broken. """
+        def test_impl(a, b, c):
+            df1 = pd.DataFrame({'A': a, 'B': b})
+            df2 = pd.DataFrame({'C': c})
+            total_cols = len(df1.columns) + len(df2.columns)
+            return total_cols
+        hpat_func = self.jit(test_impl)
+
+        a1 = np.array([1, 2, 3, 4.0, 5])
+        a2 = [7, 6, 5, 4, 3]
+        a3 = ['a', 'b', 'c', 'd', 'e']
+        self.assertEqual(hpat_func(a1, a2, a3), test_impl(a1, a2, a3))
 
     def test_create_str(self):
         def test_impl():
@@ -168,7 +184,7 @@ class TestDataFrame(TestCase):
                 result_ref = test_impl(A, B, index)
                 pd.testing.assert_frame_equal(result, result_ref)
 
-    def test_create_empty_df(self):
+    def test_unbox_empty_df(self):
         def test_impl(df):
             return df
         sdc_func = self.jit(test_impl)

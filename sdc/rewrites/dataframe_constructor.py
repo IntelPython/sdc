@@ -95,8 +95,8 @@ class RewriteDataFrame(Rewrite):
             args_len = len(args['data'])
             func_name = f'init_dataframe_{args_len}'
 
-            injected_module = modules[pd_dataframe_ext_module.__name__]
-            init_df = getattr(injected_module, func_name, None)
+            # injected_module = modules[pd_dataframe_ext_module.__name__]
+            init_df = getattr(pd_dataframe_ext_module, func_name, None)
             if init_df is None:
                 init_df_text = gen_init_dataframe_text(func_name, args_len)
                 init_df = gen_init_dataframe_func(
