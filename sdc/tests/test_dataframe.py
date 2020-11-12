@@ -2565,7 +2565,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl(), check_names=False)
 
-    @unittest.skip("Implement getting columns attribute")
     def test_dataframe_columns_attribute(self):
         def test_impl():
             df = pd.DataFrame({'A': [1, 2, 3], 'B': [2, 3, 4]})
@@ -2574,7 +2573,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
-    @unittest.skip("Implement getting columns attribute")
     def test_dataframe_columns_iterator(self):
         def test_impl():
             df = pd.DataFrame({'A': [1, 2, 3], 'B': [2, 3, 4]})

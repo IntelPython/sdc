@@ -187,11 +187,13 @@ def gen_init_dataframe_text(func_name, n_cols):
         f'''
     @intrinsic
     def {func_name}(typingctx, {params}):
-        """Create a DataFrame with provided data, index and columns values.
-        Used as a single constructor for DataFrame and assigning its data, so that
-        optimization passes can look for init_dataframe() to see if underlying
-        data has changed, and get the array variables from init_dataframe() args if
-        not changed.
+        """Create a DataFrame with provided columns data and index values.
+        Takes 2n+1 args: n columns data, index data and n column names.
+        Each column data is passed as separate argument to have compact LLVM IR.
+        Used as as generic constructor for native DataFrame objects, which
+        can be used with different input column types (e.g. lists), and
+        resulting DataFrameType is deduced by applying transform functions
+        (fix_df_array and fix_df_index) to input argument types.
         """
 
         n_cols = {n_cols}
@@ -226,8 +228,6 @@ def gen_init_dataframe_text(func_name, n_cols):
                     res = context.compile_internal(builder, lambda a: fix_df_array(a), fixed_col_sigs[i], [arr])
                     data_arrs_transformed.append(res)
 
-            column_strs = [numba.cpython.unicode.make_string_from_constant(
-                context, builder, string_type, c) for c in column_names]
             # create dataframe struct and store values
             dataframe = cgutils.create_struct_proxy(
                 sig.return_type)(context, builder)
@@ -246,12 +246,8 @@ def gen_init_dataframe_text(func_name, n_cols):
             if need_fix_index == True:
                 index = context.compile_internal(builder, lambda a: fix_df_index(a), fixed_index_sig, [index])
 
-            col_list_type = types.List(string_type)
-            column_list = context.build_list(builder, col_list_type, column_strs)
-
             dataframe.data = data_tup
             dataframe.index = index
-            dataframe.columns = column_list
             dataframe.parent = context.get_constant_null(types.pyobject)
 
             # increase refcount of stored values
@@ -259,8 +255,6 @@ def gen_init_dataframe_text(func_name, n_cols):
                 context.nrt.incref(builder, index_typ, index)
                 for var, typ in zip(data_arrs_transformed, data_typs):
                     context.nrt.incref(builder, typ, var)
-                for var in column_strs:
-                    context.nrt.incref(builder, string_type, var)
 
             return dataframe._getvalue()
 
