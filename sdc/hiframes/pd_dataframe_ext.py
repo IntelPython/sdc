@@ -100,8 +100,7 @@ def init_dataframe(typingctx, *args):
         in_tup = args[0]
         data_arrs = [builder.extract_value(in_tup, i) for i in range(n_cols)]
         index = builder.extract_value(in_tup, n_cols)
-        column_strs = [numba.cpython.unicode.make_string_from_constant(
-            context, builder, string_type, c) for c in column_names]
+
         # create dataframe struct and store values
         dataframe = cgutils.create_struct_proxy(
             signature.return_type)(context, builder)
@@ -117,12 +116,8 @@ def init_dataframe(typingctx, *args):
         data_tup = context.make_tuple(
             builder, types.Tuple(data_list_type), data_lists)
 
-        col_list_type = types.List(string_type)
-        column_list = context.build_list(builder, col_list_type, column_strs)
-
         dataframe.data = data_tup
         dataframe.index = index
-        dataframe.columns = column_list
         dataframe.parent = context.get_constant_null(types.pyobject)
 
         # increase refcount of stored values
@@ -130,8 +125,6 @@ def init_dataframe(typingctx, *args):
             context.nrt.incref(builder, index_typ, index)
             for var, typ in zip(data_arrs, data_typs):
                 context.nrt.incref(builder, typ, var)
-            for var in column_strs:
-                context.nrt.incref(builder, string_type, var)
 
         return dataframe._getvalue()
 
