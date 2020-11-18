@@ -20,7 +20,7 @@ def load_testsuite(loader, dir):
             if isfile(path) and fnmatch(f, 'test_*.py'):
                 files.append(f)
             elif isfile(join(path, '__init__.py')):
-                suite.addTests(loader.discover(path, top_level_dir=str(abspath(join(path,"../../..")))))
+                suite.addTests(loader.discover(path, top_level_dir=str(abspath(join(path, "../../..")))))
         for f in files:
             # turn 'f' into a filename relative to the toplevel dir...
             f = relpath(join(dir, f), loader._top_level_dir)
@@ -31,8 +31,6 @@ def load_testsuite(loader, dir):
     except Exception:
         traceback.print_exc(file=sys.stderr)
         sys.exit(-1)
-
-
 
 
 def run_tests(argv=None, defaultTest=None, topleveldir=None,
