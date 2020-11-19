@@ -24,13 +24,18 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
+import numba
+from numba.core import cgutils, types
 from numba.core.rewrites import (register_rewrite, Rewrite)
 from numba.core.ir_utils import (guard, find_callname)
 from numba.core.ir import (Expr)
 from numba.extending import overload
+from numba.core.extending import intrinsic
+from numba.core.typing import signature
 
 from pandas import DataFrame
+from sys import modules
+from textwrap import dedent
 
 from sdc.rewrites.ir_utils import (find_operations, is_dict,
                                    get_tuple_items, get_dict_items, remove_unused_recursively,
@@ -38,9 +43,11 @@ from sdc.rewrites.ir_utils import (find_operations, is_dict,
                                    declare_constant,
                                    import_function, make_call,
                                    insert_before)
-from sdc.hiframes.pd_dataframe_ext import (init_dataframe, DataFrameType)
-
+from sdc.hiframes import pd_dataframe_ext as pd_dataframe_ext_module
+from sdc.hiframes.pd_dataframe_type import DataFrameType, ColumnLoc
+from sdc.hiframes.pd_dataframe_ext import get_structure_maps
 from sdc.hiframes.api import fix_df_array, fix_df_index
+from sdc.str_ext import string_type
 
 
 @register_rewrite('before-inference')
@@ -54,6 +61,7 @@ class RewriteDataFrame(Rewrite):
     _df_arg_list = ('data', 'index', 'columns', 'dtype', 'copy')
 
     def __init__(self, pipeline):
+        self._pipeline = pipeline
         super().__init__(pipeline)
 
         self._reset()
@@ -79,18 +87,45 @@ class RewriteDataFrame(Rewrite):
         return len(self._calls_to_rewrite) > 0
 
     def apply(self):
-        init_df_stmt = import_function(init_dataframe, self._block, self._func_ir)
-
         for stmt in self._calls_to_rewrite:
             args = get_call_parameters(call=stmt.value, arg_names=self._df_arg_list)
-
             old_data = args['data']
-
             args['data'], args['columns'] = self._extract_dict_args(args, self._func_ir)
 
+            args_len = len(args['data'])
+            func_name = f'init_dataframe_{args_len}'
+
+            # injected_module = modules[pd_dataframe_ext_module.__name__]
+            init_df = getattr(pd_dataframe_ext_module, func_name, None)
+            if init_df is None:
+                init_df_text = gen_init_dataframe_text(func_name, args_len)
+                init_df = gen_init_dataframe_func(
+                    func_name,
+                    init_df_text,
+                    {
+                        'numba': numba,
+                        'cgutils': cgutils,
+                        'signature': signature,
+                        'types': types,
+                        'get_structure_maps': get_structure_maps,
+                        'intrinsic': intrinsic,
+                        'DataFrameType': DataFrameType,
+                        'ColumnLoc': ColumnLoc,
+                        'string_type': string_type,
+                        'intrinsic': intrinsic,
+                        'fix_df_array': fix_df_array,
+                        'fix_df_index': fix_df_index
+                    })
+
+                setattr(pd_dataframe_ext_module, func_name, init_df)
+                init_df.__module__ = pd_dataframe_ext_module.__name__
+                init_df._defn.__module__ = pd_dataframe_ext_module.__name__
+
+            init_df_stmt = import_function(init_df, self._block, self._func_ir)
             self._replace_call(stmt, init_df_stmt.target, args, self._block, self._func_ir)
 
             remove_unused_recursively(old_data, self._block, self._func_ir)
+            self._pipeline.typingctx.refresh()
 
         return self._block
 
@@ -130,42 +165,112 @@ class RewriteDataFrame(Rewrite):
         columns_args = args['columns']
         index_args = args.get('index')
 
-        data_args = RewriteDataFrame._replace_data_with_arrays(data_args, stmt, block, func_ir)
-
         if index_args is None:  # index arg was omitted
             none_stmt = declare_constant(None, block, func_ir, stmt.loc)
             index_args = none_stmt.target
 
-        index_and_data_args = [index_args] + data_args
-        index_args = RewriteDataFrame._replace_index_with_arrays(index_and_data_args, stmt, block, func_ir)
+        index_args = [index_args]
 
         all_args = data_args + index_args + columns_args
         call = Expr.call(new_call, all_args, {}, func.loc)
 
         stmt.value = call
 
-    @staticmethod
-    def _replace_data_with_arrays(args, stmt, block, func_ir):
-        new_args = []
 
-        for var in args:
-            call_stmt = make_call(fix_df_array, [var], {}, block, func_ir, var.loc)
-            insert_before(block, call_stmt, stmt)
-            new_args.append(call_stmt.target)
+def gen_init_dataframe_text(func_name, n_cols):
+    args_col_data = ['c' + str(i) for i in range(n_cols)]
+    args_col_names = ['n' + str(i) for i in range(n_cols)]
+    params = ', '.join(args_col_data + ['index'] + args_col_names)
+    suffix = ('' if n_cols == 0 else ', ')
 
-        return new_args
+    func_text = dedent(
+        f'''
+    @intrinsic
+    def {func_name}(typingctx, {params}):
+        """Create a DataFrame with provided columns data and index values.
+        Takes 2n+1 args: n columns data, index data and n column names.
+        Each column data is passed as separate argument to have compact LLVM IR.
+        Used as as generic constructor for native DataFrame objects, which
+        can be used with different input column types (e.g. lists), and
+        resulting DataFrameType is deduced by applying transform functions
+        (fix_df_array and fix_df_index) to input argument types.
+        """
 
-    @staticmethod
-    def _replace_index_with_arrays(args, stmt, block, func_ir):
-        new_args = []
+        n_cols = {n_cols}
 
-        call_stmt = make_call(fix_df_index, args, {}, block, func_ir, args[0].loc)
-        insert_before(block, call_stmt, stmt)
-        new_args.append(call_stmt.target)
+        input_data_typs = ({', '.join(args_col_data) + suffix})
+        fnty = typingctx.resolve_value_type(fix_df_array)
+        fixed_col_sigs = []
+        for i in range({n_cols}):
+            to_sig = fnty.get_call_type(typingctx, (input_data_typs[i],), {{}})
+            fixed_col_sigs.append(to_sig)
+        data_typs = tuple(fixed_col_sigs[i].return_type for i in range({n_cols}))
+        need_fix_cols = tuple(data_typs[i] != input_data_typs[i] for i in range({n_cols}))
 
-        return new_args
+        input_index_typ = index
+        fnty = typingctx.resolve_value_type(fix_df_index)
+        fixed_index_sig = fnty.get_call_type(typingctx, (input_index_typ,), {{}})
+        index_typ = fixed_index_sig.return_type
+        need_fix_index = index_typ != input_index_typ
 
-        return new_args
+        column_names = tuple(a.literal_value for a in ({', '.join(args_col_names) + suffix}))
+        column_loc, data_typs_map, types_order = get_structure_maps(data_typs, column_names)
+        col_needs_transform = tuple(not isinstance(data_typs[i], types.Array) for i in range(len(data_typs)))
+
+        def codegen(context, builder, sig, args):
+            {params}, = args
+            data_arrs = [{', '.join(args_col_data) + suffix}]
+            data_arrs_transformed = []
+            for i, arr in enumerate(data_arrs):
+                if need_fix_cols[i] == False:
+                    data_arrs_transformed.append(arr)
+                else:
+                    res = context.compile_internal(builder, lambda a: fix_df_array(a), fixed_col_sigs[i], [arr])
+                    data_arrs_transformed.append(res)
+
+            # create dataframe struct and store values
+            dataframe = cgutils.create_struct_proxy(
+                sig.return_type)(context, builder)
+
+            data_list_type = [types.List(typ) for typ in types_order]
+
+            data_lists = []
+            for typ_id, typ in enumerate(types_order):
+                data_arrs_of_typ = [data_arrs_transformed[data_id] for data_id in data_typs_map[typ][1]]
+                data_list_typ = context.build_list(builder, data_list_type[typ_id], data_arrs_of_typ)
+                data_lists.append(data_list_typ)
+
+            data_tup = context.make_tuple(
+                builder, types.Tuple(data_list_type), data_lists)
+
+            if need_fix_index == True:
+                index = context.compile_internal(builder, lambda a: fix_df_index(a), fixed_index_sig, [index])
+
+            dataframe.data = data_tup
+            dataframe.index = index
+            dataframe.parent = context.get_constant_null(types.pyobject)
+
+            # increase refcount of stored values
+            if context.enable_nrt:
+                context.nrt.incref(builder, index_typ, index)
+                for var, typ in zip(data_arrs_transformed, data_typs):
+                    context.nrt.incref(builder, typ, var)
+
+            return dataframe._getvalue()
+
+        ret_typ = DataFrameType(data_typs, index_typ, column_names, column_loc=column_loc)
+        sig = signature(ret_typ, {params})
+        return sig, codegen
+    ''')
+
+    return func_text
+
+
+def gen_init_dataframe_func(func_name, func_text, global_vars):
+
+    loc_vars = {}
+    exec(func_text, global_vars, loc_vars)
+    return loc_vars[func_name]
 
 
 @overload(DataFrame)

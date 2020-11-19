@@ -88,29 +88,10 @@ def unbox_dataframe(typ, val, c):
     columns will be extracted later if necessary.
     """
     n_cols = len(typ.columns)
-    column_strs = [numba.cpython.unicode.make_string_from_constant(
-        c.context, c.builder, string_type, a) for a in typ.columns]
     # create dataframe struct and store values
     dataframe = cgutils.create_struct_proxy(typ)(c.context, c.builder)
 
     errorptr = cgutils.alloca_once_value(c.builder, cgutils.false_bit)
-
-    col_list_type = types.List(string_type)
-    ok, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, col_list_type, n_cols)
-
-    with c.builder.if_else(ok, likely=True) as (if_ok, if_not_ok):
-        with if_ok:
-            inst.size = c.context.get_constant(types.intp, n_cols)
-            for i, column_str in enumerate(column_strs):
-                inst.setitem(c.context.get_constant(types.intp, i), column_str, incref=False)
-            dataframe.columns = inst.value
-
-        with if_not_ok:
-            c.builder.store(cgutils.true_bit, errorptr)
-
-    # If an error occurred, drop the whole native list
-    with c.builder.if_then(c.builder.load(errorptr)):
-        c.context.nrt.decref(c.builder, col_list_type, inst.value)
 
     _, data_typs_map, types_order = get_structure_maps(typ.data, typ.columns)
 
@@ -127,10 +108,11 @@ def unbox_dataframe(typ, val, c):
                     series_obj = c.pyapi.object_getattr_string(val, typ.columns[col_idx])
                     arr_obj = c.pyapi.object_getattr_string(series_obj, "values")
                     ty_series = typ.data[col_idx]
-                    if isinstance(ty_series, types.Array):
-                        native_val = unbox_array(typ.data[col_idx], arr_obj, c)
-                    elif ty_series == string_array_type:
-                        native_val = unbox_str_series(string_array_type, series_obj, c)
+
+                    # FIXME: CategoricalType has wrong dtype attribute value (i.e. dtype of codes)
+                    # current implementation offers pd_dtype for this purpose, so use it
+                    column_dtype = ty_series.pd_dtype if isinstance(ty_series, Categorical) else ty_series.dtype
+                    native_val = _unbox_series_data(column_dtype, ty_series, arr_obj, c)
 
                     inst.setitem(c.context.get_constant(types.intp, i), native_val.value, incref=False)
 
@@ -148,12 +130,6 @@ def unbox_dataframe(typ, val, c):
     c.pyapi.decref(index_obj)
 
     dataframe.parent = val
-
-    # increase refcount of stored values
-    if c.context.enable_nrt:
-        # TODO: other objects?
-        for var in column_strs:
-            c.context.nrt.incref(c.builder, string_type, var)
 
     return NativeValue(dataframe._getvalue(), is_error=c.builder.load(errorptr))
 

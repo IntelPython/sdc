@@ -24,7 +24,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from . import test_categorical
-from . import test_categoricaldtype
-from . import test_series_category
-from . import test_df_category
+import pandas as pd
+from numba import njit
+
+
+@njit
+def dataframe_columns():
+    df = pd.DataFrame({'A': [1, 2], 'AA': [3, 4], 'B': [5, 6]}, index=['a', 'b'])
+    result = df.columns
+
+    return result  # A tuple of column names ('A', 'AA', 'B')
+
+
+print(dataframe_columns())

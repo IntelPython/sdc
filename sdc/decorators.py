@@ -31,6 +31,9 @@ This is a function decorator definition
 import numba
 import sdc
 
+from functools import wraps
+from sdc.utilities.utils import print_compile_times
+
 
 def jit(signature_or_function=None, **options):
 
@@ -44,3 +47,29 @@ def jit(signature_or_function=None, **options):
     Use Numba compiler pipeline
     '''
     return numba.jit(signature_or_function, **options)
+
+
+def debug_compile_time(level=1, func_names=None):
+    """ Decorates Numba Dispatcher object to print compile stats after call.
+        Usage:
+            @debug_compile_time()
+            @numba.njit
+            <decorated function>
+        Args:
+            level: if zero prints only short summary
+            func_names: filters output to include only functions which names include listed strings,
+    """
+
+    def get_wrapper(disp):
+
+        @wraps(disp)
+        def wrapper(*args, **kwargs):
+            res = disp(*args, **kwargs)
+            print('*' * 40, 'COMPILE STATS', '*' * 40)
+            print_compile_times(disp, level=level, func_names=func_names)
+            print('*' * 95)
+            return res
+
+        return wrapper
+
+    return get_wrapper

@@ -1,4 +1,4 @@
-{% set NUMBA_VERSION = "==0.50.1" %}
+{% set NUMBA_VERSION = "==0.51.2" %}
 {% set PANDAS_VERSION = "==1.0.5" %}
 {% set PYARROW_VERSION = "==0.17.0" %}
 
@@ -16,8 +16,8 @@ build:
 
 requirements:
   build:
-    - {{ compiler('c') }}
-    - {{ compiler('cxx') }}
+    - {{ compiler('c') }}      # [not osx]
+    - {{ compiler('cxx') }}    # [not osx]
     - wheel
     - python
 
@@ -51,8 +51,8 @@ outputs:
     name: sdc
     requirements:
       build:
-        - {{ compiler('c') }}
-        - {{ compiler('cxx') }}
+        - {{ compiler('c') }}     # [not osx]
+        - {{ compiler('cxx') }}   # [not osx]
         - python
         - wheel
         - setuptools

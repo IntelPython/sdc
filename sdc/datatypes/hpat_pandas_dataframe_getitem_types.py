@@ -32,6 +32,7 @@ from numba.core import cgutils
 from numba.extending import models, overload, register_model, make_attribute_wrapper, intrinsic
 from numba.core.datamodel import register_default, StructModel
 from numba.core.typing.templates import signature
+from sdc.hiframes.pd_dataframe_type import DataFrameType
 
 
 class DataFrameGetitemAccessorType(types.Type):
@@ -56,6 +57,11 @@ make_attribute_wrapper(DataFrameGetitemAccessorType, 'dataframe', '_dataframe')
 
 @intrinsic
 def dataframe_getitem_accessor_init(typingctx, dataframe, accessor):
+
+    if not (isinstance(dataframe, DataFrameType)
+            and isinstance(accessor, types.StringLiteral)):
+        return None, None
+
     def dataframe_getitem_accessor_init_codegen(context, builder, signature, args):
         dataframe_val, accessor_val = args
         getitem_accessor = cgutils.create_struct_proxy(

@@ -116,6 +116,44 @@ def hpat_pandas_dataframe_index(df):
         return hpat_pandas_df_index_impl
 
 
+@sdc_overload_attribute(DataFrameType, 'columns')
+def hpat_pandas_dataframe_columns(df):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+    Pandas API: pandas.DataFrame.columns
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/dataframe/dataframe_columns.py
+        :language: python
+        :lines: 27-
+        :caption: The column names of the DataFrame.
+        :name: ex_dataframe_columns
+
+    .. command-output:: python ./dataframe/dataframe_columns.py
+        :cwd: ../../../examples
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas DataFrame attribute :attr:`pandas.DataFrame.columns` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_dataframe.TestDataFrame.test_dataframe_columns*
+    """
+
+    ty_checker = TypeChecker('Attribute columns.')
+    ty_checker.check(df, DataFrameType)
+
+    # no columns in DF model to avoid impact on DF ctor IR size (captured when needed only)
+    df_columns = df.columns
+
+    def hpat_pandas_df_columns_impl(df):
+        return df_columns
+
+    return hpat_pandas_df_columns_impl
+
+
 def sdc_pandas_dataframe_values_codegen(self, numba_common_dtype):
     """
     Example of generated implementation:
@@ -1462,7 +1500,7 @@ def df_getitem_slice_idx_main_codelines(self, idx):
         res_data = f'res_data_{i}'
         func_lines += [
             f'  data_{i} = self._data[{type_id}][{col_id}][idx]',
-            f'  {res_data} = pandas.Series(data_{i}, index=res_index, name="{col}")'
+            f'  {res_data} = data_{i}'
         ]
         results.append((col, res_data))
 
