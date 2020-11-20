@@ -1500,7 +1500,7 @@ def df_getitem_slice_idx_main_codelines(self, idx):
         res_data = f'res_data_{i}'
         func_lines += [
             f'  data_{i} = self._data[{type_id}][{col_id}][idx]',
-            f'  {res_data} = pandas.Series(data_{i}, index=res_index, name="{col}")'
+            f'  {res_data} = data_{i}'
         ]
         results.append((col, res_data))
 

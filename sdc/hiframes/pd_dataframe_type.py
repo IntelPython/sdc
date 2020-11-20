@@ -126,5 +126,4 @@ types.ColumnLoc = ColumnLoc
 
 make_attribute_wrapper(DataFrameType, 'data', '_data')
 make_attribute_wrapper(DataFrameType, 'index', '_index')
-make_attribute_wrapper(DataFrameType, 'unboxed', '_unboxed')
 make_attribute_wrapper(DataFrameType, 'parent', '_parent')
