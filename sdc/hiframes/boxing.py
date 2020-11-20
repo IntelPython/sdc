@@ -115,6 +115,8 @@ def unbox_dataframe(typ, val, c):
                     native_val = _unbox_series_data(column_dtype, ty_series, arr_obj, c)
 
                     inst.setitem(c.context.get_constant(types.intp, i), native_val.value, incref=False)
+                    c.pyapi.decref(arr_obj)
+                    c.pyapi.decref(series_obj)
 
                 dataframe.data = c.builder.insert_value(dataframe.data, inst.value, type_id)
 
