@@ -98,7 +98,7 @@ class TestDataFrame(TestCase):
         n = 11
         self.assertEqual(hpat_func(n), test_impl(n))
 
-    def test_create4(self):
+    def test_create_empty_df(self):
         """ Verifies empty DF can be created """
         def test_impl():
             df = pd.DataFrame({})
@@ -106,6 +106,22 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
 
         self.assertEqual(hpat_func(), test_impl())
+
+    def test_create_multiple_dfs(self):
+        """ Verifies generated dataframe ctor is added to pd_dataframe_ext module
+        correctly (and numba global context is refreshed), so that subsequent
+        compilations are not broken. """
+        def test_impl(a, b, c):
+            df1 = pd.DataFrame({'A': a, 'B': b})
+            df2 = pd.DataFrame({'C': c})
+            total_cols = len(df1.columns) + len(df2.columns)
+            return total_cols
+        hpat_func = self.jit(test_impl)
+
+        a1 = np.array([1, 2, 3, 4.0, 5])
+        a2 = [7, 6, 5, 4, 3]
+        a3 = ['a', 'b', 'c', 'd', 'e']
+        self.assertEqual(hpat_func(a1, a2, a3), test_impl(a1, a2, a3))
 
     def test_create_str(self):
         def test_impl():
@@ -168,7 +184,7 @@ class TestDataFrame(TestCase):
                 result_ref = test_impl(A, B, index)
                 pd.testing.assert_frame_equal(result, result_ref)
 
-    def test_create_empty_df(self):
+    def test_unbox_empty_df(self):
         def test_impl(df):
             return df
         sdc_func = self.jit(test_impl)
@@ -251,7 +267,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
 
-    @skip_numba_jit
     def test_box1(self):
         def test_impl(n):
             df = pd.DataFrame({'A': np.ones(n), 'B': np.arange(n)})
@@ -1852,47 +1867,6 @@ class TestDataFrame(TestCase):
             with self.subTest(index=index):
                 pd.testing.assert_frame_equal(sdc_func(index), test_impl(index))
 
-    @unittest.skip("BUG: empty df cannot be unboxed")
-    def test_df_unbox_empty_df(self):
-        def test_impl(index):
-            df = pd.DataFrame({}, index=index)
-            return df
-
-        sdc_func = self.jit(test_impl)
-        for index in [
-            [1, 2, 3, 4],
-            [.1, .2, .3, .4],
-            ['a', 'b', 'c', 'd']
-        ]:
-            with self.subTest(index=index):
-                result = sdc_func(index)
-                result_ref = test_impl(index)
-                pd.testing.assert_frame_equal(result, result_ref)
-
-    @unittest.skip("BUG: empty df cannot be unboxed")
-    def test_df_drop_empty_df(self):
-        def test_impl(index, do_jit=False):
-            df = pd.DataFrame({
-                'A': [1.0, 2.0, np.nan, 1.0],
-                'B': [4, 5, 6, 7],
-                'C': [1.0, 2.0, np.nan, 1.0]
-            }, index=index)
-            if do_jit == True:  # noqa
-                return df.drop(columns=('A', 'B', 'C'))
-            else:
-                return df.drop(columns=['A', 'B', 'C'])
-
-        sdc_func = self.jit(test_impl)
-        for index in [
-            [1, 2, 3, 4],
-            [.1, .2, .3, .4],
-            ['a', 'b', 'c', 'd']
-        ]:
-            with self.subTest(index=index):
-                result = sdc_func(index, do_jit=True)
-                result_ref = test_impl(index)
-                pd.testing.assert_frame_equal(result, result_ref)
-
     def test_df_drop_tuple_column_unboxing(self):
         def gen_test_impl(do_jit=False):
             def test_impl(df):
@@ -1940,7 +1914,24 @@ class TestDataFrame(TestCase):
             with self.subTest(index=index):
                 pd.testing.assert_frame_equal(sdc_func(index), test_impl(index))
 
-    @unittest.skip("ValueError when return empty dataframe")
+    @unittest.skip("BUG: empty df cannot be unboxed")
+    def test_df_unbox_empty_df(self):
+        def test_impl(index):
+            df = pd.DataFrame({}, index=index)
+            return df
+
+        sdc_func = self.jit(test_impl)
+        for index in [
+            [1, 2, 3, 4],
+            [.1, .2, .3, .4],
+            ['a', 'b', 'c', 'd']
+        ]:
+            with self.subTest(index=index):
+                result = sdc_func(index)
+                result_ref = test_impl(index)
+                pd.testing.assert_frame_equal(result, result_ref)
+
+    @unittest.skip("BUG: empty df cannot be unboxed")
     def test_df_drop_tuple_columns_all(self):
         def gen_test_impl(do_jit=False):
             def test_impl(df):
@@ -2607,7 +2598,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         pd.testing.assert_series_equal(hpat_func(), test_impl(), check_names=False)
 
-    @unittest.skip("Implement getting columns attribute")
     def test_dataframe_columns_attribute(self):
         def test_impl():
             df = pd.DataFrame({'A': [1, 2, 3], 'B': [2, 3, 4]})
@@ -2616,7 +2606,6 @@ class TestDataFrame(TestCase):
         hpat_func = self.jit(test_impl)
         np.testing.assert_array_equal(hpat_func(), test_impl())
 
-    @unittest.skip("Implement getting columns attribute")
     def test_dataframe_columns_iterator(self):
         def test_impl():
             df = pd.DataFrame({'A': [1, 2, 3], 'B': [2, 3, 4]})
