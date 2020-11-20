@@ -31,7 +31,7 @@ import platform
 import random
 import string
 import unittest
-from itertools import permutations, product
+from itertools import permutations, product, combinations_with_replacement
 from numba import types
 from numba.core.config import IS_32BITS
 from numba import literal_unroll
@@ -1836,83 +1836,95 @@ class TestDataFrame(TestCase):
         h_out = hpat_func(df)
         pd.testing.assert_frame_equal(out, h_out)
 
-    def test_df_drop_one_column_unboxing(self):
-        def test_impl(df):
-            return df.drop(columns='C D')
-
-        index_to_test = [[1, 2, 3, 4],
-                         [.1, .2, .3, .4],
-                         None,
-                         ['a', 'b', 'c', 'd']]
-
-        sdc_func = self.jit(test_impl)
-
-        for index in index_to_test:
-            with self.subTest(index=index):
-                df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C D': [1.0, 2.0, np.nan, 1.0]},
-                                  index=index)
-                pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
-
     def test_df_drop_one_column(self):
-        def test_impl(index):
+        """ Verifies df.drop handles string literal as columns param """
+        def test_impl():
             df = pd.DataFrame({
                 'A': [1.0, 2.0, np.nan, 1.0],
                 'B': [4, 5, 6, 7],
                 'C': [1.0, 2.0, np.nan, 1.0]
-            }, index=index)
+            })
             return df.drop(columns='A')
 
         sdc_func = self.jit(test_impl)
-        for index in [[1, 2, 3, 4], [.1, .2, .3, .4], ['a', 'b', 'c', 'd']]:
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+    def test_df_drop_handles_index(self):
+        """ Verifies df.drop handles DataFrames with indexes of different types """
+        def test_impl(df):
+            return df.drop(columns=['A', 'C'])
+
+        sdc_func = self.jit(test_impl)
+        indexes_to_test = [
+            None,
+            pd.RangeIndex(4, 0, -1),
+            [1, 2, 3, 4],
+            [.1, .2, .3, .4],
+            ['a', 'b', 'c', 'd']
+        ]
+
+        for index in indexes_to_test:
             with self.subTest(index=index):
-                pd.testing.assert_frame_equal(sdc_func(index), test_impl(index))
+                df = pd.DataFrame({
+                    'A': [1.0, 2.0, np.nan, 1.0],
+                    'B': [4, 5, 6, 7],
+                    'C': [1.0, 2.0, np.nan, 1.0]
+                }, index=index)
 
-    def test_df_drop_tuple_column_unboxing(self):
-        def gen_test_impl(do_jit=False):
-            def test_impl(df):
-                if do_jit == True:  # noqa
-                    return df.drop(columns=('A', 'C'))
-                else:
-                    return df.drop(columns=['A', 'C'])
-
-            return test_impl
-
-        index_to_test = [[1, 2, 3, 4],
-                         [.1, .2, .3, .4],
-                         None,
-                         ['a', 'b', 'c', 'd']]
-
-        test_impl = gen_test_impl()
-        sdc_func = self.jit(gen_test_impl(do_jit=True))
-
-        for index in index_to_test:
-            with self.subTest(index=index):
-                df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
-                                  index=index)
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    def test_df_drop_tuple_column(self):
-        def gen_test_impl(do_jit=False):
-            def test_impl(index):
-                df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]},
-                                  index=index)
-                if do_jit == True:  # noqa
-                    return df.drop(columns=('A', 'C'))
-                else:
-                    return df.drop(columns=['A', 'C'])
+    def test_df_drop_columns_list(self):
+        """ Verifies df.drop handles columns as list of const column names """
+        def test_impl(df):
+            return df.drop(columns=['D', 'B'])
+        sdc_func = self.jit(test_impl)
 
-            return test_impl
+        n_cols = 5
+        col_names = ['A', 'B', 'C', 'D', 'E']
+        columns_data = {
+            'int': [4, 5, 6, 7],
+            'float': [1.0, 2.0, np.nan, 1.0],
+            'str': ['a', 'b', 'c', 'd']
+        }
 
-        index_to_test = [[1, 2, 3, 4],
-                         [.1, .2, .3, .4],
-                         ['a', 'b', 'c', 'd']]
+        for scheme in combinations_with_replacement(columns_data.keys(), n_cols):
+            with self.subTest(col_types=scheme):
+                df_data = [columns_data[scheme[i]] for i in range(n_cols)]
+                df = pd.DataFrame(dict(zip(col_names, df_data)))
+                pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-        test_impl = gen_test_impl()
-        sdc_func = self.jit(gen_test_impl(do_jit=True))
+    def test_df_drop_columns_list_single_column(self):
+        """ Verifies df.drop handles list with single column """
+        def test_impl(df):
+            return df.drop(columns=['A'])
+        sdc_func = self.jit(test_impl)
 
-        for index in index_to_test:
-            with self.subTest(index=index):
-                pd.testing.assert_frame_equal(sdc_func(index), test_impl(index))
+        df = pd.DataFrame({
+            'A': [1.0, 2.0, np.nan, 1.0],
+            'B': [4, 5, 6, 7],
+            'C': [1.0, 2.0, np.nan, 1.0],
+        })
+
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
+
+    def test_df_drop_columns_list_repeat(self):
+        """ Verifies multiple invocations with different dropped column lists do not interfere """
+        def test_impl(df):
+            res = df
+            res = res.drop(columns=['A', 'E'])
+            res = res.drop(columns=['B', 'C'])
+            return res
+        sdc_func = self.jit(test_impl)
+
+        df = pd.DataFrame({
+            'A': [1.0, 2.0, np.nan, 1.0],
+            'B': [4, 5, 6, 7],
+            'C': [1.0, 2.0, np.nan, 1.0],
+            'D': ['a', 'b', '', 'c'],
+            'E': [8, 9, 10, 11],
+        })
+
+        pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
     @unittest.skip("BUG: empty df cannot be unboxed")
     def test_df_unbox_empty_df(self):
@@ -1932,23 +1944,16 @@ class TestDataFrame(TestCase):
                 pd.testing.assert_frame_equal(result, result_ref)
 
     @unittest.skip("BUG: empty df cannot be unboxed")
-    def test_df_drop_tuple_columns_all(self):
-        def gen_test_impl(do_jit=False):
-            def test_impl(df):
-                if do_jit == True:  # noqa
-                    return df.drop(columns=('A', 'B', 'C'))
-                else:
-                    return df.drop(columns=['A', 'B', 'C'])
+    def test_df_drop_all_columns(self):
+        def test_impl(df):
+            return df.drop(columns=['A', 'B', 'C'])
+        sdc_func = self.jit(test_impl)
 
-            return test_impl
 
         index_to_test = [[1, 2, 3, 4],
                          [.1, .2, .3, .4],
                          None,
                          ['a', 'b', 'c', 'd']]
-
-        test_impl = gen_test_impl()
-        sdc_func = self.jit(gen_test_impl(do_jit=True))
 
         for index in index_to_test:
             with self.subTest(index=index):
@@ -1957,13 +1962,57 @@ class TestDataFrame(TestCase):
 
                 pd.testing.assert_frame_equal(sdc_func(df), test_impl(df))
 
-    def test_df_drop_by_column_errors_ignore(self):
+    def test_df_drop_errors_ignore(self):
+        """ Verifies df.drop handles errors argument """
         def test_impl(df):
             return df.drop(columns='M', errors='ignore')
 
         df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]})
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
+
+    def test_df_drop_columns_non_literals(self):
+        """ Verifies that SDC supports only list of literals as dropped column names """
+        def test_impl(df):
+            drop_cols = [c for c in df.columns if c != 'B']
+            return df.drop(columns=drop_cols)
+        sdc_func = self.jit(test_impl)
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7], 'C': [1.0, 2.0, np.nan, 1.0]})
+        with self.assertRaises(TypingError) as raises:
+            sdc_func(df)
+        msg = 'Unsupported use of parameter columns: expected list of constant strings.'
+        self.assertIn(msg, str(raises.exception))
+
+    def test_df_drop_columns_list_mutation_unsupported(self):
+        """ Verifies SDCLimitation is raised if non-const list is used as columns """
+        def test_impl(df):
+            drop_cols = ['A', 'C']
+            drop_cols.pop(-1)
+            return df.drop(columns=drop_cols)
+        sdc_func = self.jit(test_impl)
+
+        df = pd.DataFrame({
+            'A': [1.0, 2.0, np.nan, 1.0],
+            'B': [4, 5, 6, 7],
+            'C': [1.0, 2.0, np.nan, 1.0],
+        })
+
+        with self.assertRaises(SDCLimitation) as raises:
+            sdc_func(df)
+        msg = 'Unsupported use of parameter columns: non-const list was used.'
+        self.assertIn(msg, str(raises.exception))
+
+    @skip_numba_jit
+    def test_df_drop_inplace1(self):
+        def test_impl(df):
+            df.drop('A', axis=1, inplace=True)
+            return df
+
+        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7]})
+        df2 = df.copy()
+        hpat_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
 
     @skip_numba_jit
     def test_df_drop_inplace2(self):
@@ -1977,17 +2026,6 @@ class TestDataFrame(TestCase):
         df = pd.DataFrame({'A': [1, 2, 3], 'B': [2, 3, 4]})
         hpat_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(hpat_func(df), test_impl(df))
-
-    @skip_numba_jit
-    def test_df_drop_inplace1(self):
-        def test_impl(df):
-            df.drop('A', axis=1, inplace=True)
-            return df
-
-        df = pd.DataFrame({'A': [1.0, 2.0, np.nan, 1.0], 'B': [4, 5, 6, 7]})
-        df2 = df.copy()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(df), test_impl(df2))
 
     def _test_df_getitem_str_literal_idx(self, df):
         def test_impl(df):

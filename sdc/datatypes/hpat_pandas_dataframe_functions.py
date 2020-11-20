@@ -52,7 +52,7 @@ from sdc.str_arr_ext import StringArrayType
 from sdc.datatypes.range_index_type import RangeIndexType
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
-from sdc.hiframes.pd_dataframe_ext import _internal_init_dataframe, get_structure_maps
+from sdc.hiframes.pd_dataframe_ext import init_dataframe_internal, get_structure_maps
 from sdc.hiframes.pd_series_type import SeriesType
 
 from sdc.datatypes.hpat_pandas_dataframe_getitem_types import (DataFrameGetitemAccessorType,
@@ -1342,13 +1342,16 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_col_names):
     """
     Example of generated implementation:
         def sdc_pandas_dataframe_drop_impl(df, labels=None, axis=0, index=None, columns=None,
-                                           level=None, inplace=False, errors="raise"):
-            new_col_0_data_df = df._data[1][0]
-            new_col_1_data_df = df._data[0][1]
-            return pandas.DataFrame({"B": new_col_0_data_df, "C": new_col_1_data_df}, index=df.index)
+                                            level=None, inplace=False, errors="raise"):
+            list_0 = df._data[0]
+            for col_id in old_scheme_drop_idxs_0[::-1]:
+                list_0.pop(col_id)
+            list_1 = df._data[1]
+            new_data = (list_1, )
+            return init_dataframe_internal(new_data, df._index, df_type)
     """
     indent = 4 * ' '
-    func_definition = [f'def sdc_pandas_dataframe_{func_name}_impl({", ".join(func_args)}):']
+    func_definition = [f'def {func_name}({", ".join(func_args)}):']
     func_text = []
 
     old_column_loc, old_data_typs_map, old_types_order = get_structure_maps(df.data, df.columns)
@@ -1383,17 +1386,17 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_col_names):
     # making a new tuple of lists reorder as needed
     new_ntypes = len(new_types_order)
     data_lists_reordered = ', '.join(['list_' + str(reorder_scheme[i]) for i in range(new_ntypes)])
-    data_val = data_lists_reordered + ', ' if new_ntypes > 0 else '()'
+    data_val = '(' + data_lists_reordered + ', )' if new_ntypes > 0 else '()'
 
     data, index = 'new_data', 'df._index'
     func_text.append(f'{data} = {data_val}')
-    func_text.append(f"return _internal_init_dataframe({data}, {index}, df_type)\n")
+    func_text.append(f"return init_dataframe_internal({data}, {index}, df_type)\n")
     func_definition.extend([indent + func_line for func_line in func_text])
     func_def = '\n'.join(func_definition)
 
     global_vars = {
         'pandas': pandas,
-        '_internal_init_dataframe': _internal_init_dataframe,
+        'init_dataframe_internal': init_dataframe_internal,
         'df_type': df_type
     }
 
@@ -1414,7 +1417,8 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
     -----------
     - Parameters ``labels``, ``axis``, ``index``, ``level`` and ``inplace`` are currently unsupported.
     - Parameter ``columns`` is required and is expected to be a Literal value with one column name
-    or Tuple with columns names.
+    or List with columns names. Mutating a list of column names after it was defined and then using it as a
+    columns argument results in an SDCLimitation exception at runtime.
     - Supported ``errors`` can be {``raise``, ``ignore``}, default ``raise``. If ``ignore``, suppress error and only
     existing labels are dropped.
 
@@ -1447,36 +1451,66 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
 
     """
 
-    _func_name = 'drop'
+    method_name = f'Method drop().'
 
-    ty_checker = TypeChecker(f'Method {_func_name}().')
+    ty_checker = TypeChecker(method_name)
     ty_checker.check(df, DataFrameType)
 
-    if not isinstance(labels, types.Omitted) and labels is not None:
+    if not isinstance(labels, (types.Omitted, types.NoneType)) and labels is not None:
         ty_checker.raise_exc(labels, 'None', 'labels')
 
-    if not isinstance(axis, (int, types.Omitted)):
+    if not isinstance(axis, (types.Omitted, types.Integer)) and axis != 0:
         ty_checker.raise_exc(axis, 'int', 'axis')
 
-    if not isinstance(index, types.Omitted) and index is not None:
+    if not isinstance(index, (types.Omitted, types.NoneType)) and index is not None:
         ty_checker.raise_exc(index, 'None', 'index')
 
-    if not isinstance(columns, (types.Omitted, types.Tuple, types.Literal)):
-        ty_checker.raise_exc(columns, 'str, tuple of str', 'columns')
+    if not (isinstance(columns, (types.Omitted, types.StringLiteral))
+            or (isinstance(columns, types.Tuple)
+                and all(isinstance(c, types.StringLiteral) for c in columns))
+            or (isinstance(columns, types.UniTuple) and isinstance(columns.dtype, types.StringLiteral))
+            or isinstance(columns, types.List) and isinstance(columns.dtype, types.UnicodeType)
+            ):
+        ty_checker.raise_exc(columns, 'str, list of const str', 'columns')
 
-    if not isinstance(level, (types.Omitted, types.Literal)) and level is not None:
+    if not isinstance(level, (types.Omitted, types.NoneType, types.Literal)) and level is not None:
         ty_checker.raise_exc(level, 'None', 'level')
 
-    if not isinstance(inplace, (bool, types.Omitted)) and inplace:
+    if not isinstance(inplace, (types.Omitted, types.NoneType, types.Boolean)) and inplace:
         ty_checker.raise_exc(inplace, 'bool', 'inplace')
 
-    if not isinstance(errors, (str, types.Omitted, types.Literal)):
+    if not isinstance(errors, (types.Omitted, types.UnicodeType, types.StringLiteral)) and errors != "raise":
         ty_checker.raise_exc(errors, 'str', 'errors')
+
+    if isinstance(columns, types.List):
+        if columns.initial_value is None:
+            raise TypingError('{} Unsupported use of parameter columns:'
+                              ' expected list of constant strings. Given: {}'.format(method_name, columns))
+        else:
+            # this works because global tuple of strings is captured as Tuple of StringLiterals
+            columns_as_tuple = tuple(columns.initial_value)
+            def _sdc_pandas_dataframe_drop_wrapper_impl(df, labels=None, axis=0, index=None,
+                                                        columns=None, level=None, inplace=False, errors="raise"):
+
+                # if at runtime columns list differs from it's initial value (known at compile time)
+                # we cannot tell which columns to drop and what is the resulting DataFrameType, so raise exception
+                if list(columns_as_tuple) != columns:
+                    raise SDCLimitation("Unsupported use of parameter columns: non-const list was used.")
+
+                return df.drop(labels=labels,
+                               axis=axis,
+                               index=index,
+                               columns=columns_as_tuple,
+                               level=level,
+                               inplace=inplace,
+                               errors=errors)
+
+            return _sdc_pandas_dataframe_drop_wrapper_impl
 
     args = {'labels': None, 'axis': 0, 'index': None, 'columns': None, 'level': None, 'inplace': False,
             'errors': f'"raise"'}
 
-    def sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns):
+    def sdc_pandas_dataframe_drop_impl(df, args, columns):
         func_args = ['df']
         for key, value in args.items():
             if key not in func_args:
@@ -1486,18 +1520,19 @@ def sdc_pandas_dataframe_drop(df, labels=None, axis=0, index=None, columns=None,
 
         if isinstance(columns, types.StringLiteral):
             drop_cols = (columns.literal_value,)
-        elif isinstance(columns, types.Tuple):
+        elif isinstance(columns, (types.Tuple, types.UniTuple)):
             drop_cols = tuple(column.literal_value for column in columns)
         else:
             raise ValueError('Only drop by one column or tuple of columns is currently supported in df.drop()')
 
-        func_def, global_vars = sdc_pandas_dataframe_drop_codegen(_func_name, func_args, df, drop_cols)
+        func_name = 'sdc_pandas_dataframe_drop_impl'
+        func_def, global_vars = sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_cols)
         loc_vars = {}
         exec(func_def, global_vars, loc_vars)
-        _drop_impl = loc_vars['sdc_pandas_dataframe_drop_impl']
+        _drop_impl = loc_vars[func_name]
         return _drop_impl
 
-    return sdc_pandas_dataframe_drop_impl(df, _func_name, args, columns)
+    return sdc_pandas_dataframe_drop_impl(df, args, columns)
 
 
 def df_length_expr(self):

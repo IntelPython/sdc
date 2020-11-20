@@ -79,6 +79,31 @@ def get_structure_maps(col_types, col_names):
     return column_loc, data_typs_map, types_order
 
 
+@intrinsic
+def init_dataframe_internal(typingctx, data, index, df_type):
+
+    ret_type = df_type.instance_type
+
+    def codegen(context, builder, sig, args):
+        data_val, index_val = args[:2]
+
+        dataframe = cgutils.create_struct_proxy(
+            sig.return_type)(context, builder)
+        dataframe.data = data_val
+        dataframe.index = index_val
+        dataframe.parent = context.get_constant_null(types.pyobject)
+
+        # increase refcount of stored values
+        if context.enable_nrt:
+            context.nrt.incref(builder, sig.args[0], data_val)
+            context.nrt.incref(builder, sig.args[1], index_val)
+
+        return dataframe._getvalue()
+
+    sig = signature(ret_type, data, index, df_type)
+    return sig, codegen
+
+
 # TODO: alias analysis
 # this function should be used for getting df._data for alias analysis to work
 # no_cpython_wrapper since Array(DatetimeDate) cannot be boxed
