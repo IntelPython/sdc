@@ -52,6 +52,7 @@ from sdc.str_arr_ext import StringArrayType
 from sdc.datatypes.range_index_type import RangeIndexType
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
+from sdc.hiframes.pd_dataframe_ext import init_dataframe_internal, get_structure_maps
 from sdc.hiframes.pd_series_type import SeriesType
 
 from sdc.datatypes.hpat_pandas_dataframe_getitem_types import (DataFrameGetitemAccessorType,
@@ -1492,23 +1493,32 @@ def df_index_expr(self, length_expr=None):
 
 def df_getitem_slice_idx_main_codelines(self, idx):
     """Generate main code lines for df.getitem with idx of slice"""
-    results = []
-    func_lines = [f'  res_index = self.index[idx]']
-    for i, col in enumerate(self.columns):
-        col_loc = self.column_loc[col]
-        type_id, col_id = col_loc.type_id, col_loc.col_id
-        res_data = f'res_data_{i}'
-        func_lines += [
-            f'  data_{i} = self._data[{type_id}][{col_id}][idx]',
-            f'  {res_data} = data_{i}'
-        ]
-        results.append((col, res_data))
 
-    data = ', '.join(f'"{col}": {data}' for col, data in results)
-    func_lines += [f'  return pandas.DataFrame({{{data}}}, index=res_index)']
+    types_order = get_structure_maps(self.data, self.columns)[2]
+    n_lists = len(types_order)
+
+    results = []
+    func_lines = []
+    for i in range(n_lists):
+        func_lines += [
+            f'  list_{i} = self._data[{i}].copy()',
+            f'  for i, item in enumerate(list_{i}):',
+            f'    list_{i}[i] = item[idx]'
+        ]
+
+    all_lists_joined = ', '.join([f'list_{i}' for i in range(n_lists)]) + ', '
+    res_data = f'({all_lists_joined})' if n_lists > 0 else '()'
+    func_lines += [
+        f'  if self_index_is_none == True:',
+        f'    old_index = pandas.RangeIndex(len(self))',
+        f'  else:',
+        f'    old_index = self._index',
+        f'  res_data = {res_data}',
+        f'  res_index = old_index[idx]',
+        f'  return init_dataframe_internal(res_data, res_index, df_type)'
+    ]
 
     return func_lines
-
 
 def df_getitem_tuple_idx_main_codelines(self, literal_idx):
     """Generate main code lines for df.getitem with idx of tuple"""
@@ -1624,13 +1634,17 @@ def df_getitem_key_error_codelines():
 def df_getitem_slice_idx_codegen(self, idx):
     """
     Example of generated implementation with provided index:
-        def _df_getitem_slice_idx_impl(self, idx)
-          res_index = self._index
-          data_0 = self._data[0]
-          res_data_0 = pandas.Series(data_0[idx], index=res_index[idx], name="A")
-          data_1 = self._data [1]
-          res_data_1 = pandas.Series(data_1[idx], index=res_index, name="B")
-          return pandas.DataFrame({"A": res_data_0, "B": res_data_1}, index=res_index[idx])
+        def _df_getitem_slice_idx_impl(self, idx):
+          list_0 = self._data[0].copy()
+          for i, item in enumerate(list_0):
+            list_0[i] = item[idx]
+          if self_index_is_none == True:
+            old_index = pandas.RangeIndex(len(self))
+          else:
+            old_index = self._index
+          res_data = (list_0, )
+          res_index = old_index[idx]
+          return init_dataframe_internal(res_data, res_index, df_type)
     """
     func_lines = ['def _df_getitem_slice_idx_impl(self, idx):']
     if self.columns:
@@ -1639,7 +1653,17 @@ def df_getitem_slice_idx_codegen(self, idx):
         # raise KeyError if input DF is empty
         func_lines += df_getitem_key_error_codelines()
     func_text = '\n'.join(func_lines)
-    global_vars = {'pandas': pandas, 'numpy': numpy}
+
+    # TO-DO: need DefaultIndex to handle self.index[idx] construct inside func
+    self_index_is_none = isinstance(self.index, types.NoneType)
+    new_index_type = RangeIndexType(False) if self_index_is_none else self.index
+    df_type = DataFrameType(self.data, new_index_type, self.columns, column_loc=self.column_loc)
+
+    global_vars = {'pandas': pandas,
+                   'numpy': numpy,
+                   'df_type': df_type,
+                   'init_dataframe_internal': init_dataframe_internal,
+                   'self_index_is_none': self_index_is_none}
 
     return func_text, global_vars
 
