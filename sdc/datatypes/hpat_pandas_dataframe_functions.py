@@ -1343,11 +1343,11 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_col_names):
     Example of generated implementation:
         def sdc_pandas_dataframe_drop_impl(df, labels=None, axis=0, index=None, columns=None,
                                             level=None, inplace=False, errors="raise"):
-            list_0 = df._data[0]
+            list_0 = df._data[0].copy()
             for col_id in old_scheme_drop_idxs_0[::-1]:
                 list_0.pop(col_id)
-            list_1 = df._data[1]
-            new_data = (list_1, )
+            list_1 = df._data[1].copy()
+            new_data = (list_1, list_0, )
             return init_dataframe_internal(new_data, df._index, df_type)
     """
     indent = 4 * ' '
@@ -1377,7 +1377,7 @@ def sdc_pandas_dataframe_drop_codegen(func_name, func_args, df, drop_col_names):
 
     old_ntypes = len(old_types_order)
     for type_id in range(old_ntypes):
-        func_text.append(f'list_{type_id} = df._data[{type_id}]')
+        func_text.append(f'list_{type_id} = df._data[{type_id}].copy()')
         if old_scheme_drop_idxs[type_id]:
             func_text.append(f'for col_id in old_scheme_drop_idxs_{type_id}[::-1]:')
             func_text.append(indent + f'list_{type_id}.pop(col_id)')

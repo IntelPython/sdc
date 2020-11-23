@@ -1849,6 +1849,26 @@ class TestDataFrame(TestCase):
         sdc_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
+    def test_df_drop_inplace_default_false(self):
+        """ Verifies df.drop doesn't change original dataframe (default inplace=False) """
+        def test_impl(df):
+            return df, df.drop(columns='A')
+
+        sdc_func = self.jit(test_impl)
+
+        df = pd.DataFrame({
+            'A': [1.0, 2.0, np.nan, 1.0],
+            'B': [4, 5, 6, 7],
+            'C': [1.0, 2.0, np.nan, 1.0]
+        })
+
+        df_old, df_new = sdc_func(df.copy())
+        _, df_new_ref = test_impl(df.copy())
+
+        pd.testing.assert_frame_equal(df_old, df)
+        pd.testing.assert_frame_equal(df_new, df_new_ref)
+        self.assertFalse(df.equals(df_new), "Column was dropped, but DF not changed")
+
     def test_df_drop_handles_index(self):
         """ Verifies df.drop handles DataFrames with indexes of different types """
         def test_impl(df):
