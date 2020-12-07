@@ -46,17 +46,20 @@ from numba.core.errors import TypingError
 import sdc
 from sdc.functions.statistics import skew_formula
 from sdc.hiframes.api import isna
-from sdc.datatypes.range_index_type import RangeIndexType
+
+from sdc.datatypes.indexes import *
 from sdc.utilities.sdc_typing_utils import TypeChecker, is_default
 from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
                                  max_dtype_float_val)
 from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_size,
                              string_array_type, create_str_arr_from_list, str_arr_set_na_by_mask,
-                             num_total_chars, str_arr_is_na)
+                             num_total_chars, str_arr_is_na, str_arr_set_na)
 from sdc.utilities.prange_utils import parallel_chunks
-from sdc.utilities.sdc_typing_utils import check_types_comparable
+from sdc.utilities.sdc_typing_utils import check_types_comparable, SDCLimitation
 from sdc.functions.sort import parallel_sort, parallel_stable_sort, parallel_argsort, parallel_stable_argsort
+from sdc.utilities.sdc_typing_utils import sdc_pandas_index_types, sdc_pandas_df_column_types
+
 
 def astype(self, dtype):
     pass
@@ -120,8 +123,12 @@ def sdc_astype_overload(self, dtype):
     """
 
     ty_checker = TypeChecker("numpy-like 'astype'")
-    if not isinstance(self, (types.Array, StringArrayType, RangeIndexType)):
+    valid_self_types = sdc_pandas_df_column_types
+    if not (isinstance(self, valid_self_types)):
         return None
+
+    if isinstance(self, StringArrayType):
+        return SDCLimitation("numpy_like.astype not implemented for string data")
 
     accepted_dtype_types = (types.functions.NumberClass, types.Function, types.StringLiteral)
     if not isinstance(dtype, accepted_dtype_types):
@@ -156,7 +163,7 @@ def sdc_astype_overload(self, dtype):
 
         return sdc_astype_number_to_string_impl
 
-    if (isinstance(self, (types.Array, RangeIndexType))
+    if (isinstance(self, types.Array)
             and isinstance(dtype, (types.StringLiteral, types.functions.NumberClass))):
         def sdc_astype_number_impl(self, dtype):
             arr = numpy.empty(len(self), dtype=numpy.dtype(dtype))
@@ -344,7 +351,8 @@ def sdc_copy_overload(self):
        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k copy
     """
 
-    if not isinstance(self, (types.Array, StringArrayType, RangeIndexType)):
+    valid_self_types = sdc_pandas_df_column_types
+    if not (isinstance(self, valid_self_types)):
         return None
 
     if isinstance(self, types.Array):
@@ -360,12 +368,14 @@ def sdc_copy_overload(self):
 
         return sdc_copy_array_impl
 
-    if isinstance(self, (StringArrayType, RangeIndexType)):
+    elif isinstance(self, StringArrayType):
         def sdc_copy_str_arr_impl(self):
             return self.copy()
 
         return sdc_copy_str_arr_impl
 
+    else:
+        return None
 
 @sdc_overload(notnan)
 def sdc_notnan_overload(self):
@@ -953,7 +963,7 @@ def getitem_by_mask(arr, idx):
 
 
 @sdc_overload(getitem_by_mask)
-def getitem_by_mask_overload(arr, idx):
+def getitem_by_mask_overload(self, idx):
     """
     Creates a new array from arr by selecting elements indicated by Boolean mask idx.
 
@@ -971,13 +981,22 @@ def getitem_by_mask_overload(arr, idx):
 
     """
 
-    if not isinstance(arr, (types.Array, StringArrayType, RangeIndexType)):
-        return
+    valid_self_types = (types.Array,) + sdc_pandas_index_types
+    if not isinstance(self, valid_self_types):
+        return None
 
-    res_dtype = arr.dtype
-    is_str_arr = arr == string_array_type
-    def getitem_by_mask_impl(arr, idx):
-        chunks = parallel_chunks(len(arr))
+    # for empty index assume it's returns itself
+    if isinstance(self, EmptyIndexType):
+        def getitem_by_mask_empty_index_impl(self, idx):
+            return self
+        return getitem_by_mask_empty_index_impl
+
+    res_dtype = self.dtype
+    is_str_arr = self == string_array_type
+    is_numeric_index = isinstance(self, (PositionalIndexType, RangeIndexType, Int64IndexType))
+
+    def getitem_by_mask_impl(self, idx):
+        chunks = parallel_chunks(len(self))
         arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
         length = 0
 
@@ -1002,16 +1021,18 @@ def getitem_by_mask_overload(arr, idx):
 
             for j in range(chunk.start, chunk.stop):
                 if idx[j]:
-                    value = arr[j]
+                    value = self[j]
                     result_data[current_pos] = value
                     if is_str_arr == True:  # noqa
-                        result_nan_mask[current_pos] = isna(arr, j)
+                        result_nan_mask[current_pos] = isna(self, j)
                     current_pos += 1
 
         if is_str_arr == True:  # noqa
             result_data_as_str_arr = create_str_arr_from_list(result_data)
             str_arr_set_na_by_mask(result_data_as_str_arr, result_nan_mask)
             return result_data_as_str_arr
+        elif is_numeric_index == True:  # noqa
+            return pandas.Int64Index(result_data, name=self.name)
         else:
             return result_data
 
@@ -1088,8 +1109,8 @@ def array_equal(A, B):
 def sdc_array_equal_overload(A, B):
     """ Checks 1D sequences A and B of comparable dtypes are equal """
 
-    if not (isinstance(A, (types.Array, StringArrayType, types.NoneType, RangeIndexType))
-            or isinstance(B, (types.Array, StringArrayType, types.NoneType, RangeIndexType))):
+    valid_arg_types = sdc_pandas_df_column_types
+    if not (isinstance(A, valid_arg_types) or isinstance(B, valid_arg_types)):
         return None
 
     _func_name = "numpy-like 'array_equal'"
@@ -1109,27 +1130,16 @@ def sdc_array_equal_overload(A, B):
 
         return sdc_array_equal_str_arr_impl
     else:
-        both_range_indexes = isinstance(A, RangeIndexType) and isinstance(B, RangeIndexType)
 
         def sdc_array_equal_impl(A, B):
-            if both_range_indexes == True:  # noqa
-                if len(A) != len(B):
-                    return False
-                if len(A) == 0:
-                    return True
-                if len(A) == 1:
-                    return A.start == B.start
-
-                return A.start == B.start and A.step == B.step
-            else:
-                if len(A) != len(B):
-                    return False
-                # FIXME_Numba#5157: change to simple A == B when issue is resolved
-                eq_res_size = len(A)
-                eq_res = numpy.empty(eq_res_size, dtype=types.bool_)
-                for i in numba.prange(eq_res_size):
-                    eq_res[i] = A[i] == B[i]
-                return numpy.all(eq_res)
+            if len(A) != len(B):
+                return False
+            # FIXME_Numba#5157: change to simple A == B when issue is resolved
+            eq_res_size = len(A)
+            eq_res = numpy.empty(eq_res_size, dtype=types.bool_)
+            for i in numba.prange(eq_res_size):
+                eq_res[i] = A[i] == B[i]
+            return numpy.all(eq_res)
 
         return sdc_array_equal_impl
 
@@ -1138,9 +1148,6 @@ def sdc_array_equal_overload(A, B):
 def sdc_np_array_overload(A):
     if isinstance(A, types.Array):
         return lambda A: A
-
-    if isinstance(A, RangeIndexType):
-        return lambda A: np.arange(A.start, A.stop, A.step)
 
     if isinstance(A, types.containers.Set):
         # TODO: naive implementation, data from set can probably
@@ -1263,3 +1270,119 @@ def argsort_overload(a, axis=-1, kind=None, order=None):
             raise ValueError("Unsupported value of 'kind' parameter")
 
     return argsort_impl
+
+
+def take(data, indices):
+    pass
+
+
+
+@sdc_overload(take)
+def sdc_take_overload(data, indices):
+
+    valid_data_types = sdc_pandas_df_column_types
+    if not (isinstance(data, valid_data_types)):
+        return None
+
+    valid_indexes_types = (types.Array, types.List, types.ListType) + sdc_pandas_index_types
+    valid_indexes_dtypes = (types.Integer, types.ListType)
+    if not (isinstance(indices, valid_indexes_types)
+            and isinstance(indices.dtype, valid_indexes_dtypes)
+            and (isinstance(indices.dtype, types.Integer)
+                 or isinstance(indices.dtype.dtype, types.Integer))):
+        return None
+
+    data_dtype = data.dtype
+    if isinstance(indices.dtype, types.ListType):
+
+        if isinstance(data_dtype, types.Number):
+
+            def sdc_take_array_indices_seq_impl(data, indices):
+                res_size = 0
+                for i in numba.prange(len(indices)):
+                    res_size += len(indices[i])
+                res_arr = numpy.empty(res_size, dtype=data_dtype)
+                for i in numba.prange(len(indices)):
+                    start = 0
+                    for l in range(len(indices[0:i])):
+                        start += len(indices[l])
+                    current_pos = start
+                    for j in range(len(indices[i])):
+                        res_arr[current_pos] = data[indices[i][j]]
+                        current_pos += 1
+                return res_arr
+
+            return sdc_take_array_indices_seq_impl
+
+        elif isinstance(data, StringArrayType):
+            def sdc_take_str_arr_indices_seq_impl(data, indices):
+                res_size = 0
+                for i in numba.prange(len(indices)):
+                    res_size += len(indices[i])
+                nan_mask = numpy.zeros(res_size, dtype=numpy.bool_)
+                num_total_bytes = 0
+                for i in numba.prange(len(indices)):
+                    start = 0
+                    for l in range(len(indices[0:i])):
+                        start += len(indices[l])
+                    current_pos = start
+                    for j in range(len(indices[i])):
+                        num_total_bytes += get_utf8_size(data[indices[i][j]])
+                        if isna(data, indices[i][j]):
+                            nan_mask[current_pos] = True
+                        current_pos += 1
+                res_arr = pre_alloc_string_array(res_size, num_total_bytes)
+                for i in numba.prange(len(indices)):
+                    start = 0
+                    for l in range(len(indices[0:i])):
+                        start += len(indices[l])
+                    current_pos = start
+                    for j in range(len(indices[i])):
+                        res_arr[current_pos] = data[indices[i][j]]
+                        if nan_mask[current_pos]:
+                            str_arr_set_na(res_arr, current_pos)
+                        current_pos += 1
+
+                return res_arr
+
+            return sdc_take_str_arr_indices_seq_impl
+
+        else:
+            return None
+
+    else:
+        if isinstance(data_dtype, (types.Number, types.Boolean)):
+
+            def sdc_take_array_impl(data, indices):
+                res_size = len(indices)
+                res_arr = numpy.empty(res_size, dtype=data_dtype)
+                for i in numba.prange(res_size):
+                    res_arr[i] = data[indices[i]]
+                return res_arr
+
+            return sdc_take_array_impl
+
+        elif isinstance(data, StringArrayType):
+            def sdc_take_str_arr_impl(data, indices):
+                res_size = len(indices)
+                nan_mask = numpy.zeros(res_size, dtype=numpy.bool_)
+                num_total_bytes = 0
+                for i in numba.prange(res_size):
+                    num_total_bytes += get_utf8_size(data[indices[i]])
+                    if isna(data, indices[i]):
+                        nan_mask[i] = True
+
+                res_arr = pre_alloc_string_array(res_size, num_total_bytes)
+                for i in numpy.arange(res_size):
+                    res_arr[i] = data[indices[i]]
+                    if nan_mask[i]:
+                        str_arr_set_na(res_arr, i)
+
+                return res_arr
+
+            return sdc_take_str_arr_impl
+
+        else:
+            return None
+
+    return None

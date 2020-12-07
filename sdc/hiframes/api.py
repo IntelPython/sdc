@@ -24,7 +24,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
 import numpy as np
 import pandas as pd
 
@@ -38,12 +37,14 @@ from numba.core.imputils import (lower_builtin, impl_ret_borrowed)
 import sdc
 from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import (StringArrayType, string_array_type)
-from sdc.datatypes.range_index_type import RangeIndexType
+
+from sdc.datatypes.indexes import *
 from sdc.hiframes.pd_series_ext import (
     SeriesType,
     if_series_to_array_type)
 from numba.core.errors import TypingError
 from sdc.datatypes.categorical.types import Categorical
+from sdc.utilities.sdc_typing_utils import sdc_pandas_df_column_types
 
 
 def isna(arr, i):
@@ -160,32 +161,50 @@ def fix_df_array_overload(column):
     if isinstance(column, SeriesType):
         return lambda column: column._data
 
-    if isinstance(column, RangeIndexType):
+    if isinstance(column, (RangeIndexType, Int64IndexType)):
         return lambda column: np.array(column)
 
     if isinstance(column, (types.Array, StringArrayType, Categorical)):
         return lambda column: column
 
 
-def fix_df_index(index):
+def fix_df_index(index, coldata=None):
     return index
 
 
 @overload(fix_df_index)
-def fix_df_index_overload(index):
+def fix_df_index_overload(index, coldata=None):
 
-    # TO-DO: replace types.none index with separate type, e.g. DefaultIndex
-    if (index is None or isinstance(index, types.NoneType)):
-        def fix_df_index_impl(index):
+    # FIXME: import here due to circular import between indexes, numpy_like, and api
+    from sdc.extensions.indexes.empty_index_ext import init_empty_index
+    from sdc.extensions.indexes.positional_index_ext import init_positional_index
+
+    # index here is param supplied to Series/DF ctors, so it can be None
+    if index is None or isinstance(index, types.NoneType):
+        if coldata is None or isinstance(coldata, (types.NoneType, types.Omitted)):
+            def fix_df_index_impl(index, coldata=None):
+                return init_empty_index()
+        elif isinstance(coldata, sdc_pandas_df_column_types):
+            def fix_df_index_impl(index, coldata=None):
+                return init_positional_index(len(coldata))
+        else:
             return None
 
-    elif isinstance(index, RangeIndexType):
-        def fix_df_index_impl(index):
+        return fix_df_index_impl
+
+    elif isinstance(index, (RangeIndexType, Int64IndexType, EmptyIndexType, PositionalIndexType)):
+        def fix_df_index_impl(index, coldata=None):
             return index
 
+    # currently only signed integer indexes are represented with own type
+    # TO-DO: support Uint64Index and Float64Indexes
+    elif isinstance(index.dtype, types.Integer) and index.dtype.signed:
+        def fix_df_index_impl(index, coldata=None):
+            index_data = fix_df_array(index)
+            return pd.Int64Index(index_data)
     else:
         # default case, transform index the same as df data
-        def fix_df_index_impl(index):
+        def fix_df_index_impl(index, coldata=None):
             return fix_df_array(index)
 
     return fix_df_index_impl

@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,31 +24,8 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
-from .categorical import *
-
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
-
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
-
-from sdc.tests.test_ml import *
-
-from sdc.tests.test_io import *
-
-from sdc.tests.test_hpat_jit import *
-from sdc.tests.indexes import *
-
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
-from sdc.tests.test_compile_time import *
-
-# performance tests
-import sdc.tests.tests_perf
+from sdc.tests.indexes.test_empty_index import TestEmptyIndex
+from sdc.tests.indexes.test_range_index import TestRangeIndex
+from sdc.tests.indexes.test_positional_index import TestPositionalIndex
+from sdc.tests.indexes.test_int64_index import TestInt64Index
+from sdc.tests.indexes.test_indexes import TestIndexes

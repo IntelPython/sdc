@@ -33,7 +33,7 @@ import pyarrow.parquet as pq
 import sdc
 import string
 import unittest
-from itertools import combinations, combinations_with_replacement, product
+from itertools import combinations, combinations_with_replacement, islice, permutations, product
 import numba
 from numba import types
 from numba.core.config import IS_32BITS
@@ -62,7 +62,7 @@ from sdc.tests.test_utils import (test_global_input_data_unicode_kind1,
                                   gen_frand_array,
                                   gen_strlist,
                                   _make_func_from_text)
-from sdc.datatypes.common_functions import SDCLimitation
+from sdc.utilities.sdc_typing_utils import SDCLimitation
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -323,24 +323,7 @@ class TestSeries(
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    def test_create_series_index1(self):
-        # create and box an indexed Series
-        def test_impl():
-            A = pd.Series([1, 2, 3], ['A', 'C', 'B'])
-            return A
-        hpat_func = self.jit(test_impl)
-
-        pd.testing.assert_series_equal(hpat_func(), test_impl())
-
-    def test_create_series_index2(self):
-        def test_impl():
-            A = pd.Series([1, 2, 3], index=[2, 1, 0])
-            return A
-        hpat_func = self.jit(test_impl)
-
-        pd.testing.assert_series_equal(hpat_func(), test_impl())
-
-    def test_create_series_index3(self):
+    def test_create_series_param_name_literal(self):
         def test_impl():
             A = pd.Series([1, 2, 3], index=['A', 'C', 'B'], name='A')
             return A
@@ -348,7 +331,7 @@ class TestSeries(
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
-    def test_create_series_index4(self):
+    def test_create_series_param_name(self):
         def test_impl(name):
             A = pd.Series([1, 2, 3], index=['A', 'C', 'B'], name=name)
             return A
@@ -376,7 +359,7 @@ class TestSeries(
         S = pd.Series(['a', 'b', 'c'], name='A')
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    def test_pass_series_index1(self):
+    def test_pass_series_all_indexes(self):
         def test_impl(A):
             return A
         hpat_func = self.jit(test_impl)
@@ -387,6 +370,7 @@ class TestSeries(
             list(np.arange(n)),
             np.arange(n),
             pd.RangeIndex(n),
+            pd.Int64Index(np.arange(n)),
             gen_strlist(n)
         ]
         for index in indexes_to_test:
@@ -2206,13 +2190,15 @@ class TestSeries(
         def test_impl(S):
             return S.value_counts()
 
-        hpat_func = self.jit(test_impl)
+        sdc_func = self.jit(test_impl)
 
         for data in test_global_input_data_integer64:
+            index = np.arange(start=1, stop=len(data) + 1)
             with self.subTest(series_data=data):
-                index = np.arange(start=1, stop=len(data) + 1)
                 S = pd.Series(data, index=index)
-                pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
+                result = sdc_func(S)
+                result_ref = test_impl(S)
+                pd.testing.assert_series_equal(result.sort_index(), result_ref.sort_index())
 
     def test_series_value_counts_no_unboxing(self):
         def test_impl():
@@ -4796,7 +4782,36 @@ class TestSeries(
         msg = 'Method cov(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
-    @skip_numba_jit
+    def test_series_div_special(self):
+        @self.jit
+        def test_func(S1, S2):
+            return S1.div(S2)
+            # return S1 + S2
+
+        S1 = pd.Series(
+                np.arange(12),
+                index=pd.RangeIndex(start=0, stop=12, step=1)
+            )
+        S2 = pd.Series(
+                # [1.1, 0.3, np.nan, 1., np.inf, 0., 1.1, np.nan, 2.2, np.inf, 2., 2.],
+                np.arange(12),
+                index=pd.RangeIndex(start=0, stop=12, step=1)
+            )
+
+        res = test_func(S1, S2)
+
+    def test_series_get_index(self):
+        @self.jit
+        def test_func(S1):
+            return S1._index.values
+
+        S1 = pd.Series(
+                np.arange(12),
+                index=pd.RangeIndex(start=0, stop=12, step=1)
+            )
+
+        res = test_func(S1)
+
     def test_series_pct_change(self):
         def test_series_pct_change_impl(S, periods, method):
             return S.pct_change(periods=periods, fill_method=method, limit=None, freq=None)
@@ -4814,7 +4829,13 @@ class TestSeries(
         for input_data in test_input_data:
             S = pd.Series(input_data)
             for periods in [0, 1, 2, 5, 10, -1, -2, -5]:
-                for method in [None, 'pad', 'ffill', 'backfill', 'bfill']:
+                for method in [
+                        None,
+                        'pad',
+                        'ffill',
+                        'backfill',
+                        'bfill'
+                    ]:
                     result_ref = test_series_pct_change_impl(S, periods, method)
                     result = hpat_func(S, periods, method)
                     pd.testing.assert_series_equal(result, result_ref)
@@ -5009,7 +5030,7 @@ class TestSeries(
                        'not a Boolean or integer indexer or a Slice. Given: self.index={}, idx={}'
             with self.assertRaises(TypingError) as raises:
                 hpat_func(S, idx, value)
-            msg = msg_tmpl.format('none', 'unicode_type')
+            msg = msg_tmpl.format('PositionalIndexType(False)', 'unicode_type')
             self.assertIn(msg, str(raises.exception))
 
     def test_series_istitle_str(self):

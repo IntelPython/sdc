@@ -48,6 +48,10 @@ from sdc.hiframes.pd_dataframe_type import DataFrameType, ColumnLoc
 from sdc.hiframes.pd_dataframe_ext import get_structure_maps
 from sdc.hiframes.api import fix_df_array, fix_df_index
 from sdc.str_ext import string_type
+from sdc.extensions.indexes.empty_index_ext import init_empty_index
+from sdc.datatypes.indexes.empty_index_type import EmptyIndexType
+from sdc.utilities.sdc_typing_utils import TypeChecker
+from sdc.str_arr_type import StringArrayType
 
 
 @register_rewrite('before-inference')
@@ -114,7 +118,9 @@ class RewriteDataFrame(Rewrite):
                         'string_type': string_type,
                         'intrinsic': intrinsic,
                         'fix_df_array': fix_df_array,
-                        'fix_df_index': fix_df_index
+                        'fix_df_index': fix_df_index,
+                        'init_empty_index': init_empty_index,
+                        'EmptyIndexType': EmptyIndexType
                     })
 
                 setattr(pd_dataframe_ext_module, func_name, init_df)
@@ -197,6 +203,7 @@ def gen_init_dataframe_text(func_name, n_cols):
         """
 
         n_cols = {n_cols}
+        is_df_empty = {n_cols == 0}
 
         input_data_typs = ({', '.join(args_col_data) + suffix})
         fnty = typingctx.resolve_value_type(fix_df_array)
@@ -209,7 +216,8 @@ def gen_init_dataframe_text(func_name, n_cols):
 
         input_index_typ = index
         fnty = typingctx.resolve_value_type(fix_df_index)
-        fixed_index_sig = fnty.get_call_type(typingctx, (input_index_typ,), {{}})
+        fixed_index_sig = fnty.get_call_type(typingctx,
+                                             (input_index_typ, {'data_typs[0]' if n_cols > 0 else ''}), {{}})
         index_typ = fixed_index_sig.return_type
         need_fix_index = index_typ != input_index_typ
 
@@ -244,7 +252,11 @@ def gen_init_dataframe_text(func_name, n_cols):
                 builder, types.Tuple(data_list_type), data_lists)
 
             if need_fix_index == True:
-                index = context.compile_internal(builder, lambda a: fix_df_index(a), fixed_index_sig, [index])
+                if is_df_empty == True:
+                    first_col_data = context.get_dummy_value()
+                else:
+                    first_col_data = data_arrs_transformed[0]
+                index = context.compile_internal(builder, lambda a, d: fix_df_index(a, d), fixed_index_sig, [index, first_col_data])
 
             dataframe.data = data_tup
             dataframe.index = index
@@ -286,21 +298,21 @@ def pd_dataframe_overload(data, index=None, columns=None, dtype=None, copy=False
     """
 
     ty_checker = TypeChecker('Method DataFrame')
-    ty_checker.check(self, DataFrameType)
 
-    if not isinstance(data, dict):
-        ty_checker.raise_exc(pat, 'dict', 'data')
+    if not isinstance(data, (types.DictType, types.LiteralStrKeyDict)):
+        ty_checker.raise_exc(data, 'dict', 'data')
 
-    if not isinstance(index, (types.Ommited, types.Array, StringArray, types.NoneType)) and index is not None:
-        ty_checker.raise_exc(na, 'array-like', 'index')
+    if not (isinstance(index, (types.Omitted, types.ListType, types.List,
+                               types.Array, StringArrayType, types.NoneType) or index is None)):
+        ty_checker.raise_exc(index, 'array-like', 'index')
 
-    if not isinstance(columns, (types.Ommited, types.NoneType)) and columns is not None:
-        ty_checker.raise_exc(na, 'None', 'columns')
+    if not (isinstance(columns, (types.Omitted, types.NoneType, types.Tuple, types.UniTuple) or columns is None)):
+        ty_checker.raise_exc(columns, 'tuple of strings', 'columns')
 
-    if not isinstance(dtype, (types.Ommited, types.NoneType)) and dtype is not None:
-        ty_checker.raise_exc(na, 'None', 'dtype')
+    if not (isinstance(dtype, (types.Omitted, types.NoneType) or dtype is None)):
+        ty_checker.raise_exc(dtype, 'None', 'dtype')
 
-    if not isinstance(copy, (types.Ommited, types.NoneType)) and columns is not False:
-        ty_checker.raise_exc(na, 'False', 'copy')
+    if not (isinstance(copy, (types.Omitted, types.NoneType) or columns is False)):
+        ty_checker.raise_exc(copy, 'False', 'copy')
 
     return None

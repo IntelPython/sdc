@@ -41,26 +41,27 @@ from numba.core.errors import TypingError
 from numba.extending import register_jitable
 from numba.np import numpy_support
 from numba.typed import Dict
+from numba.typed.typedobjectutils import _nonoptional
 
 import sdc
+from sdc.datatypes.indexes import *
 from sdc.hiframes.api import isna
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.functions import numpy_like
 from sdc.str_arr_type import string_array_type, StringArrayType
-from sdc.datatypes.range_index_type import RangeIndexType
 from sdc.str_arr_ext import (num_total_chars, append_string_array_to,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na, string_array_type,
                              cp_str_list_to_array, create_str_arr_from_list, get_utf8_size,
                              str_arr_set_na_by_mask)
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
-from sdc.utilities.sdc_typing_utils import (find_common_dtype_from_numpy_dtypes,
-                                            TypeChecker)
-
-
-class SDCLimitation(Exception):
-    """Exception to be raised in case of SDC limitation"""
-    pass
+from sdc.utilities.sdc_typing_utils import (
+                            find_common_dtype_from_numpy_dtypes,
+                            TypeChecker,
+                            sdc_pandas_index_types,
+                            sdc_pandas_df_column_types,
+                            sdc_old_index_types,
+                            )
 
 
 def hpat_arrays_append(A, B):
@@ -71,20 +72,31 @@ def hpat_arrays_append(A, B):
 def hpat_arrays_append_overload(A, B):
     """Function for appending underlying arrays (A and B) or list/tuple of arrays B to an array A"""
 
-    A_is_range_index = isinstance(A, RangeIndexType)
-    B_is_range_index = isinstance(B, RangeIndexType)
-    if isinstance(A, (types.Array, RangeIndexType)):
-        if isinstance(B, (types.Array, RangeIndexType)):
+    if not isinstance(A, sdc_pandas_df_column_types):
+        return None
+
+    # this function should work with arrays, not indexes, but until all indexes support
+    # common API (e.g. append is not supported for types.Array indexes) it is simplier to support
+    # indexes here rather than branch depending on index types on call site
+    # TO-DO: clean-up when Float64Index and StringArrayIndex are supported
+    # if not (isinstance(B, sdc_pandas_df_column_types) or isinstance(B.dtype, sdc_pandas_df_column_types)):
+    #     return None
+    valid_num_single_B_dtype = (types.Array, ) + sdc_pandas_index_types
+    valid_num_seq_B_dtypes = (types.Array, ) + sdc_pandas_index_types
+
+    if isinstance(A, types.Array):
+        if isinstance(B, valid_num_single_B_dtype):
+            convert_B = not isinstance(B, types.Array)
             def _append_single_numeric_impl(A, B):
-                _A = A.values if A_is_range_index == True else A  # noqa
-                _B = B.values if B_is_range_index == True else B  # noqa
-                return numpy.concatenate((_A, _B,))
+                _B = B if convert_B == False else B.values
+                return numpy.concatenate((A, _B,))
 
             return _append_single_numeric_impl
-        elif isinstance(B, (types.UniTuple, types.List)) and isinstance(B.dtype, (types.Array, RangeIndexType)):
-            B_dtype_is_range_index = isinstance(B.dtype, RangeIndexType)
+
+        elif (isinstance(B, (types.UniTuple, types.List)) and isinstance(B.dtype, valid_num_seq_B_dtypes)):
             numba_common_dtype = find_common_dtype_from_numpy_dtypes([A.dtype, B.dtype.dtype], [])
 
+            convert_B = not isinstance(B.dtype, types.Array)
             # TODO: refactor to use numpy.concatenate when Numba supports building a tuple at runtime
             def _append_list_numeric_impl(A, B):
 
@@ -92,13 +104,14 @@ def hpat_arrays_append_overload(A, B):
                 new_data = numpy.empty(total_length, numba_common_dtype)
 
                 stop = len(A)
-                _A = numpy.array(A) if A_is_range_index == True else A  # noqa
-                new_data[:stop] = _A
+                new_data[:stop] = A
                 for arr in B:
-                    _arr = numpy.array(arr) if B_dtype_is_range_index == True else arr  # noqa
                     start = stop
-                    stop = start + len(_arr)
-                    new_data[start:stop] = _arr
+                    stop = start + len(arr)
+                    if convert_B == False:   # noqa
+                        new_data[start:stop] = arr
+                    else:
+                        new_data[start:stop] = arr.values
                 return new_data
 
             return _append_list_numeric_impl
@@ -209,49 +222,14 @@ def _hpat_ensure_array_capacity(new_size, arr):
     return res
 
 
-def sdc_join_series_indexes(left, right):
+def _sdc_internal_join(left, right):
     pass
 
 
-@sdc_overload(sdc_join_series_indexes, jit_options={'parallel': False})
-def sdc_join_series_indexes_overload(left, right):
-    """Function for joining arrays left and right in a way similar to pandas.join 'outer' algorithm"""
+@sdc_overload(_sdc_internal_join, jit_options={'parallel': False})
+def _sdc_internal_join_ovld(left, right):
 
-    # check that both operands are of types used for representing Pandas indexes
-    if not (isinstance(left, (types.Array, StringArrayType, RangeIndexType))
-            and isinstance(right, (types.Array, StringArrayType, RangeIndexType))):
-        return None
-
-    convert_left = isinstance(left, RangeIndexType)
-    convert_right = isinstance(right, RangeIndexType)
-
-    def _convert_to_arrays_impl(left, right):
-        _left = left.values if convert_left == True else left  # noqa
-        _right = right.values if convert_right == True else right  # noqa
-        return sdc_join_series_indexes(_left, _right)
-
-    if isinstance(left, RangeIndexType) and isinstance(right, RangeIndexType):
-
-        def sdc_join_range_indexes_impl(left, right):
-            if (left is right or numpy_like.array_equal(left, right)):
-                joined = left.values
-                lidx = numpy.arange(len(joined))
-                ridx = lidx
-                return joined, lidx, ridx
-            else:
-                return sdc_join_series_indexes(left.values, right.values)
-
-        return sdc_join_range_indexes_impl
-
-    elif isinstance(left, RangeIndexType) and isinstance(right, types.Array):
-        return _convert_to_arrays_impl
-
-    elif isinstance(left, types.Array) and isinstance(right, RangeIndexType):
-        return _convert_to_arrays_impl
-
-    # TODO: remove code duplication below and merge numeric and StringArray impls into one
-    # needs equivalents of numpy.arsort and _hpat_ensure_array_capacity for StringArrays
-    elif isinstance(left, types.Array) and isinstance(right, types.Array):
+    if isinstance(left, types.Array) and isinstance(right, types.Array):
 
         numba_common_dtype = find_common_dtype_from_numpy_dtypes([left.dtype, right.dtype], [])
         if isinstance(numba_common_dtype, types.Number):
@@ -611,107 +589,6 @@ def _sdc_asarray_overload(data):
     return None
 
 
-def _sdc_take(data, indexes):
-    pass
-
-
-@sdc_overload(_sdc_take)
-def _sdc_take_overload(data, indexes):
-
-    if not isinstance(data, (types.Array, StringArrayType, RangeIndexType)):
-        return None
-    if not (isinstance(indexes, (types.Array, types.List))
-            and isinstance(indexes.dtype, (types.Integer, types.ListType))):
-        return None
-
-    if isinstance(indexes.dtype, types.ListType) and isinstance(data, (types.Array, types.List, RangeIndexType)):
-        arr_dtype = data.dtype
-
-        def _sdc_take_list_impl(data, indexes):
-            res_size = 0
-            for i in numba.prange(len(indexes)):
-                res_size += len(indexes[i])
-            res_arr = numpy.empty(res_size, dtype=arr_dtype)
-            for i in numba.prange(len(indexes)):
-                start = 0
-                for l in range(len(indexes[0:i])):
-                    start += len(indexes[l])
-                current_pos = start
-                for j in range(len(indexes[i])):
-                    res_arr[current_pos] = data[indexes[i][j]]
-                    current_pos += 1
-            return res_arr
-
-        return _sdc_take_list_impl
-
-    elif isinstance(indexes.dtype, types.ListType) and data == string_array_type:
-        def _sdc_take_list_str_impl(data, indexes):
-            res_size = 0
-            for i in numba.prange(len(indexes)):
-                res_size += len(indexes[i])
-            nan_mask = numpy.zeros(res_size, dtype=numpy.bool_)
-            num_total_bytes = 0
-            for i in numba.prange(len(indexes)):
-                start = 0
-                for l in range(len(indexes[0:i])):
-                    start += len(indexes[l])
-                current_pos = start
-                for j in range(len(indexes[i])):
-                    num_total_bytes += get_utf8_size(data[indexes[i][j]])
-                    if isna(data, indexes[i][j]):
-                        nan_mask[current_pos] = True
-                    current_pos += 1
-            res_arr = pre_alloc_string_array(res_size, num_total_bytes)
-            for i in numba.prange(len(indexes)):
-                start = 0
-                for l in range(len(indexes[0:i])):
-                    start += len(indexes[l])
-                current_pos = start
-                for j in range(len(indexes[i])):
-                    res_arr[current_pos] = data[indexes[i][j]]
-                    if nan_mask[current_pos]:
-                        str_arr_set_na(res_arr, current_pos)
-                    current_pos += 1
-
-            return res_arr
-
-        return _sdc_take_list_str_impl
-
-    elif isinstance(data, (types.Array, RangeIndexType)):
-        arr_dtype = data.dtype
-
-        def _sdc_take_array_impl(data, indexes):
-            res_size = len(indexes)
-            res_arr = numpy.empty(res_size, dtype=arr_dtype)
-            for i in numba.prange(res_size):
-                res_arr[i] = data[indexes[i]]
-            return res_arr
-
-        return _sdc_take_array_impl
-
-    elif isinstance(data, StringArrayType):
-        def _sdc_take_str_arr_impl(data, indexes):
-            res_size = len(indexes)
-            nan_mask = numpy.zeros(res_size, dtype=numpy.bool_)
-            num_total_bytes = 0
-            for i in numba.prange(res_size):
-                num_total_bytes += get_utf8_size(data[indexes[i]])
-                if isna(data, indexes[i]):
-                    nan_mask[i] = True
-
-            res_arr = pre_alloc_string_array(res_size, num_total_bytes)
-            for i in numpy.arange(res_size):
-                res_arr[i] = data[indexes[i]]
-                if nan_mask[i]:
-                    str_arr_set_na(res_arr, i)
-
-            return res_arr
-
-        return _sdc_take_str_arr_impl
-
-    return None
-
-
 def _almost_equal(x, y):
     """Check if floats are almost equal based on the float epsilon"""
     pass
@@ -735,62 +612,91 @@ def sdc_reindex_series(arr, index, name, by_index):
     pass
 
 
+# TO-DO: support Series.reindex() that should replace this function
 @sdc_overload(sdc_reindex_series)
 def sdc_reindex_series_overload(arr, index, name, by_index):
     """ Reindexes series data by new index following the logic of pandas.core.indexing.check_bool_indexer """
 
-    range_indexes = isinstance(index, RangeIndexType) and isinstance(by_index, RangeIndexType)
+    range_indexes = (isinstance(index, (PositionalIndexType, RangeIndexType))
+                     and isinstance(by_index, (PositionalIndexType, RangeIndexType)))
     data_dtype, index_dtype = arr.dtype, index.dtype
     data_is_str_arr = isinstance(arr.dtype, types.UnicodeType)
 
+    # use old implementation if old indexes types are used
+    if (isinstance(index, sdc_old_index_types) or isinstance(by_index, sdc_old_index_types)):
+
+        def sdc_reindex_series_old_impl(arr, index, name, by_index):
+
+            # no reindexing is needed if indexes are equal, but only check if it's fast
+            if range_indexes == True:  # noqa
+                equal_indexes = index.equals(by_index)
+            else:
+                equal_indexes = False
+            if (index is by_index or equal_indexes):
+                return pandas.Series(data=arr, index=by_index, name=name)
+
+            if data_is_str_arr == True:  # noqa
+                _res_data = [''] * len(by_index)
+                res_data_nan_mask = numpy.zeros(len(by_index), dtype=types.bool_)
+            else:
+                _res_data = numpy.empty(len(by_index), dtype=data_dtype)
+
+            # build a dict of self.index values to their positions:
+            map_index_to_position = Dict.empty(
+                key_type=index_dtype,
+                value_type=types.int32
+            )
+
+            for i, value in enumerate(index):
+                if value in map_index_to_position:
+                    raise ValueError("cannot reindex from a duplicate axis")
+                else:
+                    map_index_to_position[value] = i
+
+            index_mismatch = 0
+            for i in numba.prange(len(by_index)):
+                val = by_index[i]
+                if val in map_index_to_position:
+                    pos_in_self = map_index_to_position[val]
+                    _res_data[i] = arr[pos_in_self]
+                    if data_is_str_arr == True:  # noqa
+                        res_data_nan_mask[i] = isna(arr, i)
+                else:
+                    index_mismatch += 1
+            if index_mismatch:
+                msg = "Unalignable boolean Series provided as indexer " + \
+                      "(index of the boolean Series and of the indexed object do not match)."
+                raise IndexingError(msg)
+
+            if data_is_str_arr == True:  # noqa
+                res_data = create_str_arr_from_list(_res_data)
+                str_arr_set_na_by_mask(res_data, res_data_nan_mask)
+            else:
+                res_data = _res_data
+
+            return pandas.Series(data=res_data, index=by_index, name=name)
+
+        return sdc_reindex_series_old_impl
+
     def sdc_reindex_series_impl(arr, index, name, by_index):
 
-        # no reindexing is needed if indexes are equal
-        if range_indexes == True:  # noqa
-            equal_indexes = numpy_like.array_equal(index, by_index)
+        _, new_order = index.reindex(by_index)
+        if new_order is not None:
+            new_order_as_array = _nonoptional(new_order)
+            index_mismatch = 0
+            for i in numba.prange(len(by_index)):
+                if new_order_as_array[i] == -1:
+                    index_mismatch += 1
+
+            if index_mismatch:
+                # TO-DO: seems it covers only specific series reindex case, generalize?
+                msg = "Unalignable boolean Series provided as indexer " + \
+                      "(index of the boolean Series and of the indexed object do not match)."
+                raise IndexingError(msg)
+
+            res_data = numpy_like.take(arr, new_order_as_array)
         else:
-            equal_indexes = False
-        if (index is by_index or equal_indexes):
-            return pandas.Series(data=arr, index=by_index, name=name)
-
-        if data_is_str_arr == True:  # noqa
-            _res_data = [''] * len(by_index)
-            res_data_nan_mask = numpy.zeros(len(by_index), dtype=types.bool_)
-        else:
-            _res_data = numpy.empty(len(by_index), dtype=data_dtype)
-
-        # build a dict of self.index values to their positions:
-        map_index_to_position = Dict.empty(
-            key_type=index_dtype,
-            value_type=types.int32
-        )
-
-        for i, value in enumerate(index):
-            if value in map_index_to_position:
-                raise ValueError("cannot reindex from a duplicate axis")
-            else:
-                map_index_to_position[value] = i
-
-        index_mismatch = 0
-        # FIXME: TypingError in parfor step (wrong promotion to float64?) if prange is used
-        for i in numpy.arange(len(by_index)):
-            if by_index[i] in map_index_to_position:
-                pos_in_self = map_index_to_position[by_index[i]]
-                _res_data[i] = arr[pos_in_self]
-                if data_is_str_arr == True:  # noqa
-                    res_data_nan_mask[i] = isna(arr, i)
-            else:
-                index_mismatch += 1
-        if index_mismatch:
-            msg = "Unalignable boolean Series provided as indexer " + \
-                  "(index of the boolean Series and of the indexed object do not match)."
-            raise IndexingError(msg)
-
-        if data_is_str_arr == True:  # noqa
-            res_data = create_str_arr_from_list(_res_data)
-            str_arr_set_na_by_mask(res_data, res_data_nan_mask)
-        else:
-            res_data = _res_data
+            res_data = arr
 
         return pandas.Series(data=res_data, index=by_index, name=name)
 

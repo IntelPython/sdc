@@ -1,5 +1,6 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,31 +25,38 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+from numba import types
+from numba.extending import (
+    models,
+    register_model,
+    make_attribute_wrapper
+)
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
-from .categorical import *
+from sdc.datatypes.indexes import RangeIndexType
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
+class PositionalIndexType(types.IterableType):
+    dtype = types.int64
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
+    def __init__(self, is_named=False):
+        self.data = RangeIndexType(is_named)
+        self.is_named = is_named
+        super(PositionalIndexType, self).__init__(
+            name='PositionalIndexType({})'.format(is_named))
 
-from sdc.tests.test_ml import *
+    @property
+    def iterator_type(self):
+        res = self.data.iterator_type
+        return res
 
-from sdc.tests.test_io import *
 
-from sdc.tests.test_hpat_jit import *
-from sdc.tests.indexes import *
+@register_model(PositionalIndexType)
+class PositionalIndexModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
 
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
-from sdc.tests.test_compile_time import *
+        members = [
+            ('data', fe_type.data),
+        ]
+        models.StructModel.__init__(self, dmm, fe_type, members)
 
-# performance tests
-import sdc.tests.tests_perf
+
+make_attribute_wrapper(PositionalIndexType, 'data', '_data')
