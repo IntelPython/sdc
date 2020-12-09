@@ -362,6 +362,30 @@ class TestDataFrame(TestCase):
         self.assertEqual(count_parfor_REPs(), 0)
         self.assertEqual(count_parfor_OneDs(), 1)
 
+    @unittest.skip("Works, but compile time needs debug")
+    def test_column_getitem_repeats(self):
+        def test_impl(a, b, c):
+            df = pd.DataFrame({
+                'A': a,
+                'B': b,
+                'C': c,
+            })
+
+            A = df['A']
+            B = df['B']
+            C = df['C']
+            return A[0] + B[0] + C[0]
+        sdc_func = self.jit(test_impl)
+
+        n = 11
+        np.random.seed(0)
+        a = np.ones(n)
+        b = np.random.ranf(n)
+        c = np.random.randint(-100, 100, n)
+        result = sdc_func(a, b, c)
+        result_ref = pd.Series(test_impl(a, b, c))
+        pd.testing.assert_series_equal(result, result_ref)
+
     @skip_numba_jit
     def test_column_list_getitem1(self):
         def test_impl(df):

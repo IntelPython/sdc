@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
@@ -24,31 +25,31 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numba
+import numpy as np
+import operator
+import pandas as pd
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
-from .categorical import *
+from numba import types
+from numba.core import cgutils
+from numba.extending import (typeof_impl, NativeValue, intrinsic, box, unbox, lower_builtin, )
+from numba.core.errors import TypingError
+from numba.core.typing.templates import signature
+from numba.core.imputils import impl_ret_untracked, call_getiter
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
+from sdc.datatypes.common_functions import SDCLimitation, _sdc_take
+from sdc.utilities.utils import sdc_overload, sdc_overload_attribute, sdc_overload_method
+from sdc.utilities.sdc_typing_utils import TypeChecker, check_is_numeric_array, check_signed_integer
+from sdc.functions.numpy_like import getitem_by_mask
+from sdc.functions.numpy_like import astype as nplike_astype
+from numba.core.boxing import box_array, unbox_array
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
 
-from sdc.tests.test_ml import *
+def _check_dtype_param_type(dtype):
+    """ Returns True is dtype is a valid type for dtype parameter and False otherwise.
+        Used in RangeIndex ctor and other methods that take dtype parameter. """
 
-from sdc.tests.test_io import *
+    valid_dtype_types = (types.NoneType, types.Omitted, types.UnicodeType, types.NumberClass)
+    return isinstance(dtype, valid_dtype_types) or dtype is None
 
-from sdc.tests.test_hpat_jit import *
-from sdc.tests.indexes import *
 
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
-from sdc.tests.test_compile_time import *
-
-# performance tests
-import sdc.tests.tests_perf

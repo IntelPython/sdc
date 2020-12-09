@@ -33,7 +33,7 @@ import pyarrow.parquet as pq
 import sdc
 import string
 import unittest
-from itertools import combinations, combinations_with_replacement, product
+from itertools import combinations, combinations_with_replacement, islice, permutations, product
 import numba
 from numba import types
 from numba.core.config import IS_32BITS
@@ -323,24 +323,7 @@ class TestSeries(
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    def test_create_series_index1(self):
-        # create and box an indexed Series
-        def test_impl():
-            A = pd.Series([1, 2, 3], ['A', 'C', 'B'])
-            return A
-        hpat_func = self.jit(test_impl)
-
-        pd.testing.assert_series_equal(hpat_func(), test_impl())
-
-    def test_create_series_index2(self):
-        def test_impl():
-            A = pd.Series([1, 2, 3], index=[2, 1, 0])
-            return A
-        hpat_func = self.jit(test_impl)
-
-        pd.testing.assert_series_equal(hpat_func(), test_impl())
-
-    def test_create_series_index3(self):
+    def test_create_series_param_name_literal(self):
         def test_impl():
             A = pd.Series([1, 2, 3], index=['A', 'C', 'B'], name='A')
             return A
@@ -348,7 +331,7 @@ class TestSeries(
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
-    def test_create_series_index4(self):
+    def test_create_series_param_name(self):
         def test_impl(name):
             A = pd.Series([1, 2, 3], index=['A', 'C', 'B'], name=name)
             return A
@@ -376,7 +359,7 @@ class TestSeries(
         S = pd.Series(['a', 'b', 'c'], name='A')
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    def test_pass_series_index1(self):
+    def test_pass_series_all_indexes(self):
         def test_impl(A):
             return A
         hpat_func = self.jit(test_impl)
@@ -387,6 +370,7 @@ class TestSeries(
             list(np.arange(n)),
             np.arange(n),
             pd.RangeIndex(n),
+            pd.Int64Index(np.arange(n)),
             gen_strlist(n)
         ]
         for index in indexes_to_test:
@@ -2206,13 +2190,15 @@ class TestSeries(
         def test_impl(S):
             return S.value_counts()
 
-        hpat_func = self.jit(test_impl)
+        sdc_func = self.jit(test_impl)
 
         for data in test_global_input_data_integer64:
+            index = np.arange(start=1, stop=len(data) + 1)
             with self.subTest(series_data=data):
-                index = np.arange(start=1, stop=len(data) + 1)
                 S = pd.Series(data, index=index)
-                pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
+                result = sdc_func(S)
+                result_ref = test_impl(S)
+                pd.testing.assert_series_equal(result.sort_index(), result_ref.sort_index())
 
     def test_series_value_counts_no_unboxing(self):
         def test_impl():
