@@ -112,6 +112,7 @@ def pd_int64_index_overload(data, dtype=None, copy=False, name=None):
     is_data_array = isinstance(data, types.Array)
     is_data_index = isinstance(data, (RangeIndexType, Int64IndexType))
     data_dtype_is_int64 = data.dtype is types.int64
+
     def pd_int64_index_ctor_impl(data, dtype=None, copy=False, name=None):
 
         if not (dtype is None
@@ -121,12 +122,12 @@ def pd_int64_index_overload(data, dtype=None, copy=False, name=None):
 
         if is_data_array == True:  # noqa
             _data = data
-        elif is_data_index == True:
+        elif is_data_index == True:  # noqa
             _data = data.values
         else:
             _data = fix_df_index(data)._data
 
-        if data_dtype_is_int64 == False:
+        if data_dtype_is_int64 == False:  # noqa
             _data = nplike_astype(_data, dtype=types.int64)
         else:
             if copy:
@@ -198,6 +199,7 @@ def pd_int64_index_name_overload(self):
         return None
 
     is_named_index = self.is_named
+
     def pd_int64_index_name_impl(self):
         if is_named_index == True:  # noqa
             return self._name
@@ -285,6 +287,7 @@ def pd_int64_index_copy_overload(self, name=None, deep=False, dtype=None):
 
     name_is_none = isinstance(name, (types.NoneType, types.Omitted)) or name is None
     keep_name = name_is_none and self.is_named
+
     def pd_int64_index_copy_impl(self, name=None, deep=False, dtype=None):
 
         _name = self._name if keep_name == True else name  # noqa

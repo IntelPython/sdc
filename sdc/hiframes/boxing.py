@@ -194,6 +194,8 @@ def _infer_series_list_dtype(S):
 
 def _infer_index_type(index):
     """ Deduces native Numba type used to represent index Python object """
+
+    # more specific types go first (e.g. RangeIndex is subtype of Int64Index)
     if isinstance(index, pd.RangeIndex):
         # depending on actual index value unbox to diff types: none-index if it matches
         # positions or to RangeIndexType in general case
@@ -205,6 +207,10 @@ def _infer_index_type(index):
             else:
                 return RangeIndexType(is_named=True)
 
+    # for unsupported pandas indexes we explicitly unbox to None
+    if isinstance(index, pd.DatetimeIndex):
+        return types.none
+
     if isinstance(index, pd.Int64Index):
         index_data_type = numba.typeof(index._data)
         if index.name is None:
@@ -212,9 +218,6 @@ def _infer_index_type(index):
         else:
             return Int64IndexType(index_data_type, is_named=True)
 
-    # for unsupported pandas indexes we explicitly unbox to None
-    if isinstance(index, pd.DatetimeIndex):
-        return types.none
     if index.dtype == np.dtype('O'):
         # TO-DO: should we check that all elements are strings?
         if len(index) > 0 and isinstance(index[0], str):
