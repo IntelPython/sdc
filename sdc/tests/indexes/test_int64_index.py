@@ -194,6 +194,37 @@ class TestInt64Index(TestCase):
                 result_ref = test_impl(index, value)
                 np.testing.assert_array_equal(result, result_ref)
 
+    def test_int64_index_copy(self):
+        def test_impl(index, new_name):
+            return index.copy(name=new_name)
+        sdc_func = self.jit(test_impl)
+
+        for data in _generate_valid_int64_index_data():
+            for name, new_name in product(test_global_index_names, repeat=2):
+                index = pd.Int64Index(data, name=name)
+                with self.subTest(index=index, new_name=new_name):
+                    result = sdc_func(index, new_name)
+                    result_ref = test_impl(index, new_name)
+                    pd.testing.assert_index_equal(result, result_ref)
+
+    def test_int64_index_copy_param_deep(self):
+        def test_impl(index, deep):
+            return index.copy(deep=deep)
+        sdc_func = self.jit(test_impl)
+
+        index = pd.Int64Index([1, 11, 2])
+        for deep in [True, False]:
+            with self.subTest(deep=deep):
+                result = sdc_func(index, deep)
+                result_ref = test_impl(index, deep)
+                pd.testing.assert_index_equal(result, result_ref)
+                # pandas uses ndarray views when copies index, so for python
+                # case check that data arrays share the same memory
+                self.assertEqual(
+                    result._data is index._data,
+                    result_ref._data.base is index._data
+                )
+
     def test_int64_index_getitem_scalar(self):
         def test_impl(index, idx):
             return index[idx]

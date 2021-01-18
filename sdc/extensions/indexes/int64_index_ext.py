@@ -39,11 +39,9 @@ from numba.core.imputils import impl_ret_untracked, call_getiter
 
 from sdc.datatypes.range_index_type import RangeIndexType
 from sdc.datatypes.int64_index_type import Int64IndexType
-from sdc.datatypes.common_functions import SDCLimitation, _sdc_take
 from sdc.utilities.utils import sdc_overload, sdc_overload_attribute, sdc_overload_method
 from sdc.utilities.sdc_typing_utils import TypeChecker, check_is_numeric_array, check_signed_integer
-from sdc.functions.numpy_like import getitem_by_mask
-from sdc.functions.numpy_like import astype as nplike_astype
+from sdc.functions import numpy_like
 from numba.core.boxing import box_array, unbox_array
 from sdc.hiframes.api import fix_df_index
 from sdc.extensions.indexes.indexes_generic import _check_dtype_param_type
@@ -128,7 +126,7 @@ def pd_int64_index_overload(data, dtype=None, copy=False, name=None):
             _data = fix_df_index(data)._data
 
         if data_dtype_is_int64 == False:  # noqa
-            _data = nplike_astype(_data, dtype=types.int64)
+            _data = numpy_like.astype(_data, dtype=types.int64)
         else:
             if copy:
                 _data = np.copy(_data)
@@ -257,13 +255,12 @@ def pd_int64_index_contains_overload(self, val):
 
     def pd_int64_index_contains_impl(self, val):
         # TO-DO: add operator.contains support for arrays in Numba
+        found = 0
         for i in prange(len(self._data)):
             if val == self._data[i]:
-                break
-        else:
-            return False
+                found += 1
 
-        return True
+        return found > 0
 
     return pd_int64_index_contains_impl
 
@@ -291,7 +288,8 @@ def pd_int64_index_copy_overload(self, name=None, deep=False, dtype=None):
     def pd_int64_index_copy_impl(self, name=None, deep=False, dtype=None):
 
         _name = self._name if keep_name == True else name  # noqa
-        return init_int64_index(self._data, _name)
+        new_index_data = self._data if not deep else numpy_like.copy(self._data)
+        return init_int64_index(new_index_data, _name)
 
     return pd_int64_index_copy_impl
 
@@ -408,6 +406,10 @@ def pd_int64_index_ravel_overload(self, order='C'):
         raise TypingError('{} Unsupported parameters. Given order: {}'.format(_func_name, order))
 
     def pd_int64_index_ravel_impl(self, order='C'):
+        # np.ravel argument order is not supported in Numba
+        if order != 'C':
+            raise ValueError(f"Unsupported value for argument 'order' (only default 'C' is supported)")
+
         return self.values
 
     return pd_int64_index_ravel_impl
