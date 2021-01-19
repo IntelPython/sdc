@@ -292,9 +292,6 @@ def pd_int64_index_copy_overload(self, name=None, deep=False, dtype=None):
     name_is_none = isinstance(name, (types.NoneType, types.Omitted)) or name is None
     keep_name = name_is_none and self.is_named
 
-    # FIXME: deep=True/False is not handled at all - and has to be supported!
-    # Support for other indexes too!
-    # FIXME: add tests for all index types on copy_param_deep
     def pd_int64_index_copy_impl(self, name=None, deep=False, dtype=None):
 
         _name = self._name if keep_name == True else name  # noqa
@@ -418,6 +415,10 @@ def pd_int64_index_ravel_overload(self, order='C'):
         raise TypingError('{} Unsupported parameters. Given order: {}'.format(_func_name, order))
 
     def pd_int64_index_ravel_impl(self, order='C'):
+        # np.ravel argument order is not supported in Numba
+        if order != 'C':
+            raise ValueError(f"Unsupported value for argument 'order' (only default 'C' is supported)")
+
         return self.values
 
     return pd_int64_index_ravel_impl

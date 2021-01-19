@@ -482,6 +482,10 @@ def pd_range_index_ravel_overload(self, order='C'):
         raise TypingError('{} Unsupported parameters. Given order: {}'.format(_func_name, order))
 
     def pd_range_index_ravel_impl(self, order='C'):
+        # np.ravel argument order is not supported in Numba
+        if order != 'C':
+            raise ValueError(f"Unsupported value for argument 'order' (only default 'C' is supported)")
+
         return self.values
 
     return pd_range_index_ravel_impl
