@@ -59,4 +59,8 @@ class PositionalIndexModel(models.StructModel):
         models.StructModel.__init__(self, dmm, fe_type, members)
 
 
+# FIXME_Numba#3372: add into numba.types to allow returning from objmode
+types.PositionalIndexType = PositionalIndexType
+
+
 make_attribute_wrapper(PositionalIndexType, 'data', '_data')

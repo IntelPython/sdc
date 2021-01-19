@@ -56,4 +56,8 @@ class EmptyIndexModel(models.StructModel):
         models.StructModel.__init__(self, dmm, fe_type, members)
 
 
+# FIXME_Numba#3372: add into numba.types to allow returning from objmode
+types.EmptyIndexType = EmptyIndexType
+
+
 make_attribute_wrapper(EmptyIndexType, 'name', '_name')
