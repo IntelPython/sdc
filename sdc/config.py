@@ -45,17 +45,6 @@ def strtobool(val):
     return bool(distutils_util.strtobool(val))
 
 
-config_transport_mpi_default = strtobool(os.getenv('SDC_CONFIG_MPI', 'True'))
-'''
-Default value for transport used if no function decorator controls the transport
-'''
-
-config_transport_mpi = config_transport_mpi_default
-'''
-Current value for transport controlled by decorator need to initialize this here
-because decorator called later then modules have been initialized
-'''
-
 config_use_parallel_overloads = strtobool(os.getenv('SDC_AUTO_PARALLEL', 'True'))
 '''
 Default value used to select whether auto parallel would be applied to sdc functions
