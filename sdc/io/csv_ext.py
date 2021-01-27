@@ -24,7 +24,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
 import contextlib
 import functools
 
@@ -45,6 +44,8 @@ from sdc import distributed, distributed_analysis
 from sdc.utilities.utils import (debug_prints, alloc_arr_tup, empty_like_type,
                                  _numba_to_c_type_map)
 from sdc.distributed_analysis import Distribution
+from sdc.hiframes.pd_dataframe_type import DataFrameType, ColumnLoc
+from sdc.hiframes.pd_dataframe_ext import get_structure_maps
 from sdc.str_ext import string_type
 from sdc.str_arr_ext import (string_array_type, to_string_list,
                               cp_str_list_to_array, str_list_to_array,
@@ -56,13 +57,14 @@ from sdc import objmode
 import pandas as pd
 import numpy as np
 
-from sdc.types import CategoricalDtypeType, Categorical
+from sdc.types import Categorical
 
 import pyarrow
 import pyarrow.csv
 
 
 class CsvReader(ir.Stmt):
+
     def __init__(self, file_name, df_out, sep, df_colnames, out_vars, out_types, usecols, loc, skiprows=0):
         self.file_name = file_name
         self.df_out = df_out
@@ -263,8 +265,10 @@ def csv_distributed_run(csv_node, array_dists, typemap, calltypes, typingctx, ta
     # get global array sizes by calling allreduce on chunk lens
     # TODO: get global size from C
     for arr in csv_node.out_vars:
+
         def f(A):
             return sdc.distributed_api.dist_reduce(len(A), np.int32(_op))
+
         f_block = compile_to_numba_ir(
             f, {'sdc': sdc, 'np': np,
                 '_op': sdc.distributed_api.Reduce_Type.Sum.value},
@@ -287,6 +291,7 @@ distributed.distributed_run_extensions[CsvReader] = csv_distributed_run
 
 
 class StreamReaderType(types.Opaque):
+
     def __init__(self):
         super(StreamReaderType, self).__init__(name='StreamReaderType')
 
@@ -298,36 +303,6 @@ register_model(StreamReaderType)(models.OpaqueModel)
 @box(StreamReaderType)
 def box_stream_reader(typ, val, c):
     return val
-
-
-def _get_dtype_str(t):
-    dtype = t.dtype
-
-    if isinstance(t, Categorical):
-        # return categorical representation
-        # for some reason pandas and pyarrow read_csv() return CategoricalDtype with
-        # ordered=False in case when dtype is with ordered=None
-        return str(t).replace('ordered=None', 'ordered=False')
-
-    if dtype == types.NPDatetime('ns'):
-        dtype = 'NPDatetime("ns")'
-    if t == string_array_type:
-        # HACK: add string_array_type to numba.types
-        # FIXME: fix after Numba #3372 is resolved
-        types.string_array_type = string_array_type
-        return 'string_array_type'
-    return '{}[::1]'.format(dtype)
-
-
-def _get_pd_dtype_str(t):
-    dtype = t.dtype
-    if isinstance(t, Categorical):
-        return 'pd.{}'.format(t.pd_dtype)
-    if dtype == types.NPDatetime('ns'):
-        dtype = 'str'
-    if t == string_array_type:
-        return 'str'
-    return 'np.{}'.format(dtype)
 
 
 # XXX: temporary fix pending Numba's #3378
@@ -343,7 +318,7 @@ def to_varname(string):
     Replaces unavailable symbols with _ and insert _ if string starts with digit.
     """
     import re
-    return re.sub(r'\W|^(?=\d)','_', string)
+    return re.sub(r'\W|^(?=\d)', '_', string)
 
 
 @contextlib.contextmanager
@@ -358,10 +333,12 @@ def pyarrow_cpu_count(cpu_count=pyarrow.cpu_count()):
 
 def pyarrow_cpu_count_equal_numba_num_treads(func):
     """Decorator. Set pyarrow cpu_count the same as NUMBA_NUM_THREADS."""
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         with pyarrow_cpu_count(numba.config.NUMBA_NUM_THREADS):
             return func(*args, **kwargs)
+
     return wrapper
 
 
@@ -541,84 +518,81 @@ def pandas_read_csv(
     return dataframe
 
 
-def _gen_csv_reader_py_pyarrow(col_names, col_typs, usecols, sep, typingctx, targetctx, parallel, skiprows):
-    func_text, func_name = _gen_csv_reader_py_pyarrow_func_text(col_names, col_typs, usecols, sep, skiprows)
-    csv_reader_py = _gen_csv_reader_py_pyarrow_py_func(func_text, func_name)
-    return _gen_csv_reader_py_pyarrow_jit_func(csv_reader_py)
+def _gen_pandas_read_csv_func_text(col_names, col_typs, py_col_dtypes, usecols, signature=None):
 
+    func_name = 'csv_reader_py'
+    return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
 
-def _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, dtype_present, usecols, signature=None):
+    column_loc, _, _ = get_structure_maps(col_typs, return_columns)
+    df_type = DataFrameType(
+        tuple(col_typs),
+        types.none,
+        tuple(col_names),
+        column_loc=column_loc
+    )
+
+    df_type_repr = repr(df_type)
+    # for some reason pandas and pyarrow read_csv() return CategoricalDtype with
+    # ordered=False in case when dtype is with ordered=None
+    df_type_repr = df_type_repr.replace('ordered=None', 'ordered=False')
+
     # TODO: support non-numpy types like strings
     date_inds = ", ".join(str(i) for i, t in enumerate(col_typs) if t.dtype == types.NPDatetime('ns'))
     return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
-    nb_objmode_vars = ", ".join([
-        '{}="{}"'.format(to_varname(cname), _get_dtype_str(t))
-        for cname, t in zip(return_columns, col_typs)
-    ])
-    pd_dtype_strs = ", ".join([
-        "'{}': {}".format(cname, _get_pd_dtype_str(t))
-        for cname, t in zip(return_columns, col_typs)
-    ])
 
     if signature is None:
         signature = "filepath_or_buffer"
-    func_text = "def csv_reader_py({}):\n".format(signature)
-    func_text += "  with objmode({}):\n".format(nb_objmode_vars)
-    func_text += "    df = pandas_read_csv(filepath_or_buffer,\n"
+
+    # map generated func params into values used in inner call of pandas_read_csv
+    # if no transformation is needed just use outer param name (since APIs match)
+    # otherwise use value in the dictionary
+    inner_call_params = {'parse_dates': f"[{date_inds}]"}
+    used_read_csv_params = (
+        'filepath_or_buffer',
+        'names',
+        'skiprows',
+        'parse_dates',
+        'dtype',
+        'usecols',
+        'sep',
+        'delimiter'
+    )
 
     # pyarrow reads unnamed header as " ", pandas reads it as "Unnamed: N"
     # during inference from file names should be raplaced with "Unnamed: N"
     # passing names to pyarrow means that one row is header and should be skipped
     if col_names and any(map(lambda x: x.startswith('Unnamed: '), col_names)):
-        func_text += "        names={},\n".format(col_names)
-        func_text += "        skiprows=(skiprows and skiprows + 1) or 1,\n"
-    else:
-        func_text += "        names=names,\n"
-        func_text += "        skiprows=skiprows,\n"
+        inner_call_params['names'] = str(col_names)
+        inner_call_params['skiprows'] = "(skiprows and skiprows + 1) or 1"
 
-    func_text += "        parse_dates=[{}],\n".format(date_inds)
+    # dtype parameter of compiled function is not used at all, instead a python dict
+    # of columns dtypes is captured at compile time, because some dtypes (like datetime)
+    # are converted and also to avoid penalty of creating dict in objmode
+    inner_call_params['dtype'] = 'read_as_dtypes'
 
-    # Python objects (e.g. str, np.float) could not be jitted and passed to objmode
-    # so they are hardcoded to function
-    # func_text += "        dtype={{{}}},\n".format(pd_dtype_strs) if dtype_present else \
-    #              "        dtype=dtype,\n"
-    # dtype is hardcoded because datetime should be read as string
-    func_text += "        dtype={{{}}},\n".format(pd_dtype_strs)
+    params_str = '\n'.join([
+        f"      {param}={inner_call_params.get(param, param)}," for param in used_read_csv_params
+    ])
+    func_text = '\n'.join([
+        f"def {func_name}({signature}):",
+        f"  with objmode(df=\"{df_type_repr}\"):",
+        f"    df = pandas_read_csv(\n{params_str}",
+        f"    )",
+        f"  return df"
+    ])
 
-    func_text += "        usecols=usecols,\n"
-    func_text += "        sep=sep,\n"
-    func_text += "        delimiter=delimiter,\n"
-    func_text += "    )\n"
-    for cname in return_columns:
-        func_text += "    {} = df['{}'].values\n".format(to_varname(cname), cname)
-        # func_text += "    print({})\n".format(cname)
-    return func_text, 'csv_reader_py'
+    global_vars = {
+        'read_as_dtypes': py_col_dtypes,
+        'objmode': objmode,
+        'pandas_read_csv': pandas_read_csv,
+    }
 
-
-def _gen_csv_reader_py_pyarrow_func_text(col_names, col_typs, usecols):
-    func_text, func_name = _gen_csv_reader_py_pyarrow_func_text_core(col_names, col_typs, usecols)
-
-    func_text += "  return ({},)\n".format(", ".join(to_varname(c) for c in col_names))
-
-    return func_text, func_name
+    return func_text, func_name, global_vars
 
 
-def _gen_csv_reader_py_pyarrow_func_text_dataframe(col_names, col_typs, dtype_present, usecols, signature):
-    func_text, func_name = _gen_csv_reader_py_pyarrow_func_text_core(
-        col_names, col_typs, dtype_present, usecols, signature)
-    return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
-
-    func_text += "  return sdc.hiframes.pd_dataframe_ext.init_dataframe({}, None, {})\n".format(
-        ", ".join(to_varname(c) for c in return_columns),
-        ", ".join("'{}'".format(c) for c in return_columns)
-    )
-
-    return func_text, func_name
-
-
-def _gen_csv_reader_py_pyarrow_py_func(func_text, func_name):
+def _gen_csv_reader_py_pyarrow_py_func(func_text, func_name, global_vars):
     locals = {}
-    exec(func_text, globals(), locals)
+    exec(func_text, global_vars, locals)
     func = locals[func_name]
     return func
 
@@ -628,6 +602,3 @@ def _gen_csv_reader_py_pyarrow_jit_func(csv_reader_py):
     jit_func = numba.njit(csv_reader_py)
     compiled_funcs.append(jit_func)
     return jit_func
-
-
-_gen_csv_reader_py = _gen_csv_reader_py_pyarrow
