@@ -48,6 +48,7 @@ import sdc.datatypes.categorical.init
 import sdc.datatypes.series.init
 
 import sdc.extensions.indexes.range_index_ext
+import sdc.extensions.indexes.int64_index_ext
 
 from ._version import get_versions
 

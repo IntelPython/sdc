@@ -40,6 +40,17 @@ from numba.np import numpy_support
 
 from sdc.str_arr_type import string_array_type
 from sdc.datatypes.range_index_type import RangeIndexType
+from sdc.datatypes.int64_index_type import Int64IndexType
+from sdc.str_arr_ext import StringArrayType
+
+
+sdc_pandas_index_types = (
+        types.NoneType,
+        types.Array,
+        StringArrayType,
+        RangeIndexType,
+        Int64IndexType,
+    )
 
 
 class TypeChecker:
@@ -138,7 +149,7 @@ def check_is_numeric_array(type_var):
 
 def check_index_is_numeric(ty_series):
     """Used during typing to check that series has numeric index"""
-    return check_is_numeric_array(ty_series.index)
+    return isinstance(ty_series.index.dtype, types.Number)
 
 
 def check_types_comparable(ty_left, ty_right):
@@ -196,6 +207,7 @@ def find_index_common_dtype(self, other):
 
     return index_dtypes_match, numba_index_common_dtype
 
+
 def gen_impl_generator(codegen, impl_name):
     """Generate generator of an implementation"""
     def _df_impl_generator(*args, **kwargs):
@@ -208,3 +220,7 @@ def gen_impl_generator(codegen, impl_name):
         return _impl
 
     return _df_impl_generator
+
+
+def check_signed_integer(ty):
+    return isinstance(ty, types.Integer) and ty.signed

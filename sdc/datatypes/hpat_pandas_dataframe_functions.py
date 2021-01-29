@@ -50,6 +50,7 @@ from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric,
                                             gen_impl_generator, find_common_dtype_from_numpy_dtypes)
 from sdc.str_arr_ext import StringArrayType
 from sdc.datatypes.range_index_type import RangeIndexType
+from sdc.datatypes.int64_index_type import Int64IndexType
 
 from sdc.hiframes.pd_dataframe_type import DataFrameType
 from sdc.hiframes.pd_dataframe_ext import init_dataframe_internal, get_structure_maps
@@ -2257,7 +2258,7 @@ def sdc_pandas_dataframe_accessor_getitem(self, idx):
 
     if accessor == 'at':
         num_idx = (isinstance(idx[0], types.Number)
-                   and isinstance(self.dataframe.index, (types.Array, types.NoneType, RangeIndexType)))
+                   and isinstance(self.dataframe.index, (types.NoneType, RangeIndexType, Int64IndexType)))
         str_idx = (isinstance(idx[0], (types.UnicodeType, types.StringLiteral))
                    and isinstance(self.dataframe.index, StringArrayType))
         if isinstance(idx, types.Tuple) and isinstance(idx[1], types.StringLiteral):

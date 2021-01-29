@@ -53,6 +53,7 @@ from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric,
                                             find_common_dtype_from_numpy_dtypes, has_literal_value,
                                             has_python_value)
 from sdc.datatypes.range_index_type import RangeIndexType
+from sdc.datatypes.int64_index_type import Int64IndexType
 from sdc.datatypes.common_functions import (sdc_join_series_indexes, sdc_arrays_argsort, sdc_reindex_series)
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
@@ -618,7 +619,7 @@ def sdc_pandas_series_setitem(self, idx, value):
         def sdc_pandas_series_setitem_no_reindexing_impl(self, idx, value):
 
             if assign_via_idx_mask == True:  # noqa
-                # FIXME_Numba#5157: using asarray since eq impl for RangeIndexType returns list
+                # FIXME_Numba#5157: using asarray since eq impl for index types returns list
                 _idx = numpy.asarray(self._index == idx)
             elif assign_via_idx_data == True:  # noqa
                 _idx = idx._data
@@ -4034,7 +4035,8 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
         ty_checker.raise_exc(inplace, 'bool', 'inplace')
 
     if (isinstance(self.data.dtype, types.Number)
-            and isinstance(self.index, (types.Number, types.NoneType, RangeIndexType))):
+            and (isinstance(self.index, types.NoneType)
+                 or isinstance(self.index.dtype, types.Number))):
         def hpat_pandas_series_dropna_impl(self, axis=0, inplace=False):
             index = self.index
             return numpy_like.dropna(self._data, index, self._name)
