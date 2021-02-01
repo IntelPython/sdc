@@ -477,7 +477,6 @@ def pd_range_index_ravel_overload(self, order='C'):
 
     _func_name = 'Method ravel().'
 
-    # np.ravel argument order is not supported in Numba
     if not (isinstance(order, (types.Omitted, types.StringLiteral, types.UnicodeType)) or order == 'C'):
         raise TypingError('{} Unsupported parameters. Given order: {}'.format(_func_name, order))
 

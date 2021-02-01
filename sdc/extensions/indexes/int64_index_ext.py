@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
@@ -260,14 +261,13 @@ def pd_int64_index_contains_overload(self, val):
         ty_checker.raise_exc(val, 'integer scalar', 'val')
 
     def pd_int64_index_contains_impl(self, val):
-        # TO-DO: add operator.contains support for arrays in Numba or numpy_like
+        # TO-DO: add operator.contains support for arrays in Numba
+        found = 0
         for i in prange(len(self._data)):
             if val == self._data[i]:
-                break
-        else:
-            return False
+                found += 1
 
-        return True
+        return found > 0
 
     return pd_int64_index_contains_impl
 
@@ -410,7 +410,6 @@ def pd_int64_index_ravel_overload(self, order='C'):
 
     _func_name = 'Method ravel().'
 
-    # np.ravel argument order is not supported in Numba
     if not (isinstance(order, (types.Omitted, types.StringLiteral, types.UnicodeType)) or order == 'C'):
         raise TypingError('{} Unsupported parameters. Given order: {}'.format(_func_name, order))
 

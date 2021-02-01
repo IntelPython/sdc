@@ -20,6 +20,7 @@ requirements:
     - {{ compiler('cxx') }}    # [not osx]
     - wheel
     - python
+    - numba   {{ NUMBA_VERSION }}
 
   host:
     - python

@@ -3136,7 +3136,6 @@ def df_add_column_codelines(self, key):
         res_data = f'res_data_{i}'
         func_lines += [
             f'  data_{i} = self._data[{type_id}][{col_id}]',
-            # f'  {res_data} = pandas.Series(data_{i}, index=series_index, name="{col}")',
             f'  {res_data} = data_{i}',
         ]
         results.append((col, res_data))
