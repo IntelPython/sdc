@@ -19,7 +19,6 @@ requirements:
   build:
     - {{ compiler('c') }}      # [not osx]
     - {{ compiler('cxx') }}    # [not osx]
-
   host:
     - python
     - setuptools

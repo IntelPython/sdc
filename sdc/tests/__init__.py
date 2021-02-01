@@ -48,6 +48,7 @@ from sdc.tests.test_indexes import *
 
 from sdc.tests.test_sdc_numpy import *
 from sdc.tests.test_prange_utils import *
+from sdc.tests.test_compile_time import *
 
 # performance tests
 import sdc.tests.tests_perf

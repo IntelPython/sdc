@@ -51,6 +51,8 @@ import types as pytypes
 from numba.extending import overload, overload_method, overload_attribute
 from numba.extending import register_jitable, register_model
 from numba.core.datamodel.registry import register_default
+from functools import wraps
+from itertools import filterfalse, chain
 
 
 # int values for types to pass to C code
@@ -686,3 +688,59 @@ def sdc_overload_attribute(typ, name, jit_options={}, parallel=None, strict=True
     return overload_attribute(
         typ, name, jit_options=jit_options, strict=strict, inline=inline, prefer_literal=prefer_literal
     )
+
+
+def print_compile_times(disp, level, func_names=None):
+
+    def print_times(cres, args):
+        print(f'Function: {cres.fndesc.unique_name}')
+        pad = '  ' * 2
+        if level:
+            print(f'{pad * 1}Args: {args}')
+        times = cres.metadata['pipeline_times']
+        for pipeline, pass_times in times.items():
+            print(f'{pad * 1}Pipeline: {pipeline}')
+            if level:
+                for name, timings in pass_times.items():
+                    print(f'{pad * 2}{name:50s}{timings.run:.13f}')
+
+            pipeline_total = sum(t.init + t.run + t.finalize for t in pass_times.values())
+            print(f'{pad * 1}Time: {pipeline_total}\n')
+
+    # print times for compiled function indicated by disp
+    for args, cres in disp.overloads.items():
+        print_times(cres, args)
+
+    def has_no_cache(ovld):
+        return not (getattr(ovld, '_impl_cache', False) and ovld._impl_cache)
+
+    known_funcs = disp.typingctx._functions
+    all_templs = chain.from_iterable(known_funcs.values())
+    compiled_templs = filterfalse(has_no_cache, all_templs)
+
+    # filter only function names that are in the func_names list
+    if func_names:
+        compiled_templs = filterfalse(
+                                lambda x: not any(f in str(x) for f in func_names),
+                                compiled_templs
+                            )
+
+    dispatchers_list = []
+    for template in compiled_templs:
+        tmpl_cached_impls = template._impl_cache.values()
+        dispatchers_list.extend(tmpl_cached_impls)
+
+    for impl_cache in set(dispatchers_list):
+        # impl_cache is usually a tuple of format (dispatcher, args)
+        # if not just skip these entires
+        if not (isinstance(impl_cache, tuple)
+                and len(impl_cache) == 2
+                and isinstance(impl_cache[0], type(disp))):
+            continue
+
+        fndisp, args = impl_cache
+        if not getattr(fndisp, 'overloads', False):
+            continue
+
+        cres, = list(fndisp.overloads.values())
+        print_times(cres, args)
