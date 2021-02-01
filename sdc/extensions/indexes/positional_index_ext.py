@@ -58,6 +58,7 @@ def init_positional_index(typingctx, size, name=None):
 
     ret_typ = PositionalIndexType(is_named)
     inner_sig = signature(ret_typ.data, size, name)
+
     def codegen(context, builder, sig, args):
         data_val, name_val = args
 
@@ -140,6 +141,7 @@ def pd_positional_index_name_overload(self):
         return None
 
     is_named_index = self.is_named
+
     def pd_positional_index_name_impl(self):
         _self = self._data
         if is_named_index == True:  # noqa
@@ -160,6 +162,7 @@ def pd_positional_index_dtype_overload(self):
 
     return pd_positional_index_dtype_impl
 
+
 @sdc_overload_attribute(PositionalIndexType, 'values')
 def pd_positional_index_values_overload(self):
     if not isinstance(self, PositionalIndexType):
@@ -170,6 +173,7 @@ def pd_positional_index_values_overload(self):
         return np.array(self)
 
     return pd_positional_index_values_impl
+
 
 @sdc_overload(len)
 def pd_positional_index_len_overload(self):
@@ -213,6 +217,7 @@ def pd_positional_index_copy_overload(self, name=None, deep=False, dtype=None):
 
     name_is_none = isinstance(name, (types.NoneType, types.Omitted)) or name is None
     keep_name = name_is_none and self.is_named
+
     def pd_positional_index_copy_impl(self, name=None, deep=False, dtype=None):
 
         _name = self.name if keep_name == True else name  # noqa
@@ -311,9 +316,6 @@ def pd_positional_index_getiter(context, builder, sig, args):
     return impl_ret_untracked(context, builder, PositionalIndexType, res)
 
 
-
-
-
 @sdc_overload_method(PositionalIndexType, 'ravel')
 def pd_positional_index_ravel_overload(self, order='C'):
     if not isinstance(self, PositionalIndexType):
@@ -364,7 +366,6 @@ def pd_positional_index_reindex_overload(self, target, method=None, level=None, 
     if not check_types_comparable(self, target):
         raise TypingError('{} Not allowed for non comparable indexes. \
         Given: self={}, target={}'.format(_func_name, self, target))
-
 
     def pd_positional_index_reindex_impl(self, target, method=None, level=None, limit=None, tolerance=None):
         return sdc_indexes_reindex(self, target=target, method=method, level=level, tolerance=tolerance)
@@ -466,7 +467,7 @@ def pd_positional_index_join_overload(self, other, how, level=None, return_index
     else:
 
         def pd_positional_index_join_common_impl(self, other, how, level=None, return_indexers=False, sort=False):
-            if _return_indexers == True:
+            if _return_indexers == True:  # noqa
                 return sdc_indexes_join_outer(self, other)
             else:
                 return sdc_indexes_join_outer(self, other)[0]

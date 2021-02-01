@@ -274,6 +274,7 @@ class TestIndexes(
         """ Verifies numpy_like.take can handle SDC index types as indices """
 
         from sdc.functions import numpy_like
+
         def pyfunc(arr, index):
             return np.take(arr, index)
 

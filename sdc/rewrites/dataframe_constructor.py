@@ -256,7 +256,10 @@ def gen_init_dataframe_text(func_name, n_cols):
                     first_col_data = context.get_dummy_value()
                 else:
                     first_col_data = data_arrs_transformed[0]
-                index = context.compile_internal(builder, lambda a, d: fix_df_index(a, d), fixed_index_sig, [index, first_col_data])
+                index = context.compile_internal(builder,
+                                                lambda a, d: fix_df_index(a, d),
+                                                fixed_index_sig,
+                                                [index, first_col_data])
 
             dataframe.data = data_tup
             dataframe.index = index

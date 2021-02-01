@@ -590,7 +590,7 @@ class TestRangeIndex(TestCase):
         index2 = index1.copy(deep=True)
 
         result = sdc_func(index1, index2)
-        result_ref  = test_func(index1, index2)
+        result_ref = test_func(index1, index2)
         pd.testing.assert_index_equal(result[0], result_ref[0])
         np.testing.assert_array_equal(result[1], result_ref[1])
 
@@ -612,7 +612,7 @@ class TestRangeIndex(TestCase):
         for index2 in reindex_by:
             with self.subTest(index2=index2):
                 result = sdc_func(index1, index2)
-                result_ref  = test_impl(index1, index2)
+                result_ref = test_impl(index1, index2)
                 pd.testing.assert_index_equal(result[0], result_ref[0])
                 np.testing.assert_array_equal(result[1], result_ref[1])
 
@@ -649,8 +649,7 @@ class TestRangeIndex(TestCase):
         ]
         for index, other in product(
                 _generate_range_indexes_fixed(n),
-                other_indexes
-            ):
+                other_indexes):
             with self.subTest(index=index, other=other):
                 result = sdc_func(index, other)
                 result_ref = test_impl(index, other)
@@ -669,8 +668,7 @@ class TestRangeIndex(TestCase):
         ]
         for index, other in product(
                 _generate_range_indexes_fixed(n),
-                other_indexes
-            ):
+                other_indexes):
             with self.subTest(index=index, other=other):
                 result = sdc_func(index, other)
                 result_ref = test_impl(index, other)

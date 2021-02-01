@@ -538,7 +538,6 @@ def pd_range_index_reindex_overload(self, target, method=None, level=None, limit
         raise TypingError('{} Not allowed for non comparable indexes. \
         Given: self={}, target={}'.format(_func_name, self, target))
 
-
     def pd_range_index_reindex_impl(self, target, method=None, level=None, limit=None, tolerance=None):
         return sdc_indexes_reindex(self, target=target, method=method, level=level, tolerance=tolerance)
 
@@ -612,8 +611,9 @@ def pd_range_index_join_overload(self, other, how, level=None, return_indexers=F
         ty_checker.raise_exc(sort, 'boolean', 'sort')
 
     _return_indexers = return_indexers.literal_value
+
     def pd_range_index_join_impl(self, other, how, level=None, return_indexers=False, sort=False):
-        if _return_indexers == True:
+        if _return_indexers == True:  # noqa
             return sdc_indexes_join_outer(self, other)
         else:
             joined_index, = sdc_indexes_join_outer(self, other)

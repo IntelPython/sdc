@@ -119,6 +119,7 @@ def sdc_indexes_reindex(self, target):
 def pd_indexes_reindex_overload(self, target, method=None, level=None, limit=None, tolerance=None):
 
     index_dtype = self.dtype
+
     def pd_indexes_index_reindex_impl(self, target, method=None, level=None, limit=None, tolerance=None):
         """ Simplified version of pandas.core.index.base.reindex """
 
@@ -168,7 +169,7 @@ def pd_indexes_join_overload(left, right):
 
     # for index types with dtype=int64 resulting index should be of Int64Index type
     if (isinstance(left, (PositionalIndexType, RangeIndexType, Int64IndexType))
-          and isinstance(right, (PositionalIndexType, RangeIndexType, Int64IndexType))):
+            and isinstance(right, (PositionalIndexType, RangeIndexType, Int64IndexType))):
 
         def _convert_to_arrays_impl(left, right):
 
@@ -187,6 +188,7 @@ def pd_indexes_join_overload(left, right):
         convert_left = isinstance(left, (PositionalIndexType, RangeIndexType, Int64IndexType))
         convert_right = isinstance(right, (PositionalIndexType, RangeIndexType, Int64IndexType))
         index_dtypes_match, res_index_dtype = find_index_common_dtype(left, right)
+
         def pd_indexes_join_array_indexes_impl(left, right):
 
             _left = left.values if convert_left == True else left  # noqa

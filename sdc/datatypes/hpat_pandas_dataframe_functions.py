@@ -2161,7 +2161,10 @@ def df_getitem_list_bool_iloc_codegen(self, idx):
             result_1 = pandas.Series(data_1[numpy.array(idx)])
             data_2 = self._dataframe._data[1][0]
             result_2 = pandas.Series(data_2[numpy.array(idx)])
-            return pandas.DataFrame(data={"A": result_0, "B": result_1, "C": result_2}, index=self._dataframe.index[numpy.array(idx)])
+            return pandas.DataFrame(data={"A": result_0,
+                                          "B": result_1,
+                                          "C": result_2},
+                                          index=self._dataframe.index[numpy.array(idx)])
           raise IndexingError('Item wrong length')
     """
     func_lines = ['def _df_getitem_list_bool_iloc_impl(self, idx):']

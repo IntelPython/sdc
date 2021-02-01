@@ -34,6 +34,7 @@ from numba.extending import (
 
 from sdc.datatypes.indexes import RangeIndexType
 
+
 class PositionalIndexType(types.IterableType):
     dtype = types.int64
 

@@ -456,7 +456,6 @@ def pd_int64_index_reindex_overload(self, target, method=None, level=None, limit
         raise TypingError('{} Not allowed for non comparable indexes. \
         Given: self={}, target={}'.format(_func_name, self, target))
 
-
     def pd_int64_index_reindex_impl(self, target, method=None, level=None, limit=None, tolerance=None):
         return sdc_indexes_reindex(self, target=target, method=method, level=level, tolerance=tolerance)
 
@@ -485,8 +484,9 @@ def pd_int64_index_take_overload(self, indexes):
         return pd_int64_index_take_chunked_impl
 
     convert_target = isinstance(indexes, sdc_pandas_index_types) and not isinstance(indexes, types.Array)
+
     def pd_int64_index_take_impl(self, indexes):
-        _indexes = indexes.values if convert_target == True else indexes
+        _indexes = indexes.values if convert_target == True else indexes  # noqa
         new_index_data = numpy_like.take(self._data, _indexes)
         return pd.Int64Index(new_index_data, name=self._name)
 
@@ -511,12 +511,13 @@ def pd_int64_index_append_overload(self, other):
     convert_other = not isinstance(other, types.Array)
     _, res_index_dtype = find_index_common_dtype(self, other)
     return_as_array_index = res_index_dtype is not types.int64
+
     def pd_int64_index_append_impl(self, other):
         _other = other.values if convert_other == True else other  # noqa
         new_index_data = hpat_arrays_append(self._data, _other)
         # this is only needed while some indexes are represented with arrays
         # TO-DO: support pd.Index() overload with dtype arg to create indexes
-        if return_as_array_index == False:
+        if return_as_array_index == False:  # noqa
             return pd.Int64Index(new_index_data)
         else:
             return new_index_data
@@ -550,9 +551,10 @@ def pd_int64_index_join_overload(self, other, how, level=None, return_indexers=F
         ty_checker.raise_exc(sort, 'boolean', 'sort')
 
     _return_indexers = return_indexers.literal_value
+
     def pd_int64_index_join_impl(self, other, how, level=None, return_indexers=False, sort=False):
 
-        if _return_indexers == True:
+        if _return_indexers == True:  # noqa
             return sdc_indexes_join_outer(self, other)
         else:
             joined_index, = sdc_indexes_join_outer(self, other)

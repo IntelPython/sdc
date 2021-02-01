@@ -1276,7 +1276,6 @@ def take(data, indices):
     pass
 
 
-
 @sdc_overload(take)
 def sdc_take_overload(data, indices):
 
@@ -1304,8 +1303,8 @@ def sdc_take_overload(data, indices):
                 res_arr = numpy.empty(res_size, dtype=data_dtype)
                 for i in numba.prange(len(indices)):
                     start = 0
-                    for l in range(len(indices[0:i])):
-                        start += len(indices[l])
+                    for list_elem in range(len(indices[0:i])):
+                        start += len(indices[list_elem])
                     current_pos = start
                     for j in range(len(indices[i])):
                         res_arr[current_pos] = data[indices[i][j]]
@@ -1323,8 +1322,8 @@ def sdc_take_overload(data, indices):
                 num_total_bytes = 0
                 for i in numba.prange(len(indices)):
                     start = 0
-                    for l in range(len(indices[0:i])):
-                        start += len(indices[l])
+                    for list_elem in range(len(indices[0:i])):
+                        start += len(indices[list_elem])
                     current_pos = start
                     for j in range(len(indices[i])):
                         num_total_bytes += get_utf8_size(data[indices[i][j]])
@@ -1334,8 +1333,8 @@ def sdc_take_overload(data, indices):
                 res_arr = pre_alloc_string_array(res_size, num_total_bytes)
                 for i in numba.prange(len(indices)):
                     start = 0
-                    for l in range(len(indices[0:i])):
-                        start += len(indices[l])
+                    for list_elem in range(len(indices[0:i])):
+                        start += len(indices[list_elem])
                     current_pos = start
                     for j in range(len(indices[i])):
                         res_arr[current_pos] = data[indices[i][j]]

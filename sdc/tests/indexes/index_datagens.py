@@ -52,7 +52,7 @@ def _generate_all_range_params():
 def _generate_positional_range_params():
 
     # for PositionalIndexType represented ranges only
-    starts, stops, steps = [0,], [1, 2, 10,], [1,]
+    starts, stops, steps = [0, ], [1, 2, 10, ], [1, ]
     return product(starts, stops, steps)
 
 

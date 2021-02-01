@@ -4829,13 +4829,7 @@ class TestSeries(
         for input_data in test_input_data:
             S = pd.Series(input_data)
             for periods in [0, 1, 2, 5, 10, -1, -2, -5]:
-                for method in [
-                        None,
-                        'pad',
-                        'ffill',
-                        'backfill',
-                        'bfill'
-                    ]:
+                for method in [None, 'pad', 'ffill', 'backfill', 'bfill']:
                     result_ref = test_series_pct_change_impl(S, periods, method)
                     result = hpat_func(S, periods, method)
                     pd.testing.assert_series_equal(result, result_ref)

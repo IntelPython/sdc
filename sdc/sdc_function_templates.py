@@ -80,10 +80,11 @@ def sdc_binop_ovld(self, other, fill_value=None):
 
         use_index_methods = not (isinstance(self.index, sdc_old_index_types)
                                  or isinstance(other.index, sdc_old_index_types))
+
         def sdc_binop_impl(self, other, fill_value=None):
 
             left_index, right_index = self._index, other._index
-            if use_index_methods == True:
+            if use_index_methods == True:  # noqa
                 indexes_join_res = left_index.join(right_index, 'outer', return_indexers=True)
             else:
                 indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
@@ -207,7 +208,8 @@ def sdc_comp_binop_ovld(self, other, fill_value=None):
     else:
 
         index_api_supported = not (isinstance(self.index, sdc_old_index_types)
-                                 and isinstance(other.index, sdc_old_index_types))
+                                   and isinstance(other.index, sdc_old_index_types))
+
         def _series_lt_common_impl(self, other, fill_value=None):
 
             left_index, right_index = self.index, other.index

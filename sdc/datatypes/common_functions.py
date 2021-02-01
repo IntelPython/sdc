@@ -88,7 +88,7 @@ def hpat_arrays_append_overload(A, B):
         if isinstance(B, valid_num_single_B_dtype):
             convert_B = not isinstance(B, types.Array)
             def _append_single_numeric_impl(A, B):
-                _B = B if convert_B == False else B.values
+                _B = B if convert_B == False else B.values  # noqa
                 return numpy.concatenate((A, _B,))
 
             return _append_single_numeric_impl

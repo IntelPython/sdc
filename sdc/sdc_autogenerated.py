@@ -80,10 +80,11 @@ def sdc_add_ovld(self, other, fill_value=None):
 
         use_index_methods = not (isinstance(self.index, sdc_old_index_types)
                                  or isinstance(other.index, sdc_old_index_types))
+
         def sdc_add_impl(self, other, fill_value=None):
 
             left_index, right_index = self._index, other._index
-            if use_index_methods == True:
+            if use_index_methods == True:  # noqa
                 indexes_join_res = left_index.join(right_index, 'outer', return_indexers=True)
             else:
                 indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
@@ -219,10 +220,11 @@ def sdc_div_ovld(self, other, fill_value=None):
 
         use_index_methods = not (isinstance(self.index, sdc_old_index_types)
                                  or isinstance(other.index, sdc_old_index_types))
+
         def sdc_div_impl(self, other, fill_value=None):
 
             left_index, right_index = self._index, other._index
-            if use_index_methods == True:
+            if use_index_methods == True:  # noqa
                 indexes_join_res = left_index.join(right_index, 'outer', return_indexers=True)
             else:
                 indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
@@ -358,10 +360,11 @@ def sdc_sub_ovld(self, other, fill_value=None):
 
         use_index_methods = not (isinstance(self.index, sdc_old_index_types)
                                  or isinstance(other.index, sdc_old_index_types))
+
         def sdc_sub_impl(self, other, fill_value=None):
 
             left_index, right_index = self._index, other._index
-            if use_index_methods == True:
+            if use_index_methods == True:  # noqa
                 indexes_join_res = left_index.join(right_index, 'outer', return_indexers=True)
             else:
                 indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
@@ -497,10 +500,11 @@ def sdc_mul_ovld(self, other, fill_value=None):
 
         use_index_methods = not (isinstance(self.index, sdc_old_index_types)
                                  or isinstance(other.index, sdc_old_index_types))
+
         def sdc_mul_impl(self, other, fill_value=None):
 
             left_index, right_index = self._index, other._index
-            if use_index_methods == True:
+            if use_index_methods == True:  # noqa
                 indexes_join_res = left_index.join(right_index, 'outer', return_indexers=True)
             else:
                 indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
@@ -636,10 +640,11 @@ def sdc_truediv_ovld(self, other, fill_value=None):
 
         use_index_methods = not (isinstance(self.index, sdc_old_index_types)
                                  or isinstance(other.index, sdc_old_index_types))
+
         def sdc_truediv_impl(self, other, fill_value=None):
 
             left_index, right_index = self._index, other._index
-            if use_index_methods == True:
+            if use_index_methods == True:  # noqa
                 indexes_join_res = left_index.join(right_index, 'outer', return_indexers=True)
             else:
                 indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
@@ -775,10 +780,11 @@ def sdc_floordiv_ovld(self, other, fill_value=None):
 
         use_index_methods = not (isinstance(self.index, sdc_old_index_types)
                                  or isinstance(other.index, sdc_old_index_types))
+
         def sdc_floordiv_impl(self, other, fill_value=None):
 
             left_index, right_index = self._index, other._index
-            if use_index_methods == True:
+            if use_index_methods == True:  # noqa
                 indexes_join_res = left_index.join(right_index, 'outer', return_indexers=True)
             else:
                 indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
@@ -914,10 +920,11 @@ def sdc_mod_ovld(self, other, fill_value=None):
 
         use_index_methods = not (isinstance(self.index, sdc_old_index_types)
                                  or isinstance(other.index, sdc_old_index_types))
+
         def sdc_mod_impl(self, other, fill_value=None):
 
             left_index, right_index = self._index, other._index
-            if use_index_methods == True:
+            if use_index_methods == True:  # noqa
                 indexes_join_res = left_index.join(right_index, 'outer', return_indexers=True)
             else:
                 indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
@@ -1053,10 +1060,11 @@ def sdc_pow_ovld(self, other, fill_value=None):
 
         use_index_methods = not (isinstance(self.index, sdc_old_index_types)
                                  or isinstance(other.index, sdc_old_index_types))
+
         def sdc_pow_impl(self, other, fill_value=None):
 
             left_index, right_index = self._index, other._index
-            if use_index_methods == True:
+            if use_index_methods == True:  # noqa
                 indexes_join_res = left_index.join(right_index, 'outer', return_indexers=True)
             else:
                 indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
@@ -1182,7 +1190,8 @@ def sdc_lt_ovld(self, other, fill_value=None):
     else:
 
         index_api_supported = not (isinstance(self.index, sdc_old_index_types)
-                                 and isinstance(other.index, sdc_old_index_types))
+                                   and isinstance(other.index, sdc_old_index_types))
+
         def _series_lt_common_impl(self, other, fill_value=None):
 
             left_index, right_index = self.index, other.index
@@ -1310,7 +1319,8 @@ def sdc_gt_ovld(self, other, fill_value=None):
     else:
 
         index_api_supported = not (isinstance(self.index, sdc_old_index_types)
-                                 and isinstance(other.index, sdc_old_index_types))
+                                   and isinstance(other.index, sdc_old_index_types))
+
         def _series_lt_common_impl(self, other, fill_value=None):
 
             left_index, right_index = self.index, other.index
@@ -1438,7 +1448,8 @@ def sdc_le_ovld(self, other, fill_value=None):
     else:
 
         index_api_supported = not (isinstance(self.index, sdc_old_index_types)
-                                 and isinstance(other.index, sdc_old_index_types))
+                                   and isinstance(other.index, sdc_old_index_types))
+
         def _series_lt_common_impl(self, other, fill_value=None):
 
             left_index, right_index = self.index, other.index
@@ -1566,7 +1577,8 @@ def sdc_ge_ovld(self, other, fill_value=None):
     else:
 
         index_api_supported = not (isinstance(self.index, sdc_old_index_types)
-                                 and isinstance(other.index, sdc_old_index_types))
+                                   and isinstance(other.index, sdc_old_index_types))
+
         def _series_lt_common_impl(self, other, fill_value=None):
 
             left_index, right_index = self.index, other.index
@@ -1694,7 +1706,8 @@ def sdc_ne_ovld(self, other, fill_value=None):
     else:
 
         index_api_supported = not (isinstance(self.index, sdc_old_index_types)
-                                 and isinstance(other.index, sdc_old_index_types))
+                                   and isinstance(other.index, sdc_old_index_types))
+
         def _series_lt_common_impl(self, other, fill_value=None):
 
             left_index, right_index = self.index, other.index
@@ -1822,7 +1835,8 @@ def sdc_eq_ovld(self, other, fill_value=None):
     else:
 
         index_api_supported = not (isinstance(self.index, sdc_old_index_types)
-                                 and isinstance(other.index, sdc_old_index_types))
+                                   and isinstance(other.index, sdc_old_index_types))
+
         def _series_lt_common_impl(self, other, fill_value=None):
 
             left_index, right_index = self.index, other.index

@@ -59,7 +59,7 @@ def init_empty_index(typingctx, name=None):
                 index_struct.name = name_val
 
         if context.enable_nrt and is_named:
-                context.nrt.incref(builder, sig.args[1], name_val)
+            context.nrt.incref(builder, sig.args[1], name_val)
 
         return index_struct._getvalue()
 
