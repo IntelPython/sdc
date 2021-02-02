@@ -1914,7 +1914,7 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
     data_narr = isinstance(self.data, types.npytypes.Array)
     dtype_num_liter = isinstance(dtype, (types.functions.NumberClass, types.StringLiteral))
 
-    if data_narr and dtype_num_liter:
+    if data_narr and dtype_num_liter or str_check:
         return hpat_pandas_series_astype_numba_impl
 
     if errors == 'raise':
