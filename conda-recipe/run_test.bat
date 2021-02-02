@@ -9,33 +9,33 @@ if errorlevel 1 exit 1
 
 @rem TODO investigate root cause of NumbaPerformanceWarning
 @rem http://numba.pydata.org/numba-doc/latest/user/parallel.html#diagnostics
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_basic
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_basic
 if errorlevel 1 exit 1
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_series
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_series
 if errorlevel 1 exit 1
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_dataframe
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_dataframe
 if errorlevel 1 exit 1
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_hiframes
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_hiframes
 if errorlevel 1 exit 1
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_date
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_date
 if errorlevel 1 exit 1
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_strings
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_strings
 if errorlevel 1 exit 1
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_groupby
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_groupby
 if errorlevel 1 exit 1
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_join
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_join
 if errorlevel 1 exit 1
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_rolling
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_rolling
 if errorlevel 1 exit 1
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_ml
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_ml
 if errorlevel 1 exit 1
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_io
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_io
 if errorlevel 1 exit 1
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_hpat_jit
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_hpat_jit
 if errorlevel 1 exit 1
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_sdc_numpy
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_sdc_numpy
 if errorlevel 1 exit 1
-python -W ignore -u -m sdc.runtests -v sdc.tests.test_prange_utils
+python -W ignore -u -m numba.runtests -m -v sdc.tests.test_prange_utils
 if errorlevel 1 exit 1
 
 REM Link check for Documentation using Sphinx's in-built linkchecker
