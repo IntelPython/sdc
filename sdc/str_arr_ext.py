@@ -1026,6 +1026,7 @@ def str_arr_getitem_int(A, arg):
 def decode_utf8(typingctx, ptr_t, len_t=None):
     def codegen(context, builder, sig, args):
         ptr, length = args
+        nrt_table = context.nrt.get_nrt_api(builder)
 
         # create str and call decode with internal pointers
         uni_str = cgutils.create_struct_proxy(string_type)(context, builder)
@@ -1034,14 +1035,16 @@ def decode_utf8(typingctx, ptr_t, len_t=None):
                                                  lir.IntType(32).as_pointer(),
                                                  lir.IntType(32).as_pointer(),
                                                  lir.IntType(64).as_pointer(),
-                                                 uni_str.meminfo.type.as_pointer()])
+                                                 uni_str.meminfo.type.as_pointer(),
+                                                 lir.IntType(8).as_pointer()])
         fn_decode = builder.module.get_or_insert_function(
             fnty, name="decode_utf8")
         builder.call(fn_decode, [ptr, length,
                                  uni_str._get_ptr_by_name('kind'),
                                  uni_str._get_ptr_by_name('is_ascii'),
                                  uni_str._get_ptr_by_name('length'),
-                                 uni_str._get_ptr_by_name('meminfo')])
+                                 uni_str._get_ptr_by_name('meminfo'),
+                                 nrt_table])
         uni_str.hash = context.get_constant(_Py_hash_t, -1)
         uni_str.data = context.nrt.meminfo_data(builder, uni_str.meminfo)
         # Set parent to NULL
