@@ -19,6 +19,7 @@ requirements:
   build:
     - {{ compiler('c') }}      # [not osx]
     - {{ compiler('cxx') }}    # [not osx]
+    - numba   {{ NUMBA_VERSION }}
 
   host:
     - python
