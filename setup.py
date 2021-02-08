@@ -352,7 +352,7 @@ class style(Command):
 sdc_build_commands = versioneer.get_cmdclass()
 sdc_build_commands['build_doc'] = SDCBuildDoc
 sdc_build_commands.update({'style': style})
-sdc_version = versioneer.get_version()
+sdc_version = versioneer.get_version().split('+')[0]
 sdc_release = 'Alpha ({})'.format(versioneer.get_version())
 
 setup(name=SDC_NAME_STR,
@@ -378,8 +378,7 @@ setup(name=SDC_NAME_STR,
           'pandas>=1.0',
           'pyarrow==0.17.0',
           'numba>=0.51.2,<0.52',
-          'setuptools',
-          'tbb4py'
+          'tbb'
           ],
       cmdclass=sdc_build_commands,
       ext_modules=_ext_mods,
