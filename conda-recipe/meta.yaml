@@ -16,10 +16,11 @@ build:
 
 requirements:
   build:
-    - {{ compiler('c') }}
-    - {{ compiler('cxx') }}
+    - {{ compiler('c') }}      # [not osx]
+    - {{ compiler('cxx') }}    # [not osx]
     - wheel
     - python
+    - numba   {{ NUMBA_VERSION }}
 
   host:
     - python
@@ -51,8 +52,8 @@ outputs:
     name: sdc
     requirements:
       build:
-        - {{ compiler('c') }}
-        - {{ compiler('cxx') }}
+        - {{ compiler('c') }}     # [not osx]
+        - {{ compiler('cxx') }}   # [not osx]
         - python
         - wheel
         - setuptools

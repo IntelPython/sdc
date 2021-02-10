@@ -160,6 +160,8 @@ def sdc_pandas_dataframe_getitem(self, idx):
             target_col_loc = self.parent.column_loc[self.parent.columns[target_col_id_literal]]
             target_type_id, target_col_id = target_col_loc.type_id, target_col_loc.col_id
 
+        parent_df_col_names = self.parent.columns
+
         def sdc_pandas_dataframe_getitem_common_impl(self, idx):
 
             # calling getitem twice raises IndexError, just as in pandas
@@ -170,7 +172,7 @@ def sdc_pandas_dataframe_getitem(self, idx):
                 # no need to pass index into this series, as we group by array
                 target_series = pandas.Series(
                     data=self._parent._data[target_type_id][target_col_id],
-                    name=self._parent._columns[target_col_id_literal]
+                    name=parent_df_col_names[target_col_id_literal]
                 )
                 by_arr_data = self._parent._data[by_type_id][by_col_id]
                 return init_series_groupby(target_series, by_arr_data, self._data, self._sort)

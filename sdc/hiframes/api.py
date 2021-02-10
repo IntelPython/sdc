@@ -39,6 +39,7 @@ import sdc
 from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import (StringArrayType, string_array_type)
 from sdc.datatypes.range_index_type import RangeIndexType
+from sdc.datatypes.int64_index_type import Int64IndexType
 from sdc.hiframes.pd_series_ext import (
     SeriesType,
     if_series_to_array_type)
@@ -160,32 +161,38 @@ def fix_df_array_overload(column):
     if isinstance(column, SeriesType):
         return lambda column: column._data
 
-    if isinstance(column, RangeIndexType):
+    if isinstance(column, (RangeIndexType, Int64IndexType)):
         return lambda column: np.array(column)
 
     if isinstance(column, (types.Array, StringArrayType, Categorical)):
         return lambda column: column
 
 
-def fix_df_index(index, *columns):
+def fix_df_index(index):
     return index
 
 
 @overload(fix_df_index)
-def fix_df_index_overload(index, *columns):
+def fix_df_index_overload(index):
 
     # TO-DO: replace types.none index with separate type, e.g. DefaultIndex
     if (index is None or isinstance(index, types.NoneType)):
-        def fix_df_index_impl(index, *columns):
+        def fix_df_index_impl(index):
             return None
 
-    elif isinstance(index, RangeIndexType):
-        def fix_df_index_impl(index, *columns):
+    elif isinstance(index, (RangeIndexType, Int64IndexType)):
+        def fix_df_index_impl(index):
             return index
 
+    # currently only signed integer indexes are represented with own type
+    # TO-DO: support Uint64Index and Float64Indexes
+    elif isinstance(index.dtype, types.Integer) and index.dtype.signed:
+        def fix_df_index_impl(index):
+            index_data = fix_df_array(index)
+            return pd.Int64Index(index_data)
     else:
         # default case, transform index the same as df data
-        def fix_df_index_impl(index, *columns):
+        def fix_df_index_impl(index):
             return fix_df_array(index)
 
     return fix_df_index_impl

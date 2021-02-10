@@ -48,7 +48,6 @@ from sdc.str_ext import string_type, list_string_array_type
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.datatypes.categorical.pdimpl import is_categoricaldtype
 from sdc.datatypes.series.pdimpl import _Series_category
-from sdc.datatypes.range_index_type import RangeIndexType
 
 
 def is_str_series_typ(t):
@@ -138,7 +137,7 @@ def pd_series_overload(data=None, index=None, dtype=None, name=None, copy=False,
     def hpat_pandas_series_ctor_impl(data=None, index=None, dtype=None, name=None, copy=False, fastpath=False):
 
         fix_data = sdc.hiframes.api.fix_df_array(data)
-        fix_index = sdc.hiframes.api.fix_df_index(index, fix_data)
+        fix_index = sdc.hiframes.api.fix_df_index(index)
         return sdc.hiframes.api.init_series(fix_data, fix_index, name)
 
     return hpat_pandas_series_ctor_impl

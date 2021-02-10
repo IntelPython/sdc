@@ -29,6 +29,7 @@ from setuptools import setup, Extension, find_packages, Command
 import platform
 import os
 import sys
+import numba
 from docs.source.buildscripts.sdc_build_doc import SDCBuildDoc
 
 
@@ -185,6 +186,7 @@ ext_sort = Extension(name="sdc.concurrent_sort",
                      )
 
 str_libs = np_compile_args['libraries']
+numba_include_path = numba.extending.include_path()
 
 ext_str = Extension(name="sdc.hstr_ext",
                     sources=["sdc/_str_ext.cpp"],
@@ -192,7 +194,7 @@ ext_str = Extension(name="sdc.hstr_ext",
                     define_macros=np_compile_args['define_macros'],
                     extra_compile_args=eca,
                     extra_link_args=ela,
-                    include_dirs=np_compile_args['include_dirs'] + ind,
+                    include_dirs=np_compile_args['include_dirs'] + ind + [numba_include_path],
                     library_dirs=np_compile_args['library_dirs'] + lid,
                     )
 

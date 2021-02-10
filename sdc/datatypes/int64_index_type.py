@@ -1,5 +1,6 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,52 +25,41 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-'''
-This is a function decorator definition
-'''
-
-import numba
-import sdc
-
-from functools import wraps
-from sdc.utilities.utils import print_compile_times
+from numba import types
+from numba.extending import (
+    models,
+    register_model,
+    make_attribute_wrapper
+)
 
 
-def jit(signature_or_function=None, **options):
+class Int64IndexType(types.IterableType):
+    dtype = types.int64
 
-    if 'nopython' not in options:
-        '''
-        Always use @jit(noPython=True) in SDC by default
-        '''
-        options['nopython'] = True
+    def __init__(self, data, is_named=False):
+        self.data = data
+        self.is_named = is_named
+        super(Int64IndexType, self).__init__(
+            name='Int64IndexType({}, {})'.format(data, is_named))
 
-    '''
-    Use Numba compiler pipeline
-    '''
-    return numba.jit(signature_or_function, **options)
+    @property
+    def iterator_type(self):
+        res = self.data.iterator_type
+        return res
 
 
-def debug_compile_time(level=1, func_names=None):
-    """ Decorates Numba Dispatcher object to print compile stats after call.
-        Usage:
-            @debug_compile_time()
-            @numba.njit
-            <decorated function>
-        Args:
-            level: if zero prints only short summary
-            func_names: filters output to include only functions which names include listed strings,
-    """
+@register_model(Int64IndexType)
+class Int64IndexModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
 
-    def get_wrapper(disp):
+        data_type = fe_type.data
+        name_type = types.unicode_type if fe_type.is_named else types.none
+        members = [
+            ('data', data_type),
+            ('name', name_type),
+        ]
+        models.StructModel.__init__(self, dmm, fe_type, members)
 
-        @wraps(disp)
-        def wrapper(*args, **kwargs):
-            res = disp(*args, **kwargs)
-            print('*' * 40, 'COMPILE STATS', '*' * 40)
-            print_compile_times(disp, level=level, func_names=func_names)
-            print('*' * 95)
-            return res
 
-        return wrapper
-
-    return get_wrapper
+make_attribute_wrapper(Int64IndexType, 'data', '_data')
+make_attribute_wrapper(Int64IndexType, 'name', '_name')

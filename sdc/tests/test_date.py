@@ -81,7 +81,9 @@ class TestDate(TestCase):
         hpat_func = self.jit(test_impl)
         df = self._gen_str_date_df()
         A = pd.DatetimeIndex(df['str_date']).to_series()
-        np.testing.assert_array_equal(hpat_func(A), test_impl(A))
+        result = hpat_func(A)
+        result_ref = test_impl(A)
+        np.testing.assert_array_equal(result, result_ref)
 
     @skip_numba_jit
     def test_datetime_getitem(self):

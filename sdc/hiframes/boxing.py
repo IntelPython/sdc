@@ -47,15 +47,17 @@ from sdc.datatypes.categorical.types import CategoricalDtypeType, Categorical
 from sdc.datatypes.categorical.boxing import unbox_Categorical, box_Categorical
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.hiframes.pd_series_type import _get_series_array_type
-
 from sdc.hiframes.pd_dataframe_ext import get_structure_maps
+from sdc.utilities.sdc_typing_utils import sdc_pandas_index_types
 
 from .. import hstr_ext
 import llvmlite.binding as ll
 from llvmlite import ir as lir
 from llvmlite.llvmpy.core import Type as LLType
 from sdc.datatypes.range_index_type import RangeIndexType
+from sdc.datatypes.int64_index_type import Int64IndexType
 from sdc.extensions.indexes.range_index_ext import box_range_index, unbox_range_index
+from sdc.extensions.indexes.int64_index_ext import box_int64_index, unbox_int64_index
 from sdc.str_arr_type import StringArrayType
 ll.add_symbol('array_size', hstr_ext.array_size)
 ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
@@ -88,29 +90,10 @@ def unbox_dataframe(typ, val, c):
     columns will be extracted later if necessary.
     """
     n_cols = len(typ.columns)
-    column_strs = [numba.cpython.unicode.make_string_from_constant(
-        c.context, c.builder, string_type, a) for a in typ.columns]
     # create dataframe struct and store values
     dataframe = cgutils.create_struct_proxy(typ)(c.context, c.builder)
 
     errorptr = cgutils.alloca_once_value(c.builder, cgutils.false_bit)
-
-    col_list_type = types.List(string_type)
-    ok, inst = listobj.ListInstance.allocate_ex(c.context, c.builder, col_list_type, n_cols)
-
-    with c.builder.if_else(ok, likely=True) as (if_ok, if_not_ok):
-        with if_ok:
-            inst.size = c.context.get_constant(types.intp, n_cols)
-            for i, column_str in enumerate(column_strs):
-                inst.setitem(c.context.get_constant(types.intp, i), column_str, incref=False)
-            dataframe.columns = inst.value
-
-        with if_not_ok:
-            c.builder.store(cgutils.true_bit, errorptr)
-
-    # If an error occurred, drop the whole native list
-    with c.builder.if_then(c.builder.load(errorptr)):
-        c.context.nrt.decref(c.builder, col_list_type, inst.value)
 
     _, data_typs_map, types_order = get_structure_maps(typ.data, typ.columns)
 
@@ -134,6 +117,8 @@ def unbox_dataframe(typ, val, c):
                     native_val = _unbox_series_data(column_dtype, ty_series, arr_obj, c)
 
                     inst.setitem(c.context.get_constant(types.intp, i), native_val.value, incref=False)
+                    c.pyapi.decref(arr_obj)
+                    c.pyapi.decref(series_obj)
 
                 dataframe.data = c.builder.insert_value(dataframe.data, inst.value, type_id)
 
@@ -149,12 +134,6 @@ def unbox_dataframe(typ, val, c):
     c.pyapi.decref(index_obj)
 
     dataframe.parent = val
-
-    # increase refcount of stored values
-    if c.context.enable_nrt:
-        # TODO: other objects?
-        for var in column_strs:
-            c.context.nrt.incref(c.builder, string_type, var)
 
     return NativeValue(dataframe._getvalue(), is_error=c.builder.load(errorptr))
 
@@ -215,6 +194,8 @@ def _infer_series_list_dtype(S):
 
 def _infer_index_type(index):
     """ Deduces native Numba type used to represent index Python object """
+
+    # more specific types go first (e.g. RangeIndex is subtype of Int64Index)
     if isinstance(index, pd.RangeIndex):
         # depending on actual index value unbox to diff types: none-index if it matches
         # positions or to RangeIndexType in general case
@@ -229,6 +210,14 @@ def _infer_index_type(index):
     # for unsupported pandas indexes we explicitly unbox to None
     if isinstance(index, pd.DatetimeIndex):
         return types.none
+
+    if isinstance(index, pd.Int64Index):
+        index_data_type = numba.typeof(index._data)
+        if index.name is None:
+            return Int64IndexType(index_data_type)
+        else:
+            return Int64IndexType(index_data_type, is_named=True)
+
     if index.dtype == np.dtype('O'):
         # TO-DO: should we check that all elements are strings?
         if len(index) > 0 and isinstance(index[0], str):
@@ -346,9 +335,14 @@ def _unbox_index_data(index_typ, index_obj, c):
     if isinstance(index_typ, RangeIndexType):
         return unbox_range_index(index_typ, index_obj, c)
 
+    if isinstance(index_typ, Int64IndexType):
+        return unbox_int64_index(index_typ, index_obj, c)
+
     if index_typ == string_array_type:
         return unbox_str_series(index_typ, index_obj, c)
 
+    # this is still here only because of Float64Index represented as array
+    # TO-DO: remove when it's added
     if isinstance(index_typ, types.Array):
         index_data = c.pyapi.object_getattr_string(index_obj, "_data")
         res = unbox_array(index_typ, index_data, c)
@@ -460,10 +454,12 @@ def _box_index_data(index_typ, val, c):
             c: LLVM context object
         Returns: Python object native value is boxed into
     """
-    assert isinstance(index_typ, (RangeIndexType, StringArrayType, types.Array, types.NoneType))
+    assert isinstance(index_typ, sdc_pandas_index_types)
 
     if isinstance(index_typ, RangeIndexType):
         index = box_range_index(index_typ, val, c)
+    elif isinstance(index_typ, Int64IndexType):
+        index = box_int64_index(index_typ, val, c)
     elif isinstance(index_typ, types.Array):
         index = box_array(index_typ, val, c)
     elif isinstance(index_typ, StringArrayType):
