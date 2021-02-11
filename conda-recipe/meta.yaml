@@ -13,13 +13,12 @@ build:
   number: {{ GIT_DESCRIBE_NUMBER|int }}
   script_env:
     - SDC_CONFIG_PIPELINE_SDC
+    - WHEELS_OUTPUT_FOLDER
 
 requirements:
   build:
     - {{ compiler('c') }}      # [not osx]
     - {{ compiler('cxx') }}    # [not osx]
-    - wheel
-    - python
     - numba   {{ NUMBA_VERSION }}
 
   host:
@@ -44,24 +43,6 @@ requirements:
 test:
   imports:
     - sdc
-
-outputs:
-  - type: conda
-    name: sdc
-  - type: wheel
-    name: sdc
-    requirements:
-      build:
-        - {{ compiler('c') }}     # [not osx]
-        - {{ compiler('cxx') }}   # [not osx]
-        - python
-        - wheel
-        - setuptools
-        - numba   {{ NUMBA_VERSION }}
-        - numpy
-        - pandas  {{ PANDAS_VERSION }}
-        - pyarrow {{ PYARROW_VERSION }}
-        - tbb-devel
 
 about:
   home: https://github.com/IntelPython/sdc
