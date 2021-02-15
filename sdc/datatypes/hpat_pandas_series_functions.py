@@ -775,7 +775,7 @@ def sdc_pandas_series_setitem(self, idx, value):
                     raise ValueError("Reindexing only valid with uniquely valued Index objects")
 
                 if len(valid_indices_masked) != idx_size:
-                    raise ValueError("Reindexing not possible: idx has index not found in Series")
+                    raise KeyError("Reindexing not possible: idx has index not found in Series")
 
                 if value_is_scalar == True:  # noqa
                     self._data[valid_indices_positions] = _value
@@ -809,7 +809,7 @@ def sdc_pandas_series_setitem(self, idx, value):
                         set_positions[i] = map_index_to_position[index_value]
 
                 if number_of_found != idx_data_size:
-                    raise ValueError("Reindexing not possible: idx has index not found in Series")
+                    raise KeyError("Reindexing not possible: idx has index not found in Series")
 
                 if value_is_series == True:  # noqa
                     self._data[set_positions] = value._data
