@@ -4013,6 +4013,7 @@ class TestSeries(
                         np.testing.assert_array_equal(ref_result.data, jit_result.data)
                         self.assertEqual(ref, jit)
 
+    @unittest.expectedFailure  # expected to fail until pandas=1.2.0 (since pandas mergesort is not stable)
     def test_series_sort_values_full_unicode4(self):
         def test_impl(series, ascending, kind):
             return series.sort_values(axis=0, ascending=ascending, kind=literally(kind), na_position='last')
@@ -4023,17 +4024,17 @@ class TestSeries(
 
         for data in all_data:
             series = pd.Series(data * 3)
-            for ascending in [True, False]:
-                for kind in ['quicksort', 'mergesort']:
-                    ref_result = test_impl(series, ascending, kind=kind)
-                    jit_result = hpat_func(series, ascending, kind=kind)
-                    ref = restore_series_sort_values(series, ref_result.index, ascending)
-                    jit = restore_series_sort_values(series, jit_result.index, ascending)
+            for ascending, kind in product([True, False], ['quicksort', 'mergesort']):
+                with self.subTest(data=data, ascending=ascending, kind=kind):
+                    result = hpat_func(series, ascending, kind=kind)
+                    result_ref = test_impl(series, ascending, kind=kind)
                     if kind == 'mergesort':
-                        pd.testing.assert_series_equal(ref_result, jit_result)
+                        pd.testing.assert_series_equal(result, result_ref)
                     else:
-                        np.testing.assert_array_equal(ref_result.values, jit_result.values)
-                        self.assertEqual(ref, jit)
+                        np.testing.assert_array_equal(result.values, result_ref.values)
+                        jit = restore_series_sort_values(series, result.index, ascending)
+                        ref = restore_series_sort_values(series, result_ref.index, ascending)
+                        self.assertEqual(jit, ref)
 
     @skip_parallel
     def test_series_sort_values_full_idx(self):
