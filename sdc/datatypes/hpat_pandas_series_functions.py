@@ -3950,11 +3950,9 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
         good = ~data_nan_mask
 
         if kind_is_none_or_default == True:  # noqa
-            argsort_res = sdc_arrays_argsort(self._data[good], kind='quicksort')
+            argsort_res = sdc_arrays_argsort(self._data[good], kind='quicksort', ascending=ascending)
         else:
-            argsort_res = sdc_arrays_argsort(self._data[good], kind=kind)
-        if not ascending:
-            argsort_res = argsort_res[::-1]
+            argsort_res = sdc_arrays_argsort(self._data[good], kind=kind, ascending=ascending)
 
         idx = numpy.arange(len(self), dtype=numpy.int32)
         sorted_index = numpy.empty(len(self), dtype=numpy.int32)

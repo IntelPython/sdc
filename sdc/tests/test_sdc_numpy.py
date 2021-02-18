@@ -387,6 +387,45 @@ class TestArrays(TestCase):
                     with self.subTest(data=case, kind=kind, size=len(int_array)):
                         run_test(ref_impl, sdc_func, data, kind)
 
+    def test_argsort_param_ascending(self):
+
+        def ref_impl(a, kind, ascending):
+            return pd.Series(a).sort_values(kind=kind, ascending=ascending).index
+
+        def sdc_impl(a, kind, ascending):
+            return numpy_like.argsort(a, kind=kind, ascending=ascending)
+
+        def run_test(ref_impl, sdc_impl, data, kind, ascending):
+            if kind == 'mergesort':
+                np.testing.assert_array_equal(
+                    ref_impl(data, kind, ascending),
+                    sdc_func(data, kind, ascending))
+            else:
+                sorted_ref = data[ref_impl(data, kind, ascending)]
+                sorted_sdc = data[sdc_impl(data, kind, ascending)]
+                np.testing.assert_array_equal(sorted_ref, sorted_sdc)
+
+        sdc_func = self.jit(sdc_impl)
+
+        n = 100
+        np.random.seed(0)
+        data_values = {
+            'float': [np.inf, np.NINF, np.nan, 0, -1, 2.1, 2/3, -3/4, 0.777],
+            'int': [1, -1, 3, 5, -60, 21, 22, 23],
+        }
+        all_dtypes = {
+            'float': ['float32', 'float64'],
+            'int': ['int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64']
+        }
+
+        for kind, ascending in product([None, 'quicksort', 'mergesort'], [True, False]):
+            for dtype_group, arr_values in data_values.items():
+                for dtype in all_dtypes[dtype_group]:
+                    data = np.random.choice(arr_values, n).astype(dtype)
+                    with self.subTest(data=data, kind=kind, ascending=ascending):
+                        run_test(ref_impl, sdc_func, data, kind, ascending)
+
+
     def _test_fillna_numeric(self, pyfunc, cfunc, inplace):
         data_to_test = [
             [True, False, False, True, True],
