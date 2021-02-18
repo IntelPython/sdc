@@ -1149,7 +1149,6 @@ class TestRolling(TestCase):
             hpat_func(df, other, True)
         self.assertIn(msg_tmpl.format('False, None'), str(raises.exception))
 
-    @unittest.expectedFailure
     def test_df_rolling_cov_issue_floating_point_rounding(self):
         """
             Cover issue of different float rounding in Python and SDC/Numba:
