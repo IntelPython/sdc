@@ -28,7 +28,7 @@ import numba
 
 # re-export from Numba
 from numba import (typeof, prange, pndindex, gdb, gdb_breakpoint, gdb_init,
-                   stencil, threading_layer, jitclass, objmode)
+                   stencil, threading_layer, objmode)
 
 import sdc.config
 import sdc.set_ext

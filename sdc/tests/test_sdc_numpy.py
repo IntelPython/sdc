@@ -387,7 +387,6 @@ class TestArrays(TestCase):
                     with self.subTest(data=case, kind=kind, size=len(int_array)):
                         run_test(ref_impl, sdc_func, data, kind)
 
-    @unittest.expectedFailure  # expected to fail until pandas=1.2.0 (since pandas mergesort is not stable)
     def test_argsort_param_ascending(self):
 
         def ref_impl(a, kind, ascending):

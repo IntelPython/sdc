@@ -2138,16 +2138,26 @@ class TestSeries(
         def test_impl(S):
             return S.value_counts(dropna=False)
 
-        data_to_test = [[1, 2, 3, 1, 1, 3],
-                        [1, 2, 3, np.nan, 1, 3, np.nan, np.inf],
-                        [0.1, 3., np.nan, 3., 0.1, 3., np.nan, np.inf, 0.1, 0.1]]
+        data_to_test = [
+            [1, 2, 3, 1, 1, 3],
+            [1, 2, 3, np.nan, 1, 3, np.nan, np.inf],
+            [0.1, 3., np.nan, 3., 0.1, 3., np.nan, np.inf, 0.1, 0.1]
+        ]
 
         hpat_func = self.jit(test_impl)
 
         for data in data_to_test:
             with self.subTest(series_data=data):
                 S = pd.Series(data)
-                pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+                result = hpat_func(S)
+                result_ref = test_impl(S)
+
+                # order within groups of same counts may be different since
+                # pandas impl uses sort_values() with default kind='quicksort'
+                pd.testing.assert_series_equal(
+                    result.sort_index(),
+                    result_ref.sort_index()
+                )
 
     def test_series_value_counts_str_dropna_false(self):
         def test_impl(S):
@@ -4013,7 +4023,6 @@ class TestSeries(
                         np.testing.assert_array_equal(ref_result.data, jit_result.data)
                         self.assertEqual(ref, jit)
 
-    @unittest.expectedFailure  # expected to fail until pandas=1.2.0 (since pandas mergesort is not stable)
     def test_series_sort_values_full_unicode4(self):
         def test_impl(series, ascending, kind):
             return series.sort_values(axis=0, ascending=ascending, kind=literally(kind), na_position='last')
@@ -5317,6 +5326,7 @@ class TestSeries(
         test_impl(S2, idx, value)
         pd.testing.assert_series_equal(S1, S2)
 
+    @unittest.expectedFailure   # FIXME_Pandas#37427 (since pandas=1.1 setitem does diff things for diff dtypes)
     def test_series_setitem_idx_str_series(self):
         """ Verifies Series.setitem for idx operand of type pandas.Series and string dtype called on
             integer Series with index of matching dtype and scalar and non scalar assigned values """
@@ -5332,6 +5342,7 @@ class TestSeries(
                           pd.Series(assigned_values)]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, np.intp)
 
+    @unittest.expectedFailure   # FIXME_Pandas#37427 (since pandas=1.1 setitem does diff things for diff dtypes)
     def test_series_setitem_idx_float_series(self):
         """ Verifies Series.setitem for idx operand of type pandas.Series and float dtype called on
             integer Series with index of matching dtype and scalar and non scalar assigned values """

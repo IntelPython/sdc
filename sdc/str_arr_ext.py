@@ -91,11 +91,11 @@ _get_utf8_size = types.ExternalFunction("get_utf8_size",
                                                    types.int32))   # kind
 
 _stable_argsort = types.ExternalFunction("stable_argsort",
-                                        types.void(types.intp,    # data_ptr
-                                                   types.intp,    # offset_ptr
-                                                   types.uint64,  # data size
-                                                   types.int8,    # ascending
-                                                   types.intp))   # result ptr
+                                         types.void(types.intp,    # data_ptr
+                                                    types.intp,    # offset_ptr
+                                                    types.uint64,  # data size
+                                                    types.int8,    # ascending
+                                                    types.intp))   # result ptr
 
 
 @typeof_impl.register(StringArray)
