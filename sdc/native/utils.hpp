@@ -266,6 +266,27 @@ struct less
     }
 };
 
+template<typename T>
+bool nangreater(const T& left, const T& right)
+{
+    return std::greater<T>()(left, right);
+}
+
+template<>
+bool nangreater<float>(const float& left, const float& right);
+
+template<>
+bool nangreater<double>(const double& left, const double& right);
+
+template<typename T>
+struct greater
+{
+    bool operator() (const T& left, const T& right) const
+    {
+        return nangreater<T>(left, right);
+    }
+};
+
 namespace tbb_control
 {
     void init();

@@ -72,6 +72,7 @@ from sdc.functions import numpy_like
 from sdc.hiframes.api import isna
 from sdc.datatypes.hpat_pandas_groupby_functions import init_series_groupby
 from sdc.utilities.prange_utils import parallel_chunks
+from sdc.set_ext import build_set
 
 from .pandas_series_functions import apply
 from .pandas_series_functions import map as _map
@@ -652,7 +653,7 @@ def sdc_pandas_series_setitem(self, idx, value):
             # and filtered indexes are looked in value.index, and if found corresponding value is set
             if value_is_series == True:  # noqa
                 value_index, self_index = value.index, self.index
-                unique_value_indices, unique_self_indices = set(value_index), set(self_index)
+                unique_value_indices, unique_self_indices = build_set(value_index), build_set(self_index)
 
                 # pandas behaves differently if value.index has duplicates and if it has no
                 # in case of duplicates in value.index assignment is made via positions
@@ -702,7 +703,7 @@ def sdc_pandas_series_setitem(self, idx, value):
             # and filtered indexes are either looked in value.index (if value is a Series)
             # or in self.index (if value is scalar or array)
             filtered_idx_indices = idx_index[idx._data]
-            filtered_idx_indices_set = set(filtered_idx_indices)
+            filtered_idx_indices_set = build_set(filtered_idx_indices)
             if value_is_series == True:  # noqa
 
                 if len(filtered_idx_indices_set) != len(filtered_idx_indices):
@@ -775,7 +776,7 @@ def sdc_pandas_series_setitem(self, idx, value):
                     raise ValueError("Reindexing only valid with uniquely valued Index objects")
 
                 if len(valid_indices_masked) != idx_size:
-                    raise ValueError("Reindexing not possible: idx has index not found in Series")
+                    raise KeyError("Reindexing not possible: idx has index not found in Series")
 
                 if value_is_scalar == True:  # noqa
                     self._data[valid_indices_positions] = _value
@@ -809,7 +810,7 @@ def sdc_pandas_series_setitem(self, idx, value):
                         set_positions[i] = map_index_to_position[index_value]
 
                 if number_of_found != idx_data_size:
-                    raise ValueError("Reindexing not possible: idx has index not found in Series")
+                    raise KeyError("Reindexing not possible: idx has index not found in Series")
 
                 if value_is_series == True:  # noqa
                     self._data[set_positions] = value._data
@@ -2074,7 +2075,7 @@ def hpat_pandas_series_isin(self, values):
             # return pandas.Series (np.isin (self._data, values))
 
             values = str_list_to_array(list(values))
-            values = set(values)
+            values = build_set(values)
             data_len = len(self._data)
             result = numpy.empty(data_len, dtype=numpy.bool_)
             for i in prange(data_len):
@@ -2086,7 +2087,7 @@ def hpat_pandas_series_isin(self, values):
             # TODO: replace with below line when Numba supports np.isin in nopython mode
             # return pandas.Series (np.isin (self._data, values))
 
-            values = set(values)
+            values = build_set(values)
             data_len = len(self._data)
             result = numpy.empty(data_len, dtype=numpy.bool_)
             for i in prange(data_len):
@@ -3447,7 +3448,7 @@ def hpat_pandas_series_unique(self):
             Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_unique_str
             '''
 
-            str_set = set(self._data)
+            str_set = build_set(self._data)
             return to_array(str_set)
 
         return hpat_pandas_series_unique_str_impl
@@ -3579,7 +3580,7 @@ def hpat_pandas_series_nunique(self, dropna=True):
             if dropna:
                 nan_mask = self.isna()
                 data = self._data[~nan_mask._data]
-            unique_values = set(data)
+            unique_values = build_set(data)
             return len(unique_values)
 
         return hpat_pandas_series_nunique_str_impl
@@ -3592,7 +3593,7 @@ def hpat_pandas_series_nunique(self, dropna=True):
         data_mask_for_nan = numpy.isnan(self._data)
         nan_exists = numpy.any(data_mask_for_nan)
         data_no_nan = self._data[~data_mask_for_nan]
-        data_set = set(data_no_nan)
+        data_set = build_set(data_no_nan)
         if dropna or not nan_exists:
             return len(data_set)
         else:
@@ -3949,11 +3950,9 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
         good = ~data_nan_mask
 
         if kind_is_none_or_default == True:  # noqa
-            argsort_res = sdc_arrays_argsort(self._data[good], kind='quicksort')
+            argsort_res = sdc_arrays_argsort(self._data[good], kind='quicksort', ascending=ascending)
         else:
-            argsort_res = sdc_arrays_argsort(self._data[good], kind=kind)
-        if not ascending:
-            argsort_res = argsort_res[::-1]
+            argsort_res = sdc_arrays_argsort(self._data[good], kind=kind, ascending=ascending)
 
         idx = numpy.arange(len(self), dtype=numpy.int32)
         sorted_index = numpy.empty(len(self), dtype=numpy.int32)

@@ -52,7 +52,7 @@ from sdc.datatypes.int64_index_type import Int64IndexType
 from sdc.str_arr_ext import (num_total_chars, append_string_array_to,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na, string_array_type,
                              cp_str_list_to_array, create_str_arr_from_list, get_utf8_size,
-                             str_arr_set_na_by_mask)
+                             str_arr_set_na_by_mask, str_arr_stable_argosort)
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
 from sdc.utilities.sdc_typing_utils import (
@@ -518,7 +518,7 @@ def sdc_arrays_argsort(A, kind='quicksort'):
 
 
 @sdc_overload(sdc_arrays_argsort, jit_options={'parallel': False})
-def sdc_arrays_argsort_overload(A, kind='quicksort'):
+def sdc_arrays_argsort_overload(A, kind='quicksort', ascending=True):
     """Function providing pandas argsort implementation for different 1D array types"""
 
     # kind is not known at compile time, so get this function here and use in impl if needed
@@ -526,33 +526,31 @@ def sdc_arrays_argsort_overload(A, kind='quicksort'):
 
     kind_is_default = isinstance(kind, str)
     if isinstance(A, types.Array):
-        def _sdc_arrays_argsort_array_impl(A, kind='quicksort'):
+        def _sdc_arrays_argsort_array_impl(A, kind='quicksort', ascending=True):
             _kind = 'quicksort' if kind_is_default == True else kind  # noqa
-            return numpy_like.argsort(A, kind=_kind)
+            return numpy_like.argsort(A, kind=_kind, ascending=ascending)
 
         return _sdc_arrays_argsort_array_impl
 
     elif A == string_array_type:
-        def _sdc_arrays_argsort_str_arr_impl(A, kind='quicksort'):
+        def _sdc_arrays_argsort_str_arr_impl(A, kind='quicksort', ascending=True):
 
-            nan_mask = sdc.hiframes.api.get_nan_mask(A)
-            idx = numpy.arange(len(A))
-            old_nan_positions = idx[nan_mask]
-
-            data = A[~nan_mask]
-            keys = idx[~nan_mask]
             if kind == 'quicksort':
-                zipped = list(zip(list(data), list(keys)))
-                zipped = quicksort_func(zipped)
-                argsorted = [zipped[i][1] for i in numpy.arange(len(data))]
+                indexes = numpy.arange(len(A))
+                data_index_pairs = list(zip(list(A), list(indexes)))
+                zipped = quicksort_func(data_index_pairs)
+                argsorted = [zipped[i][1] for i in indexes]
+                res = numpy.array(argsorted, dtype=numpy.int64)
+                # for non-stable sort the order within groups does not matter
+                # so just reverse the result when sorting in descending order
+                if not ascending:
+                    res = res[::-1]
             elif kind == 'mergesort':
-                sdc.hiframes.sort.local_sort((data, ), (keys, ))
-                argsorted = list(keys)
+                res = str_arr_stable_argosort(A, ascending=ascending)
             else:
                 raise ValueError("Unrecognized kind of sort in sdc_arrays_argsort")
 
-            argsorted.extend(old_nan_positions)
-            return numpy.asarray(argsorted, dtype=numpy.int32)
+            return res
 
         return _sdc_arrays_argsort_str_arr_impl
 
