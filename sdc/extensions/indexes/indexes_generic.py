@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2019-2020, Intel Corporation All rights reserved.
 #
@@ -24,31 +25,16 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+import numba
+import numpy as np
+import pandas as pd
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
-from .categorical import *
+from numba import types
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
+def _check_dtype_param_type(dtype):
+    """ Returns True is dtype is a valid type for dtype parameter and False otherwise.
+        Used in RangeIndex ctor and other methods that take dtype parameter. """
 
-from sdc.tests.test_ml import *
-
-from sdc.tests.test_io import *
-
-from sdc.tests.test_hpat_jit import *
-from sdc.tests.indexes import *
-
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
-from sdc.tests.test_compile_time import *
-
-# performance tests
-import sdc.tests.tests_perf
+    valid_dtype_types = (types.NoneType, types.Omitted, types.UnicodeType, types.NumberClass)
+    return isinstance(dtype, valid_dtype_types) or dtype is None

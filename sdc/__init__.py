@@ -28,7 +28,7 @@ import numba
 
 # re-export from Numba
 from numba import (typeof, prange, pndindex, gdb, gdb_breakpoint, gdb_init,
-                   stencil, threading_layer, jitclass, objmode)
+                   stencil, threading_layer, objmode)
 
 import sdc.config
 import sdc.set_ext
@@ -48,6 +48,7 @@ import sdc.datatypes.categorical.init
 import sdc.datatypes.series.init
 
 import sdc.extensions.indexes.range_index_ext
+import sdc.extensions.indexes.int64_index_ext
 
 from ._version import get_versions
 

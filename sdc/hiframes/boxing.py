@@ -47,15 +47,17 @@ from sdc.datatypes.categorical.types import CategoricalDtypeType, Categorical
 from sdc.datatypes.categorical.boxing import unbox_Categorical, box_Categorical
 from sdc.hiframes.pd_series_ext import SeriesType
 from sdc.hiframes.pd_series_type import _get_series_array_type
-
 from sdc.hiframes.pd_dataframe_ext import get_structure_maps
+from sdc.utilities.sdc_typing_utils import sdc_pandas_index_types
 
 from .. import hstr_ext
 import llvmlite.binding as ll
 from llvmlite import ir as lir
 from llvmlite.llvmpy.core import Type as LLType
 from sdc.datatypes.range_index_type import RangeIndexType
+from sdc.datatypes.int64_index_type import Int64IndexType
 from sdc.extensions.indexes.range_index_ext import box_range_index, unbox_range_index
+from sdc.extensions.indexes.int64_index_ext import box_int64_index, unbox_int64_index
 from sdc.str_arr_type import StringArrayType
 ll.add_symbol('array_size', hstr_ext.array_size)
 ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
@@ -192,6 +194,8 @@ def _infer_series_list_dtype(S):
 
 def _infer_index_type(index):
     """ Deduces native Numba type used to represent index Python object """
+
+    # more specific types go first (e.g. RangeIndex is subtype of Int64Index)
     if isinstance(index, pd.RangeIndex):
         # depending on actual index value unbox to diff types: none-index if it matches
         # positions or to RangeIndexType in general case
@@ -206,6 +210,14 @@ def _infer_index_type(index):
     # for unsupported pandas indexes we explicitly unbox to None
     if isinstance(index, pd.DatetimeIndex):
         return types.none
+
+    if isinstance(index, pd.Int64Index):
+        index_data_type = numba.typeof(index._data)
+        if index.name is None:
+            return Int64IndexType(index_data_type)
+        else:
+            return Int64IndexType(index_data_type, is_named=True)
+
     if index.dtype == np.dtype('O'):
         # TO-DO: should we check that all elements are strings?
         if len(index) > 0 and isinstance(index[0], str):
@@ -323,9 +335,14 @@ def _unbox_index_data(index_typ, index_obj, c):
     if isinstance(index_typ, RangeIndexType):
         return unbox_range_index(index_typ, index_obj, c)
 
+    if isinstance(index_typ, Int64IndexType):
+        return unbox_int64_index(index_typ, index_obj, c)
+
     if index_typ == string_array_type:
         return unbox_str_series(index_typ, index_obj, c)
 
+    # this is still here only because of Float64Index represented as array
+    # TO-DO: remove when it's added
     if isinstance(index_typ, types.Array):
         index_data = c.pyapi.object_getattr_string(index_obj, "_data")
         res = unbox_array(index_typ, index_data, c)
@@ -437,10 +454,12 @@ def _box_index_data(index_typ, val, c):
             c: LLVM context object
         Returns: Python object native value is boxed into
     """
-    assert isinstance(index_typ, (RangeIndexType, StringArrayType, types.Array, types.NoneType))
+    assert isinstance(index_typ, sdc_pandas_index_types)
 
     if isinstance(index_typ, RangeIndexType):
         index = box_range_index(index_typ, val, c)
+    elif isinstance(index_typ, Int64IndexType):
+        index = box_int64_index(index_typ, val, c)
     elif isinstance(index_typ, types.Array):
         index = box_array(index_typ, val, c)
     elif isinstance(index_typ, StringArrayType):
