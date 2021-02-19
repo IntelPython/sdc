@@ -44,7 +44,7 @@ from sdc.tests.test_ml import *
 from sdc.tests.test_io import *
 
 from sdc.tests.test_hpat_jit import *
-from sdc.tests.indexes import *
+from sdc.tests.test_indexes import *
 
 from sdc.tests.test_sdc_numpy import *
 from sdc.tests.test_prange_utils import *

@@ -31,7 +31,6 @@
 #include <string>
 #include <vector>
 #include <cmath>
-#include <algorithm>
 
 #include "_str_decode.cpp"
 
@@ -130,7 +129,6 @@ extern "C"
     npy_intp array_size(PyArrayObject* arr);
     void* array_getptr1(PyArrayObject* arr, npy_intp ind);
     void array_setitem(PyArrayObject* arr, char* p, PyObject* s);
-    void stable_argsort(char* data_ptr, uint32_t* in_offsets, int64_t len, int8_t ascending, uint64_t* result);
 
     PyMODINIT_FUNC PyInit_hstr_ext(void)
     {
@@ -203,7 +201,6 @@ extern "C"
         PyObject_SetAttrString(m, "array_setitem", PyLong_FromVoidPtr((void*)(&array_setitem)));
         PyObject_SetAttrString(m, "decode_utf8", PyLong_FromVoidPtr((void*)(&decode_utf8)));
         PyObject_SetAttrString(m, "get_utf8_size", PyLong_FromVoidPtr((void*)(&get_utf8_size)));
-        PyObject_SetAttrString(m, "stable_argsort", PyLong_FromVoidPtr((void*)(&stable_argsort)));
         return m;
     }
 
@@ -873,36 +870,5 @@ extern "C"
 
         return;
     }
-
-    void stable_argsort(char* data_ptr, uint32_t* in_offsets, int64_t len, int8_t ascending, uint64_t* result)
-    {
-        using str_index_pair_type = std::pair<std::string, int64_t>;
-        std::vector<str_index_pair_type> str_arr_indexed;
-        str_arr_indexed.reserve(len);
-
-        for (int64_t i=0; i < len; ++i)
-        {
-            uint32_t start = in_offsets[i];
-            uint32_t size = in_offsets[i + 1] - in_offsets[i];
-            str_arr_indexed.emplace_back(
-                    std::move(std::string(&data_ptr[start], size)),
-                    i
-            );
-        }
-
-        std::stable_sort(str_arr_indexed.begin(),
-                         str_arr_indexed.end(),
-                         [=](const str_index_pair_type& left, const str_index_pair_type& right){
-                            if (ascending)
-                                return left.first < right.first;
-                            else
-                                return left.first > right.first;
-                         }
-        );
-
-        for (int64_t i=0; i < len; ++i)
-            result[i] = str_arr_indexed[i].second;
-    }
-
 
 } // extern "C"

@@ -281,16 +281,8 @@ struct parallel_sort_fixed_size
 } // namespace
 
 #define declare_single_argsort(index_prefix, type_prefix, ity, ty) \
-void parallel_stable_argsort_##index_prefix##type_prefix(ity* index, void* begin, uint64_t len, uint8_t ascending) \
-{ \
-    if (ascending) { \
-        auto cmp = utils::less<ty>(); \
-        parallel_stable_argsort_(reinterpret_cast<ity*>(index), reinterpret_cast<ty*>(begin), len, cmp); \
-    } else { \
-        auto cmp = utils::greater<ty>(); \
-        parallel_stable_argsort_(reinterpret_cast<ity*>(index), reinterpret_cast<ty*>(begin), len, cmp); \
-    } \
-}
+void parallel_stable_argsort_##index_prefix##type_prefix(ity* index, void* begin, uint64_t len) \
+{ parallel_stable_argsort_(reinterpret_cast<ity*>(index), reinterpret_cast<ty*>(begin), len); }
 
 #define declare_argsort(prefix, ty) \
 declare_single_argsort(u8,  prefix, uint8_t,  ty) \

@@ -128,7 +128,6 @@ def _build_str_set_impl(A):
         str_set.add(_str)
     return str_set
 
-
 # TODO: remove since probably unused
 @overload(set)
 def init_set_string_array(A):

@@ -33,7 +33,7 @@ import pyarrow.parquet as pq
 import sdc
 import string
 import unittest
-from itertools import combinations, combinations_with_replacement, islice, permutations, product
+from itertools import combinations, combinations_with_replacement, product
 import numba
 from numba import types
 from numba.core.config import IS_32BITS
@@ -323,7 +323,24 @@ class TestSeries(
         n = 11
         pd.testing.assert_series_equal(hpat_func(n), test_impl(n))
 
-    def test_create_series_param_name_literal(self):
+    def test_create_series_index1(self):
+        # create and box an indexed Series
+        def test_impl():
+            A = pd.Series([1, 2, 3], ['A', 'C', 'B'])
+            return A
+        hpat_func = self.jit(test_impl)
+
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_create_series_index2(self):
+        def test_impl():
+            A = pd.Series([1, 2, 3], index=[2, 1, 0])
+            return A
+        hpat_func = self.jit(test_impl)
+
+        pd.testing.assert_series_equal(hpat_func(), test_impl())
+
+    def test_create_series_index3(self):
         def test_impl():
             A = pd.Series([1, 2, 3], index=['A', 'C', 'B'], name='A')
             return A
@@ -331,7 +348,7 @@ class TestSeries(
 
         pd.testing.assert_series_equal(hpat_func(), test_impl())
 
-    def test_create_series_param_name(self):
+    def test_create_series_index4(self):
         def test_impl(name):
             A = pd.Series([1, 2, 3], index=['A', 'C', 'B'], name=name)
             return A
@@ -359,7 +376,7 @@ class TestSeries(
         S = pd.Series(['a', 'b', 'c'], name='A')
         self.assertEqual(hpat_func(S), test_impl(S))
 
-    def test_pass_series_all_indexes(self):
+    def test_pass_series_index1(self):
         def test_impl(A):
             return A
         hpat_func = self.jit(test_impl)
@@ -370,7 +387,6 @@ class TestSeries(
             list(np.arange(n)),
             np.arange(n),
             pd.RangeIndex(n),
-            pd.Int64Index(np.arange(n)),
             gen_strlist(n)
         ]
         for index in indexes_to_test:
@@ -2138,26 +2154,16 @@ class TestSeries(
         def test_impl(S):
             return S.value_counts(dropna=False)
 
-        data_to_test = [
-            [1, 2, 3, 1, 1, 3],
-            [1, 2, 3, np.nan, 1, 3, np.nan, np.inf],
-            [0.1, 3., np.nan, 3., 0.1, 3., np.nan, np.inf, 0.1, 0.1]
-        ]
+        data_to_test = [[1, 2, 3, 1, 1, 3],
+                        [1, 2, 3, np.nan, 1, 3, np.nan, np.inf],
+                        [0.1, 3., np.nan, 3., 0.1, 3., np.nan, np.inf, 0.1, 0.1]]
 
         hpat_func = self.jit(test_impl)
 
         for data in data_to_test:
             with self.subTest(series_data=data):
                 S = pd.Series(data)
-                result = hpat_func(S)
-                result_ref = test_impl(S)
-
-                # order within groups of same counts may be different since
-                # pandas impl uses sort_values() with default kind='quicksort'
-                pd.testing.assert_series_equal(
-                    result.sort_index(),
-                    result_ref.sort_index()
-                )
+                pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
     def test_series_value_counts_str_dropna_false(self):
         def test_impl(S):
@@ -2200,15 +2206,13 @@ class TestSeries(
         def test_impl(S):
             return S.value_counts()
 
-        sdc_func = self.jit(test_impl)
+        hpat_func = self.jit(test_impl)
 
         for data in test_global_input_data_integer64:
-            index = np.arange(start=1, stop=len(data) + 1)
             with self.subTest(series_data=data):
+                index = np.arange(start=1, stop=len(data) + 1)
                 S = pd.Series(data, index=index)
-                result = sdc_func(S)
-                result_ref = test_impl(S)
-                pd.testing.assert_series_equal(result.sort_index(), result_ref.sort_index())
+                pd.testing.assert_series_equal(hpat_func(S).sort_index(), test_impl(S).sort_index())
 
     def test_series_value_counts_no_unboxing(self):
         def test_impl():
@@ -4033,17 +4037,17 @@ class TestSeries(
 
         for data in all_data:
             series = pd.Series(data * 3)
-            for ascending, kind in product([True, False], ['quicksort', 'mergesort']):
-                with self.subTest(data=data, ascending=ascending, kind=kind):
-                    result = hpat_func(series, ascending, kind=kind)
-                    result_ref = test_impl(series, ascending, kind=kind)
+            for ascending in [True, False]:
+                for kind in ['quicksort', 'mergesort']:
+                    ref_result = test_impl(series, ascending, kind=kind)
+                    jit_result = hpat_func(series, ascending, kind=kind)
+                    ref = restore_series_sort_values(series, ref_result.index, ascending)
+                    jit = restore_series_sort_values(series, jit_result.index, ascending)
                     if kind == 'mergesort':
-                        pd.testing.assert_series_equal(result, result_ref)
+                        pd.testing.assert_series_equal(ref_result, jit_result)
                     else:
-                        np.testing.assert_array_equal(result.values, result_ref.values)
-                        jit = restore_series_sort_values(series, result.index, ascending)
-                        ref = restore_series_sort_values(series, result_ref.index, ascending)
-                        self.assertEqual(jit, ref)
+                        np.testing.assert_array_equal(ref_result.values, jit_result.values)
+                        self.assertEqual(ref, jit)
 
     @skip_parallel
     def test_series_sort_values_full_idx(self):
@@ -5326,7 +5330,6 @@ class TestSeries(
         test_impl(S2, idx, value)
         pd.testing.assert_series_equal(S1, S2)
 
-    @unittest.expectedFailure   # FIXME_Pandas#37427 (since pandas=1.1 setitem does diff things for diff dtypes)
     def test_series_setitem_idx_str_series(self):
         """ Verifies Series.setitem for idx operand of type pandas.Series and string dtype called on
             integer Series with index of matching dtype and scalar and non scalar assigned values """
@@ -5342,7 +5345,6 @@ class TestSeries(
                           pd.Series(assigned_values)]
         self._test_series_setitem([series_data], [series_index], [idx], values_to_test, np.intp)
 
-    @unittest.expectedFailure   # FIXME_Pandas#37427 (since pandas=1.1 setitem does diff things for diff dtypes)
     def test_series_setitem_idx_float_series(self):
         """ Verifies Series.setitem for idx operand of type pandas.Series and float dtype called on
             integer Series with index of matching dtype and scalar and non scalar assigned values """
