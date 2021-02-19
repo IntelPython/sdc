@@ -33,18 +33,23 @@ import pandas as pd
 from numba import types
 from numba.core import cgutils
 from numba.extending import (typeof_impl, NativeValue, intrinsic, box, unbox, lower_builtin, )
-from numba.core.errors import TypingError
+
 from numba.core.typing.templates import signature
 from numba.core.imputils import impl_ret_untracked, call_getiter
 
 from sdc.datatypes.range_index_type import RangeIndexType, RangeIndexDataType
 from sdc.datatypes.common_functions import SDCLimitation, _sdc_take
 from sdc.utilities.utils import sdc_overload, sdc_overload_attribute, sdc_overload_method
-from sdc.utilities.sdc_typing_utils import TypeChecker, check_is_numeric_array, check_signed_integer
+from sdc.utilities.sdc_typing_utils import TypeChecker, check_is_numeric_array
 from sdc.functions.numpy_like import getitem_by_mask
-from sdc.functions.numpy_like import astype as nplike_astype
-from numba.core.boxing import box_array, unbox_array
-from sdc.extensions.indexes.indexes_generic import _check_dtype_param_type
+
+
+def _check_dtype_param_type(dtype):
+    """ Returns True is dtype is a valid type for dtype parameter and False otherwise.
+        Used in RangeIndex ctor and other methods that take dtype parameter. """
+
+    valid_dtype_types = (types.NoneType, types.Omitted, types.UnicodeType, types.NumberClass)
+    return isinstance(dtype, valid_dtype_types) or dtype is None
 
 
 @intrinsic
@@ -91,9 +96,8 @@ def pd_range_index_overload(start=None, stop=None, step=None, dtype=None, copy=F
     if not (isinstance(copy, types.Omitted) or fastpath is None):
         raise SDCLimitation(f"{_func_name} Unsupported parameter. Given 'fastpath': {fastpath}")
 
-    dtype_is_number_class = isinstance(dtype, types.NumberClass)
-    dtype_is_numpy_signed_int = (check_signed_integer(dtype)
-                                 or dtype_is_number_class and check_signed_integer(dtype.dtype))
+    dtype_is_np_int64 = dtype is types.NumberClass(types.int64)
+    dtype_is_np_int32 = dtype is types.NumberClass(types.int32)
     dtype_is_unicode_str = isinstance(dtype, (types.UnicodeType, types.StringLiteral))
     if not _check_dtype_param_type(dtype):
         ty_checker.raise_exc(dtype, 'int64 dtype', 'dtype')
@@ -121,8 +125,10 @@ def pd_range_index_overload(start=None, stop=None, step=None, dtype=None, copy=F
     def pd_range_index_ctor_impl(start=None, stop=None, step=None, dtype=None, copy=False, name=None, fastpath=None):
 
         if not (dtype is None
-                or dtype_is_numpy_signed_int
-                or dtype_is_unicode_str and dtype in ('int8', 'int16', 'int32', 'int64')):
+                or dtype_is_unicode_str and dtype == 'int64'
+                or dtype_is_unicode_str and dtype == 'int32'
+                or dtype_is_np_int64
+                or dtype_is_np_int32):
             raise ValueError("Incorrect `dtype` passed: expected signed integer")
 
         # TODO: add support of int32 type
@@ -350,8 +356,7 @@ def pd_range_index_getitem_overload(self, idx):
     if isinstance(idx, types.Integer):
         def pd_range_index_getitem_impl(self, idx):
             range_len = len(self._data)
-            # FIXME_Numba#5801: Numba type unification rules make this float
-            idx = types.int64((range_len + idx) if idx < 0 else idx)
+            idx = (range_len + idx) if idx < 0 else idx
             if (idx < 0 or idx >= range_len):
                 raise IndexError("RangeIndex.getitem: index is out of bounds")
             return self.start + self.step * idx
@@ -370,12 +375,12 @@ def pd_range_index_getitem_overload(self, idx):
 
         return pd_range_index_getitem_impl
 
+    # returns np.array which is used to represent pandas Int64Index now
     if isinstance(idx, (types.Array, types.List)):
 
         if isinstance(idx.dtype, types.Integer):
             def pd_range_index_getitem_impl(self, idx):
-                res_as_arr = _sdc_take(self, idx)
-                return pd.Int64Index(res_as_arr, name=self._name)
+                return _sdc_take(self, idx)
 
             return pd_range_index_getitem_impl
         elif isinstance(idx.dtype, types.Boolean):
@@ -393,7 +398,7 @@ def pd_range_index_eq_overload(self, other):
 
     if not (self_is_range_index and other_is_range_index
             or (self_is_range_index and (check_is_numeric_array(other) or isinstance(other, types.Number)))
-            or ((check_is_numeric_array(self) or isinstance(self, types.Number)) and other_is_range_index)):
+            or ((check_is_numeric_array(self) or isinstance(self, types.Number) and other_is_range_index))):
         return None
     one_operand_is_scalar = isinstance(self, types.Number) or isinstance(other, types.Number)
 
@@ -419,7 +424,7 @@ def pd_range_index_ne_overload(self, other):
 
     if not (self_is_range_index and other_is_range_index
             or (self_is_range_index and (check_is_numeric_array(other) or isinstance(other, types.Number)))
-            or ((check_is_numeric_array(self) or isinstance(self, types.Number)) and other_is_range_index)):
+            or ((check_is_numeric_array(self) or isinstance(self, types.Number) and other_is_range_index))):
         return None
 
     def pd_range_index_ne_impl(self, other):
@@ -448,25 +453,5 @@ def pd_range_index_getiter(context, builder, sig, args):
     """ Returns a new iterator object for RangeIndexType by delegating to range.__iter__ """
     (value,) = args
     range_index = cgutils.create_struct_proxy(sig.args[0])(context, builder, value)
-    res = call_getiter(context, builder, RangeIndexDataType, range_index.data)
+    res = call_getiter(context, builder, types.range_state64_type, range_index.data)
     return impl_ret_untracked(context, builder, RangeIndexType, res)
-
-
-@sdc_overload_method(RangeIndexType, 'ravel')
-def pd_range_index_ravel_overload(self, order='C'):
-    if not isinstance(self, RangeIndexType):
-        return None
-
-    _func_name = 'Method ravel().'
-
-    if not (isinstance(order, (types.Omitted, types.StringLiteral, types.UnicodeType)) or order == 'C'):
-        raise TypingError('{} Unsupported parameters. Given order: {}'.format(_func_name, order))
-
-    def pd_range_index_ravel_impl(self, order='C'):
-        # np.ravel argument order is not supported in Numba
-        if order != 'C':
-            raise ValueError(f"Unsupported value for argument 'order' (only default 'C' is supported)")
-
-        return self.values
-
-    return pd_range_index_ravel_impl

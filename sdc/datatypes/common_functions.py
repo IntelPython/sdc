@@ -48,17 +48,14 @@ from sdc.hiframes.pd_series_type import SeriesType
 from sdc.functions import numpy_like
 from sdc.str_arr_type import string_array_type, StringArrayType
 from sdc.datatypes.range_index_type import RangeIndexType
-from sdc.datatypes.int64_index_type import Int64IndexType
 from sdc.str_arr_ext import (num_total_chars, append_string_array_to,
                              str_arr_is_na, pre_alloc_string_array, str_arr_set_na, string_array_type,
                              cp_str_list_to_array, create_str_arr_from_list, get_utf8_size,
-                             str_arr_set_na_by_mask, str_arr_stable_argosort)
+                             str_arr_set_na_by_mask)
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.utils import sdc_overload, sdc_register_jitable
-from sdc.utilities.sdc_typing_utils import (
-                            find_common_dtype_from_numpy_dtypes,
-                            TypeChecker)
-from sdc.utilities.sdc_typing_utils import sdc_pandas_index_types
+from sdc.utilities.sdc_typing_utils import (find_common_dtype_from_numpy_dtypes,
+                                            TypeChecker)
 
 
 class SDCLimitation(Exception):
@@ -74,20 +71,18 @@ def hpat_arrays_append(A, B):
 def hpat_arrays_append_overload(A, B):
     """Function for appending underlying arrays (A and B) or list/tuple of arrays B to an array A"""
 
-    use_A_array = isinstance(A, (RangeIndexType, Int64IndexType))
-    use_B_array = isinstance(B, (RangeIndexType, Int64IndexType))
-    if isinstance(A, (types.Array, RangeIndexType, Int64IndexType)):
-        if isinstance(B, (types.Array, RangeIndexType, Int64IndexType)):
+    A_is_range_index = isinstance(A, RangeIndexType)
+    B_is_range_index = isinstance(B, RangeIndexType)
+    if isinstance(A, (types.Array, RangeIndexType)):
+        if isinstance(B, (types.Array, RangeIndexType)):
             def _append_single_numeric_impl(A, B):
-                _A = A.values if use_A_array == True else A  # noqa
-                _B = B.values if use_B_array == True else B  # noqa
+                _A = A.values if A_is_range_index == True else A  # noqa
+                _B = B.values if B_is_range_index == True else B  # noqa
                 return numpy.concatenate((_A, _B,))
 
             return _append_single_numeric_impl
-
-        elif (isinstance(B, (types.UniTuple, types.List))
-              and isinstance(B.dtype, (types.Array, RangeIndexType, Int64IndexType))):
-            B_dtype_is_index = isinstance(B.dtype, (RangeIndexType, Int64IndexType))
+        elif isinstance(B, (types.UniTuple, types.List)) and isinstance(B.dtype, (types.Array, RangeIndexType)):
+            B_dtype_is_range_index = isinstance(B.dtype, RangeIndexType)
             numba_common_dtype = find_common_dtype_from_numpy_dtypes([A.dtype, B.dtype.dtype], [])
 
             # TODO: refactor to use numpy.concatenate when Numba supports building a tuple at runtime
@@ -97,10 +92,10 @@ def hpat_arrays_append_overload(A, B):
                 new_data = numpy.empty(total_length, numba_common_dtype)
 
                 stop = len(A)
-                _A = numpy.array(A) if use_A_array == True else A  # noqa
+                _A = numpy.array(A) if A_is_range_index == True else A  # noqa
                 new_data[:stop] = _A
                 for arr in B:
-                    _arr = arr.values if B_dtype_is_index == True else arr  # noqa
+                    _arr = numpy.array(arr) if B_dtype_is_range_index == True else arr  # noqa
                     start = stop
                     stop = start + len(_arr)
                     new_data[start:stop] = _arr
@@ -223,13 +218,12 @@ def sdc_join_series_indexes_overload(left, right):
     """Function for joining arrays left and right in a way similar to pandas.join 'outer' algorithm"""
 
     # check that both operands are of types used for representing Pandas indexes
-    if not (isinstance(left, sdc_pandas_index_types) and isinstance(right, sdc_pandas_index_types)
-            and not isinstance(left, types.NoneType)
-            and not isinstance(right, types.NoneType)):
+    if not (isinstance(left, (types.Array, StringArrayType, RangeIndexType))
+            and isinstance(right, (types.Array, StringArrayType, RangeIndexType))):
         return None
 
-    convert_left = isinstance(left, (RangeIndexType, Int64IndexType))
-    convert_right = isinstance(right, (RangeIndexType, Int64IndexType))
+    convert_left = isinstance(left, RangeIndexType)
+    convert_right = isinstance(right, RangeIndexType)
 
     def _convert_to_arrays_impl(left, right):
         _left = left.values if convert_left == True else left  # noqa
@@ -249,9 +243,10 @@ def sdc_join_series_indexes_overload(left, right):
 
         return sdc_join_range_indexes_impl
 
-    elif (isinstance(left, (RangeIndexType, Int64IndexType, types.Array))
-          and isinstance(right, (RangeIndexType, Int64IndexType, types.Array))
-          and not (isinstance(left, types.Array) and isinstance(right, types.Array))):
+    elif isinstance(left, RangeIndexType) and isinstance(right, types.Array):
+        return _convert_to_arrays_impl
+
+    elif isinstance(left, types.Array) and isinstance(right, RangeIndexType):
         return _convert_to_arrays_impl
 
     # TODO: remove code duplication below and merge numeric and StringArray impls into one
@@ -518,7 +513,7 @@ def sdc_arrays_argsort(A, kind='quicksort'):
 
 
 @sdc_overload(sdc_arrays_argsort, jit_options={'parallel': False})
-def sdc_arrays_argsort_overload(A, kind='quicksort', ascending=True):
+def sdc_arrays_argsort_overload(A, kind='quicksort'):
     """Function providing pandas argsort implementation for different 1D array types"""
 
     # kind is not known at compile time, so get this function here and use in impl if needed
@@ -526,31 +521,33 @@ def sdc_arrays_argsort_overload(A, kind='quicksort', ascending=True):
 
     kind_is_default = isinstance(kind, str)
     if isinstance(A, types.Array):
-        def _sdc_arrays_argsort_array_impl(A, kind='quicksort', ascending=True):
+        def _sdc_arrays_argsort_array_impl(A, kind='quicksort'):
             _kind = 'quicksort' if kind_is_default == True else kind  # noqa
-            return numpy_like.argsort(A, kind=_kind, ascending=ascending)
+            return numpy_like.argsort(A, kind=_kind)
 
         return _sdc_arrays_argsort_array_impl
 
     elif A == string_array_type:
-        def _sdc_arrays_argsort_str_arr_impl(A, kind='quicksort', ascending=True):
+        def _sdc_arrays_argsort_str_arr_impl(A, kind='quicksort'):
 
+            nan_mask = sdc.hiframes.api.get_nan_mask(A)
+            idx = numpy.arange(len(A))
+            old_nan_positions = idx[nan_mask]
+
+            data = A[~nan_mask]
+            keys = idx[~nan_mask]
             if kind == 'quicksort':
-                indexes = numpy.arange(len(A))
-                data_index_pairs = list(zip(list(A), list(indexes)))
-                zipped = quicksort_func(data_index_pairs)
-                argsorted = [zipped[i][1] for i in indexes]
-                res = numpy.array(argsorted, dtype=numpy.int64)
-                # for non-stable sort the order within groups does not matter
-                # so just reverse the result when sorting in descending order
-                if not ascending:
-                    res = res[::-1]
+                zipped = list(zip(list(data), list(keys)))
+                zipped = quicksort_func(zipped)
+                argsorted = [zipped[i][1] for i in numpy.arange(len(data))]
             elif kind == 'mergesort':
-                res = str_arr_stable_argosort(A, ascending=ascending)
+                sdc.hiframes.sort.local_sort((data, ), (keys, ))
+                argsorted = list(keys)
             else:
                 raise ValueError("Unrecognized kind of sort in sdc_arrays_argsort")
 
-            return res
+            argsorted.extend(old_nan_positions)
+            return numpy.asarray(argsorted, dtype=numpy.int32)
 
         return _sdc_arrays_argsort_str_arr_impl
 
@@ -621,16 +618,13 @@ def _sdc_take(data, indexes):
 @sdc_overload(_sdc_take)
 def _sdc_take_overload(data, indexes):
 
-    valid_data_types = (types.Array,) + sdc_pandas_index_types
-    if not (isinstance(data, valid_data_types) and not isinstance(data, types.NoneType)):
+    if not isinstance(data, (types.Array, StringArrayType, RangeIndexType)):
         return None
-
-    if not (isinstance(indexes, (types.Array, types.List, Int64IndexType))
+    if not (isinstance(indexes, (types.Array, types.List))
             and isinstance(indexes.dtype, (types.Integer, types.ListType))):
         return None
 
-    if (isinstance(indexes.dtype, types.ListType)
-            and isinstance(data, (types.Array, types.List, RangeIndexType, Int64IndexType))):
+    if isinstance(indexes.dtype, types.ListType) and isinstance(data, (types.Array, types.List, RangeIndexType)):
         arr_dtype = data.dtype
 
         def _sdc_take_list_impl(data, indexes):
@@ -683,7 +677,7 @@ def _sdc_take_overload(data, indexes):
 
         return _sdc_take_list_str_impl
 
-    elif isinstance(data, (types.Array, RangeIndexType, Int64IndexType)):
+    elif isinstance(data, (types.Array, RangeIndexType)):
         arr_dtype = data.dtype
 
         def _sdc_take_array_impl(data, indexes):
@@ -746,7 +740,6 @@ def sdc_reindex_series_overload(arr, index, name, by_index):
     """ Reindexes series data by new index following the logic of pandas.core.indexing.check_bool_indexer """
 
     range_indexes = isinstance(index, RangeIndexType) and isinstance(by_index, RangeIndexType)
-    int64_indexes = isinstance(index, Int64IndexType) and isinstance(by_index, Int64IndexType)
     data_dtype, index_dtype = arr.dtype, index.dtype
     data_is_str_arr = isinstance(arr.dtype, types.UnicodeType)
 
@@ -754,8 +747,6 @@ def sdc_reindex_series_overload(arr, index, name, by_index):
 
         # no reindexing is needed if indexes are equal
         if range_indexes == True:  # noqa
-            equal_indexes = numpy_like.array_equal(index, by_index)
-        elif int64_indexes == True:  # noqa
             equal_indexes = numpy_like.array_equal(index, by_index)
         else:
             equal_indexes = False
@@ -781,10 +772,10 @@ def sdc_reindex_series_overload(arr, index, name, by_index):
                 map_index_to_position[value] = i
 
         index_mismatch = 0
-        for i in numba.prange(len(by_index)):
-            val = by_index[i]
-            if val in map_index_to_position:
-                pos_in_self = map_index_to_position[val]
+        # FIXME: TypingError in parfor step (wrong promotion to float64?) if prange is used
+        for i in numpy.arange(len(by_index)):
+            if by_index[i] in map_index_to_position:
+                pos_in_self = map_index_to_position[by_index[i]]
                 _res_data[i] = arr[pos_in_self]
                 if data_is_str_arr == True:  # noqa
                     res_data_nan_mask[i] = isna(arr, i)

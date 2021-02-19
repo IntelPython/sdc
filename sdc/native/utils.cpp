@@ -169,16 +169,4 @@ bool nanless<double>(const double& left, const double& right)
     return std::less<double>()(left, right) || (std::isnan(right) && !std::isnan(left));
 }
 
-template<>
-bool nangreater<float>(const float& left, const float& right)
-{
-    return std::greater<float>()(left, right) || (std::isnan(right) && !std::isnan(left));
-}
-
-template<>
-bool nangreater<double>(const double& left, const double& right)
-{
-    return std::greater<double>()(left, right) || (std::isnan(right) && !std::isnan(left));
-}
-
 }

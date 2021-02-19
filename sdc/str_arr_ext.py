@@ -54,50 +54,6 @@ from sdc.str_arr_type import (StringArray, string_array_type, StringArrayType,
 from sdc.utilities.sdc_typing_utils import check_is_array_of_dtype
 
 
-ll.add_symbol('get_str_len', hstr_ext.get_str_len)
-ll.add_symbol('allocate_string_array', hstr_ext.allocate_string_array)
-ll.add_symbol('setitem_string_array', hstr_ext.setitem_string_array)
-ll.add_symbol('getitem_string_array', hstr_ext.getitem_string_array)
-ll.add_symbol('getitem_string_array_std', hstr_ext.getitem_string_array_std)
-ll.add_symbol('is_na', hstr_ext.is_na)
-ll.add_symbol('string_array_from_sequence', hstr_ext.string_array_from_sequence)
-ll.add_symbol('np_array_from_string_array', hstr_ext.np_array_from_string_array)
-ll.add_symbol('print_int', hstr_ext.print_int)
-ll.add_symbol('convert_len_arr_to_offset', hstr_ext.convert_len_arr_to_offset)
-ll.add_symbol('set_string_array_range', hstr_ext.set_string_array_range)
-ll.add_symbol('str_arr_to_int64', hstr_ext.str_arr_to_int64)
-ll.add_symbol('str_arr_to_float64', hstr_ext.str_arr_to_float64)
-ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
-ll.add_symbol('c_glob', hstr_ext.c_glob)
-ll.add_symbol('decode_utf8', hstr_ext.decode_utf8)
-ll.add_symbol('get_utf8_size', hstr_ext.get_utf8_size)
-ll.add_symbol('stable_argsort', hstr_ext.stable_argsort)
-
-
-convert_len_arr_to_offset = types.ExternalFunction("convert_len_arr_to_offset",
-                                                   types.void(types.voidptr,
-                                                              types.intp))
-
-setitem_string_array = types.ExternalFunction("setitem_string_array",
-                                              types.void(types.voidptr,
-                                                         types.voidptr,
-                                                         types.intp,
-                                                         string_type,
-                                                         types.intp))
-
-_get_utf8_size = types.ExternalFunction("get_utf8_size",
-                                        types.intp(types.voidptr,  # data_ptr
-                                                   types.intp,     # length
-                                                   types.int32))   # kind
-
-_stable_argsort = types.ExternalFunction("stable_argsort",
-                                         types.void(types.intp,    # data_ptr
-                                                    types.intp,    # offset_ptr
-                                                    types.uint64,  # data size
-                                                    types.int8,    # ascending
-                                                    types.intp))   # result ptr
-
-
 @typeof_impl.register(StringArray)
 def typeof_string_array(val, c):
     return string_array_type
@@ -565,6 +521,34 @@ def str_arr_len_overload(str_arr):
         def str_arr_len(str_arr):
             return str_arr.size
         return str_arr_len
+
+
+ll.add_symbol('get_str_len', hstr_ext.get_str_len)
+ll.add_symbol('allocate_string_array', hstr_ext.allocate_string_array)
+ll.add_symbol('setitem_string_array', hstr_ext.setitem_string_array)
+ll.add_symbol('getitem_string_array', hstr_ext.getitem_string_array)
+ll.add_symbol('getitem_string_array_std', hstr_ext.getitem_string_array_std)
+ll.add_symbol('is_na', hstr_ext.is_na)
+ll.add_symbol('string_array_from_sequence', hstr_ext.string_array_from_sequence)
+ll.add_symbol('np_array_from_string_array', hstr_ext.np_array_from_string_array)
+ll.add_symbol('print_int', hstr_ext.print_int)
+ll.add_symbol('convert_len_arr_to_offset', hstr_ext.convert_len_arr_to_offset)
+ll.add_symbol('set_string_array_range', hstr_ext.set_string_array_range)
+ll.add_symbol('str_arr_to_int64', hstr_ext.str_arr_to_int64)
+ll.add_symbol('str_arr_to_float64', hstr_ext.str_arr_to_float64)
+ll.add_symbol('dtor_string_array', hstr_ext.dtor_string_array)
+ll.add_symbol('c_glob', hstr_ext.c_glob)
+ll.add_symbol('decode_utf8', hstr_ext.decode_utf8)
+ll.add_symbol('get_utf8_size', hstr_ext.get_utf8_size)
+
+convert_len_arr_to_offset = types.ExternalFunction("convert_len_arr_to_offset", types.void(types.voidptr, types.intp))
+
+
+setitem_string_array = types.ExternalFunction("setitem_string_array",
+                                              types.void(types.voidptr, types.voidptr, types.intp, string_type,
+                                                         types.intp))
+_get_utf8_size = types.ExternalFunction("get_utf8_size",
+                                        types.intp(types.voidptr, types.intp, types.int32))
 
 
 def construct_string_array(context, builder):
@@ -1460,14 +1444,3 @@ def sdc_str_arr_operator_is(context, builder, sig, args):
     ma = builder.ptrtoint(a.meminfo, cgutils.intp_t)
     mb = builder.ptrtoint(b.meminfo, cgutils.intp_t)
     return builder.icmp_signed('==', ma, mb)
-
-
-@numba.njit(no_cpython_wrapper=True)
-def str_arr_stable_argosort(arr, ascending=True):
-    argsort_res = np.empty(len(arr), dtype=np.int64)
-    _stable_argsort(get_data_ptr(arr).data,
-                    get_offset_ptr(arr).data,
-                    len(arr),
-                    types.int8(ascending),
-                    argsort_res.ctypes.data)
-    return argsort_res

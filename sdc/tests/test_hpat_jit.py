@@ -36,7 +36,6 @@ import sdc
 from sdc import *
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
-from numba.experimental import jitclass
 
 
 class TestHpatJitIssues(TestCase):

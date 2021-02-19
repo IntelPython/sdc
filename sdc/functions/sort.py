@@ -47,7 +47,7 @@ parallel_sort_arithm_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_uint64)
 parallel_sort_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_uint64,
                                  ct.c_uint64, ct.c_void_p,)
 
-parallel_argsort_arithm_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_void_p, ct.c_uint64, ct.c_uint8)
+parallel_argsort_arithm_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_void_p, ct.c_uint64)
 
 parallel_argsort_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_void_p, ct.c_uint64,
                                     ct.c_uint64, ct.c_void_p,)
@@ -66,7 +66,7 @@ parallel_stable_argsort_sym = bind('parallel_stable_argsort_u64v',
 
 parallel_sort_t_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_uint64)
 
-parallel_argsort_t_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_void_p, ct.c_uint64, ct.c_uint8)
+parallel_argsort_t_sig = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_void_p, ct.c_uint64)
 
 set_threads_count_sig = ct.CFUNCTYPE(None, ct.c_uint64)
 set_threads_count_sym = bind('set_number_of_threads', set_threads_count_sig)
@@ -290,19 +290,17 @@ def parallel_xargsort_overload_impl(dt, xargsort_map, xargsort_sym):
     if dt in types_to_postfix.keys():
         sort_f = xargsort_map[dt]
 
-        def parallel_xargsort_arithm_impl(arr, ascending=True):
+        def parallel_xargsort_arithm_impl(arr):
             index = numpy.empty(shape=len(arr), dtype=numpy.int64)
-            sort_f(index.ctypes, arr.ctypes, len(arr), types.uint8(ascending))
+            sort_f(index.ctypes, arr.ctypes, len(arr))
 
             return index
 
         return parallel_xargsort_arithm_impl
 
-    # TO-DO: add/change adaptor to handle case of ascending=False
-    def parallel_xargsort_impl(arr, ascending=True):
+    def parallel_xargsort_impl(arr):
         item_size = itemsize(arr)
         index = numpy.empty(shape=len(arr), dtype=numpy.int64)
-
         xargsort_sym(index.ctypes, arr.ctypes, len(arr), item_size, adaptor(arr[0], arr[0]))
 
         return index
@@ -310,12 +308,12 @@ def parallel_xargsort_overload_impl(dt, xargsort_map, xargsort_sym):
     return parallel_xargsort_impl
 
 
-def parallel_argsort(arr, ascending=True):
+def parallel_argsort(arr):
     pass
 
 
 @overload(parallel_argsort)
-def parallel_argsort_overload(arr, ascending=True):
+def parallel_argsort_overload(arr):
 
     if not isinstance(arr, types.Array):
         raise NotImplementedError
@@ -325,12 +323,12 @@ def parallel_argsort_overload(arr, ascending=True):
     return parallel_xargsort_overload_impl(dt, argsort_map, parallel_argsort_sym)
 
 
-def parallel_stable_argsort(arr, ascending=True):
+def parallel_stable_argsort(arr):
     pass
 
 
 @overload(parallel_stable_argsort)
-def parallel_stable_argsort_overload(arr, ascending=True):
+def parallel_argsort_overload(arr):
 
     if not isinstance(arr, types.Array):
         raise NotImplementedError

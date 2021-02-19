@@ -47,7 +47,6 @@ import sdc
 from sdc.functions.statistics import skew_formula
 from sdc.hiframes.api import isna
 from sdc.datatypes.range_index_type import RangeIndexType
-from sdc.datatypes.int64_index_type import Int64IndexType
 from sdc.utilities.sdc_typing_utils import TypeChecker, is_default
 from sdc.utilities.utils import (sdc_overload, sdc_register_jitable,
                                  min_dtype_int_val, max_dtype_int_val, min_dtype_float_val,
@@ -58,8 +57,6 @@ from sdc.str_arr_ext import (StringArrayType, pre_alloc_string_array, get_utf8_s
 from sdc.utilities.prange_utils import parallel_chunks
 from sdc.utilities.sdc_typing_utils import check_types_comparable
 from sdc.functions.sort import parallel_sort, parallel_stable_sort, parallel_argsort, parallel_stable_argsort
-from sdc.utilities.sdc_typing_utils import sdc_pandas_index_types
-
 
 def astype(self, dtype):
     pass
@@ -123,9 +120,7 @@ def sdc_astype_overload(self, dtype):
     """
 
     ty_checker = TypeChecker("numpy-like 'astype'")
-    valid_self_types = (types.Array,) + sdc_pandas_index_types
-    if not (isinstance(self, valid_self_types)
-            and not isinstance(self, types.NoneType)):
+    if not isinstance(self, (types.Array, StringArrayType, RangeIndexType)):
         return None
 
     accepted_dtype_types = (types.functions.NumberClass, types.Function, types.StringLiteral)
@@ -161,7 +156,7 @@ def sdc_astype_overload(self, dtype):
 
         return sdc_astype_number_to_string_impl
 
-    if (isinstance(self, (types.Array, RangeIndexType, Int64IndexType))
+    if (isinstance(self, (types.Array, RangeIndexType))
             and isinstance(dtype, (types.StringLiteral, types.functions.NumberClass))):
         def sdc_astype_number_impl(self, dtype):
             arr = numpy.empty(len(self), dtype=numpy.dtype(dtype))
@@ -349,9 +344,7 @@ def sdc_copy_overload(self):
        Test: python -m sdc.runtests sdc.tests.test_sdc_numpy -k copy
     """
 
-    valid_self_types = (types.Array,) + sdc_pandas_index_types
-    if not (isinstance(self, valid_self_types)
-            and not isinstance(self, types.NoneType)):
+    if not isinstance(self, (types.Array, StringArrayType, RangeIndexType)):
         return None
 
     if isinstance(self, types.Array):
@@ -367,7 +360,7 @@ def sdc_copy_overload(self):
 
         return sdc_copy_array_impl
 
-    if isinstance(self, (StringArrayType, RangeIndexType, Int64IndexType)):
+    if isinstance(self, (StringArrayType, RangeIndexType)):
         def sdc_copy_str_arr_impl(self):
             return self.copy()
 
@@ -960,7 +953,7 @@ def getitem_by_mask(arr, idx):
 
 
 @sdc_overload(getitem_by_mask)
-def getitem_by_mask_overload(self, idx):
+def getitem_by_mask_overload(arr, idx):
     """
     Creates a new array from arr by selecting elements indicated by Boolean mask idx.
 
@@ -978,17 +971,13 @@ def getitem_by_mask_overload(self, idx):
 
     """
 
-    valid_self_types = (types.Array,) + sdc_pandas_index_types
-    if not (isinstance(self, valid_self_types)
-            and not isinstance(self, types.NoneType)):
-        return None
+    if not isinstance(arr, (types.Array, StringArrayType, RangeIndexType)):
+        return
 
-    res_dtype = self.dtype
-    is_str_arr = self == string_array_type
-    is_numeric_index = isinstance(self, (RangeIndexType, Int64IndexType))
-
-    def getitem_by_mask_impl(self, idx):
-        chunks = parallel_chunks(len(self))
+    res_dtype = arr.dtype
+    is_str_arr = arr == string_array_type
+    def getitem_by_mask_impl(arr, idx):
+        chunks = parallel_chunks(len(arr))
         arr_len = numpy.empty(len(chunks), dtype=numpy.int64)
         length = 0
 
@@ -1013,18 +1002,16 @@ def getitem_by_mask_overload(self, idx):
 
             for j in range(chunk.start, chunk.stop):
                 if idx[j]:
-                    value = self[j]
+                    value = arr[j]
                     result_data[current_pos] = value
                     if is_str_arr == True:  # noqa
-                        result_nan_mask[current_pos] = isna(self, j)
+                        result_nan_mask[current_pos] = isna(arr, j)
                     current_pos += 1
 
         if is_str_arr == True:  # noqa
             result_data_as_str_arr = create_str_arr_from_list(result_data)
             str_arr_set_na_by_mask(result_data_as_str_arr, result_nan_mask)
             return result_data_as_str_arr
-        elif is_numeric_index == True:  # noqa
-            return pandas.Int64Index(result_data, name=self._name)
         else:
             return result_data
 
@@ -1101,8 +1088,8 @@ def array_equal(A, B):
 def sdc_array_equal_overload(A, B):
     """ Checks 1D sequences A and B of comparable dtypes are equal """
 
-    valid_arg_types = (types.Array,) + sdc_pandas_index_types
-    if not (isinstance(A, valid_arg_types) or isinstance(B, valid_arg_types)):
+    if not (isinstance(A, (types.Array, StringArrayType, types.NoneType, RangeIndexType))
+            or isinstance(B, (types.Array, StringArrayType, types.NoneType, RangeIndexType))):
         return None
 
     _func_name = "numpy-like 'array_equal'"
@@ -1154,9 +1141,6 @@ def sdc_np_array_overload(A):
 
     if isinstance(A, RangeIndexType):
         return lambda A: np.arange(A.start, A.stop, A.step)
-
-    if isinstance(A, Int64IndexType):
-        return lambda A: A._data
 
     if isinstance(A, types.containers.Set):
         # TODO: naive implementation, data from set can probably
@@ -1225,7 +1209,7 @@ def sort_overload(a, axis=-1, kind=None, order=None):
     return sort_impl
 
 
-def argsort(a, axis=-1, kind=None, order=None, ascending=True):
+def argsort(a, axis=-1, kind=None, order=None):
     """
     Returns the indices that would sort an array.
 
@@ -1254,7 +1238,7 @@ def argsort(a, axis=-1, kind=None, order=None, ascending=True):
 
 
 @sdc_overload(argsort)
-def argsort_overload(a, axis=-1, kind=None, order=None, ascending=True):
+def argsort_overload(a, axis=-1, kind=None, order=None):
     _func_name = 'argsort'
     ty_checker = TypeChecker(_func_name)
 
@@ -1266,15 +1250,15 @@ def argsort_overload(a, axis=-1, kind=None, order=None, ascending=True):
     if not is_default(order, None):
         raise TypingError(f'{_func_name} Unsupported parameter order')
 
-    def argsort_impl(a, axis=-1, kind=None, order=None, ascending=True):
+    def argsort_impl(a, axis=-1, kind=None, order=None):
         _kind = 'quicksort'
         if kind is not None:
             _kind = kind
 
         if _kind == 'quicksort':
-            return parallel_argsort(a, ascending)
+            return parallel_argsort(a)
         elif _kind == 'mergesort':
-            return parallel_stable_argsort(a, ascending)
+            return parallel_stable_argsort(a)
         else:
             raise ValueError("Unsupported value of 'kind' parameter")
 

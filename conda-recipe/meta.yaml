@@ -1,5 +1,5 @@
-{% set NUMBA_VERSION = "==0.52.0" %}
-{% set PANDAS_VERSION = "==1.2.0" %}
+{% set NUMBA_VERSION = "==0.51.2" %}
+{% set PANDAS_VERSION = "==1.0.5" %}
 {% set PYARROW_VERSION = "==0.17.0" %}
 
 package:

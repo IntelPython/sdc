@@ -51,8 +51,8 @@ Exponentially-weighted moving window functions
 ----------------------------------------------
 
 .. sdc_toctree
-   ewm.ExponentialMovingWindow.mean
-   ewm.ExponentialMovingWindow.std
-   ewm.ExponentialMovingWindow.var
-   ewm.ExponentialMovingWindow.corr
-   ewm.ExponentialMovingWindow.cov
+   EWM.mean
+   EWM.std
+   EWM.var
+   EWM.corr
+   EWM.cov
