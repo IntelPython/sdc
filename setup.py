@@ -375,9 +375,9 @@ setup(name=SDC_NAME_STR,
       package_data={'sdc.tests': ['*.bz2'], },
       install_requires=[
           'numpy>=1.16',
-          'pandas>=1.0',
+          'pandas>=1.2.0',
           'pyarrow==0.17.0',
-          'numba>=0.51.2,<0.52',
+          'numba>=0.52.0,<0.53',
           'tbb'
           ],
       cmdclass=sdc_build_commands,
