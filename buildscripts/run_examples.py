@@ -32,45 +32,82 @@ import traceback
 
 from pathlib import Path
 from utilities import SDC_Build_Utilities
+import multiprocessing as mp
 
 
 EXAMPLES_TO_SKIP = {'basic_usage_nyse_predict.py'}
+TEST_TIMEOUT = 120
 
 
-def run_examples(sdc_utils):
+# keep test results global to be visible for async callbacks
+class TestResults():
     total = 0
-    passed = 0
     failed = 0
+    passed = 0
     skipped = 0
     failed_examples = []
 
+
+def run_single_example(path, sdc_utils):
+    str_path = str(path)
+    try:
+        sdc_utils.log_info(sdc_utils.line_double)
+        sdc_utils.run_command(f'python {str_path}')
+    except Exception as e:
+        raise Exception(str_path).with_traceback(e.__traceback__)
+
+    return str_path
+
+
+def normal_handler(test_name):
+    TestResults.passed += 1
+    sdc_utils.log_info(f'{test_name} PASSED')
+
+
+def error_handler(error):
+    TestResults.failed += 1
+    test_name = str(error).split()[-1]
+    sdc_utils.log_info(f'{test_name} FAILED')
+    TestResults.failed_examples.append(test_name)
+
+
+def run_examples(sdc_utils):
+
     os.chdir(str(sdc_utils.examples_path))
+    pool = mp.Pool(max(1, mp.cpu_count()))
+
+    task_queue = []
     for sdc_example in Path('.').glob('**/*.py'):
-        total += 1
+        TestResults.total += 1
 
         if sdc_example.name in EXAMPLES_TO_SKIP:
-            skipped += 1
+            TestResults.skipped += 1
             continue
 
         sdc_example = str(sdc_example)
+        task_queue.append(pool.apply_async(
+            run_single_example,
+            [sdc_example, sdc_utils],
+            callback=normal_handler,
+            error_callback=error_handler
+        ))
+
+    for promise in task_queue:
         try:
-            sdc_utils.log_info(sdc_utils.line_double)
-            sdc_utils.run_command(f'python {str(sdc_example)}')
+            promise.get(TEST_TIMEOUT)
         except Exception:
-            failed += 1
-            failed_examples.append(sdc_example)
-            sdc_utils.log_info(f'{sdc_example} FAILED')
             traceback.print_exc()
-        else:
-            passed += 1
-            sdc_utils.log_info(f'{sdc_example} PASSED')
 
-    summary_msg = f'SDC examples summary: {total} RUN, {passed} PASSED, {failed} FAILED, {skipped} SKIPPED'
+    pool.close()
+    pool.join()
+
+    summary_msg = f'SDC examples summary: {TestResults.total} RUN, {TestResults.passed} PASSED, ' \
+                  f'{TestResults.failed} FAILED, {TestResults.skipped} SKIPPED'
     sdc_utils.log_info(summary_msg, separate=True)
-    for failed_example in failed_examples:
-        sdc_utils.log_info(f'FAILED: {failed_example}')
+    for test_name in TestResults.failed_examples:
+        sdc_utils.log_info(f'FAILED: {test_name}')
 
-    if failed > 0:
+    if TestResults.failed > 0:
         sdc_utils.log_info('Intel SDC examples FAILED', separate=True)
         exit(-1)
     sdc_utils.log_info('Intel SDC examples PASSED', separate=True)
