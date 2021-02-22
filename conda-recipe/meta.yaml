@@ -1,6 +1,6 @@
 {% set NUMBA_VERSION = "==0.52.0" %}
 {% set PANDAS_VERSION = "==1.2.0" %}
-{% set PYARROW_VERSION = "==0.17.0" %}
+{% set PYARROW_VERSION = "==2.0.0" %}
 
 package:
   name: sdc
