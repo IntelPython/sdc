@@ -4392,7 +4392,7 @@ class TestSeries(
             return a.quantile()
 
         hpat_func = self.jit(test_impl)
-        np.testing.assert_equal(hpat_func(), test_impl())
+        np.testing.assert_almost_equal(hpat_func(), test_impl())
 
     def test_series_quantile_q_vector(self):
         def test_series_quantile_q_vector_impl(S, param1):
@@ -4404,7 +4404,7 @@ class TestSeries(
         param1 = [0.0, 0.25, 0.5, 0.75, 1.0]
         result_ref = test_series_quantile_q_vector_impl(s, param1)
         result = hpat_func(s, param1)
-        np.testing.assert_equal(result, result_ref)
+        np.testing.assert_almost_equal(result, result_ref)
 
     @unittest.skip("Implement unique without sorting like in pandas")
     def test_unique(self):
