@@ -336,10 +336,11 @@ void parallel_stable_sort(void* begin, uint64_t len, uint64_t size, void* compar
     static const std::array<parallel_sort_call, MaxFixSize> fixed_size_sort = fill_parallel_sort_array<MaxFixSize, parallel_sort_fixed_size>();
 
     auto cmp = reinterpret_cast<compare_func>(compare);
-    if (size <= MaxFixSize)
-        return fixed_size_sort[size - 1](begin, len, cmp);
-
-    return sort_by_argsort<uint64_t>(begin, len, size, cmp, parallel_stable_argsort_<uint64_t>);
+    if (size <= MaxFixSize) {
+        fixed_size_sort[size - 1](begin, len, cmp);
+    } else {
+        sort_by_argsort<uint64_t>(begin, len, size, cmp, parallel_stable_argsort_<uint64_t>);
+    }
 }
 
 }

@@ -83,7 +83,7 @@ struct tbb_context
 
     void finalize()
     {
-        if (arena)
+        if (!arena)
             return;
 
         arena->terminate();
