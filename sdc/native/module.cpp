@@ -60,31 +60,31 @@ extern "C"
 
     void parallel_argsort_u64v(void* index, void* begin, uint64_t len, uint64_t size, void* compare);
 
-    void parallel_argsort_u64i8(void* index, void* begin, uint64_t len);
-    void parallel_argsort_u64u8(void* index, void* begin, uint64_t len);
-    void parallel_argsort_u64i16(void* index, void* begin, uint64_t len);
-    void parallel_argsort_u64u16(void* index, void* begin, uint64_t len);
-    void parallel_argsort_u64i32(void* index, void* begin, uint64_t len);
-    void parallel_argsort_u64u32(void* index, void* begin, uint64_t len);
-    void parallel_argsort_u64i64(void* index, void* begin, uint64_t len);
-    void parallel_argsort_u64u64(void* index, void* begin, uint64_t len);
+    void parallel_argsort_u64i8(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_argsort_u64u8(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_argsort_u64i16(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_argsort_u64u16(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_argsort_u64i32(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_argsort_u64u32(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_argsort_u64i64(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_argsort_u64u64(void* index, void* begin, uint64_t len, uint8_t ascending);
 
-    void parallel_argsort_u64f32(void* index, void* begin, uint64_t len);
-    void parallel_argsort_u64f64(void* index, void* begin, uint64_t len);
+    void parallel_argsort_u64f32(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_argsort_u64f64(void* index, void* begin, uint64_t len, uint8_t ascending);
 
     void parallel_stable_argsort_u64v(void* index, void* begin, uint64_t len, uint64_t size, void* compare);
 
-    void parallel_stable_argsort_u64i8(void* index, void* begin, uint64_t len);
-    void parallel_stable_argsort_u64u8(void* index, void* begin, uint64_t len);
-    void parallel_stable_argsort_u64i16(void* index, void* begin, uint64_t len);
-    void parallel_stable_argsort_u64u16(void* index, void* begin, uint64_t len);
-    void parallel_stable_argsort_u64i32(void* index, void* begin, uint64_t len);
-    void parallel_stable_argsort_u64u32(void* index, void* begin, uint64_t len);
-    void parallel_stable_argsort_u64i64(void* index, void* begin, uint64_t len);
-    void parallel_stable_argsort_u64u64(void* index, void* begin, uint64_t len);
+    void parallel_stable_argsort_u64i8(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_stable_argsort_u64u8(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_stable_argsort_u64i16(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_stable_argsort_u64u16(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_stable_argsort_u64i32(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_stable_argsort_u64u32(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_stable_argsort_u64i64(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_stable_argsort_u64u64(void* index, void* begin, uint64_t len, uint8_t ascending);
 
-    void parallel_stable_argsort_u64f32(void* index, void* begin, uint64_t len);
-    void parallel_stable_argsort_u64f64(void* index, void* begin, uint64_t len);
+    void parallel_stable_argsort_u64f32(void* index, void* begin, uint64_t len, uint8_t ascending);
+    void parallel_stable_argsort_u64f64(void* index, void* begin, uint64_t len, uint8_t ascending);
 
     void set_number_of_threads(uint64_t threads)
     {

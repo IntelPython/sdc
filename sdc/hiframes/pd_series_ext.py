@@ -48,7 +48,6 @@ from sdc.str_ext import string_type, list_string_array_type
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.datatypes.categorical.pdimpl import is_categoricaldtype
 from sdc.datatypes.series.pdimpl import _Series_category
-from sdc.datatypes.range_index_type import RangeIndexType
 
 
 def is_str_series_typ(t):
