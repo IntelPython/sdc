@@ -1,6 +1,9 @@
-**********************************
+*****
+Sdc
+*****
+
 Intel® Scalable Dataframe Compiler
-**********************************
+###################################################
 
 .. image:: https://travis-ci.com/IntelPython/sdc.svg?branch=master
     :target: https://travis-ci.com/IntelPython/sdc
@@ -21,7 +24,7 @@ Intel® Scalable Dataframe Compiler (Intel® SDC) is an extension of `Numba*`_
 that enables compilation of `Pandas*`_ operations. It automatically vectorizes and parallelizes
 the code by leveraging modern hardware instructions and by utilizing all available cores.
 
-Intel® SDC documentation can be found `here <https://intelpython.github.io/sdc-doc/>`_.
+Intel® SDC documentation can be found `here <https://intelpython.github.io/sdc-doc/>`__.
 
 .. note::
     For maximum performance and stability, please use numba from ``intel/label/beta`` channel.
@@ -171,7 +174,7 @@ The built documentation will be located in the ``./sdc/docs/build/html`` directo
 To preview the documentation open ``index.html`` file.
 
 
-More information about building and adding documentation can be found `here <docs/README.rst>`_.
+More information about building and adding documentation can be found `here <docs/README.rst>`__.
 
 
 Running unit tests
