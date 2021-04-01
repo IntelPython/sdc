@@ -1216,7 +1216,7 @@ def sort_overload(a, axis=-1, kind=None, order=None):
     return sort_impl
 
 
-def argsort(a, axis=-1, kind=None, order=None):
+def argsort(a, axis=-1, kind=None, order=None, ascending=True):
     """
     Returns the indices that would sort an array.
 
@@ -1245,7 +1245,7 @@ def argsort(a, axis=-1, kind=None, order=None):
 
 
 @sdc_overload(argsort)
-def argsort_overload(a, axis=-1, kind=None, order=None):
+def argsort_overload(a, axis=-1, kind=None, order=None, ascending=True):
     _func_name = 'argsort'
     ty_checker = TypeChecker(_func_name)
 
@@ -1257,15 +1257,15 @@ def argsort_overload(a, axis=-1, kind=None, order=None):
     if not is_default(order, None):
         raise TypingError(f'{_func_name} Unsupported parameter order')
 
-    def argsort_impl(a, axis=-1, kind=None, order=None):
+    def argsort_impl(a, axis=-1, kind=None, order=None, ascending=True):
         _kind = 'quicksort'
         if kind is not None:
             _kind = kind
 
         if _kind == 'quicksort':
-            return parallel_argsort(a)
+            return parallel_argsort(a, ascending)
         elif _kind == 'mergesort':
-            return parallel_stable_argsort(a)
+            return parallel_stable_argsort(a, ascending)
         else:
             raise ValueError("Unsupported value of 'kind' parameter")
 

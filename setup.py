@@ -352,15 +352,15 @@ class style(Command):
 sdc_build_commands = versioneer.get_cmdclass()
 sdc_build_commands['build_doc'] = SDCBuildDoc
 sdc_build_commands.update({'style': style})
-sdc_version = versioneer.get_version()
-sdc_release = 'Alpha ({})'.format(versioneer.get_version())
+sdc_version = versioneer.get_version().split('+')[0]
 
 setup(name=SDC_NAME_STR,
       version=sdc_version,
       description='Numba* extension for compiling Pandas* operations',
       long_description=readme(),
+      long_description_content_type='text/markdown',
       classifiers=[
-          "Development Status :: 2 - Pre-Alpha",
+          "Development Status :: 4 - Beta",
           "Intended Audience :: Developers",
           "Operating System :: POSIX :: Linux",
           "Programming Language :: Python",
@@ -370,14 +370,19 @@ setup(name=SDC_NAME_STR,
       ],
       keywords='data analytics distributed Pandas Numba',
       url='https://github.com/IntelPython/sdc',
+      license='BSD',
       author='Intel Corporation',
+      maintainer="Intel Corp.",
+      maintainer_email="scripting@intel.com",
+      platforms=["Windows", "Linux", "Mac OS-X"],
+      python_requires='>=3.6',
       packages=find_packages(),
       package_data={'sdc.tests': ['*.bz2'], },
       install_requires=[
           'numpy>=1.16',
-          'pandas>=1.0',
-          'pyarrow==0.17.0',
-          'numba>=0.51.2,<0.52',
+          'pandas==1.2.0',
+          'pyarrow==2.0.0',
+          'numba==0.52.0',
           'tbb'
           ],
       cmdclass=sdc_build_commands,
