@@ -111,8 +111,13 @@ if not tbb_root:
 
 ind = [PREFIX_DIR + '/include', ]
 lid = [PREFIX_DIR + '/lib', ]
-eca = ['-std=c++11', "-O3", "-DTBB_PREVIEW_WAITING_FOR_WORKERS=1"]  # '-g', '-O0']
-ela = ['-std=c++11', ]
+
+if is_win:
+    eca = ['/std:c++17', "/Ox", "/DTBB_PREVIEW_WAITING_FOR_WORKERS=1"]  # '/ZI', '/Od']
+    ela = ['/std:c++17', ]
+else:
+    eca = ['-std=c++17', "-O3", "-DTBB_PREVIEW_WAITING_FOR_WORKERS=1"]  # '-g', '-O0']
+    ela = ['-std=c++17', ]
 
 io_libs = []
 
@@ -202,8 +207,8 @@ ext_dt = Extension(name="sdc.hdatetime_ext",
                    sources=["sdc/_datetime_ext.cpp"],
                    libraries=np_compile_args['libraries'],
                    define_macros=np_compile_args['define_macros'],
-                   extra_compile_args=['-std=c++11'],
-                   extra_link_args=['-std=c++11'],
+                   extra_compile_args=eca,
+                   extra_link_args=ela,
                    include_dirs=np_compile_args['include_dirs'],
                    library_dirs=np_compile_args['library_dirs'],
                    language="c++"
