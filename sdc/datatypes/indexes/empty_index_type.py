@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2020, Intel Corporation All rights reserved.
 #
@@ -24,8 +25,39 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from sdc.tests.indexes.test_empty_index import TestEmptyIndex
-from sdc.tests.indexes.test_range_index import TestRangeIndex
-from sdc.tests.indexes.test_positional_index import TestPositionalIndex
-from sdc.tests.indexes.test_int64_index import TestInt64Index
-from sdc.tests.indexes.test_indexes import TestIndexes
+from numba import types
+from numba.extending import (
+    models,
+    register_model,
+    make_attribute_wrapper
+)
+
+
+class EmptyIndexType(types.Type):
+
+    # this index represents special case of pd.Index([]) with dtype='object'
+    # for overload typing functions assume it has following dtype
+    dtype = types.pyobject
+
+    def __init__(self, is_named=False):
+        self.is_named = is_named
+        super(EmptyIndexType, self).__init__(
+            name='EmptyIndexType({})'.format(is_named))
+
+
+@register_model(EmptyIndexType)
+class EmptyIndexModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+
+        name_type = types.unicode_type if fe_type.is_named else types.none
+        members = [
+            ('name', name_type),
+        ]
+        models.StructModel.__init__(self, dmm, fe_type, members)
+
+
+# FIXME_Numba#3372: add into numba.types to allow returning from objmode
+types.EmptyIndexType = EmptyIndexType
+
+
+make_attribute_wrapper(EmptyIndexType, 'name', '_name')

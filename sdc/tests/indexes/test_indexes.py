@@ -28,12 +28,21 @@
 import numpy as np
 import pandas as pd
 import unittest
+from itertools import product
 
-from sdc.tests.indexes import TestRangeIndex, TestInt64Index
-from sdc.tests.indexes.index_datagens import _generate_index_param_values
+from sdc.tests.indexes import (
+            TestEmptyIndex,
+            TestPositionalIndex,
+            TestRangeIndex,
+            TestInt64Index,
+        )
+from sdc.tests.indexes.index_datagens import _generate_index_param_values, get_sample_index
+from sdc.datatypes.indexes import *
 
 
 class TestIndexes(
+        TestEmptyIndex,
+        TestPositionalIndex,
         TestRangeIndex,
         TestInt64Index
         ):
@@ -155,7 +164,7 @@ class TestIndexes(
         @self.jit
         def test_impl(S):
             # TO-DO: this actually includes calling 'index' attribute overload, should really be S._index,
-            # but this requires separate type (e.g. DefaultIndexType) instead of types.none as default index
+            # but this requires separate type (e.g. PositionalIndexType) instead of types.none as default index
             return S.index
 
         n = 11
@@ -193,7 +202,7 @@ class TestIndexes(
                 result_ref = test_impl(series_data, index)
                 pd.testing.assert_series_equal(result, result_ref)
 
-    def test_indexes_index_get_series_index(self):
+    def test_indexes_get_series_index(self):
         def test_impl(S):
             return S.index
         sdc_func = self.jit(test_impl)
@@ -206,11 +215,11 @@ class TestIndexes(
                 result_ref = test_impl(S)
                 self.assert_indexes_equal(result, result_ref)
 
-    def test_indexes_index_unbox_df_with_index(self):
+    def test_indexes_unbox_df_with_index(self):
         @self.jit
         def test_impl(df):
             # TO-DO: this actually includes calling 'index' attribute overload, should really be df._index,
-            # but this requires separate type (e.g. DefaultIndexType) instead of types.none as default index
+            # but this requires separate type (e.g. PositionalIndexType) instead of types.none as default index
             return df.index
 
         n = 11
@@ -221,7 +230,7 @@ class TestIndexes(
                 result = test_impl(df)
                 self.assert_indexes_equal(result, expected_res)
 
-    def test_indexes_index_create_df_with_index(self):
+    def test_indexes_create_df_with_index(self):
         @self.jit
         def test_impl(A, B, index):
             df = pd.DataFrame({'A': A, 'B': B}, index=index)
@@ -235,7 +244,7 @@ class TestIndexes(
                 result = test_impl(A, B, index)
                 self.assert_indexes_equal(result, expected_res)
 
-    def test_indexes_index_box_df_with_index(self):
+    def test_indexes_box_df_with_index(self):
         def test_impl(A, B, index):
             return pd.DataFrame({'A': A, 'B': B}, index=index)
         sdc_func = self.jit(test_impl)
@@ -248,7 +257,7 @@ class TestIndexes(
                 result_ref = test_impl(A, B, index)
                 pd.testing.assert_frame_equal(result, result_ref)
 
-    def test_indexes_index_get_df_index(self):
+    def test_indexes_get_df_index(self):
         def test_impl(df):
             return df.index
         sdc_func = self.jit(test_impl)
@@ -260,6 +269,107 @@ class TestIndexes(
                 result = sdc_func(df)
                 result_ref = test_impl(df)
                 self.assert_indexes_equal(result, result_ref)
+
+    def test_indexes_support_numpy_like_take_by(self):
+        """ Verifies numpy_like.take can handle SDC index types as indices """
+
+        from sdc.functions import numpy_like
+
+        def pyfunc(arr, index):
+            return np.take(arr, index)
+
+        @self.jit
+        def sdc_func(arr, index):
+            return numpy_like.take(arr, index)
+
+        n, k = 1000, 200
+        np.random.seed(0)
+        arr = np.arange(n) * 2
+        indexes_to_test = [
+            get_sample_index(k, PositionalIndexType),
+            get_sample_index(k, RangeIndexType),
+            get_sample_index(k, Int64IndexType),
+        ]
+        for index in indexes_to_test:
+            with self.subTest(index=index):
+                result = sdc_func(arr, index)
+                result_ref = pyfunc(arr, index)
+                np.testing.assert_array_equal(result, result_ref)
+
+    def test_indexes_support_series_operator_add(self):
+        def test_impl(data, index1, index2):
+            S1 = pd.Series(data, index=index1)
+            S2 = pd.Series(2 * data + 1, index=index2)
+            return S1 + S2
+        sdc_func = self.jit(test_impl)
+
+        n = 11
+        series_data = np.arange(n, dtype=np.float64)
+        index_params_to_test = [
+            None,
+            pd.RangeIndex(0, -n, -1),
+            pd.Int64Index(np.arange(n) * 2),
+        ]
+
+        for index1, index2 in product(index_params_to_test, repeat=2):
+            with self.subTest(index1=index1, index2=index2):
+                result = sdc_func(series_data, index1, index2)
+                result_ref = test_impl(series_data, index1, index2)
+                pd.testing.assert_series_equal(result, result_ref, check_dtype=False)
+
+    def test_indexes_support_series_operator_lt(self):
+        def test_impl(data, index1, index2):
+            S1 = pd.Series(data, index=index1)
+            S2 = pd.Series(2 * data + 1, index=index2)
+            return S1 < S2
+        sdc_func = self.jit(test_impl)
+
+        n = 11
+        series_data = np.arange(n, dtype=np.float64)
+        index_params_to_test = [
+            None,
+            pd.RangeIndex(0, -n, -1),
+            pd.Int64Index(np.arange(n) * 2),
+        ]
+
+        for index1 in index_params_to_test:
+            index2 = index1
+            with self.subTest(index1=index1, index2=index2):
+                result = sdc_func(series_data, index1, index2)
+                result_ref = test_impl(series_data, index1, index2)
+                pd.testing.assert_series_equal(result, result_ref, check_dtype=False)
+
+    def test_indexes_support_series_reindexing(self):
+        from sdc.datatypes.common_functions import sdc_reindex_series
+
+        def pyfunc(data, index, name, by_index):
+            S = pd.Series(data, index, name=name)
+            return S.reindex(by_index)
+
+        @self.jit
+        def sdc_func(data, index, name, by_index):
+            return sdc_reindex_series(data, index, name, by_index)
+
+        n = 17
+        np.random.seed(0)
+        mask = np.random.choice([True, False], n)
+        name = 'asdf'
+
+        range_index = pd.RangeIndex(n)
+        int64_index = pd.Int64Index(np.random.choice(range_index.values, n, replace=False))
+        indexes_combinations = [
+            (range_index, range_index),
+            (range_index, range_index[::-1]),
+            (range_index[::-1], range_index),
+            (range_index, int64_index),
+            (int64_index, range_index),
+        ]
+
+        for index1, index2 in indexes_combinations:
+            with self.subTest(index1=index1, index2=index2):
+                result = sdc_func(mask, index1, name, index2)
+                result_ref = pyfunc(mask, index1, name, index2)
+                pd.testing.assert_series_equal(result, result_ref)
 
 
 if __name__ == "__main__":

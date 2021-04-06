@@ -36,15 +36,22 @@ from numba.extending import (typeof_impl, NativeValue, intrinsic, box, unbox, lo
 from numba.core.errors import TypingError
 from numba.core.typing.templates import signature
 from numba.core.imputils import impl_ret_untracked, call_getiter
-
-from sdc.datatypes.range_index_type import RangeIndexType
-from sdc.datatypes.int64_index_type import Int64IndexType
-from sdc.utilities.utils import sdc_overload, sdc_overload_attribute, sdc_overload_method
-from sdc.utilities.sdc_typing_utils import TypeChecker, check_is_numeric_array, check_signed_integer
-from sdc.functions import numpy_like
 from numba.core.boxing import box_array, unbox_array
+
+from sdc.datatypes.indexes import *
+from sdc.utilities.sdc_typing_utils import SDCLimitation
+from sdc.utilities.utils import sdc_overload, sdc_overload_attribute, sdc_overload_method, BooleanLiteral
+from sdc.utilities.sdc_typing_utils import (
+        TypeChecker,
+        check_signed_integer,
+        _check_dtype_param_type,
+        sdc_pandas_index_types,
+        check_types_comparable,
+    )
+from sdc.functions import numpy_like
 from sdc.hiframes.api import fix_df_index
-from sdc.extensions.indexes.indexes_generic import _check_dtype_param_type
+from sdc.extensions.indexes.indexes_generic import *
+from sdc.datatypes.common_functions import hpat_arrays_append
 
 
 @intrinsic
@@ -90,8 +97,9 @@ def pd_int64_index_overload(data, dtype=None, copy=False, name=None):
     _func_name = 'pd.Int64Index().'
     ty_checker = TypeChecker(_func_name)
 
+    convertible_indexes = (PositionalIndexType, RangeIndexType, Int64IndexType)
     if not (isinstance(data, (types.Array, types.List)) and isinstance(data.dtype, types.Integer)
-            or isinstance(data, (RangeIndexType, Int64IndexType))):
+            or isinstance(data, convertible_indexes)):
         ty_checker.raise_exc(data, 'array/list of integers or integer index', 'data')
 
     dtype_is_number_class = isinstance(dtype, types.NumberClass)
@@ -108,7 +116,7 @@ def pd_int64_index_overload(data, dtype=None, copy=False, name=None):
         ty_checker.raise_exc(name, 'string or none', 'name')
 
     is_data_array = isinstance(data, types.Array)
-    is_data_index = isinstance(data, (RangeIndexType, Int64IndexType))
+    is_data_index = isinstance(data, convertible_indexes)
     data_dtype_is_int64 = data.dtype is types.int64
 
     def pd_int64_index_ctor_impl(data, dtype=None, copy=False, name=None):
@@ -123,6 +131,7 @@ def pd_int64_index_overload(data, dtype=None, copy=False, name=None):
         elif is_data_index == True:  # noqa
             _data = data.values
         else:
+            # using fix_df_index to get array since it handles index=None
             _data = fix_df_index(data)._data
 
         if data_dtype_is_int64 == False:  # noqa
@@ -212,10 +221,8 @@ def pd_int64_index_dtype_overload(self):
     if not isinstance(self, Int64IndexType):
         return None
 
-    range_index_dtype = self.dtype
-
     def pd_int64_index_dtype_impl(self):
-        return range_index_dtype
+        return sdc_indexes_attribute_dtype(self)
 
     return pd_int64_index_dtype_impl
 
@@ -276,7 +283,7 @@ def pd_int64_index_copy_overload(self, name=None, deep=False, dtype=None):
     if not (isinstance(name, (types.NoneType, types.Omitted, types.UnicodeType)) or name is None):
         ty_checker.raise_exc(name, 'string or none', 'name')
 
-    if not (isinstance(deep, (types.Omitted, types.Boolean)) or deep is False):
+    if not (isinstance(deep, (types.NoneType, types.Omitted, types.Boolean)) or deep is False):
         ty_checker.raise_exc(deep, 'boolean', 'deep')
 
     if not _check_dtype_param_type(dtype):
@@ -326,29 +333,25 @@ def pd_int64_index_getitem_overload(self, idx):
         return pd_int64_index_getitem_impl
 
 
-# TO-DO: this and many other impls are generic and should be moved to indexes_generic.py
 @sdc_overload(operator.eq)
 def pd_int64_index_eq_overload(self, other):
 
-    self_is_index = isinstance(self, Int64IndexType)
-    other_is_index = isinstance(other, Int64IndexType)
+    _func_name = 'Operator eq.'
+    if not check_types_comparable(self, other):
+        raise TypingError('{} Not allowed for non comparable indexes. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if not (self_is_index and other_is_index
-            or (self_is_index and (check_is_numeric_array(other) or isinstance(other, types.Number)))
-            or ((check_is_numeric_array(self) or isinstance(self, types.Number)) and other_is_index)):
+    self_is_int64_index = isinstance(self, Int64IndexType)
+    other_is_int64_index = isinstance(other, Int64IndexType)
+
+    possible_arg_types = (types.Array, types.Number) + sdc_pandas_index_types
+    if not (self_is_int64_index and other_is_int64_index
+            or (self_is_int64_index and isinstance(other, possible_arg_types))
+            or (isinstance(self, possible_arg_types) and other_is_int64_index)):
         return None
-    one_operand_is_scalar = isinstance(self, types.Number) or isinstance(other, types.Number)
 
     def pd_int64_index_eq_impl(self, other):
-
-        if one_operand_is_scalar == False:  # noqa
-            if len(self) != len(other):
-                raise ValueError("Lengths must match to compare")
-
-        # names do not matter when comparing pd.Int64Index
-        left = self.values if self_is_index == True else self  # noqa
-        right = other.values if other_is_index == True else other  # noqa
-        return list(left == right)  # FIXME_Numba#5157: result must be np.array, remove list when Numba is fixed
+        return sdc_indexes_operator_eq(self, other)
 
     return pd_int64_index_eq_impl
 
@@ -356,12 +359,18 @@ def pd_int64_index_eq_overload(self, other):
 @sdc_overload(operator.ne)
 def pd_int64_index_ne_overload(self, other):
 
-    self_is_index = isinstance(self, Int64IndexType)
-    other_is_index = isinstance(other, Int64IndexType)
+    _func_name = 'Operator ne.'
+    if not check_types_comparable(self, other):
+        raise TypingError('{} Not allowed for non comparable indexes. \
+        Given: self={}, other={}'.format(_func_name, self, other))
 
-    if not (self_is_index and other_is_index
-            or (self_is_index and (check_is_numeric_array(other) or isinstance(other, types.Number)))
-            or ((check_is_numeric_array(self) or isinstance(self, types.Number)) and other_is_index)):
+    self_is_int64_index = isinstance(self, Int64IndexType)
+    other_is_int64_index = isinstance(other, Int64IndexType)
+
+    possible_arg_types = (types.Array, types.Number) + sdc_pandas_index_types
+    if not (self_is_int64_index and other_is_int64_index
+            or (self_is_int64_index and isinstance(other, possible_arg_types))
+            or (isinstance(self, possible_arg_types) and other_is_int64_index)):
         return None
 
     def pd_int64_index_ne_impl(self, other):
@@ -401,7 +410,6 @@ def pd_int64_index_ravel_overload(self, order='C'):
 
     _func_name = 'Method ravel().'
 
-    # np.ravel argument order is not supported in Numba
     if not (isinstance(order, (types.Omitted, types.StringLiteral, types.UnicodeType)) or order == 'C'):
         raise TypingError('{} Unsupported parameters. Given order: {}'.format(_func_name, order))
 
@@ -413,3 +421,142 @@ def pd_int64_index_ravel_overload(self, order='C'):
         return self.values
 
     return pd_int64_index_ravel_impl
+
+
+@sdc_overload_method(Int64IndexType, 'equals')
+def pd_int64_index_equals_overload(self, other):
+    if not isinstance(self, Int64IndexType):
+        return None
+
+    _func_name = 'Method equals().'
+    if not isinstance(other, sdc_pandas_index_types):
+        raise SDCLimitation(f"{_func_name} Unsupported parameter. Given 'other': {other}")
+
+    if not check_types_comparable(self, other):
+        raise TypingError('{} Not allowed for non comparable indexes. \
+        Given: self={}, other={}'.format(_func_name, self, other))
+
+    def pd_int64_index_equals_impl(self, other):
+        return sdc_numeric_indexes_equals(self, other)
+
+    return pd_int64_index_equals_impl
+
+
+@sdc_overload_method(Int64IndexType, 'reindex')
+def pd_int64_index_reindex_overload(self, target, method=None, level=None, limit=None, tolerance=None):
+    if not isinstance(self, Int64IndexType):
+        return None
+
+    _func_name = 'Method reindex().'
+    if not isinstance(target, sdc_pandas_index_types):
+        raise SDCLimitation(f"{_func_name} Unsupported parameter. Given 'target': {target}")
+
+    if not check_types_comparable(self, target):
+        raise TypingError('{} Not allowed for non comparable indexes. \
+        Given: self={}, target={}'.format(_func_name, self, target))
+
+    def pd_int64_index_reindex_impl(self, target, method=None, level=None, limit=None, tolerance=None):
+        return sdc_indexes_reindex(self, target=target, method=method, level=level, tolerance=tolerance)
+
+    return pd_int64_index_reindex_impl
+
+
+@sdc_overload_method(Int64IndexType, 'take')
+def pd_int64_index_take_overload(self, indexes):
+    if not isinstance(self, Int64IndexType):
+        return None
+
+    _func_name = 'Method take().'
+    ty_checker = TypeChecker(_func_name)
+
+    valid_indexes_types = (types.Array, types.List, types.ListType) + sdc_pandas_index_types
+    if not (isinstance(indexes, valid_indexes_types)
+            and isinstance(indexes.dtype, (types.Integer, types.ListType))):
+        ty_checker.raise_exc(indexes, 'array/list of integers or integer index', 'indexes')
+
+    # separate handling when indexes is nested lists produces with parallel impls
+    if isinstance(indexes.dtype, types.ListType):
+        def pd_int64_index_take_chunked_impl(self, indexes):
+            new_index_data = numpy_like.take(self.values, indexes)
+            return pd.Int64Index(new_index_data, name=self._name)
+
+        return pd_int64_index_take_chunked_impl
+
+    convert_target = isinstance(indexes, sdc_pandas_index_types) and not isinstance(indexes, types.Array)
+
+    def pd_int64_index_take_impl(self, indexes):
+        _indexes = indexes.values if convert_target == True else indexes  # noqa
+        new_index_data = numpy_like.take(self._data, _indexes)
+        return pd.Int64Index(new_index_data, name=self._name)
+
+    return pd_int64_index_take_impl
+
+
+@sdc_overload_method(Int64IndexType, 'append')
+def pd_int64_index_append_overload(self, other):
+    if not isinstance(self, Int64IndexType):
+        return None
+
+    _func_name = 'Method append().'
+    ty_checker = TypeChecker(_func_name)
+
+    if not isinstance(other, sdc_pandas_index_types):
+        ty_checker.raise_exc(other, 'pandas index', 'other')
+
+    if not check_types_comparable(self, other):
+        raise TypingError('{} Not allowed for non comparable indexes. \
+        Given: self={}, other={}'.format(_func_name, self, other))
+
+    convert_other = not isinstance(other, types.Array)
+    _, res_index_dtype = find_index_common_dtype(self, other)
+    return_as_array_index = res_index_dtype is not types.int64
+
+    def pd_int64_index_append_impl(self, other):
+        _other = other.values if convert_other == True else other  # noqa
+        new_index_data = hpat_arrays_append(self._data, _other)
+        # this is only needed while some indexes are represented with arrays
+        # TO-DO: support pd.Index() overload with dtype arg to create indexes
+        if return_as_array_index == False:  # noqa
+            return pd.Int64Index(new_index_data)
+        else:
+            return new_index_data
+
+    return pd_int64_index_append_impl
+
+
+@sdc_overload_method(Int64IndexType, 'join')
+def pd_int64_index_join_overload(self, other, how, level=None, return_indexers=False, sort=False):
+    if not isinstance(self, Int64IndexType):
+        return None
+
+    _func_name = 'Method join().'
+    ty_checker = TypeChecker(_func_name)
+
+    if not isinstance(other, sdc_pandas_index_types):
+        ty_checker.raise_exc(other, 'pandas index', 'other')
+
+    if not isinstance(how, types.StringLiteral):
+        ty_checker.raise_exc(how, 'string', 'how')
+    if not how.literal_value == 'outer':
+        raise SDCLimitation(f"{_func_name} Only supporting 'outer' now. Given 'how': {how.literal_value}")
+
+    if not (isinstance(level, (types.Omitted, types.NoneType)) or level is None):
+        ty_checker.raise_exc(level, 'None', 'level')
+
+    if not (isinstance(return_indexers, (types.Omitted, BooleanLiteral)) or return_indexers is False):
+        ty_checker.raise_exc(return_indexers, 'boolean', 'return_indexers')
+
+    if not (isinstance(sort, (types.Omitted, types.Boolean)) or sort is False):
+        ty_checker.raise_exc(sort, 'boolean', 'sort')
+
+    _return_indexers = return_indexers.literal_value
+
+    def pd_int64_index_join_impl(self, other, how, level=None, return_indexers=False, sort=False):
+
+        if _return_indexers == True:  # noqa
+            return sdc_indexes_join_outer(self, other)
+        else:
+            joined_index, = sdc_indexes_join_outer(self, other)
+            return joined_index
+
+    return pd_int64_index_join_impl

@@ -1157,6 +1157,22 @@ class TestSeries_ops(TestCase):
                 result_ref = test_impl(S1, scalar, fill_value)
                 pd.testing.assert_series_equal(result, result_ref)
 
+    @skip_numba_jit("Expected to fail due to type-stability of index operations")
+    def test_series_operator_add_index_type_check(self):
+        def test_impl(S1, S2):
+            return S1 + S2
+        hpat_func = self.jit(test_impl)
+
+        n = 11
+        series_data = np.arange(n, dtype=np.float64)
+        index_data = pd.RangeIndex(n, 0, -1)
+        S1 = pd.Series(series_data, index_data)
+        S2 = pd.Series(2 * series_data + 1, index_data)
+        result = hpat_func(S1, S2)
+        result_ref = test_impl(S1, S2)
+        pd.testing.assert_series_equal(result, result_ref)
+        pd.testing.assert_index_equal(result.index, result_ref.index, exact=True)
+
 
 if __name__ == "__main__":
     unittest.main()
