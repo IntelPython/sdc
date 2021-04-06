@@ -53,6 +53,11 @@ sdc_pandas_index_types = (
     )
 
 
+class SDCLimitation(Exception):
+    """Exception to be raised in case of SDC limitation"""
+    pass
+
+
 class TypeChecker:
     """
         Validate object type and raise TypingError if the type is invalid, e.g.:
@@ -60,7 +65,7 @@ class TypeChecker:
              given: bool
              expected: int
     """
-    msg_template = '{} The object {}\n given: {}\n expected: {}'
+    default_tmpl = '{} The object {}\n given: {}\n expected: {}'
 
     def __init__(self, func_name):
         """
@@ -71,9 +76,23 @@ class TypeChecker:
         """
         self.func_name = func_name
 
-    def raise_exc(self, data, expected_types, name=''):
+    def _raise_exc(self, exc_cls, tmpl, *args):
         """
-        Raise exception with unified message
+        Generic for raising exception
+        Parameters
+        ----------
+        tmpl: :obj:`any`
+            template for exception message
+        exc_cls: :obj:`Exception`
+            class of the exception to be raised
+        args: :obj:`list`
+            arguments to render template
+        """
+        raise exc_cls(tmpl.format(*args))
+
+    def raise_exc(self, data, expected_types, name='', exc_cls=TypingError):
+        """
+        Raise exception with message about invalid type of parameter
         Parameters
         ----------
         data: :obj:`any`
@@ -82,9 +101,26 @@ class TypeChecker:
             expected types inserting directly to the exception
         name: :obj:`str`
             name of the parameter
+        exc_cls: :obj:`Exception`
+            class of the exception to be raised
         """
-        msg = self.msg_template.format(self.func_name, name, data, expected_types)
-        raise TypingError(msg)
+        self._raise_exc(exc_cls, self.default_tmpl, self.func_name,
+                        name, data, expected_types)
+
+    def raise_unsupported_exc(self, data, name='', exc_cls=SDCLimitation):
+        """
+        Raise exception with message about unsupported parameter
+        Parameters
+        ----------
+        data: :obj:`any`
+            real type of the data
+        name: :obj:`str`
+            name of the parameter
+        exc_cls: :obj:`Exception`
+            class of the exception to be raised
+        """
+        tmpl = '{} Unsupported object {}\n given: {}'
+        self._raise_exc(exc_cls, tmpl, self.func_name, name, data)
 
     def check(self, data, accepted_type, name=''):
         """

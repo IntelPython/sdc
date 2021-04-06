@@ -61,11 +61,6 @@ from sdc.utilities.sdc_typing_utils import (
 from sdc.utilities.sdc_typing_utils import sdc_pandas_index_types
 
 
-class SDCLimitation(Exception):
-    """Exception to be raised in case of SDC limitation"""
-    pass
-
-
 def hpat_arrays_append(A, B):
     pass
 

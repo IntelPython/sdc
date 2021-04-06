@@ -39,7 +39,7 @@ from numba.core.errors import TypingError
 from pandas.core.indexing import IndexingError
 
 import sdc
-from sdc.datatypes.common_functions import SDCLimitation
+from sdc.utilities.sdc_typing_utils import SDCLimitation
 from sdc.tests.gen_test_data import ParquetGenerator
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (check_numba_version,
