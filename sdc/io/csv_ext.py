@@ -61,6 +61,8 @@ from sdc.types import Categorical
 
 import pyarrow
 import pyarrow.csv
+from sdc.datatypes.indexes.empty_index_type import EmptyIndexType
+from sdc.datatypes.indexes.positional_index_type import PositionalIndexType
 
 
 class CsvReader(ir.Stmt):
@@ -524,9 +526,10 @@ def _gen_pandas_read_csv_func_text(col_names, col_typs, py_col_dtypes, usecols, 
     return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
 
     column_loc, _, _ = get_structure_maps(col_typs, return_columns)
+    index_type = PositionalIndexType(False) if col_typs else EmptyIndexType(False)
     df_type = DataFrameType(
         tuple(col_typs),
-        types.none,
+        index_type,
         tuple(col_names),
         column_loc=column_loc
     )

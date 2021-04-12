@@ -54,11 +54,13 @@ from .. import hstr_ext
 import llvmlite.binding as ll
 from llvmlite import ir as lir
 from llvmlite.llvmpy.core import Type as LLType
-from sdc.datatypes.range_index_type import RangeIndexType
-from sdc.datatypes.int64_index_type import Int64IndexType
+
+from sdc.datatypes.indexes import *
 from sdc.extensions.indexes.range_index_ext import box_range_index, unbox_range_index
+from sdc.extensions.indexes.empty_index_ext import box_empty_index, unbox_empty_index
 from sdc.extensions.indexes.int64_index_ext import box_int64_index, unbox_int64_index
 from sdc.str_arr_type import StringArrayType
+from sdc.extensions.indexes.positional_index_ext import unbox_positional_index, box_positional_index
 ll.add_symbol('array_size', hstr_ext.array_size)
 ll.add_symbol('array_getptr1', hstr_ext.array_getptr1)
 
@@ -195,17 +197,15 @@ def _infer_series_list_dtype(S):
 def _infer_index_type(index):
     """ Deduces native Numba type used to represent index Python object """
 
+    index_is_named = index.name is not None
     # more specific types go first (e.g. RangeIndex is subtype of Int64Index)
     if isinstance(index, pd.RangeIndex):
         # depending on actual index value unbox to diff types: none-index if it matches
         # positions or to RangeIndexType in general case
-        if (index.start == 0 and index.step == 1 and index.name is None):
-            return types.none
+        if (index.start == 0 and index.step == 1):
+            return PositionalIndexType(is_named=index_is_named)
         else:
-            if index.name is None:
-                return RangeIndexType()
-            else:
-                return RangeIndexType(is_named=True)
+            return RangeIndexType(is_named=index_is_named)
 
     # for unsupported pandas indexes we explicitly unbox to None
     if isinstance(index, pd.DatetimeIndex):
@@ -213,16 +213,16 @@ def _infer_index_type(index):
 
     if isinstance(index, pd.Int64Index):
         index_data_type = numba.typeof(index._data)
-        if index.name is None:
-            return Int64IndexType(index_data_type)
-        else:
-            return Int64IndexType(index_data_type, is_named=True)
+        return Int64IndexType(index_data_type, is_named=index_is_named)
 
     if index.dtype == np.dtype('O'):
         # TO-DO: should we check that all elements are strings?
         if len(index) > 0 and isinstance(index[0], str):
             return string_array_type
+        elif len(index) == 0:
+            return EmptyIndexType(is_named=index_is_named)
         else:
+            assert False, f"Unboxing failed: cannot infer type for index:\n\t{index}"
             return types.none
 
     numba_index_type = numpy_support.from_dtype(index.dtype)
@@ -276,11 +276,9 @@ def box_dataframe(typ, val, c):
     df_obj = pyapi.call_method(class_obj, "DataFrame", (df_dict,))
     pyapi.decref(df_dict)
 
-    # set df.index if necessary
-    if typ.index != types.none:
-        index_obj = _box_index_data(typ.index, dataframe.index, c)
-        pyapi.object_setattr_string(df_obj, 'index', index_obj)
-        pyapi.decref(index_obj)
+    index_obj = _box_index_data(typ.index, dataframe.index, c)
+    pyapi.object_setattr_string(df_obj, 'index', index_obj)
+    pyapi.decref(index_obj)
 
     for arrays_list_obj in arrays_list_objs.values():
         pyapi.decref(arrays_list_obj)
@@ -332,6 +330,13 @@ def _unbox_index_data(index_typ, index_obj, c):
             c: LLVM context object
         Returns: LLVM instructions to generate native value
     """
+
+    if isinstance(index_typ, EmptyIndexType):
+        return unbox_empty_index(index_typ, index_obj, c)
+
+    if isinstance(index_typ, PositionalIndexType):
+        return unbox_positional_index(index_typ, index_obj, c)
+
     if isinstance(index_typ, RangeIndexType):
         return unbox_range_index(index_typ, index_obj, c)
 
@@ -350,6 +355,7 @@ def _unbox_index_data(index_typ, index_obj, c):
         return res
 
     if isinstance(index_typ, types.NoneType):
+        assert False, "unboxing to None index!"
         return unbox_none(index_typ, index_obj, c)
 
     assert False, f"_unbox_index_data: unexpected index type({index_typ}) while unboxing"
@@ -399,11 +405,7 @@ def box_series(typ, val, c):
         typ)(c.context, c.builder, val)
 
     arr = _box_series_data(dtype, typ.data, series.data, c)
-
-    if typ.index is types.none:
-        index = c.pyapi.make_none()
-    else:
-        index = _box_index_data(typ.index, series.index, c)
+    index = _box_index_data(typ.index, series.index, c)
 
     if typ.is_named:
         name = c.pyapi.from_native_value(string_type, series.name)
@@ -456,7 +458,11 @@ def _box_index_data(index_typ, val, c):
     """
     assert isinstance(index_typ, sdc_pandas_index_types)
 
-    if isinstance(index_typ, RangeIndexType):
+    if isinstance(index_typ, EmptyIndexType):
+        index = box_empty_index(index_typ, val, c)
+    elif isinstance(index_typ, PositionalIndexType):
+        index = box_positional_index(index_typ, val, c)
+    elif isinstance(index_typ, RangeIndexType):
         index = box_range_index(index_typ, val, c)
     elif isinstance(index_typ, Int64IndexType):
         index = box_int64_index(index_typ, val, c)
@@ -464,8 +470,8 @@ def _box_index_data(index_typ, val, c):
         index = box_array(index_typ, val, c)
     elif isinstance(index_typ, StringArrayType):
         index = box_str_arr(string_array_type, val, c)
-    else:  # index_typ is types.none
-        index = c.pyapi.make_none()
+    else:
+        assert False, f"_box_index_data called with unknown index type: {index_typ}"
 
     return index
 

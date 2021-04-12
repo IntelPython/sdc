@@ -24,8 +24,9 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from sdc.tests.indexes.test_empty_index import TestEmptyIndex
-from sdc.tests.indexes.test_range_index import TestRangeIndex
-from sdc.tests.indexes.test_positional_index import TestPositionalIndex
-from sdc.tests.indexes.test_int64_index import TestInt64Index
-from sdc.tests.indexes.test_indexes import TestIndexes
+# modules are dependent on each other e.g. positional_index_type
+# needs range_index_type to be imported, so below order matters
+from .range_index_type import RangeIndexType
+from .positional_index_type import PositionalIndexType
+from .empty_index_type import EmptyIndexType
+from .int64_index_type import Int64IndexType
