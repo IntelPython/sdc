@@ -1,6 +1,6 @@
-{% set NUMBA_VERSION = "==0.51.2" %}
-{% set PANDAS_VERSION = "==1.0.5" %}
-{% set PYARROW_VERSION = "==0.17.0" %}
+{% set NUMBA_VERSION = "==0.52.0" %}
+{% set PANDAS_VERSION = "==1.2.0" %}
+{% set PYARROW_VERSION = "==2.0.0" %}
 
 package:
   name: sdc
@@ -13,13 +13,13 @@ build:
   number: {{ GIT_DESCRIBE_NUMBER|int }}
   script_env:
     - SDC_CONFIG_PIPELINE_SDC
+    - WHEELS_OUTPUT_FOLDER
 
 requirements:
   build:
     - {{ compiler('c') }}      # [not osx]
     - {{ compiler('cxx') }}    # [not osx]
-    - wheel
-    - python
+    - numba   {{ NUMBA_VERSION }}
 
   host:
     - python
@@ -43,24 +43,6 @@ requirements:
 test:
   imports:
     - sdc
-
-outputs:
-  - type: conda
-    name: sdc
-  - type: wheel
-    name: sdc
-    requirements:
-      build:
-        - {{ compiler('c') }}     # [not osx]
-        - {{ compiler('cxx') }}   # [not osx]
-        - python
-        - wheel
-        - setuptools
-        - numba   {{ NUMBA_VERSION }}
-        - numpy
-        - pandas  {{ PANDAS_VERSION }}
-        - pyarrow {{ PYARROW_VERSION }}
-        - tbb-devel
 
 about:
   home: https://github.com/IntelPython/sdc

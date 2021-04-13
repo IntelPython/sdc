@@ -1,6 +1,9 @@
-**********************************
+*****
+Sdc
+*****
+
 Intel® Scalable Dataframe Compiler
-**********************************
+###################################################
 
 .. image:: https://travis-ci.com/IntelPython/sdc.svg?branch=master
     :target: https://travis-ci.com/IntelPython/sdc
@@ -21,7 +24,7 @@ Intel® Scalable Dataframe Compiler (Intel® SDC) is an extension of `Numba*`_
 that enables compilation of `Pandas*`_ operations. It automatically vectorizes and parallelizes
 the code by leveraging modern hardware instructions and by utilizing all available cores.
 
-Intel® SDC documentation can be found `here <https://intelpython.github.io/sdc-doc/>`_.
+Intel® SDC documentation can be found `here <https://intelpython.github.io/sdc-doc/>`__.
 
 .. note::
     For maximum performance and stability, please use numba from ``intel/label/beta`` channel.
@@ -34,13 +37,13 @@ Distribution includes Intel® SDC for Python 3.6 and Python 3.7 for Windows and 
 
 Intel® SDC conda package can be installed using the steps below::
 
-    > conda create -n sdc-env python=<3.7 or 3.6> pyarrow=0.17.0 pandas=1.0.5 -c anaconda -c conda-forge
+    > conda create -n sdc-env python=<3.7 or 3.6> pyarrow=2.0.0 pandas=1.2.0 -c anaconda -c conda-forge
     > conda activate sdc-env
     > conda install sdc -c intel/label/beta -c intel -c defaults -c conda-forge --override-channels
 
 Intel® SDC wheel package can be installed using the steps below::
 
-    > conda create -n sdc-env python=<3.7 or 3.6> pip pyarrow=0.17.0 pandas=1.0.5 -c anaconda -c conda-forge
+    > conda create -n sdc-env python=<3.7 or 3.6> pip pyarrow=2.0.0 pandas=1.2.0 -c anaconda -c conda-forge
     > conda activate sdc-env
     > pip install --index-url https://pypi.anaconda.org/intel/label/beta/simple --extra-index-url https://pypi.anaconda.org/intel/simple --extra-index-url https://pypi.org/simple sdc
 
@@ -82,7 +85,7 @@ Building on Linux with setuptools
 
     export PYVER=<3.6 or 3.7>
     export NUMPYVER=<1.16 or 1.17>
-    conda create -n sdc-env -q -y -c intel/label/beta -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER tbb-devel tbb4py numba=0.49 pandas=1.0.5 pyarrow=0.17.0 gcc_linux-64 gxx_linux-64
+    conda create -n sdc-env -q -y -c intel/label/beta -c defaults -c intel -c conda-forge python=$PYVER numpy=$NUMPYVER tbb-devel tbb4py numba=0.52 pandas=1.2.0 pyarrow=2.0.0 gcc_linux-64 gxx_linux-64
     source activate sdc-env
     git clone https://github.com/IntelPython/sdc.git
     cd sdc
@@ -120,7 +123,7 @@ Building on Windows with setuptools
 
     set PYVER=<3.6 or 3.7>
     set NUMPYVER=<1.16 or 1.17>
-    conda create -n sdc-env -c intel/label/beta -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% tbb-devel tbb4py numba=0.49 pandas=1.0.5 pyarrow=0.17.0
+    conda create -n sdc-env -c intel/label/beta -c defaults -c intel -c conda-forge python=%PYVER% numpy=%NUMPYVER% tbb-devel tbb4py numba=0.52 pandas=1.2.0 pyarrow=2.0.0
     conda activate sdc-env
     set INCLUDE=%INCLUDE%;%CONDA_PREFIX%\Library\include
     set LIB=%LIB%;%CONDA_PREFIX%\Library\lib
@@ -171,7 +174,7 @@ The built documentation will be located in the ``./sdc/docs/build/html`` directo
 To preview the documentation open ``index.html`` file.
 
 
-More information about building and adding documentation can be found `here <docs/README.rst>`_.
+More information about building and adding documentation can be found `here <docs/README.rst>`__.
 
 
 Running unit tests

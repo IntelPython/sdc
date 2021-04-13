@@ -33,23 +33,24 @@ import pandas as pd
 from numba import types
 from numba.core import cgutils
 from numba.extending import (typeof_impl, NativeValue, intrinsic, box, unbox, lower_builtin, )
-
+from numba.core.errors import TypingError
 from numba.core.typing.templates import signature
 from numba.core.imputils import impl_ret_untracked, call_getiter
 
-from sdc.datatypes.range_index_type import RangeIndexType, RangeIndexDataType
-from sdc.datatypes.common_functions import SDCLimitation, _sdc_take
-from sdc.utilities.utils import sdc_overload, sdc_overload_attribute, sdc_overload_method
-from sdc.utilities.sdc_typing_utils import TypeChecker, check_is_numeric_array
-from sdc.functions.numpy_like import getitem_by_mask
-
-
-def _check_dtype_param_type(dtype):
-    """ Returns True is dtype is a valid type for dtype parameter and False otherwise.
-        Used in RangeIndex ctor and other methods that take dtype parameter. """
-
-    valid_dtype_types = (types.NoneType, types.Omitted, types.UnicodeType, types.NumberClass)
-    return isinstance(dtype, valid_dtype_types) or dtype is None
+from sdc.datatypes.indexes import PositionalIndexType, RangeIndexType
+from sdc.datatypes.indexes.range_index_type import RangeIndexDataType
+from sdc.utilities.sdc_typing_utils import SDCLimitation
+from sdc.utilities.utils import sdc_overload, sdc_overload_attribute, sdc_overload_method, BooleanLiteral
+from sdc.utilities.sdc_typing_utils import (
+                                    TypeChecker,
+                                    check_signed_integer,
+                                    sdc_pandas_index_types,
+                                    check_types_comparable,
+                                    _check_dtype_param_type,
+                                    sdc_indexes_range_like,
+                                )
+from sdc.functions import numpy_like
+from sdc.extensions.indexes.indexes_generic import *
 
 
 @intrinsic
@@ -96,8 +97,9 @@ def pd_range_index_overload(start=None, stop=None, step=None, dtype=None, copy=F
     if not (isinstance(copy, types.Omitted) or fastpath is None):
         raise SDCLimitation(f"{_func_name} Unsupported parameter. Given 'fastpath': {fastpath}")
 
-    dtype_is_np_int64 = dtype is types.NumberClass(types.int64)
-    dtype_is_np_int32 = dtype is types.NumberClass(types.int32)
+    dtype_is_number_class = isinstance(dtype, types.NumberClass)
+    dtype_is_numpy_signed_int = (check_signed_integer(dtype)
+                                 or dtype_is_number_class and check_signed_integer(dtype.dtype))
     dtype_is_unicode_str = isinstance(dtype, (types.UnicodeType, types.StringLiteral))
     if not _check_dtype_param_type(dtype):
         ty_checker.raise_exc(dtype, 'int64 dtype', 'dtype')
@@ -125,10 +127,8 @@ def pd_range_index_overload(start=None, stop=None, step=None, dtype=None, copy=F
     def pd_range_index_ctor_impl(start=None, stop=None, step=None, dtype=None, copy=False, name=None, fastpath=None):
 
         if not (dtype is None
-                or dtype_is_unicode_str and dtype == 'int64'
-                or dtype_is_unicode_str and dtype == 'int32'
-                or dtype_is_np_int64
-                or dtype_is_np_int32):
+                or dtype_is_numpy_signed_int
+                or dtype_is_unicode_str and dtype in ('int8', 'int16', 'int32', 'int64')):
             raise ValueError("Incorrect `dtype` passed: expected signed integer")
 
         # TODO: add support of int32 type
@@ -150,8 +150,19 @@ def pd_range_index_overload(start=None, stop=None, step=None, dtype=None, copy=F
 
 @typeof_impl.register(pd.RangeIndex)
 def typeof_range_index(val, c):
+    # Note: unboxing pd.RangeIndex creates instance of PositionalIndexType
+    # if index values are trivial range, but creating pd.RangeIndex() with same
+    # parameters via ctor will create instance of RangeIndexType.
+
+    # This is needed for specializing of Series and DF methods on combination of
+    # index types and preserving PositionalIndexType as result index type (when possible),
+    # since in pandas operations on two range indexes may give:
+    # either RangeIndex or Int64Index (in common case)
     is_named = val.name is not None
-    return RangeIndexType(is_named=is_named)
+    if not (val.start == 0 and val.stop > 0 and val.step == 1):
+        return RangeIndexType(is_named=is_named)
+    else:
+        return PositionalIndexType(is_named=is_named)
 
 
 @box(RangeIndexType)
@@ -272,10 +283,8 @@ def pd_range_index_dtype_overload(self):
     if not isinstance(self, RangeIndexType):
         return None
 
-    range_index_dtype = self.dtype
-
     def pd_range_index_dtype_impl(self):
-        return range_index_dtype
+        return sdc_indexes_attribute_dtype(self)
 
     return pd_range_index_dtype_impl
 
@@ -325,7 +334,7 @@ def pd_range_index_copy_overload(self, name=None, deep=False, dtype=None):
     if not (isinstance(name, (types.NoneType, types.Omitted, types.UnicodeType)) or name is None):
         ty_checker.raise_exc(name, 'string or none', 'name')
 
-    if not (isinstance(deep, (types.Omitted, types.Boolean)) or deep is False):
+    if not (isinstance(deep, (types.NoneType, types.Omitted, types.Boolean)) or deep is False):
         ty_checker.raise_exc(deep, 'boolean', 'deep')
 
     if not _check_dtype_param_type(dtype):
@@ -356,7 +365,8 @@ def pd_range_index_getitem_overload(self, idx):
     if isinstance(idx, types.Integer):
         def pd_range_index_getitem_impl(self, idx):
             range_len = len(self._data)
-            idx = (range_len + idx) if idx < 0 else idx
+            # FIXME_Numba#5801: Numba type unification rules make this float
+            idx = types.int64((range_len + idx) if idx < 0 else idx)
             if (idx < 0 or idx >= range_len):
                 raise IndexError("RangeIndex.getitem: index is out of bounds")
             return self.start + self.step * idx
@@ -375,17 +385,17 @@ def pd_range_index_getitem_overload(self, idx):
 
         return pd_range_index_getitem_impl
 
-    # returns np.array which is used to represent pandas Int64Index now
     if isinstance(idx, (types.Array, types.List)):
 
         if isinstance(idx.dtype, types.Integer):
             def pd_range_index_getitem_impl(self, idx):
-                return _sdc_take(self, idx)
+                res_as_arr = self.take(idx)
+                return pd.Int64Index(res_as_arr, name=self._name)
 
             return pd_range_index_getitem_impl
         elif isinstance(idx.dtype, types.Boolean):
             def pd_range_index_getitem_impl(self, idx):
-                return getitem_by_mask(self, idx)
+                return numpy_like.getitem_by_mask(self, idx)
 
             return pd_range_index_getitem_impl
 
@@ -393,25 +403,22 @@ def pd_range_index_getitem_overload(self, idx):
 @sdc_overload(operator.eq)
 def pd_range_index_eq_overload(self, other):
 
+    _func_name = 'Operator eq.'
+    if not check_types_comparable(self, other):
+        raise TypingError('{} Not allowed for non comparable indexes. \
+        Given: self={}, other={}'.format(_func_name, self, other))
+
     self_is_range_index = isinstance(self, RangeIndexType)
     other_is_range_index = isinstance(other, RangeIndexType)
 
+    possible_arg_types = (types.Array, types.Number) + sdc_pandas_index_types
     if not (self_is_range_index and other_is_range_index
-            or (self_is_range_index and (check_is_numeric_array(other) or isinstance(other, types.Number)))
-            or ((check_is_numeric_array(self) or isinstance(self, types.Number) and other_is_range_index))):
+            or (self_is_range_index and isinstance(other, possible_arg_types))
+            or (isinstance(self, possible_arg_types) and other_is_range_index)):
         return None
-    one_operand_is_scalar = isinstance(self, types.Number) or isinstance(other, types.Number)
 
     def pd_range_index_eq_impl(self, other):
-
-        if one_operand_is_scalar == False:  # noqa
-            if len(self) != len(other):
-                raise ValueError("Lengths must match to compare")
-
-        # names do not matter when comparing pd.RangeIndex
-        left = self.values if self_is_range_index == True else self  # noqa
-        right = other.values if other_is_range_index == True else other  # noqa
-        return list(left == right)  # FIXME_Numba#5157: result must be np.array, remove list when Numba is fixed
+        return sdc_indexes_operator_eq(self, other)
 
     return pd_range_index_eq_impl
 
@@ -419,12 +426,18 @@ def pd_range_index_eq_overload(self, other):
 @sdc_overload(operator.ne)
 def pd_range_index_ne_overload(self, other):
 
+    _func_name = 'Operator ne.'
+    if not check_types_comparable(self, other):
+        raise TypingError('{} Not allowed for non comparable indexes. \
+        Given: self={}, other={}'.format(_func_name, self, other))
+
     self_is_range_index = isinstance(self, RangeIndexType)
     other_is_range_index = isinstance(other, RangeIndexType)
 
+    possible_arg_types = (types.Array, types.Number) + sdc_pandas_index_types
     if not (self_is_range_index and other_is_range_index
-            or (self_is_range_index and (check_is_numeric_array(other) or isinstance(other, types.Number)))
-            or ((check_is_numeric_array(self) or isinstance(self, types.Number) and other_is_range_index))):
+            or (self_is_range_index and isinstance(other, possible_arg_types))
+            or (isinstance(self, possible_arg_types) and other_is_range_index)):
         return None
 
     def pd_range_index_ne_impl(self, other):
@@ -453,5 +466,156 @@ def pd_range_index_getiter(context, builder, sig, args):
     """ Returns a new iterator object for RangeIndexType by delegating to range.__iter__ """
     (value,) = args
     range_index = cgutils.create_struct_proxy(sig.args[0])(context, builder, value)
-    res = call_getiter(context, builder, types.range_state64_type, range_index.data)
+    res = call_getiter(context, builder, RangeIndexDataType, range_index.data)
     return impl_ret_untracked(context, builder, RangeIndexType, res)
+
+
+@sdc_overload_method(RangeIndexType, 'ravel')
+def pd_range_index_ravel_overload(self, order='C'):
+    if not isinstance(self, RangeIndexType):
+        return None
+
+    _func_name = 'Method ravel().'
+
+    if not (isinstance(order, (types.Omitted, types.StringLiteral, types.UnicodeType)) or order == 'C'):
+        raise TypingError('{} Unsupported parameters. Given order: {}'.format(_func_name, order))
+
+    def pd_range_index_ravel_impl(self, order='C'):
+        # np.ravel argument order is not supported in Numba
+        if order != 'C':
+            raise ValueError(f"Unsupported value for argument 'order' (only default 'C' is supported)")
+
+        return self.values
+
+    return pd_range_index_ravel_impl
+
+
+@sdc_overload_method(RangeIndexType, 'equals')
+def pd_range_index_equals_overload(self, other):
+    if not isinstance(self, RangeIndexType):
+        return None
+
+    _func_name = 'Method equals().'
+    if not isinstance(other, sdc_pandas_index_types):
+        raise SDCLimitation(f"{_func_name} Unsupported parameter. Given 'other': {other}")
+
+    if not check_types_comparable(self, other):
+        raise TypingError('{} Not allowed for non comparable indexes. \
+        Given: self={}, other={}'.format(_func_name, self, other))
+
+    if isinstance(other, sdc_indexes_range_like):
+
+        def pd_range_index_equals_impl(self, other):
+
+            if len(self) != len(other):
+                return False
+            if len(self) == 0:
+                return True
+
+            if len(self) == 1:
+                return self.start == other.start
+
+            return self.start == other.start and self.step == other.step
+    else:
+
+        def pd_range_index_equals_impl(self, other):
+            return sdc_numeric_indexes_equals(self, other)
+
+    return pd_range_index_equals_impl
+
+
+@sdc_overload_method(RangeIndexType, 'reindex')
+def pd_range_index_reindex_overload(self, target, method=None, level=None, limit=None, tolerance=None):
+    if not isinstance(self, RangeIndexType):
+        return None
+
+    _func_name = 'Method reindex().'
+    if not isinstance(target, sdc_pandas_index_types):
+        raise SDCLimitation(f"{_func_name} Unsupported parameter. Given 'target': {target}")
+
+    if not check_types_comparable(self, target):
+        raise TypingError('{} Not allowed for non comparable indexes. \
+        Given: self={}, target={}'.format(_func_name, self, target))
+
+    def pd_range_index_reindex_impl(self, target, method=None, level=None, limit=None, tolerance=None):
+        return sdc_indexes_reindex(self, target=target, method=method, level=level, tolerance=tolerance)
+
+    return pd_range_index_reindex_impl
+
+
+@sdc_overload_method(RangeIndexType, 'take')
+def pd_range_index_take_overload(self, indexes):
+    if not isinstance(self, RangeIndexType):
+        return None
+
+    _func_name = 'Method take().'
+    ty_checker = TypeChecker(_func_name)
+
+    valid_indexes_types = (types.Array, types.List) + sdc_pandas_index_types
+    if not (isinstance(indexes, valid_indexes_types) and isinstance(indexes.dtype, types.Integer)):
+        ty_checker.raise_exc(indexes, 'array/list of integers or integer index', 'indexes')
+
+    def pd_range_index_take_impl(self, indexes):
+        _self = pd.Int64Index(self.values, name=self._name)
+        return _self.take(indexes)
+
+    return pd_range_index_take_impl
+
+
+@sdc_overload_method(RangeIndexType, 'append')
+def pd_range_index_append_overload(self, other):
+    if not isinstance(self, RangeIndexType):
+        return None
+
+    _func_name = 'Method append().'
+    ty_checker = TypeChecker(_func_name)
+
+    if not isinstance(other, sdc_pandas_index_types):
+        ty_checker.raise_exc(other, 'pandas index', 'other')
+
+    if not check_types_comparable(self, other):
+        raise TypingError('{} Not allowed for non comparable indexes. \
+        Given: self={}, other={}'.format(_func_name, self, other))
+
+    def pd_range_index_append_impl(self, other):
+        int64_index = pd.Int64Index(self.values, name=self._name)
+        return int64_index.append(other)
+
+    return pd_range_index_append_impl
+
+
+@sdc_overload_method(RangeIndexType, 'join')
+def pd_range_index_join_overload(self, other, how, level=None, return_indexers=False, sort=False):
+    if not isinstance(self, RangeIndexType):
+        return None
+
+    _func_name = 'Method join().'
+    ty_checker = TypeChecker(_func_name)
+
+    if not isinstance(other, sdc_pandas_index_types):
+        ty_checker.raise_exc(other, 'pandas index', 'other')
+
+    if not isinstance(how, types.StringLiteral):
+        ty_checker.raise_exc(how, 'string', 'how')
+    if not how.literal_value == 'outer':
+        raise SDCLimitation(f"{_func_name} Only supporting 'outer' now. Given 'how': {how.literal_value}")
+
+    if not (isinstance(level, (types.Omitted, types.NoneType)) or level is None):
+        ty_checker.raise_exc(level, 'None', 'level')
+
+    if not (isinstance(return_indexers, (types.Omitted, BooleanLiteral)) or return_indexers is False):
+        ty_checker.raise_exc(return_indexers, 'boolean', 'return_indexers')
+
+    if not (isinstance(sort, (types.Omitted, types.Boolean)) or sort is False):
+        ty_checker.raise_exc(sort, 'boolean', 'sort')
+
+    _return_indexers = return_indexers.literal_value
+
+    def pd_range_index_join_impl(self, other, how, level=None, return_indexers=False, sort=False):
+        if _return_indexers == True:  # noqa
+            return sdc_indexes_join_outer(self, other)
+        else:
+            joined_index, = sdc_indexes_join_outer(self, other)
+            return joined_index
+
+    return pd_range_index_join_impl

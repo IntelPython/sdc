@@ -74,14 +74,17 @@ class TestDate(TestCase):
         df = self._gen_str_date_df()
         np.testing.assert_array_equal(hpat_func(df), test_impl(df))
 
+    @skip_numba_jit("DatetimeIndex unboxing not supported")
     def test_datetime_arg(self):
         def test_impl(A):
             return A
 
-        hpat_func = self.jit(test_impl)
+        sdc_func = self.jit(test_impl)
         df = self._gen_str_date_df()
         A = pd.DatetimeIndex(df['str_date']).to_series()
-        np.testing.assert_array_equal(hpat_func(A), test_impl(A))
+        result = sdc_func(A)
+        result_ref = test_impl(A)
+        pd.testing.assert_series_equal(result, result_ref)
 
     @skip_numba_jit
     def test_datetime_getitem(self):

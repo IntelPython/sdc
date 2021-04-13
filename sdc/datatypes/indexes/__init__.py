@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,31 +24,9 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
-from .categorical import *
-
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
-
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
-
-from sdc.tests.test_ml import *
-
-from sdc.tests.test_io import *
-
-from sdc.tests.test_hpat_jit import *
-from sdc.tests.indexes import *
-
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
-from sdc.tests.test_compile_time import *
-
-# performance tests
-import sdc.tests.tests_perf
+# modules are dependent on each other e.g. positional_index_type
+# needs range_index_type to be imported, so below order matters
+from .range_index_type import RangeIndexType
+from .positional_index_type import PositionalIndexType
+from .empty_index_type import EmptyIndexType
+from .int64_index_type import Int64IndexType

@@ -41,12 +41,13 @@ from numba.core.registry import cpu_target
 from numba.core.typing import signature
 from numba import literally
 
-from sdc.datatypes.common_functions import sdc_arrays_argsort, _sdc_asarray, _sdc_take
+from sdc.datatypes.common_functions import sdc_arrays_argsort, _sdc_asarray
 from sdc.datatypes.hpat_pandas_groupby_types import DataFrameGroupByType, SeriesGroupByType
 from sdc.utilities.sdc_typing_utils import TypeChecker, kwsparams2list, sigparams2list
 from sdc.utilities.utils import (sdc_overload, sdc_overload_method, sdc_register_jitable)
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_ext import string_type
+from sdc.functions.numpy_like import take as nplike_take
 
 
 performance_limitation = "This function may reveal slower performance than Pandas* on user system.\
@@ -218,7 +219,7 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, column_loc,
             f'  column_data_{i} = {df}._data[{type_id}][{col_id}]',
             f'  for j in numpy.arange(res_index_len):',
             f'    idx = argsorted_index[j] if {groupby_param_sort} else j',
-            f'    group_arr_{i} = _sdc_take(column_data_{i}, list({groupby_dict}[group_keys[idx]]))',
+            f'    group_arr_{i} = sdc_take(column_data_{i}, list({groupby_dict}[group_keys[idx]]))',
             f'    group_series_{i} = pandas.Series(group_arr_{i})',
             f'    result_data_{i}[j] = group_series_{i}.{func_name}({extra_impl_params})',
         ]
@@ -226,7 +227,7 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, column_loc,
     data = ', '.join(f'\'{column_names[i]}\': result_data_{i}' for i in range(len(columns)))
     func_lines.extend(['\n'.join([
         f'  if {groupby_param_sort}:',
-        f'    res_index = _sdc_take(group_keys, argsorted_index)',
+        f'    res_index = sdc_take(group_keys, argsorted_index)',
         f'  else:',
         f'    res_index = group_keys',
         f'  return pandas.DataFrame({{{data}}}, index=res_index)'
@@ -236,7 +237,7 @@ def _sdc_pandas_groupby_generic_func_codegen(func_name, columns, column_loc,
     global_vars = {'pandas': pandas,
                    'numpy': numpy,
                    '_sdc_asarray': _sdc_asarray,
-                   '_sdc_take': _sdc_take,
+                   'sdc_take': nplike_take,
                    'sdc_arrays_argsort': sdc_arrays_argsort}
 
     return func_text, global_vars
@@ -262,11 +263,11 @@ def _sdc_pandas_series_groupby_generic_func_codegen(func_name, func_params, defa
         f'  result_data = numpy.empty(res_index_len, dtype=res_dtype)',
         f'  for j in numpy.arange(res_index_len):',
         f'    idx = argsorted_index[j] if {groupby_param_sort} else j',
-        f'    group_arr = _sdc_take({series}._data, list({groupby_dict}[group_keys[idx]]))',
+        f'    group_arr = sdc_take({series}._data, list({groupby_dict}[group_keys[idx]]))',
         f'    group_series = pandas.Series(group_arr)',
         f'    result_data[j] = group_series.{func_name}({extra_impl_params})',
         f'  if {groupby_param_sort}:',
-        f'    res_index = _sdc_take(group_keys, argsorted_index)',
+        f'    res_index = sdc_take(group_keys, argsorted_index)',
         f'  else:',
         f'    res_index = group_keys',
         f'  return pandas.Series(data=result_data, index=res_index, name={series}._name)'
@@ -276,7 +277,7 @@ def _sdc_pandas_series_groupby_generic_func_codegen(func_name, func_params, defa
     global_vars = {'pandas': pandas,
                    'numpy': numpy,
                    '_sdc_asarray': _sdc_asarray,
-                   '_sdc_take': _sdc_take,
+                   'sdc_take': nplike_take,
                    'sdc_arrays_argsort': sdc_arrays_argsort}
 
     return func_text, global_vars

@@ -1,5 +1,6 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2020, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,31 +25,39 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+from numba import types
+from numba.extending import (
+    models,
+    register_model,
+    make_attribute_wrapper
+)
 
-from sdc.tests.test_basic import *
-from sdc.tests.test_series import *
-from sdc.tests.test_dataframe import *
-from sdc.tests.test_hiframes import *
-from .categorical import *
 
-# from sdc.tests.test_d4p import *
-from sdc.tests.test_date import *
-from sdc.tests.test_strings import *
+class EmptyIndexType(types.Type):
 
-from sdc.tests.test_groupby import *
-from sdc.tests.test_join import *
-from sdc.tests.test_rolling import *
+    # this index represents special case of pd.Index([]) with dtype='object'
+    # for overload typing functions assume it has following dtype
+    dtype = types.pyobject
 
-from sdc.tests.test_ml import *
+    def __init__(self, is_named=False):
+        self.is_named = is_named
+        super(EmptyIndexType, self).__init__(
+            name='EmptyIndexType({})'.format(is_named))
 
-from sdc.tests.test_io import *
 
-from sdc.tests.test_hpat_jit import *
-from sdc.tests.indexes import *
+@register_model(EmptyIndexType)
+class EmptyIndexModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
 
-from sdc.tests.test_sdc_numpy import *
-from sdc.tests.test_prange_utils import *
-from sdc.tests.test_compile_time import *
+        name_type = types.unicode_type if fe_type.is_named else types.none
+        members = [
+            ('name', name_type),
+        ]
+        models.StructModel.__init__(self, dmm, fe_type, members)
 
-# performance tests
-import sdc.tests.tests_perf
+
+# FIXME_Numba#3372: add into numba.types to allow returning from objmode
+types.EmptyIndexType = EmptyIndexType
+
+
+make_attribute_wrapper(EmptyIndexType, 'name', '_name')

@@ -51,9 +51,12 @@ import sdc
 import sdc.datatypes.common_functions as common_functions
 from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric, check_types_comparable,
                                             find_common_dtype_from_numpy_dtypes, has_literal_value,
-                                            has_python_value)
-from sdc.datatypes.range_index_type import RangeIndexType
-from sdc.datatypes.common_functions import (sdc_join_series_indexes, sdc_arrays_argsort, sdc_reindex_series)
+                                            has_python_value,
+                                            sdc_old_index_types,
+                                            find_index_common_dtype,
+                                            )
+from sdc.datatypes.indexes import *
+from sdc.datatypes.common_functions import (sdc_arrays_argsort, sdc_reindex_series, _sdc_internal_join)
 from sdc.datatypes.hpat_pandas_rolling_types import (
     gen_sdc_pandas_rolling_overload_body, sdc_pandas_rolling_docstring_tmpl)
 from sdc.datatypes.hpat_pandas_series_rolling_types import _hpat_pandas_series_rolling_init
@@ -71,6 +74,8 @@ from sdc.functions import numpy_like
 from sdc.hiframes.api import isna
 from sdc.datatypes.hpat_pandas_groupby_functions import init_series_groupby
 from sdc.utilities.prange_utils import parallel_chunks
+from sdc.extensions.indexes.indexes_generic import sdc_indexes_join_outer, sdc_fix_indexes_join
+from sdc.set_ext import build_set
 
 from .pandas_series_functions import apply
 from .pandas_series_functions import map as _map
@@ -145,9 +150,8 @@ def hpat_pandas_series_accessor_getitem(self, idx):
         # Note: Loc slice without start is not supported
         min_int64 = numpy.iinfo('int64').min
         max_int64 = numpy.iinfo('int64').max
-        index_is_none = (self.series.index is None or
-                         isinstance(self.series.index, numba.types.misc.NoneType))
-        if isinstance(idx, types.SliceType) and not index_is_none:
+        index_is_positional = isinstance(self.series.index, PositionalIndexType)
+        if isinstance(idx, types.SliceType) and not index_is_positional:
             def hpat_pandas_series_loc_slice_impl(self, idx):
                 series = self._series
                 index = series.index
@@ -201,7 +205,7 @@ def hpat_pandas_series_accessor_getitem(self, idx):
 
             return hpat_pandas_series_loc_slice_impl
 
-        if isinstance(idx, types.SliceType) and index_is_none:
+        if isinstance(idx, types.SliceType) and index_is_positional:
             def hpat_pandas_series_loc_slice_noidx_impl(self, idx):
                 max_slice = sys.maxsize
                 start = idx.start
@@ -372,16 +376,16 @@ def hpat_pandas_series_getitem(self, idx):
         return None
 
     # Note: Getitem return Series
-    index_is_none = isinstance(self.index, numba.types.misc.NoneType)
-    index_is_none_or_numeric = index_is_none or (self.index and isinstance(self.index.dtype, types.Number))
-    index_is_string = not index_is_none and isinstance(self.index.dtype, (types.UnicodeType, types.StringLiteral))
+    index_is_positional = isinstance(self.index, PositionalIndexType)
+    index_is_numeric = isinstance(self.index.dtype, types.Number)
+    index_is_string = isinstance(self.index.dtype, types.UnicodeType)
 
     if (
-        isinstance(idx, types.Number) and index_is_none_or_numeric or
+        isinstance(idx, types.Number) and index_is_numeric or
         (isinstance(idx, (types.UnicodeType, types.StringLiteral)) and index_is_string)
     ):
         def hpat_pandas_series_getitem_index_impl(self, idx):
-            index = self.index
+            index = self._index
             mask = numpy.empty(len(self._data), numpy.bool_)
             for i in numba.prange(len(index)):
                 mask[i] = index[i] == idx
@@ -403,7 +407,7 @@ def hpat_pandas_series_getitem(self, idx):
         return hpat_pandas_series_getitem_idx_slice_impl
 
     if (isinstance(idx, (types.List, types.Array))
-            and isinstance(idx.dtype, (types.Boolean, bool))):
+            and isinstance(idx.dtype, types.Boolean)):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
 
             if len(self) != len(idx):
@@ -420,11 +424,9 @@ def hpat_pandas_series_getitem(self, idx):
     # idx is Series and it's index is any, idx.dtype is Boolean
     if (isinstance(idx, SeriesType) and isinstance(idx.dtype, types.Boolean)):
 
-        none_indexes = isinstance(self.index, types.NoneType) and isinstance(idx.index, types.NoneType)
-        none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
-                                   and (isinstance(idx.index, types.NoneType) or check_index_is_numeric(idx)))
-        if not (none_or_numeric_indexes
-                or check_types_comparable(self.index, idx.index)):
+        positional_indexes = (isinstance(self.index, PositionalIndexType)
+                              and isinstance(idx.index, PositionalIndexType))
+        if not check_types_comparable(self.index, idx.index):
             msg = '{} The index of boolean indexer is not comparable to Series index.' + \
                   ' Given: self.index={}, idx.index={}'
             raise TypingError(msg.format(_func_name, self.index, idx.index))
@@ -433,7 +435,7 @@ def hpat_pandas_series_getitem(self, idx):
 
             # TO-DO: replace sdc_reindex_series with reindex methods and move this logic to impl
             # for specific index types (needs proper index type instead of types.none as index)
-            if none_indexes == True:  # noqa
+            if positional_indexes == True:  # noqa
                 if len(self) > len(idx):
                     msg = "Unalignable boolean Series provided as indexer " + \
                           "(index of the boolean Series and of the indexed object do not match)."
@@ -453,8 +455,8 @@ def hpat_pandas_series_getitem(self, idx):
 
         return _series_getitem_idx_bool_indexer_impl
 
-    # idx is Series and it's index is None, idx.dtype is not Boolean
-    if (isinstance(idx, SeriesType) and index_is_none
+    # idx is Series and it's index is PositionalIndex, idx.dtype is not Boolean
+    if (isinstance(idx, SeriesType) and index_is_positional
             and not isinstance(idx.data.dtype, (types.Boolean, bool))):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
             res = numpy.copy(self._data[:len(idx._data)])
@@ -466,8 +468,8 @@ def hpat_pandas_series_getitem(self, idx):
             return pandas.Series(data=res, index=index[idx._data], name=self._name)
         return hpat_pandas_series_getitem_idx_list_impl
 
-    # idx is Series and it's index is not None, idx.dtype is not Boolean
-    if (isinstance(idx, SeriesType) and not isinstance(self.index, types.NoneType)
+    # idx is Series and it's index is not PositionalIndex, idx.dtype is not Boolean
+    if (isinstance(idx, SeriesType) and not isinstance(self.index, PositionalIndexType)
             and not isinstance(idx.data.dtype, (types.Boolean, bool))):
         def hpat_pandas_series_getitem_idx_series_impl(self, idx):
             index = self.index
@@ -600,8 +602,9 @@ def sdc_pandas_series_setitem(self, idx, value):
     idx_is_boolean_array = isinstance(idx, types.Array) and isinstance(idx.dtype, types.Boolean)
     idx_is_boolean_series = isinstance(idx, SeriesType) and isinstance(idx.dtype, types.Boolean)
     idx_and_self_index_comparable = check_types_comparable(self.index, idx)
-    self_index_is_none = isinstance(self.index, types.NoneType)
-    assign_along_positions = ((self_index_is_none
+    self_index_is_positional = isinstance(self.index, PositionalIndexType)
+    idx_index_is_positional = isinstance(idx, SeriesType) and isinstance(idx.index, PositionalIndexType)
+    assign_along_positions = ((self_index_is_positional
                                or isinstance(idx, types.SliceType)
                                or not idx_and_self_index_comparable)
                               and not idx_is_boolean_series
@@ -613,15 +616,16 @@ def sdc_pandas_series_setitem(self, idx, value):
         idx_is_numeric_or_boolean_series = (isinstance(idx, SeriesType)
                                             and isinstance(idx.dtype, (types.Number, types.Boolean)))
         assign_via_idx_mask = idx_is_scalar and idx_and_self_index_comparable
-        assign_via_idx_data = idx_is_numeric_or_boolean_series and not idx_and_self_index_comparable
+        assign_via_idx_values = (self_index_is_positional and idx_index_is_positional
+                                 or idx_is_numeric_or_boolean_series and not idx_and_self_index_comparable)
 
         def sdc_pandas_series_setitem_no_reindexing_impl(self, idx, value):
 
             if assign_via_idx_mask == True:  # noqa
-                # FIXME_Numba#5157: using asarray since eq impl for RangeIndexType returns list
+                # FIXME_Numba#5157: using asarray since eq impl for index types returns list
                 _idx = numpy.asarray(self._index == idx)
-            elif assign_via_idx_data == True:  # noqa
-                _idx = idx._data
+            elif assign_via_idx_values == True:  # noqa
+                _idx = idx.values
             else:
                 _idx = idx
 
@@ -633,15 +637,11 @@ def sdc_pandas_series_setitem(self, idx, value):
 
     if (idx_is_boolean_array or idx_is_boolean_series) and value_is_series:
 
-        self_index_dtype = types.int64 if isinstance(self.index, types.NoneType) else self.index.dtype
-        value_index_dtype = types.int64 if isinstance(value.index, types.NoneType) else value.index.dtype
-        if (isinstance(self_index_dtype, types.Number) and isinstance(value_index_dtype, types.Number)):
-            indexes_common_dtype = find_common_dtype_from_numpy_dtypes([self_index_dtype, value_index_dtype], [])
-        elif (isinstance(self_index_dtype, types.UnicodeType) and isinstance(value_index_dtype, types.UnicodeType)):
-            indexes_common_dtype = types.unicode_type
-        else:
+        if not check_types_comparable(self.index, value.index):
             msg = '{} The self and value indexes must be comparable. Given: self.dtype={}, value.dtype={}'
-            raise TypingError(msg.format(_func_name, self_index_dtype, value_index_dtype))
+            raise TypingError(msg.format(_func_name, self.index, value.index))
+
+        _, indexes_common_dtype = find_index_common_dtype(self.index, value.index)
 
     if idx_is_boolean_array:
 
@@ -651,7 +651,7 @@ def sdc_pandas_series_setitem(self, idx, value):
             # and filtered indexes are looked in value.index, and if found corresponding value is set
             if value_is_series == True:  # noqa
                 value_index, self_index = value.index, self.index
-                unique_value_indices, unique_self_indices = set(value_index), set(self_index)
+                unique_value_indices, unique_self_indices = build_set(value_index), build_set(self_index)
 
                 # pandas behaves differently if value.index has duplicates and if it has no
                 # in case of duplicates in value.index assignment is made via positions
@@ -701,7 +701,7 @@ def sdc_pandas_series_setitem(self, idx, value):
             # and filtered indexes are either looked in value.index (if value is a Series)
             # or in self.index (if value is scalar or array)
             filtered_idx_indices = idx_index[idx._data]
-            filtered_idx_indices_set = set(filtered_idx_indices)
+            filtered_idx_indices_set = build_set(filtered_idx_indices)
             if value_is_series == True:  # noqa
 
                 if len(filtered_idx_indices_set) != len(filtered_idx_indices):
@@ -774,7 +774,7 @@ def sdc_pandas_series_setitem(self, idx, value):
                     raise ValueError("Reindexing only valid with uniquely valued Index objects")
 
                 if len(valid_indices_masked) != idx_size:
-                    raise ValueError("Reindexing not possible: idx has index not found in Series")
+                    raise KeyError("Reindexing not possible: idx has index not found in Series")
 
                 if value_is_scalar == True:  # noqa
                     self._data[valid_indices_positions] = _value
@@ -808,12 +808,11 @@ def sdc_pandas_series_setitem(self, idx, value):
                         set_positions[i] = map_index_to_position[index_value]
 
                 if number_of_found != idx_data_size:
-                    raise ValueError("Reindexing not possible: idx has index not found in Series")
+                    raise KeyError("Reindexing not possible: idx has index not found in Series")
 
-                if value_is_series == True:  # noqa
-                    self._data[set_positions] = value._data
-                else:
-                    self._data[set_positions] = value
+                set_values = value if value_is_series == False else value._data  # noqa
+                self._data[set_positions] = set_values
+
                 return self
 
             return sdc_pandas_series_setitem_idx_str_series_align_impl
@@ -1652,16 +1651,10 @@ def hpat_pandas_series_index(self):
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
-    if isinstance(self.index, types.NoneType):
-        def hpat_pandas_series_index_none_impl(self):
-            return pandas.RangeIndex(len(self._data))
+    def hpat_pandas_series_index_impl(self):
+        return self._index
 
-        return hpat_pandas_series_index_none_impl
-    else:
-        def hpat_pandas_series_index_impl(self):
-            return self._index
-
-        return hpat_pandas_series_index_impl
+    return hpat_pandas_series_index_impl
 
 
 hpat_pandas_series_rolling = sdc_overload_method(SeriesType, 'rolling')(
@@ -1905,16 +1898,19 @@ def hpat_pandas_series_astype(self, dtype, copy=True, errors='raise'):
                  (isinstance(dtype, types.StringLiteral) and dtype.literal_value == 'str'))
 
     # Needs Numba astype impl support converting unicode_type to NumberClass and other types
-    if (isinstance(self.data, StringArrayType) and not str_check):
-        if isinstance(dtype, types.functions.NumberClass) and errors == 'raise':
-            raise TypingError(f'Needs Numba astype impl support converting unicode_type to {dtype}')
-        if isinstance(dtype, types.StringLiteral) and errors == 'raise':
-            try:
-                literal_value = numpy.dtype(dtype.literal_value)
-            except:
-                pass # Will raise the exception later
-            else:
-                raise TypingError(f'Needs Numba astype impl support converting unicode_type to {dtype.literal_value}')
+    if isinstance(self.data, StringArrayType):
+        if not str_check:
+            if isinstance(dtype, types.functions.NumberClass) and errors == 'raise':
+                raise TypingError(f'Needs Numba astype impl support converting unicode_type to {dtype}')
+            if isinstance(dtype, types.StringLiteral) and errors == 'raise':
+                try:
+                    literal_value = numpy.dtype(dtype.literal_value)
+                except TypeError:
+                    pass  # Will raise the exception later
+                else:
+                    raise TypingError(f'Needs Numba astype impl support converting unicode_type to {literal_value}')
+        else:
+            return hpat_pandas_series_astype_no_modify_impl
 
     data_narr = isinstance(self.data, types.npytypes.Array)
     dtype_num_liter = isinstance(dtype, (types.functions.NumberClass, types.StringLiteral))
@@ -2073,7 +2069,7 @@ def hpat_pandas_series_isin(self, values):
             # return pandas.Series (np.isin (self._data, values))
 
             values = str_list_to_array(list(values))
-            values = set(values)
+            values = build_set(values)
             data_len = len(self._data)
             result = numpy.empty(data_len, dtype=numpy.bool_)
             for i in prange(data_len):
@@ -2085,7 +2081,7 @@ def hpat_pandas_series_isin(self, values):
             # TODO: replace with below line when Numba supports np.isin in nopython mode
             # return pandas.Series (np.isin (self._data, values))
 
-            values = set(values)
+            values = build_set(values)
             data_len = len(self._data)
             result = numpy.empty(data_len, dtype=numpy.bool_)
             for i in prange(data_len):
@@ -2141,6 +2137,7 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
     ty_checker = TypeChecker(_func_name)
     ty_checker.check(self, SeriesType)
 
+    other_is_series = isinstance(to_append, SeriesType)
     if not (isinstance(to_append, SeriesType)
             or (isinstance(to_append, (types.UniTuple, types.List)) and isinstance(to_append.dtype, SeriesType))):
         ty_checker.raise_exc(to_append, 'series or list/tuple of series', 'to_append')
@@ -2160,17 +2157,21 @@ def hpat_pandas_series_append(self, to_append, ignore_index=False, verify_integr
                              or has_python_value(ignore_index, False)
                              or isinstance(ignore_index, types.Omitted))
     to_append_is_series = isinstance(to_append, SeriesType)
+    index_api_supported = not isinstance(self.index, sdc_old_index_types)
 
     if ignore_index_is_false:
         def hpat_pandas_series_append_impl(self, to_append, ignore_index=False, verify_integrity=False):
             if to_append_is_series == True:  # noqa
                 new_data = common_functions.hpat_arrays_append(self._data, to_append._data)
-                new_index = common_functions.hpat_arrays_append(self.index, to_append.index)
+                _self_index = self._index.values if index_api_supported == True else self._index  # noqa
+                new_index = common_functions.hpat_arrays_append(_self_index, to_append._index)
             else:
                 data_arrays_to_append = [series._data for series in to_append]
-                index_arrays_to_append = [series.index for series in to_append]
+                index_arrays_to_append = [series._index for series in to_append]
+
                 new_data = common_functions.hpat_arrays_append(self._data, data_arrays_to_append)
-                new_index = common_functions.hpat_arrays_append(self.index, index_arrays_to_append)
+                _self_index = self._index.values if index_api_supported == True else self._index  # noqa
+                new_index = common_functions.hpat_arrays_append(_self_index, index_arrays_to_append)
 
             return pandas.Series(new_data, new_index)
 
@@ -2228,22 +2229,18 @@ def hpat_pandas_series_copy(self, deep=True):
     if not isinstance(deep, (types.Omitted, types.Boolean)) and not deep:
         ty_checker.raise_exc(deep, 'boolean', 'deep')
 
-    if isinstance(self.index, types.NoneType):
-        def hpat_pandas_series_copy_impl(self, deep=True):
-            if deep:
-                return pandas.Series(data=numpy_like.copy(self._data), name=self._name)
-            else:
-                return pandas.Series(data=self._data, name=self._name)
-        return hpat_pandas_series_copy_impl
-    else:
-        def hpat_pandas_series_copy_impl(self, deep=True):
-            if deep:
-                return pandas.Series(data=numpy_like.copy(self._data), index=numpy_like.copy(self._index),
-                                     name=self._name)
-            else:
-                # Shallow copy of index is not supported yet
-                return pandas.Series(data=self._data, index=numpy_like.copy(self._index), name=self._name)
-        return hpat_pandas_series_copy_impl
+    index_api_supported = not isinstance(self.index, sdc_old_index_types)
+
+    def hpat_pandas_series_copy_impl(self, deep=True):
+        new_series_data = numpy_like.copy(self._data) if deep else self._data
+
+        if index_api_supported == False:  # noqa
+            new_series_index = self._index.copy() if deep else self._index
+        else:
+            new_series_index = self._index.copy(deep=deep)
+        return pandas.Series(new_series_data, new_series_index, name=self._name)
+
+    return hpat_pandas_series_copy_impl
 
 
 @sdc_overload_method(SeriesType, 'corr')
@@ -2342,16 +2339,10 @@ def hpat_pandas_series_head(self, n=5):
     if not isinstance(n, (types.Integer, types.Omitted, types.NoneType)) and n != 5:
         ty_checker.raise_exc(n, 'int', 'n')
 
-    if isinstance(self.index, types.NoneType):
-        def hpat_pandas_series_head_impl(self, n=5):
-            return pandas.Series(data=self._data[:n], name=self._name)
+    def hpat_pandas_series_head_index_impl(self, n=5):
+        return pandas.Series(data=self._data[:n], index=self._index[:n], name=self._name)
 
-        return hpat_pandas_series_head_impl
-    else:
-        def hpat_pandas_series_head_index_impl(self, n=5):
-            return pandas.Series(data=self._data[:n], index=self._index[:n], name=self._name)
-
-        return hpat_pandas_series_head_index_impl
+    return hpat_pandas_series_head_index_impl
 
 
 @sdc_overload_method(SeriesType, 'isnull')
@@ -2703,14 +2694,6 @@ def hpat_pandas_series_take(self, indices, axis=0, is_copy=False):
     if not isinstance(indices, (types.List, types.Array)):
         ty_checker.raise_exc(indices, 'array-like', 'indices')
 
-    if isinstance(self.index, types.NoneType) or self.index is None:
-        def hpat_pandas_series_take_noindex_impl(self, indices, axis=0, is_copy=False):
-            local_data = [self._data[i] for i in indices]
-
-            return pandas.Series(local_data, indices)
-
-        return hpat_pandas_series_take_noindex_impl
-
     def hpat_pandas_series_take_impl(self, indices, axis=0, is_copy=False):
         local_data = [self._data[i] for i in indices]
         local_index = [self._index[i] for i in indices]
@@ -2777,7 +2760,7 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
     if not (isinstance(axis, types.Omitted) or axis is None):
         ty_checker.raise_exc(axis, 'None', 'axis')
 
-    none_index = isinstance(self.index, types.NoneType) or self.index is None
+    positional_index = isinstance(self.index, PositionalIndexType)
     if isinstance(self.data, StringArrayType):
         def hpat_pandas_series_idxmax_str_impl(self, axis=None, skipna=None):
             if skipna is None:
@@ -2786,7 +2769,7 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
                 raise ValueError("Method idxmax(). Unsupported parameter 'skipna'=False with str data")
 
             result = numpy.argmax(self._data)
-            if none_index == True:  # noqa
+            if positional_index == True:  # noqa
                 return result
             else:
                 return self._index[int(result)]
@@ -2805,7 +2788,7 @@ def hpat_pandas_series_idxmax(self, axis=None, skipna=None):
         else:
             result = numpy_like.argmax(self._data)
 
-        if none_index == True:  # noqa
+        if positional_index == True:  # noqa
             return result
         else:
             return self._index[int(result)]
@@ -2994,7 +2977,7 @@ def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=
                               types.StringLiteral, types.Integer)) and level is not None:
         ty_checker.raise_exc(level, 'Integer or string', 'level')
 
-    def hpat_pandas_series_rename_idx_impl(self, index=None, copy=True, inplace=False, level=None):
+    def hpat_pandas_series_rename_impl(self, index=None, copy=True, inplace=False, level=None):
         if copy is True:
             series_data = self._data.copy()
             series_index = self._index.copy()
@@ -3004,17 +2987,7 @@ def hpat_pandas_series_rename(self, index=None, copy=True, inplace=False, level=
 
         return pandas.Series(data=series_data, index=series_index, name=index)
 
-    def hpat_pandas_series_rename_noidx_impl(self, index=None, copy=True, inplace=False, level=None):
-        if copy is True:
-            series_data = self._data.copy()
-        else:
-            series_data = self._data
-
-        return pandas.Series(data=series_data, index=self._index, name=index)
-
-    if isinstance(self.index, types.NoneType):
-        return hpat_pandas_series_rename_noidx_impl
-    return hpat_pandas_series_rename_idx_impl
+    return hpat_pandas_series_rename_impl
 
 
 @sdc_overload_method(SeriesType, 'min')
@@ -3314,7 +3287,7 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
     if not (isinstance(axis, types.Omitted) or axis is None):
         ty_checker.raise_exc(axis, 'None', 'axis')
 
-    none_index = isinstance(self.index, types.NoneType) or self.index is None
+    positional_index = isinstance(self.index, PositionalIndexType)
     if isinstance(self.data, StringArrayType):
         def hpat_pandas_series_idxmin_str_impl(self, axis=None, skipna=None):
             if skipna is None:
@@ -3323,7 +3296,7 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
                 raise ValueError("Method idxmin(). Unsupported parameter 'skipna'=False with str data")
 
             result = numpy.argmin(self._data)
-            if none_index == True:  # noqa
+            if positional_index == True:  # noqa
                 return result
             else:
                 return self._index[int(result)]
@@ -3342,7 +3315,7 @@ def hpat_pandas_series_idxmin(self, axis=None, skipna=None):
         else:
             result = numpy_like.argmin(self._data)
 
-        if none_index == True:  # noqa
+        if positional_index == True:  # noqa
             return result
         else:
             return self._index[int(result)]
@@ -3446,7 +3419,7 @@ def hpat_pandas_series_unique(self):
             Test: python -m sdc.runtests sdc.tests.test_series.TestSeries.test_unique_str
             '''
 
-            str_set = set(self._data)
+            str_set = build_set(self._data)
             return to_array(str_set)
 
         return hpat_pandas_series_unique_str_impl
@@ -3578,7 +3551,7 @@ def hpat_pandas_series_nunique(self, dropna=True):
             if dropna:
                 nan_mask = self.isna()
                 data = self._data[~nan_mask._data]
-            unique_values = set(data)
+            unique_values = build_set(data)
             return len(unique_values)
 
         return hpat_pandas_series_nunique_str_impl
@@ -3591,7 +3564,7 @@ def hpat_pandas_series_nunique(self, dropna=True):
         data_mask_for_nan = numpy.isnan(self._data)
         nan_exists = numpy.any(data_mask_for_nan)
         data_no_nan = self._data[~data_mask_for_nan]
-        data_set = set(data_no_nan)
+        data_set = build_set(data_no_nan)
         if dropna or not nan_exists:
             return len(data_set)
         else:
@@ -3805,7 +3778,7 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
             and order is not None:
         ty_checker.raise_exc(order, 'None', 'order')
 
-    if not isinstance(self.index, types.NoneType):
+    if not isinstance(self.index, PositionalIndexType):
         def hpat_pandas_series_argsort_idx_impl(self, axis=0, kind='quicksort', order=None):
             if kind != 'quicksort' and kind != 'mergesort':
                 raise ValueError("Method argsort(). Unsupported parameter. Given 'kind' != 'quicksort' or 'mergesort'")
@@ -3948,11 +3921,9 @@ def hpat_pandas_series_sort_values(self, axis=0, ascending=True, inplace=False, 
         good = ~data_nan_mask
 
         if kind_is_none_or_default == True:  # noqa
-            argsort_res = sdc_arrays_argsort(self._data[good], kind='quicksort')
+            argsort_res = sdc_arrays_argsort(self._data[good], kind='quicksort', ascending=ascending)
         else:
-            argsort_res = sdc_arrays_argsort(self._data[good], kind=kind)
-        if not ascending:
-            argsort_res = argsort_res[::-1]
+            argsort_res = sdc_arrays_argsort(self._data[good], kind=kind, ascending=ascending)
 
         idx = numpy.arange(len(self), dtype=numpy.int32)
         sorted_index = numpy.empty(len(self), dtype=numpy.int32)
@@ -4033,20 +4004,19 @@ def hpat_pandas_series_dropna(self, axis=0, inplace=False):
     if not (inplace is False or isinstance(inplace, types.Omitted)):
         ty_checker.raise_exc(inplace, 'bool', 'inplace')
 
-    if (isinstance(self.data.dtype, types.Number)
-            and isinstance(self.index, (types.Number, types.NoneType, RangeIndexType))):
+    # if both data and index are numeric (i.e. types.Array) dispatch to numpy_like.dropna impl
+    if (isinstance(self.dtype, types.Number) and isinstance(self.index.dtype, types.Number)):
         def hpat_pandas_series_dropna_impl(self, axis=0, inplace=False):
-            index = self.index
-            return numpy_like.dropna(self._data, index, self._name)
+            return numpy_like.dropna(self._data, self._index, self._name)
 
         return hpat_pandas_series_dropna_impl
 
     else:
         def hpat_pandas_series_dropna_str_impl(self, axis=0, inplace=False):
-            # generate Series index if needed by using SeriesType.index (i.e. not self._index)
+            # TO-DO: verify these operations are fused
             na_data_arr = sdc.hiframes.api.get_nan_mask(self._data)
             data = self._data[~na_data_arr]
-            index = self.index[~na_data_arr]
+            index = self._index[~na_data_arr]
             return pandas.Series(data, index, self._name)
 
         return hpat_pandas_series_dropna_str_impl
@@ -4528,9 +4498,7 @@ def sdc_pandas_str_series_operator_add(self, other):
 
     operands_are_series = self_is_series and other_is_series
     if operands_are_series:
-        none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
-                                   and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index)
         if not series_indexes_comparable:
             raise TypingError('{} Not implemented for series with not-comparable indexes. \
             Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
@@ -4553,7 +4521,7 @@ def sdc_pandas_str_series_operator_add(self, other):
     else:   # both operands are string series
 
         # TO-DO: None indexes branch is dead code, remove?
-        if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
+        if (isinstance(self.index, PositionalIndexType) and isinstance(other.index, PositionalIndexType)):
             def _series_operator_add_none_indexes_impl(self, other):
 
                 if (len(self._data) == len(other._data)):
@@ -4582,32 +4550,18 @@ def sdc_pandas_str_series_operator_add(self, other):
             return _series_operator_add_none_indexes_impl
         else:
 
-            left_index_is_range = isinstance(self.index, RangeIndexType)
-            numba_index_common_dtype = find_common_dtype_from_numpy_dtypes(
-                [self.index.dtype, other.index.dtype], [])
-            common_dtype_different = (numba_index_common_dtype != self.index.dtype
-                                      or numba_index_common_dtype != other.index.dtype)
+            index_api_supported = not (isinstance(self.index, sdc_old_index_types)
+                                       or isinstance(other.index, sdc_old_index_types))
 
-            def _series_operator_add_common_impl(self, other):
-                left_index, right_index = self.index, other.index
+            def _series_operator_add_str_impl(self, other):
+                left_index, right_index = self._index, other._index
+                if index_api_supported == True:  # noqa
+                    indexes_join_res = left_index.join(right_index, 'outer', return_indexers=True)
+                else:
+                    indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
 
-                # TO-DO: coversion of RangeIndexType to np.array may happen several times here:
-                # in array_equal, in astype or left_index.values - need caching of array allocated once
-
-                # check if indexes are equal and series don't have to be aligned
-                if (left_index is right_index or numpy_like.array_equal(left_index, right_index)):
-                    result_data = self._data + other._data
-
-                    if common_dtype_different == True:  # noqa
-                        result_index = numpy_like.astype(left_index, numba_index_common_dtype)
-                    else:
-                        result_index = left_index.values if left_index_is_range == True else left_index  # noqa
-
-                    return pandas.Series(result_data, index=result_index)
-
-                # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
-                joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
-
+                # FIXME_Numba#XXXX: remove sdc_fix_indexes_join call at all when issue is fixed
+                joined_index, left_indexer, right_indexer = sdc_fix_indexes_join(*indexes_join_res)
                 result_size = len(joined_index)
                 result_nan_mask = numpy.zeros(result_size, dtype=numpy.bool_)
                 result_data_as_list = []
@@ -4626,7 +4580,7 @@ def sdc_pandas_str_series_operator_add(self, other):
 
                 return pandas.Series(result_data, joined_index)
 
-            return _series_operator_add_common_impl
+            return _series_operator_add_str_impl
 
     return None
 
@@ -4659,9 +4613,7 @@ def sdc_pandas_str_series_operator_mul(self, other):
 
     operands_are_series = self_is_series and other_is_series
     if operands_are_series:
-        none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
-                                   and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index)
         if not series_indexes_comparable:
             raise TypingError('{} Not implemented for series with not-comparable indexes. \
             Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
@@ -4688,7 +4640,7 @@ def sdc_pandas_str_series_operator_mul(self, other):
 
         self_is_series = isinstance(self, SeriesType)
         # optimization for series with default indexes, that can be aligned differently
-        if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
+        if (isinstance(self.index, PositionalIndexType) and isinstance(other.index, PositionalIndexType)):
             def _series_operator_mul_none_indexes_impl(self, other):
 
                 series_operand = self if self_is_series == True else other  # noqa
@@ -4716,32 +4668,18 @@ def sdc_pandas_str_series_operator_mul(self, other):
 
             return _series_operator_mul_none_indexes_impl
         else:
-            left_index_is_range = isinstance(self.index, RangeIndexType)
-            numba_index_common_dtype = find_common_dtype_from_numpy_dtypes(
-                [self.index.dtype, other.index.dtype], [])
-            common_dtype_different = (numba_index_common_dtype != self.index.dtype
-                                      or numba_index_common_dtype != other.index.dtype)
+            index_api_supported = not (isinstance(self.index, sdc_old_index_types)
+                                       or isinstance(other.index, sdc_old_index_types))
 
             def _series_operator_mul_common_impl(self, other):
-                left_index, right_index = self.index, other.index
+                left_index, right_index = self._index, other._index
+                if index_api_supported == True:  # noqa
+                    indexes_join_res = left_index.join(right_index, 'outer', return_indexers=True)
+                else:
+                    indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
 
-                # TO-DO: coversion of RangeIndexType to np.array may happen several times here:
-                # in array_equal, in astype or left_index.values - need caching of array allocated once
-
-                # check if indexes are equal and series don't have to be aligned
-                if (left_index is right_index or numpy_like.array_equal(left_index, right_index)):
-                    result_data = self._data * other._data
-
-                    if common_dtype_different == True:  # noqa
-                        result_index = numpy_like.astype(left_index, numba_index_common_dtype)
-                    else:
-                        result_index = left_index.values if left_index_is_range == True else left_index  # noqa
-
-                    return pandas.Series(result_data, index=result_index)
-
-                # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
-                joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
-
+                # FIXME_Numba#XXXX: remove sdc_fix_indexes_join call at all when issue is fixed
+                joined_index, left_indexer, right_indexer = sdc_fix_indexes_join(*indexes_join_res)
                 str_series_operand = self if self_is_string_series == True else other  # noqa
                 str_series_indexer = left_indexer if self_is_string_series == True else right_indexer  # noqa
                 result_size = len(joined_index)

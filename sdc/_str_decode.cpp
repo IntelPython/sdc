@@ -26,8 +26,9 @@
 
 #include <Python.h>
 #include <iostream>
+#include <stdlib.h>
 
-#include "_meminfo.h"
+#include "numba/core/runtime/nrt_external.h"
 
 #ifndef Py_UNREACHABLE
 #define Py_UNREACHABLE() abort()
@@ -37,6 +38,7 @@
 
 typedef struct
 {
+    NRT_api_functions* nrt;
     NRT_MemInfo* buffer;
     void* data;
     enum PyUnicode_Kind kind;
@@ -120,7 +122,8 @@ void _C_UnicodeWriter_Init(_C_UnicodeWriter* writer)
 #include "stringlib/undef.h"
 
 static inline int _C_UnicodeWriter_WriteCharInline(_C_UnicodeWriter* writer, Py_UCS4 ch);
-static int _copy_characters(NRT_MemInfo* to,
+static int _copy_characters(NRT_api_functions* nrt,
+                            NRT_MemInfo* to,
                             Py_ssize_t to_start,
                             NRT_MemInfo* from,
                             Py_ssize_t from_start,
@@ -128,12 +131,19 @@ static int _copy_characters(NRT_MemInfo* to,
                             unsigned int from_kind,
                             unsigned int to_kind);
 
+
+static void str_data_dtor(void* data_ptr)
+{
+    free(data_ptr);
+}
+
 // similar to PyUnicode_New()
 NRT_MemInfo* alloc_writer(_C_UnicodeWriter* writer, Py_ssize_t newlen, Py_UCS4 maxchar)
 {
     enum PyUnicode_Kind kind;
     int is_ascii = 0;
     Py_ssize_t char_size;
+    auto nrt = writer->nrt;
 
     if (maxchar < 128)
     {
@@ -161,20 +171,22 @@ NRT_MemInfo* alloc_writer(_C_UnicodeWriter* writer, Py_ssize_t newlen, Py_UCS4 m
         kind = PyUnicode_4BYTE_KIND;
         char_size = 4;
     }
-    NRT_MemInfo* newbuffer = NRT_MemInfo_alloc_safe((newlen + 1) * char_size);
-    if (newbuffer == NULL)
+
+    char* str_data = (char*)malloc((newlen + 1) * char_size);
+    if (str_data == NULL)
     {
         return NULL;
     }
 
+    auto newbuffer = nrt->manage_memory(str_data, str_data_dtor);
     if (writer->buffer != NULL)
     {
-        _copy_characters(newbuffer, 0, writer->buffer, 0, writer->pos, writer->kind, kind);
-        NRT_MemInfo_call_dtor(writer->buffer);
+        _copy_characters(nrt, newbuffer, 0, writer->buffer, 0, writer->pos, writer->kind, kind);
+        nrt->release(writer->buffer);
     }
     writer->buffer = newbuffer;
     writer->maxchar = KIND_MAX_CHAR_VALUE(kind);
-    writer->data = writer->buffer->data;
+    writer->data = nrt->get_data(writer->buffer);
 
     if (!writer->readonly)
     {
@@ -356,19 +368,22 @@ static Py_ssize_t ascii_decode(const char* start, const char* end, Py_UCS1* dest
     return p - start;
 }
 
+
 // ported from CPython PyUnicode_DecodeUTF8Stateful: https://github.com/python/cpython/blob/31e8d69bfe7cf5d4ffe0967cb225d2a8a229cc97/Objects/unicodeobject.c#L4813
-void decode_utf8(const char* s, Py_ssize_t size, int* kind, int* is_ascii, int* length, NRT_MemInfo** meminfo)
+void decode_utf8(const char* s, Py_ssize_t size, int* kind, int* is_ascii, int* length, NRT_MemInfo** meminfo, void* nrt_table)
 {
     _C_UnicodeWriter writer;
     const char* end = s + size;
+    auto nrt = (NRT_api_functions*)nrt_table;
 
     const char* errmsg = "";
     *is_ascii = 0;
 
     if (size == 0)
     {
-        (*meminfo) = NRT_MemInfo_alloc_safe(1);
-        ((char*)((*meminfo)->data))[0] = 0;
+        char* str_data = (char*)malloc(1);
+        (*meminfo) = nrt->manage_memory(str_data, str_data_dtor);
+        ((char*)(nrt->get_data(*meminfo)))[0] = 0;
         *kind = PyUnicode_1BYTE_KIND;
         *is_ascii = 1;
         *length = 0;
@@ -379,9 +394,10 @@ void decode_utf8(const char* s, Py_ssize_t size, int* kind, int* is_ascii, int* 
     if (size == 1 && (unsigned char)s[0] < 128)
     {
         // TODO interning
-        (*meminfo) = NRT_MemInfo_alloc_safe(2);
-        ((char*)((*meminfo)->data))[0] = s[0];
-        ((char*)((*meminfo)->data))[1] = 0;
+        char* str_data = (char*)malloc(2);
+        (*meminfo) = nrt->manage_memory(str_data, str_data_dtor);
+        ((char*)(nrt->get_data(*meminfo)))[0] = s[0];
+        ((char*)(nrt->get_data(*meminfo)))[1] = 0;
         *kind = PyUnicode_1BYTE_KIND;
         *is_ascii = 1;
         *length = 1;
@@ -390,6 +406,7 @@ void decode_utf8(const char* s, Py_ssize_t size, int* kind, int* is_ascii, int* 
 
     _C_UnicodeWriter_Init(&writer);
     writer.min_length = size;
+    writer.nrt = nrt;
     if (_C_UnicodeWriter_Prepare(&writer, writer.min_length, 127) == -1)
         goto onError;
 
@@ -469,7 +486,7 @@ End:
 
 onError:
     std::cerr << "utf8 decode error:" << errmsg << std::endl;
-    NRT_MemInfo_call_dtor(writer.buffer);
+    nrt->release(*meminfo);
     return;
 }
 
@@ -499,7 +516,8 @@ onError:
             *_to++ = (to_type)*_iter++;                                                                                \
     } while (0)
 
-static int _copy_characters(NRT_MemInfo* to,
+static int _copy_characters(NRT_api_functions* nrt,
+                            NRT_MemInfo* to,
                             Py_ssize_t to_start,
                             NRT_MemInfo* from,
                             Py_ssize_t from_start,
@@ -516,8 +534,8 @@ static int _copy_characters(NRT_MemInfo* to,
     if (how_many == 0)
         return 0;
 
-    from_data = from->data;
-    to_data = to->data;
+    from_data = nrt->get_data(from);
+    to_data = nrt->get_data(to);
 
     if (from_kind == to_kind)
     {
