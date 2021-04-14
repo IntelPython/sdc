@@ -221,22 +221,27 @@ ext_parquet = Extension(name="sdc.parquet_cpp",
                         library_dirs=lid,
                         )
 
-print("Using Intel TBB from:", tbb_root)
-ext_conc_dict = Extension(
-    name="sdc.hconc_dict",
-    sources=["sdc/native/conc_dict_module.cpp", "sdc/native/utils.cpp"],
-    include_dirs=[os.path.join(tbb_root, 'include')] + [numba_include_path, "sdc/native/"],
-    libraries=['tbb'],
-    library_dirs=[
-      # for Linux
-      os.path.join(tbb_root, 'lib', 'intel64', 'gcc4.4'),
-      # for MacOS
-      os.path.join(tbb_root, 'lib'),
-      # for Windows
-      os.path.join(tbb_root, 'lib', 'intel64', 'vc_mt'),
-    ],
-    language="c++",
-    )
+ext_conc_dict = Extension(name="sdc.hconc_dict",
+                     sources=[
+                        "sdc/native/conc_dict_module.cpp",
+                        "sdc/native/utils.cpp"],
+                     extra_compile_args=eca,
+                     extra_link_args=ela,
+                     libraries=['tbb'],
+                     include_dirs=["sdc/native/",
+                        numba_include_path,
+                        os.path.join(tbb_root, 'include'),
+                     ],
+                     library_dirs=lid + [
+                        # for Linux
+                        os.path.join(tbb_root, 'lib', 'intel64', 'gcc4.4'),
+                        # for MacOS
+                        os.path.join(tbb_root, 'lib'),
+                        # for Windows
+                        os.path.join(tbb_root, 'lib', 'intel64', 'vc_mt'),
+                     ],
+                     language="c++"
+                     )
 
 _ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq, ext_sort,
              ext_conc_dict]

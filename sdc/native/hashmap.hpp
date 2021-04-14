@@ -140,6 +140,7 @@ public:
     NumericHashmapType(NumericHashmapType&& rhs) : p_map(std::move(rhs->p_map)) {};
     NumericHashmapType& operator=(NumericHashmapType&& rhs) {
         this->p_map.reset(std::move(rhs->p_map));
+        return *this;
     };
     ~NumericHashmapType() {}
 
@@ -210,6 +211,7 @@ public:
     GenericHashmapBase(GenericHashmapBase&& rhs) : p_map(std::move(rhs->p_map)) {};
     GenericHashmapBase& operator=(GenericHashmapBase&& rhs) {
         this->p_map.reset(std::move(rhs->p_map));
+        return *this;
     };
     virtual ~GenericHashmapBase() {
     }
@@ -275,9 +277,9 @@ public:
     GenericHashmapType(const VoidPtrTypeInfo& ki,
                        const VoidPtrTypeInfo& vi,
                        const HashCompare& hash_compare)
-    : key_info(ki),
-      val_info(vi),
-      GenericHashmapBase<Key, Val, HashCompare>(hash_compare) {}
+    : GenericHashmapBase<Key, Val, HashCompare>(hash_compare),
+      key_info(ki),
+      val_info(vi) {}
     GenericHashmapType(const VoidPtrTypeInfo& ki, const VoidPtrTypeInfo& vi) : GenericHashmapType(ki, vi, HashCompare()) {}
 
     GenericHashmapType() = delete;
@@ -291,6 +293,7 @@ public:
         this->p_map = std::move(rhs.p_map);
         this->key_info = std::move(rhs.key_info);
         this->val_info = std::move(rhs.val_info);
+        return *this;
     };
     virtual ~GenericHashmapType() {};
 
@@ -341,9 +344,9 @@ public:
     GenericHashmapType(const VoidPtrTypeInfo& ki,
                        const VoidPtrTypeInfo& vi,
                        const HashCompare& hash_compare)
-    : key_info(ki),
-      val_info(vi),
-      GenericHashmapBase<Key, void*, HashCompare>(hash_compare) {}
+    : GenericHashmapBase<Key, void*, HashCompare>(hash_compare),
+      key_info(ki),
+      val_info(vi) {}
     GenericHashmapType(const VoidPtrTypeInfo& ki, const VoidPtrTypeInfo& vi) : GenericHashmapType(ki, vi, HashCompare()) {}
 
     GenericHashmapType() = delete;
@@ -357,6 +360,7 @@ public:
         this->p_map = std::move(rhs.p_map);
         this->key_info = std::move(rhs.key_info);
         this->val_info = std::move(rhs.val_info);
+        return *this;
     };
     virtual ~GenericHashmapType() {};
 
@@ -377,9 +381,9 @@ public:
     GenericHashmapType(const VoidPtrTypeInfo& ki,
                        const VoidPtrTypeInfo& vi,
                        const VoidPtrHashCompare& hash_compare)
-    : key_info(ki),
-      val_info(vi),
-      GenericHashmapBase<void*, Val, VoidPtrHashCompare>(hash_compare) {}
+    : GenericHashmapBase<void*, Val, VoidPtrHashCompare>(hash_compare),
+      key_info(ki),
+      val_info(vi) {}
 
     GenericHashmapType() = delete;
     GenericHashmapType(const GenericHashmapType&) = delete;
@@ -392,6 +396,7 @@ public:
         this->p_map = std::move(rhs.p_map);
         this->key_info = std::move(rhs.key_info);
         this->val_info = std::move(rhs.val_info);
+        return *this;
     };
     virtual ~GenericHashmapType() {};
 
@@ -412,9 +417,9 @@ public:
     GenericHashmapType(const VoidPtrTypeInfo& ki,
                        const VoidPtrTypeInfo& vi,
                        const VoidPtrHashCompare& hash_compare)
-    : key_info(ki),
-      val_info(vi),
-      GenericHashmapBase<void*, void*, VoidPtrHashCompare>(hash_compare) {}
+    : GenericHashmapBase<void*, void*, VoidPtrHashCompare>(hash_compare),
+      key_info(ki),
+      val_info(vi) {}
 
     GenericHashmapType() = delete;
     GenericHashmapType(const GenericHashmapType&) = delete;
@@ -427,6 +432,7 @@ public:
         this->p_map = std::move(rhs.p_map);
         this->key_info = std::move(rhs.key_info);
         this->val_info = std::move(rhs.val_info);
+        return *this;
     };
     virtual ~GenericHashmapType() {};
 
@@ -449,37 +455,41 @@ using generic_hashmap = GenericHashmapType<void*, void*, VoidPtrHashCompare>;
 
 
 template<typename key_type, typename val_type>
-auto reinterpet_hashmap_ptr(void* p_hash_map,
-                            std::enable_if_t<
-                                !std::is_same<key_type, void*>::value &&
-                                !std::is_same<val_type, void*>::value>* = 0)
+numeric_hashmap<key_type, val_type>*
+reinterpet_hashmap_ptr(void* p_hash_map,
+                       typename std::enable_if<
+                           !std::is_same<key_type, void*>::value &&
+                           !std::is_same<val_type, void*>::value>::type* = 0)
 {
     return reinterpret_cast<numeric_hashmap<key_type, val_type>*>(p_hash_map);
 }
 
 template<typename key_type, typename val_type>
-auto reinterpet_hashmap_ptr(void* p_hash_map,
-                            std::enable_if_t<
-                                std::is_same<key_type, void*>::value &&
-                                std::is_same<val_type, void*>::value>* = 0)
+generic_hashmap*
+reinterpet_hashmap_ptr(void* p_hash_map,
+                       typename std::enable_if<
+                           std::is_same<key_type, void*>::value &&
+                           std::is_same<val_type, void*>::value>::type* = 0)
 {
     return reinterpret_cast<generic_hashmap*>(p_hash_map);
 }
 
 template<typename key_type, typename val_type>
-auto reinterpet_hashmap_ptr(void* p_hash_map,
-                            std::enable_if_t<
-                                !std::is_same<key_type, void*>::value &&
-                                std::is_same<val_type, void*>::value>* = 0)
+generic_value_hashmap<key_type>*
+reinterpet_hashmap_ptr(void* p_hash_map,
+                       typename std::enable_if<
+                           !std::is_same<key_type, void*>::value &&
+                           std::is_same<val_type, void*>::value>::type* = 0)
 {
     return reinterpret_cast<generic_value_hashmap<key_type>*>(p_hash_map);
 }
 
 template<typename key_type, typename val_type>
-auto reinterpet_hashmap_ptr(void* p_hash_map,
-                            std::enable_if_t<
-                                std::is_same<key_type, void*>::value &&
-                                !std::is_same<val_type, void*>::value>* = 0)
+generic_key_hashmap<val_type>*
+reinterpet_hashmap_ptr(void* p_hash_map,
+                       typename std::enable_if<
+                           std::is_same<key_type, void*>::value &&
+                           !std::is_same<val_type, void*>::value>::type* = 0)
 {
     return reinterpret_cast<generic_key_hashmap<val_type>*>(p_hash_map);
 }
@@ -534,7 +544,7 @@ void delete_iter_state(void* p_iter_state)
 {
     auto p_iter_state_spec = reinterpret_cast<iter_state*>(p_iter_state);
     auto p_hash_map_spec = reinterpet_hashmap_ptr<key_type, value_type>(p_iter_state_spec->second);
-    using itertype = typename std::remove_reference_t<decltype(*p_hash_map_spec)>::iterator_type;
+    using itertype = typename std::remove_reference<decltype(*p_hash_map_spec)>::type::iterator_type;
     auto p_hash_map_iter = reinterpret_cast<itertype*>(p_iter_state_spec->first);
 
     delete p_hash_map_iter;
@@ -881,9 +891,8 @@ int8_t hashmap_iternext(void* p_iter_state, key_type* ret_key, val_type* ret_val
 {
     auto p_iter_state_spec = reinterpret_cast<iter_state*>(p_iter_state);
     auto p_hash_map_spec = reinterpet_hashmap_ptr<key_type, val_type>(p_iter_state_spec->second);
-    using itertype = typename std::remove_reference_t<decltype(*p_hash_map_spec)>::iterator_type;
+    using itertype = typename std::remove_reference<decltype(*p_hash_map_spec)>::type::iterator_type;
     auto p_hash_map_iter = reinterpret_cast<itertype*>(p_iter_state_spec->first);
-    static int iteration = 0;
 
     int8_t status = 1;
     if (*p_hash_map_iter != p_hash_map_spec->p_map->end())
