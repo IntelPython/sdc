@@ -354,6 +354,7 @@ sdc_build_commands['build_doc'] = SDCBuildDoc
 sdc_build_commands.update({'style': style})
 sdc_version = versioneer.get_version().split('+')[0]
 
+
 setup(name=SDC_NAME_STR,
       version=sdc_version,
       description='Numba* extension for compiling Pandas* operations',
