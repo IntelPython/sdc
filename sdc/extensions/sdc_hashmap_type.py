@@ -37,7 +37,7 @@ from numba.core.types import Dummy, IterableType, SimpleIterableType, SimpleIter
 
 from numba.extending import typeof_impl
 from numba.typed import Dict
-from numba.core.typing.typeof import typeof_type as numba_typeof_type
+from numba.core.typing.typeof import _typeof_type as numba_typeof_type
 
 
 class ConcDictIteratorType(SimpleIteratorType):

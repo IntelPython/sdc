@@ -239,8 +239,7 @@ ext_conc_dict = Extension(
     )
 
 _ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq, ext_sort,
-             ext_conc_dict,
-]
+             ext_conc_dict]
 
 # Support of Parquet is disabled because HPAT pipeline does not work now
 # if _has_pyarrow:

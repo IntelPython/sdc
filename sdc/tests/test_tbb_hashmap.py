@@ -45,40 +45,6 @@ from sdc.extensions.sdc_hashmap_ext import (
     )
 from numba.core.extending import register_jitable
 
-# FIXME: things to tests and TO-DO:
-# [x] 1. need to do dispatcher on C++ side that will dispatch to correct template function?
-# [x] 2. creation of dict from iterable (+/-)
-# [x] 3. support iteration? (it would be non-parallel one, does it worth it?)
-# 4. perf test that will check prange dict is faster than numba jit-compiled typed.Dict
-# 4.1. debug issue with impl being slower on one thread
-# [x] 5. correct exceptions propagation from native to python: i.e. what if d[idx] raises
-# [+-] 6. top-priority dicts: int64 -> int64, uint64 -> int64, types.unicode_type -> int64
-# [x] 7. Reduce number of types combinations? i.e. 11 types (all ints, all, floats, and strings) give 11^2 = 121 combinations of each finction?
-#    Can we reduce types to (int32, uint32, int64, uint64, float64, strings) will give 64 combinations
-# [x] 8. how to handle exception like KeyError that should appear from ConcurrentDict?
-# 9. need to check scalability of concurrent dict, what's the best test?
-# [x] 10. need to support generic keys for concurrent dict (with random hash function?) to be used
-#    with keys as e.g. tuples of integers (1, 2, 3) which are necessary for MultiIndex.reindex/join
-# 11. test we need no 121 combination of key/value types since both int8 and uint8 take have
-#    same bit-width so they can be casted on passing to native function and back when getting
-#    return value. That way it would be (int8, int16, int32, int64, float, double), i.e. 64 type combinations
-# 12. need to implement some kind of fallback in case when TBB is not available
-#     and decide how to use it (e.g. obviously non-concurrent structure cannot be used in
-#     prange). OR better no fallback, just fail if TBB is not available?
-# 13. Since we have casts of keys/values need to thoroughly test
-#     it with signed/unsigned integers to avoid missing some errors
-# [x] 14. Need more tests for object lifetime (e.g. when dict is freed and test with MemLeakMixing)
-# 15. Need some performance tests added as well (maybe not to our common framework)
-# [x] 16. MAJOR: numba allows changing dict keys? but in native we rely on key being constant, still we can 
-#     e.g. change unicode string from python and that will broke our hashmap?
-#     Hence we need to restrict Dict keys to immutable types only!! So e.g. lists won't
-#     be accepted (currently they are? - hash(list) exists? - no, so it won't compile) - RESOLVED: types.Hashable as keys
-#     guarantees that string won't be changed. 
-# [x] 17. Add lookup operation for generic value and generic key-value dicts
-# [-]   18. Can we make opaque boxing to Numba type??
-# [-]   19. Operators (at least operator.eq) needed for self.assertEqual
-#     20. Fix arena usage like in native sort!
-
 
 int_limits_min = list(map(lambda x: np.iinfo(x).min, ['int32', 'int64', 'uint32', 'uint64']))
 int_limits_max = list(map(lambda x: np.iinfo(x).max, ['int32', 'int64', 'uint32', 'uint64']))
@@ -96,7 +62,10 @@ def assert_dict_correct(self, result, fromdata):
     i.e. keys match strictly and all values are associated with the same key in fromdata """
 
     self.assertEqual(set(result.keys()), set(dict(fromdata).keys()))
-    key_func = lambda x: x[0]
+
+    def key_func(x):
+        return x[0]
+
     fromdata = sorted(fromdata, key=key_func)
     for k, g in groupby(fromdata, key_func):
         v = result[k]
@@ -169,6 +138,7 @@ class TestHashmapNumeric(MemoryLeakMixin, TestCase):  # FIXME: use unified names
         self.disable_leak_check()
 
         from numba.typed import Dict
+
         @self.jit
         # FIXME: we still need to implement key_type and value_type properties??
         def test_impl(tdict, key_type, value_type):
@@ -216,8 +186,8 @@ class TestHashmapNumeric(MemoryLeakMixin, TestCase):  # FIXME: use unified names
         @self.jit
         def test_impl(key, value, new_value):
             a_dict = ConcurrentDict.from_arrays(
-                np.array([key,]),
-                np.array([value,]),
+                np.array([key, ]),
+                np.array([value, ]),
             )
 
             a_dict[key] = new_value
@@ -237,8 +207,8 @@ class TestHashmapNumeric(MemoryLeakMixin, TestCase):  # FIXME: use unified names
         @self.jit
         def test_impl(key, value):
             a_dict = ConcurrentDict.from_arrays(
-                np.array([key,]),
-                np.array([value,]),
+                np.array([key, ]),
+                np.array([value, ]),
             )
             return a_dict[key]
 
@@ -256,8 +226,8 @@ class TestHashmapNumeric(MemoryLeakMixin, TestCase):  # FIXME: use unified names
         @self.jit
         def test_impl(key, value):
             a_dict = ConcurrentDict.from_arrays(
-                np.array([key,]),
-                np.array([value,]),
+                np.array([key, ]),
+                np.array([value, ]),
             )
 
             return a_dict[2*key]
@@ -276,8 +246,8 @@ class TestHashmapNumeric(MemoryLeakMixin, TestCase):  # FIXME: use unified names
         @self.jit
         def test_impl(key, value):
             a_dict = ConcurrentDict.from_arrays(
-                np.array([key,]),
-                np.array([value,]),
+                np.array([key, ]),
+                np.array([value, ]),
             )
             return key in a_dict, 2*key in a_dict
 
@@ -293,8 +263,8 @@ class TestHashmapNumeric(MemoryLeakMixin, TestCase):  # FIXME: use unified names
         @self.jit
         def test_impl(key, value):
             a_dict = ConcurrentDict.from_arrays(
-                np.array([key,]),
-                np.array([value,]),
+                np.array([key, ]),
+                np.array([value, ]),
             )
             a_dict.pop(key)
             return len(a_dict), a_dict.get(key, None)
@@ -331,8 +301,8 @@ class TestHashmapNumeric(MemoryLeakMixin, TestCase):  # FIXME: use unified names
         @self.jit
         def test_impl(key, value, default):
             a_dict = ConcurrentDict.from_arrays(
-                np.array([key,]),
-                np.array([value,]),
+                np.array([key, ]),
+                np.array([value, ]),
             )
             r1 = a_dict.get(key, None)
             r2 = a_dict.get(2*key, default)
@@ -598,19 +568,19 @@ class TestHashmapGeneric(MemoryLeakMixin, TestCase):
 
     key_types = [
         types.int32,
-#         types.uint32,
-#         types.int64,
-#         types.uint64,
+        types.uint32,
+        types.int64,
+        types.uint64,
         types.unicode_type,
     ]
 
     value_types = [
         types.int32,
-#         types.uint32,
-#         types.int64,
-#         types.uint64,
-#         types.float32,
-#         types.float64,
+        types.uint32,
+        types.int64,
+        types.uint64,
+        types.float32,
+        types.float64,
         types.unicode_type,
     ]
 
@@ -619,7 +589,6 @@ class TestHashmapGeneric(MemoryLeakMixin, TestCase):
         types.Float: 42.3,
         types.UnicodeType: 'sdf',
     }
-
 
     def get_default_scalar(self, nbtype):
         meta_type = type(nbtype)
@@ -659,6 +628,7 @@ class TestHashmapGeneric(MemoryLeakMixin, TestCase):
         self.disable_leak_check()
 
         from numba.typed import Dict
+
         @self.jit
         def test_impl(tdict, key_type, value_type):
             a_dict = ConcurrentDict.empty(key_type, value_type)

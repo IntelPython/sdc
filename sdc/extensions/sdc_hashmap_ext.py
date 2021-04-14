@@ -149,6 +149,7 @@ def gen_deref_voidptr(key_type):
             return None
 
         ret_type = key_type
+
         def codegen(context, builder, sig, args):
             str_val, = args
 
@@ -188,9 +189,10 @@ def gen_hash_compare_ops(key_type):
 @intrinsic
 def call_incref(typingctx, val_type):
     ret_type = types.void
+
     def codegen(context, builder, sig, args):
-        [arg_val,] = args
-        [arg_type,] = sig.args
+        [arg_val] = args
+        [arg_type] = sig.args
 
         if context.enable_nrt:
             context.nrt.incref(builder, arg_type, arg_val)
@@ -201,9 +203,10 @@ def call_incref(typingctx, val_type):
 @intrinsic
 def call_decref(typingctx, val_type):
     ret_type = types.void
+
     def codegen(context, builder, sig, args):
-        [arg_val,] = args
-        [arg_type,] = sig.args
+        [arg_val] = args
+        [arg_type] = sig.args
 
         if context.enable_nrt:
             context.nrt.decref(builder, arg_type, arg_val)
@@ -273,7 +276,6 @@ def alloc_native_value(context, builder, ty_arg):
     return (ret_val_ptr, lir_val_type)
 
 
-
 def transform_native_val(context, builder, ty_arg, val):
     """ This function should cast value returned from native func back to dicts value_type """
 
@@ -310,14 +312,13 @@ def hashmap_create(typingctx, key, value):
         llptrtype = context.get_value_type(types.intp)
         cdict = cgutils.create_struct_proxy(sig.return_type)(context, builder)
         fnty = lir.FunctionType(lir.VoidType(),
-                                [cdict.meminfo.type.as_pointer(),   # meminfo to fill
-                                 lir.IntType(8).as_pointer(),       # NRT API func table
-                                 lir.IntType(8), lir.IntType(8),    # gen_key, gen_value flags
-                                 llptrtype, llptrtype,              # hash_func, equality func
-                                 llptrtype, llptrtype,              # key incref, decref
-                                 llptrtype, llptrtype,              # val incref, decref
-                                 lir.IntType(64), lir.IntType(64)   # key size, val size
-        ])
+                                [cdict.meminfo.type.as_pointer(),     # meminfo to fill
+                                 lir.IntType(8).as_pointer(),         # NRT API func table
+                                 lir.IntType(8), lir.IntType(8),      # gen_key, gen_value flags
+                                 llptrtype, llptrtype,                # hash_func, equality func
+                                 llptrtype, llptrtype,                # key incref, decref
+                                 llptrtype, llptrtype,                # val incref, decref
+                                 lir.IntType(64), lir.IntType(64)])   # key size, val size
         func_name = f"hashmap_create_{key_type_postfix}_to_{value_type_postfix}"
         fn_hashmap_create = builder.module.get_or_insert_function(
             fnty, name=func_name)
@@ -394,13 +395,14 @@ def hashmap_size(typingctx, dict_type):
 
     ty_key, ty_val = dict_type.key_type, dict_type.value_type
     key_type_postfix, value_type_postfix = _get_types_postfixes(ty_key, ty_val)
+
     def codegen(context, builder, sig, args):
         dict_val, = args
 
         cdict = cgutils.create_struct_proxy(dict_type)(
                     context, builder, value=dict_val)
         fnty = lir.FunctionType(lir.IntType(64),
-                                [lir.IntType(8).as_pointer(),])
+                                [lir.IntType(8).as_pointer()])
         func_name = f"hashmap_size_{key_type_postfix}_to_{value_type_postfix}"
         fn_hashmap_size = builder.module.get_or_insert_function(
             fnty, name=func_name)
@@ -425,6 +427,7 @@ def concurrent_dict_len_ovld(cdict):
 def hashmap_set(typingctx, dict_type, key_type, value_type):
 
     key_type_postfix, value_type_postfix = _get_types_postfixes(key_type, value_type)
+
     def codegen(context, builder, sig, args):
         dict_val, key_val, value_val = args
 
@@ -436,8 +439,7 @@ def hashmap_set(typingctx, dict_type, key_type, value_type):
         fnty = lir.FunctionType(lir.VoidType(),
                                 [lir.IntType(8).as_pointer(),
                                  lir_key_type,
-                                 lir_val_type
-        ])
+                                 lir_val_type])
 
         func_name = f"hashmap_set_{key_type_postfix}_to_{value_type_postfix}"
         fn_hashmap_insert = builder.module.get_or_insert_function(
@@ -457,6 +459,7 @@ def concurrent_dict_set_ovld(self, key, value):
     dict_key_type, dict_value_type = self.key_type, self.value_type
     cast_key = key is not dict_key_type
     cast_value = value is not dict_value_type
+
     def concurrent_dict_set_impl(self, key, value):
         _key = key if cast_key == False else _cast(key, dict_key_type)  # noqa
         _value = value if cast_value == False else _cast(value, dict_value_type)  # noqa
@@ -470,6 +473,7 @@ def hashmap_contains(typingctx, dict_type, key_type):
 
     ty_key, ty_val = dict_type.key_type, dict_type.value_type
     key_type_postfix, value_type_postfix = _get_types_postfixes(ty_key, ty_val)
+
     def codegen(context, builder, sig, args):
         dict_val, key_val = args
 
@@ -496,6 +500,7 @@ def concurrent_dict_contains_ovld(self, key):
 
     dict_key_type = self.key_type
     cast_key = key is not dict_key_type
+
     def concurrent_dict_contains_impl(self, key):
         _key = key if cast_key == False else _cast(key, dict_key_type)  # noqa
         return hashmap_contains(self, _key)
@@ -526,14 +531,13 @@ def hashmap_lookup(typingctx, dict_type, key_type):
         fn_hashmap_lookup = builder.module.get_or_insert_function(
             fnty, name=func_name)
 
-
         status = builder.call(fn_hashmap_lookup, [cdict.data_ptr, key_val, native_value_ptr])
         status_as_bool = context.cast(builder, status, types.uint8, types.bool_)
 
         # if key was not found nothing would be stored to native_value_ptr, so depending on status
         # we either deref it or not, wrapping final result into types.Optional value
         result_ptr = cgutils.alloca_once(builder,
-                                context.get_value_type(types.Optional(ty_val)))
+                                         context.get_value_type(types.Optional(ty_val)))
         with builder.if_else(status_as_bool, likely=True) as (if_ok, if_not_ok):
             with if_ok:
                 native_value = builder.load(native_value_ptr)
@@ -563,6 +567,7 @@ def concurrent_dict_lookup_ovld(self, key):
 
     dict_key_type = self.key_type
     cast_key = key is not dict_key_type
+
     def concurrent_dict_lookup_impl(self, key):
         _key = key if cast_key == False else _cast(key, dict_key_type)  # noqa
         found, res = hashmap_lookup(self, _key)
@@ -580,13 +585,14 @@ def hashmap_clear(typingctx, dict_type):
 
     ty_key, ty_val = dict_type.key_type, dict_type.value_type
     key_type_postfix, value_type_postfix = _get_types_postfixes(ty_key, ty_val)
+
     def codegen(context, builder, sig, args):
         dict_val, = args
 
         cdict = cgutils.create_struct_proxy(dict_type)(
                     context, builder, value=dict_val)
         fnty = lir.FunctionType(lir.VoidType(),
-                                [lir.IntType(8).as_pointer(),])
+                                [lir.IntType(8).as_pointer()])
         func_name = f"hashmap_clear_{key_type_postfix}_to_{value_type_postfix}"
         fn_hashmap_clear = builder.module.get_or_insert_function(
             fnty, name=func_name)
@@ -624,6 +630,7 @@ def concurrent_dict_get_ovld(self, key, default=None):
 
     dict_key_type, dict_value_type = self.key_type, self.value_type
     cast_key = key is not dict_key_type
+
     def concurrent_dict_get_impl(self, key, default=None):
         _key = key if cast_key == False else _cast(key, dict_key_type)  # noqa
         found, res = hashmap_lookup(self, _key)
@@ -677,7 +684,7 @@ def hashmap_pop(typingctx, dict_type, key_type):
 
         # same logic to handle non-existing key as in hashmap_lookup
         result_ptr = cgutils.alloca_once(builder,
-                                context.get_value_type(types.Optional(ty_val)))
+                                         context.get_value_type(types.Optional(ty_val)))
         with builder.if_else(status_as_bool, likely=True) as (if_ok, if_not_ok):
             with if_ok:
 
@@ -721,6 +728,7 @@ def concurrent_dict_pop_ovld(self, key, default=None):
 
     dict_key_type, dict_value_type = self.key_type, self.value_type
     cast_key = key is not dict_key_type
+
     def concurrent_dict_pop_impl(self, key, default=None):
         _key = key if cast_key == False else _cast(key, dict_key_type)  # noqa
         found, res = hashmap_pop(self, _key)
@@ -785,7 +793,7 @@ def concurrent_dict_fromkeys_ovld(self, keys, value):
         return None
 
     def wrapper_impl(self, keys, value):
-            return ConcurrentDict.fromkeys(keys, value)
+        return ConcurrentDict.fromkeys(keys, value)
 
     return wrapper_impl
 
@@ -802,6 +810,7 @@ def create_from_arrays(typingctx, keys, values):
     dict_type = ConcurrentDictType(ty_key, ty_val)
     key_type_postfix, value_type_postfix = _get_types_postfixes(ty_key, ty_val)
     get_min_size_sig = signature(types.int64, keys, values)
+
     def codegen(context, builder, sig, args):
         keys_val, values_val = args
         nrt_table = context.nrt.get_nrt_api(builder)
@@ -850,7 +859,7 @@ def concurrent_dict_from_arrays_ovld(cls, keys, values):
     _func_name = f'Method ConcurrentDict::from_arrays()'
     if not (isinstance(keys, types.Array) and keys.ndim == 1
             and isinstance(values, types.Array) and values.ndim == 1):
-        raise TypingError('{} Supported only with 1D arrays of keys and values' \
+        raise TypingError('{} Supported only with 1D arrays of keys and values'
                           'Given: keys={}, values={}'.format(_func_name, keys, values))
 
     def concurrent_dict_from_arrays_impl(cls, keys, values):
@@ -878,7 +887,7 @@ def concurrent_dict_type_fromkeys_ovld(cls, keys, value):
             for i in numba.prange(len(keys)):
                 res[keys[i]] = value
             return res
-    else: # generic for all other iterables
+    else:  # generic for all other iterables
         def concurrent_dict_fromkeys_impl(cls, keys, value):
             res = ConcurrentDict.empty(dict_key_type, dict_value_type)
             for k in keys:
@@ -893,13 +902,14 @@ def _hashmap_dump(typingctx, dict_type):
 
     ty_key, ty_val = dict_type.key_type, dict_type.value_type
     key_type_postfix, value_type_postfix = _get_types_postfixes(ty_key, ty_val)
+
     def codegen(context, builder, sig, args):
         dict_val, = args
 
         cdict = cgutils.create_struct_proxy(dict_type)(
                     context, builder, value=dict_val)
         fnty = lir.FunctionType(lir.VoidType(),
-                                [lir.IntType(8).as_pointer(),])
+                                [lir.IntType(8).as_pointer()])
         func_name = f"hashmap_dump_{key_type_postfix}_to_{value_type_postfix}"
         fn_hashmap_dump = builder.module.get_or_insert_function(
             fnty, name=func_name)
@@ -1011,9 +1021,9 @@ def call_native_getiter(context, builder, dict_type, dict_val, it):
 
     cdict = cgutils.create_struct_proxy(dict_type)(context, builder, value=dict_val)
     it.state = builder.call(fn_hashmap_getiter,
-                              [it._get_ptr_by_name('meminfo'),
-                               nrt_table,
-                               cdict.data_ptr])
+                            [it._get_ptr_by_name('meminfo'),
+                             nrt_table,
+                             cdict.data_ptr])
 
     # store the reference to parent and incref
     it.parent = dict_val
@@ -1071,7 +1081,7 @@ def impl_iterator_iternext(context, builder, sig, args, result):
     fnty = lir.FunctionType(lir.IntType(8),
                             [llvoidptr,
                              lir_key_type.as_pointer(),
-                             lir_value_type.as_pointer(),])
+                             lir_value_type.as_pointer()])
     func_name = f"hashmap_iternext_{key_type_postfix}_to_{value_type_postfix}"
     fn_hashmap_iternext = builder.module.get_or_insert_function(
         fnty, name=func_name)
