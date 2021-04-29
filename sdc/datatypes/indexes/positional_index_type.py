@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2020, Intel Corporation All rights reserved.
 #
@@ -24,8 +25,43 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from sdc.tests.indexes.test_empty_index import TestEmptyIndex
-from sdc.tests.indexes.test_range_index import TestRangeIndex
-from sdc.tests.indexes.test_positional_index import TestPositionalIndex
-from sdc.tests.indexes.test_int64_index import TestInt64Index
-from sdc.tests.indexes.test_indexes import TestIndexes
+from numba import types
+from numba.extending import (
+    models,
+    register_model,
+    make_attribute_wrapper
+)
+
+from sdc.datatypes.indexes import RangeIndexType
+
+
+class PositionalIndexType(types.IterableType):
+    dtype = types.int64
+
+    def __init__(self, is_named=False):
+        self.data = RangeIndexType(is_named)
+        self.is_named = is_named
+        super(PositionalIndexType, self).__init__(
+            name='PositionalIndexType({})'.format(is_named))
+
+    @property
+    def iterator_type(self):
+        res = self.data.iterator_type
+        return res
+
+
+@register_model(PositionalIndexType)
+class PositionalIndexModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+
+        members = [
+            ('data', fe_type.data),
+        ]
+        models.StructModel.__init__(self, dmm, fe_type, members)
+
+
+# FIXME_Numba#3372: add into numba.types to allow returning from objmode
+types.PositionalIndexType = PositionalIndexType
+
+
+make_attribute_wrapper(PositionalIndexType, 'data', '_data')

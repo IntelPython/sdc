@@ -23,7 +23,6 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
-
 """
 
 | This file contains SDC utility functions related to typing compilation phase
@@ -39,19 +38,34 @@ from numba.core.errors import TypingError
 from numba.np import numpy_support
 
 from sdc.str_arr_type import string_array_type
-from sdc.datatypes.range_index_type import RangeIndexType
-from sdc.datatypes.int64_index_type import Int64IndexType
+from sdc.datatypes.indexes import *
 from sdc.str_arr_ext import StringArrayType
 
 
+sdc_old_index_types = (types.Array, StringArrayType, )
 sdc_pandas_index_types = (
-        types.NoneType,
-        types.Array,
-        StringArrayType,
+        EmptyIndexType,
+        PositionalIndexType,
         RangeIndexType,
         Int64IndexType,
+    ) + sdc_old_index_types
+
+sdc_indexes_range_like = (
+        PositionalIndexType,
+        RangeIndexType,
     )
 
+# TO-DO: support caching of data allocated for range indexes at request for .values
+sdc_indexes_wo_values_cache = (
+        EmptyIndexType,
+        PositionalIndexType,
+        RangeIndexType,
+    )
+
+sdc_pandas_df_column_types = (
+        types.Array,
+        StringArrayType,
+    )
 
 class TypeChecker:
     """
@@ -100,6 +114,11 @@ class TypeChecker:
         """
         if not isinstance(data, accepted_type):
             self.raise_exc(data, accepted_type.__name__, name=name)
+
+
+class SDCLimitation(Exception):
+    """Exception to be raised in case of SDC limitation"""
+    pass
 
 
 def kwsparams2list(params):
@@ -193,17 +212,17 @@ def find_common_dtype_from_numpy_dtypes(array_types, scalar_types):
     return numba_common_dtype
 
 
-def find_index_common_dtype(self, other):
+def find_index_common_dtype(left, right):
     """Used to find common dtype for indexes of two series and verify if index dtypes are equal"""
 
-    self_index_dtype = RangeIndexType.dtype if isinstance(self.index, types.NoneType) else self.index.dtype
-    other_index_dtype = RangeIndexType.dtype if isinstance(other.index, types.NoneType) else other.index.dtype
-    index_dtypes_match = self_index_dtype == other_index_dtype
+    left_index_dtype = left.dtype
+    right_index_dtype = right.dtype
+    index_dtypes_match = left_index_dtype == right_index_dtype
     if not index_dtypes_match:
         numba_index_common_dtype = find_common_dtype_from_numpy_dtypes(
-            [self_index_dtype, other_index_dtype], [])
+            [left_index_dtype, right_index_dtype], [])
     else:
-        numba_index_common_dtype = self_index_dtype
+        numba_index_common_dtype = left_index_dtype
 
     return index_dtypes_match, numba_index_common_dtype
 
@@ -224,3 +243,11 @@ def gen_impl_generator(codegen, impl_name):
 
 def check_signed_integer(ty):
     return isinstance(ty, types.Integer) and ty.signed
+
+
+def _check_dtype_param_type(dtype):
+    """ Returns True is dtype is a valid type for dtype parameter and False otherwise.
+        Used in RangeIndex ctor and other methods that take dtype parameter. """
+
+    valid_dtype_types = (types.NoneType, types.Omitted, types.UnicodeType, types.NumberClass)
+    return isinstance(dtype, valid_dtype_types) or dtype is None

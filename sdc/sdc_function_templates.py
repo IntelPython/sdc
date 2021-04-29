@@ -40,15 +40,13 @@ import pandas
 from numba.core.errors import TypingError
 from numba import types
 
-from sdc.utilities.sdc_typing_utils import (TypeChecker, check_index_is_numeric, check_types_comparable,
-                                            find_common_dtype_from_numpy_dtypes, find_index_common_dtype)
-from sdc.datatypes.common_functions import (sdc_join_series_indexes, )
+from sdc.utilities.sdc_typing_utils import (TypeChecker, check_types_comparable, sdc_old_index_types,)
 from sdc.hiframes.api import isna
 from sdc.hiframes.pd_series_type import SeriesType
 from sdc.str_arr_ext import (string_array_type, str_arr_is_na)
 from sdc.utilities.utils import sdc_overload, sdc_overload_method
 from sdc.functions import numpy_like
-from sdc.datatypes.range_index_type import RangeIndexType
+from sdc.extensions.indexes.indexes_generic import sdc_indexes_join_outer, sdc_fix_indexes_join, sdc_unify_index_types
 
 
 def sdc_binop(self, other, fill_value=None):
@@ -79,63 +77,37 @@ def sdc_binop_ovld(self, other, fill_value=None):
         return sdc_binop_impl
 
     else:   # both operands are numeric series
-        # optimization for series with default indexes, that can be aligned differently
-        if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
-            def sdc_binop_impl(self, other, fill_value=None):
 
-                left_size, right_size = len(self._data), len(other._data)
-                max_data_size = max(left_size, right_size)
-                result_data = numpy.empty(max_data_size, dtype=numpy.float64)
+        use_index_methods = not (isinstance(self.index, sdc_old_index_types)
+                                 or isinstance(other.index, sdc_old_index_types))
 
-                _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
-                for i in numba.prange(max_data_size):
-                    left_nan = (i >= left_size or numpy.isnan(self._data[i]))
-                    right_nan = (i >= right_size or numpy.isnan(other._data[i]))
-                    _left = _fill_value if left_nan else self._data[i]
-                    _right = _fill_value if right_nan else other._data[i]
-                    result_data[i] = numpy.nan if (left_nan and right_nan) else _left + _right
+        def sdc_binop_impl(self, other, fill_value=None):
 
-                return pandas.Series(result_data)
+            left_index, right_index = self._index, other._index
+            if use_index_methods == True:  # noqa
+                indexes_join_res = left_index.join(right_index, 'outer', return_indexers=True)
+            else:
+                indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
 
-            return sdc_binop_impl
-        else:
-            left_index_is_range = isinstance(self.index, (RangeIndexType, types.NoneType))
-            index_dtypes_match, numba_index_common_dtype = find_index_common_dtype(self, other)
+            # FIXME_Numba#XXXX: remove sdc_fix_indexes_join call at all when issue is fixed
+            joined_index, left_indexer, right_indexer = sdc_fix_indexes_join(*indexes_join_res)
+            result_size = len(joined_index)
+            result_data = numpy.empty(result_size, dtype=numpy.float64)
 
-            def sdc_binop_impl(self, other, fill_value=None):
+            _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
+            for i in numba.prange(result_size):
+                left_pos = left_indexer[i]
+                right_pos = right_indexer[i]
 
-                # check if indexes are equal and series don't have to be aligned
-                left_index, right_index = self.index, other.index
-                if (left_index is right_index
-                        or numpy_like.array_equal(left_index, right_index)):
+                left_nan = (left_pos == -1 or numpy.isnan(self._data[left_pos]))
+                right_nan = (right_pos == -1 or numpy.isnan(other._data[right_pos]))
+                _left = _fill_value if left_nan else self._data[left_pos]
+                _right = _fill_value if right_nan else other._data[right_pos]
+                result_data[i] = numpy.nan if (left_nan and right_nan) else _left + _right
 
-                    _left = pandas.Series(self._data)
-                    _right = pandas.Series(other._data)
-                    partial_res = _left.binop(_right, fill_value=fill_value)
+            return pandas.Series(result_data, index=joined_index)
 
-                    if index_dtypes_match == False:  # noqa
-                        result_index = numpy_like.astype(left_index, numba_index_common_dtype)
-                    else:
-                        result_index = left_index.values if left_index_is_range == True else left_index  # noqa
-
-                    return pandas.Series(partial_res._data, index=result_index)
-
-                _fill_value = numpy.nan if fill_value_is_none == True else fill_value  # noqa
-                # TODO: replace below with core join(how='outer', return_indexers=True) when implemented
-                joined_index, left_indexer, right_indexer = sdc_join_series_indexes(left_index, right_index)
-                result_size = len(joined_index)
-                result_data = numpy.empty(result_size, dtype=numpy.float64)
-                for i in numba.prange(result_size):
-                    left_pos, right_pos = left_indexer[i], right_indexer[i]
-                    left_nan = (left_pos == -1 or numpy.isnan(self._data[left_pos]))
-                    right_nan = (right_pos == -1 or numpy.isnan(other._data[right_pos]))
-                    _left = _fill_value if left_nan else self._data[left_pos]
-                    _right = _fill_value if right_nan else other._data[right_pos]
-                    result_data[i] = numpy.nan if (left_nan and right_nan) else _left + _right
-
-                return pandas.Series(result_data, index=joined_index)
-
-            return sdc_binop_impl
+        return sdc_binop_impl
 
 
 def sdc_pandas_series_binop(self, other, level=None, fill_value=None, axis=0):
@@ -189,9 +161,7 @@ def sdc_pandas_series_binop(self, other, level=None, fill_value=None, axis=0):
 
     operands_are_series = self_is_series and other_is_series
     if operands_are_series:
-        none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
-                                   and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index)
         if not series_indexes_comparable:
             raise TypingError('{} Not implemented for series with not-comparable indexes. \
             Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
@@ -228,59 +198,44 @@ def sdc_comp_binop_ovld(self, other, fill_value=None):
     fill_value_is_none = isinstance(fill_value, (types.NoneType, types.Omitted)) or fill_value is None
 
     if not operands_are_series:
-        def _series_comp_binop_scalar_impl(self, other, fill_value=None):
+        def _series_lt_scalar_impl(self, other, fill_value=None):
 
             _self = numpy_like.fillna(self._data, inplace=False, value=fill_value)
             return pandas.Series(_self < other, index=self._index, name=self._name)
 
-        return _series_comp_binop_scalar_impl
+        return _series_lt_scalar_impl
 
     else:
 
-        # optimization for series with default indexes, that can be aligned differently
-        if (isinstance(self.index, types.NoneType) and isinstance(other.index, types.NoneType)):
-            def _series_comp_binop_none_indexes_impl(self, other, fill_value=None):
+        index_api_supported = not (isinstance(self.index, sdc_old_index_types)
+                                   and isinstance(other.index, sdc_old_index_types))
 
-                left_size, right_size = len(self._data), len(other._data)
-                if left_size != right_size:
+        def _series_lt_common_impl(self, other, fill_value=None):
+
+            left_index, right_index = self.index, other.index
+            if index_api_supported == True:  # noqa
+                if not (left_index is right_index or left_index.equals(right_index)):
+                    raise ValueError("Can only compare identically-labeled Series objects")
+            else:
+                if not (left_index is right_index or numpy_like.array_equal(left_index, right_index)):
                     raise ValueError("Can only compare identically-labeled Series objects")
 
-                if fill_value_is_none == True:  # noqa
-                    result_data = self._data < other._data
-                else:
-                    result_data = numpy.empty(left_size, dtype=types.bool_)
-                    for i in numba.prange(left_size):
-                        left_nan = isna(self._data, i)
-                        right_nan = isna(other._data, i)
-                        _left = fill_value if left_nan else self._data[i]
-                        _right = fill_value if right_nan else other._data[i]
-                        result_data[i] = False if (left_nan and right_nan) else _left < _right
+            res_size = len(left_index)
+            if fill_value_is_none == True:  # noqa
+                res_data = self._data < other._data
+            else:
+                res_data = numpy.empty(res_size, dtype=types.bool_)
+                for i in numba.prange(res_size):
+                    left_nan = isna(self._data, i)
+                    right_nan = isna(other._data, i)
+                    _left = fill_value if left_nan else self._data[i]
+                    _right = fill_value if right_nan else other._data[i]
+                    res_data[i] = False if (left_nan and right_nan) else _left < _right
 
-                return pandas.Series(result_data)
+            res_index = sdc_unify_index_types(left_index, right_index)
+            return pandas.Series(res_data, index=res_index)
 
-            return _series_comp_binop_none_indexes_impl
-        else:
-            left_index_is_range = isinstance(self.index, (RangeIndexType, types.NoneType))
-            index_dtypes_match, numba_index_common_dtype = find_index_common_dtype(self, other)
-
-            def _series_comp_binop_common_impl(self, other, fill_value=None):
-
-                left_index, right_index = self.index, other.index
-                if not (left_index is right_index
-                        or numpy_like.array_equal(left_index, right_index)):
-                    raise ValueError("Can only compare identically-labeled Series objects")
-
-                _left, _right = pandas.Series(self._data), pandas.Series(other._data)
-                partial_res = _left.comp_binop(_right, fill_value=fill_value)
-
-                if index_dtypes_match == False:  # noqa
-                    result_index = numpy_like.astype(left_index, numba_index_common_dtype)
-                else:
-                    result_index = left_index.values if left_index_is_range == True else left_index  # noqa
-
-                return pandas.Series(partial_res._data, result_index)
-
-            return _series_comp_binop_common_impl
+        return _series_lt_common_impl
 
     return None
 
@@ -342,9 +297,7 @@ def sdc_pandas_series_comp_binop(self, other, level=None, fill_value=None, axis=
 
     operands_are_series = self_is_series and other_is_series
     if operands_are_series:
-        none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
-                                   and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index)
         if not series_indexes_comparable:
             raise TypingError('{} Not implemented for series with not-comparable indexes. \
             Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
@@ -407,9 +360,7 @@ def sdc_pandas_series_operator_binop(self, other):
 
     operands_are_series = self_is_series and other_is_series
     if operands_are_series:
-        none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
-                                   and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index)
         if not series_indexes_comparable:
             raise TypingError('{} Not implemented for series with not-comparable indexes. \
             Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
@@ -461,9 +412,7 @@ def sdc_pandas_series_operator_comp_binop(self, other):
 
     operands_are_series = self_is_series and other_is_series
     if operands_are_series:
-        none_or_numeric_indexes = ((isinstance(self.index, types.NoneType) or check_index_is_numeric(self))
-                                   and (isinstance(other.index, types.NoneType) or check_index_is_numeric(other)))
-        series_indexes_comparable = check_types_comparable(self.index, other.index) or none_or_numeric_indexes
+        series_indexes_comparable = check_types_comparable(self.index, other.index)
         if not series_indexes_comparable:
             raise TypingError('{} Not implemented for series with not-comparable indexes. \
             Given: self.index={}, other.index={}'.format(_func_name, self.index, other.index))
