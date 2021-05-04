@@ -43,7 +43,6 @@ from sdc.extensions.sdc_hashmap_ext import (
     supported_numeric_key_types,
     supported_numeric_value_types,
     )
-from numba.core.extending import register_jitable
 
 
 int_limits_min = list(map(lambda x: np.iinfo(x).min, ['int32', 'int64', 'uint32', 'uint64']))
@@ -78,9 +77,9 @@ def assert_dict_correct(self, result, fromdata):
             self.assertIn(v, group_values_set)
 
 
-class TestHashmapNumeric(MemoryLeakMixin, TestCase):  # FIXME: use unified names (i.e. TBB hashmap of ConcDict)
-    """ Verifies correctness of single following specialization of numeric hashmap,
-        i.e. when both keys and values are numeric. """
+class TestHashmapNumeric(MemoryLeakMixin, TestCase):
+    """ Verifies correctness of numeric implementation TBB based hashmap,
+        i.e. specialization that is selected when both keys and values are numeric. """
 
     key_types = supported_numeric_key_types
     value_types = supported_numeric_value_types

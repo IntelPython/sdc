@@ -95,8 +95,9 @@ public:
     }
 
     VoidPtrHashCompare() = delete;
-    VoidPtrHashCompare(const VoidPtrHashCompare& rhs) = default;
+    VoidPtrHashCompare(const VoidPtrHashCompare&) = default;
     VoidPtrHashCompare& operator=(const VoidPtrHashCompare&) = default;
+    VoidPtrHashCompare(VoidPtrHashCompare&&) = default;
     VoidPtrHashCompare& operator=(VoidPtrHashCompare&&) = default;
     ~VoidPtrHashCompare() = default;
 };
@@ -130,46 +131,43 @@ class NumericHashmapType {
 public:
     using map_type = typename tbb::concurrent_unordered_map<Key, Val, Hasher, Equality>;
     using iterator_type = typename map_type::iterator;
-    std::unique_ptr<map_type> p_map;
+    map_type map;
 
     NumericHashmapType()
-    : p_map(std::unique_ptr<map_type>(new map_type(0, Hasher(), Equality()))) {}
+    : map(0, Hasher(), Equality()) {}
     // TO-DO: support copying for all hashmaps and ConcurrentDict's .copy() method in python?
     NumericHashmapType(const NumericHashmapType&) = delete;
     NumericHashmapType& operator=(const NumericHashmapType&) = delete;
-    NumericHashmapType(NumericHashmapType&& rhs) : p_map(std::move(rhs->p_map)) {};
-    NumericHashmapType& operator=(NumericHashmapType&& rhs) {
-        this->p_map.reset(std::move(rhs->p_map));
-        return *this;
-    };
+    NumericHashmapType(NumericHashmapType&& rhs) = delete;
+    NumericHashmapType& operator=(NumericHashmapType&& rhs) = delete;
     ~NumericHashmapType() {}
 
     uint64_t size() {
-        return this->p_map->size();
+        return this->map.size();
     }
 
     void set(Key key, Val val) {
-        (*this->p_map)[key] = val;
+        this->map[key] = val;
     }
 
     int8_t contains(Key key) {
-        auto it = this->p_map->find(key);
-        return it != this->p_map->end();
+        auto it = this->map.find(key);
+        return it != this->map.end();
     }
     int8_t lookup(Key key, Val* res) {
-        auto it = this->p_map->find(key);
-        bool found = it != this->p_map->end();
+        auto it = this->map.find(key);
+        bool found = it != this->map.end();
         if (found)
             *res = (*it).second;
 
         return found;
     }
     void clear() {
-        this->p_map->clear();
+        this->map.clear();
     }
 
     int8_t pop(Key key, Val* res) {
-        auto node_handle = this->p_map->unsafe_extract(key);
+        auto node_handle = this->map.unsafe_extract(key);
         auto found = !node_handle.empty();
         if (found)
             *res = node_handle.mapped();
@@ -177,12 +175,12 @@ public:
         return found;
     }
 
-    void update(const NumericHashmapType& other) {
-        this->p_map->merge(*other.p_map);
+    void update(NumericHashmapType& other) {
+        this->map.merge(other.map);
     }
 
     void* getiter() {
-        auto p_it = new iterator_type(this->p_map->begin());
+        auto p_it = new iterator_type(this->map.begin());
         auto state = new iter_state((void*)p_it, (void*)this);
         return state;
     }
@@ -197,34 +195,28 @@ class GenericHashmapBase {
 public:
     using map_type = typename tbb::concurrent_hash_map<Key, Val, HashCompare>;
     using iterator_type = typename map_type::iterator;
-    std::unique_ptr<map_type> p_map;
+    map_type map;
 
     // FIXME: 0 default size is suboptimal, can we optimize this?
-    GenericHashmapBase() : p_map(std::unique_ptr<map_type>(new map_type(0, HashCompare()))) {}
-    GenericHashmapBase(const HashCompare& hash_compare) {
-        this->p_map.reset(new map_type(0, hash_compare));
-    }
-    GenericHashmapBase(std::unique_ptr<map_type>&& rhs_p_map) : p_map(std::move(rhs_p_map)) {};
+    GenericHashmapBase() : map(0, HashCompare()) {}
+    GenericHashmapBase(const HashCompare& hash_compare) : map(0, hash_compare) {}
 
     GenericHashmapBase(const GenericHashmapBase&) = delete;
     GenericHashmapBase& operator=(const GenericHashmapBase&) = delete;
-    GenericHashmapBase(GenericHashmapBase&& rhs) : p_map(std::move(rhs->p_map)) {};
-    GenericHashmapBase& operator=(GenericHashmapBase&& rhs) {
-        this->p_map.reset(std::move(rhs->p_map));
-        return *this;
-    };
+    GenericHashmapBase(GenericHashmapBase&& rhs) = delete;
+    GenericHashmapBase& operator=(GenericHashmapBase&& rhs) = delete;
     virtual ~GenericHashmapBase() {
     }
 
     uint64_t size() {
-        return this->p_map->size();
+        return this->map.size();
     }
 
     int8_t contains(Key key) {
         bool found = false;
         {
             typename map_type::const_accessor result;
-            found = this->p_map->find(result, key);
+            found = this->map.find(result, key);
             result.release();
         }
         return found;
@@ -234,7 +226,7 @@ public:
         bool found = false;
         {
             typename map_type::const_accessor result;
-            found = this->p_map->find(result, key);
+            found = this->map.find(result, key);
             if (found)
                 *res = result->second;
             result.release();
@@ -245,9 +237,9 @@ public:
 
     virtual void set(Key key, Val val) = 0;
 
-    void update(const GenericHashmapBase& other) {
+    void update(GenericHashmapBase& other) {
         tbb::parallel_for(
-                other.p_map->range(),
+                other.map.range(),
                 [this](const typename map_type::range_type& r) {
                     for (typename map_type::iterator i = r.begin(); i != r.end(); ++i) {
                         this->set(i->first, i->second);
@@ -256,7 +248,7 @@ public:
     }
 
     void* getiter() {
-        auto p_it = new iterator_type(this->p_map->begin());
+        auto p_it = new iterator_type(this->map.begin());
         auto state = new iter_state((void*)p_it, (void*)this);
         return state;
     }
@@ -270,6 +262,7 @@ template<typename Key,
 >
 class GenericHashmapType : public GenericHashmapBase<Key, Val, HashCompare> {
 public:
+    // TO-DO: make VoidPtrTypeInfo templates and unify modifiers impl via calls to template funcs
     using map_type = typename GenericHashmapBase<Key, Val, HashCompare>::map_type;
     VoidPtrTypeInfo key_info;
     VoidPtrTypeInfo val_info;
@@ -285,32 +278,24 @@ public:
     GenericHashmapType() = delete;
     GenericHashmapType(const GenericHashmapType&) = delete;
     GenericHashmapType& operator=(const GenericHashmapType&) = delete;
-    GenericHashmapType(GenericHashmapType&& rhs)
-    : GenericHashmapBase<Key, Val, HashCompare>(std::move(rhs.p_map)),
-      key_info(std::move(rhs.key_info)),
-      val_info(std::move(rhs.val_info)) {};
-    GenericHashmapType& operator=(GenericHashmapType&& rhs) {
-        this->p_map = std::move(rhs.p_map);
-        this->key_info = std::move(rhs.key_info);
-        this->val_info = std::move(rhs.val_info);
-        return *this;
-    };
+    GenericHashmapType(GenericHashmapType&& rhs) = delete;
+    GenericHashmapType& operator=(GenericHashmapType&& rhs) = delete;
     virtual ~GenericHashmapType() {};
 
 
     void clear() {
-        this->p_map->clear();
+        this->map.clear();
     }
 
     int8_t pop(Key key, void* res) {
         bool found = false;
         {
             typename map_type::const_accessor result;
-            found = this->p_map->find(result, key);
+            found = this->map.find(result, key);
             if (found)
             {
                 memcpy(res, &(result->second), this->val_info.size);
-                this->p_map->erase(result);
+                this->map.erase(result);
             }
             result.release();
         }
@@ -322,7 +307,7 @@ public:
         typename map_type::value_type inserted_node(key, val);
         {
             typename map_type::accessor existing_node;
-            bool ok = this->p_map->insert(existing_node, inserted_node);
+            bool ok = this->map.insert(existing_node, inserted_node);
             if (!ok)
             {
                 // insertion failed key already exists
@@ -352,16 +337,8 @@ public:
     GenericHashmapType() = delete;
     GenericHashmapType(const GenericHashmapType&) = delete;
     GenericHashmapType& operator=(const GenericHashmapType&) = delete;
-    GenericHashmapType(GenericHashmapType&& rhs)
-    : GenericHashmapBase<Key, void*, HashCompare>(std::move(rhs.p_map)),
-      key_info(std::move(rhs.key_info)),
-      val_info(std::move(rhs.val_info)) {};
-    GenericHashmapType& operator=(GenericHashmapType&& rhs) {
-        this->p_map = std::move(rhs.p_map);
-        this->key_info = std::move(rhs.key_info);
-        this->val_info = std::move(rhs.val_info);
-        return *this;
-    };
+    GenericHashmapType(GenericHashmapType&& rhs) = delete;
+    GenericHashmapType& operator=(GenericHashmapType&& rhs) = delete;
     virtual ~GenericHashmapType() {};
 
     void clear();
@@ -388,16 +365,8 @@ public:
     GenericHashmapType() = delete;
     GenericHashmapType(const GenericHashmapType&) = delete;
     GenericHashmapType& operator=(const GenericHashmapType&) = delete;
-    GenericHashmapType(GenericHashmapType&& rhs)
-    : GenericHashmapBase<void*, Val, VoidPtrHashCompare>(std::move(rhs.p_map)),
-      key_info(std::move(rhs.key_info)),
-      val_info(std::move(rhs.val_info)) {};
-    GenericHashmapType& operator=(GenericHashmapType&& rhs) {
-        this->p_map = std::move(rhs.p_map);
-        this->key_info = std::move(rhs.key_info);
-        this->val_info = std::move(rhs.val_info);
-        return *this;
-    };
+    GenericHashmapType(GenericHashmapType&& rhs) = delete;
+    GenericHashmapType& operator=(GenericHashmapType&& rhs) = delete;
     virtual ~GenericHashmapType() {};
 
     void clear();
@@ -424,16 +393,8 @@ public:
     GenericHashmapType() = delete;
     GenericHashmapType(const GenericHashmapType&) = delete;
     GenericHashmapType& operator=(const GenericHashmapType&) = delete;
-    GenericHashmapType(GenericHashmapType&& rhs)
-    : GenericHashmapBase<void*, void*, VoidPtrHashCompare>(std::move(rhs.p_map)),
-      key_info(std::move(rhs.key_info)),
-      val_info(std::move(rhs.val_info)) {};
-    GenericHashmapType& operator=(GenericHashmapType&& rhs) {
-        this->p_map = std::move(rhs.p_map);
-        this->key_info = std::move(rhs.key_info);
-        this->val_info = std::move(rhs.val_info);
-        return *this;
-    };
+    GenericHashmapType(GenericHashmapType&& rhs) = delete;
+    GenericHashmapType& operator=(GenericHashmapType&& rhs) = delete;
     virtual ~GenericHashmapType() {};
 
     void clear();
@@ -499,7 +460,7 @@ template <typename value_type>
 void delete_generic_key_hashmap(void* p_hash_map)
 {
     auto p_hash_map_spec = (generic_key_hashmap<value_type>*)p_hash_map;
-    for (auto kv_pair: (*p_hash_map_spec->p_map)) {
+    for (auto kv_pair: p_hash_map_spec->map) {
         p_hash_map_spec->key_info.decref(kv_pair.first);
         free(kv_pair.first);
     }
@@ -511,7 +472,7 @@ void delete_generic_value_hashmap(void* p_hash_map)
 {
 
     auto p_hash_map_spec = (generic_value_hashmap<key_type>*)p_hash_map;
-    for (auto kv_pair: (*p_hash_map_spec->p_map)) {
+    for (auto kv_pair: p_hash_map_spec->map) {
         p_hash_map_spec->val_info.decref(kv_pair.second);
         free(kv_pair.second);
     }
@@ -521,7 +482,7 @@ void delete_generic_value_hashmap(void* p_hash_map)
 void delete_generic_hashmap(void* p_hash_map)
 {
     auto p_hash_map_spec = (generic_hashmap*)p_hash_map;
-    for (auto kv_pair: (*p_hash_map_spec->p_map)) {
+    for (auto kv_pair: p_hash_map_spec->map) {
         p_hash_map_spec->key_info.decref(kv_pair.first);
         free(kv_pair.first);
         p_hash_map_spec->val_info.decref(kv_pair.second);
@@ -564,10 +525,10 @@ void GenericHashmapType<Key, void*, HashCompare>::set(Key key, void* val)
     typename map_type::value_type inserted_node(key, _val);
     {
         typename map_type::accessor existing_node;
-        bool ok = this->p_map->insert(existing_node, inserted_node);
+        bool ok = this->map.insert(existing_node, inserted_node);
         if (ok)
         {
-            // isnertion succeeded need to incref value
+            // insertion succeeded need to incref value
             this->val_info.incref(val);
         }
         else
@@ -586,11 +547,11 @@ template<typename Key,
 >
 void GenericHashmapType<Key, void*, HashCompare>::clear()
 {
-    for (auto kv_pair: (*this->p_map)) {
+    for (auto kv_pair: this->map) {
         this->val_info.decref(kv_pair.second);
         free(kv_pair.second);
     }
-    this->p_map->clear();
+    this->map.clear();
 }
 
 
@@ -601,13 +562,13 @@ int8_t GenericHashmapType<Key, void*, HashCompare>::pop(Key key, void* res) {
     bool found = false;
     {
         typename map_type::const_accessor result;
-        found = this->p_map->find(result, key);
+        found = this->map.find(result, key);
         if (found)
         {
             memcpy(res, result->second, this->val_info.size);
             free(result->second);
             // no decref for value since it would be returned (and no incref on python side!)
-            this->p_map->erase(result);
+            this->map.erase(result);
         }
         result.release();
     }
@@ -626,10 +587,10 @@ void GenericHashmapType<void*, Val, VoidPtrHashCompare>::set(void* key, Val val)
     typename map_type::value_type inserted_node(_key, val);
     {
         typename map_type::accessor existing_node;
-        bool ok = this->p_map->insert(existing_node, inserted_node);
+        bool ok = this->map.insert(existing_node, inserted_node);
         if (ok)
         {
-            // isnertion succeeded need to incref key
+            // insertion succeeded need to incref key
             this->key_info.incref(key);
         }
         else
@@ -644,11 +605,11 @@ void GenericHashmapType<void*, Val, VoidPtrHashCompare>::set(void* key, Val val)
 template<typename Val>
 void GenericHashmapType<void*, Val, VoidPtrHashCompare>::clear()
 {
-    for (auto kv_pair: (*this->p_map)) {
+    for (auto kv_pair: this->map) {
         this->key_info.decref(kv_pair.first);
         free(kv_pair.first);
     }
-    this->p_map->clear();
+    this->map.clear();
 }
 
 template<typename Val>
@@ -656,14 +617,14 @@ int8_t GenericHashmapType<void*, Val, VoidPtrHashCompare>::pop(void* key, void* 
     bool found = false;
     {
         typename map_type::const_accessor result;
-        found = this->p_map->find(result, key);
+        found = this->map.find(result, key);
         if (found)
         {
             memcpy(res, &(result->second), this->val_info.size);
             this->key_info.decref(result->first);
             free(result->first);
             // no decref for value since it would be returned (and no incref on python side!)
-            this->p_map->erase(result);
+            this->map.erase(result);
         }
         result.release();
     }
@@ -686,7 +647,7 @@ void GenericHashmapType<void*, void*, VoidPtrHashCompare>::set(void* key, void* 
     typename map_type::value_type inserted_node(_key, _val);
     {
         typename map_type::accessor existing_node;
-        bool ok = this->p_map->insert(existing_node, inserted_node);
+        bool ok = this->map.insert(existing_node, inserted_node);
         if (ok)
         {
             this->key_info.incref(key);
@@ -707,13 +668,13 @@ void GenericHashmapType<void*, void*, VoidPtrHashCompare>::set(void* key, void* 
 
 void GenericHashmapType<void*, void*, VoidPtrHashCompare>::clear()
 {
-    for (auto kv_pair: (*this->p_map)) {
+    for (auto kv_pair: this->map) {
         this->key_info.decref(kv_pair.first);
         free(kv_pair.first);
         this->val_info.decref(kv_pair.second);
         free(kv_pair.second);
     }
-    this->p_map->clear();
+    this->map.clear();
 }
 
 
@@ -721,7 +682,7 @@ int8_t GenericHashmapType<void*, void*, VoidPtrHashCompare>::pop(void* key, void
     bool found = false;
     {
         typename map_type::const_accessor result;
-        found = this->p_map->find(result, key);
+        found = this->map.find(result, key);
         if (found)
         {
             memcpy(res, result->second, this->val_info.size);
@@ -729,7 +690,7 @@ int8_t GenericHashmapType<void*, void*, VoidPtrHashCompare>::pop(void* key, void
             this->key_info.decref(result->first);
             free(result->first);
             // no decref for value since it would be returned (and no incref on python side!)
-            this->p_map->erase(result);
+            this->map.erase(result);
         }
         result.release();
     }
@@ -841,7 +802,7 @@ void hashmap_numeric_from_arrays(NRT_MemInfo** meminfo, void* nrt_table, key_typ
                  [=](const tbb::blocked_range<size_t>& r) {
                      for(size_t i=r.begin(); i!=r.end(); ++i) {
                          auto kv_pair = std::pair<const key_type, val_type>(keys[i], values[i]);
-                         p_hash_map->p_map->insert(
+                         p_hash_map->map.insert(
                              std::move(kv_pair)
                          );
                      }
@@ -864,9 +825,9 @@ template<typename key_type, typename val_type>
 void hashmap_dump(void* p_hash_map)
 {
     auto p_hash_map_spec = reinterpet_hashmap_ptr<key_type, val_type>(p_hash_map);
-    auto size = p_hash_map_spec->p_map->size();
+    auto size = p_hash_map_spec->map.size();
     std::cout << "Hashmap at: " << p_hash_map_spec << ", size = " << size << std::endl;
-    for (auto kv_pair: (*p_hash_map_spec->p_map))
+    for (auto kv_pair: p_hash_map_spec->map)
     {
         std::cout << "key, value: " << kv_pair.first << ", " << kv_pair.second << std::endl;
     }
@@ -895,7 +856,7 @@ int8_t hashmap_iternext(void* p_iter_state, key_type* ret_key, val_type* ret_val
     auto p_hash_map_iter = reinterpret_cast<itertype*>(p_iter_state_spec->first);
 
     int8_t status = 1;
-    if (*p_hash_map_iter != p_hash_map_spec->p_map->end())
+    if (*p_hash_map_iter != p_hash_map_spec->map.end())
     {
         *ret_key = (*p_hash_map_iter)->first;
         *ret_val = (*p_hash_map_iter)->second;

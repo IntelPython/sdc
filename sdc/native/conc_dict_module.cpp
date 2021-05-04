@@ -130,254 +130,70 @@ int8_t hashmap_iternext_##suffix(void* p_iter_state, key_type* ret_key, val_type
 } \
 
 
+#define declare_hashmap(key_type, val_type, suffix) \
+declare_hashmap_create(key_type, val_type, suffix); \
+declare_hashmap_size(key_type, val_type, suffix); \
+declare_hashmap_set(key_type, val_type, suffix); \
+declare_hashmap_contains(key_type, val_type, suffix); \
+declare_hashmap_lookup(key_type, val_type, suffix); \
+declare_hashmap_clear(key_type, val_type, suffix); \
+declare_hashmap_pop(key_type, val_type, suffix); \
+declare_hashmap_update(key_type, val_type, suffix); \
+declare_hashmap_dump(key_type, val_type, suffix); \
+declare_hashmap_getiter(key_type, val_type, suffix); \
+declare_hashmap_iternext(key_type, val_type, suffix); \
+
+#define REGISTER(func) PyObject_SetAttrString(m, #func, PyLong_FromVoidPtr((void*)(&func)));
+
+#define register_hashmap(suffix) \
+REGISTER(hashmap_create_##suffix) \
+REGISTER(hashmap_size_##suffix) \
+REGISTER(hashmap_set_##suffix) \
+REGISTER(hashmap_contains_##suffix) \
+REGISTER(hashmap_lookup_##suffix) \
+REGISTER(hashmap_clear_##suffix) \
+REGISTER(hashmap_pop_##suffix) \
+REGISTER(hashmap_update_##suffix) \
+REGISTER(hashmap_dump_##suffix) \
+REGISTER(hashmap_getiter_##suffix) \
+REGISTER(hashmap_iternext_##suffix) \
+
+
 extern "C"
 {
 
-// empty hashmap creation functions
-declare_hashmap_create(int32_t, int32_t, int32_t_to_int32_t);
-declare_hashmap_create(int32_t, int64_t, int32_t_to_int64_t);
-declare_hashmap_create(int32_t, float, int32_t_to_float);
-declare_hashmap_create(int32_t, double, int32_t_to_double);
+// declare all hashmap methods for below combinations of key-value types
+declare_hashmap(int32_t, int32_t, int32_t_to_int32_t)
+declare_hashmap(int32_t, int64_t, int32_t_to_int64_t)
+declare_hashmap(int32_t, float, int32_t_to_float)
+declare_hashmap(int32_t, double, int32_t_to_double)
 
-declare_hashmap_create(int64_t, int32_t, int64_t_to_int32_t);
-declare_hashmap_create(int64_t, int64_t, int64_t_to_int64_t);
-declare_hashmap_create(int64_t, float, int64_t_to_float);
-declare_hashmap_create(int64_t, double, int64_t_to_double);
+declare_hashmap(int64_t, int32_t, int64_t_to_int32_t)
+declare_hashmap(int64_t, int64_t, int64_t_to_int64_t)
+declare_hashmap(int64_t, float, int64_t_to_float)
+declare_hashmap(int64_t, double, int64_t_to_double)
 
-declare_hashmap_create(void*, int32_t, voidptr_to_int32_t);
-declare_hashmap_create(void*, int64_t, voidptr_to_int64_t);
-declare_hashmap_create(void*, float, voidptr_to_float);
-declare_hashmap_create(void*, double, voidptr_to_double);
+declare_hashmap(void*, int32_t, voidptr_to_int32_t)
+declare_hashmap(void*, int64_t, voidptr_to_int64_t)
+declare_hashmap(void*, float, voidptr_to_float)
+declare_hashmap(void*, double, voidptr_to_double)
 
-declare_hashmap_create(int32_t, void*, int32_t_to_voidptr);
-declare_hashmap_create(int64_t, void*, int64_t_to_voidptr);
+declare_hashmap(int32_t, void*, int32_t_to_voidptr)
+declare_hashmap(int64_t, void*, int64_t_to_voidptr)
 
-declare_hashmap_create(void*, void*, voidptr_to_voidptr);
+declare_hashmap(void*, void*, voidptr_to_voidptr)
 
-// hashmap size functions
-declare_hashmap_size(int32_t, int32_t, int32_t_to_int32_t);
-declare_hashmap_size(int32_t, int64_t, int32_t_to_int64_t);
-declare_hashmap_size(int32_t, float, int32_t_to_float);
-declare_hashmap_size(int32_t, double, int32_t_to_double);
+// additionally declare create_from_data functions for numeric hashmap
+declare_hashmap_create_from_data(int32_t, int32_t)
+declare_hashmap_create_from_data(int32_t, int64_t)
+declare_hashmap_create_from_data(int32_t, float)
+declare_hashmap_create_from_data(int32_t, double)
 
-declare_hashmap_size(int64_t, int32_t, int64_t_to_int32_t);
-declare_hashmap_size(int64_t, int64_t, int64_t_to_int64_t);
-declare_hashmap_size(int64_t, float, int64_t_to_float);
-declare_hashmap_size(int64_t, double, int64_t_to_double);
+declare_hashmap_create_from_data(int64_t, int32_t)
+declare_hashmap_create_from_data(int64_t, int64_t)
+declare_hashmap_create_from_data(int64_t, float)
+declare_hashmap_create_from_data(int64_t, double)
 
-declare_hashmap_size(void*, int32_t, voidptr_to_int32_t);
-declare_hashmap_size(void*, int64_t, voidptr_to_int64_t);
-declare_hashmap_size(void*, float, voidptr_to_float);
-declare_hashmap_size(void*, double, voidptr_to_double);
-
-declare_hashmap_size(int32_t, void*, int32_t_to_voidptr);
-declare_hashmap_size(int64_t, void*, int64_t_to_voidptr);
-
-declare_hashmap_size(void*, void*, voidptr_to_voidptr);
-
-// hashmap set functions
-declare_hashmap_set(int32_t, int32_t, int32_t_to_int32_t);
-declare_hashmap_set(int32_t, int64_t, int32_t_to_int64_t);
-declare_hashmap_set(int32_t, float, int32_t_to_float);
-declare_hashmap_set(int32_t, double, int32_t_to_double);
-
-declare_hashmap_set(int64_t, int32_t, int64_t_to_int32_t);
-declare_hashmap_set(int64_t, int64_t, int64_t_to_int64_t);
-declare_hashmap_set(int64_t, float, int64_t_to_float);
-declare_hashmap_set(int64_t, double, int64_t_to_double);
-
-declare_hashmap_set(void*, int32_t, voidptr_to_int32_t);
-declare_hashmap_set(void*, int64_t, voidptr_to_int64_t);
-declare_hashmap_set(void*, float, voidptr_to_float);
-declare_hashmap_set(void*, double, voidptr_to_double);
-
-declare_hashmap_set(int32_t, void*, int32_t_to_voidptr);
-declare_hashmap_set(int64_t, void*, int64_t_to_voidptr);
-
-declare_hashmap_set(void*, void*, voidptr_to_voidptr);
-
-// hashmap contains functions
-declare_hashmap_contains(int32_t, int32_t, int32_t_to_int32_t);
-declare_hashmap_contains(int32_t, int64_t, int32_t_to_int64_t);
-declare_hashmap_contains(int32_t, float, int32_t_to_float);
-declare_hashmap_contains(int32_t, double, int32_t_to_double);
-
-declare_hashmap_contains(int64_t, int32_t, int64_t_to_int32_t);
-declare_hashmap_contains(int64_t, int64_t, int64_t_to_int64_t);
-declare_hashmap_contains(int64_t, float, int64_t_to_float);
-declare_hashmap_contains(int64_t, double, int64_t_to_double);
-
-declare_hashmap_contains(void*, int32_t, voidptr_to_int32_t);
-declare_hashmap_contains(void*, int64_t, voidptr_to_int64_t);
-declare_hashmap_contains(void*, float, voidptr_to_float);
-declare_hashmap_contains(void*, double, voidptr_to_double);
-
-declare_hashmap_contains(int32_t, void*, int32_t_to_voidptr);
-declare_hashmap_contains(int64_t, void*, int64_t_to_voidptr);
-
-declare_hashmap_contains(void*, void*, voidptr_to_voidptr);
-
-// hashmap lookup functions
-declare_hashmap_lookup(int32_t, int32_t, int32_t_to_int32_t);
-declare_hashmap_lookup(int32_t, int64_t, int32_t_to_int64_t);
-declare_hashmap_lookup(int32_t, float, int32_t_to_float);
-declare_hashmap_lookup(int32_t, double, int32_t_to_double);
-
-declare_hashmap_lookup(int64_t, int32_t, int64_t_to_int32_t);
-declare_hashmap_lookup(int64_t, int64_t, int64_t_to_int64_t);
-declare_hashmap_lookup(int64_t, float, int64_t_to_float);
-declare_hashmap_lookup(int64_t, double, int64_t_to_double);
-
-declare_hashmap_lookup(void*, int32_t, voidptr_to_int32_t);
-declare_hashmap_lookup(void*, int64_t, voidptr_to_int64_t);
-declare_hashmap_lookup(void*, float, voidptr_to_float);
-declare_hashmap_lookup(void*, double, voidptr_to_double);
-
-declare_hashmap_lookup(int32_t, void*, int32_t_to_voidptr);
-declare_hashmap_lookup(int64_t, void*, int64_t_to_voidptr);
-
-declare_hashmap_lookup(void*, void*, voidptr_to_voidptr);
-
-// hashmap clear functions
-declare_hashmap_clear(int32_t, int32_t, int32_t_to_int32_t);
-declare_hashmap_clear(int32_t, int64_t, int32_t_to_int64_t);
-declare_hashmap_clear(int32_t, float, int32_t_to_float);
-declare_hashmap_clear(int32_t, double, int32_t_to_double);
-
-declare_hashmap_clear(int64_t, int32_t, int64_t_to_int32_t);
-declare_hashmap_clear(int64_t, int64_t, int64_t_to_int64_t);
-declare_hashmap_clear(int64_t, float, int64_t_to_float);
-declare_hashmap_clear(int64_t, double, int64_t_to_double);
-
-declare_hashmap_clear(void*, int32_t, voidptr_to_int32_t);
-declare_hashmap_clear(void*, int64_t, voidptr_to_int64_t);
-declare_hashmap_clear(void*, float, voidptr_to_float);
-declare_hashmap_clear(void*, double, voidptr_to_double);
-
-declare_hashmap_clear(int32_t, void*, int32_t_to_voidptr);
-declare_hashmap_clear(int64_t, void*, int64_t_to_voidptr);
-
-declare_hashmap_clear(void*, void*, voidptr_to_voidptr);
-
-// hashmap pop functions
-declare_hashmap_pop(int32_t, int32_t, int32_t_to_int32_t);
-declare_hashmap_pop(int32_t, int64_t, int32_t_to_int64_t);
-declare_hashmap_pop(int32_t, float, int32_t_to_float);
-declare_hashmap_pop(int32_t, double, int32_t_to_double);
-
-declare_hashmap_pop(int64_t, int32_t, int64_t_to_int32_t);
-declare_hashmap_pop(int64_t, int64_t, int64_t_to_int64_t);
-declare_hashmap_pop(int64_t, float, int64_t_to_float);
-declare_hashmap_pop(int64_t, double, int64_t_to_double);
-
-declare_hashmap_pop(void*, int32_t, voidptr_to_int32_t);
-declare_hashmap_pop(void*, int64_t, voidptr_to_int64_t);
-declare_hashmap_pop(void*, float, voidptr_to_float);
-declare_hashmap_pop(void*, double, voidptr_to_double);
-
-declare_hashmap_pop(int32_t, void*, int32_t_to_voidptr);
-declare_hashmap_pop(int64_t, void*, int64_t_to_voidptr);
-
-declare_hashmap_pop(void*, void*, voidptr_to_voidptr);
-
-// hashmap update functions
-declare_hashmap_update(int32_t, int32_t, int32_t_to_int32_t);
-declare_hashmap_update(int32_t, int64_t, int32_t_to_int64_t);
-declare_hashmap_update(int32_t, float, int32_t_to_float);
-declare_hashmap_update(int32_t, double, int32_t_to_double);
-
-declare_hashmap_update(int64_t, int32_t, int64_t_to_int32_t);
-declare_hashmap_update(int64_t, int64_t, int64_t_to_int64_t);
-declare_hashmap_update(int64_t, float, int64_t_to_float);
-declare_hashmap_update(int64_t, double, int64_t_to_double);
-
-declare_hashmap_update(void*, int32_t, voidptr_to_int32_t);
-declare_hashmap_update(void*, int64_t, voidptr_to_int64_t);
-declare_hashmap_update(void*, float, voidptr_to_float);
-declare_hashmap_update(void*, double, voidptr_to_double);
-
-declare_hashmap_update(int32_t, void*, int32_t_to_voidptr);
-declare_hashmap_update(int64_t, void*, int64_t_to_voidptr);
-
-declare_hashmap_update(void*, void*, voidptr_to_voidptr);
-
-// numeric hashmap create_from_data functions
-declare_hashmap_create_from_data(int32_t, int32_t);
-declare_hashmap_create_from_data(int32_t, int64_t);
-declare_hashmap_create_from_data(int32_t, float);
-declare_hashmap_create_from_data(int32_t, double);
-
-declare_hashmap_create_from_data(int64_t, int32_t);
-declare_hashmap_create_from_data(int64_t, int64_t);
-declare_hashmap_create_from_data(int64_t, float);
-declare_hashmap_create_from_data(int64_t, double);
-
-// hashmap dump functions
-declare_hashmap_dump(int32_t, int32_t, int32_t_to_int32_t);
-declare_hashmap_dump(int32_t, int64_t, int32_t_to_int64_t);
-declare_hashmap_dump(int32_t, float, int32_t_to_float);
-declare_hashmap_dump(int32_t, double, int32_t_to_double);
-
-declare_hashmap_dump(int64_t, int32_t, int64_t_to_int32_t);
-declare_hashmap_dump(int64_t, int64_t, int64_t_to_int64_t);
-declare_hashmap_dump(int64_t, float, int64_t_to_float);
-declare_hashmap_dump(int64_t, double, int64_t_to_double);
-
-declare_hashmap_dump(void*, int32_t, voidptr_to_int32_t);
-declare_hashmap_dump(void*, int64_t, voidptr_to_int64_t);
-declare_hashmap_dump(void*, float, voidptr_to_float);
-declare_hashmap_dump(void*, double, voidptr_to_double);
-
-declare_hashmap_dump(int32_t, void*, int32_t_to_voidptr);
-declare_hashmap_dump(int64_t, void*, int64_t_to_voidptr);
-
-declare_hashmap_dump(void*, void*, voidptr_to_voidptr);
-
-
-// hashmap getiter functions
-declare_hashmap_getiter(int32_t, int32_t, int32_t_to_int32_t);
-declare_hashmap_getiter(int32_t, int64_t, int32_t_to_int64_t);
-declare_hashmap_getiter(int32_t, float, int32_t_to_float);
-declare_hashmap_getiter(int32_t, double, int32_t_to_double);
-
-declare_hashmap_getiter(int64_t, int32_t, int64_t_to_int32_t);
-declare_hashmap_getiter(int64_t, int64_t, int64_t_to_int64_t);
-declare_hashmap_getiter(int64_t, float, int64_t_to_float);
-declare_hashmap_getiter(int64_t, double, int64_t_to_double);
-
-declare_hashmap_getiter(void*, int32_t, voidptr_to_int32_t);
-declare_hashmap_getiter(void*, int64_t, voidptr_to_int64_t);
-declare_hashmap_getiter(void*, float, voidptr_to_float);
-declare_hashmap_getiter(void*, double, voidptr_to_double);
-
-declare_hashmap_getiter(int32_t, void*, int32_t_to_voidptr);
-declare_hashmap_getiter(int64_t, void*, int64_t_to_voidptr);
-
-declare_hashmap_getiter(void*, void*, voidptr_to_voidptr);
-
-// hashmap iternext functions
-declare_hashmap_iternext(int32_t, int32_t, int32_t_to_int32_t);
-declare_hashmap_iternext(int32_t, int64_t, int32_t_to_int64_t);
-declare_hashmap_iternext(int32_t, float, int32_t_to_float);
-declare_hashmap_iternext(int32_t, double, int32_t_to_double);
-
-declare_hashmap_iternext(int64_t, int32_t, int64_t_to_int32_t);
-declare_hashmap_iternext(int64_t, int64_t, int64_t_to_int64_t);
-declare_hashmap_iternext(int64_t, float, int64_t_to_float);
-declare_hashmap_iternext(int64_t, double, int64_t_to_double);
-
-declare_hashmap_iternext(void*, int32_t, voidptr_to_int32_t);
-declare_hashmap_iternext(void*, int64_t, voidptr_to_int64_t);
-declare_hashmap_iternext(void*, float, voidptr_to_float);
-declare_hashmap_iternext(void*, double, voidptr_to_double);
-
-declare_hashmap_iternext(int32_t, void*, int32_t_to_voidptr);
-declare_hashmap_iternext(int64_t, void*, int64_t_to_voidptr);
-
-declare_hashmap_iternext(void*, void*, voidptr_to_voidptr);
-
-
-#define REGISTER(func) PyObject_SetAttrString(m, #func, PyLong_FromVoidPtr((void*)(&func)));
 
 PyMODINIT_FUNC PyInit_hconc_dict()
 {
@@ -394,175 +210,28 @@ PyMODINIT_FUNC PyInit_hconc_dict()
         return NULL;
     }
 
-    // hashmap creation functions
-    REGISTER(hashmap_create_int32_t_to_int32_t)
-    REGISTER(hashmap_create_int32_t_to_int64_t)
-    REGISTER(hashmap_create_int64_t_to_int32_t)
-    REGISTER(hashmap_create_int64_t_to_int64_t)
+    // register previosuly declared hashmap methods
+    register_hashmap(int32_t_to_int32_t)
+    register_hashmap(int32_t_to_int64_t)
+    register_hashmap(int64_t_to_int32_t)
+    register_hashmap(int64_t_to_int64_t)
 
-    REGISTER(hashmap_create_int32_t_to_float)
-    REGISTER(hashmap_create_int32_t_to_double)
-    REGISTER(hashmap_create_int64_t_to_float)
-    REGISTER(hashmap_create_int64_t_to_double)
+    register_hashmap(int32_t_to_float)
+    register_hashmap(int32_t_to_double)
+    register_hashmap(int64_t_to_float)
+    register_hashmap(int64_t_to_double)
 
-    REGISTER(hashmap_create_voidptr_to_int32_t)
-    REGISTER(hashmap_create_voidptr_to_int64_t)
-    REGISTER(hashmap_create_voidptr_to_float)
-    REGISTER(hashmap_create_voidptr_to_double)
+    register_hashmap(voidptr_to_int32_t)
+    register_hashmap(voidptr_to_int64_t)
+    register_hashmap(voidptr_to_float)
+    register_hashmap(voidptr_to_double)
 
-    REGISTER(hashmap_create_int32_t_to_voidptr)
-    REGISTER(hashmap_create_int64_t_to_voidptr)
+    register_hashmap(int32_t_to_voidptr)
+    register_hashmap(int64_t_to_voidptr)
 
-    REGISTER(hashmap_create_voidptr_to_voidptr);
+    register_hashmap(voidptr_to_voidptr);
 
-    // hashmap size functions
-    REGISTER(hashmap_size_int32_t_to_int32_t)
-    REGISTER(hashmap_size_int32_t_to_int64_t)
-    REGISTER(hashmap_size_int64_t_to_int32_t)
-    REGISTER(hashmap_size_int64_t_to_int64_t)
-
-    REGISTER(hashmap_size_int32_t_to_float)
-    REGISTER(hashmap_size_int32_t_to_double)
-    REGISTER(hashmap_size_int64_t_to_float)
-    REGISTER(hashmap_size_int64_t_to_double)
-
-    REGISTER(hashmap_size_voidptr_to_int32_t)
-    REGISTER(hashmap_size_voidptr_to_int64_t)
-    REGISTER(hashmap_size_voidptr_to_float)
-    REGISTER(hashmap_size_voidptr_to_double)
-
-    REGISTER(hashmap_size_int32_t_to_voidptr)
-    REGISTER(hashmap_size_int64_t_to_voidptr)
-
-    REGISTER(hashmap_size_voidptr_to_voidptr);
-
-    // hashmap set functions
-    REGISTER(hashmap_set_int32_t_to_int32_t)
-    REGISTER(hashmap_set_int32_t_to_int64_t)
-    REGISTER(hashmap_set_int64_t_to_int32_t)
-    REGISTER(hashmap_set_int64_t_to_int64_t)
-
-    REGISTER(hashmap_set_int32_t_to_float)
-    REGISTER(hashmap_set_int32_t_to_double)
-    REGISTER(hashmap_set_int64_t_to_float)
-    REGISTER(hashmap_set_int64_t_to_double)
-
-    REGISTER(hashmap_set_voidptr_to_int32_t)
-    REGISTER(hashmap_set_voidptr_to_int64_t)
-    REGISTER(hashmap_set_voidptr_to_float)
-    REGISTER(hashmap_set_voidptr_to_double)
-
-    REGISTER(hashmap_set_int32_t_to_voidptr)
-    REGISTER(hashmap_set_int64_t_to_voidptr)
-
-    REGISTER(hashmap_set_voidptr_to_voidptr);
-
-    // hashmap contains functions
-    REGISTER(hashmap_contains_int32_t_to_int32_t)
-    REGISTER(hashmap_contains_int32_t_to_int64_t)
-    REGISTER(hashmap_contains_int64_t_to_int32_t)
-    REGISTER(hashmap_contains_int64_t_to_int64_t)
-
-    REGISTER(hashmap_contains_int32_t_to_float)
-    REGISTER(hashmap_contains_int32_t_to_double)
-    REGISTER(hashmap_contains_int64_t_to_float)
-    REGISTER(hashmap_contains_int64_t_to_double)
-
-    REGISTER(hashmap_contains_voidptr_to_int32_t)
-    REGISTER(hashmap_contains_voidptr_to_int64_t)
-    REGISTER(hashmap_contains_voidptr_to_float)
-    REGISTER(hashmap_contains_voidptr_to_double)
-
-    REGISTER(hashmap_contains_int32_t_to_voidptr)
-    REGISTER(hashmap_contains_int64_t_to_voidptr)
-
-    REGISTER(hashmap_contains_voidptr_to_voidptr);
-
-    // hashmap lookup functions
-    REGISTER(hashmap_lookup_int32_t_to_int32_t)
-    REGISTER(hashmap_lookup_int32_t_to_int64_t)
-    REGISTER(hashmap_lookup_int64_t_to_int32_t)
-    REGISTER(hashmap_lookup_int64_t_to_int64_t)
-
-    REGISTER(hashmap_lookup_int32_t_to_float)
-    REGISTER(hashmap_lookup_int32_t_to_double)
-    REGISTER(hashmap_lookup_int64_t_to_float)
-    REGISTER(hashmap_lookup_int64_t_to_double)
-
-    REGISTER(hashmap_lookup_voidptr_to_int32_t)
-    REGISTER(hashmap_lookup_voidptr_to_int64_t)
-    REGISTER(hashmap_lookup_voidptr_to_float)
-    REGISTER(hashmap_lookup_voidptr_to_double)
-
-    REGISTER(hashmap_lookup_int32_t_to_voidptr)
-    REGISTER(hashmap_lookup_int64_t_to_voidptr)
-
-    REGISTER(hashmap_lookup_voidptr_to_voidptr);
-
-    // hashmap clear functions
-    REGISTER(hashmap_clear_int32_t_to_int32_t)
-    REGISTER(hashmap_clear_int32_t_to_int64_t)
-    REGISTER(hashmap_clear_int64_t_to_int32_t)
-    REGISTER(hashmap_clear_int64_t_to_int64_t)
-
-    REGISTER(hashmap_clear_int32_t_to_float)
-    REGISTER(hashmap_clear_int32_t_to_double)
-    REGISTER(hashmap_clear_int64_t_to_float)
-    REGISTER(hashmap_clear_int64_t_to_double)
-
-    REGISTER(hashmap_clear_voidptr_to_int32_t)
-    REGISTER(hashmap_clear_voidptr_to_int64_t)
-    REGISTER(hashmap_clear_voidptr_to_float)
-    REGISTER(hashmap_clear_voidptr_to_double)
-
-    REGISTER(hashmap_clear_int32_t_to_voidptr)
-    REGISTER(hashmap_clear_int64_t_to_voidptr)
-
-    REGISTER(hashmap_clear_voidptr_to_voidptr);
-
-    // hashmap pop functions
-    REGISTER(hashmap_pop_int32_t_to_int32_t)
-    REGISTER(hashmap_pop_int32_t_to_int64_t)
-    REGISTER(hashmap_pop_int64_t_to_int32_t)
-    REGISTER(hashmap_pop_int64_t_to_int64_t)
-
-    REGISTER(hashmap_pop_int32_t_to_float)
-    REGISTER(hashmap_pop_int32_t_to_double)
-    REGISTER(hashmap_pop_int64_t_to_float)
-    REGISTER(hashmap_pop_int64_t_to_double)
-
-    REGISTER(hashmap_pop_voidptr_to_int32_t)
-    REGISTER(hashmap_pop_voidptr_to_int64_t)
-    REGISTER(hashmap_pop_voidptr_to_float)
-    REGISTER(hashmap_pop_voidptr_to_double)
-
-    REGISTER(hashmap_pop_int32_t_to_voidptr)
-    REGISTER(hashmap_pop_int64_t_to_voidptr)
-
-    REGISTER(hashmap_pop_voidptr_to_voidptr);
-
-    // hashmap update functions
-    REGISTER(hashmap_update_int32_t_to_int32_t)
-    REGISTER(hashmap_update_int32_t_to_int64_t)
-    REGISTER(hashmap_update_int64_t_to_int32_t)
-    REGISTER(hashmap_update_int64_t_to_int64_t)
-
-    REGISTER(hashmap_update_int32_t_to_float)
-    REGISTER(hashmap_update_int32_t_to_double)
-    REGISTER(hashmap_update_int64_t_to_float)
-    REGISTER(hashmap_update_int64_t_to_double)
-
-    REGISTER(hashmap_update_voidptr_to_int32_t)
-    REGISTER(hashmap_update_voidptr_to_int64_t)
-    REGISTER(hashmap_update_voidptr_to_float)
-    REGISTER(hashmap_update_voidptr_to_double)
-
-    REGISTER(hashmap_update_int32_t_to_voidptr)
-    REGISTER(hashmap_update_int64_t_to_voidptr)
-
-    REGISTER(hashmap_update_voidptr_to_voidptr);
-
-    // hashmap create_from_data functions
+    // hashmap create_from_data functions for numeric hashmap
     REGISTER(hashmap_create_from_data_int32_t_to_int32_t)
     REGISTER(hashmap_create_from_data_int32_t_to_int64_t)
     REGISTER(hashmap_create_from_data_int64_t_to_int32_t)
@@ -573,73 +242,12 @@ PyMODINIT_FUNC PyInit_hconc_dict()
     REGISTER(hashmap_create_from_data_int64_t_to_float)
     REGISTER(hashmap_create_from_data_int64_t_to_double)
 
-    // hashmap dump functions
-    REGISTER(hashmap_dump_int32_t_to_int32_t)
-    REGISTER(hashmap_dump_int32_t_to_int64_t)
-    REGISTER(hashmap_dump_int64_t_to_int32_t)
-    REGISTER(hashmap_dump_int64_t_to_int64_t)
-
-    REGISTER(hashmap_dump_int32_t_to_float)
-    REGISTER(hashmap_dump_int32_t_to_double)
-    REGISTER(hashmap_dump_int64_t_to_float)
-    REGISTER(hashmap_dump_int64_t_to_double)
-
-    REGISTER(hashmap_dump_voidptr_to_int32_t)
-    REGISTER(hashmap_dump_voidptr_to_int64_t)
-    REGISTER(hashmap_dump_voidptr_to_float)
-    REGISTER(hashmap_dump_voidptr_to_double)
-
-    REGISTER(hashmap_dump_int32_t_to_voidptr)
-    REGISTER(hashmap_dump_int64_t_to_voidptr)
-
-    REGISTER(hashmap_dump_voidptr_to_voidptr);
-
-    // hashmap getiter functions
-    REGISTER(hashmap_getiter_int32_t_to_int32_t)
-    REGISTER(hashmap_getiter_int32_t_to_int64_t)
-    REGISTER(hashmap_getiter_int64_t_to_int32_t)
-    REGISTER(hashmap_getiter_int64_t_to_int64_t)
-
-    REGISTER(hashmap_getiter_int32_t_to_float)
-    REGISTER(hashmap_getiter_int32_t_to_double)
-    REGISTER(hashmap_getiter_int64_t_to_float)
-    REGISTER(hashmap_getiter_int64_t_to_double)
-
-    REGISTER(hashmap_getiter_voidptr_to_int32_t)
-    REGISTER(hashmap_getiter_voidptr_to_int64_t)
-    REGISTER(hashmap_getiter_voidptr_to_float)
-    REGISTER(hashmap_getiter_voidptr_to_double)
-
-    REGISTER(hashmap_getiter_int32_t_to_voidptr)
-    REGISTER(hashmap_getiter_int64_t_to_voidptr)
-
-    REGISTER(hashmap_getiter_voidptr_to_voidptr);
-
-    // hashmap iternext functions
-    REGISTER(hashmap_iternext_int32_t_to_int32_t)
-    REGISTER(hashmap_iternext_int32_t_to_int64_t)
-    REGISTER(hashmap_iternext_int64_t_to_int32_t)
-    REGISTER(hashmap_iternext_int64_t_to_int64_t)
-
-    REGISTER(hashmap_iternext_int32_t_to_float)
-    REGISTER(hashmap_iternext_int32_t_to_double)
-    REGISTER(hashmap_iternext_int64_t_to_float)
-    REGISTER(hashmap_iternext_int64_t_to_double)
-
-    REGISTER(hashmap_iternext_voidptr_to_int32_t)
-    REGISTER(hashmap_iternext_voidptr_to_int64_t)
-    REGISTER(hashmap_iternext_voidptr_to_float)
-    REGISTER(hashmap_iternext_voidptr_to_double)
-
-    REGISTER(hashmap_iternext_int32_t_to_voidptr)
-    REGISTER(hashmap_iternext_int64_t_to_voidptr)
-
-    REGISTER(hashmap_iternext_voidptr_to_voidptr);
-
     utils::tbb_control::init();
 
     return m;
 }
+
+}  // extern "C"
 
 #undef declare_hashmap_create
 #undef declare_hashmap_size
@@ -653,7 +261,6 @@ PyMODINIT_FUNC PyInit_hconc_dict()
 #undef declare_hashmap_dump
 #undef declare_hashmap_getiter
 #undef declare_hashmap_iternext
+#undef register_hashmap
 #undef REGISTER
-
-}  // extern "C"
-
+#undef declare_hashmap
