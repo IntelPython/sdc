@@ -43,3 +43,9 @@ jobs:
         python buildscripts/build_doc.py --python=$PYTHON_VER --sdc-channel=./sdc-build
       displayName: 'Build Intel SDC documentation'
       continueOnError: ${{ parameters.allowFailure }}
+
+    - script: |
+        source $HOME/miniconda3/bin/activate
+        python buildscripts/test_conda_install.py --python=$PYTHON_VER --channels="-c anaconda -c conda-forge"
+      displayName: 'Test SDC installation from conda'
+      continueOnError: ${{ parameters.allowFailure }}

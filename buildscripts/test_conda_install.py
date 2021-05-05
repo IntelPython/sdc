@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2021, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -28,19 +28,17 @@
 import argparse
 import os
 import shutil
+import traceback
+import re
 
 from pathlib import Path
 from utilities import SDC_Build_Utilities
 
 
-def run_benchmarks(sdc_utils, args_list, num_threads_list):
-    os.chdir(str(sdc_utils.src_path.parent))
-
-    for args_set in args_list:
-        for num_threads in num_threads_list:
-            os.environ['NUMBA_NUM_THREADS'] = num_threads
-            sdc_utils.log_info(f'Run Intel SDC benchmarks on {num_threads} threads', separate=True)
-            sdc_utils.run_command(f'python -W ignore -m sdc.runtests {args_set}')
+def check_sdc_installed(sdc_utils, sdc_package):
+    cmd_output = sdc_utils.get_command_output('conda list sdc')
+    pattern = sdc_package.replace('=', '\s+')
+    return re.search(pattern, cmd_output)
 
 
 if __name__ == '__main__':
@@ -49,16 +47,17 @@ if __name__ == '__main__':
                         help='Python version, default = 3.7')
     parser.add_argument('--channels', default=None, help='Default env channels')
     parser.add_argument('--sdc-channel', default=None, help='Intel SDC channel')
-    parser.add_argument('--args-list', required=True, nargs='+', help='List of arguments sets for benchmarks')
-    parser.add_argument('--num-threads-list', required=True, nargs='+',
-                        help='List of values for NUMBA_NUM_THREADS env variable')
 
     args = parser.parse_args()
 
     sdc_utils = SDC_Build_Utilities(args.python, args.channels, args.sdc_channel)
-    sdc_utils.log_info('Run Intel(R) SDC benchmarks', separate=True)
+    sdc_utils.log_info('Test Intel(R) SDC conda install', separate=True)
     sdc_utils.log_info(sdc_utils.line_double)
-    sdc_utils.create_environment(['openpyxl', 'xlrd'])
-    sdc_utils.install_conda_package(['sdc'])
+    sdc_utils.create_environment()
+    sdc_package = f'sdc={sdc_utils.get_sdc_version_from_channel()}'
 
-    run_benchmarks(sdc_utils, args.args_list, args.num_threads_list)
+    # channels list is aligned with install instruction in README.rst
+    install_channels = "-c intel/label/beta -c intel -c defaults -c conda-forge"
+    sdc_utils.install_conda_package([sdc_package], channels=install_channels)
+
+    assert check_sdc_installed(sdc_utils, sdc_package), "SDC package was not installed"
