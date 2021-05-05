@@ -1062,7 +1062,6 @@ class TestSeries_ops(TestCase):
                 result_ref = test_impl(S1, scalar, fill_value)
                 pd.testing.assert_series_equal(result, result_ref)
 
-    @unittest.expectedFailure  # Numba issue with 1/0 is different (inf) than in Numpy (nan)
     def test_series_binop_floordiv_numeric(self):
         def test_impl(a, b, value):
             return a.floordiv(b, fill_value=value)
