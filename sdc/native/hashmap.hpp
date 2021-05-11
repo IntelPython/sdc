@@ -119,6 +119,11 @@ struct VoidPtrTypeInfo {
     VoidPtrTypeInfo& operator=(const VoidPtrTypeInfo&) = default;
     VoidPtrTypeInfo& operator=(VoidPtrTypeInfo&&) = default;
     ~VoidPtrTypeInfo() = default;
+
+    void delete_voidptr(void* ptr_data) {
+        this->decref(ptr_data);
+        free(ptr_data);
+    }
 };
 
 
@@ -461,8 +466,7 @@ void delete_generic_key_hashmap(void* p_hash_map)
 {
     auto p_hash_map_spec = (generic_key_hashmap<value_type>*)p_hash_map;
     for (auto kv_pair: p_hash_map_spec->map) {
-        p_hash_map_spec->key_info.decref(kv_pair.first);
-        free(kv_pair.first);
+        p_hash_map_spec->key_info.delete_voidptr(kv_pair.first);
     }
     delete p_hash_map_spec;
 }
@@ -473,8 +477,7 @@ void delete_generic_value_hashmap(void* p_hash_map)
 
     auto p_hash_map_spec = (generic_value_hashmap<key_type>*)p_hash_map;
     for (auto kv_pair: p_hash_map_spec->map) {
-        p_hash_map_spec->val_info.decref(kv_pair.second);
-        free(kv_pair.second);
+        p_hash_map_spec->val_info.delete_voidptr(kv_pair.second);
     }
     delete p_hash_map_spec;
 }
@@ -483,10 +486,8 @@ void delete_generic_hashmap(void* p_hash_map)
 {
     auto p_hash_map_spec = (generic_hashmap*)p_hash_map;
     for (auto kv_pair: p_hash_map_spec->map) {
-        p_hash_map_spec->key_info.decref(kv_pair.first);
-        free(kv_pair.first);
-        p_hash_map_spec->val_info.decref(kv_pair.second);
-        free(kv_pair.second);
+        p_hash_map_spec->key_info.delete_voidptr(kv_pair.first);
+        p_hash_map_spec->val_info.delete_voidptr(kv_pair.second);
     }
     delete p_hash_map_spec;
 }
@@ -534,8 +535,7 @@ void GenericHashmapType<Key, void*, HashCompare>::set(Key key, void* val)
         else
         {
             // insertion failed key already exists
-            this->val_info.decref(existing_node->second);
-            free(existing_node->second);
+            this->val_info.delete_voidptr(existing_node->second);
             existing_node->second = _val;
             this->val_info.incref(val);
         }
@@ -548,8 +548,7 @@ template<typename Key,
 void GenericHashmapType<Key, void*, HashCompare>::clear()
 {
     for (auto kv_pair: this->map) {
-        this->val_info.decref(kv_pair.second);
-        free(kv_pair.second);
+        this->val_info.delete_voidptr(kv_pair.second);
     }
     this->map.clear();
 }
@@ -606,8 +605,7 @@ template<typename Val>
 void GenericHashmapType<void*, Val, VoidPtrHashCompare>::clear()
 {
     for (auto kv_pair: this->map) {
-        this->key_info.decref(kv_pair.first);
-        free(kv_pair.first);
+        this->key_info.delete_voidptr(kv_pair.first);
     }
     this->map.clear();
 }
@@ -621,8 +619,7 @@ int8_t GenericHashmapType<void*, Val, VoidPtrHashCompare>::pop(void* key, void* 
         if (found)
         {
             memcpy(res, &(result->second), this->val_info.size);
-            this->key_info.decref(result->first);
-            free(result->first);
+            this->key_info.delete_voidptr(result->first);
             // no decref for value since it would be returned (and no incref on python side!)
             this->map.erase(result);
         }
@@ -658,8 +655,7 @@ void GenericHashmapType<void*, void*, VoidPtrHashCompare>::set(void* key, void* 
             // insertion failed key already exists
             free(_key);
 
-            this->val_info.decref(existing_node->second);
-            free(existing_node->second);
+            this->val_info.delete_voidptr(existing_node->second);
             existing_node->second = _val;
             this->val_info.incref(val);
         }
@@ -669,10 +665,8 @@ void GenericHashmapType<void*, void*, VoidPtrHashCompare>::set(void* key, void* 
 void GenericHashmapType<void*, void*, VoidPtrHashCompare>::clear()
 {
     for (auto kv_pair: this->map) {
-        this->key_info.decref(kv_pair.first);
-        free(kv_pair.first);
-        this->val_info.decref(kv_pair.second);
-        free(kv_pair.second);
+        this->key_info.delete_voidptr(kv_pair.first);
+        this->val_info.delete_voidptr(kv_pair.second);
     }
     this->map.clear();
 }
@@ -686,9 +680,9 @@ int8_t GenericHashmapType<void*, void*, VoidPtrHashCompare>::pop(void* key, void
         if (found)
         {
             memcpy(res, result->second, this->val_info.size);
+
             free(result->second);
-            this->key_info.decref(result->first);
-            free(result->first);
+            this->key_info.delete_voidptr(result->first);
             // no decref for value since it would be returned (and no incref on python side!)
             this->map.erase(result);
         }
