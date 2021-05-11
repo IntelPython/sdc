@@ -37,7 +37,7 @@ from utilities import SDC_Build_Utilities
 
 def check_sdc_installed(sdc_utils, sdc_package):
     cmd_output = sdc_utils.get_command_output('conda list sdc')
-    pattern = sdc_package.replace('=', '\s+')
+    pattern = sdc_package.replace('=', r'\s+')
     return re.search(pattern, cmd_output)
 
 
