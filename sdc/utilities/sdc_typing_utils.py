@@ -40,6 +40,7 @@ from numba.np import numpy_support
 from sdc.str_arr_type import string_array_type
 from sdc.datatypes.indexes import *
 from sdc.str_arr_ext import StringArrayType
+from sdc.datatypes.categorical.types import Categorical
 
 
 sdc_old_index_types = (types.Array, StringArrayType, )
@@ -65,6 +66,7 @@ sdc_indexes_wo_values_cache = (
 sdc_pandas_df_column_types = (
         types.Array,
         StringArrayType,
+        Categorical,
     )
 
 class TypeChecker:
