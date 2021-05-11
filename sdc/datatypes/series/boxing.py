@@ -25,9 +25,13 @@
 # *****************************************************************************
 
 from numba.core.imputils import lower_constant
-from numba.core import cgutils
+from numba.core import cgutils, types
 
 from .types import SeriesType
+from sdc.datatypes.indexes.positional_index_type import PositionalIndexType
+from sdc.hiframes.boxing import _unbox_index_data
+from sdc.extensions.indexes.range_index_ext import unbox_range_index
+from sdc.datatypes.indexes.range_index_type import RangeIndexDataType
 
 
 @lower_constant(SeriesType)
@@ -39,7 +43,21 @@ def constant_Series(context, builder, ty, pyval):
     """
     series = cgutils.create_struct_proxy(ty)(context, builder)
     series.data = _constant_Series_data(context, builder, ty, pyval)
-    # TODO: index and name
+
+    # TODO: index and name (this only handles PositionalIndexType(False)
+    # and repeats unboxing, need to refactor to support all indexes)
+    native_range_index = cgutils.create_struct_proxy(RangeIndexDataType)(context, builder)
+    native_range_index.start = context.get_constant(types.int64, pyval.index.start)
+    native_range_index.stop = context.get_constant(types.int64, pyval.index.stop)
+    native_range_index.step = context.get_constant(types.int64, pyval.index.step)
+
+    range_index = cgutils.create_struct_proxy(ty.index.data)(context, builder)
+    range_index.data = native_range_index._getvalue()
+
+    positional_index = cgutils.create_struct_proxy(PositionalIndexType(False))(context, builder)
+    positional_index.data = range_index._getvalue()
+
+    series.index = positional_index._getvalue()
     return series._getvalue()
 
 
@@ -52,7 +70,11 @@ def _constant_Series_data(context, builder, ty, pyval):
 
     from ..categorical.types import CategoricalDtypeType
 
-    if isinstance(ty.dtype, CategoricalDtypeType):
+    # TO-DO: this requires lower_constant to be implemented for other types
+    # like indices and so on, until that raise NotImplementedError
+    if (isinstance(ty.dtype, CategoricalDtypeType)
+            and ty.index is PositionalIndexType(False)
+            and ty.is_named is False):
         from ..categorical.boxing import constant_Categorical
         return constant_Categorical(context, builder, ty.data, pyval.array)
 
