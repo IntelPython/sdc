@@ -230,11 +230,9 @@ class TestInt64Index(TestCase):
                 result = sdc_func(index, deep)
                 result_ref = test_impl(index, deep)
                 pd.testing.assert_index_equal(result, result_ref)
-                # pandas uses ndarray views when copies index, so for python
-                # case check that data arrays share the same memory
                 self.assertEqual(
                     result._data is index._data,
-                    result_ref._data.base is index._data
+                    result_ref._data is index._data
                 )
 
     def test_int64_index_getitem_scalar(self):
