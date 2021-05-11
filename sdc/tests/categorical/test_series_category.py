@@ -27,6 +27,7 @@
 from sdc.tests.test_base import TestCase
 
 import pandas as pd
+import numpy as np
 import numba as nb
 from numba import types
 
@@ -35,6 +36,7 @@ from sdc.types import (
     CategoricalDtypeType,
     Categorical,
 )
+from sdc.datatypes.indexes.positional_index_type import PositionalIndexType
 
 
 class SeriesCategoryTest(TestCase):
@@ -51,7 +53,7 @@ class SeriesCategoryTest(TestCase):
 
         assert(isinstance(nb_type, SeriesType))
         assert(nb_type.dtype == CategoricalDtypeType(categories=[1, 2, 3], ordered=False))
-        assert(nb_type.index == types.none)
+        assert(nb_type.index == PositionalIndexType(False))
         assert(nb_type.data == Categorical(CategoricalDtypeType(categories=[1, 2, 3], ordered=False)))
 
     def test_unboxing(self):
