@@ -39,6 +39,6 @@ jobs:
 
     - script: |
         call C:\\Miniconda\\Scripts\activate.bat
-        python buildscripts\\run_examples.py --python=%PYTHON_VER% --channels="-c anaconda -c conda-forge"
+        python buildscripts\\test_conda_install.py --python=%PYTHON_VER% --channels="-c anaconda -c conda-forge"
       displayName: 'Test SDC installation from conda'
       continueOnError: ${{ parameters.allowFailure }}

@@ -100,7 +100,7 @@ class SDC_Build_Utilities:
 
         self.log_info(f'Install {" ".join(packages_list)} to {self.env_name} conda environment')
         install_args = ['-n', self.env_name]
-        replace_channels = self.channel_list if channels is None else channels.split()
+        replace_channels = channels.split() if channels else self.channel_list
         install_args += replace_channels + ['--override-channels', '-q', '-y'] + packages_list
         self.log_info(self.__run_conda_command(Conda_Commands.INSTALL, install_args))
 
