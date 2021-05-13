@@ -24,43 +24,9 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from sdc.utilities.utils import sdc_overload_attribute, sdc_overload
-from numba.extending import intrinsic
-from numba import types
-
-from .types import CategoricalDtypeType, Categorical
-
-
-@sdc_overload_attribute(CategoricalDtypeType, 'ordered')
-def pd_CategoricalDtype_categories_overload(self):
-    ordered = self.ordered
-
-    def impl(self):
-        return ordered
-    return impl
-
-
-@intrinsic
-def _categorical_len(tyctx, arr_type):
-    ret_type = types.intp
-
-    def codegen(context, builder, sig, args):
-        arr_val, = args
-        arr_info = context.make_helper(builder, arr_type, arr_val)
-        res = builder.load(arr_info._get_ptr_by_name('nitems'))
-        return res
-
-    return ret_type(arr_type), codegen
-
-
-@sdc_overload(len)
-def pd_Categorical_len_overload(self):
-    if not isinstance(self, Categorical):
-        return None
-
-    # Categorical use ArrayModel and don't expose be_type members
-    # hence we use intrinsic to access those fields. TO-DO: refactor
-    def impl(self):
-        return _categorical_len(self)
-
-    return impl
+# modules are dependent on each other e.g. positional_index_type
+# needs range_index_type to be imported, so below order matters
+from .range_index_type import RangeIndexType
+from .positional_index_type import PositionalIndexType
+from .empty_index_type import EmptyIndexType
+from .int64_index_type import Int64IndexType

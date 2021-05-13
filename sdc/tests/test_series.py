@@ -62,7 +62,7 @@ from sdc.tests.test_utils import (test_global_input_data_unicode_kind1,
                                   gen_frand_array,
                                   gen_strlist,
                                   _make_func_from_text)
-from sdc.datatypes.common_functions import SDCLimitation
+from sdc.utilities.sdc_typing_utils import SDCLimitation
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -4392,7 +4392,7 @@ class TestSeries(
             return a.quantile()
 
         hpat_func = self.jit(test_impl)
-        np.testing.assert_equal(hpat_func(), test_impl())
+        np.testing.assert_almost_equal(hpat_func(), test_impl())
 
     def test_series_quantile_q_vector(self):
         def test_series_quantile_q_vector_impl(S, param1):
@@ -4404,7 +4404,7 @@ class TestSeries(
         param1 = [0.0, 0.25, 0.5, 0.75, 1.0]
         result_ref = test_series_quantile_q_vector_impl(s, param1)
         result = hpat_func(s, param1)
-        np.testing.assert_equal(result, result_ref)
+        np.testing.assert_almost_equal(result, result_ref)
 
     @unittest.skip("Implement unique without sorting like in pandas")
     def test_unique(self):
@@ -4792,7 +4792,36 @@ class TestSeries(
         msg = 'Method cov(). The object min_periods'
         self.assertIn(msg, str(raises.exception))
 
-    @skip_numba_jit
+    def test_series_div_special(self):
+        @self.jit
+        def test_func(S1, S2):
+            return S1.div(S2)
+            # return S1 + S2
+
+        S1 = pd.Series(
+                np.arange(12),
+                index=pd.RangeIndex(start=0, stop=12, step=1)
+            )
+        S2 = pd.Series(
+                # [1.1, 0.3, np.nan, 1., np.inf, 0., 1.1, np.nan, 2.2, np.inf, 2., 2.],
+                np.arange(12),
+                index=pd.RangeIndex(start=0, stop=12, step=1)
+            )
+
+        res = test_func(S1, S2)
+
+    def test_series_get_index(self):
+        @self.jit
+        def test_func(S1):
+            return S1._index.values
+
+        S1 = pd.Series(
+                np.arange(12),
+                index=pd.RangeIndex(start=0, stop=12, step=1)
+            )
+
+        res = test_func(S1)
+
     def test_series_pct_change(self):
         def test_series_pct_change_impl(S, periods, method):
             return S.pct_change(periods=periods, fill_method=method, limit=None, freq=None)
@@ -5005,7 +5034,7 @@ class TestSeries(
                        'not a Boolean or integer indexer or a Slice. Given: self.index={}, idx={}'
             with self.assertRaises(TypingError) as raises:
                 hpat_func(S, idx, value)
-            msg = msg_tmpl.format('none', 'unicode_type')
+            msg = msg_tmpl.format('PositionalIndexType(False)', 'unicode_type')
             self.assertIn(msg, str(raises.exception))
 
     def test_series_istitle_str(self):

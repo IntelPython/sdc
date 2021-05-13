@@ -89,7 +89,7 @@ from sdc.datatypes.hpat_pandas_stringmethods_types import StringMethodsType
 from sdc.utilities.utils import sdc_overload_method, sdc_register_jitable
 from sdc.hiframes.api import get_nan_mask
 from sdc.str_arr_ext import str_arr_set_na_by_mask, create_str_arr_from_list
-from sdc.datatypes.common_functions import SDCLimitation
+from sdc.utilities.sdc_typing_utils import SDCLimitation
 
 
 @sdc_overload_method(StringMethodsType, 'center')

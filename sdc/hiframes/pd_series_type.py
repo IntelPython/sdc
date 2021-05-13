@@ -38,6 +38,7 @@ from numba.np.arrayobj import make_array, _getitem_array_single_int
 from sdc.str_ext import string_type, list_string_array_type
 from sdc.str_arr_ext import (string_array_type, iternext_str_array, StringArrayType)
 from sdc.datatypes.categorical.types import CategoricalDtypeType, Categorical
+from sdc.datatypes.indexes.positional_index_type import PositionalIndexType
 
 
 class SeriesType(types.IterableType):
@@ -54,7 +55,7 @@ class SeriesType(types.IterableType):
                       if isinstance(dtype, types.Record) else dtype)
         self.data = data
         if index is None:
-            index = types.none
+            index = PositionalIndexType(False)
         self.index = index
         # keep is_named in type to enable boxing
         self.is_named = is_named

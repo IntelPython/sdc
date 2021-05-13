@@ -39,7 +39,7 @@ from numba.core.errors import TypingError
 from pandas.core.indexing import IndexingError
 
 import sdc
-from sdc.datatypes.common_functions import SDCLimitation
+from sdc.utilities.sdc_typing_utils import SDCLimitation
 from sdc.tests.gen_test_data import ParquetGenerator
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import (check_numba_version,
@@ -1864,7 +1864,7 @@ class TestDataFrame(TestCase):
         """ Verifies df.drop handles string literal as columns param """
         def test_impl():
             df = pd.DataFrame({
-                'A': [1.0, 2.0, np.nan, 1.0],
+                'A': np.array([1.0, 2.0, np.nan, 1.0]),
                 'B': [4, 5, 6, 7],
                 'C': [1.0, 2.0, np.nan, 1.0]
             })
