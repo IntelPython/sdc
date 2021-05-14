@@ -149,7 +149,7 @@ def sdc_astype_overload(self, dtype):
             arr_len = len(self)
 
             # Get total bytes for new array
-            for i in prange(arr_len):
+            for i in np.arange(arr_len):    # FIXME_Numba#6969: prange segfaults, use it when resolved
                 item = self[i]
                 num_bytes += get_utf8_size(str(item))
 
