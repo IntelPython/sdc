@@ -90,7 +90,6 @@ load_native_func('hashmap_lookup', hconc_dict)
 load_native_func('hashmap_clear', hconc_dict)
 load_native_func('hashmap_pop', hconc_dict)
 load_native_func('hashmap_update', hconc_dict)
-load_native_func('hashmap_dump', hconc_dict)
 load_native_func('hashmap_create_from_data', hconc_dict, lambda x: 'voidptr' in x)
 load_native_func('hashmap_getiter', hconc_dict)
 load_native_func('hashmap_iternext', hconc_dict)
@@ -900,6 +899,9 @@ def concurrent_dict_type_fromkeys_ovld(cls, keys, value):
 @intrinsic
 def _hashmap_dump(typingctx, dict_type):
 
+    # load hashmap_dump here as otherwise module import will fail
+    # since it's included in debug build only
+    load_native_func('hashmap_dump', hconc_dict)
     ty_key, ty_val = dict_type.key_type, dict_type.value_type
     key_type_postfix, value_type_postfix = _get_types_postfixes(ty_key, ty_val)
 

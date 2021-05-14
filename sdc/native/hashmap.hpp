@@ -25,10 +25,13 @@
 // *****************************************************************************
 
 #include <cstdint>
-#include <iostream>
 #include <utility>
 #include <memory>
 #include <type_traits>
+
+#ifdef SDC_DEBUG_NATIVE
+#include <iostream>
+#endif
 
 #include "utils.hpp"
 #include "tbb/tbb.h"
@@ -815,6 +818,7 @@ void hashmap_update(void* p_self_hash_map, void* p_arg_hash_map)
 }
 
 
+#ifdef SDC_DEBUG_NATIVE
 template<typename key_type, typename val_type>
 void hashmap_dump(void* p_hash_map)
 {
@@ -827,6 +831,7 @@ void hashmap_dump(void* p_hash_map)
     }
     return;
 }
+#endif
 
 
 template<typename key_type, typename val_type>

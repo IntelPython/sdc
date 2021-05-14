@@ -109,11 +109,15 @@ void hashmap_update_##suffix(void* p_self_hash_map, void* p_arg_hash_map) \
 } \
 
 
+#ifdef SDC_DEBUG_NATIVE
 #define declare_hashmap_dump(key_type, val_type, suffix) \
 void hashmap_dump_##suffix(void* p_hash_map) \
 { \
     hashmap_dump<key_type, val_type>(p_hash_map); \
-} \
+}
+#else
+#define declare_hashmap_dump(key_type, val_type, suffix)
+#endif
 
 
 #define declare_hashmap_getiter(key_type, val_type, suffix) \
@@ -139,13 +143,15 @@ declare_hashmap_lookup(key_type, val_type, suffix); \
 declare_hashmap_clear(key_type, val_type, suffix); \
 declare_hashmap_pop(key_type, val_type, suffix); \
 declare_hashmap_update(key_type, val_type, suffix); \
-declare_hashmap_dump(key_type, val_type, suffix); \
 declare_hashmap_getiter(key_type, val_type, suffix); \
 declare_hashmap_iternext(key_type, val_type, suffix); \
+declare_hashmap_dump(key_type, val_type, suffix); \
+
 
 #define REGISTER(func) PyObject_SetAttrString(m, #func, PyLong_FromVoidPtr((void*)(&func)));
 
-#define register_hashmap(suffix) \
+
+#define register_release(suffix) \
 REGISTER(hashmap_create_##suffix) \
 REGISTER(hashmap_size_##suffix) \
 REGISTER(hashmap_set_##suffix) \
@@ -154,9 +160,19 @@ REGISTER(hashmap_lookup_##suffix) \
 REGISTER(hashmap_clear_##suffix) \
 REGISTER(hashmap_pop_##suffix) \
 REGISTER(hashmap_update_##suffix) \
-REGISTER(hashmap_dump_##suffix) \
 REGISTER(hashmap_getiter_##suffix) \
 REGISTER(hashmap_iternext_##suffix) \
+
+#define register_debug(suffix) \
+REGISTER(hashmap_dump_##suffix)
+
+#ifndef SDC_DEBUG_NATIVE
+#define register_hashmap(suffix) register_release(suffix)
+#else
+#define register_hashmap(suffix) \
+register_release(suffix) \
+register_debug(suffix)
+#endif
 
 
 extern "C"
@@ -193,7 +209,6 @@ declare_hashmap_create_from_data(int64_t, int32_t)
 declare_hashmap_create_from_data(int64_t, int64_t)
 declare_hashmap_create_from_data(int64_t, float)
 declare_hashmap_create_from_data(int64_t, double)
-
 
 PyMODINIT_FUNC PyInit_hconc_dict()
 {
@@ -258,9 +273,9 @@ PyMODINIT_FUNC PyInit_hconc_dict()
 #undef declare_hashmap_pop
 #undef declare_hashmap_create_from_data
 #undef declare_hashmap_update
-#undef declare_hashmap_dump
 #undef declare_hashmap_getiter
 #undef declare_hashmap_iternext
+#undef declare_hashmap_dump
 #undef register_hashmap
 #undef REGISTER
 #undef declare_hashmap
