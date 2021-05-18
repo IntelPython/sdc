@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2020, Intel Corporation All rights reserved.
 #
@@ -24,43 +25,39 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from sdc.utilities.utils import sdc_overload_attribute, sdc_overload
-from numba.extending import intrinsic
 from numba import types
-
-from .types import CategoricalDtypeType, Categorical
-
-
-@sdc_overload_attribute(CategoricalDtypeType, 'ordered')
-def pd_CategoricalDtype_categories_overload(self):
-    ordered = self.ordered
-
-    def impl(self):
-        return ordered
-    return impl
+from numba.extending import (
+    models,
+    register_model,
+    make_attribute_wrapper
+)
 
 
-@intrinsic
-def _categorical_len(tyctx, arr_type):
-    ret_type = types.intp
+class EmptyIndexType(types.Type):
 
-    def codegen(context, builder, sig, args):
-        arr_val, = args
-        arr_info = context.make_helper(builder, arr_type, arr_val)
-        res = builder.load(arr_info._get_ptr_by_name('nitems'))
-        return res
+    # this index represents special case of pd.Index([]) with dtype='object'
+    # for overload typing functions assume it has following dtype
+    dtype = types.pyobject
 
-    return ret_type(arr_type), codegen
+    def __init__(self, is_named=False):
+        self.is_named = is_named
+        super(EmptyIndexType, self).__init__(
+            name='EmptyIndexType({})'.format(is_named))
 
 
-@sdc_overload(len)
-def pd_Categorical_len_overload(self):
-    if not isinstance(self, Categorical):
-        return None
+@register_model(EmptyIndexType)
+class EmptyIndexModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
 
-    # Categorical use ArrayModel and don't expose be_type members
-    # hence we use intrinsic to access those fields. TO-DO: refactor
-    def impl(self):
-        return _categorical_len(self)
+        name_type = types.unicode_type if fe_type.is_named else types.none
+        members = [
+            ('name', name_type),
+        ]
+        models.StructModel.__init__(self, dmm, fe_type, members)
 
-    return impl
+
+# FIXME_Numba#3372: add into numba.types to allow returning from objmode
+types.EmptyIndexType = EmptyIndexType
+
+
+make_attribute_wrapper(EmptyIndexType, 'name', '_name')

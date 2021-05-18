@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # *****************************************************************************
 # Copyright (c) 2020, Intel Corporation All rights reserved.
 #
@@ -24,43 +25,43 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from sdc.utilities.utils import sdc_overload_attribute, sdc_overload
-from numba.extending import intrinsic
 from numba import types
+from numba.extending import (
+    models,
+    register_model,
+    make_attribute_wrapper
+)
 
-from .types import CategoricalDtypeType, Categorical
-
-
-@sdc_overload_attribute(CategoricalDtypeType, 'ordered')
-def pd_CategoricalDtype_categories_overload(self):
-    ordered = self.ordered
-
-    def impl(self):
-        return ordered
-    return impl
+from sdc.datatypes.indexes import RangeIndexType
 
 
-@intrinsic
-def _categorical_len(tyctx, arr_type):
-    ret_type = types.intp
+class PositionalIndexType(types.IterableType):
+    dtype = types.int64
 
-    def codegen(context, builder, sig, args):
-        arr_val, = args
-        arr_info = context.make_helper(builder, arr_type, arr_val)
-        res = builder.load(arr_info._get_ptr_by_name('nitems'))
+    def __init__(self, is_named=False):
+        self.data = RangeIndexType(is_named)
+        self.is_named = is_named
+        super(PositionalIndexType, self).__init__(
+            name='PositionalIndexType({})'.format(is_named))
+
+    @property
+    def iterator_type(self):
+        res = self.data.iterator_type
         return res
 
-    return ret_type(arr_type), codegen
+
+@register_model(PositionalIndexType)
+class PositionalIndexModel(models.StructModel):
+    def __init__(self, dmm, fe_type):
+
+        members = [
+            ('data', fe_type.data),
+        ]
+        models.StructModel.__init__(self, dmm, fe_type, members)
 
 
-@sdc_overload(len)
-def pd_Categorical_len_overload(self):
-    if not isinstance(self, Categorical):
-        return None
+# FIXME_Numba#3372: add into numba.types to allow returning from objmode
+types.PositionalIndexType = PositionalIndexType
 
-    # Categorical use ArrayModel and don't expose be_type members
-    # hence we use intrinsic to access those fields. TO-DO: refactor
-    def impl(self):
-        return _categorical_len(self)
 
-    return impl
+make_attribute_wrapper(PositionalIndexType, 'data', '_data')

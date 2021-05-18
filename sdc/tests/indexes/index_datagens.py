@@ -27,15 +27,16 @@
 
 import numpy as np
 import pandas as pd
-from itertools import (combinations_with_replacement, filterfalse, chain)
-from sdc.tests.test_utils import gen_strlist
+from itertools import (product, combinations_with_replacement, filterfalse, chain)
 
+from sdc.tests.test_utils import gen_strlist
+from sdc.datatypes.indexes import *
 
 test_global_index_names = [None, 'abc', 'index']
 test_global_range_member_values = [1, 2, 10, -5, 0, None]
 
 
-def _generate_valid_range_params():
+def _generate_all_range_params():
 
     def valid_params_predicate(range_params):
         # if step is zero or all start/stop/step are None range is invalid
@@ -48,13 +49,43 @@ def _generate_valid_range_params():
     )
 
 
-def _generate_range_indexes_fixed(size, start=1, step=3):
+def _generate_positional_range_params():
+
+    # for PositionalIndexType represented ranges only
+    starts, stops, steps = [0, ], [1, 2, 10, ], [1, ]
+    return product(starts, stops, steps)
+
+
+def _generate_custom_range_params():
+
+    # for non PositionalIndexType represented range objects
+    def valid_positional_index_predicate(range_params):
+        index = pd.RangeIndex(*range_params)
+        return index.start == 0 and index.stop > 0 and index.step == 1
+
+    return filterfalse(
+        valid_positional_index_predicate,
+        _generate_all_range_params()
+    )
+
+
+def _generate_positional_indexes_fixed(size, start=1, step=3):
     yield pd.RangeIndex(size)
     yield pd.RangeIndex(size, name='abc')
+
+
+def _generate_custom_range_indexes_fixed(size, start=1, step=3):
     yield pd.RangeIndex(stop=step * size, step=step)
     yield pd.RangeIndex(stop=2*step*size, step=2*step)
     yield pd.RangeIndex(start=start, stop=start + size*step - step//2, step=step)
     yield pd.RangeIndex(start=start + step, stop=start + (size + 1)*step, step=step)
+
+
+def _generate_range_indexes_fixed(size, start=1, step=3):
+    return chain(
+            _generate_positional_indexes_fixed(size, start, step),
+            _generate_custom_range_indexes_fixed(size, start, step),
+        )
 
 
 def _generate_index_param_values(n):
@@ -86,3 +117,14 @@ def _generate_int64_indexes_fixed(size):
     yield pd.Int64Index([i if i % 2 else 0 for i in range(size)])
     yield pd.Int64Index([i // 2 for i in range(size)])
     yield pd.Int64Index(np.ones(size))
+
+
+def get_sample_index(size, sdc_index_type):
+    if sdc_index_type is PositionalIndexType:
+        return pd.RangeIndex(size)
+    if sdc_index_type is RangeIndexType:
+        return pd.RangeIndex(-1, size - 1, 1)
+    if sdc_index_type is Int64IndexType:
+        return pd.Int64Index(np.arange(size))
+
+    assert False, f"Refusing to create index of non-specific index type: {sdc_index_type}"

@@ -114,7 +114,7 @@ lid = [PREFIX_DIR + '/lib', ]
 
 if is_win:
     eca = ['/std:c++17', "/Ox", "/DTBB_PREVIEW_WAITING_FOR_WORKERS=1", ]  # "/Zi", "/Od", "/DEBUG:FULL"]
-    ela = ['/DEBUG:FULL']
+    ela = []  # '/DEBUG:FULL', ]
 else:
     eca = ['-std=c++17', "-O3", "-DTBB_PREVIEW_WAITING_FOR_WORKERS=1", ]  # '-g', '-O0']
     ela = []
@@ -226,7 +226,30 @@ ext_parquet = Extension(name="sdc.parquet_cpp",
                         library_dirs=lid,
                         )
 
-_ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq, ext_sort]
+ext_conc_dict = Extension(name="sdc.hconc_dict",
+                          sources=[
+                              "sdc/native/conc_dict_module.cpp",
+                              "sdc/native/utils.cpp"],
+                          extra_compile_args=eca,
+                          extra_link_args=ela,
+                          libraries=['tbb'],
+                          include_dirs=[
+                              "sdc/native/",
+                              numba_include_path,
+                              os.path.join(tbb_root, 'include')],
+                          library_dirs=lid + [
+                              # for Linux
+                              os.path.join(tbb_root, 'lib', 'intel64', 'gcc4.4'),
+                              # for MacOS
+                              os.path.join(tbb_root, 'lib'),
+                              # for Windows
+                              os.path.join(tbb_root, 'lib', 'intel64', 'vc_mt'),
+                          ],
+                          language="c++"
+                          )
+
+_ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq, ext_sort,
+             ext_conc_dict]
 
 # Support of Parquet is disabled because HPAT pipeline does not work now
 # if _has_pyarrow:
@@ -387,7 +410,7 @@ setup(name=SDC_NAME_STR,
           'numpy>=1.16',
           'pandas==1.2.0',
           'pyarrow==2.0.0',
-          'numba==0.52.0',
+          'numba==0.53.1',
           'tbb'
           ],
       cmdclass=sdc_build_commands,
