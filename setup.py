@@ -113,11 +113,11 @@ ind = [PREFIX_DIR + '/include', ]
 lid = [PREFIX_DIR + '/lib', ]
 
 if is_win:
-    eca = ['/std:c++17', "/Ox", "/DTBB_PREVIEW_WAITING_FOR_WORKERS=1"]  # '/ZI', '/Od']
-    ela = ['/std:c++17', ]
+    eca = ['/std:c++17', "/Ox", "/DTBB_PREVIEW_WAITING_FOR_WORKERS=1", ]  # "/Zi", "/Od", "/DEBUG:FULL"]
+    ela = ['/DEBUG:FULL']
 else:
-    eca = ['-std=c++17', "-O3", "-DTBB_PREVIEW_WAITING_FOR_WORKERS=1"]  # '-g', '-O0']
-    ela = ['-std=c++17', ]
+    eca = ['-std=c++17', "-O3", "-DTBB_PREVIEW_WAITING_FOR_WORKERS=1", ]  # '-g', '-O0']
+    ela = []
 
 io_libs = []
 
