@@ -459,13 +459,15 @@ def hpat_pandas_series_getitem(self, idx):
     if (isinstance(idx, SeriesType) and index_is_positional
             and not isinstance(idx.data.dtype, (types.Boolean, bool))):
         def hpat_pandas_series_getitem_idx_list_impl(self, idx):
-            res = numpy.copy(self._data[:len(idx._data)])
-            index = numpy.arange(len(self._data))
+            idx_data = idx._data
+            self_data = self._data
+            res = numpy.copy(self._data[:len(idx_data)])
+            index = numpy.arange(len(self_data))
             for i in numba.prange(len(res)):
                 for j in numba.prange(len(index)):
-                    if j == idx._data[i]:
-                        res[i] = self._data[j]
-            return pandas.Series(data=res, index=index[idx._data], name=self._name)
+                    if j == idx_data[i]:
+                        res[i] = self_data[j]
+            return pandas.Series(data=res, index=index[idx_data], name=self._name)
         return hpat_pandas_series_getitem_idx_list_impl
 
     # idx is Series and it's index is not PositionalIndex, idx.dtype is not Boolean
@@ -647,6 +649,7 @@ def sdc_pandas_series_setitem(self, idx, value):
 
         def sdc_pandas_series_setitem_idx_bool_array_align_impl(self, idx, value):
 
+            series_data = self._data  # FIXME_Numba#6960
             # if idx is a Boolean array (and value is a series) it's used as a mask for self.index
             # and filtered indexes are looked in value.index, and if found corresponding value is set
             if value_is_series == True:  # noqa
@@ -659,7 +662,7 @@ def sdc_pandas_series_setitem(self, idx, value):
                 self_index_has_duplicates = len(unique_self_indices) != len(self_index)
                 value_index_has_duplicates = len(unique_value_indices) != len(value_index)
                 if (self_index_has_duplicates or value_index_has_duplicates):
-                    self._data[idx] = value._data
+                    series_data[idx] = value._data
                 else:
                     map_index_to_position = Dict.empty(
                         key_type=indexes_common_dtype,
@@ -674,13 +677,13 @@ def sdc_pandas_series_setitem(self, idx, value):
                         if idx[i]:
                             self_index_value = self_index[i]
                             if self_index_value in map_index_to_position:
-                                self._data[i] = value._data[map_index_to_position[self_index_value]]
+                                series_data[i] = value._data[map_index_to_position[self_index_value]]
                             else:
-                                sdc.hiframes.join.setitem_arr_nan(self._data, i)
+                                sdc.hiframes.join.setitem_arr_nan(series_data, i)
 
             else:
                 # if value has no index - nothing to reindex and assignment is made along positions set by idx mask
-                self._data[idx] = value
+                series_data[idx] = value
 
             return self
 
@@ -755,21 +758,25 @@ def sdc_pandas_series_setitem(self, idx, value):
             value_is_scalar = not (value_is_series or value_is_array)
             def sdc_pandas_series_setitem_idx_int_series_align_impl(self, idx, value):
 
+                # FIXME_Numba#6960: all changes of this commit are unnecessary - revert when resolved
+                self_data = self._data
+                self_index = self._index
+                self_index_size = len(self_index)
+                idx_size = len(idx)
+
                 _idx = idx._data if idx_is_series == True else idx  # noqa
                 _value = value._data if value_is_series == True else value  # noqa
 
-                self_index_size = len(self._index)
-                idx_size = len(_idx)
                 valid_indices = numpy.repeat(-1, self_index_size)
                 for i in numba.prange(self_index_size):
                     for j in numpy.arange(idx_size):
-                        if self._index[i] == _idx[j]:
+                        if self_index[i] == _idx[j]:
                             valid_indices[i] = j
 
                 valid_indices_positions = numpy.arange(self_index_size)[valid_indices != -1]
                 valid_indices_masked = valid_indices[valid_indices != -1]
 
-                indexes_found = self._index[valid_indices_positions]
+                indexes_found = self_index[valid_indices_positions]
                 if len(numpy.unique(indexes_found)) != len(indexes_found):
                     raise ValueError("Reindexing only valid with uniquely valued Index objects")
 
@@ -777,9 +784,9 @@ def sdc_pandas_series_setitem(self, idx, value):
                     raise KeyError("Reindexing not possible: idx has index not found in Series")
 
                 if value_is_scalar == True:  # noqa
-                    self._data[valid_indices_positions] = _value
+                    self_data[valid_indices_positions] = _value
                 else:
-                    self._data[valid_indices_positions] = numpy.take(_value, valid_indices_masked)
+                    self_data[valid_indices_positions] = numpy.take(_value, valid_indices_masked)
 
                 return self
 
@@ -1598,17 +1605,18 @@ def hpat_pandas_series_var(self, axis=None, skipna=None, level=None, ddof=1, num
         if skipna is None:
             skipna = True
 
+        self_data = self._data  # FIXME_Numba#6960
         if skipna:
-            valuable_length = len(self._data) - numpy.sum(numpy.isnan(self._data))
+            valuable_length = len(self_data) - numpy.sum(numpy.isnan(self_data))
             if valuable_length <= ddof:
                 return numpy.nan
 
-            return numpy_like.nanvar(self._data) * valuable_length / (valuable_length - ddof)
+            return numpy_like.nanvar(self_data) * valuable_length / (valuable_length - ddof)
 
-        if len(self._data) <= ddof:
+        if len(self_data) <= ddof:
             return numpy.nan
 
-        return self._data.var() * len(self._data) / (len(self._data) - ddof)
+        return self_data.var() * len(self_data) / (len(self_data) - ddof)
 
     return hpat_pandas_series_var_impl
 
@@ -2859,8 +2867,9 @@ def hpat_pandas_series_prod(self, axis=None, skipna=None, level=None, numeric_on
         else:
             _skipna = skipna
 
+        series_data = self._data  # FIXME_Numba#6960
         if _skipna:
-            return numpy_like.nanprod(self._data)
+            return numpy_like.nanprod(series_data)
         else:
             return numpy.prod(self._data)
 
@@ -3079,8 +3088,9 @@ def hpat_pandas_series_min(self, axis=None, skipna=None, level=None, numeric_onl
         else:
             _skipna = skipna
 
+        series_data = self._data  # FIXME_Numba#6960
         if _skipna:
-            return numpy_like.nanmin(self._data)
+            return numpy_like.nanmin(series_data)
 
         return self._data.min()
 
@@ -3156,8 +3166,9 @@ def hpat_pandas_series_max(self, axis=None, skipna=None, level=None, numeric_onl
         else:
             _skipna = skipna
 
+        series_data = self._data  # FIXME_Numba#6960
         if _skipna:
-            return numpy_like.nanmax(self._data)
+            return numpy_like.nanmax(series_data)
 
         return self._data.max()
 
@@ -3222,8 +3233,9 @@ def hpat_pandas_series_mean(self, axis=None, skipna=None, level=None, numeric_on
         else:
             _skipna = skipna
 
+        series_data = self._data  # FIXME_Numba#6960
         if _skipna:
-            return numpy_like.nanmean(self._data)
+            return numpy_like.nanmean(series_data)
 
         return self._data.mean()
 
@@ -3780,27 +3792,28 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
 
     if not isinstance(self.index, PositionalIndexType):
         def hpat_pandas_series_argsort_idx_impl(self, axis=0, kind='quicksort', order=None):
+            series_data = self._data  # FIXME_Numba#6960
             if kind != 'quicksort' and kind != 'mergesort':
                 raise ValueError("Method argsort(). Unsupported parameter. Given 'kind' != 'quicksort' or 'mergesort'")
             if kind == 'mergesort':
                 #It is impossible to use numpy.argsort(self._data, kind=kind) since numba gives typing error
-                sort = numpy_like.argsort(self._data, kind='mergesort')
+                sort = numpy_like.argsort(series_data, kind='mergesort')
             else:
-                sort = numpy_like.argsort(self._data)
+                sort = numpy_like.argsort(series_data)
             na = self.isna().sum()
-            result = numpy.empty(len(self._data), dtype=numpy.int64)
-            na_data_arr = sdc.hiframes.api.get_nan_mask(self._data)
+            result = numpy.empty(len(series_data), dtype=numpy.int64)
+            na_data_arr = sdc.hiframes.api.get_nan_mask(series_data)
             if kind == 'mergesort':
-                sort_nona = numpy_like.argsort(self._data[~na_data_arr], kind='mergesort')
+                sort_nona = numpy_like.argsort(series_data[~na_data_arr], kind='mergesort')
             else:
-                sort_nona = numpy_like.argsort(self._data[~na_data_arr])
+                sort_nona = numpy_like.argsort(series_data[~na_data_arr])
             q = 0
             for id, i in enumerate(sort):
-                if id in set(sort[len(self._data) - na:]):
+                if id in set(sort[len(series_data) - na:]):
                     q += 1
                 else:
                     result[id] = sort_nona[id - q]
-            for i in sort[len(self._data) - na:]:
+            for i in sort[len(series_data) - na:]:
                 result[i] = -1
 
             return pandas.Series(result, self._index)
@@ -3808,26 +3821,27 @@ def hpat_pandas_series_argsort(self, axis=0, kind='quicksort', order=None):
         return hpat_pandas_series_argsort_idx_impl
 
     def hpat_pandas_series_argsort_noidx_impl(self, axis=0, kind='quicksort', order=None):
+        series_data = self._data  # FIXME_Numba#6960
         if kind != 'quicksort' and kind != 'mergesort':
             raise ValueError("Method argsort(). Unsupported parameter. Given 'kind' != 'quicksort' or 'mergesort'")
         if kind == 'mergesort':
-            sort = numpy_like.argsort(self._data, kind='mergesort')
+            sort = numpy_like.argsort(series_data, kind='mergesort')
         else:
-            sort = numpy_like.argsort(self._data)
+            sort = numpy_like.argsort(series_data)
         na = self.isna().sum()
-        result = numpy.empty(len(self._data), dtype=numpy.int64)
-        na_data_arr = sdc.hiframes.api.get_nan_mask(self._data)
+        result = numpy.empty(len(series_data), dtype=numpy.int64)
+        na_data_arr = sdc.hiframes.api.get_nan_mask(series_data)
         if kind == 'mergesort':
-            sort_nona = numpy_like.argsort(self._data[~na_data_arr], kind='mergesort')
+            sort_nona = numpy_like.argsort(series_data[~na_data_arr], kind='mergesort')
         else:
-            sort_nona = numpy_like.argsort(self._data[~na_data_arr])
+            sort_nona = numpy_like.argsort(series_data[~na_data_arr])
         q = 0
         for id, i in enumerate(sort):
-            if id in set(sort[len(self._data) - na:]):
+            if id in set(sort[len(series_data) - na:]):
                 q += 1
             else:
                 result[id] = sort_nona[id - q]
-        for i in sort[len(self._data) - na:]:
+        for i in sort[len(series_data) - na:]:
             result[i] = -1
 
         return pandas.Series(result)

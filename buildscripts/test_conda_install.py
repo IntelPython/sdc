@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2021, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,43 +24,40 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from sdc.utilities.utils import sdc_overload_attribute, sdc_overload
-from numba.extending import intrinsic
-from numba import types
 
-from .types import CategoricalDtypeType, Categorical
+import argparse
+import os
+import shutil
+import traceback
+import re
 
-
-@sdc_overload_attribute(CategoricalDtypeType, 'ordered')
-def pd_CategoricalDtype_categories_overload(self):
-    ordered = self.ordered
-
-    def impl(self):
-        return ordered
-    return impl
+from pathlib import Path
+from utilities import SDC_Build_Utilities
 
 
-@intrinsic
-def _categorical_len(tyctx, arr_type):
-    ret_type = types.intp
-
-    def codegen(context, builder, sig, args):
-        arr_val, = args
-        arr_info = context.make_helper(builder, arr_type, arr_val)
-        res = builder.load(arr_info._get_ptr_by_name('nitems'))
-        return res
-
-    return ret_type(arr_type), codegen
+def check_sdc_installed(sdc_utils, sdc_package):
+    cmd_output = sdc_utils.get_command_output('conda list sdc')
+    pattern = sdc_package.replace('=', r'\s+')
+    return re.search(pattern, cmd_output)
 
 
-@sdc_overload(len)
-def pd_Categorical_len_overload(self):
-    if not isinstance(self, Categorical):
-        return None
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--python', default='3.7', choices=['3.6', '3.7', '3.8'],
+                        help='Python version, default = 3.7')
+    parser.add_argument('--channels', default=None, help='Default env channels')
+    parser.add_argument('--sdc-channel', default=None, help='Intel SDC channel')
 
-    # Categorical use ArrayModel and don't expose be_type members
-    # hence we use intrinsic to access those fields. TO-DO: refactor
-    def impl(self):
-        return _categorical_len(self)
+    args = parser.parse_args()
 
-    return impl
+    sdc_utils = SDC_Build_Utilities(args.python, args.channels, args.sdc_channel)
+    sdc_utils.log_info('Test Intel(R) SDC conda install', separate=True)
+    sdc_utils.log_info(sdc_utils.line_double)
+    sdc_utils.create_environment()
+    sdc_package = f'sdc={sdc_utils.get_sdc_version_from_channel()}'
+
+    # channels list is aligned with install instruction in README.rst
+    install_channels = "-c intel/label/beta -c intel -c defaults -c conda-forge"
+    sdc_utils.install_conda_package([sdc_package], channels=install_channels)
+
+    assert check_sdc_installed(sdc_utils, sdc_package), "SDC package was not installed"
