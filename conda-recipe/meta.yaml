@@ -25,7 +25,8 @@ requirements:
     - python
     - setuptools
     - numba   {{ NUMBA_VERSION }}
-    - numpy 1.17
+    - numpy                           # [win or osx or py==38]
+    - numpy 1.17                      # [linux and py==37]
     - pandas  {{ PANDAS_VERSION }}
     - pyarrow {{ PYARROW_VERSION }}
     - wheel
