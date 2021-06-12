@@ -44,7 +44,10 @@ from sdc.hiframes.pd_series_ext import (
     if_series_to_array_type)
 from numba.core.errors import TypingError
 from sdc.datatypes.categorical.types import Categorical
-from sdc.utilities.sdc_typing_utils import sdc_pandas_df_column_types
+from sdc.utilities.sdc_typing_utils import (
+    sdc_pandas_df_column_types,
+    sdc_pandas_index_types,
+    sdc_old_index_types, )
 
 
 def isna(arr, i):
@@ -146,6 +149,10 @@ def fix_df_array(column):
 @overload(fix_df_array)
 def fix_df_array_overload(column):
 
+    if not isinstance(column, (types.List, types.ListType, types.Array, StringArrayType)):
+        return None
+
+    print("DEBUG: fix_df_array_overload column=", column)
     if (isinstance(column, types.List)):
         dtype = column.dtype
         if isinstance(dtype, (types.Number, types.Boolean)):
@@ -165,7 +172,11 @@ def fix_df_array_overload(column):
         return lambda column: np.array(column)
 
     if isinstance(column, (types.Array, StringArrayType, Categorical)):
-        return lambda column: column
+        def fix_df_array_array_impl(column):
+            print("DEBUG: calling fix_df_array, column=", column)
+            return column
+        return fix_df_array_array_impl
+        # return lambda column: column
 
 
 def fix_df_index(index, coldata=None):
@@ -175,6 +186,7 @@ def fix_df_index(index, coldata=None):
 @overload(fix_df_index)
 def fix_df_index_overload(index, coldata=None):
 
+    print("DEBUG: fix_df_index_overload index=", index)
     # FIXME: import here due to circular import between indexes, numpy_like, and api
     from sdc.extensions.indexes.empty_index_ext import init_empty_index
     from sdc.extensions.indexes.positional_index_ext import init_positional_index
@@ -192,8 +204,11 @@ def fix_df_index_overload(index, coldata=None):
 
         return fix_df_index_impl
 
-    elif isinstance(index, (RangeIndexType, Int64IndexType, EmptyIndexType, PositionalIndexType)):
+    # elif isinstance(index, (RangeIndexType, Int64IndexType, EmptyIndexType, PositionalIndexType)):
+    elif (isinstance(index, sdc_pandas_index_types)
+            and not isinstance(index, sdc_old_index_types)):     ## MAJOR bug fix in a separate PR
         def fix_df_index_impl(index, coldata=None):
+            print("DEBUG: calling this fix_df_index, index=", index)
             return index
 
     # currently only signed integer indexes are represented with own type

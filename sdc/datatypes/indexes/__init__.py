@@ -30,3 +30,4 @@ from .range_index_type import RangeIndexType
 from .positional_index_type import PositionalIndexType
 from .empty_index_type import EmptyIndexType
 from .int64_index_type import Int64IndexType
+from .multi_index_type import MultiIndexType

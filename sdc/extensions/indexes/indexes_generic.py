@@ -96,7 +96,10 @@ def sdc_indexes_operator_eq_ovld(self, other):
     # TO-DO: this is for numeric indexes only now, extend to string-index when it's added
     use_self_values = isinstance(self, sdc_pandas_index_types) and not isinstance(self, types.Array)
     use_other_values = isinstance(other, sdc_pandas_index_types) and not isinstance(other, types.Array)
-    one_operand_is_scalar = isinstance(self, types.Number) or isinstance(other, types.Number)
+
+    ## prev. version:    one_operand_is_scalar = isinstance(self, types.Number) or isinstance(other, types.Number)
+    # FIXME: check that one_operand_is_scalar is fixed and works in tests now
+    one_operand_is_scalar = self is other.dtype or other is self.dtype
 
     def sdc_indexes_operator_eq_impl(self, other):
 
@@ -217,8 +220,8 @@ def pd_fix_indexes_join_overload(joined, indexer1, indexer2):
     """ Wraps pandas index.join() into new function that returns indexers as arrays and not optional(array) """
 
     # This function is simply a workaround for problem with parfor lowering
-    # broken by indexers typed as types.Optional(Array) - FIXME_Numba#XXXX: remove it
-    # in all places whne parfor issue is fixed
+    # broken by indexers typed as types.Optional(Array) - FIXME_Numba#6686: remove it
+    # in all places when parfor issue is fixed
     def pd_fix_indexes_join_impl(joined, indexer1, indexer2):
         if indexer1 is not None:
             _indexer1 = _nonoptional(indexer1)
@@ -282,3 +285,31 @@ def sdc_np_array_overload(A):
 
     if isinstance(A, Int64IndexType):
         return lambda A: A._data
+
+
+def sdc_indexes_take(self, target):
+    pass
+
+
+@sdc_overload(sdc_indexes_take)
+def pd_fix_indexes_take_overload(self, indexes):
+    """ Simply workaround for not having take method as unique indexes due to
+        the fact that StringArrayType is one of the index types """
+
+    check = isinstance(self, sdc_pandas_index_types)
+    print("DEBUG: sdc_indexes_take typing:", self, check)
+    if not isinstance(self, sdc_pandas_index_types):
+        return None
+
+    index_api_supported = not isinstance(self, sdc_old_index_types)
+
+    def pd_fix_indexes_take_impl(self, indexes):
+
+        if index_api_supported == True:  # noqa
+            res = self.take(indexes)
+        else:
+            res = numpy_like.take(self, indexes)
+
+        return res
+
+    return pd_fix_indexes_take_impl
