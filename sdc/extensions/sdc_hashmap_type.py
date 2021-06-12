@@ -24,20 +24,11 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-from numba.core.typing.templates import (
-    infer_global, AbstractTemplate, signature,
-    )
-from numba.extending import type_callable, lower_builtin
 from numba import types
-from numba.extending import (models, register_model, make_attribute_wrapper, overload_method)
-from sdc.str_ext import string_type
+from numba.core.types import IterableType, SimpleIterableType, SimpleIteratorType
+from numba.extending import (models, register_model, make_attribute_wrapper, )
 
 from collections.abc import MutableMapping
-from numba.core.types import Dummy, IterableType, SimpleIterableType, SimpleIteratorType
-
-from numba.extending import typeof_impl
-from numba.typed import Dict
-from numba.core.typing.typeof import _typeof_type as numba_typeof_type
 
 
 class ConcDictIteratorType(SimpleIteratorType):
@@ -161,33 +152,3 @@ class ConcurrentDict(MutableMapping):
         if self._dict_type is None:
             raise TypeError("invalid operation on untyped dictionary")
         return self._dict_type
-
-
-# FIXME_Numba#6781: due to overlapping of overload_methods for Numba TypeRef
-# we have to use our new SdcTypeRef to type objects created from types.Type
-# (i.e. ConcurrentDict meta-type). This should be removed once it's fixed.
-class SdcTypeRef(Dummy):
-    """Reference to a type.
-
-    Used when a type is passed as a value.
-    """
-    def __init__(self, instance_type):
-        self.instance_type = instance_type
-        super(SdcTypeRef, self).__init__('sdc_typeref[{}]'.format(self.instance_type))
-
-
-@register_model(SdcTypeRef)
-class SdcTypeRefModel(models.OpaqueModel):
-    def __init__(self, dmm, fe_type):
-
-        models.OpaqueModel.__init__(self, dmm, fe_type)
-
-
-@typeof_impl.register(type)
-def mynew_typeof_type(val, c):
-    """ This function is a workaround for """
-
-    if not issubclass(val, ConcurrentDict):
-        return numba_typeof_type(val, c)
-    else:
-        return SdcTypeRef(ConcurrentDictType)

@@ -97,9 +97,8 @@ def sdc_indexes_operator_eq_ovld(self, other):
     use_self_values = isinstance(self, sdc_pandas_index_types) and not isinstance(self, types.Array)
     use_other_values = isinstance(other, sdc_pandas_index_types) and not isinstance(other, types.Array)
 
-    ## prev. version:    one_operand_is_scalar = isinstance(self, types.Number) or isinstance(other, types.Number)
-    # FIXME: check that one_operand_is_scalar is fixed and works in tests now
-    one_operand_is_scalar = self is other.dtype or other is self.dtype
+    one_operand_is_scalar = (isinstance(other, sdc_pandas_index_types) and self is other.dtype
+                             or isinstance(self, sdc_pandas_index_types) and other is self.dtype)
 
     def sdc_indexes_operator_eq_impl(self, other):
 

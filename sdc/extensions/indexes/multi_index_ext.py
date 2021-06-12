@@ -37,7 +37,6 @@ from numba.core.errors import TypingError
 from numba.core.typing.templates import signature, AttributeTemplate, AbstractTemplate, infer_getattr
 from numba.core.imputils import impl_ret_untracked, call_getiter, impl_ret_borrowed
 from numba.core.imputils import (impl_ret_new_ref, impl_ret_borrowed, iternext_impl, RefType)
-from numba.core.boxing import box_array, unbox_array
 from numba.core.boxing import box_array, unbox_array, box_tuple
 
 import llvmlite.llvmpy.core as lc
@@ -55,8 +54,8 @@ from sdc.utilities.sdc_typing_utils import (
 from sdc.functions import numpy_like
 from sdc.hiframes.api import fix_df_array, fix_df_index
 from sdc.hiframes.boxing import _infer_index_type, _unbox_index_data
-from sdc.extensions.indexes.indexes_generic import *
 from sdc.datatypes.common_functions import hpat_arrays_append
+from sdc.extensions.indexes.indexes_generic import *
 
 from sdc.datatypes.indexes.multi_index_type import MultiIndexIteratorType
 from numba.core.extending import register_jitable
@@ -64,11 +63,11 @@ from numba import literal_unroll
 from numba.typed import Dict, List
 from sdc.str_arr_type import StringArrayType
 from sdc.extensions.indexes.positional_index_ext import init_positional_index
-from sdc.extensions.indexes.empty_index_ext import init_empty_index
 
-from sdc.datatypes.indexes.multi_index_type import SdcTypeRef
-from sdc.hiframes.boxing import _infer_index_type
+from sdc.datatypes.sdc_typeref import SdcTypeRef
 
+
+from sdc.extensions.sdc_hashmap_type import *
 
 ### FIXME: clean-up imports
 

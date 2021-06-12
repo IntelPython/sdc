@@ -59,7 +59,7 @@ from sdc.extensions.sdc_hashmap_type import (ConcurrentDict, ConcurrentDictType,
                                              ConcDictItemsIterableType, ConcDictValuesIterableType)
 from numba.extending import register_jitable
 
-from sdc.extensions.sdc_hashmap_type import SdcTypeRef
+from sdc.datatypes.sdc_typeref import SdcTypeRef
 from sdc.utilities.sdc_typing_utils import TypingError, TypeChecker, check_types_comparable
 from itertools import product
 

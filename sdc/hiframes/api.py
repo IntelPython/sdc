@@ -149,8 +149,9 @@ def fix_df_array(column):
 @overload(fix_df_array)
 def fix_df_array_overload(column):
 
-    if not isinstance(column, (types.List, types.ListType, types.Array, StringArrayType)):
-        return None
+    # FIXME: do we need some restriction on column types here?
+#     if not isinstance(column, (types.List, types.ListType, types.Array, StringArrayType)):
+#         return None
 
     print("DEBUG: fix_df_array_overload column=", column)
     if (isinstance(column, types.List)):

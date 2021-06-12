@@ -125,23 +125,10 @@ class SdcTypeRef(types.Dummy):
     def __init__(self, instance_type):
         self.instance_type = instance_type
         super(SdcTypeRef, self).__init__('sdc_typeref[{}]'.format(self.instance_type))
- 
- 
+
+
 @register_model(SdcTypeRef)
 class SdcTypeRefModel(models.OpaqueModel):
     def __init__(self, dmm, fe_type):
- 
+
         models.OpaqueModel.__init__(self, dmm, fe_type)
- 
-
-import pandas as pd
-@typeof_impl.register(type)
-def mynew_typeof_type(val, c):
-    """ This function is a workaround for """
-
-    # print("DEBUG: val=", val)
-    if not issubclass(val, pd.MultiIndex):
-    # if not issubclass(val, MultiIndex):
-        return numba_typeof_type(val, c)
-    else:
-        return SdcTypeRef(MultiIndexType)

@@ -70,6 +70,7 @@ sdc_pandas_df_column_types = (
         Categorical,
     )
 
+
 class TypeChecker:
     """
         Validate object type and raise TypingError if the type is invalid, e.g.:
