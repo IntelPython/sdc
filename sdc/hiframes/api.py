@@ -149,11 +149,6 @@ def fix_df_array(column):
 @overload(fix_df_array)
 def fix_df_array_overload(column):
 
-    # FIXME: do we need some restriction on column types here?
-#     if not isinstance(column, (types.List, types.ListType, types.Array, StringArrayType)):
-#         return None
-
-    print("DEBUG: fix_df_array_overload column=", column)
     if (isinstance(column, types.List)):
         dtype = column.dtype
         if isinstance(dtype, (types.Number, types.Boolean)):
@@ -173,11 +168,7 @@ def fix_df_array_overload(column):
         return lambda column: np.array(column)
 
     if isinstance(column, (types.Array, StringArrayType, Categorical)):
-        def fix_df_array_array_impl(column):
-            print("DEBUG: calling fix_df_array, column=", column)
-            return column
-        return fix_df_array_array_impl
-        # return lambda column: column
+        return lambda column: column
 
 
 def fix_df_index(index, coldata=None):
@@ -187,7 +178,6 @@ def fix_df_index(index, coldata=None):
 @overload(fix_df_index)
 def fix_df_index_overload(index, coldata=None):
 
-    print("DEBUG: fix_df_index_overload index=", index)
     # FIXME: import here due to circular import between indexes, numpy_like, and api
     from sdc.extensions.indexes.empty_index_ext import init_empty_index
     from sdc.extensions.indexes.positional_index_ext import init_positional_index
@@ -209,7 +199,6 @@ def fix_df_index_overload(index, coldata=None):
     elif (isinstance(index, sdc_pandas_index_types)
             and not isinstance(index, sdc_old_index_types)):     ## MAJOR bug fix in a separate PR
         def fix_df_index_impl(index, coldata=None):
-            print("DEBUG: calling this fix_df_index, index=", index)
             return index
 
     # currently only signed integer indexes are represented with own type

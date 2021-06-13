@@ -296,7 +296,6 @@ def pd_fix_indexes_take_overload(self, indexes):
         the fact that StringArrayType is one of the index types """
 
     check = isinstance(self, sdc_pandas_index_types)
-    print("DEBUG: sdc_indexes_take typing:", self, check)
     if not isinstance(self, sdc_pandas_index_types):
         return None
 
@@ -312,3 +311,56 @@ def pd_fix_indexes_take_overload(self, indexes):
         return res
 
     return pd_fix_indexes_take_impl
+
+
+def sdc_indexes_rename(index, name):
+    pass
+
+
+@sdc_overload(sdc_indexes_rename)
+def sdc_index_rename_ovld(index, name):
+
+    if not isinstance(index, sdc_pandas_index_types):
+        return None
+
+    if isinstance(index, sdc_old_index_types):
+        def sdc_indexes_rename_stub(index, name):
+            # cannot rename string or float indexes, TO-DO: StringIndexType
+            return index
+        return sdc_indexes_rename_stub
+
+    if isinstance(index, PositionalIndexType):
+        from sdc.extensions.indexes.positional_index_ext import init_positional_index
+
+        def sdc_indexes_rename_impl(index, name):
+            return init_positional_index(len(index), name)
+        return sdc_indexes_rename_impl
+
+    elif isinstance(index, RangeIndexType):
+        def sdc_indexes_rename_impl(index, name):
+            return pd.RangeIndex(index.start, index.stop, index.step, name=name)
+        return sdc_indexes_rename_impl
+
+    elif isinstance(index, Int64IndexType):
+        def sdc_indexes_rename_impl(index, name):
+            return pd.Int64Index(index, name=name)
+        return sdc_indexes_rename_impl
+
+
+def sdc_indexes_get_name(index):
+    pass
+
+
+@sdc_overload(sdc_indexes_get_name)
+def sdc_indexes_get_name_ovld(index):
+
+    if (isinstance(index, sdc_pandas_index_types)
+            and not isinstance(index, sdc_old_index_types)):
+        def sdc_indexes_get_name_impl(index):
+            return index.name
+        return sdc_indexes_get_name_impl
+
+    def sdc_indexes_get_name_stub(index):
+        # cannot rename string or float indexes, TO-DO: StringIndexType
+        return None
+    return sdc_indexes_get_name_stub
