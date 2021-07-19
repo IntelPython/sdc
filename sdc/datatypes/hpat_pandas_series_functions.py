@@ -4429,7 +4429,7 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
                 sorted_percentiles = sorted(percentiles_list)
 
                 # check percentiles have correct values:
-                arr = numpy.asarray(sorted_percentiles)
+                arr = numpy.asarray(sorted_percentiles).astype(numpy.float64)
                 if len(numpy.unique(arr)) != len(arr):
                     raise ValueError("percentiles cannot contain duplicates")
                 if numpy.any(arr[(arr < 0) * (arr > 1)]):

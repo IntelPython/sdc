@@ -89,14 +89,14 @@ ll.add_symbol('hpat_dist_get_node_portion', hdist.hpat_dist_get_node_portion)
 @lower_builtin(distributed_api.get_rank)
 def dist_get_rank(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [])
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_rank")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="hpat_dist_get_rank")
     return builder.call(fn, [])
 
 
 @lower_builtin(distributed_api.get_size)
 def dist_get_size(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [])
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_size")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="hpat_dist_get_size")
     return builder.call(fn, [])
 
 
@@ -113,7 +113,7 @@ def dist_get_start(context, builder, sig, args):
 def dist_get_end(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(64),
                                               lir.IntType(32), lir.IntType(32)])
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_end")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="hpat_dist_get_end")
     return builder.call(fn, [args[0], args[1], args[2]])
 
 
@@ -163,7 +163,7 @@ def lower_dist_reduce(context, builder, sig, args):
 
     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(),
                                              lir.IntType(8).as_pointer(), op_typ, lir.IntType(32)])
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_reduce")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="hpat_dist_reduce")
     builder.call(fn, [in_ptr, out_ptr, args[1], builder.load(typ_arg)])
     # cast back to value type
     out_ptr = builder.bitcast(out_ptr, val_typ.as_pointer())
@@ -206,21 +206,21 @@ def lower_dist_arr_reduce(context, builder, sig, args):
 @lower_builtin(time.time)
 def dist_get_time(context, builder, sig, args):
     fnty = lir.FunctionType(lir.DoubleType(), [])
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_get_time")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="hpat_get_time")
     return builder.call(fn, [])
 
 
 @lower_builtin(distributed_api.dist_time)
 def dist_get_dist_time(context, builder, sig, args):
     fnty = lir.FunctionType(lir.DoubleType(), [])
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_time")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="hpat_dist_get_time")
     return builder.call(fn, [])
 
 
 @lower_builtin(distributed_api.barrier)
 def dist_barrier(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [])
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_barrier")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="hpat_barrier")
     return builder.call(fn, [])
 
 
@@ -285,7 +285,7 @@ def lower_dist_irecv(context, builder, sig, args):
                     32), lir.IntType(32), lir.IntType(32),
                 lir.IntType(1)]
     fnty = lir.FunctionType(mpi_req_llvm_type, arg_typs)
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_irecv")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="hpat_dist_irecv")
     return builder.call(fn, call_args)
 
 # array, size, pe, tag, cond
@@ -313,14 +313,14 @@ def lower_dist_isend(context, builder, sig, args):
                     32), lir.IntType(32), lir.IntType(32),
                 lir.IntType(1)]
     fnty = lir.FunctionType(mpi_req_llvm_type, arg_typs)
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_isend")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="hpat_dist_isend")
     return builder.call(fn, call_args)
 
 
 @lower_builtin(distributed_api.wait, mpi_req_numba_type, types.boolean)
 def lower_dist_wait(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [mpi_req_llvm_type, lir.IntType(1)])
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_wait")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="hpat_dist_wait")
     return builder.call(fn, args)
 
 
@@ -328,7 +328,7 @@ def lower_dist_wait(context, builder, sig, args):
 def lower_dist_waitall(context, builder, sig, args):
     fnty = lir.FunctionType(lir.VoidType(),
                             [lir.IntType(32), lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_waitall")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="hpat_dist_waitall")
     builder.call(fn, args)
     return context.get_dummy_value()
 
@@ -425,7 +425,7 @@ def lower_dist_allgather(context, builder, sig, args):
 
     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer(),
                                              lir.IntType(32), val_ptr.type, lir.IntType(32)])
-    fn = builder.module.get_or_insert_function(fnty, name="allgather")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="allgather")
     builder.call(fn, call_args)
     return context.get_dummy_value()
 
@@ -433,14 +433,14 @@ def lower_dist_allgather(context, builder, sig, args):
 @lower_builtin(distributed_api.comm_req_alloc, types.int32)
 def lower_dist_comm_req_alloc(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [lir.IntType(32)])
-    fn = builder.module.get_or_insert_function(fnty, name="comm_req_alloc")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="comm_req_alloc")
     return builder.call(fn, args)
 
 
 @lower_builtin(distributed_api.comm_req_dealloc, req_array_type)
 def lower_dist_comm_req_dealloc(context, builder, sig, args):
     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="comm_req_dealloc")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="comm_req_dealloc")
     builder.call(fn, args)
     return context.get_dummy_value()
 
@@ -471,7 +471,7 @@ def setitem_req_array(context, builder, sig, args):
 #                       wraparound=False):
 #         # get local index or -1 if out of bounds
 #         fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(64), lir.IntType(64), lir.IntType(64)])
-#         fn = builder.module.get_or_insert_function(fnty, name="hpat_dist_get_item_pointer")
+#         fn = cgutils.get_or_insert_function(builder.module, fnty, name="hpat_dist_get_item_pointer")
 #         first_ind = builder.call(fn, [inds[0], start, count])
 #         inds = tuple([first_ind, *inds[1:]])
 #         # regular local pointer with new indices
@@ -481,7 +481,7 @@ def setitem_req_array(context, builder, sig, args):
 #         not_inbound = builder.icmp_signed('==', first_ind, lir.Constant(lir.IntType(64), -1))
 #         # get dummy pointer
 #         dummy_fnty  = lir.FunctionType(lir.IntType(8).as_pointer(), [])
-#         dummy_fn = builder.module.get_or_insert_function(dummy_fnty, name="hpat_get_dummy_ptr")
+#         dummy_fn = cgutils.get_or_insert_function(builder.module, dummy_fnty, name="hpat_get_dummy_ptr")
 #         dummy_ptr = builder.bitcast(builder.call(dummy_fn, []), in_ptr.type)
 #         with builder.if_then(not_inbound, likely=True):
 #             builder.store(dummy_ptr, ret_ptr)
@@ -613,7 +613,7 @@ class FinalizeInfer(AbstractTemplate):
 @lower_builtin(hpat_finalize)
 def lower_hpat_finalize(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32), [])
-    fn = builder.module.get_or_insert_function(fnty, name="hpat_finalize")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="hpat_finalize")
     return builder.call(fn, args)
 
 

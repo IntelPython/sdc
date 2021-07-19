@@ -186,7 +186,7 @@ class InSetOp(AbstractTemplate):
 def lower_dict_in(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
                                              lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="set_in_string")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="set_in_string")
     return builder.call(fn, args)
 
 
@@ -196,7 +196,7 @@ def lower_dict_in_op(context, builder, sig, args):
     char_str = gen_get_unicode_chars(context, builder, unicode_str)
     fnty = lir.FunctionType(lir.IntType(1), [lir.IntType(8).as_pointer(),
                                              lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="set_in_string")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="set_in_string")
     return builder.call(fn, [char_str, set_str])
 
 
@@ -230,8 +230,9 @@ def populate_str_arr_from_set(typingctx, in_set_typ, in_str_arr_typ=None):
                                  lir.IntType(32).as_pointer(),
                                  lir.IntType(8).as_pointer(),
                                  ])
-        fn_getitem = builder.module.get_or_insert_function(fnty,
-                                                           name="populate_str_arr_from_set")
+        fn_getitem = cgutils.get_or_insert_function(builder.module,
+                                                    fnty,
+                                                    name="populate_str_arr_from_set")
         builder.call(fn_getitem, [in_set, string_array.offsets,
                                   string_array.data])
         return context.get_dummy_value()
@@ -253,7 +254,7 @@ class StrSetIteratorModel(models.StructModel):
 def getiter_set(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="set_iterator_string")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="set_iterator_string")
     itp = builder.call(fn, args)
 
     iterobj = context.make_helper(builder, sig.return_type)
@@ -273,13 +274,13 @@ def iternext_setiter(context, builder, sig, args, result):
 
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="set_itervalid_string")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="set_itervalid_string")
     is_valid = builder.call(fn, [iterobj.itp, iterobj.set])
     result.set_valid(is_valid)
 
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="set_nextval_string")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="set_nextval_string")
     kind = numba.cpython.unicode.PY_UNICODE_1BYTE_KIND
 
     def std_str_to_unicode(std_str):

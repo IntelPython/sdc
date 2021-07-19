@@ -31,7 +31,6 @@ import numpy as np
 import operator
 import sdc
 
-from sdc import hstr_ext
 from glob import glob
 from llvmlite import ir as lir
 from numba import types, cfunc
@@ -44,15 +43,9 @@ from numba.core.imputils import (impl_ret_new_ref, impl_ret_borrowed, iternext_i
 from numba.cpython.listobj import ListInstance
 from numba.core.typing.templates import (infer_global, AbstractTemplate, infer,
                                          signature, AttributeTemplate, infer_getattr, bound_function)
-from numba import prange
-
-from sdc.str_ext import string_type
-from sdc.str_arr_type import (StringArray, string_array_type, StringArrayType,
-                              StringArrayPayloadType, str_arr_payload_type, StringArrayIterator,
-                              is_str_arr_typ, offset_typ, data_ctypes_type, offset_ctypes_type)
-from sdc.utilities.sdc_typing_utils import check_is_array_of_dtype
-
 from numba.typed.typedobjectutils import _as_bytes
+
+from sdc.str_arr_type import StringArrayType
 from sdc import hconc_dict
 from sdc.extensions.sdc_hashmap_type import (ConcurrentDict, ConcurrentDictType,
                                              ConcDictKeysIterableType, ConcDictIteratorType,
@@ -319,7 +312,7 @@ def hashmap_create(typingctx, key, value):
                                  llptrtype, llptrtype,                # val incref, decref
                                  lir.IntType(64), lir.IntType(64)])   # key size, val size
         func_name = f"hashmap_create_{key_type_postfix}_to_{value_type_postfix}"
-        fn_hashmap_create = builder.module.get_or_insert_function(
+        fn_hashmap_create = cgutils.get_or_insert_function(builder.module,
             fnty, name=func_name)
 
         gen_key = context.get_constant(types.int8, types.int8(not key_numeric))
@@ -403,7 +396,7 @@ def hashmap_size(typingctx, dict_type):
         fnty = lir.FunctionType(lir.IntType(64),
                                 [lir.IntType(8).as_pointer()])
         func_name = f"hashmap_size_{key_type_postfix}_to_{value_type_postfix}"
-        fn_hashmap_size = builder.module.get_or_insert_function(
+        fn_hashmap_size = cgutils.get_or_insert_function(builder.module,
             fnty, name=func_name)
         ret = builder.call(fn_hashmap_size, [cdict.data_ptr])
         return ret
@@ -441,7 +434,7 @@ def hashmap_set(typingctx, dict_type, key_type, value_type):
                                  lir_val_type])
 
         func_name = f"hashmap_set_{key_type_postfix}_to_{value_type_postfix}"
-        fn_hashmap_insert = builder.module.get_or_insert_function(
+        fn_hashmap_insert = cgutils.get_or_insert_function(builder.module,
             fnty, name=func_name)
 
         builder.call(fn_hashmap_insert, [cdict.data_ptr, key_val, val_val])
@@ -483,7 +476,7 @@ def hashmap_contains(typingctx, dict_type, key_type):
                                 [lir.IntType(8).as_pointer(),
                                  lir_key_type])
         func_name = f"hashmap_contains_{key_type_postfix}_to_{value_type_postfix}"
-        fn_hashmap_contains = builder.module.get_or_insert_function(
+        fn_hashmap_contains = cgutils.get_or_insert_function(builder.module,
             fnty, name=func_name)
 
         res = builder.call(fn_hashmap_contains, [cdict.data_ptr, key_val])
@@ -527,7 +520,7 @@ def hashmap_lookup(typingctx, dict_type, key_type):
                                  lir_value_type.as_pointer()
                                  ])
         func_name = f"hashmap_lookup_{key_type_postfix}_to_{value_type_postfix}"
-        fn_hashmap_lookup = builder.module.get_or_insert_function(
+        fn_hashmap_lookup = cgutils.get_or_insert_function(builder.module,
             fnty, name=func_name)
 
         status = builder.call(fn_hashmap_lookup, [cdict.data_ptr, key_val, native_value_ptr])
@@ -593,7 +586,7 @@ def hashmap_clear(typingctx, dict_type):
         fnty = lir.FunctionType(lir.VoidType(),
                                 [lir.IntType(8).as_pointer()])
         func_name = f"hashmap_clear_{key_type_postfix}_to_{value_type_postfix}"
-        fn_hashmap_clear = builder.module.get_or_insert_function(
+        fn_hashmap_clear = cgutils.get_or_insert_function(builder.module,
             fnty, name=func_name)
         builder.call(fn_hashmap_clear, [cdict.data_ptr])
         return
@@ -675,7 +668,7 @@ def hashmap_pop(typingctx, dict_type, key_type):
                                  llvoidptr,
                                  ])
         func_name = f"hashmap_pop_{key_type_postfix}_to_{value_type_postfix}"
-        fn_hashmap_pop = builder.module.get_or_insert_function(
+        fn_hashmap_pop = cgutils.get_or_insert_function(builder.module,
             fnty, name=func_name)
 
         status = builder.call(fn_hashmap_pop, [cdict.data_ptr, key_val, ret_val_ptr])
@@ -759,7 +752,7 @@ def hashmap_update(typingctx, dict_type, other_dict_type):
                                  lir.IntType(8).as_pointer()
                                  ])
         func_name = f"hashmap_update_{key_type_postfix}_to_{value_type_postfix}"
-        fn_hashmap_update = builder.module.get_or_insert_function(
+        fn_hashmap_update = cgutils.get_or_insert_function(builder.module,
             fnty, name=func_name)
 
         builder.call(fn_hashmap_update, [self_cdict.data_ptr, other_cdict.data_ptr])
@@ -835,7 +828,7 @@ def create_from_arrays(typingctx, keys, values):
                                  lir.IntType(64),                    # size
                                  ])
         func_name = f"hashmap_create_from_data_{key_type_postfix}_to_{value_type_postfix}"
-        fn_hashmap_create = builder.module.get_or_insert_function(
+        fn_hashmap_create = cgutils.get_or_insert_function(builder.module,
             fnty, name=func_name)
         builder.call(fn_hashmap_create,
                      [cdict._get_ptr_by_name('meminfo'),
@@ -913,7 +906,7 @@ def _hashmap_dump(typingctx, dict_type):
         fnty = lir.FunctionType(lir.VoidType(),
                                 [lir.IntType(8).as_pointer()])
         func_name = f"hashmap_dump_{key_type_postfix}_to_{value_type_postfix}"
-        fn_hashmap_dump = builder.module.get_or_insert_function(
+        fn_hashmap_dump = cgutils.get_or_insert_function(builder.module,
             fnty, name=func_name)
         builder.call(fn_hashmap_dump, [cdict.data_ptr])
         return
@@ -1018,7 +1011,7 @@ def call_native_getiter(context, builder, dict_type, dict_val, it):
                              llvoidptr,
                              llvoidptr])
     func_name = f"hashmap_getiter_{key_type_postfix}_to_{value_type_postfix}"
-    fn_hashmap_getiter = builder.module.get_or_insert_function(
+    fn_hashmap_getiter = cgutils.get_or_insert_function(builder.module,
         fnty, name=func_name)
 
     cdict = cgutils.create_struct_proxy(dict_type)(context, builder, value=dict_val)
@@ -1085,7 +1078,7 @@ def impl_iterator_iternext(context, builder, sig, args, result):
                              lir_key_type.as_pointer(),
                              lir_value_type.as_pointer()])
     func_name = f"hashmap_iternext_{key_type_postfix}_to_{value_type_postfix}"
-    fn_hashmap_iternext = builder.module.get_or_insert_function(
+    fn_hashmap_iternext = cgutils.get_or_insert_function(builder.module,
         fnty, name=func_name)
 
     iter_ctinfo = context.make_helper(builder, iter_type, iter_val)

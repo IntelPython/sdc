@@ -30,7 +30,6 @@ from numba.core.typing.templates import (
 from numba.extending import type_callable, lower_builtin
 from numba import types
 from numba.extending import (models, register_model, make_attribute_wrapper, overload_method)
-from sdc.str_ext import string_type
 
 from collections.abc import MutableMapping
 from numba.core.types import Dummy, IterableType, SimpleIterableType, SimpleIteratorType

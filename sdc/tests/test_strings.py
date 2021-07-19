@@ -146,13 +146,23 @@ class TestStrings(TestCase):
     def test_string_str_cast(self):
         def test_impl(a):
             return str(a)
-        hpat_func = self.jit(test_impl)
+        sdc_func = self.jit(test_impl)
 
-        for arg in [np.int32(45), 43, np.float32(1.4), 4.5]:
-            py_res = test_impl(arg)
-            h_res = hpat_func(arg)
-            # XXX: use startswith since hpat output can have extra characters
-            self.assertTrue(h_res.startswith(py_res))
+        tested_values = [
+            np.int32(45),
+            43,
+            np.float32(1.4),
+            np.float64(1.4),
+            4.5,
+            np.float64(np.nan)
+        ]
+        for val in tested_values:
+            with self.subTest(val=val):
+                result_ref = test_impl(val)
+                result = sdc_func(val)
+                ### FIXME: return back comment
+                self.assertTrue(result.startswith(result_ref),
+                                f"result={result} not started with {result_ref}")
 
     def test_re_sub(self):
         def test_impl(_str):
