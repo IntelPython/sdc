@@ -140,7 +140,7 @@ class TestMultiIndex(TestCase):
     def test_multi_index_create_param_names(self):
 
         # using keyword arguments in typeref ctor, is not supported due to limitation of __call__ overload,
-        # TO-DO: refactor this after @overload is supported for typerefs (see FIXME_Numba#XXXX):
+        # TO-DO: refactor this after @overload is supported for typerefs (see FIXME_Numba#7111):
         def test_impl(levels, codes, names):
             # return pd.MultiIndex(levels, codes, name=names)
             return pd.MultiIndex(levels, codes, None, None, None, False, names)
@@ -663,7 +663,7 @@ class TestMultiIndex(TestCase):
         sdc_func = self.jit(test_impl)
 
         np.random.seed(0)
-        for data in list(_generate_multi_index_levels())[:1]:
+        for data in _generate_multi_index_levels():
             # creating pd.MultiIndex is only supported with levels and codes as tuples
             levels = tuple(data)
             with self.subTest(levels=levels):
@@ -678,7 +678,7 @@ class TestMultiIndex(TestCase):
 
         n = 100
         np.random.seed(0)
-        for index in list(_generate_multi_indexes_fixed(n))[:1]:
+        for index in _generate_multi_indexes_fixed(n):
             data = list(index.values)
             with self.subTest(data=data):
                 result = sdc_func(data)

@@ -59,7 +59,7 @@ from sdc.datatypes.indexes.multi_index_type import MultiIndexIteratorType
 from numba.core.extending import register_jitable
 from numba import literal_unroll
 from numba.typed import Dict, List
-from sdc.datatypes.sdc_typeref import SdcTypeRef
+from sdc.datatypes.sdc_typeref import MultiIndexTypeRef
 
 
 @typeof_impl.register(pd.MultiIndex)
@@ -264,7 +264,7 @@ def _sdc_multi_index_ctor_typer(typing_ctx, *args):
 # work, but this typer handles only case when SdcTypeRef.instance_type is MultiIndexType
 # but it may be reference to other type as well (e.g. ConcurrentDictType). Need differentiate
 # SdcTypeRef-s for different types.
-@type_callable(SdcTypeRef)
+@type_callable(MultiIndexTypeRef)
 def typing_sdctyperef(context):
     typing_ctx = context
 
@@ -276,11 +276,11 @@ def typing_sdctyperef(context):
     return typer
 
 
-# FIXME_Numba#7111: low-level api is used as providing SdcTypeRef.__call__ allows numba
-# find existing implementation (until above issue is fixed and @overload can be used)
+# FIXME_Numba#7111: low-level api is used to implement typing and impl of MultiIndex ctor
+# which is a workaround numba issue (once it's fixed @overload can be used instead)
 @infer_getattr
 class SdcTypeRefAttribute(AttributeTemplate):
-    key = SdcTypeRef
+    key = MultiIndexTypeRef
 
     def resolve___call__(self, instance):
         return type(instance)
@@ -347,7 +347,7 @@ def pd_multi_index_overload(levels, codes, sortorder=None, names=None,
     return pd_multi_index_ctor_impl
 
 
-@lower_builtin(SdcTypeRef, types.VarArg(types.Any))
+@lower_builtin(MultiIndexTypeRef, types.VarArg(types.Any))
 def sdctyperef_call_impl(context, builder, sig, args):
 
     # FIXME: this hardcodes template number and selected dispatcher, refactor?
@@ -1103,7 +1103,7 @@ def _make_level_unique_ovld(index):
     return _make_level_unique_impl
 
 
-@sdc_overload_method(SdcTypeRef, 'from_product', prefer_literal=False)
+@sdc_overload_method(MultiIndexTypeRef, 'from_product', prefer_literal=False)
 def pd_multi_index_from_product_overload(cls, iterables, sortorder=None, names=None):
     if cls.instance_type is not MultiIndexType:
         return
@@ -1229,7 +1229,7 @@ def _multi_index_append_value(typingctx, val, levels, codes, idx):
     return types.none(val, levels, codes, idx), codegen
 
 
-@sdc_overload_method(SdcTypeRef, 'from_tuples', prefer_literal=False)
+@sdc_overload_method(MultiIndexTypeRef, 'from_tuples', prefer_literal=False)
 def pd_multi_index_from_tuples_overload(cls, iterables):
     if cls.instance_type is not MultiIndexType:
         return
