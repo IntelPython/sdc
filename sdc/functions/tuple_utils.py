@@ -86,8 +86,10 @@ def sdc_tuple_map(typingctx, func, data, *args):
     ret_type = types.Tuple(ret_tuple_types)
     ret_sig = ret_type(func, data, types.StarArgTuple.from_types(args))
 
-    ### FIXME: this works with single overload for decorated function only
-    ### but this isn't necessary, just need to find out corresponding template
+    # codegen below uses first func template to get the dispatcher, so
+    # for now deny compilation for overloaded func-s that have multiple overloads
+    # (using the jitted function dispatcher as func will work anyway)
+    # TO-DO: improve and upstream to Numba
     if isinstance(func, types.Function):
         assert len(func.templates) == 1, "Function template has multiple overloads"
 
@@ -109,7 +111,8 @@ def sdc_tuple_map(typingctx, func, data, *args):
             if isinstance(func, types.Dispatcher):
                 py_func = func.dispatcher.py_func
             else:
-                # for function overloads get pyfunc from compiled impl
+                # for function overloads get pyfunc from compiled impl (this
+                # hardcodes the first available template)
                 target_disp = func.templates[0](context.typing_context)
                 py_func = target_disp._get_impl(call_sig.args, {})[0].py_func
 
@@ -209,10 +212,10 @@ def sdc_tuple_unzip(typingctx, data_type):
 
     for x in data_type:
         assert isinstance(x, (types.Tuple, types.UniTuple)) and len(x) == len(data_type[0]), \
-        f"{_func_name}: non-supported tuple elements types. {_given_args_str}"
+               f"{_func_name}: non-supported tuple elements types. {_given_args_str}"
 
     ty_firsts, ty_seconds = map(lambda x: types.Tuple.from_types(x),
-                              zip(*data_type))
+                                zip(*data_type))
     ret_type = types.Tuple([ty_firsts, ty_seconds])
 
     def codegen(context, builder, sig, args):

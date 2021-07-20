@@ -195,9 +195,8 @@ def fix_df_index_overload(index, coldata=None):
 
         return fix_df_index_impl
 
-    # elif isinstance(index, (RangeIndexType, Int64IndexType, EmptyIndexType, PositionalIndexType)):
     elif (isinstance(index, sdc_pandas_index_types)
-            and not isinstance(index, sdc_old_index_types)):     ## MAJOR bug fix in a separate PR
+          and not isinstance(index, sdc_old_index_types)):
         def fix_df_index_impl(index, coldata=None):
             return index
 

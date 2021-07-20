@@ -156,10 +156,8 @@ class TestMultiIndex(TestCase):
             pd.Int64Index([5, 2, 1, 4, 3]),
             pd.Int64Index([5, 2, 1, 4, 3], name='bce'),
         ]
-        for data, names in product(
-                combinations(all_levels, 2),
-                combinations_with_replacement(test_global_index_names, 2)
-            ):
+        for data, names in product(combinations(all_levels, 2),
+                                   combinations_with_replacement(test_global_index_names, 2)):
 
             # all parameters are supported as tuples only in pd.MultiIndex ctor
             levels = tuple(data)
@@ -562,7 +560,7 @@ class TestMultiIndex(TestCase):
         n = 11
         np.random.seed(0)
         base_index = _get_multi_index_base_index(n)
-        index1 = base_index[:n] 
+        index1 = base_index[:n]
         size_range = np.arange(len(index1))
         reindex_by = list(map(
             lambda x: base_index.take(x),
@@ -572,7 +570,7 @@ class TestMultiIndex(TestCase):
                 np.random.choice(size_range, n, replace=False),   # random unique values from index1
                 np.random.choice(np.arange(len(base_index)), n),  # random values from larger set
                 size_range[:n // 2],  # shorter index
-                np.random.choice(size_range, 2*n), # longer index
+                np.random.choice(size_range, 2*n),  # longer index
             ]
         ))
 
@@ -665,7 +663,7 @@ class TestMultiIndex(TestCase):
         sdc_func = self.jit(test_impl)
 
         np.random.seed(0)
-        for data in _generate_multi_index_levels():
+        for data in list(_generate_multi_index_levels())[:1]:
             # creating pd.MultiIndex is only supported with levels and codes as tuples
             levels = tuple(data)
             with self.subTest(levels=levels):
@@ -680,7 +678,7 @@ class TestMultiIndex(TestCase):
 
         n = 100
         np.random.seed(0)
-        for index in _generate_multi_indexes_fixed(n):
+        for index in list(_generate_multi_indexes_fixed(n))[:1]:
             data = list(index.values)
             with self.subTest(data=data):
                 result = sdc_func(data)

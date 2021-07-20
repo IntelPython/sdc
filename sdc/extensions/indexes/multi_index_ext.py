@@ -236,13 +236,13 @@ def _sdc_multi_index_ctor_typer(typing_ctx, *args):
         assert False, f"{_func_name}: argument copy is not supported, given: {args[5]}"
 
     # if ctor args provide list of levels names via name argument
-    # update type information for elements in ty_levels
+    # update type information for elements in ty_levels (so that levels are named indexes)
     name = args[6] if len(args) >= 6 and not args[6] is None else types.none
     if not isinstance(name, (types.NoneType, types.Omitted)):
         assert (isinstance(name, types.Tuple)
-                    and all(map(lambda x: isinstance(x, (types.StringLiteral, types.UnicodeType, types.NoneType)), name))
-                    or isinstance(name, types.UniTuple)
-                    and isinstance(name.dtype, (types.UnicodeType, types.NoneType))), \
+                and all(map(lambda x: isinstance(x, (types.StringLiteral, types.UnicodeType, types.NoneType)), name))
+                or isinstance(name, types.UniTuple)
+                and isinstance(name.dtype, (types.UnicodeType, types.NoneType))), \
                 f"{_func_name}: argument name must be tuple of strings, given: {args[6]}"
         assert len(name) == nlevels, \
                f"{_func_name}: Length of names must match number of levels in MultiIndex, given: {args[6]}"
@@ -260,7 +260,10 @@ def _sdc_multi_index_ctor_typer(typing_ctx, *args):
     return MultiIndexType(ty_levels, ty_codes, is_named=False)
 
 
-### FIXME: this should not be generic SdcTypeRef, but specific type, such as MultiIndexTypeRef
+# TO-DO: refactor: this allows SdcTypeRef to be callable and makes pd.MultiIndex.from_product
+# work, but this typer handles only case when SdcTypeRef.instance_type is MultiIndexType
+# but it may be reference to other type as well (e.g. ConcurrentDictType). Need differentiate
+# SdcTypeRef-s for different types.
 @type_callable(SdcTypeRef)
 def typing_sdctyperef(context):
     typing_ctx = context
@@ -273,7 +276,8 @@ def typing_sdctyperef(context):
     return typer
 
 
-### FIXME: add comment explaining why it's needed
+# FIXME_Numba#7111: low-level api is used as providing SdcTypeRef.__call__ allows numba
+# find existing implementation (until above issue is fixed and @overload can be used)
 @infer_getattr
 class SdcTypeRefAttribute(AttributeTemplate):
     key = SdcTypeRef
@@ -322,7 +326,7 @@ def pd_multi_index_overload(levels, codes, sortorder=None, names=None,
             raise ValueError("Must pass non-zero number of levels/codes")
 
         # if name is None then all level names are reset
-        if is_name_none == True:
+        if is_name_none == True:  # noqa
             _names = sdc_tuple_map(
                 lambda x: None,
                 levels,
@@ -911,7 +915,7 @@ def pd_multi_index_reindex_overload(self, target, method=None, level=None, limit
     return pd_multi_index_reindex_impl
 
 
-# FIXME: move to indexes_generic or build into index model?
+# TO-DO: seems like this can be removed when indexes have map_positions property
 @register_jitable
 def _appender_build_map(index1, index2):
     res = {}
@@ -1051,7 +1055,6 @@ def next_codes_array(stats, res_size):
     return np.array(list(np.repeat(codes_pattern, span_i)) * repeat_i)
 
 
-### FIXME: can we re-use this in from_tuples?
 def factorize_level(level):
     pass
 

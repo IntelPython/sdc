@@ -111,24 +111,3 @@ class MultiIndexModel(models.StructModel):
 make_attribute_wrapper(MultiIndexType, 'levels', '_levels')
 make_attribute_wrapper(MultiIndexType, 'codes', '_codes')
 make_attribute_wrapper(MultiIndexType, 'name', '_name')
-
-
-#### FIXME: move below to one common place:
- 
-# FIXME_Numba#6781: due to overlapping of overload_methods for Numba TypeRef
-# we have to use our new SdcTypeRef to type objects created from types.Type
-# (i.e. ConcurrentDict meta-type). This should be removed once it's fixed.
-class SdcTypeRef(types.Dummy):
-    """Reference to a type.
-    Used when a type is passed as a value.
-    """
-    def __init__(self, instance_type):
-        self.instance_type = instance_type
-        super(SdcTypeRef, self).__init__('sdc_typeref[{}]'.format(self.instance_type))
-
-
-@register_model(SdcTypeRef)
-class SdcTypeRefModel(models.OpaqueModel):
-    def __init__(self, dmm, fe_type):
-
-        models.OpaqueModel.__init__(self, dmm, fe_type)
