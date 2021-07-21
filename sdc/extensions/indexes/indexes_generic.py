@@ -30,12 +30,12 @@ import numpy as np
 import pandas as pd
 
 from numba import types
-from numba.typed import Dict
+from numba.typed import Dict, List
 from numba.typed.typedobjectutils import _nonoptional
 
 from sdc.utilities.sdc_typing_utils import sdc_pandas_index_types, sdc_old_index_types
 from sdc.datatypes.indexes import *
-from sdc.utilities.utils import sdc_overload_method, sdc_overload
+from sdc.utilities.utils import sdc_overload
 from sdc.utilities.sdc_typing_utils import (
                         find_index_common_dtype,
                         sdc_indexes_wo_values_cache,
@@ -364,3 +364,29 @@ def sdc_indexes_get_name_ovld(index):
         # cannot rename string or float indexes, TO-DO: StringIndexType
         return None
     return sdc_indexes_get_name_stub
+
+
+def sdc_indexes_build_map_positions(self):
+    pass
+
+
+@sdc_overload(sdc_indexes_build_map_positions)
+def sdc_indexes_build_map_positions_ovld(self):
+
+    indexer_dtype = self.dtype
+    indexer_value_type = types.ListType(types.int64)
+
+    def sdc_indexes_build_map_positions_impl(self):
+        indexer_map = Dict.empty(indexer_dtype, indexer_value_type)
+        for i in range(len(self)):
+            val = self[i]
+            index_list = indexer_map.get(val, None)
+            if index_list is None:
+                indexer_map[val] = List.empty_list(types.int64)
+                indexer_map[val].append(i)
+            else:
+                index_list.append(i)
+
+        return indexer_map
+
+    return sdc_indexes_build_map_positions_impl
