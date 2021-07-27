@@ -367,7 +367,7 @@ def multi_index_typeref_call_impl(context, builder, sig, args):
     # (1) lookup function type for the actual ctor (sdc_pandas_multi_index_ctor)
     # (2) get compiled implementation for provided args (hardcodes 0 as selected overload template,
     #     i.e. we rely on the fact that sdc_pandas_multi_index_ctor was overloaded only once)
-    # (3) get the function descriptor from compiled result and emit the call to it 
+    # (3) get the function descriptor from compiled result and emit the call to it
     call_sig = context.typing_context._resolve_user_function_type(
         sdc_pandas_multi_index_ctor,
         sig.args,

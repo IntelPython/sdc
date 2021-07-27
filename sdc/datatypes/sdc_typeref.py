@@ -27,8 +27,8 @@
 import pandas as pd
 
 from numba.core import types
-from numba.extending import (models, register_model, typeof_impl, )
-from numba.core.typing.typeof import _typeof_type as numba_typeof_type
+from numba.extending import (models, register_model, )
+from numba.core.typing.templates import infer_global
 
 from sdc.extensions.sdc_hashmap_type import ConcurrentDict, ConcurrentDictType
 from sdc.datatypes.indexes import MultiIndexType
@@ -59,14 +59,5 @@ def sdc_make_new_typeref_class():
 ConcurrentDictTypeRef = sdc_make_new_typeref_class()
 MultiIndexTypeRef = sdc_make_new_typeref_class()
 
-
-@typeof_impl.register(type)
-def mynew_typeof_type(val, c):
-    """ This function is a workaround for """
-
-    if issubclass(val, ConcurrentDict):
-        return ConcurrentDictTypeRef(ConcurrentDictType)
-    elif issubclass(val, pd.MultiIndex):
-        return MultiIndexTypeRef(MultiIndexType)
-    else:
-        return numba_typeof_type(val, c)
+infer_global(ConcurrentDict, ConcurrentDictTypeRef(ConcurrentDictType))
+infer_global(pd.MultiIndex, MultiIndexTypeRef(MultiIndexType))

@@ -30,9 +30,7 @@ from numba.extending import (
     models,
     register_model,
     make_attribute_wrapper,
-    typeof_impl,
 )
-from numba.core.typing.typeof import _typeof_type as numba_typeof_type
 
 
 class MultiIndexIteratorType(types.SimpleIteratorType):
