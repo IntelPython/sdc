@@ -49,6 +49,7 @@ sdc_pandas_index_types = (
         PositionalIndexType,
         RangeIndexType,
         Int64IndexType,
+        MultiIndexType,
     ) + sdc_old_index_types
 
 sdc_indexes_range_like = (
@@ -68,6 +69,7 @@ sdc_pandas_df_column_types = (
         StringArrayType,
         Categorical,
     )
+
 
 class TypeChecker:
     """
@@ -189,6 +191,9 @@ def check_types_comparable(ty_left, ty_right):
         return isinstance(ty_right, types.UnicodeType)
     if isinstance(ty_left, types.Boolean):
         return isinstance(ty_right, types.Boolean)
+    if isinstance(ty_left, (types.Tuple, types.UniTuple)):
+        # FIXME: just for now to unblock compilation
+        return ty_left == ty_right
 
     return False
 

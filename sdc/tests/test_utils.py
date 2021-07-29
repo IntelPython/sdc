@@ -254,6 +254,19 @@ def assert_raises_ty_checker(self, err_details, func, *args, **kwargs):
     self.assertRaisesRegex(TypingError, regex_str, func, *args, **kwargs)
 
 
+def assert_pandas_exception(self, test_msg, sdc_exc_str, test_impl, sdc_func, args):
+    with self.subTest(test_msg):
+        with self.assertRaises(Exception) as context:
+            test_impl(*args)
+        pandas_exception = context.exception
+
+        with self.assertRaises(type(pandas_exception)) as context:
+            sdc_func(*args)
+        sdc_exception = context.exception
+        self.assertIsInstance(sdc_exception, type(pandas_exception))
+        self.assertIn(sdc_exc_str, str(sdc_exception))
+
+
 def _make_func_from_text(func_text, func_name='test_impl', global_vars={}):
     loc_vars = {}
     exec(func_text, global_vars, loc_vars)
