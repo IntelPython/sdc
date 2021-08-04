@@ -404,7 +404,7 @@ setup(name=SDC_NAME_STR,
       install_requires=[
           'numpy>=1.16',
           'pandas==1.2.0',
-          'pyarrow==2.0.0',
+          'pyarrow==4.0.1',
           'numba==0.53.1',
           'tbb'
           ],
