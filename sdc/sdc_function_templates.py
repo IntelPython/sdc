@@ -89,7 +89,7 @@ def sdc_binop_ovld(self, other, fill_value=None):
             else:
                 indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
 
-            # FIXME_Numba#XXXX: remove sdc_fix_indexes_join call at all when issue is fixed
+            # FIXME_Numba#6686: remove sdc_fix_indexes_join call at all when issue is fixed
             joined_index, left_indexer, right_indexer = sdc_fix_indexes_join(*indexes_join_res)
             result_size = len(joined_index)
             result_data = numpy.empty(result_size, dtype=numpy.float64)

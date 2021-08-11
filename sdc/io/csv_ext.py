@@ -470,9 +470,11 @@ def pandas_read_csv(
     try:
         for column in parse_dates:
             name = f"f{column}"
-            # TODO: Try to help pyarrow infer date type - set DateType.
-            # dtype[name] = pyarrow.from_numpy_dtype(np.datetime64) # string
-            del column_types[name]
+            # starting from pyarrow=3.0.0 strings are parsed to DateType (converted back to 'object'
+            # when using to_pandas), but not TimestampType (that is used to represent np.datetime64)
+            # see: pyarrow.from_numpy_dtype(np.datetime64('NaT', 's'))
+            # so make pyarrow infer needed type manually
+            column_types[name] = pyarrow.timestamp('s')
     except: pass
 
     parse_options = pyarrow.csv.ParseOptions(

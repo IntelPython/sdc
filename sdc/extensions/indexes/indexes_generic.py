@@ -30,12 +30,12 @@ import numpy as np
 import pandas as pd
 
 from numba import types
-from numba.typed import Dict
+from numba.typed import Dict, List
 from numba.typed.typedobjectutils import _nonoptional
 
 from sdc.utilities.sdc_typing_utils import sdc_pandas_index_types, sdc_old_index_types
 from sdc.datatypes.indexes import *
-from sdc.utilities.utils import sdc_overload_method, sdc_overload
+from sdc.utilities.utils import sdc_overload
 from sdc.utilities.sdc_typing_utils import (
                         find_index_common_dtype,
                         sdc_indexes_wo_values_cache,
@@ -96,7 +96,9 @@ def sdc_indexes_operator_eq_ovld(self, other):
     # TO-DO: this is for numeric indexes only now, extend to string-index when it's added
     use_self_values = isinstance(self, sdc_pandas_index_types) and not isinstance(self, types.Array)
     use_other_values = isinstance(other, sdc_pandas_index_types) and not isinstance(other, types.Array)
-    one_operand_is_scalar = isinstance(self, types.Number) or isinstance(other, types.Number)
+
+    one_operand_is_scalar = (isinstance(other, sdc_pandas_index_types) and self is other.dtype
+                             or isinstance(self, sdc_pandas_index_types) and other is self.dtype)
 
     def sdc_indexes_operator_eq_impl(self, other):
 
@@ -217,8 +219,8 @@ def pd_fix_indexes_join_overload(joined, indexer1, indexer2):
     """ Wraps pandas index.join() into new function that returns indexers as arrays and not optional(array) """
 
     # This function is simply a workaround for problem with parfor lowering
-    # broken by indexers typed as types.Optional(Array) - FIXME_Numba#XXXX: remove it
-    # in all places whne parfor issue is fixed
+    # broken by indexers typed as types.Optional(Array) - FIXME_Numba#6686: remove it
+    # in all places when parfor issue is fixed
     def pd_fix_indexes_join_impl(joined, indexer1, indexer2):
         if indexer1 is not None:
             _indexer1 = _nonoptional(indexer1)
@@ -282,3 +284,109 @@ def sdc_np_array_overload(A):
 
     if isinstance(A, Int64IndexType):
         return lambda A: A._data
+
+
+def sdc_indexes_take(self, target):
+    pass
+
+
+@sdc_overload(sdc_indexes_take)
+def pd_fix_indexes_take_overload(self, indexes):
+    """ Simply workaround for not having take method as unique indexes due to
+        the fact that StringArrayType is one of the index types """
+
+    check = isinstance(self, sdc_pandas_index_types)
+    if not isinstance(self, sdc_pandas_index_types):
+        return None
+
+    index_api_supported = not isinstance(self, sdc_old_index_types)
+
+    def pd_fix_indexes_take_impl(self, indexes):
+
+        if index_api_supported == True:  # noqa
+            res = self.take(indexes)
+        else:
+            res = numpy_like.take(self, indexes)
+
+        return res
+
+    return pd_fix_indexes_take_impl
+
+
+def sdc_indexes_rename(index, name):
+    pass
+
+
+@sdc_overload(sdc_indexes_rename)
+def sdc_index_rename_ovld(index, name):
+
+    if not isinstance(index, sdc_pandas_index_types):
+        return None
+
+    if isinstance(index, sdc_old_index_types):
+        def sdc_indexes_rename_stub(index, name):
+            # cannot rename string or float indexes, TO-DO: StringIndexType
+            return index
+        return sdc_indexes_rename_stub
+
+    if isinstance(index, PositionalIndexType):
+        from sdc.extensions.indexes.positional_index_ext import init_positional_index
+
+        def sdc_indexes_rename_impl(index, name):
+            return init_positional_index(len(index), name)
+        return sdc_indexes_rename_impl
+
+    elif isinstance(index, RangeIndexType):
+        def sdc_indexes_rename_impl(index, name):
+            return pd.RangeIndex(index.start, index.stop, index.step, name=name)
+        return sdc_indexes_rename_impl
+
+    elif isinstance(index, Int64IndexType):
+        def sdc_indexes_rename_impl(index, name):
+            return pd.Int64Index(index, name=name)
+        return sdc_indexes_rename_impl
+
+
+def sdc_indexes_get_name(index):
+    pass
+
+
+@sdc_overload(sdc_indexes_get_name)
+def sdc_indexes_get_name_ovld(index):
+
+    if (isinstance(index, sdc_pandas_index_types)
+            and not isinstance(index, sdc_old_index_types)):
+        def sdc_indexes_get_name_impl(index):
+            return index.name
+        return sdc_indexes_get_name_impl
+
+    def sdc_indexes_get_name_stub(index):
+        # cannot rename string or float indexes, TO-DO: StringIndexType
+        return None
+    return sdc_indexes_get_name_stub
+
+
+def sdc_indexes_build_map_positions(self):
+    pass
+
+
+@sdc_overload(sdc_indexes_build_map_positions)
+def sdc_indexes_build_map_positions_ovld(self):
+
+    indexer_dtype = self.dtype
+    indexer_value_type = types.ListType(types.int64)
+
+    def sdc_indexes_build_map_positions_impl(self):
+        indexer_map = Dict.empty(indexer_dtype, indexer_value_type)
+        for i in range(len(self)):
+            val = self[i]
+            index_list = indexer_map.get(val, None)
+            if index_list is None:
+                indexer_map[val] = List.empty_list(types.int64)
+                indexer_map[val].append(i)
+            else:
+                index_list.append(i)
+
+        return indexer_map
+
+    return sdc_indexes_build_map_positions_impl
