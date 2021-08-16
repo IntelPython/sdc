@@ -160,7 +160,7 @@ class TestStrings(TestCase):
             with self.subTest(val=val):
                 result_ref = test_impl(val)
                 result = sdc_func(val)
-                ### FIXME: return back comment
+                # XXX: use startswith since hpat output can have extra characters
                 self.assertTrue(result.startswith(result_ref),
                                 f"result={result} not started with {result_ref}")
 

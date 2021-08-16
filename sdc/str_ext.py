@@ -30,6 +30,7 @@ import re
 import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
 import llvmlite.binding as ll
+import numpy as np
 
 import numba
 from numba.core import cgutils, types
@@ -406,16 +407,6 @@ class StrToFloat(AbstractTemplate):
             return signature(types.float64, arg)
 
 
-# FIXME: this is typing for broken impl
-# @infer_global(str)
-# class StrConstInfer(AbstractTemplate):
-#     def generic(self, args, kws):
-#         assert not kws
-#         assert len(args) == 1
-#         assert args[0] in [types.int32, types.int64, types.float32, types.float64, string_type]
-#         return signature(string_type, *args)
-
-
 class RegexType(types.Opaque):
     def __init__(self):
         super(RegexType, self).__init__(name='RegexType')
@@ -673,22 +664,6 @@ def const_to_string_type(context, builder, fromty, toty, val):
     return ret
 
 
-### FIXME: this impl introduces problem!
-'''
-@lower_builtin(str, types.Any)
-def string_from_impl(context, builder, sig, args):
-    in_typ = sig.args[0]
-    if in_typ == string_type:
-        return args[0]
-    ll_in_typ = context.get_value_type(sig.args[0])
-    fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [ll_in_typ])
-    fn = cgutils.get_or_insert_function(builder.module,
-        fnty, name="str_from_" + str(in_typ))
-    std_str = builder.call(fn, args)
-    return gen_std_str_to_unicode(context, builder, std_str)
-'''
-
-import numpy as np
 @overload(str)
 def str_from_float_ovld(val):
     if not isinstance(val, types.Float):
@@ -825,7 +800,8 @@ def cast_str_to_int64(context, builder, fromty, toty, val):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer()])
     fn = cgutils.get_or_insert_function(builder.module, fnty, name="std_str_to_int64")
     return builder.call(fn, (val,))
- 
+
+
 # # XXX handle unicode until Numba supports int(str)
 # @lower_cast(string_type, types.int64)
 # def cast_unicode_str_to_int64(context, builder, fromty, toty, val):
