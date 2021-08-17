@@ -26,7 +26,20 @@
 
 #include <Python.h>
 #include "hashmap.hpp"
+#include <chrono>
+#include <iostream>
 
+class TrivialTBBHashCompare {
+public:
+    static size_t hash(const int64_t& val) {
+        return (size_t)val;
+    }
+    static bool equal(const int64_t& k1, const int64_t& k2) {
+        return k1==k2;
+    }
+};
+
+using namespace std::chrono;
 
 #define declare_hashmap_create(key_type, val_type, suffix) \
 void hashmap_create_##suffix(NRT_MemInfo** meminfo, \
@@ -210,6 +223,63 @@ declare_hashmap_create_from_data(int64_t, int64_t)
 declare_hashmap_create_from_data(int64_t, float)
 declare_hashmap_create_from_data(int64_t, double)
 
+void set_number_of_threads(uint64_t threads)
+{
+utils::tbb_control::set_threads_num(threads);
+}
+
+uint8_t native_map_and_fill_indexer_int64(int64_t* data, int64_t* searched, int64_t size, int64_t* res)
+{
+    auto t1 = high_resolution_clock::now();
+    auto my_map_ptr = new tbb::concurrent_hash_map<int64_t, int64_t, TrivialTBBHashCompare>(2*size, TrivialTBBHashCompare());
+    auto& my_map = *my_map_ptr;
+
+    utils::tbb_control::get_arena().execute([&]() {
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, size),
+                         [&](const tbb::blocked_range<size_t>& r) {
+                             for(size_t i=r.begin(); i!=r.end(); ++i) {
+                                 my_map.emplace(data[i], i);
+                             }
+                         }
+            );
+    });
+
+    if (my_map.size() < size)
+        return 0;
+
+    auto t2 = high_resolution_clock::now();
+    duration<double, std::ratio<1, 1>> ms_double = t2 - t1;
+    auto ms_int = duration_cast<milliseconds>(t2 - t1);
+    std::cout << "native (TBB) building map: " << ms_int.count() << " ms, (" << ms_double.count() << " sec)" << std::endl;
+
+    auto it_map_end = my_map.end();
+    utils::tbb_control::get_arena().execute([&]() {
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, size),
+                     [&](const tbb::blocked_range<size_t>& r) {
+                         for(size_t i=r.begin(); i!=r.end(); ++i) {
+                             auto it_pair = my_map.equal_range(searched[i]);
+                             if (it_pair.first != my_map.end()) {
+                                 res[i] = it_pair.first->second;
+                             } else {
+                                 res[i] = -1;
+                             }
+                         }
+                     }
+        );
+    });
+
+    auto t3 = high_resolution_clock::now();
+    ms_double = t3 - t2;
+    ms_int = duration_cast<milliseconds>(t3 - t2);
+    std::cout << "native (TBB) filling indexer: " << ms_int.count() << " ms, (" << ms_double.count() << " sec)" << std::endl;
+    ms_double = t3 - t1;
+    ms_int = duration_cast<milliseconds>(t3 - t1);
+    std::cout << "total time: " << ms_int.count() << " ms, (" << ms_double.count() << " sec)" << std::endl;
+
+    return 1;
+}
+
+
 PyMODINIT_FUNC PyInit_hconc_dict()
 {
     static struct PyModuleDef moduledef = {
@@ -257,6 +327,8 @@ PyMODINIT_FUNC PyInit_hconc_dict()
     REGISTER(hashmap_create_from_data_int64_t_to_float)
     REGISTER(hashmap_create_from_data_int64_t_to_double)
 
+    REGISTER(native_map_and_fill_indexer_int64)
+    REGISTER(set_number_of_threads)
     utils::tbb_control::init();
 
     return m;

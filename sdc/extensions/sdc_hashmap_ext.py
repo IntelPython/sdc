@@ -35,7 +35,7 @@ from sdc import hstr_ext
 from glob import glob
 from llvmlite import ir as lir
 from numba import types, cfunc
-from numba.core import cgutils
+from numba.core import cgutils, config
 from numba.extending import (typeof_impl, type_callable, models, register_model, NativeValue,
                              lower_builtin, box, unbox, lower_getattr, intrinsic,
                              overload_method, overload, overload_attribute)
@@ -66,6 +66,19 @@ from itertools import product
 from numba.typed.dictobject import _cast
 
 
+## FIXME: need to place this binding into separate module?
+import ctypes as ct
+def bind(sym, sig):
+    # Returns ctypes binding to symbol sym with signature sig
+    addr = getattr(hconc_dict, sym)
+    return ct.cast(addr, sig)
+
+set_threads_count_sig = ct.CFUNCTYPE(None, ct.c_uint64)
+set_threads_count_sym = bind('set_number_of_threads', set_threads_count_sig)
+
+set_threads_count_sym(config.NUMBA_NUM_THREADS)
+
+
 def gen_func_suffixes():
     key_suffixes = ['int32_t', 'int64_t', 'voidptr']
     val_suffixes = ['int32_t', 'int64_t', 'float', 'double', 'voidptr']
@@ -93,6 +106,8 @@ load_native_func('hashmap_update', hconc_dict)
 load_native_func('hashmap_create_from_data', hconc_dict, lambda x: 'voidptr' in x)
 load_native_func('hashmap_getiter', hconc_dict)
 load_native_func('hashmap_iternext', hconc_dict)
+
+ll.add_symbol('native_map_and_fill_indexer_int64', hconc_dict.native_map_and_fill_indexer_int64)
 
 
 supported_numeric_key_types = [
@@ -1123,3 +1138,41 @@ def impl_iterator_iternext(context, builder, sig, args, result):
         else:
             # unreachable
             raise AssertionError('unknown type: {}'.format(iter_type.iterable))
+
+
+@intrinsic
+def map_and_fill_indexer_int64(typingctx, index_data_type, searched_type, res_type):
+
+    ret_type = types.bool_
+
+    def codegen(context, builder, sig, args):
+        data_val, searched_val, res_val = args
+
+        data_ctinfo = context.make_helper(builder, index_data_type, data_val)
+        searched_ctinfo = context.make_helper(builder, searched_type, searched_val)
+        res_ctinfo = context.make_helper(builder, res_type, res_val)
+        lir_key_type = context.get_value_type(types.int64)
+
+        size_val = context.compile_internal(
+            builder,
+            lambda arr: len(arr),
+            types.int64(searched_type),
+            [searched_val]
+        )
+
+        fnty = lir.FunctionType(lir.IntType(8),
+                                [lir_key_type.as_pointer(),
+                                 lir_key_type.as_pointer(),
+                                 lir.IntType(64),
+                                 lir_key_type.as_pointer(),])
+        fn_hashmap_fill_indexer = builder.module.get_or_insert_function(
+            fnty, name=f"native_map_and_fill_indexer_int64")
+
+        res = builder.call(fn_hashmap_fill_indexer,
+                           [data_ctinfo.data,
+                            searched_ctinfo.data,
+                            size_val,
+                            res_ctinfo.data])
+        return context.cast(builder, res, types.uint8, types.bool_)
+
+    return ret_type(index_data_type, searched_type, res_type), codegen
