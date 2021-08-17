@@ -456,6 +456,7 @@ def pd_int64_index_reindex_overload(self, target, method=None, level=None, limit
         raise TypingError('{} Not allowed for non comparable indexes. \
         Given: self={}, target={}'.format(_func_name, self, target))
 
+    # FIXME: handle case when target is not numpy array!
     def pd_int64_index_reindex_impl(self, target, method=None, level=None, limit=None, tolerance=None):
         # for Int64Index case index.data can be passed to native function that can built the map
         # and fill the resulting indexer more efficiently than generic implementation

@@ -25,11 +25,10 @@
 // *****************************************************************************
 
 #include <Python.h>
+#include <unordered_map>
 #include "hashmap.hpp"
-#include <chrono>
-#include <iostream>
 
-class TrivialTBBHashCompare {
+class TrivialInt64TBBHashCompare {
 public:
     static size_t hash(const int64_t& val) {
         return (size_t)val;
@@ -39,7 +38,17 @@ public:
     }
 };
 
-using namespace std::chrono;
+struct TrivialInt64Hash {
+public:
+    TrivialInt64Hash() = default;
+    TrivialInt64Hash(const TrivialInt64Hash&) = default;
+    ~TrivialInt64Hash() = default;
+    size_t operator()(const int64_t& val) const {
+        return (size_t)val;
+    }
+};
+
+using namespace std;
 
 #define declare_hashmap_create(key_type, val_type, suffix) \
 void hashmap_create_##suffix(NRT_MemInfo** meminfo, \
@@ -228,37 +237,31 @@ void set_number_of_threads(uint64_t threads)
 utils::tbb_control::set_threads_num(threads);
 }
 
-uint8_t native_map_and_fill_indexer_int64(int64_t* data, int64_t* searched, int64_t size, int64_t* res)
+uint8_t native_map_and_fill_indexer_int64(int64_t* data, int64_t* searched, int64_t dsize, int64_t ssize, int64_t* res)
 {
-    auto t1 = high_resolution_clock::now();
-    auto my_map_ptr = new tbb::concurrent_hash_map<int64_t, int64_t, TrivialTBBHashCompare>(2*size, TrivialTBBHashCompare());
-    auto& my_map = *my_map_ptr;
-
+#if SUPPORTED_TBB_VERSION
+    // FIXME: we need to store the allocated map somewhere and re-use it later
+    // here it's allocated on the heap (but not freed) to avoid calling dtor (like pandas does the map once built is cached)
+    auto ptr_my_map = new tbb::concurrent_hash_map<int64_t, int64_t, TrivialInt64TBBHashCompare>(2*dsize, TrivialInt64TBBHashCompare());
     utils::tbb_control::get_arena().execute([&]() {
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, size),
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, dsize),
                          [&](const tbb::blocked_range<size_t>& r) {
                              for(size_t i=r.begin(); i!=r.end(); ++i) {
-                                 my_map.emplace(data[i], i);
+                                 ptr_my_map->emplace(data[i], i);
                              }
                          }
             );
     });
 
-    if (my_map.size() < size)
+    if (ptr_my_map->size() < dsize)
         return 0;
 
-    auto t2 = high_resolution_clock::now();
-    duration<double, std::ratio<1, 1>> ms_double = t2 - t1;
-    auto ms_int = duration_cast<milliseconds>(t2 - t1);
-    std::cout << "native (TBB) building map: " << ms_int.count() << " ms, (" << ms_double.count() << " sec)" << std::endl;
-
-    auto it_map_end = my_map.end();
     utils::tbb_control::get_arena().execute([&]() {
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, size),
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, ssize),
                      [&](const tbb::blocked_range<size_t>& r) {
                          for(size_t i=r.begin(); i!=r.end(); ++i) {
-                             auto it_pair = my_map.equal_range(searched[i]);
-                             if (it_pair.first != my_map.end()) {
+                             auto it_pair = ptr_my_map->equal_range(searched[i]);
+                             if (it_pair.first != ptr_my_map->end()) {
                                  res[i] = it_pair.first->second;
                              } else {
                                  res[i] = -1;
@@ -268,15 +271,23 @@ uint8_t native_map_and_fill_indexer_int64(int64_t* data, int64_t* searched, int6
         );
     });
 
-    auto t3 = high_resolution_clock::now();
-    ms_double = t3 - t2;
-    ms_int = duration_cast<milliseconds>(t3 - t2);
-    std::cout << "native (TBB) filling indexer: " << ms_int.count() << " ms, (" << ms_double.count() << " sec)" << std::endl;
-    ms_double = t3 - t1;
-    ms_int = duration_cast<milliseconds>(t3 - t1);
-    std::cout << "total time: " << ms_int.count() << " ms, (" << ms_double.count() << " sec)" << std::endl;
+    return 1;
+#else
+    auto ptr_my_map = new std::unordered_map<int64_t, int64_t, TrivialInt64Hash>(2*dsize, TrivialInt64Hash());
+    for(size_t i=0; i<dsize; ++i) {
+        ptr_my_map->emplace(data[i], i);
+    }
+
+    if (ptr_my_map->size() < dsize)
+        return 0;
+
+    for(size_t i=0; i<ssize; ++i) {
+        auto it = ptr_my_map->find(searched[i]);
+        res[i] = (it != ptr_my_map->end()) ? it->second : -1;
+    }
 
     return 1;
+#endif
 }
 
 

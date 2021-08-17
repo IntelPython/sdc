@@ -1153,7 +1153,14 @@ def map_and_fill_indexer_int64(typingctx, index_data_type, searched_type, res_ty
         res_ctinfo = context.make_helper(builder, res_type, res_val)
         lir_key_type = context.get_value_type(types.int64)
 
-        size_val = context.compile_internal(
+        data_size_val = context.compile_internal(
+            builder,
+            lambda arr: len(arr),
+            types.int64(index_data_type),
+            [data_val]
+        )
+
+        searched_size_val = context.compile_internal(
             builder,
             lambda arr: len(arr),
             types.int64(searched_type),
@@ -1164,6 +1171,7 @@ def map_and_fill_indexer_int64(typingctx, index_data_type, searched_type, res_ty
                                 [lir_key_type.as_pointer(),
                                  lir_key_type.as_pointer(),
                                  lir.IntType(64),
+                                 lir.IntType(64),
                                  lir_key_type.as_pointer(),])
         fn_hashmap_fill_indexer = builder.module.get_or_insert_function(
             fnty, name=f"native_map_and_fill_indexer_int64")
@@ -1171,7 +1179,8 @@ def map_and_fill_indexer_int64(typingctx, index_data_type, searched_type, res_ty
         res = builder.call(fn_hashmap_fill_indexer,
                            [data_ctinfo.data,
                             searched_ctinfo.data,
-                            size_val,
+                            data_size_val,
+                            searched_size_val,
                             res_ctinfo.data])
         return context.cast(builder, res, types.uint8, types.bool_)
 
