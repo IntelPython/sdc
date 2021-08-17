@@ -52,7 +52,7 @@ from sdc.extensions.sdc_hashmap_type import (ConcurrentDict, ConcurrentDictType,
                                              ConcDictItemsIterableType, ConcDictValuesIterableType)
 from numba.extending import register_jitable
 
-from sdc.extensions.sdc_hashmap_type import SdcTypeRef
+from sdc.datatypes.sdc_typeref import ConcurrentDictTypeRef
 from sdc.utilities.sdc_typing_utils import TypingError, TypeChecker, check_types_comparable
 from itertools import product
 
@@ -350,13 +350,13 @@ def hashmap_create(typingctx, key, value):
     return dict_type(key, value), codegen
 
 
-@overload_method(SdcTypeRef, 'empty')
+@overload_method(ConcurrentDictTypeRef, 'empty')
 def concurrent_dict_empty(cls, key_type, value_type):
 
     if cls.instance_type is not ConcurrentDictType:
         return
 
-    _func_name = 'Method SdcTypeRef::empty().'
+    _func_name = 'Method ConcurrentDictTypeRef::empty().'
     ty_checker = TypeChecker(_func_name)
 
     supported_key_types = (types.NumberClass, types.TypeRef)
@@ -843,7 +843,7 @@ def create_from_arrays(typingctx, keys, values):
     return dict_type(keys, values), codegen
 
 
-@overload_method(SdcTypeRef, 'from_arrays')
+@overload_method(ConcurrentDictTypeRef, 'from_arrays')
 def concurrent_dict_from_arrays_ovld(cls, keys, values):
     if cls.instance_type is not ConcurrentDictType:
         return
@@ -860,7 +860,7 @@ def concurrent_dict_from_arrays_ovld(cls, keys, values):
     return concurrent_dict_from_arrays_impl
 
 
-@overload_method(SdcTypeRef, 'fromkeys', prefer_literal=False)
+@overload_method(ConcurrentDictTypeRef, 'fromkeys', prefer_literal=False)
 def concurrent_dict_type_fromkeys_ovld(cls, keys, value):
     if cls.instance_type is not ConcurrentDictType:
         return
