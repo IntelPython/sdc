@@ -352,7 +352,7 @@ class ReadParallelParquetInfer(AbstractTemplate):
 def pq_size_lower(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(64),
                             [lir.IntType(8).as_pointer(), lir.IntType(64)])
-    fn = builder.module.get_or_insert_function(fnty, name="pq_get_size")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="pq_get_size")
     return builder.call(fn, args)
 
 
@@ -363,7 +363,7 @@ def pq_read_lower(context, builder, sig, args):
                              lir.IntType(8).as_pointer()], lir.IntType(32))
     out_array = make_array(sig.args[2])(context, builder, args[2])
 
-    fn = builder.module.get_or_insert_function(fnty, name="pq_read")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="pq_read")
     return builder.call(fn, [args[0], args[1],
                              builder.bitcast(
                                  out_array.data, lir.IntType(8).as_pointer()),
@@ -385,7 +385,7 @@ def pq_read_parallel_lower(context, builder, sig, args):
                              lir.IntType(32), lir.IntType(64), lir.IntType(64)])
     out_array = make_array(sig.args[2])(context, builder, args[2])
 
-    fn = builder.module.get_or_insert_function(fnty, name="pq_read_parallel")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="pq_read_parallel")
     return builder.call(fn, [args[0], args[1],
                              builder.bitcast(
                                  out_array.data, lir.IntType(8).as_pointer()),
@@ -411,7 +411,7 @@ def pq_read_string_lower(context, builder, sig, args):
                              lir.IntType(8).as_pointer().as_pointer(),
                              lir.IntType(8).as_pointer().as_pointer()])
 
-    fn = builder.module.get_or_insert_function(fnty, name="pq_read_string")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="pq_read_string")
     res = builder.call(fn, [args[0], args[1],
                             str_arr_payload._get_ptr_by_name('offsets'),
                             str_arr_payload._get_ptr_by_name('data'),
@@ -444,7 +444,7 @@ def pq_read_string_parallel_lower(context, builder, sig, args):
                              lir.IntType(8).as_pointer().as_pointer(),
                              lir.IntType(64), lir.IntType(64)])
 
-    fn = builder.module.get_or_insert_function(
+    fn = cgutils.get_or_insert_function(builder.module,
         fnty, name="pq_read_string_parallel")
     res = builder.call(fn, [args[0], args[1],
                             str_arr_payload._get_ptr_by_name('offsets'),

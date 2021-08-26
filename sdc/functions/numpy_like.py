@@ -1120,6 +1120,9 @@ def sdc_array_equal_overload(A, B):
 
     if (A == string_array_type and A == B):
         def sdc_array_equal_str_arr_impl(A, B):
+            if A is B:
+                return True
+
             is_index_equal = (len(A) == len(B)
                               and num_total_chars(A) == num_total_chars(B))
             for i in numpy.arange(len(A)):
@@ -1132,6 +1135,9 @@ def sdc_array_equal_overload(A, B):
     else:
 
         def sdc_array_equal_impl(A, B):
+            if A is B:
+                return True
+
             if len(A) != len(B):
                 return False
             # FIXME_Numba#5157: change to simple A == B when issue is resolved

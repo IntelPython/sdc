@@ -136,50 +136,6 @@ np_alloc_callnames = ('empty', 'zeros', 'ones', 'full')
 def unliteral_all(args):
     return tuple(types.unliteral(a) for a in args)
 
-# TODO: move to Numba
-
-
-class BooleanLiteral(types.Literal, types.Boolean):
-
-    def __init__(self, value):
-        self._literal_init(value)
-        name = 'Literal[bool]({})'.format(value)
-        basetype = self.literal_type
-        types.Boolean.__init__(
-            self,
-            name=name
-            )
-
-    def can_convert_to(self, typingctx, other):
-        # similar to IntegerLiteral
-        conv = typingctx.can_convert(self.literal_type, other)
-        if conv is not None:
-            return max(conv, types.Conversion.promote)
-
-
-types.Literal.ctor_map[bool] = BooleanLiteral
-register_default(BooleanLiteral)(numba.core.datamodel.models.BooleanModel)
-
-
-@lower_cast(BooleanLiteral, types.boolean)
-def literal_bool_cast(context, builder, fromty, toty, val):
-    lit = context.get_constant_generic(
-        builder,
-        fromty.literal_type,
-        fromty.literal_value,
-    )
-    return context.cast(builder, lit, fromty.literal_type, toty)
-
-
-lower_builtin(operator.eq, BooleanLiteral, BooleanLiteral)(numba.cpython.builtins.const_eq_impl)
-lower_builtin(operator.ne, BooleanLiteral, BooleanLiteral)(numba.cpython.builtins.const_ne_impl)
-
-
-@lower_builtin(bool, BooleanLiteral)
-def bool_as_bool(context, builder, sig, args):
-    [val] = args
-    return val
-
 
 def get_constant(func_ir, var, default=NOT_CONSTANT):
     def_node = guard(get_definition, func_ir, var)
@@ -308,14 +264,14 @@ def cprint_lower(context, builder, sig, args):
         if typ == string_type:
             fnty = lir.FunctionType(
                 lir.VoidType(), [lir.IntType(8).as_pointer()])
-            fn = builder.module.get_or_insert_function(fnty, name="print_str")
+            fn = cgutils.get_or_insert_function(builder.module, fnty, name="print_str")
             builder.call(fn, [val])
             cgutils.printf(builder, " ")
             continue
         if typ == char_type:
             fnty = lir.FunctionType(
                 lir.VoidType(), [lir.IntType(8)])
-            fn = builder.module.get_or_insert_function(fnty, name="print_char")
+            fn = cgutils.get_or_insert_function(builder.module, fnty, name="print_char")
             builder.call(fn, [val])
             cgutils.printf(builder, " ")
             continue

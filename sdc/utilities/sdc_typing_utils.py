@@ -37,9 +37,8 @@ from numba import types
 from numba.core.errors import TypingError
 from numba.np import numpy_support
 
-from sdc.str_arr_type import string_array_type
 from sdc.datatypes.indexes import *
-from sdc.str_arr_ext import StringArrayType
+from sdc.str_arr_type import string_array_type, StringArrayType
 from sdc.datatypes.categorical.types import Categorical
 
 
