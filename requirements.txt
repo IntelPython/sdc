@@ -1,6 +1,6 @@
 numpy>=1.16
 pandas==1.2.0
 pyarrow==4.0.1
-numba==0.54.0
+numba==0.54.1
 tbb
 tbb-devel
