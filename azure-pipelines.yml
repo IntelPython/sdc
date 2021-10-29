@@ -31,8 +31,8 @@ jobs:
 
 - template: buildscripts/azure/template-linux-macos.yml
   parameters:
-    name: Ubuntu1604
-    vmImage: ubuntu-16.04
+    name: Ubuntu1804
+    vmImage: ubuntu-18.04
     allowFailure: false
     matrix:
       py3.7_numpy1.17:

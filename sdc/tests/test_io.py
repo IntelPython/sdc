@@ -250,9 +250,9 @@ class TestCSV(TestIO):
             "csv_parallel1",
             "csv_str_parallel1",
             "csv_usecols1",
-            "csv_cat1",
-            "csv_cat2",
-            "csv_single_dtype1",
+            # "csv_cat1",
+            # "csv_cat2",
+            # "csv_single_dtype1",
         ]
         for test in tests:
             with self.subTest(test=test):
