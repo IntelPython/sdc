@@ -32,6 +32,8 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
+#include <limits>
 
 #include "_str_decode.cpp"
 
