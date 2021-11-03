@@ -75,7 +75,7 @@ def lower_cv2_imread(context, builder, sig, args):
                             [ll_shty.as_pointer(),
                              lir.IntType(8).as_pointer().as_pointer(),
                              lir.IntType(8).as_pointer()])
-    fn_imread = builder.module.get_or_insert_function(fnty, name="cv_imread")
+    fn_imread = cgutils.get_or_insert_function(builder.module, fnty, name="cv_imread")
     img = builder.call(fn_imread, [shapes_array, data, fname])
 
     return _image_to_array(context, builder, shapes_array, arrtype, data, img)
@@ -99,7 +99,7 @@ def lower_cv2_imread(context, builder, sig, args):
 #                              lir.IntType(8).as_pointer(),
 #                              lir.IntType(64),
 #                              lir.IntType(64)])
-#     fn_resize = builder.module.get_or_insert_function(fnty, name="cv_resize")
+#     fn_resize = cgutils.get_or_insert_function(builder.module, fnty, name="cv_resize")
 #     img = builder.call(fn_resize, [new_sizes[1], new_sizes[0], ary.data, in_array.data,
 #                                     in_shapes[0], in_shapes[1]])
 #
@@ -115,7 +115,7 @@ def _image_to_array(context, builder, shapes_array, arrtype, data, img):
 
     # clean up cv::Mat image
     fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer()])
-    fn_release = builder.module.get_or_insert_function(fnty, name="cv_mat_release")
+    fn_release = cgutils.get_or_insert_function(builder.module, fnty, name="cv_mat_release")
     builder.call(fn_release, [img])
 
     return impl_ret_new_ref(context, builder, arrtype, ary._getvalue())
@@ -203,7 +203,7 @@ def wrap_array(typingctx, data_ptr, shape_tup):
 
         # clean up image buffer
         fnty = lir.FunctionType(lir.VoidType(), [lir.IntType(8).as_pointer()])
-        fn_release = builder.module.get_or_insert_function(fnty, name="cv_delete_buf")
+        fn_release = cgutils.get_or_insert_function(builder.module, fnty, name="cv_delete_buf")
         builder.call(fn_release, [data])
 
         return impl_ret_new_ref(context, builder, sig.return_type, ary._getvalue())

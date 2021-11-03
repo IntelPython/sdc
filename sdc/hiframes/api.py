@@ -44,7 +44,10 @@ from sdc.hiframes.pd_series_ext import (
     if_series_to_array_type)
 from numba.core.errors import TypingError
 from sdc.datatypes.categorical.types import Categorical
-from sdc.utilities.sdc_typing_utils import sdc_pandas_df_column_types
+from sdc.utilities.sdc_typing_utils import (
+    sdc_pandas_df_column_types,
+    sdc_pandas_index_types,
+    sdc_old_index_types, )
 
 
 def isna(arr, i):
@@ -192,7 +195,8 @@ def fix_df_index_overload(index, coldata=None):
 
         return fix_df_index_impl
 
-    elif isinstance(index, (RangeIndexType, Int64IndexType, EmptyIndexType, PositionalIndexType)):
+    elif (isinstance(index, sdc_pandas_index_types)
+          and not isinstance(index, sdc_old_index_types)):
         def fix_df_index_impl(index, coldata=None):
             return index
 

@@ -4429,7 +4429,7 @@ def hpat_pandas_series_describe(self, percentiles=None, include=None, exclude=No
                 sorted_percentiles = sorted(percentiles_list)
 
                 # check percentiles have correct values:
-                arr = numpy.asarray(sorted_percentiles)
+                arr = numpy.asarray(sorted_percentiles).astype(numpy.float64)
                 if len(numpy.unique(arr)) != len(arr):
                     raise ValueError("percentiles cannot contain duplicates")
                 if numpy.any(arr[(arr < 0) * (arr > 1)]):
@@ -4574,7 +4574,7 @@ def sdc_pandas_str_series_operator_add(self, other):
                 else:
                     indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
 
-                # FIXME_Numba#XXXX: remove sdc_fix_indexes_join call at all when issue is fixed
+                # FIXME_Numba#6686: remove sdc_fix_indexes_join call at all when issue is fixed
                 joined_index, left_indexer, right_indexer = sdc_fix_indexes_join(*indexes_join_res)
                 result_size = len(joined_index)
                 result_nan_mask = numpy.zeros(result_size, dtype=numpy.bool_)
@@ -4692,7 +4692,7 @@ def sdc_pandas_str_series_operator_mul(self, other):
                 else:
                     indexes_join_res = sdc_indexes_join_outer(left_index, right_index)
 
-                # FIXME_Numba#XXXX: remove sdc_fix_indexes_join call at all when issue is fixed
+                # FIXME_Numba#6686: remove sdc_fix_indexes_join call at all when issue is fixed
                 joined_index, left_indexer, right_indexer = sdc_fix_indexes_join(*indexes_join_res)
                 str_series_operand = self if self_is_string_series == True else other  # noqa
                 str_series_indexer = left_indexer if self_is_string_series == True else right_indexer  # noqa

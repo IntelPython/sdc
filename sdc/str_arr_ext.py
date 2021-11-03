@@ -45,6 +45,7 @@ from numba.core.imputils import (impl_ret_new_ref, impl_ret_borrowed, iternext_i
 from numba.cpython.listobj import ListInstance
 from numba.core.typing.templates import (infer_global, AbstractTemplate, infer,
                                          signature, AttributeTemplate, infer_getattr, bound_function)
+from numba.np import arrayobj
 from numba import prange
 
 from sdc.str_ext import string_type
@@ -154,7 +155,7 @@ class StrArrayIteratorModel(models.StructModel):
         super(StrArrayIteratorModel, self).__init__(dmm, fe_type, members)
 
 
-lower_builtin('getiter', string_array_type)(numba.np.arrayobj.getiter_array)
+lower_builtin('getiter', string_array_type)(arrayobj.getiter_array)
 lower_builtin('iternext', StringArrayIterator)(iternext_impl(RefType.NEW)(iternext_str_array))
 
 
@@ -577,7 +578,7 @@ def construct_string_array(context, builder):
     llsize = context.get_value_type(types.uintp)
     dtor_ftype = lir.FunctionType(lir.VoidType(),
                                   [llvoidptr, llsize, llvoidptr])
-    dtor_fn = builder.module.get_or_insert_function(
+    dtor_fn = cgutils.get_or_insert_function(builder.module,
         dtor_ftype, name="dtor_string_array")
 
     meminfo = context.nrt.meminfo_alloc_dtor(
@@ -688,7 +689,7 @@ def impl_string_array_single(context, builder, sig, args):
 #     # get total size of string buffer
 #     fnty = lir.FunctionType(lir.IntType(64),
 #                             [lir.IntType(8).as_pointer()])
-#     fn_len = builder.module.get_or_insert_function(fnty, name="get_str_len")
+#     fn_len = cgutils.get_or_insert_function(builder.module, fnty, name="get_str_len")
 #     total_size = cgutils.alloca_once_value(builder, zero)
 
 #     # loop through all strings and get length
@@ -758,8 +759,8 @@ def pre_alloc_string_array(typingctx, num_strs_typ, num_total_chars_typ=None):
                                  lir.IntType(8).as_pointer().as_pointer(),
                                  lir.IntType(64),
                                  lir.IntType(64)])
-        fn_alloc = builder.module.get_or_insert_function(fnty,
-                                                         name="allocate_string_array")
+
+        fn_alloc = cgutils.get_or_insert_function(builder.module, fnty, name="allocate_string_array")
         builder.call(fn_alloc, [str_arr_payload._get_ptr_by_name('offsets'),
                                 str_arr_payload._get_ptr_by_name('data'),
                                 str_arr_payload._get_ptr_by_name('null_bitmap'),
@@ -803,8 +804,9 @@ def set_string_array_range(typingctx, out_typ, in_typ, curr_str_typ, curr_chars_
                                  lir.IntType(64),
                                  lir.IntType(64),
                                  lir.IntType(64), ])
-        fn_alloc = builder.module.get_or_insert_function(fnty,
-                                                         name="set_string_array_range")
+        fn_alloc = cgutils.get_or_insert_function(builder.module,
+                                                  fnty,
+                                                  name="set_string_array_range")
         builder.call(fn_alloc, [out_string_array.offsets,
                                 out_string_array.data,
                                 in_string_array.offsets,
@@ -833,7 +835,7 @@ def box_str_arr(typ, val, c):
                              lir.IntType(8).as_pointer(),
                              lir.IntType(8).as_pointer(),
                              ])
-    fn_get = c.builder.module.get_or_insert_function(fnty, name="np_array_from_string_array")
+    fn_get = cgutils.get_or_insert_function(c.builder.module, fnty, name="np_array_from_string_array")
     arr = c.builder.call(fn_get, [string_array.num_items, string_array.offsets,
                                   string_array.data, string_array.null_bitmap])
 
@@ -923,7 +925,7 @@ def setitem_str_arr(context, builder, sig, args):
                              lir.IntType(32),
                              lir.IntType(32),
                              lir.IntType(64)])
-    fn_setitem = builder.module.get_or_insert_function(
+    fn_setitem = cgutils.get_or_insert_function(builder.module,
         fnty, name="setitem_string_array")
     builder.call(fn_setitem, [string_array.offsets, string_array.data,
                               string_array.num_total_chars,
@@ -953,7 +955,7 @@ def setitem_str_arr_ptr(typingctx, str_arr_t, ind_t, ptr_t, len_t=None):
                                  lir.IntType(32),
                                  lir.IntType(32),
                                  lir.IntType(64)])
-        fn_setitem = builder.module.get_or_insert_function(
+        fn_setitem = cgutils.get_or_insert_function(builder.module,
             fnty, name="setitem_string_array")
         # kind doesn't matter since input is ASCII
         kind = context.get_constant(types.int32, -1)
@@ -971,8 +973,9 @@ def lower_is_na(context, builder, bull_bitmap, ind):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(),
                              lir.IntType(64)])
-    fn_getitem = builder.module.get_or_insert_function(fnty,
-                                                       name="is_na")
+    fn_getitem = cgutils.get_or_insert_function(builder.module,
+                                                fnty,
+                                                name="is_na")
     return builder.call(fn_getitem, [bull_bitmap,
                                      ind])
 
@@ -1053,7 +1056,7 @@ def decode_utf8(typingctx, ptr_t, len_t=None):
                                                  lir.IntType(64).as_pointer(),
                                                  uni_str.meminfo.type.as_pointer(),
                                                  lir.IntType(8).as_pointer()])
-        fn_decode = builder.module.get_or_insert_function(
+        fn_decode = cgutils.get_or_insert_function(builder.module,
             fnty, name="decode_utf8")
         builder.call(fn_decode, [ptr, length,
                                  uni_str._get_ptr_by_name('kind'),
@@ -1172,7 +1175,7 @@ def _str_arr_item_to_numeric(typingctx, out_ptr_t, str_arr_t, ind_t,
             fname = 'str_arr_to_float64'
         else:
             assert sig.args[3].dtype == types.int64
-        fn_to_numeric = builder.module.get_or_insert_function(fnty, fname)
+        fn_to_numeric = cgutils.get_or_insert_function(builder.module, fnty, fname)
         return builder.call(
             fn_to_numeric,
             [out_ptr, string_array.offsets, string_array.data, ind])
@@ -1209,7 +1212,7 @@ def unbox_str_series(typ, val, c):
                              lir.IntType(8).as_pointer().as_pointer(),
                              lir.IntType(8).as_pointer().as_pointer(),
                              ])
-    fn = c.builder.module.get_or_insert_function(fnty, name="string_array_from_sequence")
+    fn = cgutils.get_or_insert_function(c.builder.module, fnty, name="string_array_from_sequence")
     c.builder.call(fn, [val,
                         string_array._get_ptr_by_name('num_items'),
                         payload._get_ptr_by_name('offsets'),
@@ -1268,7 +1271,7 @@ def lower_glob(context, builder, sig, args):
                              lir.IntType(8).as_pointer().as_pointer(),
                              lir.IntType(64).as_pointer(),
                              lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="c_glob")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="c_glob")
     builder.call(fn, [str_arr_payload._get_ptr_by_name('offsets'),
                       str_arr_payload._get_ptr_by_name('data'),
                       str_arr_payload._get_ptr_by_name('null_bitmap'),
