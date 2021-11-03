@@ -389,32 +389,33 @@ class TestInt64Index(TestCase):
                 np.testing.assert_array_equal(result, result_ref)
 
     def test_int64_index_operator_is_nounbox(self):
-        def test_impl_1(data):
-            index1 = pd.Int64Index(data)
+        # positive testcase
+        def test_impl_1(data, name):
+            index1 = pd.Int64Index(data, name=name)
             index2 = index1
             return index1 is index2
-        sdc_func_1 = self.jit(test_impl_1)
-
-        def test_impl_2(data):
-            index1 = pd.Int64Index(data)
-            index2 = pd.Int64Index(data)
-            return index1 is index2
-        sdc_func_2 = self.jit(test_impl_2)
-
-        # positive testcase
-        index_data = [1, 2, 3, 5, 6, 3, 4]
-        with self.subTest(subtest="same indexes"):
-            result = sdc_func_1(index_data)
-            result_ref = test_impl_1(index_data)
-            self.assertEqual(result, result_ref)
-            self.assertEqual(result, True)
 
         # negative testcase
-        with self.subTest(subtest="not same indexes"):
-            result = sdc_func_2(index_data)
-            result_ref = test_impl_2(index_data)
-            self.assertEqual(result, result_ref)
-            self.assertEqual(result, False)
+        def test_impl_2(data, name):
+            index1 = pd.Int64Index(data, name=name)
+            index2 = pd.Int64Index(data, name=name)
+            return index1 is index2
+
+        index_data = pd.Int64Index([1, 2, 3, 5, 6, 3, 4]).values
+        compiled_funcs = [
+            (test_impl_1, "same indexes"),
+            (test_impl_2, "not same indexes")
+        ]
+
+        for pyfuncs, name in product(compiled_funcs, test_global_index_names):
+            func, descr = pyfuncs
+            sdc_func = self.jit(func)
+            with self.subTest(subtest=f"{descr}, name={name}"):
+                result = sdc_func(index_data, name)
+                result_ref = func(index_data, name)
+                expected = True if descr == "same indexes" else False
+                self.assertEqual(result, result_ref)
+                self.assertEqual(result, expected)
 
     def test_int64_index_getitem_by_mask(self):
         def test_impl(index, mask):

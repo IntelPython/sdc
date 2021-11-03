@@ -88,12 +88,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--python', default='3.7', choices=['3.6', '3.7', '3.8'],
                         help='Python version, default = 3.7')
+    parser.add_argument('--channels', default=None, help='Default env channels')
     parser.add_argument('--sdc-channel', default=None, help='Intel SDC channel')
     parser.add_argument('--publish', action='store_true', help='Publish documentation to sdc-doc')
 
     args = parser.parse_args()
 
-    sdc_utils = SDC_Build_Utilities(args.python, args.sdc_channel)
+    sdc_utils = SDC_Build_Utilities(args.python, args.channels, args.sdc_channel)
     sdc_utils.log_info('Build Intel(R) SDC documentation', separate=True)
     sdc_utils.log_info(sdc_utils.line_double)
     sdc_utils.create_environment(['sphinx', 'sphinxcontrib-programoutput'])

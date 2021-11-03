@@ -69,7 +69,7 @@ class TestCompileTime(TestCase):
             test_impl(S1, S2)
 
         entry_format = fr'{line_function}{line_pipeline}{line_time}\n'
-        log_format = fr'^{line_heading}({entry_format})+{line_ending}$'
+        log_format = fr'{line_heading}({entry_format})+{line_ending}$'
         self.assertRegex(buffer.getvalue(), log_format)
 
     def test_log_format_detailed(self):

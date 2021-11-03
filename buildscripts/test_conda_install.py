@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2021, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,10 +24,40 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-# modules are dependent on each other e.g. positional_index_type
-# needs range_index_type to be imported, so below order matters
-from .range_index_type import RangeIndexType
-from .positional_index_type import PositionalIndexType
-from .empty_index_type import EmptyIndexType
-from .int64_index_type import Int64IndexType
-from .multi_index_type import MultiIndexType
+
+import argparse
+import os
+import shutil
+import traceback
+import re
+
+from pathlib import Path
+from utilities import SDC_Build_Utilities
+
+
+def check_sdc_installed(sdc_utils, sdc_package):
+    cmd_output = sdc_utils.get_command_output('conda list sdc')
+    pattern = sdc_package.replace('=', r'\s+')
+    return re.search(pattern, cmd_output)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--python', default='3.7', choices=['3.6', '3.7', '3.8'],
+                        help='Python version, default = 3.7')
+    parser.add_argument('--channels', default=None, help='Default env channels')
+    parser.add_argument('--sdc-channel', default=None, help='Intel SDC channel')
+
+    args = parser.parse_args()
+
+    sdc_utils = SDC_Build_Utilities(args.python, args.channels, args.sdc_channel)
+    sdc_utils.log_info('Test Intel(R) SDC conda install', separate=True)
+    sdc_utils.log_info(sdc_utils.line_double)
+    sdc_utils.create_environment()
+    sdc_package = f'sdc={sdc_utils.get_sdc_version_from_channel()}'
+
+    # channels list is aligned with install instruction in README.rst
+    install_channels = "-c intel/label/beta -c intel -c defaults -c conda-forge"
+    sdc_utils.install_conda_package([sdc_package], channels=install_channels)
+
+    assert check_sdc_installed(sdc_utils, sdc_package), "SDC package was not installed"

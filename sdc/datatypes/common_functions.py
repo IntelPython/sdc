@@ -455,35 +455,29 @@ def _sdc_internal_join_ovld(left, right):
     return None
 
 
-@numba.njit
 def _sdc_pandas_format_percentiles(arr):
+    pass
+
+
+@sdc_overload(_sdc_pandas_format_percentiles)
+def _sdc_pandas_format_percentiles_ovld(arr):
     """ Function converting float array of percentiles to a list of strings formatted
         the same as in pandas.io.formats.format.format_percentiles
     """
 
-    percentiles_strs = []
-    for percentile in arr:
-        p_as_string = str(percentile * 100)
+    dtype_precision = numpy.finfo(arr.dtype.key).precision
 
-        trim_index = len(p_as_string) - 1
-        while trim_index >= 0:
-            if p_as_string[trim_index] == '0':
-                trim_index -= 1
-                continue
-            elif p_as_string[trim_index] == '.':
-                break
+    def _sdc_pandas_format_percentiles_impl(arr):
+        percentiles_strs = []
+        for percentile in arr:
+            p_as_string = str(numpy.round(percentile * 100, dtype_precision - 1))
+            p_as_string_trimmed = p_as_string.rstrip('0')
+            p_as_string_trimmed = p_as_string_trimmed.rstrip('.')
+            percentiles_strs.append(p_as_string_trimmed + '%')
 
-            trim_index += 1
-            break
+        return percentiles_strs
 
-        if trim_index < 0:
-            p_as_string_trimmed = '0'
-        else:
-            p_as_string_trimmed = p_as_string[:trim_index]
-
-        percentiles_strs.append(p_as_string_trimmed + '%')
-
-    return percentiles_strs
+    return _sdc_pandas_format_percentiles_impl
 
 
 def sdc_arrays_argsort(A, kind='quicksort'):

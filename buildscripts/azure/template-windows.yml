@@ -36,3 +36,9 @@ jobs:
         python buildscripts\\run_examples.py --python=%PYTHON_VER% --sdc-channel=.\\sdc-build
       displayName: 'Run Intel SDC examples'
       continueOnError: ${{ parameters.allowFailure }}
+
+    - script: |
+        call C:\\Miniconda\\Scripts\activate.bat
+        python buildscripts\\test_conda_install.py --python=%PYTHON_VER% --channels="-c anaconda -c conda-forge"
+      displayName: 'Test SDC installation from conda'
+      continueOnError: ${{ parameters.allowFailure }}

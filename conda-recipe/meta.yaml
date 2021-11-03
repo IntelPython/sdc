@@ -1,6 +1,6 @@
-{% set NUMBA_VERSION = "==0.53.1" %}
+{% set NUMBA_VERSION = "==0.54.1" %}
 {% set PANDAS_VERSION = "==1.2.0" %}
-{% set PYARROW_VERSION = "==2.0.0" %}
+{% set PYARROW_VERSION = "==4.0.1" %}
 
 package:
   name: sdc
@@ -33,7 +33,7 @@ requirements:
 
   run:
     - python
-    - numpy
+    - {{ pin_compatible('numpy') }}
     - pandas  {{ PANDAS_VERSION }}
     - pyarrow {{ PYARROW_VERSION }}
     - numba   {{ NUMBA_VERSION }}
