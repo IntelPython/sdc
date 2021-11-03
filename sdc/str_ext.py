@@ -30,6 +30,7 @@ import re
 import llvmlite.llvmpy.core as lc
 from llvmlite import ir as lir
 import llvmlite.binding as ll
+import numpy as np
 
 import numba
 from numba.core import cgutils, types
@@ -230,7 +231,7 @@ def char_getitem_overload(_str, ind):
 def getitem_string(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8),
                             [lir.IntType(8).as_pointer(), lir.IntType(64)])
-    fn = builder.module.get_or_insert_function(fnty, name="get_char_from_string")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="get_char_from_string")
     return builder.call(fn, args)
 
 
@@ -240,7 +241,7 @@ def box_char(typ, val, c):
     """
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8)])
-    fn = c.builder.module.get_or_insert_function(fnty, name="get_char_ptr")
+    fn = cgutils.get_or_insert_function(c.builder.module, fnty, name="get_char_ptr")
     c_str = c.builder.call(fn, [val])
     pystr = c.pyapi.string_from_string_and_size(c_str, c.context.get_constant(types.intp, 1))
     # TODO: delete ptr
@@ -406,15 +407,6 @@ class StrToFloat(AbstractTemplate):
             return signature(types.float64, arg)
 
 
-@infer_global(str)
-class StrConstInfer(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args) == 1
-        assert args[0] in [types.int32, types.int64, types.float32, types.float64, string_type]
-        return signature(string_type, *args)
-
-
 class RegexType(types.Opaque):
     def __init__(self):
         super(RegexType, self).__init__(name='RegexType')
@@ -494,7 +486,7 @@ def gen_unicode_to_std_str(context, builder, unicode_val):
         context, builder, value=unicode_val)
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer(), lir.IntType(64)])
-    fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="init_string_const")
     return builder.call(fn, [uni_str.data, uni_str.length])
 
 
@@ -584,7 +576,7 @@ def unbox_string(typ, obj, c):
 
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer(), lir.IntType(64)])
-    fn = c.builder.module.get_or_insert_function(fnty, name="init_string")
+    fn = cgutils.get_or_insert_function(c.builder.module, fnty, name="init_string")
     ret = c.builder.call(fn, [buffer, size])
 
     return NativeValue(ret, is_error=c.builder.not_(ok))
@@ -596,7 +588,7 @@ def box_str(typ, val, c):
     """
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer()])
-    fn = c.builder.module.get_or_insert_function(fnty, name="get_c_str")
+    fn = cgutils.get_or_insert_function(c.builder.module, fnty, name="get_c_str")
     c_str = c.builder.call(fn, [val])
     pystr = c.pyapi.string_from_string(c_str)
     return pystr
@@ -618,7 +610,7 @@ def getpointer_from_string(context, builder, sig, args):
     val = args[0]
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="get_c_str")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="get_c_str")
     c_str = builder.call(fn, [val])
     return c_str
 
@@ -637,7 +629,7 @@ def string_type_to_const(context, builder, fromty, toty, val):
     # call str == cstr
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_equal_cstr")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="str_equal_cstr")
     match = builder.call(fn, [val, cstr])
     with cgutils.if_unlikely(builder, builder.not_(match)):
         # Raise RuntimeError about the assumption violation
@@ -655,7 +647,7 @@ def const_string(context, builder, ty, pyval):
 
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer(), lir.IntType(64)])
-    fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="init_string_const")
     ret = builder.call(fn, [cstr, length])
     return ret
 
@@ -667,22 +659,23 @@ def const_to_string_type(context, builder, fromty, toty, val):
 
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer(), lir.IntType(64)])
-    fn = builder.module.get_or_insert_function(fnty, name="init_string_const")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="init_string_const")
     ret = builder.call(fn, [cstr, length])
     return ret
 
 
-@lower_builtin(str, types.Any)
-def string_from_impl(context, builder, sig, args):
-    in_typ = sig.args[0]
-    if in_typ == string_type:
-        return args[0]
-    ll_in_typ = context.get_value_type(sig.args[0])
-    fnty = lir.FunctionType(lir.IntType(8).as_pointer(), [ll_in_typ])
-    fn = builder.module.get_or_insert_function(
-        fnty, name="str_from_" + str(in_typ))
-    std_str = builder.call(fn, args)
-    return gen_std_str_to_unicode(context, builder, std_str)
+@overload(str)
+def str_from_float_ovld(val):
+    if not isinstance(val, types.Float):
+        return None
+
+    val_type_precision = np.finfo(val.key).precision
+
+    def str_from_float_impl(val):
+        with numba.objmode(res='types.unicode_type'):
+            res = np.format_float_positional(val, val_type_precision)
+        return res
+    return str_from_float_impl
 
 
 @lower_builtin(operator.add, std_str_type, std_str_type)
@@ -690,7 +683,7 @@ def string_from_impl(context, builder, sig, args):
 def impl_string_concat(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_concat")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="str_concat")
     return builder.call(fn, args)
 
 
@@ -699,7 +692,7 @@ def impl_string_concat(context, builder, sig, args):
 def string_eq_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_equal")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="str_equal")
     return builder.call(fn, args)
 
 
@@ -718,7 +711,7 @@ def char_eq_impl(context, builder, sig, args):
 def string_neq_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_equal")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="str_equal")
     return builder.not_(builder.call(fn, args))
 
 
@@ -727,7 +720,7 @@ def string_neq_impl(context, builder, sig, args):
 def string_ge_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_compare")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="str_compare")
     comp_val = builder.call(fn, args)
     zero = context.get_constant(types.int32, 0)
     res = builder.icmp(lc.ICMP_SGE, comp_val, zero)
@@ -739,7 +732,7 @@ def string_ge_impl(context, builder, sig, args):
 def string_gt_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_compare")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="str_compare")
     comp_val = builder.call(fn, args)
     zero = context.get_constant(types.int32, 0)
     res = builder.icmp(lc.ICMP_SGT, comp_val, zero)
@@ -751,7 +744,7 @@ def string_gt_impl(context, builder, sig, args):
 def string_le_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_compare")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="str_compare")
     comp_val = builder.call(fn, args)
     zero = context.get_constant(types.int32, 0)
     res = builder.icmp(lc.ICMP_SLE, comp_val, zero)
@@ -763,7 +756,7 @@ def string_le_impl(context, builder, sig, args):
 def string_lt_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(32),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_compare")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="str_compare")
     comp_val = builder.call(fn, args)
     zero = context.get_constant(types.int32, 0)
     res = builder.icmp(lc.ICMP_SLT, comp_val, zero)
@@ -777,7 +770,7 @@ def string_split_impl(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer().as_pointer(),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer(),
                              lir.IntType(64).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_split")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="str_split")
     ptr = builder.call(fn, args + [nitems])
     size = builder.load(nitems)
     # TODO: use ptr instead of allocating and copying, use NRT_MemInfo_new
@@ -796,7 +789,7 @@ def string_split_impl(context, builder, sig, args):
 # def getitem_string(context, builder, sig, args):
 #     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
 #                             [lir.IntType(8).as_pointer(), lir.IntType(64)])
-#     fn = builder.module.get_or_insert_function(fnty, name="str_substr_int")
+#     fn = cgutils.get_or_insert_function(builder.module, fnty, name="str_substr_int")
 #     # TODO: handle reference counting
 #     # return impl_ret_new_ref(builder.call(fn, args))
 #     return (builder.call(fn, args))
@@ -805,8 +798,9 @@ def string_split_impl(context, builder, sig, args):
 @lower_cast(StringType, types.int64)
 def cast_str_to_int64(context, builder, fromty, toty, val):
     fnty = lir.FunctionType(lir.IntType(64), [lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="std_str_to_int64")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="std_str_to_int64")
     return builder.call(fn, (val,))
+
 
 # # XXX handle unicode until Numba supports int(str)
 # @lower_cast(string_type, types.int64)
@@ -818,7 +812,7 @@ def cast_str_to_int64(context, builder, fromty, toty, val):
 @lower_cast(StringType, types.float64)
 def cast_str_to_float64(context, builder, fromty, toty, val):
     fnty = lir.FunctionType(lir.DoubleType(), [lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_to_float64")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="str_to_float64")
     return builder.call(fn, (val,))
 
 # XXX handle unicode until Numba supports float(str)
@@ -831,7 +825,7 @@ def cast_unicode_str_to_float64(context, builder, fromty, toty, val):
 # def len_string(context, builder, sig, args):
 #     fnty = lir.FunctionType(lir.IntType(64),
 #                             [lir.IntType(8).as_pointer()])
-#     fn = builder.module.get_or_insert_function(fnty, name="get_str_len")
+#     fn = cgutils.get_or_insert_function(builder.module, fnty, name="get_str_len")
 #     return (builder.call(fn, args))
 
 
@@ -839,7 +833,7 @@ def cast_unicode_str_to_float64(context, builder, fromty, toty, val):
 def lower_compile_regex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(8).as_pointer(),
                             [lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="compile_regex")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="compile_regex")
     return builder.call(fn, args)
 
 
@@ -854,7 +848,7 @@ def lower_compile_regex_unicode(context, builder, sig, args):
 def impl_string_contains_regex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(fnty, name="str_contains_regex")
+    fn = cgutils.get_or_insert_function(builder.module, fnty, name="str_contains_regex")
     return builder.call(fn, args)
 
 
@@ -870,7 +864,7 @@ def impl_unicode_string_contains_regex(context, builder, sig, args):
 def impl_string_contains_noregex(context, builder, sig, args):
     fnty = lir.FunctionType(lir.IntType(1),
                             [lir.IntType(8).as_pointer(), lir.IntType(8).as_pointer()])
-    fn = builder.module.get_or_insert_function(
+    fn = cgutils.get_or_insert_function(builder.module,
         fnty, name="str_contains_noregex")
     return builder.call(fn, args)
 

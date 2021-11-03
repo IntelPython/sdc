@@ -40,7 +40,7 @@ from numba.core.imputils import impl_ret_untracked, call_getiter
 from sdc.datatypes.indexes import PositionalIndexType, RangeIndexType
 from sdc.datatypes.indexes.range_index_type import RangeIndexDataType
 from sdc.utilities.sdc_typing_utils import SDCLimitation
-from sdc.utilities.utils import sdc_overload, sdc_overload_attribute, sdc_overload_method, BooleanLiteral
+from sdc.utilities.utils import sdc_overload, sdc_overload_attribute, sdc_overload_method
 from sdc.utilities.sdc_typing_utils import (
                                     TypeChecker,
                                     check_signed_integer,
@@ -455,10 +455,9 @@ def pd_range_index_is_overload(context, builder, sig, args):
     if ty_lhs != ty_rhs:
         return cgutils.false_bit
 
+    # similar to Int64Index (compare instructions building index structs)
     lhs, rhs = args
-    lhs_ptr = builder.ptrtoint(lhs.operands[0], cgutils.intp_t)
-    rhs_ptr = builder.ptrtoint(rhs.operands[0], cgutils.intp_t)
-    return builder.icmp_signed('==', lhs_ptr, rhs_ptr)
+    return context.get_constant(types.bool_, lhs == rhs)
 
 
 @lower_builtin('getiter', RangeIndexType)
@@ -603,7 +602,7 @@ def pd_range_index_join_overload(self, other, how, level=None, return_indexers=F
     if not (isinstance(level, (types.Omitted, types.NoneType)) or level is None):
         ty_checker.raise_exc(level, 'None', 'level')
 
-    if not (isinstance(return_indexers, (types.Omitted, BooleanLiteral)) or return_indexers is False):
+    if not (isinstance(return_indexers, (types.Omitted, types.BooleanLiteral)) or return_indexers is False):
         ty_checker.raise_exc(return_indexers, 'boolean', 'return_indexers')
 
     if not (isinstance(sort, (types.Omitted, types.Boolean)) or sort is False):

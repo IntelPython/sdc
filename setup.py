@@ -405,7 +405,7 @@ setup(name=SDC_NAME_STR,
           'numpy>=1.16',
           'pandas==1.2.0',
           'pyarrow==4.0.1',
-          'numba==0.53.1',
+          'numba==0.54.1',
           'tbb'
           ],
       cmdclass=sdc_build_commands,

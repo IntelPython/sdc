@@ -42,7 +42,7 @@ import llvmlite.llvmpy.core as lc
 
 from sdc.datatypes.indexes import *
 from sdc.utilities.sdc_typing_utils import SDCLimitation
-from sdc.utilities.utils import sdc_overload, sdc_overload_attribute, sdc_overload_method, BooleanLiteral
+from sdc.utilities.utils import sdc_overload, sdc_overload_attribute, sdc_overload_method
 from sdc.utilities.sdc_typing_utils import (
         TypeChecker,
         sdc_pandas_index_types,
@@ -759,10 +759,9 @@ def pd_multi_index_is_overload(context, builder, sig, args):
     if ty_lhs != ty_rhs:
         return cgutils.false_bit
 
+    # similar to Int64Index (compare instructions building index structs)
     lhs, rhs = args
-    lhs_ptr = builder.ptrtoint(lhs.operands[0], cgutils.intp_t)
-    rhs_ptr = builder.ptrtoint(rhs.operands[0], cgutils.intp_t)
-    return builder.icmp_signed('==', lhs_ptr, rhs_ptr)
+    return context.get_constant(types.bool_, lhs == rhs)
 
 
 @lower_builtin('getiter', MultiIndexType)
