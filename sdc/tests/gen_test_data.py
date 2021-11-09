@@ -120,6 +120,22 @@ def generate_csv_data():
     with open("csv_data_date1.csv", "w") as f:
         f.write(data)
 
+    data = ("2,B,SA\n"
+            "3,A,SBC\n"
+            "4,C,S123\n"
+            "5,B,BCD\n")
+
+    with open("csv_data_cat1.csv", "w") as f:
+        f.write(data)
+
+    data = ("2,4.1\n"
+            "3,3.4\n"
+            "4,1.3\n"
+            "5,1.1\n")
+
+    with open("csv_data_dtype1.csv", "w") as f:
+        f.write(data)
+
 
 def generate_other_data():
     df = pd.DataFrame({'A': ['bc'] + ["a"] * 3 + ["bc"] * 3 + ['a'], 'B': [-8, 1, 2, 3, 1, 5, 6, 7]})

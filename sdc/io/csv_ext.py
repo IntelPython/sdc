@@ -59,10 +59,15 @@ import numpy as np
 
 from sdc.types import Categorical
 
-import pyarrow
-import pyarrow.csv
+import pyarrow as pa
+import pyarrow.csv as csv
 from sdc.datatypes.indexes.empty_index_type import EmptyIndexType
 from sdc.datatypes.indexes.positional_index_type import PositionalIndexType
+from sdc.extensions.sdc_arrow_table_ext import ArrowTableType
+from sdc.extensions.sdc_string_view_type import StdStringViewType
+
+from numba.core.errors import TypingError
+from numba.np import numpy_support
 
 
 class CsvReader(ir.Stmt):
@@ -324,13 +329,13 @@ def to_varname(string):
 
 
 @contextlib.contextmanager
-def pyarrow_cpu_count(cpu_count=pyarrow.cpu_count()):
-    old_cpu_count = pyarrow.cpu_count()
-    pyarrow.set_cpu_count(cpu_count)
+def pyarrow_cpu_count(cpu_count=pa.cpu_count()):
+    old_cpu_count = pa.cpu_count()
+    pa.set_cpu_count(cpu_count)
     try:
         yield
     finally:
-        pyarrow.set_cpu_count(old_cpu_count)
+        pa.set_cpu_count(old_cpu_count)
 
 
 def pyarrow_cpu_count_equal_numba_num_treads(func):
@@ -522,88 +527,163 @@ def pandas_read_csv(
     return dataframe
 
 
-def _gen_pandas_read_csv_func_text(col_names, col_typs, py_col_dtypes, usecols, signature=None):
+@pyarrow_cpu_count_equal_numba_num_treads
+def do_read_csv(filepath_or_buffer, sep, delimiter, names, usecols, dtype, skiprows, parse_dates):
 
-    func_name = 'csv_reader_py'
-    return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
+    pa_options = get_pyarrow_read_csv_options(
+                    sep, delimiter, names, usecols, dtype, skiprows, parse_dates)
 
-    column_loc, _, _ = get_structure_maps(col_typs, return_columns)
-    index_type = PositionalIndexType(False) if col_typs else EmptyIndexType(False)
-    df_type = DataFrameType(
-        tuple(col_typs),
-        index_type,
-        tuple(col_names),
-        column_loc=column_loc
+    table = csv.read_csv(
+        filepath_or_buffer,
+        read_options=pa_options[0],
+        parse_options=pa_options[1],
+        convert_options=pa_options[2],
     )
 
-    df_type_repr = repr(df_type)
-    # for some reason pandas and pyarrow read_csv() return CategoricalDtype with
-    # ordered=False in case when dtype is with ordered=None
-    df_type_repr = df_type_repr.replace('ordered=None', 'ordered=False')
+    return table
 
-    # TODO: support non-numpy types like strings
-    date_inds = ", ".join(str(i) for i, t in enumerate(col_typs) if t.dtype == types.NPDatetime('ns'))
-    return_columns = usecols if usecols and isinstance(usecols[0], str) else col_names
 
-    if signature is None:
-        signature = "filepath_or_buffer"
+def csv_reader_infer_nb_arrow_type(
+    filepath_or_buffer, sep, delimiter, names, usecols, dtype, skiprows, parse_dates
+):
 
-    # map generated func params into values used in inner call of pandas_read_csv
-    # if no transformation is needed just use outer param name (since APIs match)
-    # otherwise use value in the dictionary
-    inner_call_params = {'parse_dates': f"[{date_inds}]"}
-    used_read_csv_params = (
-        'filepath_or_buffer',
-        'names',
-        'skiprows',
-        'parse_dates',
-        'dtype',
-        'usecols',
-        'sep',
-        'delimiter'
+    read_opts, parse_opts, convert_opts = get_pyarrow_read_csv_options(
+                                                sep, delimiter, names, usecols, dtype, skiprows, parse_dates)
+    csv_reader = csv.open_csv(filepath_or_buffer,
+                              read_options=read_opts,
+                              parse_options=parse_opts,
+                              convert_options=convert_opts)
+
+    table_schema = csv_reader.schema
+
+    nb_arrow_column_types = []
+    for i, pa_data_type in enumerate(table_schema.types):
+        nb_type = numpy_support.from_dtype(pa_data_type.to_pandas_dtype())
+
+        if isinstance(nb_type, types.PyObject):
+            if pa_data_type == pa.string():
+                nb_type = StdStringViewType()
+            else:
+                raise TypingError("Cannot infer numba type for: ", pa_data_type, f"of column={table_schema.names[i]}")
+
+        nb_arrow_column_types.append(nb_type)
+
+    table_column_names = table_schema.names if not names else (names if usecols is None else usecols)
+
+    arrow_table_type = ArrowTableType(nb_arrow_column_types, table_column_names)
+    return arrow_table_type
+
+
+def csv_reader_infer_nb_pandas_type(
+    filepath_or_buffer, sep, delimiter, names, usecols, dtype, skiprows, parse_dates
+):
+
+    # infer column types from the first block (similarly as Arrow does this)
+    # TO-DO: tune the block size or allow user configure it via env var
+    rows_to_read = 1000
+    df = pd.read_csv(filepath_or_buffer, sep=sep, delimiter=delimiter, names=names,
+                     usecols=usecols, dtype=dtype, skiprows=skiprows, nrows=rows_to_read,
+                     parse_dates=parse_dates)
+
+    df_type = numba.typeof(df)
+    return df_type
+
+
+def csv_reader_get_pyarrow_read_options(names, skiprows):
+
+    # if in the pd.read_csv call names=None the column names are inferred from the first row
+    # but instead of using them here as column_names argument, we rely on pyarrow
+    # autogenerated names, since this simplifies mapping of usecols pandas argument to
+    # include_columns in ConvertOptions when usecols are column indices (not names)
+    autogenerate_column_names = bool(names)
+
+    read_options = pa.csv.ReadOptions(
+        skip_rows=skiprows,
+        # column_names=column_names,
+        autogenerate_column_names=autogenerate_column_names,
     )
 
-    # pyarrow reads unnamed header as " ", pandas reads it as "Unnamed: N"
-    # during inference from file names should be raplaced with "Unnamed: N"
-    # passing names to pyarrow means that one row is header and should be skipped
-    if col_names and any(map(lambda x: x.startswith('Unnamed: '), col_names)):
-        inner_call_params['names'] = str(col_names)
-        inner_call_params['skiprows'] = "(skiprows and skiprows + 1) or 1"
-
-    # dtype parameter of compiled function is not used at all, instead a python dict
-    # of columns dtypes is captured at compile time, because some dtypes (like datetime)
-    # are converted and also to avoid penalty of creating dict in objmode
-    inner_call_params['dtype'] = 'read_as_dtypes'
-
-    params_str = '\n'.join([
-        f"      {param}={inner_call_params.get(param, param)}," for param in used_read_csv_params
-    ])
-    func_text = '\n'.join([
-        f"def {func_name}({signature}):",
-        f"  with objmode(df=\"{df_type_repr}\"):",
-        f"    df = pandas_read_csv(\n{params_str}",
-        f"    )",
-        f"  return df"
-    ])
-
-    global_vars = {
-        'read_as_dtypes': py_col_dtypes,
-        'objmode': objmode,
-        'pandas_read_csv': pandas_read_csv,
-    }
-
-    return func_text, func_name, global_vars
+    return read_options
 
 
-def _gen_csv_reader_py_pyarrow_py_func(func_text, func_name, global_vars):
-    locals = {}
-    exec(func_text, global_vars, locals)
-    func = locals[func_name]
-    return func
+def csv_reader_get_pyarrow_parse_options(delimiter, sep):
+
+    if delimiter is None:
+        delimiter = sep
+
+    parse_options = csv.ParseOptions(
+        delimiter=delimiter,
+    )
+    return parse_options
 
 
-def _gen_csv_reader_py_pyarrow_jit_func(csv_reader_py):
-    # TODO: no_cpython_wrapper=True crashes for some reason
-    jit_func = numba.njit(csv_reader_py)
-    compiled_funcs.append(jit_func)
-    return jit_func
+def csv_reader_get_pyarrow_convert_options(names, usecols, dtype, parse_dates):
+
+    ### FIXME: why all column names are default pyarrow autogenerated names??? i.e. f0, f1
+    ### FIXME: check this code and simplify if possible
+    include_columns = None
+
+    if usecols:
+        if type(usecols[0]) == str:
+            if names:
+                include_columns = [f'f{names.index(col)}' for col in usecols]
+            else:
+                include_columns = usecols
+        elif type(usecols[0]) == int:
+            include_columns = [f'f{i}' for i in usecols]
+        else:
+            assert False, f"Failed building pyarrow ConvertOptions due to usecols param value: {usecols}"
+
+    # FIXME: simplify logic or add comments
+    if dtype:
+        if names:
+            names_list = list(names)
+            if isinstance(dtype, dict):
+                column_types = {}
+                for k, v in dtype.items():
+                    column_name = "f{}".format(names_list.index(k))
+                    if isinstance(v, pd.CategoricalDtype):
+                        column_type = pa.string()
+                    else:
+                        column_type = pa.from_numpy_dtype(v)
+                    column_types[column_name] = column_type
+            else:
+                pa_dtype = pa.from_numpy_dtype(dtype)
+                column_types = {f"f{names_list.index(k)}": pa_dtype for k in names}
+        elif usecols:
+            if isinstance(dtype, dict):
+                column_types = {k: pa.from_numpy_dtype(v) for k, v in dtype.items()}
+            else:
+                column_types = {k: pa.from_numpy_dtype(dtype) for k in usecols}
+        else:
+            if isinstance(dtype, dict):
+                column_types = {k: pa.from_numpy_dtype(v) for k, v in dtype.items()}
+            else:
+                column_types = pa.from_numpy_dtype(dtype)
+    else:
+        column_types = None
+
+    for column in parse_dates:
+        name = f"f{column}"
+        # starting from pyarrow=3.0.0 strings are parsed to DateType (converted back to 'object'
+        # when using to_pandas), but not TimestampType (that is used to represent np.datetime64)
+        # see: pyarrow.from_numpy_dtype(np.datetime64('NaT', 's'))
+        # so make pyarrow infer needed type manually
+        column_types[name] = pa.timestamp('s')
+
+    convert_options = csv.ConvertOptions(
+        column_types=column_types,
+        strings_can_be_null=True,
+        include_columns=include_columns,
+    )
+    return convert_options
+
+
+def get_pyarrow_read_csv_options(sep, delimiter, names, usecols, dtype, skiprows, parse_dates):
+    """ This function attempts to map pandas read_csv parameters to pyarrow read_csv options to be used """
+
+    read_opts = csv_reader_get_pyarrow_read_options(names, skiprows)
+    parse_opts = csv_reader_get_pyarrow_parse_options(delimiter, sep)
+    convert_opts = csv_reader_get_pyarrow_convert_options(names, usecols, dtype, parse_dates)
+
+    return (read_opts, parse_opts, convert_opts)

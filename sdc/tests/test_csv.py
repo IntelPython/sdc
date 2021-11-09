@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2019-2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2021, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -32,6 +32,7 @@ import pyarrow.parquet as pq
 import unittest
 import numba
 from numba.core.config import IS_32BITS
+from numba.core.errors import TypingError
 from pandas import CategoricalDtype
 
 import sdc
@@ -54,6 +55,24 @@ class TestIO(TestCase):
 
     def setUp(self):
         if get_rank() == 0:
+            # test_csv_cat1
+            data = ("2,B,SA\n"
+                    "3,A,SBC\n"
+                    "4,C,S123\n"
+                    "5,B,BCD\n")
+
+            with open("csv_data_cat1.csv", "w") as f:
+                f.write(data)
+
+            # test_csv_single_dtype1
+            data = ("2,4.1\n"
+                    "3,3.4\n"
+                    "4,1.3\n"
+                    "5,1.1\n")
+
+            with open("csv_data_dtype1.csv", "w") as f:
+                f.write(data)
+
             # test_np_io1
             n = 111
             A = np.random.ranf(n)
@@ -61,158 +80,126 @@ class TestIO(TestCase):
         super(TestIO, self).setUp()
 
 
-class TestParquet(TestIO):
+class TestCSVNewOnlyInferParams(TestIO):
 
-    @skip_numba_jit
-    def test_pq_read(self):
-        def test_impl():
-            t = pq.read_table('kde.parquet')
-            df = t.to_pandas()
-            X = df['points']
-            return X.sum()
+    @unittest.skip
+    def test_pyarrow(self):
+        tests = [
+            "csv_keys1",
+            "csv_const_dtype1",
+            "csv_infer_file_default",
+            "csv_infer_file_sep",
+            "csv_infer_file_delimiter",
+            "csv_infer_file_names",
+            "csv_infer_parallel1",
+            "csv_skip1",
+            "csv_infer_skip1",
+            "csv_infer_skip_parallel1",
+            "csv_rm_dead1",
+            "csv_date1",
+            "csv_str1",
+            "csv_parallel1",
+            "csv_str_parallel1",
+            "csv_usecols1",
+            "csv_cat1",
+            "csv_cat2",
+            "csv_single_dtype1",
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                test = getattr(self, f"pd_{test}")
+                pd_val = test(use_pyarrow=False)()
+                pa_val = test(use_pyarrow=True)()
+                if isinstance(pd_val, pd.Series):
+                    pd.testing.assert_series_equal(pa_val, pd_val,
+                        check_categorical=False
+                    )
+                elif isinstance(pd_val, pd.DataFrame):
+                    pd.testing.assert_frame_equal(pa_val, pd_val,
+                        check_categorical=False
+                    )
+                elif isinstance(pd_val, np.ndarray):
+                    np.testing.assert_array_equal(pa_val, pd_val)
+                elif isinstance(pd_val, tuple):
+                    self.assertEqual(pa_val, pd_val)
+                else:
+                    self.fail(f"Unknown Pandas type: {type(pd_val)}")
 
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
+    def _int_type(self):
+        # TODO: w/a for Numba issue with int typing rules infering intp for integers literals
+        # unlike NumPy which uses int32 by default - causes dtype mismatch on Windows 64 bit
+        if platform.system() == 'Windows' and not IS_32BITS:
+            return np.intp
+        else:
+            return np.int
 
-    @skip_numba_jit
-    def test_pq_read_global_str1(self):
-        def test_impl():
-            df = pd.read_parquet(kde_file)
-            X = df['points']
-            return X.sum()
+    def _int_type_str(self):
+        return np.dtype(self._int_type()).name
 
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
+    def _read_csv(self, use_pyarrow=False):
+        return pd_read_csv if use_pyarrow else pd.read_csv
 
-    @skip_numba_jit
-    def test_pq_read_freevar_str1(self):
-        kde_file2 = 'kde.parquet'
+    # inference errors
 
-        def test_impl():
-            df = pd.read_parquet(kde_file2)
-            X = df['points']
-            return X.sum()
+    ### FIXME: this test should actually fail with literally block that will literal fname!
+    @unittest.skip
+    def test_csv_infer_error(self):
 
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
+        def test_impl(fname):
+            return pd.read_csv(fname)
+        sdc_func = self.jit(test_impl)
 
-    @skip_numba_jit
-    def test_pd_read_parquet(self):
-        def test_impl():
-            df = pd.read_parquet('kde.parquet')
-            X = df['points']
-            return X.sum()
+        with self.assertRaises(TypingError) as raises:
+            sdc_func("csv_data1.csv")
 
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
+        self.assertIn("Cannot infer resulting DataFrame", raises.exception.msg)
 
-    @skip_numba_jit
-    def test_pq_str(self):
-        def test_impl():
-            df = pq.read_table('example.parquet').to_pandas()
-            A = df.two.values == 'foo'
-            return A.sum()
+    # inference from parameters
 
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
+    def test_csv_infer_params_default(self):
+        """Test verifies DF type inference from parameters when names and dtype params are used"""
 
-    @skip_numba_jit
-    def test_pq_str_with_nan_seq(self):
-        def test_impl():
-            df = pq.read_table('example.parquet').to_pandas()
-            A = df.five.values == 'foo'
-            return A
+        int_type = self._int_type()
 
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
+        def test_impl(fname):
+            return pd.read_csv(fname,
+                            names=['A', 'B', 'C', 'D'],
+                            dtype={'A': int_type, 'B': np.float, 'C': 'float', 'D': str})       ### FIXME: int_type??
+        sdc_func = self.jit(test_impl)
 
-    @skip_numba_jit
-    def test_pq_str_with_nan_par(self):
-        def test_impl():
-            df = pq.read_table('example.parquet').to_pandas()
-            A = df.five.values == 'foo'
-            return A.sum()
+        for fname in ["csv_data1.csv", "csv_data2.csv"]:
+            with self.subTest(fname=fname):
+                result = sdc_func(fname)
+                result_ref = test_impl(fname)
+                pd.testing.assert_frame_equal(result, result_ref)
 
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
+#     def test_csv_infer_params_usecols_names(self):
+#         """Test verifies DF type inference from parameters when both names and usecols are used"""
+#         int_type = self._int_type()
+# 
+#         def test_impl(fname):
+#             return pd.read_csv(fname,
+#                                names=['A', 'B', 'C', 'D'],
+#                                dtype={'A': int_type, 'B': np.float, 'C': np.float, 'D': str},
+#                                usecols=['B', 'D'])
+#         sdc_func = self.jit(test_impl)
+# 
+#         fname = "csv_data1.csv"
+#         pd.testing.assert_frame_equal(sdc_func(fname), test_impl(fname))
 
-    @skip_numba_jit
-    def test_pq_str_with_nan_par_multigroup(self):
-        def test_impl():
-            df = pq.read_table('example2.parquet').to_pandas()
-            A = df.five.values == 'foo'
-            return A.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pq_bool(self):
-        def test_impl():
-            df = pq.read_table('example.parquet').to_pandas()
-            return df.three.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pq_nan(self):
-        def test_impl():
-            df = pq.read_table('example.parquet').to_pandas()
-            return df.one.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pq_float_no_nan(self):
-        def test_impl():
-            df = pq.read_table('example.parquet').to_pandas()
-            return df.four.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    @skip_numba_jit
-    def test_pq_pandas_date(self):
-        def test_impl():
-            df = pd.read_parquet('pandas_dt.pq')
-            return pd.DataFrame({'DT64': df.DT64, 'col2': df.DATE})
-
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
-
-    @skip_numba_jit
-    def test_pq_spark_date(self):
-        def test_impl():
-            df = pd.read_parquet('sdf_dt.pq')
-            return pd.DataFrame({'DT64': df.DT64, 'col2': df.DATE})
-
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+#     def test_csv_infer_params_usecols_no_names(self):
+#         """Test verifies DF type inference from parameters when only usecols is used and names are default"""
+# 
+#         def test_impl(fname):
+#             return pd.read_csv(fname, dtype={'B': np.float, 'D': str}, usecols=['B', 'D'])
+# 
+#         fname = "csv_data_infer1.csv"
+#         sdc_func = self.jit(test_impl)
+#         pd.testing.assert_frame_equal(sdc_func(fname), test_impl(fname))
 
 
-class TestCSV(TestIO):
+
+class TestCSVNewInferFileOnly(TestIO):
 
     def _int_type(self):
         # TODO: w/a for Numba issue with int typing rules infering intp for integers literals
@@ -251,7 +238,7 @@ class TestCSV(TestIO):
         """Test verifies basic usage of pandas read_csv when DF type is inferred from const filename"""
 
         def test_impl(file_name):
-            return pd.read_csv(file_name)
+            return pd.read_csv("csv_data_infer1.csv")   ### FIXME: rollback
         sdc_func = self.jit(test_impl)
 
         for file_name in ["csv_data_infer1.csv", "csv_data_infer_no_column_name.csv"]:
@@ -416,7 +403,6 @@ class TestCSV(TestIO):
         pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
     def test_csv_infer_file_param_skiprows_1(self):
-        """Test verifies pandas read_csv impl supports parameter skiprows with explicit names and dtypes """
         int_type = self._int_type()
 
         def test_impl():
@@ -430,7 +416,6 @@ class TestCSV(TestIO):
         pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
     def test_csv_infer_file_param_skiprows_2(self):
-        """Test verifies pandas read_csv impl supports parameter skiprows with omitted names and dtypes """
 
         def test_impl():
             return pd.read_csv("csv_data_infer1.csv", skiprows=2)
@@ -439,9 +424,6 @@ class TestCSV(TestIO):
         pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
     def test_csv_infer_file_param_parse_dates(self):
-        """Test verifies pandas read_csv impl supports parsing string data as datetime
-           using parse_dates parameter """
-
         int_type = self._int_type()
 
         def test_impl():
@@ -453,8 +435,6 @@ class TestCSV(TestIO):
         pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
     def test_csv_infer_file_param_dtype_common(self):
-        """Test verifies pandas read_csv impl supports single dtype for dtype parameter """
-
         def test_impl():
             df = pd.read_csv("csv_data_dtype1.csv",
                              names=['C1', 'C2'],
@@ -465,9 +445,8 @@ class TestCSV(TestIO):
 
         pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-    def test_csv_infer_file_const_dtype1(self):
-        """Test verifies dtype dict can use const strings as column dtypes """
-
+    ### FIXME: check what it tested before!
+    def test_csv_const_dtype1(self):
         int_type = self._int_type_str()
 
         def test_impl():
@@ -481,27 +460,7 @@ class TestCSV(TestIO):
 
         pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-    def test_csv_infer_file_dtype_as_literal_dict(self):
-        """Test verifies dtype parameter can be a const dict produced from tuples
-           of column names and column types """
-
-        def test_impl():
-
-            # this relies on dict and zip overloads to build LiteralStrKeyDict from tuples
-            col_names = ('A', 'B', 'C', 'D')
-            col_types = (np.intp, 'float64', np.float, str)
-            dtype = dict(zip(col_names, col_types))
-
-            return pd.read_csv("csv_data1.csv",
-                               names=col_names,
-                               dtype=dtype,
-                               )
-        sdc_func = self.jit(test_impl)
-
-        pd.testing.assert_frame_equal(sdc_func(), test_impl())
-
-    def test_csv_infer_file_cat1(self):
-        """Test verifies pandas read_csv impl supports reading categorical columns via dtype paramter """
+    def test_csv_cat1(self):
 
         def test_impl():
             names = ['C1', 'C2', 'C3']
@@ -515,10 +474,7 @@ class TestCSV(TestIO):
         result_ref = test_impl()
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    def test_csv_infer_file_cat2(self):
-        """Test verifies reading categorical columns preserves unused categories during conversion
-           from pyarrow to pandas DF """
-
+    def test_csv_cat2(self):
         int_type = self._int_type()
 
         def test_impl():
@@ -541,9 +497,6 @@ class TestCSV(TestIO):
 
         def test_impl():
             dtype = {'A': int_type, 'B': np.float, 'C': np.float, 'D': str}
-            # XXX: there are two reasons this fails:
-            # 1. dtype doesn't exist as dict after RewriteReadCsv
-            # 2. dict keys would be of DictKeys type, not tuple
             return pd.read_csv("csv_data1.csv",
                             names=dtype.keys(),
                             dtype=dtype,)
@@ -639,57 +592,6 @@ class TestCSV(TestIO):
         if get_rank() == 0:
             pd.testing.assert_frame_equal(
                 pd.read_csv(hp_fname), pd.read_csv(pd_fname))
-
-
-class TestNumpy(TestIO):
-
-    @skip_numba_jit
-    def test_np_io1(self):
-        def test_impl():
-            A = np.fromfile("np_file1.dat", np.float64)
-            return A
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-
-    @skip_numba_jit
-    def test_np_io2(self):
-        # parallel version
-        def test_impl():
-            A = np.fromfile("np_file1.dat", np.float64)
-            return A.sum()
-
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_almost_equal(hpat_func(), test_impl())
-        self.assertEqual(count_array_REPs(), 0)
-        self.assertEqual(count_parfor_REPs(), 0)
-
-    def test_np_io3(self):
-        def test_impl(A):
-            if get_rank() == 0:
-                A.tofile("np_file_3.dat")
-
-        hpat_func = self.jit(test_impl)
-        n = 111
-        A = np.random.ranf(n)
-        hpat_func(A)
-        if get_rank() == 0:
-            B = np.fromfile("np_file_3.dat", np.float64)
-            np.testing.assert_almost_equal(A, B)
-
-    @skip_numba_jit("AssertionError: Failed in nopython mode pipeline (step: Preprocessing for parfors)")
-    def test_np_io4(self):
-        # parallel version
-        def test_impl(n):
-            A = np.arange(n)
-            A.tofile("np_file_3.dat")
-
-        hpat_func = self.jit(test_impl)
-        n = 111
-        A = np.arange(n)
-        hpat_func(n)
-        B = np.fromfile("np_file_3.dat", np.int64)
-        np.testing.assert_almost_equal(A, B)
 
 
 if __name__ == "__main__":

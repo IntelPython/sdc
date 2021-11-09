@@ -30,8 +30,8 @@ import platform
 import os
 import sys
 import numba
+import pyarrow as pa
 from docs.source.buildscripts.sdc_build_doc import SDCBuildDoc
-
 
 # Note we don't import Numpy at the toplevel, since setup.py
 # should be able to run without Numpy for pip to discover the
@@ -111,8 +111,12 @@ if not tbb_root:
 
 ind = [PREFIX_DIR + '/include', ]
 lid = [PREFIX_DIR + '/lib', ]
-eca = ['-std=c++11', "-O3", "-DTBB_PREVIEW_WAITING_FOR_WORKERS=1"]  # '-g', '-O0']
-ela = ['-std=c++11', ]
+if is_win:
+    eca = ['/std:c++17', "/Ox", "/DTBB_PREVIEW_WAITING_FOR_WORKERS=1", ]  # "/Zi", "/Od", "/DEBUG:FULL"]
+    ela = []  # '/DEBUG:FULL', ]
+else:
+    eca = ['-std=c++17', "-O3", "-DTBB_PREVIEW_WAITING_FOR_WORKERS=1", ]  # '-g', '-O0']
+    ela = []
 
 io_libs = []
 
@@ -189,12 +193,14 @@ str_libs = np_compile_args['libraries']
 numba_include_path = numba.extending.include_path()
 
 ext_str = Extension(name="sdc.hstr_ext",
-                    sources=["sdc/_str_ext.cpp"],
-                    libraries=str_libs,
-                    define_macros=np_compile_args['define_macros'],
+                    sources=["sdc/_str_ext.cpp", ],
                     extra_compile_args=eca,
                     extra_link_args=ela,
-                    include_dirs=np_compile_args['include_dirs'] + ind + [numba_include_path],
+                    libraries=str_libs,
+                    define_macros=np_compile_args['define_macros'],
+                    include_dirs=np_compile_args['include_dirs'] + ind + [
+                       "sdc/native/str_ext/",
+                       numba_include_path],
                     library_dirs=np_compile_args['library_dirs'] + lid,
                     )
 
@@ -243,8 +249,21 @@ ext_conc_dict = Extension(name="sdc.hconc_dict",
                           language="c++"
                           )
 
+ext_arrow_reader = Extension(name="sdc.harrow_reader",
+                             sources=["sdc/native/arrow_reader.cpp"],
+                             extra_compile_args=eca,
+                             extra_link_args=ela,
+                             libraries=pa.get_libraries(),
+                             include_dirs=[
+                                 "sdc/native/",
+                                 numba_include_path,
+                                 pa.get_include()],
+                             library_dirs=lid + pa.get_library_dirs(),
+                             language="c++"
+                             )
+
 _ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq, ext_sort,
-             ext_conc_dict]
+             ext_conc_dict, ext_arrow_reader, ]
 
 # Support of Parquet is disabled because HPAT pipeline does not work now
 # if _has_pyarrow:
