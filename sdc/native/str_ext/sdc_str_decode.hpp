@@ -1,5 +1,5 @@
 //*****************************************************************************
-// Copyright (c) 2020, Intel Corporation All rights reserved.
+// Copyright (c) 2019-2021, Intel Corporation All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
@@ -23,6 +23,9 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 // EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //*****************************************************************************
+
+#ifndef HSDC_STR_DECODE
+#define HSDC_STR_DECODE
 
 #include <Python.h>
 #include <iostream>
@@ -627,3 +630,6 @@ int64_t unicode_to_utf8(char* out_data, char* data, int64_t size, int kind)
         return ucs4lib_utf8_encoder(out_data, (Py_UCS4*)data, size);
     }
 }
+
+#endif
+

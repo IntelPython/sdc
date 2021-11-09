@@ -66,26 +66,29 @@ def gen_func_suffixes():
                product(key_suffixes, val_suffixes))
 
 
-def load_native_func(fname, module, skip_check=None):
-    for suffix in gen_func_suffixes():
-        if skip_check and skip_check(suffix):
+def load_native_func(fname, module, suffixes=None, skip_check=None):
+    suffixes = suffixes or ['', ]
+    for s in suffixes:
+        if skip_check and skip_check(s):
             continue
-        full_func_name = f'{fname}_{suffix}'
+        fsuffix = f'_{s}' if s else ''
+        full_func_name = f'{fname}{fsuffix}'
         ll.add_symbol(full_func_name,
                       getattr(module, full_func_name))
 
 
-load_native_func('hashmap_create', hconc_dict)
-load_native_func('hashmap_size', hconc_dict)
-load_native_func('hashmap_set', hconc_dict)
-load_native_func('hashmap_contains', hconc_dict)
-load_native_func('hashmap_lookup', hconc_dict)
-load_native_func('hashmap_clear', hconc_dict)
-load_native_func('hashmap_pop', hconc_dict)
-load_native_func('hashmap_update', hconc_dict)
-load_native_func('hashmap_create_from_data', hconc_dict, lambda x: 'voidptr' in x)
-load_native_func('hashmap_getiter', hconc_dict)
-load_native_func('hashmap_iternext', hconc_dict)
+hashmap_func_suffixes = list(gen_func_suffixes())
+load_native_func('hashmap_create', hconc_dict, hashmap_func_suffixes)
+load_native_func('hashmap_size', hconc_dict, hashmap_func_suffixes)
+load_native_func('hashmap_set', hconc_dict, hashmap_func_suffixes)
+load_native_func('hashmap_contains', hconc_dict, hashmap_func_suffixes)
+load_native_func('hashmap_lookup', hconc_dict, hashmap_func_suffixes)
+load_native_func('hashmap_clear', hconc_dict, hashmap_func_suffixes)
+load_native_func('hashmap_pop', hconc_dict, hashmap_func_suffixes)
+load_native_func('hashmap_update', hconc_dict, hashmap_func_suffixes)
+load_native_func('hashmap_create_from_data', hconc_dict, hashmap_func_suffixes, lambda x: 'voidptr' in x)
+load_native_func('hashmap_getiter', hconc_dict, hashmap_func_suffixes)
+load_native_func('hashmap_iternext', hconc_dict, hashmap_func_suffixes)
 
 
 supported_numeric_key_types = [
@@ -894,7 +897,7 @@ def _hashmap_dump(typingctx, dict_type):
 
     # load hashmap_dump here as otherwise module import will fail
     # since it's included in debug build only
-    load_native_func('hashmap_dump', hconc_dict)
+    load_native_func('hashmap_dump', hconc_dict, hashmap_func_suffixes)
     ty_key, ty_val = dict_type.key_type, dict_type.value_type
     key_type_postfix, value_type_postfix = _get_types_postfixes(ty_key, ty_val)
 

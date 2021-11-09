@@ -189,12 +189,14 @@ str_libs = np_compile_args['libraries']
 numba_include_path = numba.extending.include_path()
 
 ext_str = Extension(name="sdc.hstr_ext",
-                    sources=["sdc/_str_ext.cpp"],
-                    libraries=str_libs,
-                    define_macros=np_compile_args['define_macros'],
+                    sources=["sdc/_str_ext.cpp", ],
                     extra_compile_args=eca,
                     extra_link_args=ela,
-                    include_dirs=np_compile_args['include_dirs'] + ind + [numba_include_path],
+                    libraries=str_libs,
+                    define_macros=np_compile_args['define_macros'],
+                    include_dirs=np_compile_args['include_dirs'] + ind + [
+                       "sdc/native/str_ext/",
+                       numba_include_path],
                     library_dirs=np_compile_args['library_dirs'] + lid,
                     )
 
@@ -244,7 +246,7 @@ ext_conc_dict = Extension(name="sdc.hconc_dict",
                           )
 
 _ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq, ext_sort,
-             ext_conc_dict]
+             ext_conc_dict, ]
 
 # Support of Parquet is disabled because HPAT pipeline does not work now
 # if _has_pyarrow:
