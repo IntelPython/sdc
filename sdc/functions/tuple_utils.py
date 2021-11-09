@@ -25,9 +25,13 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+from textwrap import dedent
+
 from numba import types
-from numba.extending import (intrinsic, )
+from numba.extending import intrinsic
 from numba.core.typing.templates import (signature, )
+
+from sdc.utilities.utils import sdc_overload
 
 
 @intrinsic
@@ -205,3 +209,64 @@ def sdc_tuple_unzip(typingctx, data_type):
         return context.make_tuple(builder, ret_type, [first_tup, second_tup])
 
     return ret_type(data_type), codegen
+
+
+@sdc_overload(zip)
+def zip_tuples_spec_ovld(x, y):
+
+    if not (isinstance(x, types.BaseAnonymousTuple) and isinstance(y, types.BaseAnonymousTuple)):
+        return None
+
+    res_size = min(len(x), len(y))
+    func_impl_name = 'zip_tuples_spec_impl'
+    tup_elements = ', '.join([f"(x[{i}], y[{i}])" for i in range(res_size)])
+    func_text = dedent(f"""
+    def {func_impl_name}(x, y):
+        return ({tup_elements}{',' if res_size else ''})
+    """)
+    use_globals, use_locals = {}, {}
+    exec(func_text, use_globals, use_locals)
+    return use_locals[func_impl_name]
+
+    # FIXME_Numba#6533: alternatively we could have used sdc_tuple_map_elementwise
+    # to avoid another use of exec, but due to @intrinsic-s not supporting
+    # prefer_literal option below implementation looses literaly of args!
+    # from sdc.functions.tuple_utils import sdc_tuple_map_elementwise
+    # def zip_tuples_spec_impl(x, y):
+    #     return sdc_tuple_map_elementwise(
+    #         lambda a, b: (a, b),
+    #         x,
+    #         y
+    #     )
+    #
+    # return zip_tuples_spec_impl
+
+
+@sdc_overload(dict)
+def dict_from_tuples_ovld(x):
+
+    accepted_tuple_types = (types.Tuple, types.UniTuple)
+    if not isinstance(x, accepted_tuple_types):
+        return None
+
+    def check_tuple_element(ty):
+        return (isinstance(ty, accepted_tuple_types)
+                and len(ty) == 2
+                and isinstance(ty[0], types.StringLiteral))
+
+    # below checks that elements are tuples with size 2 and first element is literal string
+    if not (len(x) != 0 and all(map(check_tuple_element, x))):
+        assert False, f"Creating LiteralStrKeyDict not supported from pairs of: {x}"
+
+    # numba type-infers {'A': [1, 2, 3]} i.e. const dict of size 1 not as LiteralStrKeyDict
+    # but as non literal dict! TO-DO: add special branch here and call literal dict ctor directly
+    func_impl_name = 'dict_from_tuples_impl'
+    dict_elements = ', '.join([f"x[{i}][0]:x[{i}][1]" for i in range(len(x))])
+    func_text = dedent(f"""
+    def {func_impl_name}(x):
+        res = {{{dict_elements}}}
+        return res
+    """)
+    use_globals, use_locals = {}, {}
+    exec(func_text, use_globals, use_locals)
+    return use_locals[func_impl_name]
