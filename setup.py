@@ -109,6 +109,8 @@ tbb_root = os.getenv('TBBROOT')
 if not tbb_root:
     tbb_root = check_file_at_path(['include', 'tbb', 'tbb.h'])
 
+assert tbb_root is not None, f"TBB is required for building, but was not found!"
+
 ind = [PREFIX_DIR + '/include', ]
 lid = [PREFIX_DIR + '/lib', ]
 eca = ['-std=c++11', "-O3", "-DTBB_PREVIEW_WAITING_FOR_WORKERS=1"]  # '-g', '-O0']
