@@ -48,6 +48,7 @@ SDC_NAME_STR = 'sdc'
 np_compile_args = np_misc.get_info('npymath')
 
 is_win = platform.system() == 'Windows'
+is_osx = platform.system() == 'Darwin'
 
 
 def readme():
@@ -108,6 +109,7 @@ def check_file_at_path(path2file):
 tbb_root = os.getenv('TBBROOT')
 if not tbb_root:
     tbb_root = check_file_at_path(['include', 'tbb', 'tbb.h'])
+    assert tbb_root, "TBB headers required to build SDC not found"
 
 ind = [PREFIX_DIR + '/include', ]
 lid = [PREFIX_DIR + '/lib', ]
@@ -118,6 +120,10 @@ if is_win:
 else:
     eca = ['-std=c++17', "-O3", "-DTBB_PREVIEW_WAITING_FOR_WORKERS=1", ]  # '-g', '-O0']
     ela = []
+
+    # On macOS, c++17 flag is ignored unless this flag is also passed to distutils
+    if is_osx:
+        eca += ["-fno-aligned-allocation"]
 
 io_libs = []
 
