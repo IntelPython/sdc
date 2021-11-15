@@ -211,14 +211,20 @@ def sdc_tuple_unzip(typingctx, data_type):
     return ret_type(data_type), codegen
 
 
-@sdc_overload(zip)
-def zip_tuples_spec_ovld(x, y):
+def sdc_tuple_zip(x, y):
+    pass
+
+
+@sdc_overload(sdc_tuple_zip)
+def sdc_tuple_zip_ovld(x, y):
+    """ This function combines tuple of pairs from two input tuples x and y, preserving
+        literality of elements in them. """
 
     if not (isinstance(x, types.BaseAnonymousTuple) and isinstance(y, types.BaseAnonymousTuple)):
         return None
 
     res_size = min(len(x), len(y))
-    func_impl_name = 'zip_tuples_spec_impl'
+    func_impl_name = 'sdc_tuple_zip_impl'
     tup_elements = ', '.join([f"(x[{i}], y[{i}])" for i in range(res_size)])
     func_text = dedent(f"""
     def {func_impl_name}(x, y):
@@ -232,14 +238,14 @@ def zip_tuples_spec_ovld(x, y):
     # to avoid another use of exec, but due to @intrinsic-s not supporting
     # prefer_literal option below implementation looses literaly of args!
     # from sdc.functions.tuple_utils import sdc_tuple_map_elementwise
-    # def zip_tuples_spec_impl(x, y):
+    # def sdc_tuple_zip_impl(x, y):
     #     return sdc_tuple_map_elementwise(
     #         lambda a, b: (a, b),
     #         x,
     #         y
     #     )
     #
-    # return zip_tuples_spec_impl
+    # return sdc_tuple_zip_impl
 
 
 @sdc_overload(dict)
