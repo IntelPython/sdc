@@ -72,6 +72,6 @@ if __name__ == '__main__':
         sdc_env_packages += ['conda-verify', 'vc', 'vs2015_runtime', 'vs2015_win-64', 'pywin32=223']
     # Install conda-build and other packages from anaconda channel due to issue with wheel
     # output build if use intel channels first
-    sdc_utils.create_environment(sdc_env_packages + ['-c', 'anaconda'])
+    sdc_utils.create_environment(sdc_env_packages)
 
     build(sdc_utils)
