@@ -51,7 +51,7 @@ class SDC_Build_Utilities:
         self.line_single = '-'*80
 
         # Set channels
-        build_channels = ['-c', 'defaults', '-c', 'conda-forge']
+        build_channels = ['-c', 'main', '-c', 'conda-forge', '-c', 'defaults']
         self.channel_list = build_channels if channels is None else channels.split()
         if sdc_channel:
             self.sdc_channel = Path(sdc_channel).resolve().as_uri()
