@@ -30,6 +30,7 @@ from textwrap import dedent
 from numba import types
 from numba.extending import intrinsic
 from numba.core.typing.templates import (signature, )
+from numba.typed.dictobject import build_map
 
 from sdc.utilities.utils import sdc_overload
 
@@ -248,11 +249,37 @@ def sdc_tuple_zip_ovld(x, y):
     # return sdc_tuple_zip_impl
 
 
+@intrinsic
+def literal_dict_ctor(typingctx, items):
+
+    tup_size = len(items)
+    key_order = {p[0].literal_value: i for i, p in enumerate(items)}
+    ret_type = types.LiteralStrKeyDict(dict(items), key_order)
+
+    def codegen(context, builder, sig, args):
+        items_val = args[0]
+
+        # extract elements from the input tuple, incref and add pairs of
+        # extracted variables into a list, required by build_map
+        repacked_items = []
+        for i in range(tup_size):
+            elem = builder.extract_value(items_val, i)
+            elem_first = builder.extract_value(elem, 0)
+            elem_second = builder.extract_value(elem, 1)
+            repacked_items.append((elem_first, elem_second))
+            if context.enable_nrt:
+                context.nrt.incref(builder, items[i], elem)
+        d = build_map(context, builder, ret_type, items, repacked_items)
+        return d
+
+    return ret_type(items), codegen
+
+
 @sdc_overload(dict)
 def dict_from_tuples_ovld(x):
 
     accepted_tuple_types = (types.Tuple, types.UniTuple)
-    if not isinstance(x, accepted_tuple_types):
+    if not isinstance(x, types.BaseAnonymousTuple):
         return None
 
     def check_tuple_element(ty):
@@ -264,15 +291,6 @@ def dict_from_tuples_ovld(x):
     if not (len(x) != 0 and all(map(check_tuple_element, x))):
         assert False, f"Creating LiteralStrKeyDict not supported from pairs of: {x}"
 
-    # numba type-infers {'A': [1, 2, 3]} i.e. const dict of size 1 not as LiteralStrKeyDict
-    # but as non literal dict! TO-DO: add special branch here and call literal dict ctor directly
-    func_impl_name = 'dict_from_tuples_impl'
-    dict_elements = ', '.join([f"x[{i}][0]:x[{i}][1]" for i in range(len(x))])
-    func_text = dedent(f"""
-    def {func_impl_name}(x):
-        res = {{{dict_elements}}}
-        return res
-    """)
-    use_globals, use_locals = {}, {}
-    exec(func_text, use_globals, use_locals)
-    return use_locals[func_impl_name]
+    def dict_from_tuples_impl(x):
+        return literal_dict_ctor(x)
+    return dict_from_tuples_impl
