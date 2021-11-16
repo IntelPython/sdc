@@ -206,7 +206,7 @@ ext_str = Extension(name="sdc.hstr_ext",
                     libraries=str_libs,
                     define_macros=np_compile_args['define_macros'],
                     include_dirs=np_compile_args['include_dirs'] + ind + [
-                       "sdc/native/str_ext/",
+                       "sdc/native/",
                        numba_include_path],
                     library_dirs=np_compile_args['library_dirs'] + lid,
                     )
