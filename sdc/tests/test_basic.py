@@ -573,12 +573,11 @@ class TestPython(MemoryLeakMixin, TestCase):
         """ Verifies that a compination of dict(zip()) creates LiteralStrKeyDict when
             zip is applied to tuples of literal column names and columns data """
 
-        from sdc.functions.tuple_utils import sdc_tuple_zip
         dict_keys = ('A', 'B')
         dict_values = (np.ones(5), np.array([1, 2, 3]))
 
         def test_impl():
-            res = dict(sdc_tuple_zip(dict_keys, dict_values))
+            res = dict(zip(dict_keys, dict_values))
             return len(res)
 
         sdc_func = self.jit(test_impl)
