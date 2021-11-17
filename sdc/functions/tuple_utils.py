@@ -259,16 +259,13 @@ def literal_dict_ctor(typingctx, items):
     def codegen(context, builder, sig, args):
         items_val = args[0]
 
-        # extract elements from the input tuple, incref and add pairs of
-        # extracted variables into a list, required by build_map
+        # extract elements from the input tuple and repack into a list of variables required by build_map
         repacked_items = []
         for i in range(tup_size):
             elem = builder.extract_value(items_val, i)
             elem_first = builder.extract_value(elem, 0)
             elem_second = builder.extract_value(elem, 1)
             repacked_items.append((elem_first, elem_second))
-            if context.enable_nrt:
-                context.nrt.incref(builder, items[i], elem)
         d = build_map(context, builder, ret_type, items, repacked_items)
         return d
 
