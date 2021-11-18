@@ -663,13 +663,17 @@ def csv_reader_get_pyarrow_convert_options(names, usecols, dtype, parse_dates):
     else:
         column_types = None
 
-    for column in parse_dates:
-        name = f"f{column}"
-        # starting from pyarrow=3.0.0 strings are parsed to DateType (converted back to 'object'
-        # when using to_pandas), but not TimestampType (that is used to represent np.datetime64)
-        # see: pyarrow.from_numpy_dtype(np.datetime64('NaT', 's'))
-        # so make pyarrow infer needed type manually
-        column_types[name] = pa.timestamp('s')
+    # TO-DO: support all possible parse_dates values
+    try:
+        for column in parse_dates:
+            name = f"f{column}"
+            # starting from pyarrow=3.0.0 strings are parsed to DateType (converted back to 'object'
+            # when using to_pandas), but not TimestampType (that is used to represent np.datetime64)
+            # see: pyarrow.from_numpy_dtype(np.datetime64('NaT', 's'))
+            # so make pyarrow infer needed type manually
+            column_types[name] = pa.timestamp('s')
+    except (KeyError, TypeError):
+        pass
 
     convert_options = csv.ConvertOptions(
         column_types=column_types,

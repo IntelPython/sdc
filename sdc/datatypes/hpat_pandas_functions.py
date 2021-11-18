@@ -52,6 +52,7 @@ from sdc.extensions.sdc_arrow_table_ext import (
     apply_converters,
     combine_df_columns,
     create_df_from_columns,
+    decref_pyarrow_table,
 )
 
 
@@ -255,6 +256,7 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
                 for cat_column_name in cat_columns_list:
                     df[cat_column_name] = df[cat_column_name].astype(py_col_dtypes[cat_column_name])
 
+            # decref_pyarrow_table(pa_table)
             return df
 
         return sdc_internal_read_csv_impl
@@ -322,6 +324,7 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
                     maybe_unboxed_columns = tuple(ret_cols)
 
             arrow_table = arrow_reader_create_tableobj(arrow_table_type, pa_table)
+            # decref_pyarrow_table(pa_table)
             converted_columns = apply_converters(arrow_table, converters)
             all_df_columns = combine_df_columns(maybe_unboxed_columns, converted_columns)
 

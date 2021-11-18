@@ -60,7 +60,20 @@ def _typeof_pyarrow_table(val, c):
 
 @unbox(PyarrowTableType)
 def unbox_pyarrow_table(typ, val, c):
+    # incref pyobject, as Numba releases it when returning from objmode
+    c.pyapi.incref(val)
     return NativeValue(val)
+
+
+@intrinsic
+def decref_pyarrow_table(typingctx, pa_table):
+    ret_type = types.void
+
+    def codegen(context, builder, sig, args):
+        pa_table_val = args[0]
+        context.get_python_api(builder).decref(pa_table_val)
+
+    return ret_type(pa_table), codegen
 
 
 @intrinsic

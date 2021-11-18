@@ -368,52 +368,63 @@ class TestCSV(TestIO):
     def test_csv_infer_file_param_converters_1(self):
         """Test verifies pandas read_csv impl supports conversion of all columns using converters parameter"""
 
-        int_converter = self.get_int_converter()
-        float_converter = self.get_float_converter()
-        str_converter = self.get_str_converter()
-
-        def test_impl():
+        def test_impl(int_fn, float_fn, str_fn):
             return pd.read_csv("csv_data1.csv",
                                names=['A', 'B', 'C', 'D'],
-                               converters={'A': int_converter,
-                                           'B': float_converter,
-                                           'C': float_converter,
-                                           'D': str_converter
+                               converters={'A': int_fn,
+                                           'B': float_fn,
+                                           'C': float_fn,
+                                           'D': str_fn
                                            })
-
         sdc_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+        fn_list = [
+            self.get_int_converter(),
+            self.get_float_converter(),
+            self.get_str_converter(),
+        ]
+        py_fn_list = [x.py_func for x in fn_list]
+
+        pd.testing.assert_frame_equal(
+            sdc_func(*fn_list),
+            test_impl(*py_fn_list)
+        )
 
     def test_csv_infer_file_param_converters_2(self):
         """Test verifies pandas read_csv impl supports conversion of some of columns with converters parameter"""
 
-        float_converter = self.get_float_converter()
-        str_converter = self.get_str_converter()
-
-        def test_impl():
+        def test_impl(float_fn, str_fn):
             return pd.read_csv("csv_data1.csv",
                             names=['A', 'B', 'C', 'D'],
-                            converters={'B': float_converter,
-                                        'D': str_converter})
-
+                            converters={'B': float_fn,
+                                        'D': str_fn})
         sdc_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+        float_fn = self.get_float_converter()
+        str_fn = self.get_str_converter()
+        pd.testing.assert_frame_equal(
+            sdc_func(float_fn, str_fn),
+            test_impl(float_fn.py_func, str_fn.py_func)
+        )
 
     def test_csv_infer_file_param_converters_3(self):
         """Test verifies pandas read_csv impl supports conversion of some of columns with other columns
            converterted via dtype parameter"""
 
-        float_converter = self.get_float_converter()
-        str_converter = self.get_str_converter()
-        def test_impl():
+        def test_impl(float_fn, str_fn):
             return pd.read_csv("csv_data1.csv",
                             names=['A', 'B', 'C', 'D'],
                             dtype={'A': np.float64, 'C': np.float32},
-                            converters={'B': float_converter,
-                                        'D': str_converter})
-
+                            converters={'B': float_fn,
+                                        'D': str_fn})
         sdc_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+        float_fn = self.get_float_converter()
+        str_fn = self.get_str_converter()
+        pd.testing.assert_frame_equal(
+            sdc_func(float_fn, str_fn),
+            test_impl(float_fn.py_func, str_fn.py_func)
+        )
 
     def test_csv_infer_file_param_skiprows_1(self):
         """Test verifies pandas read_csv impl supports parameter skiprows with explicit names and dtypes """
