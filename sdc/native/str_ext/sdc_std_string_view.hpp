@@ -41,7 +41,6 @@ extern "C"
     void string_view_delete(void* p_str_view)
     {
         auto p_spec = (std::string_view*)p_str_view;
-        std::cout << "destroying string view at " << p_spec << std::endl;
         delete p_spec;
     }
 
@@ -51,7 +50,6 @@ extern "C"
         auto nrt = (NRT_api_functions*)nrt_table;
 
         auto p_str_view = new std::string_view;
-        std::cout << "string_view_create called, new allocated data ptr is " << p_str_view << std::endl;
         void* res = (void*)p_str_view;
         (*meminfo) = nrt->manage_memory(res, string_view_delete);
     }
@@ -62,7 +60,6 @@ extern "C"
         auto nrt = (NRT_api_functions*)nrt_table;
 
         auto p_str_view = new std::string_view((char*)data_ptr, size);
-        // std::cout << "string_view_create called, new allocated data ptr is " << p_str_view << ", data is: " << (*p_str_view) << std::endl;
         void* res = (void*)p_str_view;
         (*meminfo) = nrt->manage_memory(res, string_view_delete);
     }
@@ -70,21 +67,18 @@ extern "C"
 
     void string_view_print(void* p_str_view)
     {
-        //std::cout<<"print_string_view: "<<p_str_view<<std::endl;
         auto p_spec = (std::string_view*)p_str_view;
         std::cout << (*p_spec) << std::endl;
     }
 
     int64_t string_view_len(void* p_str_view)
     {
-        //std::cout<<"print_string_view: "<<p_str_view<<std::endl;
         auto p_spec = (std::string_view*)p_str_view;
         return p_spec->size();
     }
 
     const char* string_view_get_data_ptr(void* p_str_view)
     {
-        //std::cout<<"get_c_str_string_view: "<<p_str_view<<std::endl;
         auto p_spec = (std::string_view*)p_str_view;
         return p_spec->data();
     }
@@ -116,11 +110,10 @@ extern "C"
         auto ret = std::from_chars(p_data, p_data + str_len, res, base);
         if (ret.ptr != p_data + str_len)
         {
-            // FIXME: need to propagate erroc code to python?
-            // std::cout << "wrong data" << std::endl;
+            // TO-DO: propagate error code to python
+            // std::cerr << "wrong data" << std::endl;
             return 1;
         } else {
-            // std::cout << res << std::endl;
             *p_res = res;
             return 0;
         }
@@ -130,23 +123,19 @@ extern "C"
     {
         auto p_spec = (std::string_view*)p_str_view;
 
-        char* p_data = (char*)(p_spec->data());
         size_t str_len = p_spec->size();
         if (!str_len)
             return 1;
 
-        double res = 0;
-        auto ret = std::from_chars(p_data, p_data + str_len, res);
-        if (ret.ptr != p_data + str_len)
-        {
-            // FIXME: need to propagate erroc code to python?
-            // std::cout << "wrong data" << std::endl;
+        // std::from_chars overloads for floats are supported from GCC 11.1 only
+        std::string null_term_str(*p_spec);
+        auto data_ptr = null_term_str.c_str();
+        char* end_pos = nullptr;
+        *p_res = std::strtod(data_ptr, &end_pos);
+        if (data_ptr + str_len != end_pos)
             return 1;
-        } else {
-            // std::cout << res << std::endl;
-            *p_res = res;
+        else
             return 0;
-        }
     }
 
 } // extern "C"
