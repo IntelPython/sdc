@@ -33,6 +33,7 @@ import numba
 import pyarrow as pa
 from docs.source.buildscripts.sdc_build_doc import SDCBuildDoc
 
+
 # Note we don't import Numpy at the toplevel, since setup.py
 # should be able to run without Numpy for pip to discover the
 # build dependencies
@@ -48,6 +49,7 @@ SDC_NAME_STR = 'sdc'
 np_compile_args = np_misc.get_info('npymath')
 
 is_win = platform.system() == 'Windows'
+is_osx = platform.system() == 'Darwin'
 
 
 def readme():
@@ -108,15 +110,21 @@ def check_file_at_path(path2file):
 tbb_root = os.getenv('TBBROOT')
 if not tbb_root:
     tbb_root = check_file_at_path(['include', 'tbb', 'tbb.h'])
+    assert tbb_root, "TBB headers required to build SDC not found"
 
 ind = [PREFIX_DIR + '/include', ]
 lid = [PREFIX_DIR + '/lib', ]
+
 if is_win:
     eca = ['/std:c++17', "/Ox", "/DTBB_PREVIEW_WAITING_FOR_WORKERS=1", ]  # "/Zi", "/Od", "/DEBUG:FULL"]
     ela = []  # '/DEBUG:FULL', ]
 else:
     eca = ['-std=c++17', "-O3", "-DTBB_PREVIEW_WAITING_FOR_WORKERS=1", ]  # '-g', '-O0']
     ela = []
+
+    # On macOS, c++17 flag is ignored unless this flag is also passed to distutils
+    if is_osx:
+        eca += ["-fno-aligned-allocation"]
 
 io_libs = []
 
@@ -199,7 +207,7 @@ ext_str = Extension(name="sdc.hstr_ext",
                     libraries=str_libs,
                     define_macros=np_compile_args['define_macros'],
                     include_dirs=np_compile_args['include_dirs'] + ind + [
-                       "sdc/native/str_ext/",
+                       "sdc/native/",
                        numba_include_path],
                     library_dirs=np_compile_args['library_dirs'] + lid,
                     )
@@ -208,8 +216,8 @@ ext_dt = Extension(name="sdc.hdatetime_ext",
                    sources=["sdc/_datetime_ext.cpp"],
                    libraries=np_compile_args['libraries'],
                    define_macros=np_compile_args['define_macros'],
-                   extra_compile_args=['-std=c++11'],
-                   extra_link_args=['-std=c++11'],
+                   extra_compile_args=eca,
+                   extra_link_args=ela,
                    include_dirs=np_compile_args['include_dirs'],
                    library_dirs=np_compile_args['library_dirs'],
                    language="c++"

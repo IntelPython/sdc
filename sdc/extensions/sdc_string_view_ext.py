@@ -58,6 +58,7 @@ load_native_func('string_view_to_float64', hstr_ext)
 @intrinsic
 def string_view_create(typingctx):
     ret_type = StdStringViewType()
+
     def codegen(context, builder, sig, args):
         nrt_table = context.nrt.get_nrt_api(builder)
         str_view_ctinfo = cgutils.create_struct_proxy(ret_type)(
@@ -79,6 +80,7 @@ def string_view_create(typingctx):
 @intrinsic
 def string_view_create_with_data(typingctx, data, size):
     ret_type = StdStringViewType()
+
     def codegen(context, builder, sig, args):
         data_val, size_val = args
 
@@ -106,6 +108,7 @@ def string_view_create_with_data(typingctx, data, size):
 @intrinsic
 def string_view_len(typingctx, str_view):
     ret_type = types.int64
+
     def codegen(context, builder, sig, args):
         str_view_ctinfo = cgutils.create_struct_proxy(sig.args[0])(
             context, builder, value=args[0])
@@ -121,6 +124,7 @@ def string_view_len(typingctx, str_view):
 def len_string_view_ovld(str_view):
     if not isinstance(str_view, StdStringViewType):
         return None
+
     def len_string_view_impl(str_view):
         return string_view_len(str_view)
     return len_string_view_impl
@@ -129,6 +133,7 @@ def len_string_view_ovld(str_view):
 @intrinsic
 def string_view_get_data_ptr(typingctx, str_view):
     ret_type = types.voidptr
+
     def codegen(context, builder, sig, args):
         str_view_ctinfo = cgutils.create_struct_proxy(sig.args[0])(
             context, builder, value=args[0])
@@ -148,6 +153,7 @@ def string_view_print(typingctx, str_view):
     load_native_func('string_view_print', hstr_ext)
 
     ret_type = types.void
+
     def codegen(context, builder, sig, args):
         str_view_ctinfo = cgutils.create_struct_proxy(sig.args[0])(
             context, builder, value=args[0])
@@ -162,6 +168,7 @@ def string_view_print(typingctx, str_view):
 @intrinsic
 def string_view_set_data(typingctx, str_view, data, size):
     ret_type = types.voidptr
+
     def codegen(context, builder, sig, args):
         new_data_val, new_data_size = args[1:]
         str_view_ctinfo = cgutils.create_struct_proxy(sig.args[0])(
@@ -182,6 +189,7 @@ def string_view_set_data(typingctx, str_view, data, size):
 @intrinsic
 def string_view_to_int(typingctx, str_view, base):
     ret_type = types.Tuple([types.bool_, types.int64])
+
     def codegen(context, builder, sig, args):
         str_view_val, base_val = args
         str_view_ctinfo = cgutils.create_struct_proxy(sig.args[0])(
@@ -193,9 +201,9 @@ def string_view_to_int(typingctx, str_view, base):
         fn = cgutils.get_or_insert_function(builder.module, fnty, name="string_view_to_int")
         res_ptr = cgutils.alloca_once(builder, lir.IntType(64))
         status = builder.call(fn,
-                            [str_view_ctinfo.data_ptr,
-                             base_val,
-                             res_ptr])
+                              [str_view_ctinfo.data_ptr,
+                               base_val,
+                               res_ptr])
         status_as_bool = context.cast(builder, status, types.int8, types.bool_)
         return context.make_tuple(builder, ret_type, [status_as_bool, builder.load(res_ptr)])
 
@@ -219,6 +227,7 @@ def string_view_to_int_ovld(x, base=10):
 @intrinsic
 def string_view_to_float64(typingctx, str_view):
     ret_type = types.Tuple([types.bool_, types.float64])
+
     def codegen(context, builder, sig, args):
         str_view_val, = args
         str_view_ctinfo = cgutils.create_struct_proxy(sig.args[0])(
@@ -229,8 +238,8 @@ def string_view_to_float64(typingctx, str_view):
         fn = cgutils.get_or_insert_function(builder.module, fnty, name="string_view_to_float64")
         res_ptr = cgutils.alloca_once(builder, lir.DoubleType())
         status = builder.call(fn,
-                            [str_view_ctinfo.data_ptr,
-                             res_ptr])
+                              [str_view_ctinfo.data_ptr,
+                               res_ptr])
         status_as_bool = context.cast(builder, status, types.int8, types.bool_)
         return context.make_tuple(builder, ret_type, [status_as_bool, builder.load(res_ptr)])
 

@@ -28,10 +28,10 @@
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/arrayobject.h>
 
-#include "sdc_str_decode.hpp"
-#include "sdc_std_string.hpp"
-#include "sdc_str_arr.hpp"
-#include "sdc_std_string_view.hpp"
+#include "str_ext/sdc_str_decode.hpp"
+#include "str_ext/sdc_std_string.hpp"
+#include "str_ext/sdc_str_arr.hpp"
+#include "str_ext/sdc_std_string_view.hpp"
 
 #define REGISTER(func) PyObject_SetAttrString(m, #func, PyLong_FromVoidPtr((void*)(&func)));
 

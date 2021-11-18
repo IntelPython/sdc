@@ -42,9 +42,9 @@ from sdc.str_arr_ext import StringArray, create_str_arr_from_list, getitem_str_o
 from sdc.str_ext import std_str_to_unicode, unicode_to_std_str
 from sdc.extensions.sdc_string_view_ext import (
     string_view_create,
-    string_view_create_with_data,
     string_view_get_data_ptr,
     string_view_set_data,
+    string_view_create_with_data,
 )
 from sdc.tests.gen_test_data import ParquetGenerator
 from sdc.tests.test_base import TestCase
@@ -455,13 +455,17 @@ class TestStringView(MemoryLeakMixin, TestCase):
 
             # actual test: create string view pointing to data and convert it back to unicode
             str_view = string_view_create_with_data(data_ptr, size)
-            return str(str_view)
+            as_unicode = str(str_view)
+            check_equal = as_unicode == data_as_str_arr[0]  # for extending the lifetime of str_arr
+            return as_unicode, check_equal
         sdc_func = self.jit(test_impl)
 
         data_to_test = ['大处着眼', 'вавыа', '🐍⚡',  "dfad123/", ]
         for data in data_to_test:
             with self.subTest(data=data):
-                self.assertEqual(sdc_func(data), data)
+                result = sdc_func(data)
+                self.assertEqual(result[0], data)
+                self.assertEqual(result[1], True)
 
     def test_string_view_unicode_methods(self):
         get_str_view_data = self._generate_get_ctor_params()
@@ -477,16 +481,17 @@ class TestStringView(MemoryLeakMixin, TestCase):
                     data_as_str_arr = create_str_arr_from_list([x, ])
                     data_ptr, size = get_str_view_data(data_as_str_arr, 0)
                     str_view = string_view_create_with_data(data_ptr, size)
-                    return str_view.{meth_name}(*args)
+                    res = str_view.{meth_name}(*args)
+                    extra_use = len(data_as_str_arr)  # for extending the lifetime of str_arr
+                    return res, extra_use
             """)
 
             global_vars, local_vars = {'create_str_arr_from_list': create_str_arr_from_list,
-                               'get_str_view_data': get_str_view_data,
-                               'string_view_create_with_data': string_view_create_with_data}, {}
+                                       'get_str_view_data': get_str_view_data,
+                                       'string_view_create_with_data': string_view_create_with_data}, {}
             exec(test_impl_text, global_vars, local_vars)
             test_impl = self.jit(local_vars['test_impl'])
             return test_impl
-
 
         tested_methods = ['find', 'count', 'split']
         data_to_test = ['大处着眼', 'ва12выа', '🐍⚡',  "dfad123/", ]
@@ -497,7 +502,7 @@ class TestStringView(MemoryLeakMixin, TestCase):
             for data in data_to_test:
                 with self.subTest(method=method, data=data):
                     result_ref = reference_impl(data, method, call_args)
-                    result = test_impl(data, call_args)
+                    result = test_impl(data, call_args)[0]
                     self.assertEqual(result, result_ref)
 
 
