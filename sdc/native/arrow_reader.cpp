@@ -25,25 +25,21 @@
 // *****************************************************************************
 
 #include <Python.h>
+#include <iostream>
+#include <string_view>
+#include <algorithm>
+#include <vector>
+#include <numeric>
+#include <charconv>
 #include "arrow/csv/api.h"
 #include "arrow/table.h"
 #include "arrow/type.h"
 #include "arrow/io/file.h"
 #include "arrow/array/array_primitive.h"
 #include "arrow/array/array_binary.h"
+#include "arrow/python/pyarrow.h"
 #include "numba/core/runtime/nrt_external.h"
-#include <iostream>
-#include <fstream>
-#include <string_view>
-#include <algorithm>
 
-#include <arrow/python/pyarrow.h>
-
-#include <cmath>
-#include <vector>
-#include <numeric>
-#include <charconv>
-#include <random>
 
 #define REGISTER(func) PyObject_SetAttrString(m, #func, PyLong_FromVoidPtr((void*)(&func)));
 
@@ -64,7 +60,6 @@ struct ArrowChunkedTable {
 
     ArrowChunkedTable(const std::shared_ptr<arrow::Table>& _sp_table) : sp_table(_sp_table) {
 
-        // std::cout << "started\n";
         n_rows = sp_table->num_rows();
         n_cols = sp_table->num_columns();
 
@@ -73,30 +68,20 @@ struct ArrowChunkedTable {
         chunk_offsets = std::vector<size_t>(n_chunks);
         column_chunk_ptrs = std::vector<arrow::Array*>(n_cols * n_chunks);
 
-        // std::cout << "n_rows, n_cols, n_chunks:" << n_rows << ", " << n_cols << ", " << n_chunks << std::endl;
         for (int col_idx=0; col_idx < n_cols; ++col_idx) {
-            // std::cout << "col_idx=" << col_idx << std::endl;
-            // std::cout << "n_chunks=" << n_chunks << std::endl;
 
             for (int i=0; i < n_chunks; ++i) {
                 auto chunk = sp_table->column(col_idx)->chunk(i);
-                // std::cout << "i=" << i << std::endl;
                 column_chunk_ptrs[col_idx * n_chunks + i] = chunk.get();
                 if (col_idx == 0)
                     chunk_offsets[i] = chunk->length();
             }
         }
 
-        // std::cout << "DEBUG: pointers to chunks of different columns:";
-//        for (auto x : column_chunk_ptrs) {
-//            std::cout << x << ", ";
-//        }
-        // std::cout << "\nfinished\n";
         std::partial_sum(chunk_offsets.begin(), chunk_offsets.end(), chunk_offsets.begin());
     }
 
     ArrowChunkedTable(const ArrowChunkedTable& rhs) {
-        // std::cout << "ArrowChunkedTable copy ctor called" << std::endl;
         n_chunks = rhs.n_chunks;
         n_rows = rhs.n_rows;
         n_cols = rhs.n_cols;
@@ -111,16 +96,13 @@ struct ArrowChunkedTable {
     ArrowChunkedTable& operator=(ArrowChunkedTable&&) = delete;
 };
 
-
 struct PyarrowInit {
     PyarrowInit() {
         auto res = arrow::py::import_pyarrow();
-        std::cout << "pyarrow import was done!" << " res=" << res << std::endl;
     }
     ~PyarrowInit() = default;
     PyarrowInit(const PyarrowInit& rhs) = default;
 };
-
 
 static PyarrowInit& initialize_pyarrow_once() {
     static PyarrowInit s;
@@ -141,7 +123,6 @@ void create_arrow_table(void* pyarrow_table,
                           NRT_MemInfo** meminfo,
                           void* nrt_table)
 {
-    std::cout << "create_table_from_pyarrow started" << std::endl;
     auto pa_init = initialize_pyarrow_once();
     auto nrt = (NRT_api_functions*)nrt_table;
 
@@ -152,26 +133,20 @@ void create_arrow_table(void* pyarrow_table,
     }
 
     std::shared_ptr<arrow::Table> sp_table = *maybe_table;
-    std::cout << "table was read" << std::endl;
     auto p_table = new ArrowChunkedTable(sp_table);
     (*meminfo) = nrt->manage_memory((void*)p_table, delete_arrow_chunked_table);
-    std::cout << "create_table_from_pyarrow finished" << std::endl;
 }
 
 int64_t get_table_len(void* p_table)
 {
-    // std::cout << "ENTER: print_first_row" << std::endl;
-    // auto sp_table = *(reinterpret_cast<std::shared_ptr<arrow::Table>*>(p_table));
     auto p_chunked_table = (reinterpret_cast<ArrowChunkedTable*>(p_table));
     auto res = p_chunked_table->n_rows;
-    // std::cout << "Table len is " << res << std::endl;
     return res;
 }
 
 int8_t get_table_cell(void* p_table, int64_t col_idx, int64_t row_idx, void* p_res)
 {
     ArrowCellReadResult ret_code;
-    // std::cout << "get_table_cell: col_idx=" << col_idx << " row_idx=" << row_idx << std::endl;
     auto p_chunked_table = (reinterpret_cast<ArrowChunkedTable*>(p_table));
     auto& p_chunk_offsets = p_chunked_table->chunk_offsets;
     auto n_chunks = p_chunked_table->n_chunks;
@@ -187,7 +162,6 @@ int8_t get_table_cell(void* p_table, int64_t col_idx, int64_t row_idx, void* p_r
     auto arr_type_id = sp_target_chunk->type_id();
     switch (arr_type_id) {
         case arrow::Type::STRING: {
-            // std::cout << "Processing string value!" << std::endl;
             auto p_column = reinterpret_cast<arrow::StringArray*>(sp_target_chunk); // std::static_pointer_cast<arrow::StringArray>(sp_target_chunk);
             auto arrow_str_view = p_column->GetView(new_row_idx);
             auto p_res_spec = (std::string_view*)p_res;
@@ -197,15 +171,13 @@ int8_t get_table_cell(void* p_table, int64_t col_idx, int64_t row_idx, void* p_r
         }
 
         // this is not used in converters (they read columns as strings),
-        // TO-DO: fix and extend if operating on Arrow Tables with all data types is needed
+        // TO-DO: extend if operating on Arrow Tables with all data types is needed
         case arrow::Type::INT64: {
-            // std::cout << "Processing integer value!" << std::endl;
             auto p_column = reinterpret_cast<arrow::Int64Array*>(sp_target_chunk);  // std::static_pointer_cast<arrow::Int64Array>(sp_target_chunk);
             auto p_res_spec = (int64_t*)p_res;
             if (p_column->IsValid(new_row_idx)) {
                 *p_res_spec = p_column->Value(new_row_idx);
                 ret_code = ArrowCellReadResult::CELL_READ_OK;
-                // std::cout << "Cell value is: " << (*p_res_spec) << std::endl;
             } else {
                 ret_code = ArrowCellReadResult::CELL_READ_NAN_VALUE;
             }

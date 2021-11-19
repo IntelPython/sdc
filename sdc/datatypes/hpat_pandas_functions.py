@@ -46,6 +46,7 @@ from sdc.str_arr_ext import string_array_type
 from sdc.types import CategoricalDtypeType, Categorical
 from sdc.datatypes.categorical.pdimpl import _reconstruct_CategoricalDtype
 from sdc.utilities.utils import sdc_overload
+from sdc.utilities.sdc_typing_utils import has_python_value
 from sdc.extensions.sdc_arrow_table_type import PyarrowTableType
 from sdc.extensions.sdc_arrow_table_ext import (
     arrow_reader_create_tableobj,
@@ -63,7 +64,7 @@ def get_df_col_type_from_dtype(dtype):
         elif dtype.typing_key == float:
             return types.Array(types.float64, 1, 'C')
         elif dtype.typing_key == str:
-            return string_array_type 
+            return string_array_type
         else:
             assert False, f"map_dtype_to_col_type: failing to infer column type for dtype={dtype}"
 
@@ -97,8 +98,7 @@ def get_nbtype_literal_values(nbtype):
     return [x.literal_value for x in nbtype]
 
 
-
-@overload(pd.read_csv)
+@sdc_overload(pd.read_csv)
 def sdc_pandas_read_csv_ovld(
     filepath_or_buffer, sep=',', delimiter=None, header="infer", names=None, index_col=None,
     usecols=None, squeeze=False, prefix=None, mangle_dupe_cols=True, dtype=None, engine=None,
@@ -152,23 +152,8 @@ def sdc_internal_read_csv(filepath_or_buffer, sep, delimiter, names, usecols, dt
 def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecols, dtype,
                                converters, skiprows, parse_dates):
 
-    print("DEBUG: sdc_internal_read_csv typing: filepath_or_buffer, dtype=", filepath_or_buffer, dtype)
-    accepted_sep_types = (types.StringLiteral, types.Omitted)
-    accepted_delimiter_types = (types.StringLiteral, types.NoneType, types.Omitted)
-    accepted_names_types = (types.BaseAnonymousTuple, types.NoneType, types.Omitted)
-    accepted_usecols_types = (types.BaseAnonymousTuple, types.NoneType, types.Omitted)
-    accepted_skiprows_types = (types.IntegerLiteral, types.NoneType, types.Omitted)
-    accepted_parse_dates_types = (types.BaseAnonymousTuple, types.BooleanLiteral, types.Omitted)
-
-    infer_from_file = all([
-        isinstance(filepath_or_buffer, types.Literal),
-        isinstance(sep, accepted_sep_types) or sep == ',',
-        isinstance(delimiter, accepted_delimiter_types) or delimiter is None,
-        isinstance(names, accepted_names_types) or names is None,
-        isinstance(usecols, accepted_usecols_types) or usecols is None,
-        isinstance(skiprows, accepted_skiprows_types) or skiprows is None,
-        isinstance(parse_dates, accepted_parse_dates_types) or parse_dates is False,
-    ])
+    # print("Typing sdc_internal_read_csv, args:\n\t",
+    #       filepath_or_buffer, sep, delimiter, names, usecols, dtype, converters, skiprows, parse_dates)
 
     if not isinstance(filepath_or_buffer, types.Literal):
         def sdc_internal_read_csv_impl(filepath_or_buffer, sep, delimiter, names, usecols, dtype,
@@ -177,7 +162,34 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
 
         return sdc_internal_read_csv_impl
 
-    assert infer_from_file, "Overload is supposed to work with inferecning from file only!"
+    accepted_args_types = {
+        'filepath_or_buffer': (types.StringLiteral, ),
+        'sep': (types.StringLiteral, types.Omitted),
+        'delimiter': (types.StringLiteral, types.NoneType, types.Omitted),
+        'names': (types.BaseAnonymousTuple, types.NoneType, types.Omitted),
+        'usecols': (types.BaseAnonymousTuple, types.NoneType, types.Omitted),
+        'skiprows': (types.IntegerLiteral, types.NoneType, types.Omitted),
+        'parse_dates': (types.BaseAnonymousTuple, types.BooleanLiteral, types.Omitted),
+        'converters': (types.LiteralStrKeyDict, types.NoneType, types.Omitted)
+    }
+
+    args_names = accepted_args_types.keys()
+    args_py_defaults = dict.fromkeys(args_names, None)
+    args_py_defaults.pop('filepath_or_buffer')  # no default value
+    args_py_defaults.update({'sep': ',', 'parse_dates': False})
+
+    param_types = locals()
+    param_types = {k: v for k, v in param_types.items() if k in args_names}
+
+    def _param_checker(x, accepted_types, defaults):
+        is_default = has_python_value(x, defaults[x]) if x in defaults else False
+        return isinstance(param_types[x], accepted_types[x]) or is_default
+
+    check_const_args = {x: _param_checker(x, accepted_args_types, args_py_defaults) for x in args_names}
+    assert all(check_const_args.values()), \
+           f"""SDC read_csv can work with const args affecting column type inference only.
+               \tGiven param_types: {param_types}
+               \tCheck results: {check_const_args}"""
 
     # parameters should be constants when inferring DF type from a csv file
     py_filepath_or_buffer = filepath_or_buffer.literal_value
@@ -207,7 +219,7 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
         assert False, "sdc_internal_read_csv: parse_dates parameter must be literal"
 
     if isinstance(dtype, types.Tuple):
-        # dtype is a tuple of format ('A', A_dtype, 'B', B_dtype, ...)
+        # dtype is a tuple of format ('A', A_dtype, 'B', B_dtype, ...) after RewriteReadCsv
         keys = [k.literal_value for k in dtype[::2]]
         values = list(map(get_df_col_type_from_dtype, dtype[1::2]))
         py_dtype = dict(zip(keys, map(_get_py_col_dtype, values)))
@@ -222,6 +234,7 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
     else:
         assert False, f"Not supported dtype parameter received, with numba type: {dtype}"
 
+    # infer the resulting DF type as a numba type
     pandas_df_type = csv_reader_infer_nb_pandas_type(
         py_filepath_or_buffer, py_sep, py_delimiter, py_names, py_usecols, py_dtype, py_skiprows, py_parse_dates
     )
@@ -232,8 +245,19 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
     py_col_dtypes = {cname: _get_py_col_dtype(ctype) for cname, ctype in zip(col_names, col_types)}
     cat_columns_list = [name for name in col_names if isinstance(py_col_dtypes[name], pd.CategoricalDtype)]
 
-    use_user_converters = not (isinstance(converters, types.NoneType) or converters is None)
+    # need to re-order usecols as they appear in pandas_df_type in different order as in pyarrow table
+    if py_usecols is not None:
+        def _check_usecol_type(py_val, py_type):
+            return all([isinstance(x, py_type) for x in py_val])
 
+        if _check_usecol_type(py_usecols, str):
+            py_usecols = tuple([c for c in col_names if c in set(py_usecols)])
+        elif _check_usecol_type(py_usecols, int):
+            py_usecols = tuple(sorted(py_usecols))
+        else:
+            assert False, f"Unsupported usecols param value: {py_usecols}"
+
+    use_user_converters = not (isinstance(converters, types.NoneType) or converters is None)
     if not use_user_converters:
 
         def sdc_internal_read_csv_impl(filepath_or_buffer, sep, delimiter, names, usecols, dtype,
@@ -244,7 +268,7 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
                     sep=sep,
                     delimiter=delimiter,
                     names=names,
-                    usecols=usecols,
+                    usecols=py_usecols,
                     dtype=py_col_dtypes,
                     skiprows=skiprows,
                     parse_dates=parse_dates
@@ -256,7 +280,6 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
                 for cat_column_name in cat_columns_list:
                     df[cat_column_name] = df[cat_column_name].astype(py_col_dtypes[cat_column_name])
 
-            # decref_pyarrow_table(pa_table)
             return df
 
         return sdc_internal_read_csv_impl
@@ -272,8 +295,7 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
                                                           py_usecols,
                                                           py_col_dtypes,
                                                           py_skiprows,
-                                                          py_parse_dates
-        )
+                                                          py_parse_dates)
 
         n_cols = len(col_names)
         pa_table_type = PyarrowTableType()
@@ -299,7 +321,7 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
                     sep=sep,
                     delimiter=delimiter,
                     names=names,
-                    usecols=usecols,
+                    usecols=py_usecols,
                     dtype=py_col_dtypes,
                     skiprows=skiprows,
                     parse_dates=parse_dates
@@ -324,7 +346,7 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
                     maybe_unboxed_columns = tuple(ret_cols)
 
             arrow_table = arrow_reader_create_tableobj(arrow_table_type, pa_table)
-            # decref_pyarrow_table(pa_table)
+            decref_pyarrow_table(pa_table)
             converted_columns = apply_converters(arrow_table, converters)
             all_df_columns = combine_df_columns(maybe_unboxed_columns, converted_columns)
 

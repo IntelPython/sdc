@@ -183,7 +183,8 @@ def read_from_storage(typingctx, nbtype, ret):
                                          lir_ret_type)
             return builder.load(caster_ptr)
         else:
-            return ret_val
+            # currently this branch is used for StringViewType instance (thus incref is needed)
+            return impl_ret_borrowed(context, builder, ret_type, ret_val)
 
     return ret_type(nbtype, ret), codegen
 
@@ -222,8 +223,8 @@ def arrow_reader_get_table_cell_ovld(table, col_idx, row_idx, ret):
     if not isinstance(table, ArrowTableType):
         return None
 
-    # XXX: using literally erases the compilation-failure traces in error messages
-    # for debugging comment it out and use _internal implementation directly
+    # FIXME_Numba#7568: using literally erases the compilation-failure traces in error messages
+    # for debugging use else block only or use logging module with DEBUG
     if not isinstance(col_idx, types.IntegerLiteral):
 
         def arrow_reader_get_table_cell_impl(table, col_idx, row_idx, ret):
