@@ -31,17 +31,25 @@ import gc
 import glob
 import numpy as np
 import pandas as pd
-import platform
 import pyarrow.parquet as pq
 import re
-import sdc
 import unittest
 
-from sdc.str_arr_ext import StringArray
+from numba.tests.support import MemoryLeakMixin
+
+import sdc
+from sdc.str_arr_ext import StringArray, create_str_arr_from_list, getitem_str_offset, get_data_ptr_ind
 from sdc.str_ext import std_str_to_unicode, unicode_to_std_str
+from sdc.extensions.sdc_string_view_ext import (
+    string_view_create,
+    string_view_get_data_ptr,
+    string_view_set_data,
+    string_view_create_with_data,
+)
 from sdc.tests.gen_test_data import ParquetGenerator
 from sdc.tests.test_base import TestCase
 from sdc.tests.test_utils import skip_numba_jit
+from sdc.utilities.utils import get_ctypes_ptr
 
 
 class TestStrings(TestCase):
@@ -345,6 +353,157 @@ class TestStrings(TestCase):
         hpat_func = self.jit(test_impl)
 
         self.assertEqual(hpat_func(), test_impl())
+
+
+class TestStringView(MemoryLeakMixin, TestCase):
+
+    def _generate_test_func_for_method(self, func, check_func=None):
+
+        def test_impl(*args):
+            data = args[0]
+            str_view = string_view_create()
+            res = []
+            for x in data:
+                string_view_set_data(str_view, x._data, x._length)  # reset string view to point to data
+                res.append(func(str_view, *args[1:]))               # apply func to string view
+
+            expected = None if check_func is None else [check_func(x, *args[1:]) for x in data]
+            return res, expected
+
+        return self.jit(test_impl)
+
+    def _generate_get_ctor_params(self):
+
+        @self.jit
+        def get_ctor_params(str_arr, idx):
+            start_offset = getitem_str_offset(str_arr, idx)
+            data_ptr = get_ctypes_ptr(get_data_ptr_ind(str_arr, start_offset))
+            size = getitem_str_offset(str_arr, idx + 1) - start_offset
+            return data_ptr, size
+
+        return get_ctor_params
+
+    def test_string_view_get_data_ptr(self):
+
+        tested_method = self.jit(lambda x: string_view_get_data_ptr(x))
+        checkup_method = self.jit(lambda x: x._data)
+        sdc_func = self._generate_test_func_for_method(tested_method, checkup_method)
+
+        data_strs = ['abca', '123', '', ]
+        result, expected = sdc_func(data_strs)
+        self.assertEqual(result, expected)
+
+    def test_string_view_len(self):
+
+        tested_method = self.jit(lambda x: len(x))
+        sdc_func = self._generate_test_func_for_method(tested_method, tested_method)
+
+        data_strs = ['abca', '123', '', ]
+        result, expected = sdc_func(data_strs)
+        self.assertEqual(result, expected)
+
+    def test_string_view_toint(self):
+
+        tested_method = self.jit(lambda x: int(x))
+        sdc_func = self._generate_test_func_for_method(tested_method, tested_method)
+
+        data_strs = ['500', '11', '10000', ]
+        result, expected = sdc_func(data_strs)
+        self.assertEqual(result, expected)
+
+    def test_string_view_toint_param_base(self):
+
+        tested_method = self.jit(lambda x, base: int(x, base))
+        sdc_func = self._generate_test_func_for_method(tested_method, None)
+
+        data_strs = ['0x500', '0XA8', 'FFF', ]
+        result, _ = sdc_func(data_strs, 16)
+        # Numba cannot compile int(x, 16) for unicode data, so evaluate expected res here
+        expected = [tested_method.py_func(x, 16) for x in data_strs]
+        self.assertEqual(result, expected)
+
+    @skip_numba_jit("Numba memleak check is failed since impl raises exception")
+    def test_string_view_toint_negative(self):
+
+        tested_method = self.jit(lambda x, base: int(x, base))
+        sdc_func = self._generate_test_func_for_method(tested_method, None)
+
+        data_strs = ['F23G', 'FF A', '', ' C1']
+        for x in data_strs:
+            with self.subTest(x=x):
+                with self.assertRaises(ValueError) as raises:
+                    sdc_func([x, ], 16)
+                msg = 'invalid string for conversion with int()'
+                self.assertIn(msg, str(raises.exception))
+
+    def test_string_view_tofloat(self):
+
+        tested_method = self.jit(lambda x: float(x))
+        sdc_func = self._generate_test_func_for_method(tested_method, tested_method)
+
+        data_strs = ['0.500', '-1.001', '1.32E+10', '-5e-2']
+        result, expected = sdc_func(data_strs)
+        self.assertEqual(result, expected)
+
+    def test_string_view_tounicode(self):
+        get_str_view_data = self._generate_get_ctor_params()
+
+        def test_impl(x):
+            # make native encoded unicode string via StringArrayType
+            data_as_str_arr = create_str_arr_from_list([x, ])
+            data_ptr, size = get_str_view_data(data_as_str_arr, 0)
+
+            # actual test: create string view pointing to data and convert it back to unicode
+            str_view = string_view_create_with_data(data_ptr, size)
+            as_unicode = str(str_view)
+            check_equal = as_unicode == data_as_str_arr[0]  # for extending the lifetime of str_arr
+            return as_unicode, check_equal
+        sdc_func = self.jit(test_impl)
+
+        data_to_test = ['大处着眼', 'вавыа', '🐍⚡',  "dfad123/", ]
+        for data in data_to_test:
+            with self.subTest(data=data):
+                result = sdc_func(data)
+                self.assertEqual(result[0], data)
+                self.assertEqual(result[1], True)
+
+    def test_string_view_unicode_methods(self):
+        get_str_view_data = self._generate_get_ctor_params()
+
+        def reference_impl(x, meth_name, args):
+            func = getattr(x, meth_name)
+            return func(*args)
+
+        def gen_test_impl(self, meth_name):
+            from textwrap import dedent
+            test_impl_text = dedent(f"""
+                def test_impl(x, args):
+                    data_as_str_arr = create_str_arr_from_list([x, ])
+                    data_ptr, size = get_str_view_data(data_as_str_arr, 0)
+                    str_view = string_view_create_with_data(data_ptr, size)
+                    res = str_view.{meth_name}(*args)
+                    extra_use = len(data_as_str_arr)  # for extending the lifetime of str_arr
+                    return res, extra_use
+            """)
+
+            global_vars, local_vars = {'create_str_arr_from_list': create_str_arr_from_list,
+                                       'get_str_view_data': get_str_view_data,
+                                       'string_view_create_with_data': string_view_create_with_data}, {}
+            exec(test_impl_text, global_vars, local_vars)
+            test_impl = self.jit(local_vars['test_impl'])
+            return test_impl
+
+        tested_methods = ['find', 'count', 'split']
+        data_to_test = ['大处着眼', 'ва12выа', '🐍⚡',  "dfad123/", ]
+
+        call_args = ('12', )
+        for method in tested_methods:
+            test_impl = gen_test_impl(self, method)
+            for data in data_to_test:
+                with self.subTest(method=method, data=data):
+                    result_ref = reference_impl(data, method, call_args)
+                    result = test_impl(data, call_args)[0]
+                    self.assertEqual(result, result_ref)
 
 
 if __name__ == "__main__":
