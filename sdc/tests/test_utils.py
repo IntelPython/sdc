@@ -272,3 +272,10 @@ def _make_func_from_text(func_text, func_name='test_impl', global_vars={}):
     exec(func_text, global_vars, loc_vars)
     test_impl = loc_vars[func_name]
     return test_impl
+
+
+def assert_nbtype_for_varname(self, disp, var, expected_type, fn_sig=None):
+    fn_sig = fn_sig or disp.nopython_signatures[0]
+    cres = disp.get_compile_result(fn_sig)
+    fn_typemap = cres.type_annotation.typemap
+    self.assertIsInstance(fn_typemap[var], expected_type)

@@ -25,9 +25,14 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
+from textwrap import dedent
+
 from numba import types
-from numba.extending import (intrinsic, )
+from numba.extending import intrinsic
 from numba.core.typing.templates import (signature, )
+from numba.typed.dictobject import build_map
+
+from sdc.utilities.utils import sdc_overload
 
 
 @intrinsic
@@ -205,3 +210,84 @@ def sdc_tuple_unzip(typingctx, data_type):
         return context.make_tuple(builder, ret_type, [first_tup, second_tup])
 
     return ret_type(data_type), codegen
+
+
+def sdc_tuple_zip(x, y):
+    pass
+
+
+@sdc_overload(sdc_tuple_zip)
+def sdc_tuple_zip_ovld(x, y):
+    """ This function combines tuple of pairs from two input tuples x and y, preserving
+        literality of elements in them. """
+
+    if not (isinstance(x, types.BaseAnonymousTuple) and isinstance(y, types.BaseAnonymousTuple)):
+        return None
+
+    res_size = min(len(x), len(y))
+    func_impl_name = 'sdc_tuple_zip_impl'
+    tup_elements = ', '.join([f"(x[{i}], y[{i}])" for i in range(res_size)])
+    func_text = dedent(f"""
+    def {func_impl_name}(x, y):
+        return ({tup_elements}{',' if res_size else ''})
+    """)
+    use_globals, use_locals = {}, {}
+    exec(func_text, use_globals, use_locals)
+    return use_locals[func_impl_name]
+
+    # FIXME_Numba#6533: alternatively we could have used sdc_tuple_map_elementwise
+    # to avoid another use of exec, but due to @intrinsic-s not supporting
+    # prefer_literal option below implementation looses literaly of args!
+    # from sdc.functions.tuple_utils import sdc_tuple_map_elementwise
+    # def sdc_tuple_zip_impl(x, y):
+    #     return sdc_tuple_map_elementwise(
+    #         lambda a, b: (a, b),
+    #         x,
+    #         y
+    #     )
+    #
+    # return sdc_tuple_zip_impl
+
+
+@intrinsic
+def literal_dict_ctor(typingctx, items):
+
+    tup_size = len(items)
+    key_order = {p[0].literal_value: i for i, p in enumerate(items)}
+    ret_type = types.LiteralStrKeyDict(dict(items), key_order)
+
+    def codegen(context, builder, sig, args):
+        items_val = args[0]
+
+        # extract elements from the input tuple and repack into a list of variables required by build_map
+        repacked_items = []
+        for i in range(tup_size):
+            elem = builder.extract_value(items_val, i)
+            elem_first = builder.extract_value(elem, 0)
+            elem_second = builder.extract_value(elem, 1)
+            repacked_items.append((elem_first, elem_second))
+        d = build_map(context, builder, ret_type, items, repacked_items)
+        return d
+
+    return ret_type(items), codegen
+
+
+@sdc_overload(dict)
+def dict_from_tuples_ovld(x):
+
+    accepted_tuple_types = (types.Tuple, types.UniTuple)
+    if not isinstance(x, types.BaseAnonymousTuple):
+        return None
+
+    def check_tuple_element(ty):
+        return (isinstance(ty, accepted_tuple_types)
+                and len(ty) == 2
+                and isinstance(ty[0], types.StringLiteral))
+
+    # below checks that elements are tuples with size 2 and first element is literal string
+    if not (len(x) != 0 and all(map(check_tuple_element, x))):
+        assert False, f"Creating LiteralStrKeyDict not supported from pairs of: {x}"
+
+    def dict_from_tuples_impl(x):
+        return literal_dict_ctor(x)
+    return dict_from_tuples_impl

@@ -30,7 +30,10 @@ import numpy as np
 import pandas as pd
 import random
 import unittest
+from itertools import product
+
 from numba import types
+from numba.tests.support import MemoryLeakMixin
 
 import sdc
 from sdc.tests.test_base import TestCase
@@ -43,7 +46,8 @@ from sdc.tests.test_utils import (check_numba_version,
                                   dist_IR_contains,
                                   get_rank,
                                   get_start_end,
-                                  skip_numba_jit)
+                                  skip_numba_jit,
+                                  assert_nbtype_for_varname)
 
 
 def get_np_state_ptr():
@@ -538,6 +542,48 @@ class TestBasic(BaseTest):
         for arr_len in [15, 23, 26]:
             A, B, _ = hpat_func3(arr_len)
             np.testing.assert_allclose(A, B)
+
+
+class TestPython(MemoryLeakMixin, TestCase):
+
+    def test_literal_dict_ctor(self):
+        """ Verifies that dict builtin creates LiteralStrKeyDict from tuple
+            of pairs ('col_name_i', col_data_i), where col_name_i is literal string """
+
+        def test_impl_1():
+            items = (('A', np.arange(11)), )
+            res = dict(items)
+            return len(res)
+
+        def test_impl_2():
+            items = (('A', np.arange(5)), ('B', np.ones(11)), )
+            res = dict(items)
+            return len(res)
+
+        local_vars = locals()
+        list_tested_fns = [local_vars[k] for k in local_vars.keys() if k.startswith('test_impl')]
+
+        for test_impl in list_tested_fns:
+            with self.subTest(tested_func_name=test_impl.__name__):
+                sdc_func = self.jit(test_impl)
+                self.assertEqual(sdc_func(), test_impl())
+                assert_nbtype_for_varname(self, sdc_func, 'res', types.LiteralStrKeyDict)
+
+    def test_dict_zip_rewrite(self):
+        """ Verifies that a compination of dict(zip()) creates LiteralStrKeyDict when
+            zip is applied to tuples of literal column names and columns data """
+
+        dict_keys = ('A', 'B')
+        dict_values = (np.ones(5), np.array([1, 2, 3]))
+
+        def test_impl():
+            res = dict(zip(dict_keys, dict_values))
+            return len(res)
+
+        sdc_func = self.jit(test_impl)
+        expected = len(dict(zip(dict_keys, dict_values)))
+        self.assertEqual(sdc_func(), expected)
+        assert_nbtype_for_varname(self, sdc_func, 'res', types.LiteralStrKeyDict)
 
 
 if __name__ == "__main__":
