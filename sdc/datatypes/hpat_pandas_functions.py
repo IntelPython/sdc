@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Copyright (c) 2020, Intel Corporation All rights reserved.
+# Copyright (c) 2019-2021, Intel Corporation All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -32,298 +32,331 @@ import pandas as pd
 import numpy as np
 
 import numba
-from numba import types
+from numba import types, objmode, literally
 from numba.np import numpy_support
 from numba.core.errors import TypingError
 from numba.extending import overload
 
 from sdc.io.csv_ext import (
-    _gen_csv_reader_py_pyarrow_py_func,
-    _gen_pandas_read_csv_func_text,
+    do_read_csv,
+    csv_reader_infer_nb_arrow_type,
+    csv_reader_infer_nb_pandas_type,
 )
 from sdc.str_arr_ext import string_array_type
-
-from sdc.hiframes import join, aggregate, sort
 from sdc.types import CategoricalDtypeType, Categorical
 from sdc.datatypes.categorical.pdimpl import _reconstruct_CategoricalDtype
+from sdc.utilities.utils import sdc_overload
+from sdc.utilities.sdc_typing_utils import has_python_value
+from sdc.extensions.sdc_arrow_table_type import PyarrowTableType
+from sdc.extensions.sdc_arrow_table_ext import (
+    arrow_reader_create_tableobj,
+    apply_converters,
+    combine_df_columns,
+    create_df_from_columns,
+    decref_pyarrow_table,
+)
 
 
-def get_numba_array_types_for_csv(df):
-    """Extracts Numba array types from the given DataFrame."""
-    result = []
-    for numpy_type in df.dtypes.values:
-        try:
-            numba_type = numpy_support.from_dtype(numpy_type)
-        except NotImplementedError:
-            numba_type = None
-
-        if numba_type and numba_type != types.pyobject:
-            array_type = types.Array(numba_type, 1, 'C')
+def get_df_col_type_from_dtype(dtype):
+    if isinstance(dtype, types.Function):
+        if dtype.typing_key == int:
+            return types.Array(types.int_, 1, 'C')
+        elif dtype.typing_key == float:
+            return types.Array(types.float64, 1, 'C')
+        elif dtype.typing_key == str:
+            return string_array_type
         else:
-            # default type for CSV is string
-            array_type = string_array_type
+            assert False, f"map_dtype_to_col_type: failing to infer column type for dtype={dtype}"
 
-        result.append(array_type)
-    return result
+    if isinstance(dtype, types.StringLiteral):
+        if dtype.literal_value == 'str':
+            return string_array_type
+        else:
+            return types.Array(numba.from_dtype(np.dtype(dtype.literal_value)), 1, 'C')
 
+    if isinstance(dtype, types.NumberClass):
+        return types.Array(dtype.dtype, 1, 'C')
 
-def infer_column_names_and_types_from_constant_filename(fname_const, delimiter, names, usecols, skiprows):
-    rows_to_read = 100  # TODO: tune this
-    df = pd.read_csv(fname_const, delimiter=delimiter, names=names,
-                     usecols=usecols, skiprows=skiprows, nrows=rows_to_read)
-    # TODO: string_array, categorical, etc.
-    col_names = df.columns.to_list()
-    col_typs = get_numba_array_types_for_csv(df)
-    return col_names, col_typs
+    if isinstance(dtype, CategoricalDtypeType):
+        return Categorical(dtype)
 
 
-@overload(pd.read_csv)
-def sdc_pandas_read_csv(
-    filepath_or_buffer,
-    sep=',',
-    delimiter=None,
-    # Column and Index Locations and Names
-    header="infer",
-    names=None,
-    index_col=None,
-    usecols=None,
-    squeeze=False,
-    prefix=None,
-    mangle_dupe_cols=True,
-    # General Parsing Configuration
-    dtype=None,
-    engine=None,
-    converters=None,
-    true_values=None,
-    false_values=None,
-    skipinitialspace=False,
-    skiprows=None,
-    skipfooter=0,
-    nrows=None,
-    # NA and Missing Data Handling
-    na_values=None,
-    keep_default_na=True,
-    na_filter=True,
-    verbose=False,
-    skip_blank_lines=True,
-    # Datetime Handling
-    parse_dates=False,
-    infer_datetime_format=False,
-    keep_date_col=False,
-    date_parser=None,
-    dayfirst=False,
-    cache_dates=True,
-    # Iteration
-    iterator=False,
-    chunksize=None,
-    # Quoting, Compression, and File Format
-    compression="infer",
-    thousands=None,
-    decimal=b".",
-    lineterminator=None,
-    quotechar='"',
-    # quoting=csv.QUOTE_MINIMAL,  # not supported
-    doublequote=True,
-    escapechar=None,
-    comment=None,
-    encoding=None,
-    dialect=None,
-    # Error Handling
-    error_bad_lines=True,
-    warn_bad_lines=True,
-    # Internal
-    delim_whitespace=False,
+def _get_py_col_dtype(ctype):
+    """ Re-creates column dtype as python type to be used in read_csv call """
+    dtype = ctype.dtype
+    if ctype == string_array_type:
+        return 'str'
+    if isinstance(ctype, Categorical):
+        return _reconstruct_CategoricalDtype(ctype.pd_dtype)
+    return numpy_support.as_dtype(dtype)
+
+
+def get_nbtype_literal_values(nbtype):
+    assert all(isinstance(x, types.Literal) for x in nbtype), \
+           f"Attempt to unliteral values of {nbtype} failed"
+
+    return [x.literal_value for x in nbtype]
+
+
+@sdc_overload(pd.read_csv)
+def sdc_pandas_read_csv_ovld(
+    filepath_or_buffer, sep=',', delimiter=None, header="infer", names=None, index_col=None,
+    usecols=None, squeeze=False, prefix=None, mangle_dupe_cols=True, dtype=None, engine=None,
+    converters=None, true_values=None, false_values=None, skipinitialspace=False, skiprows=None,
+    skipfooter=0, nrows=None, na_values=None, keep_default_na=True, na_filter=True, verbose=False,
+    skip_blank_lines=True, parse_dates=False, infer_datetime_format=False, keep_date_col=False,
+    date_parser=None, dayfirst=False, cache_dates=True, iterator=False, chunksize=None, compression="infer",
+    thousands=None, decimal=b".", lineterminator=None, quotechar='"', doublequote=True, escapechar=None,
+    comment=None, encoding=None, dialect=None, error_bad_lines=True, warn_bad_lines=True, delim_whitespace=False,
     # low_memory=_c_parser_defaults["low_memory"],  # not supported
-    memory_map=False,
-    float_precision=None,
+    memory_map=False, float_precision=None,
 ):
-    signature = """
-        filepath_or_buffer,
-        sep=',',
-        delimiter=None,
-        # Column and Index Locations and Names
-        header="infer",
-        names=None,
-        index_col=None,
-        usecols=None,
-        squeeze=False,
-        prefix=None,
-        mangle_dupe_cols=True,
-        # General Parsing Configuration
-        dtype=None,
-        engine=None,
-        converters=None,
-        true_values=None,
-        false_values=None,
-        skipinitialspace=False,
-        skiprows=None,
-        skipfooter=0,
-        nrows=None,
-        # NA and Missing Data Handling
-        na_values=None,
-        keep_default_na=True,
-        na_filter=True,
-        verbose=False,
-        skip_blank_lines=True,
-        # Datetime Handling
-        parse_dates=False,
-        infer_datetime_format=False,
-        keep_date_col=False,
-        date_parser=None,
-        dayfirst=False,
-        cache_dates=True,
-        # Iteration
-        iterator=False,
-        chunksize=None,
-        # Quoting, Compression, and File Format
-        compression="infer",
-        thousands=None,
-        decimal=b".",
-        lineterminator=None,
-        quotechar='"',
-        # quoting=csv.QUOTE_MINIMAL,  # not supported
-        doublequote=True,
-        escapechar=None,
-        comment=None,
-        encoding=None,
-        dialect=None,
-        # Error Handling
-        error_bad_lines=True,
-        warn_bad_lines=True,
-        # Internal
-        delim_whitespace=False,
+
+    # this overload is for inferencing from constant filename only, inferencing from params is TBD
+    def sdc_pandas_read_csv_impl(
+        filepath_or_buffer, sep=',', delimiter=None, header="infer", names=None, index_col=None,
+        usecols=None, squeeze=False, prefix=None, mangle_dupe_cols=True, dtype=None, engine=None,
+        converters=None, true_values=None, false_values=None, skipinitialspace=False, skiprows=None,
+        skipfooter=0, nrows=None, na_values=None, keep_default_na=True, na_filter=True, verbose=False,
+        skip_blank_lines=True, parse_dates=False, infer_datetime_format=False, keep_date_col=False,
+        date_parser=None, dayfirst=False, cache_dates=True, iterator=False, chunksize=None, compression="infer",
+        thousands=None, decimal=b".", lineterminator=None, quotechar='"', doublequote=True, escapechar=None,
+        comment=None, encoding=None, dialect=None, error_bad_lines=True, warn_bad_lines=True, delim_whitespace=False,
         # low_memory=_c_parser_defaults["low_memory"],  # not supported
-        memory_map=False,
-        float_precision=None,
-    """
+        memory_map=False, float_precision=None,
+    ):
+        # this forwards to the overload that accepts supported arguments only
+        return sdc_internal_read_csv(filepath_or_buffer,
+                                     sep=sep,
+                                     delimiter=delimiter,
+                                     names=names,
+                                     usecols=usecols,
+                                     dtype=dtype,
+                                     converters=converters,
+                                     skiprows=skiprows,
+                                     parse_dates=parse_dates)
 
-    # read_csv can infer result DataFrame type from file or from params
+    return sdc_pandas_read_csv_impl
 
-    # for inferring from file this parameters should be literal or omitted
-    infer_from_file = all([
-        isinstance(filepath_or_buffer, types.Literal),
-        isinstance(sep, (types.Literal, types.Omitted)) or sep == ',',
-        isinstance(delimiter, (types.Literal, types.Omitted)) or delimiter is None,
-        isinstance(names, (types.Tuple, types.Omitted, type(None))),
-        isinstance(usecols, (types.Tuple, types.Omitted, type(None))),
-        isinstance(skiprows, (types.Literal, types.Omitted)) or skiprows is None,
-    ])
 
-    # for inference from params dtype and (names or usecols) shoud present
-    # names, dtype and usecols should be literal tuples after rewrite pass (see. RewriteReadCsv)
-    # header not supported
-    infer_from_params = all([
-        isinstance(dtype, types.Tuple),
-        any([
-            isinstance(names, types.Tuple) and isinstance(usecols, types.Tuple),
-            isinstance(names, types.Tuple) and isinstance(usecols, (types.Omitted, type(None))),
-            isinstance(names, (types.Omitted, type(None))) and isinstance(usecols, types.Tuple),
-        ]),
-        isinstance(header, types.Omitted) or header == 'infer',
-    ])
+def read_csv_via_pyarrow():
+    pass
 
-    # cannot create function if parameters provide not enough info
-    if not any([infer_from_file, infer_from_params]):
-        msg = "Cannot infer resulting DataFrame from constant file or parameters."
-        raise TypingError(msg)
 
-    if infer_from_file:
-        # parameters should be constants and are important only for inference from file
+def sdc_internal_read_csv(filepath_or_buffer, sep, delimiter, names, usecols, dtype,
+                          converters, skiprows, parse_dates):
+    pass
 
-        if isinstance(filepath_or_buffer, types.Literal):
-            filepath_or_buffer = filepath_or_buffer.literal_value
 
-        if isinstance(sep, types.Literal):
-            sep = sep.literal_value
+@overload(sdc_internal_read_csv, prefer_literal=True)
+def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecols, dtype,
+                               converters, skiprows, parse_dates):
 
-        if isinstance(delimiter, types.Literal):
-            delimiter = delimiter.literal_value
+    # print("Typing sdc_internal_read_csv, args:\n\t",
+    #       filepath_or_buffer, sep, delimiter, names, usecols, dtype, converters, skiprows, parse_dates)
 
-        # Alias sep -> delimiter.
-        if delimiter is None:
-            delimiter = sep
+    if not isinstance(filepath_or_buffer, types.Literal):
+        def sdc_internal_read_csv_impl(filepath_or_buffer, sep, delimiter, names, usecols, dtype,
+                                       converters, skiprows, parse_dates):
+            return literally(filepath_or_buffer)
 
-        if isinstance(skiprows, types.Literal):
-            skiprows = skiprows.literal_value
+        return sdc_internal_read_csv_impl
 
-    # names and usecols influence on both inferencing from file and from params
-    if isinstance(names, types.Tuple):
-        assert all(isinstance(name, types.Literal) for name in names)
-        names = [name.literal_value for name in names]
+    accepted_args_types = {
+        'filepath_or_buffer': (types.StringLiteral, ),
+        'sep': (types.StringLiteral, types.Omitted),
+        'delimiter': (types.StringLiteral, types.NoneType, types.Omitted),
+        'names': (types.BaseAnonymousTuple, types.NoneType, types.Omitted),
+        'usecols': (types.BaseAnonymousTuple, types.NoneType, types.Omitted),
+        'skiprows': (types.IntegerLiteral, types.NoneType, types.Omitted),
+        'parse_dates': (types.BaseAnonymousTuple, types.BooleanLiteral, types.Omitted),
+        'converters': (types.LiteralStrKeyDict, types.NoneType, types.Omitted)
+    }
 
-    if isinstance(usecols, types.Tuple):
-        assert all(isinstance(col, types.Literal) for col in usecols)
-        usecols = [col.literal_value for col in usecols]
+    args_names = accepted_args_types.keys()
+    args_py_defaults = dict.fromkeys(args_names, None)
+    args_py_defaults.pop('filepath_or_buffer')  # no default value
+    args_py_defaults.update({'sep': ',', 'parse_dates': False})
 
-    if infer_from_params:
-        # dtype is a tuple of format ('A', A_dtype, 'B', B_dtype, ...)
-        # where column names should be constants and is important only for inference from params
-        if isinstance(dtype, types.Tuple):
-            assert all(isinstance(key, types.StringLiteral) for key in dtype[::2])
-            keys = (k.literal_value for k in dtype[::2])
-            values = dtype[1::2]
+    param_types = locals()
+    param_types = {k: v for k, v in param_types.items() if k in args_names}
 
-            def _get_df_col_type(dtype):
-                if isinstance(dtype, types.Function):
-                    if dtype.typing_key == int:
-                        return types.Array(types.int_, 1, 'C')
-                    elif dtype.typing_key == float:
-                        return types.Array(types.float64, 1, 'C')
-                    elif dtype.typing_key == str:
-                        return string_array_type
-                    else:
-                        assert False, f"map_dtype_to_col_type: failing to infer column type for dtype={dtype}"
+    def _param_checker(x, accepted_types, defaults):
+        is_default = has_python_value(x, defaults[x]) if x in defaults else False
+        return isinstance(param_types[x], accepted_types[x]) or is_default
 
-                if isinstance(dtype, types.StringLiteral):
-                    if dtype.literal_value == 'str':
-                        return string_array_type
-                    else:
-                        return types.Array(numba.from_dtype(np.dtype(dtype.literal_value)), 1, 'C')
+    check_const_args = {x: _param_checker(x, accepted_args_types, args_py_defaults) for x in args_names}
+    assert all(check_const_args.values()), \
+           f"""SDC read_csv can work with const args affecting column type inference only.
+               \tGiven param_types: {param_types}
+               \tCheck results: {check_const_args}"""
 
-                if isinstance(dtype, types.NumberClass):
-                    return types.Array(dtype.dtype, 1, 'C')
+    # parameters should be constants when inferring DF type from a csv file
+    py_filepath_or_buffer = filepath_or_buffer.literal_value
 
-                if isinstance(dtype, CategoricalDtypeType):
-                    return Categorical(dtype)
-
-            col_types_map = dict(zip(keys, map(_get_df_col_type, values)))
-
-    # in case of both are available
-    # inferencing from params has priority over inferencing from file
-    if infer_from_params:
-        # all names should be in dtype
-        col_names = usecols if usecols else names
-        col_types = [col_types_map[n] for n in col_names]
-
-    elif infer_from_file:
-        col_names, col_types = infer_column_names_and_types_from_constant_filename(
-            filepath_or_buffer, delimiter, names, usecols, skiprows)
-
+    if (isinstance(names, (types.Omitted, types.NoneType)) or names is None):
+        py_names = None
     else:
-        return None
+        py_names = get_nbtype_literal_values(names)
 
-    def _get_py_col_dtype(ctype):
-        """ Re-creates column dtype as python type to be used in read_csv call """
-        dtype = ctype.dtype
-        if ctype == string_array_type:
-            return str
-        if isinstance(ctype, Categorical):
-            return _reconstruct_CategoricalDtype(ctype.pd_dtype)
-        return numpy_support.as_dtype(dtype)
+    if (isinstance(usecols, (types.Omitted, types.NoneType)) or usecols is None):
+        py_usecols = None
+    else:
+        py_usecols = get_nbtype_literal_values(usecols)
+
+    py_sep = sep.literal_value if isinstance(sep, types.Literal) else sep == ','
+    py_delimiter = delimiter.literal_value if isinstance(delimiter, types.Literal) else None
+
+    if py_delimiter is None:
+        py_delimiter = py_sep
+    py_skiprows = skiprows.literal_value if isinstance(skiprows, types.Literal) else None
+
+    if isinstance(parse_dates, types.Literal):
+        py_parse_dates = parse_dates.literal_value
+    elif isinstance(parse_dates, types.BaseAnonymousTuple):
+        py_parse_dates = get_nbtype_literal_values(parse_dates)
+    else:
+        assert False, "sdc_internal_read_csv: parse_dates parameter must be literal"
+
+    if isinstance(dtype, types.Tuple):
+        # dtype is a tuple of format ('A', A_dtype, 'B', B_dtype, ...) after RewriteReadCsv
+        keys = [k.literal_value for k in dtype[::2]]
+        values = list(map(get_df_col_type_from_dtype, dtype[1::2]))
+        py_dtype = dict(zip(keys, map(_get_py_col_dtype, values)))
+    elif isinstance(dtype, types.LiteralStrKeyDict):
+        keys = dtype.fields
+        values = list(map(get_df_col_type_from_dtype, dtype.types))
+        py_dtype = dict(zip(keys, map(_get_py_col_dtype, values)))
+    elif isinstance(dtype, types.NoneType) or dtype is None:
+        py_dtype = None
+    elif isinstance(dtype, types.NumberClass):
+        py_dtype = dtype.key.key
+    else:
+        assert False, f"Not supported dtype parameter received, with numba type: {dtype}"
+
+    # infer the resulting DF type as a numba type
+    pandas_df_type = csv_reader_infer_nb_pandas_type(
+        py_filepath_or_buffer, py_sep, py_delimiter, py_names, py_usecols, py_dtype, py_skiprows, py_parse_dates
+    )
+
+    col_names = pandas_df_type.columns
+    col_types = pandas_df_type.data
 
     py_col_dtypes = {cname: _get_py_col_dtype(ctype) for cname, ctype in zip(col_names, col_types)}
+    cat_columns_list = [name for name in col_names if isinstance(py_col_dtypes[name], pd.CategoricalDtype)]
 
-    # generate function text with signature and returning DataFrame
-    func_text, func_name, global_vars = _gen_pandas_read_csv_func_text(
-        col_names, col_types, py_col_dtypes, usecols, signature)
+    # need to re-order usecols as they appear in pandas_df_type in different order as in pyarrow table
+    if py_usecols is not None:
+        def _check_usecol_type(py_val, py_type):
+            return all([isinstance(x, py_type) for x in py_val])
 
-    # compile with Python
-    csv_reader_py = _gen_csv_reader_py_pyarrow_py_func(func_text, func_name, global_vars)
+        if _check_usecol_type(py_usecols, str):
+            py_usecols = tuple([c for c in col_names if c in set(py_usecols)])
+        elif _check_usecol_type(py_usecols, int):
+            py_usecols = tuple(sorted(py_usecols))
+        else:
+            assert False, f"Unsupported usecols param value: {py_usecols}"
 
-    return csv_reader_py
+    use_user_converters = not (isinstance(converters, types.NoneType) or converters is None)
+    if not use_user_converters:
+
+        def sdc_internal_read_csv_impl(filepath_or_buffer, sep, delimiter, names, usecols, dtype,
+                                       converters, skiprows, parse_dates):
+            with objmode(df=pandas_df_type):
+                pa_table = do_read_csv(
+                    filepath_or_buffer,
+                    sep=sep,
+                    delimiter=delimiter,
+                    names=names,
+                    usecols=py_usecols,
+                    dtype=py_col_dtypes,
+                    skiprows=skiprows,
+                    parse_dates=parse_dates
+                )
+
+                df = pa_table.rename_columns(col_names).to_pandas(categories=cat_columns_list)
+
+                # fix when PyArrow will support predicted categories
+                for cat_column_name in cat_columns_list:
+                    df[cat_column_name] = df[cat_column_name].astype(py_col_dtypes[cat_column_name])
+
+            return df
+
+        return sdc_internal_read_csv_impl
+
+    else:
+
+        converterted_cols = set(converters.fields)
+        py_col_dtypes.update(dict.fromkeys(converterted_cols, 'str'))
+        arrow_table_type = csv_reader_infer_nb_arrow_type(py_filepath_or_buffer,
+                                                          py_sep,
+                                                          py_delimiter,
+                                                          py_names,
+                                                          py_usecols,
+                                                          py_col_dtypes,
+                                                          py_skiprows,
+                                                          py_parse_dates)
+
+        n_cols = len(col_names)
+        pa_table_type = PyarrowTableType()
+        non_converted_cols_ids = [i for i in range(n_cols) if col_names[i] not in converterted_cols]
+
+        all_columns_converted = set(col_names) == converterted_cols
+        if all_columns_converted:
+            objmode_ret_column = types.none
+        else:
+            objmode_ret_tup_types = []
+            for i, name in enumerate(col_names):
+                if name in converterted_cols:
+                    objmode_ret_tup_types.append(types.none)
+                else:
+                    objmode_ret_tup_types.append(pandas_df_type.get_series_type(i))
+            objmode_ret_column = types.Tuple.from_types(objmode_ret_tup_types)
+
+        def sdc_internal_read_csv_impl(filepath_or_buffer, sep, delimiter, names, usecols, dtype,
+                                       converters, skiprows, parse_dates):
+            with objmode(pa_table=pa_table_type, maybe_unboxed_columns=objmode_ret_column):
+                pa_table = do_read_csv(
+                    filepath_or_buffer,
+                    sep=sep,
+                    delimiter=delimiter,
+                    names=names,
+                    usecols=py_usecols,
+                    dtype=py_col_dtypes,
+                    skiprows=skiprows,
+                    parse_dates=parse_dates
+                )
+
+                pa_table = pa_table.rename_columns(col_names)
+
+                if all_columns_converted:
+                    maybe_unboxed_columns = None
+                else:
+                    # if converters are not applied to some columns, convert them to pandas series
+                    # using pyarrow API calls and return from objmode in a tuple of all DF columns
+                    # where they reside at corresponding positions and other elements are None-s
+                    ret_cols = [None] * n_cols
+                    for i in non_converted_cols_ids:
+                        col_as_series = pa_table.column(col_names[i]).to_pandas(categories=cat_columns_list)
+                        # fix when PyArrow will support predicted categories
+                        if isinstance(col_as_series, pd.CategoricalDtype):
+                            col_as_series = col_as_series.astype(py_col_dtypes[col_names[i]])
+                        ret_cols[i] = col_as_series
+
+                    maybe_unboxed_columns = tuple(ret_cols)
+
+            arrow_table = arrow_reader_create_tableobj(arrow_table_type, pa_table)
+            decref_pyarrow_table(pa_table)
+            converted_columns = apply_converters(arrow_table, converters)
+            all_df_columns = combine_df_columns(maybe_unboxed_columns, converted_columns)
+
+            res_df = create_df_from_columns(col_names, all_df_columns)
+            return res_df
+
+        return sdc_internal_read_csv_impl
 
 
-sdc_pandas_read_csv.__doc__ = r"""
+sdc_pandas_read_csv_ovld.__doc__ = r"""
     Intel Scalable Dataframe Compiler User Guide
     ********************************************
 

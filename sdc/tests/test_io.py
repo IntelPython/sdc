@@ -35,16 +35,8 @@ from numba.core.config import IS_32BITS
 from pandas import CategoricalDtype
 
 import sdc
-from sdc.io.csv_ext import pandas_read_csv as pd_read_csv
 from sdc.tests.test_base import TestCase
-from sdc.tests.test_utils import (count_array_OneDs,
-                                  count_array_REPs,
-                                  count_parfor_OneDs,
-                                  count_parfor_REPs,
-                                  dist_IR_contains,
-                                  get_rank,
-                                  get_start_end,
-                                  skip_numba_jit)
+from sdc.tests.test_utils import skip_numba_jit
 
 
 kde_file = 'kde.parquet'
@@ -53,29 +45,6 @@ kde_file = 'kde.parquet'
 class TestIO(TestCase):
 
     def setUp(self):
-        if get_rank() == 0:
-            # test_csv_cat1
-            data = ("2,B,SA\n"
-                    "3,A,SBC\n"
-                    "4,C,S123\n"
-                    "5,B,BCD\n")
-
-            with open("csv_data_cat1.csv", "w") as f:
-                f.write(data)
-
-            # test_csv_single_dtype1
-            data = ("2,4.1\n"
-                    "3,3.4\n"
-                    "4,1.3\n"
-                    "5,1.1\n")
-
-            with open("csv_data_dtype1.csv", "w") as f:
-                f.write(data)
-
-            # test_np_io1
-            n = 111
-            A = np.random.ranf(n)
-            A.tofile("np_file1.dat")
         super(TestIO, self).setUp()
 
 
@@ -232,48 +201,6 @@ class TestParquet(TestIO):
 
 class TestCSV(TestIO):
 
-    def test_pyarrow(self):
-        tests = [
-            "csv_keys1",
-            "csv_const_dtype1",
-            "csv_infer_file_default",
-            "csv_infer_file_sep",
-            "csv_infer_file_delimiter",
-            "csv_infer_file_names",
-            "csv_infer_parallel1",
-            "csv_skip1",
-            "csv_infer_skip1",
-            "csv_infer_skip_parallel1",
-            "csv_rm_dead1",
-            "csv_date1",
-            "csv_str1",
-            "csv_parallel1",
-            "csv_str_parallel1",
-            "csv_usecols1",
-            # "csv_cat1",
-            # "csv_cat2",
-            # "csv_single_dtype1",
-        ]
-        for test in tests:
-            with self.subTest(test=test):
-                test = getattr(self, f"pd_{test}")
-                pd_val = test(use_pyarrow=False)()
-                pa_val = test(use_pyarrow=True)()
-                if isinstance(pd_val, pd.Series):
-                    pd.testing.assert_series_equal(pa_val, pd_val,
-                        check_categorical=False
-                    )
-                elif isinstance(pd_val, pd.DataFrame):
-                    pd.testing.assert_frame_equal(pa_val, pd_val,
-                        check_categorical=False
-                    )
-                elif isinstance(pd_val, np.ndarray):
-                    np.testing.assert_array_equal(pa_val, pd_val)
-                elif isinstance(pd_val, tuple):
-                    self.assertEqual(pa_val, pd_val)
-                else:
-                    self.fail(f"Unknown Pandas type: {type(pd_val)}")
-
     def _int_type(self):
         # TODO: w/a for Numba issue with int typing rules infering intp for integers literals
         # unlike NumPy which uses int32 by default - causes dtype mismatch on Windows 64 bit
@@ -285,444 +212,487 @@ class TestCSV(TestIO):
     def _int_type_str(self):
         return np.dtype(self._int_type()).name
 
-    def _read_csv(self, use_pyarrow=False):
-        return pd_read_csv if use_pyarrow else pd.read_csv
+    def get_int_converter(self):
 
-    # inference errors
+        @self.jit
+        def to_int_and_inc(x):
+            return int(x) + 1
+        return to_int_and_inc
 
-    def test_csv_infer_error(self):
-        read_csv = self._read_csv()
+    def get_float_converter(self):
 
-        def pyfunc(fname):
-            return read_csv(fname)
+        @self.jit
+        def to_float_and_dec(x):
+            return float(x) - 1
+        return to_float_and_dec
 
-        cfunc = self.jit(pyfunc)
+    def get_str_converter(self):
 
-        with self.assertRaises(numba.core.errors.TypingError) as cm:
-            cfunc("csv_data1.csv")
-
-        self.assertIn("Cannot infer resulting DataFrame", cm.exception.msg)
-
-    # inference from parameters
-
-    def test_csv_infer_params_default(self):
-        read_csv = self._read_csv()
-        int_type = self._int_type()
-
-        def pyfunc(fname):
-            names = ['A', 'B', 'C', 'D']
-            dtype = {'A': int_type, 'B': np.float, 'C': 'float', 'D': str}
-            return read_csv(fname, names=names, dtype=dtype)
-
-        cfunc = self.jit(pyfunc)
-
-        for fname in ["csv_data1.csv", "csv_data2.csv"]:
-            with self.subTest(fname=fname):
-                pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
-
-    def test_csv_infer_params_usecols_names(self):
-        read_csv = self._read_csv()
-        int_type = self._int_type()
-
-        def pyfunc(fname):
-            names = ['A', 'B', 'C', 'D']
-            dtype = {'A': int_type, 'B': np.float, 'C': np.float, 'D': str}
-            usecols = ['B', 'D']
-            return read_csv(fname, names=names, dtype=dtype, usecols=usecols)
-
-        fname = "csv_data1.csv"
-        cfunc = self.jit(pyfunc)
-        pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
-
-    def test_csv_infer_params_usecols_no_names(self):
-        read_csv = self._read_csv()
-        int_type = self._int_type()
-
-        def pyfunc(fname):
-            dtype = {'B': np.float, 'D': str}
-            usecols = ['B', 'D']
-            return read_csv(fname, dtype=dtype, usecols=usecols)
-
-        fname = "csv_data_infer1.csv"
-        cfunc = self.jit(pyfunc)
-        pd.testing.assert_frame_equal(cfunc(fname), pyfunc(fname))
-
-    def pd_csv_keys1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
-        int_type = self._int_type()
-
-        def test_impl():
-            dtype = {'A': int_type, 'B': np.float, 'C': np.float, 'D': str}
-            return read_csv("csv_data1.csv",
-                            names=dtype.keys(),
-                            dtype=dtype,
-                            )
-
-        return test_impl
-
-    @skip_numba_jit
-    def test_csv_keys1(self):
-        test_impl = self.pd_csv_keys1()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
-
-    def pd_csv_const_dtype1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
-        int_type = self._int_type_str()
-
-        def test_impl():
-            dtype = {'A': int_type, 'B': 'float64', 'C': 'float', 'D': 'str'}
-            return read_csv("csv_data1.csv",
-                            names=dtype.keys(),
-                            dtype=dtype,
-                            )
-
-        return test_impl
-
-    @skip_numba_jit
-    def test_csv_const_dtype1(self):
-        test_impl = self.pd_csv_const_dtype1()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
-
-    # inference from file
-
-    def pd_csv_infer_file_default(self, file_name="csv_data_infer1.csv", use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
-
-        def test_impl():
-            return read_csv(file_name)
-
-        return test_impl
+        @self.jit
+        def str_len(x):
+            return len(x)
+        return str_len
 
     def test_csv_infer_file_default(self):
-        def test(file_name):
-            test_impl = self.pd_csv_infer_file_default(file_name)
-            hpat_func = self.jit(test_impl)
-            pd.testing.assert_frame_equal(hpat_func(), test_impl())
+        """Test verifies basic usage of pandas read_csv when DF type is inferred from const filename"""
+
+        def test_impl(file_name):
+            return pd.read_csv(file_name)
+        sdc_func = self.jit(test_impl)
 
         for file_name in ["csv_data_infer1.csv", "csv_data_infer_no_column_name.csv"]:
             with self.subTest(file_name=file_name):
-                test(file_name)
+                pd.testing.assert_frame_equal(sdc_func(file_name), test_impl(file_name))
 
-    def pd_csv_infer_file_sep(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
-
-        def test_impl():
-            return read_csv("csv_data_infer_sep.csv", sep=';')
-
-        return test_impl
-
-    def test_csv_infer_file_sep(self):
-        test_impl = self.pd_csv_infer_file_sep()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
-
-    def pd_csv_infer_file_delimiter(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+    def test_csv_infer_file_param_sep(self):
+        """Test verifies pandas read_csv impl supports parameter sep (DF type inference from const file name)"""
 
         def test_impl():
-            return read_csv("csv_data_infer_sep.csv", delimiter=';')
+            return pd.read_csv("csv_data_infer_sep.csv", sep=';')
+        sdc_func = self.jit(test_impl)
 
-        return test_impl
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-    def test_csv_infer_file_delimiter(self):
-        test_impl = self.pd_csv_infer_file_delimiter()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
-
-    def pd_csv_infer_file_names(self, file_name="csv_data1.csv", use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+    def test_csv_infer_file_param_delimiter(self):
+        """Test verifies pandas read_csv impl supports parameter delimiter
+           (DF type inference from const file name)"""
 
         def test_impl():
-            return read_csv(file_name, names=['A', 'B', 'C', 'D'])
+            return pd.read_csv("csv_data_infer_sep.csv", delimiter=';')
+        sdc_func = self.jit(test_impl)
 
-        return test_impl
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-    def test_csv_infer_file_names(self):
-        def test(file_name):
-            test_impl = self.pd_csv_infer_file_names(file_name)
-            hpat_func = self.jit(test_impl)
-            pd.testing.assert_frame_equal(hpat_func(), test_impl())
+    def test_csv_infer_file_param_names(self):
+        """Test verifies pandas read_csv impl supports parameter names when DF type inferred from const filename"""
+
+        def test_impl(file_name):
+            return pd.read_csv(file_name, names=['A', 'B', 'C', 'D'])
+        sdc_func = self.jit(test_impl)
 
         for file_name in ["csv_data1.csv", "csv_data_infer1.csv"]:
             with self.subTest(file_name=file_name):
-                test(file_name)
+                pd.testing.assert_frame_equal(sdc_func(file_name), test_impl(file_name))
 
-    def pd_csv_infer_file_usecols(self, file_name="csv_data_infer1.csv", use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+    def test_csv_infer_file_param_usecols_no_names(self):
+        """Test verifies pandas read_csv impl supports parameter usecols when no column names are
+           specified and they are inferred during compilation from const filename"""
 
-        def test_impl():
-            return read_csv(file_name, usecols=['B', 'D'])
-
-        return test_impl
-
-    def test_csv_infer_file_usecols(self):
-        def test(file_name):
-            test_impl = self.pd_csv_infer_file_usecols(file_name)
-            hpat_func = self.jit(test_impl)
-            pd.testing.assert_frame_equal(hpat_func(), test_impl())
+        def test_impl(file_name):
+            return pd.read_csv(file_name, usecols=['B', 'D'])
+        sdc_func = self.jit(test_impl)
 
         for file_name in ["csv_data_infer1.csv"]:
             with self.subTest(file_name=file_name):
-                test(file_name)
+                pd.testing.assert_frame_equal(sdc_func(file_name), test_impl(file_name))
 
-    def pd_csv_infer_file_names_usecols(self, file_name="csv_data1.csv", use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+    def test_csv_infer_file_param_usecols_and_dtype_no_names(self):
+        """Test verifies pandas read_csv impl supports parameter usecols when no column names are
+           specified and dtype conversion is done (DF type is inferred from const filename)"""
 
-        def test_impl():
-            return read_csv(file_name, names=['A', 'B', 'C', 'D'], usecols=['B', 'D'])
+        def test_impl(fname):
+            return pd.read_csv(fname, dtype={'A': np.float, 'D': str}, usecols=['A', 'D'])
 
-        return test_impl
+        fname = "csv_data_infer1.csv"
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(fname), test_impl(fname))
 
-    def test_csv_infer_file_names_usecols(self):
-        def test(file_name):
-            test_impl = self.pd_csv_infer_file_names_usecols(file_name)
-            hpat_func = self.jit(test_impl)
-            pd.testing.assert_frame_equal(hpat_func(), test_impl())
+    def test_csv_infer_file_param_usecols_with_names(self):
+        """Test verifies pandas read_csv impl supports combination of parameters usecols and names
+           when DF type is inferred from const filename"""
+
+        def test_impl(file_name):
+            return pd.read_csv(file_name, names=['A', 'B', 'C', 'D'], usecols=['B', 'D'])
+        sdc_func = self.jit(test_impl)
 
         for file_name in ["csv_data1.csv", "csv_data_infer1.csv"]:
             with self.subTest(file_name=file_name):
-                test(file_name)
-
-    def pd_csv_infer_parallel1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
-
-        def test_impl():
-            df = read_csv("csv_data_infer1.csv")
-            return df.A.sum(), df.B.sum(), df.C.sum()
-
-        return test_impl
+                pd.testing.assert_frame_equal(sdc_func(file_name), test_impl(file_name))
 
     @skip_numba_jit
-    def test_csv_infer_parallel1(self):
-        test_impl = self.pd_csv_infer_parallel1()
-        hpat_func = self.jit(test_impl)
-        self.assertEqual(hpat_func(), test_impl())
+    def test_csv_infer_file_param_usecols_and_dtype_unsupported(self):
+        """Test verifies pandas read_csv impl supports combination of parameters usecols and names
+           when DF type is inferred from const filename"""
 
-    def pd_csv_skip1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+        def test_impl():
+            return pd.read_csv("csv_data_infer1.csv",
+                               usecols=[2, 3],
+                               dtype={'A': 'int',
+                                      'B': 'float',
+                                      'C': 'float',
+                                      'D': 'str'})
+        sdc_func = self.jit(test_impl)
+
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+    def test_csv_infer_file_param_usecols_dtype_names(self):
+        """Test verifies pandas read_csv impl supports combination of parameters names, dtype and usecols
+           when DF type is inferred from const filename"""
+
+        int_type = self._int_type()
+
+        def test_impl(fname):
+            return pd.read_csv(fname,
+                               names=['A', 'B', 'C', 'D'],
+                               dtype={'A': int_type, 'B': np.float, 'C': np.float, 'D': str},
+                               usecols=['B', 'D'])
+        sdc_func = self.jit(test_impl)
+
+        fname = "csv_data1.csv"
+        pd.testing.assert_frame_equal(sdc_func(fname), test_impl(fname))
+
+    def test_csv_infer_file_param_usecols_as_numbers(self):
+        """Test verifies pandas read_csv impl supports parameter usecols with numbers of columns to
+           include in the resulting DF and inference of DF type from const filename"""
+
+        def test_impl():
+            return pd.read_csv("csv_data1.csv",
+                               names=['C'],
+                               dtype={'C': np.float},
+                               usecols=[2],)
+        sdc_func = self.jit(test_impl)
+
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+    def test_csv_infer_file_param_usecols_reorder(self):
+        """Test verifies pandas read_csv impl handles case when usecols parameter
+           specifies names in different order than columns in a CSV """
+
+        def test_impl(file_name):
+            return pd.read_csv(file_name, usecols=['D', 'B'])
+        sdc_func = self.jit(test_impl)
+
+        for file_name in ["csv_data_infer1.csv"]:
+            with self.subTest(file_name=file_name):
+                pd.testing.assert_frame_equal(sdc_func(file_name), test_impl(file_name))
+
+    @unittest.expectedFailure
+    def test_csv_infer_file_read_unsupported_as_str(self):
+        """Test verifies that CSV columns that would be of pyobject dtype in pandas,
+           would be read as strings in SDC """
+
+        def test_impl():
+            return pd.read_csv("csv_data_pyobject.csv", names=['A', 'B', 'C'])
+        sdc_func = self.jit(test_impl)
+
+        result = sdc_func()
+        result_ref = test_impl()
+        self.assertEqual(str(result), str(result_ref))          # passed
+        self.assertIsInstance(result['B'][1], str)              # passed
+        self.assertIsInstance(result_ref['B'][1], bool)         # passed
+
+        # fails since in pandas df.B is mixed NaN-s with Booleans (such array cannot be unboxed)
+        # so current SDC implementation reads them as strings, but fails the next check
+        pd.testing.assert_frame_equal(result, result_ref)
+
+    def test_csv_infer_file_param_names_and_dtype(self):
+        """Test verifies pandas read_csv impl supports combination of parameters names and dtype """
+
         int_type = self._int_type()
 
         def test_impl():
-            return read_csv("csv_data1.csv",
-                            names=['A', 'B', 'C', 'D'],
-                            dtype={'A': int_type, 'B': np.float, 'C': np.float, 'D': str},
-                            skiprows=2,
-                            )
+            return pd.read_csv("csv_data_date1.csv",
+                               names=['A', 'B', 'C', 'D'],
+                               dtype={'B': np.float, 'A': int_type, 'D': np.int64, 'C': str})
 
-        return test_impl
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-    @skip_numba_jit
-    def test_csv_skip1(self):
-        test_impl = self.pd_csv_skip1()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+    def test_csv_infer_file_param_converters_1(self):
+        """Test verifies pandas read_csv impl supports conversion of all columns using converters parameter"""
 
-    def pd_csv_infer_skip1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+        def test_impl(int_fn, float_fn, str_fn):
+            return pd.read_csv("csv_data1.csv",
+                               names=['A', 'B', 'C', 'D'],
+                               converters={'A': int_fn,
+                                           'B': float_fn,
+                                           'C': float_fn,
+                                           'D': str_fn})
+        sdc_func = self.jit(test_impl)
 
-        def test_impl():
-            return read_csv("csv_data_infer1.csv", skiprows=2)
+        fn_list = [
+            self.get_int_converter(),
+            self.get_float_converter(),
+            self.get_str_converter(),
+        ]
+        py_fn_list = [x.py_func for x in fn_list]
 
-        return test_impl
+        pd.testing.assert_frame_equal(
+            sdc_func(*fn_list),
+            test_impl(*py_fn_list)
+        )
 
-    def test_csv_infer_skip1(self):
-        test_impl = self.pd_csv_infer_skip1()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+    def test_csv_infer_file_param_converters_2(self):
+        """Test verifies pandas read_csv impl supports conversion of some of columns with converters parameter"""
 
-    def pd_csv_infer_skip_parallel1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+        def test_impl(float_fn, str_fn):
+            return pd.read_csv("csv_data1.csv",
+                               names=['A', 'B', 'C', 'D'],
+                               converters={'B': float_fn,
+                                           'D': str_fn})
+        sdc_func = self.jit(test_impl)
 
-        def test_impl():
-            df = read_csv("csv_data_infer1.csv", skiprows=2,
-                          names=['A', 'B', 'C', 'D'])
-            return df.A.sum(), df.B.sum(), df.C.sum()
+        float_fn = self.get_float_converter()
+        str_fn = self.get_str_converter()
+        pd.testing.assert_frame_equal(
+            sdc_func(float_fn, str_fn),
+            test_impl(float_fn.py_func, str_fn.py_func)
+        )
 
-        return test_impl
+    def test_csv_infer_file_param_converters_3(self):
+        """Test verifies pandas read_csv impl supports conversion of some of columns with other columns
+           converterted via dtype parameter"""
 
-    @skip_numba_jit
-    def test_csv_infer_skip_parallel1(self):
-        test_impl = self.pd_csv_infer_skip_parallel1()
-        hpat_func = self.jit(test_impl)
-        self.assertEqual(hpat_func(), test_impl())
+        def test_impl(float_fn, str_fn):
+            return pd.read_csv("csv_data1.csv",
+                               names=['A', 'B', 'C', 'D'],
+                               dtype={'A': np.float64, 'C': np.float32},
+                               converters={'B': float_fn,
+                                           'D': str_fn})
+        sdc_func = self.jit(test_impl)
 
-    def pd_csv_rm_dead1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+        float_fn = self.get_float_converter()
+        str_fn = self.get_str_converter()
+        pd.testing.assert_frame_equal(
+            sdc_func(float_fn, str_fn),
+            test_impl(float_fn.py_func, str_fn.py_func)
+        )
 
-        def test_impl():
-            df = read_csv("csv_data1.csv",
-                          names=['A', 'B', 'C', 'D'],
-                          dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str},)
-            return df.B.values
+    def test_csv_infer_file_param_converters_4(self):
+        """Test verifies pandas read_csv impl supports conversion of columns
+           using converters parameter together with usecols parameter """
 
-        return test_impl
+        # float_fn not used (needed for dict to be LiteralStrKeyDict
+        def test_impl(int_fn, float_fn):
+            return pd.read_csv("csv_data_infer1.csv",
+                               converters={'A': int_fn, 'B': float_fn},
+                               usecols=['A', 'C'])
+        sdc_func = self.jit(test_impl)
 
-    @skip_numba_jit
-    def test_csv_rm_dead1(self):
-        test_impl = self.pd_csv_rm_dead1()
-        hpat_func = self.jit(test_impl)
-        np.testing.assert_array_equal(hpat_func(), test_impl())
+        int_fn = self.get_int_converter()
+        float_fn = self.get_float_converter()
+        pd.testing.assert_frame_equal(sdc_func(int_fn, float_fn),
+                                      test_impl(int_fn.py_func, float_fn.py_func))
 
-    def pd_csv_date1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+    @unittest.expectedFailure
+    def test_csv_infer_file_param_converters_unsupported(self):
+        """Test checks read_csv usecase that is not supported due to Numba limitation
+           on creating non-literal dict for a const dict with single element """
+
+        def test_impl(int_fn):
+            # workaround: use dict(zip(('A', ), (int_fn, )))
+            return pd.read_csv("csv_data_infer1.csv",
+                               converters={'A': int_fn})
+        sdc_func = self.jit(test_impl)
+
+        int_fn = self.get_int_converter()
+        pd.testing.assert_frame_equal(sdc_func(int_fn),
+                                      test_impl(int_fn.py_func))
+
+    def test_csv_infer_file_param_skiprows_1(self):
+        """Test verifies pandas read_csv impl supports parameter skiprows with explicit names and dtypes """
         int_type = self._int_type()
 
         def test_impl():
-            return read_csv("csv_data_date1.csv",
-                            names=['A', 'B', 'C', 'D'],
-                            dtype={'A': int_type, 'B': np.float, 'C': str, 'D': np.int64},
-                            parse_dates=[2])
+            return pd.read_csv("csv_data1.csv",
+                               names=['A', 'B', 'C', 'D'],
+                               dtype={'A': int_type, 'B': np.float, 'C': np.float, 'D': str},
+                               skiprows=2,
+                               )
+        sdc_func = self.jit(test_impl)
 
-        return test_impl
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-    @skip_numba_jit
-    def test_csv_date1(self):
-        test_impl = self.pd_csv_date1()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+    def test_csv_infer_file_param_skiprows_2(self):
+        """Test verifies pandas read_csv impl supports parameter skiprows with omitted names and dtypes """
 
-    def pd_csv_str1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+        def test_impl():
+            return pd.read_csv("csv_data_infer1.csv", skiprows=2)
+        sdc_func = self.jit(test_impl)
+
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+    def test_csv_infer_file_param_parse_dates(self):
+        """Test verifies pandas read_csv impl supports parsing string data as datetime
+           using parse_dates parameter """
+
         int_type = self._int_type()
 
         def test_impl():
-            return read_csv("csv_data_date1.csv",
-                            names=['A', 'B', 'C', 'D'],
-                            dtype={'A': int_type, 'B': np.float, 'C': str, 'D': np.int64})
+            return pd.read_csv("csv_data_date1.csv",
+                               names=['A', 'B', 'C', 'D'],
+                               dtype={'A': int_type, 'B': np.float, 'C': str, 'D': np.int64},
+                               parse_dates=[2, ])
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-        return test_impl
-
-    def test_csv_str1(self):
-        test_impl = self.pd_csv_str1()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
-
-    def pd_csv_parallel1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+    def test_csv_infer_file_param_dtype_common(self):
+        """Test verifies pandas read_csv impl supports single dtype for dtype parameter """
 
         def test_impl():
-            df = read_csv("csv_data1.csv",
-                          names=['A', 'B', 'C', 'D'],
-                          dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str})
-            return (df.A.sum(), df.B.sum(), df.C.sum())
+            df = pd.read_csv("csv_data_dtype1.csv",
+                             names=['C1', 'C2'],
+                             dtype=np.float64,
+                             )
+            return df
+        sdc_func = self.jit(test_impl)
 
-        return test_impl
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-    @skip_numba_jit
-    def test_csv_parallel1(self):
-        test_impl = self.pd_csv_parallel1()
-        hpat_func = self.jit(test_impl)
-        self.assertEqual(hpat_func(), test_impl())
+    def test_csv_infer_file_const_dtype1(self):
+        """Test verifies dtype dict can use const strings as column dtypes """
 
-    def pd_csv_str_parallel1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+        int_type = self._int_type_str()
 
         def test_impl():
-            df = read_csv("csv_data_date1.csv",
-                          names=['A', 'B', 'C', 'D'],
-                          dtype={'A': np.int, 'B': np.float, 'C': str, 'D': np.int})
-            return (df.A.sum(), df.B.sum(), (df.C == '1966-11-13').sum(), df.D.sum())
+            col_names = ['A', 'B', 'C', 'D']
+            dtype = {'A': int_type, 'B': 'float64', 'C': 'float', 'D': 'str'}
+            return pd.read_csv("csv_data1.csv",
+                               names=col_names,
+                               dtype=dtype,
+                               )
+        sdc_func = self.jit(test_impl)
 
-        return test_impl
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-    @skip_numba_jit
-    def test_csv_str_parallel1(self):
-        test_impl = self.pd_csv_str_parallel1()
-        hpat_func = self.jit(locals={'df:return': 'distributed'})(test_impl)
-        self.assertEqual(hpat_func(), test_impl())
-
-    def pd_csv_usecols1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+    def test_csv_infer_file_dtype_as_literal_dict(self):
+        """Test verifies dtype parameter can be a const dict produced from tuples
+           of column names and column types """
 
         def test_impl():
-            return read_csv("csv_data1.csv",
-                            names=['C'],
-                            dtype={'C': np.float},
-                            usecols=[2],
-                            )
 
-        return test_impl
+            # this relies on dict and zip overloads to build LiteralStrKeyDict from tuples
+            col_names = ('A', 'B', 'C', 'D')
+            col_types = (np.intp, 'float64', np.float, str)
+            dtype = dict(zip(col_names, col_types))
 
-    @skip_numba_jit
-    def test_csv_usecols1(self):
-        test_impl = self.pd_csv_usecols1()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+            return pd.read_csv("csv_data1.csv",
+                               names=col_names,
+                               dtype=dtype,
+                               )
+        sdc_func = self.jit(test_impl)
 
-    def pd_csv_cat1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
+    def test_csv_infer_file_cat1(self):
+        """Test verifies pandas read_csv impl supports reading categorical columns via dtype paramter """
 
         def test_impl():
             names = ['C1', 'C2', 'C3']
             ct_dtype = CategoricalDtype(['A', 'B', 'C'])
             dtypes = {'C1': np.int, 'C2': ct_dtype, 'C3': str}
-            df = read_csv("csv_data_cat1.csv", names=names, dtype=dtypes)
+            df = pd.read_csv("csv_data_cat1.csv", names=names, dtype=dtypes)
             return df
+        sdc_func = self.jit(test_impl)
 
-        return test_impl
+        result = sdc_func()
+        result_ref = test_impl()
+        pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
-    @skip_numba_jit("Lowering error while returning df from objmode:\n"
-                    "Can only insert i8* at [4] in {i8*, i8*, i64, i64, i8*, [1 x i64], [1 x i64]}: got i64*")
-    def test_csv_cat1(self):
-        test_impl = self.pd_csv_cat1()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl(), check_names=False)
+    def test_csv_infer_file_cat2(self):
+        """Test verifies reading categorical columns preserves unused categories during conversion
+           from pyarrow to pandas DF """
 
-    def pd_csv_cat2(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
         int_type = self._int_type()
 
         def test_impl():
             ct_dtype = CategoricalDtype(['A', 'B', 'C', 'D'])
-            df = read_csv("csv_data_cat1.csv",
-                          names=['C1', 'C2', 'C3'],
-                          dtype={'C1': int_type, 'C2': ct_dtype, 'C3': str},
-                          )
+            df = pd.read_csv("csv_data_cat1.csv",
+                             names=['C1', 'C2', 'C3'],
+                             dtype={'C1': int_type, 'C2': ct_dtype, 'C3': str})
             return df
+        sdc_func = self.jit(test_impl)
 
-        return test_impl
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
-    @skip_numba_jit("Lowering error while returning df from objmode:\n"
-                    "Can only insert i8* at [4] in {i8*, i8*, i64, i64, i8*, [1 x i64], [1 x i64]}: got i64*")
-    def test_csv_cat2(self):
-        test_impl = self.pd_csv_cat2()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
-
-    def pd_csv_single_dtype1(self, use_pyarrow=False):
-        read_csv = self._read_csv(use_pyarrow)
-
-        def test_impl():
-            df = read_csv("csv_data_dtype1.csv",
-                          names=['C1', 'C2'],
-                          dtype=np.float64,
-                          )
-            return df
-
-        return test_impl
+    # not supported
 
     @skip_numba_jit
-    def test_csv_single_dtype1(self):
-        test_impl = self.pd_csv_single_dtype1()
-        hpat_func = self.jit(test_impl)
-        pd.testing.assert_frame_equal(hpat_func(), test_impl())
+    def test_csv_not_supported_dict_use_1(self):
+
+        int_type = self._int_type()
+
+        def test_impl():
+            dtype = {'A': int_type, 'B': np.float, 'C': np.float, 'D': str}
+            # XXX: there are two reasons this fails:
+            # 1. dtype doesn't exist as dict after RewriteReadCsv
+            # 2. dict keys would be of DictKeys type, not tuple
+            return pd.read_csv("csv_data1.csv",
+                               names=dtype.keys(),
+                               dtype=dtype)
+        sdc_func = self.jit(test_impl)
+        pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
     @skip_numba_jit
     def test_write_csv1(self):
         def test_impl(df, fname):
             df.to_csv(fname)
 
-        hpat_func = self.jit(test_impl)
+        sdc_func = self.jit(test_impl)
         n = 111
         df = pd.DataFrame({'A': np.arange(n)})
         hp_fname = 'test_write_csv1_sdc.csv'
         pd_fname = 'test_write_csv1_pd.csv'
-        hpat_func(df, hp_fname)
+        sdc_func(df, hp_fname)
         test_impl(df, pd_fname)
         # TODO: delete files
         pd.testing.assert_frame_equal(pd.read_csv(hp_fname), pd.read_csv(pd_fname))
+
+    # not supported parallelization checking tests
+
+    @skip_numba_jit("Compiles and executes, but fusing is not checked")
+    def test_csv_infer_file_parallel(self):
+        def test_impl():
+            df = pd.read_csv("csv_data_infer1.csv")
+            return df.A.sum(), df.B.sum(), df.C.sum()
+        sdc_func = self.jit(test_impl)
+
+        self.assertEqual(sdc_func(), test_impl())
+
+    @skip_numba_jit("Compiles and executes, but fusing is not checked")
+    def test_csv_infer_file_parallel_skiprows(self):
+
+        def test_impl():
+            df = pd.read_csv("csv_data_infer1.csv",
+                             skiprows=2,
+                             names=['A', 'B', 'C', 'D'])
+            return df.A.sum(), df.B.sum(), df.C.sum()
+        sdc_func = self.jit(test_impl)
+
+        self.assertEqual(sdc_func(), test_impl())
+
+    @skip_numba_jit
+    def test_csv_rm_dead1(self):
+
+        def test_impl():
+            df = pd.read_csv("csv_data1.csv",
+                             names=['A', 'B', 'C', 'D'],
+                             dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str},)
+            return df.B.values
+        sdc_func = self.jit(test_impl)
+
+        np.testing.assert_array_equal(sdc_func(), test_impl())
+
+    @skip_numba_jit
+    def test_csv_parallel1(self):
+        def test_impl():
+            df = pd.read_csv("csv_data1.csv",
+                             names=['A', 'B', 'C', 'D'],
+                             dtype={'A': np.int, 'B': np.float, 'C': np.float, 'D': str})
+            return (df.A.sum(), df.B.sum(), df.C.sum())
+        sdc_func = self.jit(test_impl)
+        self.assertEqual(sdc_func(), test_impl())
+
+    @skip_numba_jit
+    def test_csv_str_parallel1(self):
+        def test_impl():
+            df = pd.read_csv("csv_data_date1.csv",
+                             names=['A', 'B', 'C', 'D'],
+                             dtype={'A': np.int, 'B': np.float, 'C': str, 'D': np.int})
+            return (df.A.sum(), df.B.sum(), (df.C == '1966-11-13').sum(), df.D.sum())
+        sdc_func = self.jit(locals={'df:return': 'distributed'})(test_impl)
+
+        self.assertEqual(sdc_func(), test_impl())
 
     @skip_numba_jit
     def test_write_csv_parallel1(self):
@@ -730,11 +700,11 @@ class TestCSV(TestIO):
             df = pd.DataFrame({'A': np.arange(n)})
             df.to_csv(fname)
 
-        hpat_func = self.jit(test_impl)
+        sdc_func = self.jit(test_impl)
         n = 111
         hp_fname = 'test_write_csv1_hpat_par.csv'
         pd_fname = 'test_write_csv1_pd_par.csv'
-        hpat_func(n, hp_fname)
+        sdc_func(n, hp_fname)
         test_impl(n, pd_fname)
         self.assertEqual(count_array_REPs(), 0)
         self.assertEqual(count_parfor_REPs(), 0)
@@ -769,16 +739,14 @@ class TestNumpy(TestIO):
 
     def test_np_io3(self):
         def test_impl(A):
-            if get_rank() == 0:
-                A.tofile("np_file_3.dat")
+            A.tofile("np_file_3.dat")
 
         hpat_func = self.jit(test_impl)
         n = 111
         A = np.random.ranf(n)
         hpat_func(A)
-        if get_rank() == 0:
-            B = np.fromfile("np_file_3.dat", np.float64)
-            np.testing.assert_almost_equal(A, B)
+        B = np.fromfile("np_file_3.dat", np.float64)
+        np.testing.assert_almost_equal(A, B)
 
     @skip_numba_jit("AssertionError: Failed in nopython mode pipeline (step: Preprocessing for parfors)")
     def test_np_io4(self):

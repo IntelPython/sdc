@@ -33,6 +33,7 @@ from numba.core import cgutils
 from numba.extending import (models, register_model, make_attribute_wrapper)
 
 from sdc.str_ext import string_type
+from sdc.hiframes.pd_series_type import SeriesType
 
 
 class DataFrameType(types.Type):  # TODO: IterableType over column names
@@ -65,6 +66,10 @@ class DataFrameType(types.Type):  # TODO: IterableType over column names
     def key(self):
         # needed?
         return self.data, self.index, self.columns, self.has_parent
+
+    def get_series_type(self, col_idx):
+        col_type = self.data[col_idx]
+        return SeriesType(col_type.dtype, col_type, self.index, is_named=True)
 
     def unify(self, typingctx, other):
         if (isinstance(other, DataFrameType)

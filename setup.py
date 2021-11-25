@@ -30,6 +30,7 @@ import platform
 import os
 import sys
 import numba
+import pyarrow as pa
 from docs.source.buildscripts.sdc_build_doc import SDCBuildDoc
 
 
@@ -256,8 +257,21 @@ ext_conc_dict = Extension(name="sdc.hconc_dict",
                           language="c++"
                           )
 
+ext_arrow_reader = Extension(name="sdc.harrow_reader",
+                             sources=["sdc/native/arrow_reader.cpp"],
+                             extra_compile_args=eca,
+                             extra_link_args=ela,
+                             libraries=pa.get_libraries(),
+                             include_dirs=[
+                                 "sdc/native/",
+                                 numba_include_path,
+                                 pa.get_include()],
+                             library_dirs=lid + pa.get_library_dirs(),
+                             language="c++"
+                             )
+
 _ext_mods = [ext_hdist, ext_chiframes, ext_set, ext_str, ext_dt, ext_io, ext_transport_seq, ext_sort,
-             ext_conc_dict, ]
+             ext_conc_dict, ext_arrow_reader, ]
 
 # Support of Parquet is disabled because HPAT pipeline does not work now
 # if _has_pyarrow:

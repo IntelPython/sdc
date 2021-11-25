@@ -94,15 +94,6 @@ def generate_csv_data():
     with open("csv_data1.csv", "w") as f:
         f.write(data)
 
-    with open("csv_data2.csv", "w") as f:
-        # the same types as csv_data1.csv
-        f.write((
-            "4,2.1,4.1,D\n"
-            "3,2.2,4.2,\n"
-            "2,2.3,4.3,B\n"
-            "1,2.4,4.4,A\n"
-        ))
-
     with open("csv_data_infer1.csv", "w") as f:
         f.write('A,B,C,D\n' + data)
 
@@ -118,6 +109,30 @@ def generate_csv_data():
             "4,2.3,2018-07-11,47736\n")
 
     with open("csv_data_date1.csv", "w") as f:
+        f.write(data)
+
+    data = ("2,B,SA\n"
+            "3,A,SBC\n"
+            "4,C,S123\n"
+            "5,B,BCD\n")
+
+    with open("csv_data_cat1.csv", "w") as f:
+        f.write(data)
+
+    data = ("2,4.1\n"
+            "3,3.4\n"
+            "4,1.3\n"
+            "5,1.1\n")
+
+    with open("csv_data_dtype1.csv", "w") as f:
+        f.write(data)
+
+    data = ("4,,4.1\n"
+            "3,True,4.2\n"
+            "2,False,*\n"
+            "1,True,4.4\n")
+
+    with open("csv_data_pyobject.csv", "w") as f:
         f.write(data)
 
 
@@ -144,6 +159,11 @@ def generate_other_data():
          '2017-02-25']), 'A': [2, 3, 7, 8, 9, 10]})
     df1.to_parquet("asof1.pq")
     df2.to_parquet("asof2.pq")
+
+    # for test_np_io1
+    n = 111
+    A = np.random.ranf(n)
+    A.tofile("np_file1.dat")
 
 
 if __name__ == "__main__":

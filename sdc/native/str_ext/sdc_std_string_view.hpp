@@ -44,7 +44,6 @@ extern "C"
         delete p_spec;
     }
 
-
     void string_view_create(NRT_MemInfo** meminfo, void* nrt_table)
     {
         auto nrt = (NRT_api_functions*)nrt_table;
@@ -54,7 +53,6 @@ extern "C"
         (*meminfo) = nrt->manage_memory(res, string_view_delete);
     }
 
-
     void string_view_create_with_data(NRT_MemInfo** meminfo, void* nrt_table, void* data_ptr, int64_t size)
     {
         auto nrt = (NRT_api_functions*)nrt_table;
@@ -63,7 +61,6 @@ extern "C"
         void* res = (void*)p_str_view;
         (*meminfo) = nrt->manage_memory(res, string_view_delete);
     }
-
 
     void string_view_print(void* p_str_view)
     {
