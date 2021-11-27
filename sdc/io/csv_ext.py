@@ -138,13 +138,14 @@ def csv_reader_infer_nb_arrow_type(
 
 
 def csv_reader_infer_nb_pandas_type(
+    # sep is not used at all - FIXME: remove from this as well as nb_arrow_type func?
     filepath_or_buffer, sep, delimiter, names, usecols, dtype, skiprows, parse_dates
 ):
 
     # infer column types from the first block (similarly as Arrow does this)
     # TO-DO: tune the block size or allow user configure it via env var
     rows_to_read = 1000
-    df = pd.read_csv(filepath_or_buffer, sep=sep, delimiter=delimiter, names=names,
+    df = pd.read_csv(filepath_or_buffer, delimiter=delimiter, names=names,
                      usecols=usecols, dtype=dtype, skiprows=skiprows, nrows=rows_to_read,
                      parse_dates=parse_dates)
 

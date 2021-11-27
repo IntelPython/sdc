@@ -278,7 +278,7 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
 
                 # fix when PyArrow will support predicted categories
                 for cat_column_name in cat_columns_list:
-                    df[cat_column_name] = df[cat_column_name].astype(py_col_dtypes[cat_column_name])
+                    df[cat_column_name].cat.set_categories(py_col_dtypes[cat_column_name].categories, inplace=True)
 
             return df
 
@@ -340,7 +340,7 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
                         col_as_series = pa_table.column(col_names[i]).to_pandas(categories=cat_columns_list)
                         # fix when PyArrow will support predicted categories
                         if isinstance(col_as_series, pd.CategoricalDtype):
-                            col_as_series = col_as_series.astype(py_col_dtypes[col_names[i]])
+                            col_as_series.cat.set_categories(py_col_dtypes[col_names[i]], inplace=True)
                         ret_cols[i] = col_as_series
 
                     maybe_unboxed_columns = tuple(ret_cols)
