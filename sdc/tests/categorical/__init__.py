@@ -24,11 +24,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # *****************************************************************************
 
-# from . import test_categorical
-# from . import test_categoricaldtype
-# from . import test_series_category
-# from . import test_df_category
-
 from .test_categorical import *
 from .test_categoricaldtype import *
 from .test_series_category import *
