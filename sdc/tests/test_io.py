@@ -398,6 +398,26 @@ class TestCSV(TestIO):
         sdc_func = self.jit(test_impl)
         pd.testing.assert_frame_equal(sdc_func(), test_impl())
 
+    def test_csv_infer_file_param_names_no_rewrite(self):
+        """Test verifies pandas read_csv impl supports names parameters as tuple of columns
+           both captured as global or local variable """
+
+        def test_impl_1():
+            const_names = ('A', 'B', 'C', 'D')
+            return pd.read_csv("csv_data_date1.csv",
+                               names=const_names)
+
+        global_csv_names = ('A', 'B', 'C', 'D')
+
+        def test_impl_2():
+            return pd.read_csv("csv_data_date1.csv",
+                               names=global_csv_names)
+
+        for test_impl in [test_impl_1, test_impl_2]:
+            with self.subTest(tested_func_name=test_impl.__name__):
+                sdc_func = self.jit(test_impl)
+                pd.testing.assert_frame_equal(sdc_func(), test_impl())
+
     def test_csv_infer_file_param_converters_1(self):
         """Test verifies pandas read_csv impl supports conversion of all columns using converters parameter"""
 

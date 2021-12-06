@@ -63,7 +63,7 @@ class RewriteReadCsv(Rewrite):
                 if key in self._read_csv_const_args:
                     arg_def = guard(get_definition, func_ir, var)
                     ops = ['build_list', 'build_set', 'build_map']
-                    if arg_def.op in ops:
+                    if isinstance(arg_def, ir.Expr) and arg_def.op in ops:
                         args.append(arg_def)
 
         return len(args) > 0
