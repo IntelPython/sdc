@@ -236,7 +236,13 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
 
     # infer the resulting DF type as a numba type
     pandas_df_type = csv_reader_infer_nb_pandas_type(
-        py_filepath_or_buffer, py_sep, py_delimiter, py_names, py_usecols, py_dtype, py_skiprows, py_parse_dates
+        py_filepath_or_buffer,
+        delimiter=py_delimiter,
+        names=py_names,
+        usecols=py_usecols,
+        dtype=py_dtype,
+        skiprows=py_skiprows,
+        parse_dates=py_parse_dates
     )
 
     col_names = pandas_df_type.columns
@@ -260,6 +266,8 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
     use_user_converters = not (isinstance(converters, types.NoneType) or converters is None)
     if not use_user_converters:
 
+        # dtype parameter is deliberately captured into objmode as global value to avoid
+        # IR grow due to passing large tuples as function arguments
         def sdc_internal_read_csv_impl(filepath_or_buffer, sep, delimiter, names, usecols, dtype,
                                        converters, skiprows, parse_dates):
             with objmode(df=pandas_df_type):
@@ -278,7 +286,7 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
 
                 # fix when PyArrow will support predicted categories
                 for cat_column_name in cat_columns_list:
-                    df[cat_column_name] = df[cat_column_name].astype(py_col_dtypes[cat_column_name])
+                    df[cat_column_name].cat.set_categories(py_col_dtypes[cat_column_name].categories, inplace=True)
 
             return df
 
@@ -289,13 +297,12 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
         converterted_cols = set(converters.fields)
         py_col_dtypes.update(dict.fromkeys(converterted_cols, 'str'))
         arrow_table_type = csv_reader_infer_nb_arrow_type(py_filepath_or_buffer,
-                                                          py_sep,
-                                                          py_delimiter,
-                                                          py_names,
-                                                          py_usecols,
-                                                          py_col_dtypes,
-                                                          py_skiprows,
-                                                          py_parse_dates)
+                                                          delimiter=py_delimiter,
+                                                          names=py_names,
+                                                          usecols=py_usecols,
+                                                          dtype=py_col_dtypes,
+                                                          skiprows=py_skiprows,
+                                                          parse_dates=py_parse_dates)
 
         n_cols = len(col_names)
         pa_table_type = PyarrowTableType()
@@ -340,7 +347,7 @@ def sdc_internal_read_csv_ovld(filepath_or_buffer, sep, delimiter, names, usecol
                         col_as_series = pa_table.column(col_names[i]).to_pandas(categories=cat_columns_list)
                         # fix when PyArrow will support predicted categories
                         if isinstance(col_as_series, pd.CategoricalDtype):
-                            col_as_series = col_as_series.astype(py_col_dtypes[col_names[i]])
+                            col_as_series.cat.set_categories(py_col_dtypes[col_names[i]], inplace=True)
                         ret_cols[i] = col_as_series
 
                     maybe_unboxed_columns = tuple(ret_cols)

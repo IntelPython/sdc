@@ -26,6 +26,7 @@
 
 from sdc.tests.test_base import TestCase
 
+import unittest
 import pandas as pd
 import numba as nb
 from numba import types
@@ -91,3 +92,7 @@ class CategoricalTest(TestCase):
 
         boxed = func()
         assert(boxed.equals(self._pd_value()))
+
+
+if __name__ == "__main__":
+    unittest.main()

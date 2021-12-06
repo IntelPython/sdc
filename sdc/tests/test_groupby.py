@@ -211,6 +211,7 @@ class TestGroupBy(TestCase):
 
         pd.testing.assert_frame_equal(sdc_impl(), test_impl(), **kwargs)
 
+    @unittest.expectedFailure  # FIXME_pandas#43292: pandas groupby.sum impl broken
     def test_dataframe_groupby_mean(self):
         def test_impl(df):
             return df.groupby('A').mean()
@@ -222,6 +223,7 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    @unittest.expectedFailure  # FIXME_pandas#43292: pandas groupby.sum impl broken
     def test_dataframe_groupby_mean_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({
@@ -267,7 +269,6 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result_jit, result_ref, check_names=False)
 
-    @unittest.expectedFailure   # pandas groupby.median returns unstable dtype (int or float) unlike series.median
     def test_dataframe_groupby_median_result_dtype(self):
         def test_impl(df):
             return df.groupby('A').median()
@@ -326,6 +327,7 @@ class TestGroupBy(TestCase):
         # TODO: implement index classes, as current indexes do not have names
         pd.testing.assert_frame_equal(result, result_ref, check_names=False)
 
+    @unittest.expectedFailure  # FIXME_pandas#43292: pandas groupby.sum impl broken
     def test_dataframe_groupby_sum_no_unboxing(self):
         def test_impl():
             df = pd.DataFrame({

@@ -1005,7 +1005,9 @@ def hpat_pandas_series_rolling_cov(self, other=None, pairwise=None, ddof=1):
     _hpat_pandas_series_rolling_cov_check_types(self, other=other,
                                                 pairwise=pairwise, ddof=ddof)
 
-    return _gen_hpat_pandas_rolling_series_cov_impl(other)
+    # prior to pandas_#39388 df.rolling.cov was different from series cov in handling inf values
+    # so this specific overload had align_finiteness=False
+    return _gen_hpat_pandas_rolling_series_cov_impl(other, align_finiteness=True)
 
 
 @sdc_overload_method(SeriesRollingType, 'kurt')

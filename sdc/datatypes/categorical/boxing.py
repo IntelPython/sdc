@@ -53,23 +53,21 @@ def box_Categorical(typ, val, c):
     pandas_module_name = c.context.insert_const_string(c.builder.module, "pandas")
     pandas_module = c.pyapi.import_module_noblock(pandas_module_name)
 
-    constructor = c.pyapi.object_getattr_string(pandas_module, "Categorical")
-
-    empty_list = c.pyapi.list_new(c.context.get_constant(types.intp, 0))
-    args = c.pyapi.tuple_pack([empty_list])
-    categorical = c.pyapi.call(constructor, args)
+    categorical_class = c.pyapi.object_getattr_string(pandas_module, "Categorical")
+    method_from_codes = c.pyapi.object_getattr_string(categorical_class, "from_codes")
 
     dtype = box_CategoricalDtype(typ.pd_dtype, val, c)
-    c.pyapi.object_setattr_string(categorical, "_dtype", dtype)
-
     codes = boxing.box_array(typ.codes, val, c)
-    c.pyapi.object_setattr_string(categorical, "_codes", codes)
+    py_none = c.pyapi.make_none()
+    args = c.pyapi.tuple_pack([codes, py_none, py_none, dtype])
+    categorical = c.pyapi.call(method_from_codes, args=args)
 
+    c.pyapi.decref(args)
+    c.pyapi.decref(py_none)
     c.pyapi.decref(codes)
     c.pyapi.decref(dtype)
-    c.pyapi.decref(args)
-    c.pyapi.decref(empty_list)
-    c.pyapi.decref(constructor)
+    c.pyapi.decref(method_from_codes)
+    c.pyapi.decref(categorical_class)
     c.pyapi.decref(pandas_module)
     return categorical
 

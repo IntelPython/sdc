@@ -26,6 +26,7 @@
 
 from sdc.tests.test_base import TestCase
 
+import unittest
 import pandas as pd
 import numpy as np
 import numba as nb
@@ -114,3 +115,7 @@ class SeriesCategoryTest(TestCase):
 
         boxed = func()
         assert(boxed.equals(self._pd_value()))
+
+
+if __name__ == "__main__":
+    unittest.main()

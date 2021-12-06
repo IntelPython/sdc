@@ -93,8 +93,11 @@ def pyarrow_cpu_count_equal_numba_num_treads(func):
 @pyarrow_cpu_count_equal_numba_num_treads
 def do_read_csv(filepath_or_buffer, sep, delimiter, names, usecols, dtype, skiprows, parse_dates):
 
+    if delimiter is None:
+        delimiter = sep
+
     pa_options = get_pyarrow_read_csv_options(
-                    sep, delimiter, names, usecols, dtype, skiprows, parse_dates)
+                    delimiter, names, usecols, dtype, skiprows, parse_dates)
 
     table = csv.read_csv(
         filepath_or_buffer,
@@ -107,11 +110,11 @@ def do_read_csv(filepath_or_buffer, sep, delimiter, names, usecols, dtype, skipr
 
 
 def csv_reader_infer_nb_arrow_type(
-    filepath_or_buffer, sep, delimiter, names, usecols, dtype, skiprows, parse_dates
+    filepath_or_buffer, delimiter=',', names=None, usecols=None, dtype=None, skiprows=None, parse_dates=False
 ):
 
     read_opts, parse_opts, convert_opts = get_pyarrow_read_csv_options(
-                                                sep, delimiter, names, usecols, dtype, skiprows, parse_dates)
+                                                delimiter, names, usecols, dtype, skiprows, parse_dates)
     csv_reader = csv.open_csv(filepath_or_buffer,
                               read_options=read_opts,
                               parse_options=parse_opts,
@@ -138,13 +141,13 @@ def csv_reader_infer_nb_arrow_type(
 
 
 def csv_reader_infer_nb_pandas_type(
-    filepath_or_buffer, sep, delimiter, names, usecols, dtype, skiprows, parse_dates
+    filepath_or_buffer, delimiter=',', names=None, usecols=None, dtype=None, skiprows=None, parse_dates=False
 ):
 
     # infer column types from the first block (similarly as Arrow does this)
     # TO-DO: tune the block size or allow user configure it via env var
     rows_to_read = 1000
-    df = pd.read_csv(filepath_or_buffer, sep=sep, delimiter=delimiter, names=names,
+    df = pd.read_csv(filepath_or_buffer, delimiter=delimiter, names=names,
                      usecols=usecols, dtype=dtype, skiprows=skiprows, nrows=rows_to_read,
                      parse_dates=parse_dates)
 
@@ -185,10 +188,7 @@ def csv_reader_get_pyarrow_read_options(names, skiprows):
     return read_options
 
 
-def csv_reader_get_pyarrow_parse_options(delimiter, sep):
-
-    if delimiter is None:
-        delimiter = sep
+def csv_reader_get_pyarrow_parse_options(delimiter):
 
     parse_options = csv.ParseOptions(
         delimiter=delimiter,
@@ -264,11 +264,11 @@ def csv_reader_get_pyarrow_convert_options(names, usecols, dtype, parse_dates):
     return convert_options
 
 
-def get_pyarrow_read_csv_options(sep, delimiter, names, usecols, dtype, skiprows, parse_dates):
+def get_pyarrow_read_csv_options(delimiter, names, usecols, dtype, skiprows, parse_dates):
     """ This function attempts to map pandas read_csv parameters to pyarrow read_csv options to be used """
 
     read_opts = csv_reader_get_pyarrow_read_options(names, skiprows)
-    parse_opts = csv_reader_get_pyarrow_parse_options(delimiter, sep)
+    parse_opts = csv_reader_get_pyarrow_parse_options(delimiter)
     convert_opts = csv_reader_get_pyarrow_convert_options(names, usecols, dtype, parse_dates)
 
     return (read_opts, parse_opts, convert_opts)
