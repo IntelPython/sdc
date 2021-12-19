@@ -257,3 +257,10 @@ def _check_dtype_param_type(dtype):
 
     valid_dtype_types = (types.NoneType, types.Omitted, types.UnicodeType, types.NumberClass)
     return isinstance(dtype, valid_dtype_types) or dtype is None
+
+
+def get_nbtype_literal_values(nbtype):
+    assert all(isinstance(x, types.Literal) for x in nbtype), \
+           f"Attempt to unliteral values of {nbtype} failed"
+
+    return [x.literal_value for x in nbtype]

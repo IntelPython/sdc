@@ -46,7 +46,7 @@ from sdc.str_arr_ext import string_array_type
 from sdc.types import CategoricalDtypeType, Categorical
 from sdc.datatypes.categorical.pdimpl import _reconstruct_CategoricalDtype
 from sdc.utilities.utils import sdc_overload
-from sdc.utilities.sdc_typing_utils import has_python_value
+from sdc.utilities.sdc_typing_utils import has_python_value, get_nbtype_literal_values
 from sdc.extensions.sdc_arrow_table_type import PyarrowTableType
 from sdc.extensions.sdc_arrow_table_ext import (
     arrow_reader_create_tableobj,
@@ -89,13 +89,6 @@ def _get_py_col_dtype(ctype):
     if isinstance(ctype, Categorical):
         return _reconstruct_CategoricalDtype(ctype.pd_dtype)
     return numpy_support.as_dtype(dtype)
-
-
-def get_nbtype_literal_values(nbtype):
-    assert all(isinstance(x, types.Literal) for x in nbtype), \
-           f"Attempt to unliteral values of {nbtype} failed"
-
-    return [x.literal_value for x in nbtype]
 
 
 @sdc_overload(pd.read_csv)
