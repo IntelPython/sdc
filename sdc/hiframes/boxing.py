@@ -46,7 +46,6 @@ from sdc.str_arr_ext import (string_array_type, unbox_str_series, box_str_arr)
 from sdc.datatypes.categorical.types import CategoricalDtypeType, Categorical
 from sdc.datatypes.categorical.boxing import unbox_Categorical, box_Categorical
 from sdc.hiframes.pd_series_ext import SeriesType
-from sdc.hiframes.pd_series_type import _get_series_array_type
 from sdc.hiframes.pd_dataframe_ext import get_structure_maps
 from sdc.utilities.sdc_typing_utils import sdc_pandas_index_types
 
@@ -70,7 +69,7 @@ def typeof_pd_dataframe(val, c):
 
     col_names = tuple(val.columns.tolist())
     # TODO: support other types like string and timestamp
-    col_types = get_hiframes_dtypes(val)
+    col_types = _infer_df_col_types(val)
     index_type = _infer_index_type(val.index)
     column_loc, _, _ = get_structure_maps(col_types, col_names)
 
@@ -82,8 +81,24 @@ def typeof_pd_dataframe(val, c):
 def typeof_pd_series(val, c):
     index_type = _infer_index_type(val.index)
     is_named = val.name is not None
+
+    # attempt to define numba Series data type via Series values,
+    # if not successful, define it later via dtype in SeriesType init
+    underlying_type = None
+    try:
+        underlying_type = numba.typeof(val.values)
+    except ValueError:
+        pass
+
+    if not (isinstance(underlying_type, types.Array)
+            and not isinstance(underlying_type.dtype, types.PyObject)):
+        underlying_type = None
+
     return SeriesType(
-        _infer_series_dtype(val), index=index_type, is_named=is_named)
+        dtype=_infer_series_dtype(val),
+        data=underlying_type,
+        index=index_type,
+        is_named=is_named)
 
 
 @unbox(DataFrameType)
@@ -140,13 +155,13 @@ def unbox_dataframe(typ, val, c):
     return NativeValue(dataframe._getvalue(), is_error=c.builder.load(errorptr))
 
 
-def get_hiframes_dtypes(df):
-    """get hiframe data types for a pandas dataframe
-    """
+def _infer_df_col_types(df):
+    """ Infer column data types for a pandas DataFrame """
+
     col_names = df.columns.tolist()
-    hi_typs = [_get_series_array_type(_infer_series_dtype(df[cname]))
-               for cname in col_names]
-    return tuple(hi_typs)
+    col_typs = [numba.typeof(df[cname]).data for cname in col_names]
+
+    return tuple(col_typs)
 
 
 def _infer_series_dtype(S):

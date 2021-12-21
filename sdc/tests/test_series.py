@@ -63,6 +63,7 @@ from sdc.tests.test_utils import (test_global_input_data_unicode_kind1,
                                   gen_strlist,
                                   _make_func_from_text)
 from sdc.utilities.sdc_typing_utils import SDCLimitation
+from sdc.hiframes.pd_series_type import SeriesType
 
 
 _cov_corr_series = [(pd.Series(x), pd.Series(y)) for x, y in [
@@ -339,18 +340,35 @@ class TestSeries(
 
         pd.testing.assert_series_equal(hpat_func('A'), test_impl('A'))
 
-    @skip_numba_jit
+    def test_create_series_data_layouts(self):
+        def test_impl(data):
+            vals = pd.Series(data).values
+            return vals[0], vals[-1]
+        sdc_func = self.jit(test_impl)
+
+        n = 10
+        arrays_to_test = [
+            np.arange(n),           # 'C' layout
+            np.arange(2 * n)[::2],  # 'A' layout
+            # no 'F' layout for 1d arrays
+        ]
+
+        for data in arrays_to_test:
+            with self.subTest(layout=numba.typeof(data).layout):
+                result = sdc_func(data)
+                result_ref = test_impl(data)
+                self.assertEqual(result, result_ref)
+
     def test_pass_series1(self):
-        # TODO: check to make sure it is series type
         def test_impl(A):
             return (A == 2).sum()
-        hpat_func = self.jit(test_impl)
+        sdc_func = self.jit(test_impl)
 
         n = 11
         S = pd.Series(np.arange(n), name='A')
-        self.assertEqual(hpat_func(S), test_impl(S))
+        self.assertEqual(sdc_func(S), test_impl(S))
+        self.assertIsInstance(numba.typeof(S), SeriesType)
 
-    @skip_numba_jit
     def test_pass_series_str(self):
         def test_impl(A):
             return (A == 'a').sum()
@@ -358,6 +376,7 @@ class TestSeries(
 
         S = pd.Series(['a', 'b', 'c'], name='A')
         self.assertEqual(hpat_func(S), test_impl(S))
+        self.assertIsInstance(numba.typeof(S), SeriesType)
 
     def test_pass_series_all_indexes(self):
         def test_impl(A):
@@ -377,6 +396,25 @@ class TestSeries(
             with self.subTest(df_index=index):
                 S = pd.Series(np.arange(n), index, name='A')
                 pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
+
+    def test_pass_series_data_layouts(self):
+        def test_impl(S):
+            vals = S.values
+            return vals[0], vals[-1]
+        sdc_func = self.jit(test_impl)
+
+        n = 10
+        series_to_test = [
+            pd.Series(np.arange(n)),       # 'C' layout
+            pd.Series(np.arange(n))[::2],  # 'A' layout
+            # no 'F' layout for Series
+        ]
+
+        for s in series_to_test:
+            with self.subTest(layout=numba.typeof(s).data.layout):
+                result = sdc_func(s)
+                result_ref = test_impl(s)
+                self.assertEqual(result, result_ref)
 
     def test_series_getattr_size(self):
         def test_impl(S):

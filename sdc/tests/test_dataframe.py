@@ -132,6 +132,7 @@ class TestDataFrame(TestCase):
         self.assertEqual(hpat_func(), test_impl())
 
     def test_create_with_series1(self):
+        """ Create pandas DataFrame from Series of different dtypes """
         def test_impl(n):
             A = pd.Series(np.ones(n, dtype=np.int64))
             B = pd.Series(np.zeros(n, dtype=np.float64))
@@ -143,7 +144,7 @@ class TestDataFrame(TestCase):
         pd.testing.assert_frame_equal(hpat_func(n), test_impl(n))
 
     def test_create_with_series2(self):
-        # test creating dataframe from passed series
+        """ Test creating pandas DataFrame from passed Series """
         def test_impl(A):
             df = pd.DataFrame({'A': A})
             return (df.A == 2).sum()
@@ -152,6 +153,18 @@ class TestDataFrame(TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df.A), test_impl(df.A))
+
+    def test_create_with_series3(self):
+        """ Test creating pandas DataFrame from Series of different layouts """
+        def test_impl(A, B):
+            df = pd.DataFrame({'A': A, 'B': B})
+            return df.A.sum(), df.B.sum()
+        sdc_func = self.jit(test_impl)
+
+        n = 11
+        A = pd.Series(np.arange(n))
+        B = pd.Series(np.arange(2 * n)[::2])
+        self.assertEqual(sdc_func(A, B), test_impl(A, B))
 
     def test_df_create_param_index_default(self):
         def test_impl():
@@ -219,6 +232,8 @@ class TestDataFrame(TestCase):
         pd.testing.assert_frame_equal(hpat_func(), test_impl())
 
     def test_pass_df1(self):
+        """ Test passing df with contiguous data layout """
+
         def test_impl(df):
             return (df.A == 2).sum()
         hpat_func = self.jit(test_impl)
@@ -226,6 +241,18 @@ class TestDataFrame(TestCase):
         n = 11
         df = pd.DataFrame({'A': np.arange(n)})
         self.assertEqual(hpat_func(df), test_impl(df))
+
+    def test_pass_df_2(self):
+        """ Test passing df with non-contiguous data layout """
+
+        def test_impl(df):
+            return df.B.sum()
+        sdc_func = self.jit(test_impl)
+
+        n_rows, n_cols = 4, 6
+        col_names = list(string.ascii_uppercase[:n_cols])
+        df = pd.DataFrame(np.random.rand(n_rows, n_cols), columns=col_names)
+        self.assertAlmostEqual(sdc_func(df), test_impl(df))
 
     def test_pass_df_str(self):
         def test_impl(df):
