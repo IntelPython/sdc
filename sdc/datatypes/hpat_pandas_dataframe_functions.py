@@ -32,12 +32,17 @@
 import numba
 import numpy
 import operator
+
+import numpy as np
 import pandas
+from numba.core.target_extension import resolve_dispatcher_from_str, \
+    current_target
+
 import sdc
 
 from pandas.core.indexing import IndexingError
 
-from numba import types
+from numba import types, prange
 from numba import literally
 from numba.typed import List, Dict
 from numba.core.errors import TypingError
@@ -67,7 +72,7 @@ from sdc.datatypes.hpat_pandas_rolling_types import (
 from sdc.datatypes.hpat_pandas_groupby_functions import init_dataframe_groupby, merge_groupby_dicts_inplace
 from sdc.hiframes.pd_dataframe_ext import get_dataframe_data
 from sdc.utilities.utils import sdc_overload, sdc_overload_method, sdc_overload_attribute
-from sdc.hiframes.api import isna
+from sdc.hiframes.api import isna, fix_df_index
 from sdc.functions.numpy_like import getitem_by_mask, find_idx
 from sdc.functions.numpy_like import take as nplike_take
 from sdc.datatypes.common_functions import (sdc_reindex_series,
@@ -3441,3 +3446,56 @@ def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False
 
     raise SDCLimitation('Method {}(). Parameter drop is only supported as a literal.'.format(func_name))
 
+
+# Referenced from:
+# https://gist.github.com/kozlov-alexey/f29e8d2703789491e8e24e41de16536b
+# https://github.com/IntelPython/sdc/pull/1000/files
+# limitations:
+# 1. could not point out col_names
+@sdc_overload_method(DataFrameType, 'apply')
+def pd_dataframe_apply_overload(df, udf, args, real_col_names):
+    """generate output dataframe type for impl"""
+    col_len_outside = len(real_col_names)
+    fake_col_names = tuple(['c' + str(i + 1) for i in range(col_len_outside)])
+    """fixme (from lida): generate col_type based on type(real_col_names)"""
+    col_type = types.Array(types.float64, 1, 'C')
+    col_types = tuple([col_type, ] * col_len_outside)
+    column_loc, _, _ = get_structure_maps(col_types, fake_col_names)
+    typingctx = resolve_dispatcher_from_str(
+        current_target()
+    ).targetdescr.typing_context
+    fnty = typingctx.resolve_value_type(fix_df_index)
+    index_type = df.index
+
+    """ fixme(from kov): add column argument"""
+    fixed_index_sig = fnty.get_call_type(
+        typingctx, (index_type, col_types[0]), {}
+    )
+    fixed_index_typ = fixed_index_sig.return_type
+
+    df_type = DataFrameType(
+        col_types,
+        fixed_index_typ,
+        fake_col_names,
+        column_loc=column_loc
+    )
+
+    def pd_dataframe_apply_impl(df, udf, args, real_col_names):
+        """core dataframe apply implementation logic"""
+        row_len = len(df)
+        col_len = len(real_col_names)
+        lst_col = []
+        for _ in range(col_len):
+            lst_col.append(np.empty(row_len))
+        for row_inx in prange(row_len):
+            """
+            fixme: should check the return type, maybe series/list/array 
+            now workaround: return a pd.Series in Mars, in default
+            """
+            udf_arr = udf(df.iloc[row_inx], *args, real_col_names).values
+            for col_inx in prange(col_len):
+                lst_col[col_inx][row_inx] = udf_arr[col_inx]
+
+        return init_dataframe_internal((lst_col,), df.index, df_type)
+
+    return pd_dataframe_apply_impl

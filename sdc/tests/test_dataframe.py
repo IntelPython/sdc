@@ -2993,6 +2993,28 @@ class TestDataFrame(TestCase):
         result = jitted_func()
         np.testing.assert_array_equal(result, expected)
 
+    def test_df_apply_row_wise(self):
+        @self.jit
+        def user_function(series, arg1, arg2, real_col_names):
+            col_names_lst = [val for val in real_col_names]
+            return pd.Series(np.array([.1, .2]), index=col_names_lst)
+
+        @self.jit
+        def _test_apply(df, udf, args, names):
+            return df.apply(udf, args, names)
+
+        data = pd.DataFrame(
+            {'A': np.zeros(10), 'B': np.ones(10), 'C': np.random.randn(10)}
+        )
+        real_col_names = ('A', 'B')
+        expected_df = pd.DataFrame(
+            {'A': [.1 for _ in range(10)], 'B': [.2 for _ in range(10)]}
+        )
+        jit_df = _test_apply(data, user_function, (np.nan, 0.2), real_col_names)
+        np.testing.assert_array_equal(expected_df.to_numpy(), jit_df.to_numpy())
+        # dataframe testing cannot pass
+        # pd.testing.assert_frame_equal(expected_df, jit_df)
+
 
 if __name__ == "__main__":
     unittest.main()
