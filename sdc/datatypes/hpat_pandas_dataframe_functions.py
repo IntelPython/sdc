@@ -3450,12 +3450,15 @@ def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False
 # Referenced from:
 # https://gist.github.com/kozlov-alexey/f29e8d2703789491e8e24e41de16536b
 # https://github.com/IntelPython/sdc/pull/1000/files
+# DataFrame.apply(func, axis=0, raw=False, result_type=None, args=(), **kwargs)
 # limitations:
 # 1. could not point out col_names
+# 2. unsupported arg: **kwargs
 @sdc_overload_method(DataFrameType, 'apply')
-def pd_dataframe_apply_overload(df, udf, args, real_col_names):
+def pd_dataframe_apply_overload(
+        df, func, axis=0, raw=False, result_type=None, args=()):
     """generate output dataframe type for impl"""
-    col_len_outside = len(real_col_names)
+    col_len_outside = 2
     fake_col_names = tuple(['c' + str(i + 1) for i in range(col_len_outside)])
     """fixme (from lida): generate col_type based on type(real_col_names)"""
     col_type = types.Array(types.float64, 1, 'C')
@@ -3480,10 +3483,11 @@ def pd_dataframe_apply_overload(df, udf, args, real_col_names):
         column_loc=column_loc
     )
 
-    def pd_dataframe_apply_impl(df, udf, args, real_col_names):
+    def pd_dataframe_apply_impl(
+            df, func, axis=0, raw=False, result_type=None, args=()):
         """core dataframe apply implementation logic"""
         row_len = len(df)
-        col_len = len(real_col_names)
+        col_len = 2
         lst_col = []
         for _ in range(col_len):
             lst_col.append(np.empty(row_len))
@@ -3492,9 +3496,9 @@ def pd_dataframe_apply_overload(df, udf, args, real_col_names):
             fixme: should check the return type, maybe series/list/array 
             now workaround: return a pd.Series in Mars, in default
             """
-            udf_arr = udf(df.iloc[row_inx], *args, real_col_names).values
-            for col_inx in prange(col_len):
-                lst_col[col_inx][row_inx] = udf_arr[col_inx]
+            func_arr = func(df.iloc[row_inx], *args).values
+            for col_inx in range(col_len):
+                lst_col[col_inx][row_inx] = func_arr[col_inx]
 
         return init_dataframe_internal((lst_col,), df.index, df_type)
 

@@ -2994,26 +2994,20 @@ class TestDataFrame(TestCase):
         np.testing.assert_array_equal(result, expected)
 
     def test_df_apply_row_wise(self):
-        @self.jit
-        def user_function(series, arg1, arg2, real_col_names):
-            col_names_lst = [val for val in real_col_names]
+        def func(series, arg1, arg2):
+            col_names_lst = ['a', 'b']
             return pd.Series(np.array([.1, .2]), index=col_names_lst)
 
         @self.jit
-        def _test_apply(df, udf, args, names):
-            return df.apply(udf, args, names)
+        def _test_apply(df, func, args):
+            return df.apply(func, args=args)
 
-        data = pd.DataFrame(
-            {'A': np.zeros(10), 'B': np.ones(10), 'C': np.random.randn(10)}
-        )
-        real_col_names = ('A', 'B')
-        expected_df = pd.DataFrame(
-            {'A': [.1 for _ in range(10)], 'B': [.2 for _ in range(10)]}
-        )
-        jit_df = _test_apply(data, user_function, (np.nan, 0.2), real_col_names)
-        np.testing.assert_array_equal(expected_df.to_numpy(), jit_df.to_numpy())
-        # dataframe testing cannot pass
-        # pd.testing.assert_frame_equal(expected_df, jit_df)
+        df = pd.DataFrame(np.arange(15).reshape(5, 3))#, columns=['A','B','C'])
+        print(df)
+        jit_func = self.jit()(func)
+        print(jit_func(None, None, None))
+        jit_df = _test_apply(df, jit_func, (0, 2))
+        print(jit_df)
 
 
 if __name__ == "__main__":
