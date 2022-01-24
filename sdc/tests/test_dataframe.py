@@ -3002,7 +3002,7 @@ class TestDataFrame(TestCase):
         def _test_apply(df, func, args):
             return df.apply(func, args=args)
 
-        df = pd.DataFrame(np.arange(15).reshape(5, 3))#, columns=['A','B','C'])
+        df = pd.DataFrame(np.arange(15).reshape(5, 3), columns=['A', 'B', 'C'])
         print(df)
         jit_func = self.jit()(func)
         print(jit_func(None, None, None))
