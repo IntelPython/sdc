@@ -3454,11 +3454,11 @@ def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False
 # limitations:
 # 1. could not point out col_names
 # 2. unsupported arg: **kwargs
-@sdc_overload_method(DataFrameType, 'apply')
+@sdc_overload_method(DataFrameType, 'apply', prefer_literal=False)
 def pd_dataframe_apply_overload(
         df, func, axis=0, raw=False, result_type=None, args=()):
     """generate output dataframe type for impl"""
-    col_len_outside = 2
+    col_len_outside = len(args[-1])
     fake_col_names = tuple(['c' + str(i + 1) for i in range(col_len_outside)])
     """fixme (from lida): generate col_type based on type(real_col_names)"""
     col_type = types.Array(types.float64, 1, 'C')
@@ -3487,8 +3487,10 @@ def pd_dataframe_apply_overload(
             df, func, axis=0, raw=False, result_type=None, args=()):
         """core dataframe apply implementation logic"""
         row_len = len(df)
-        col_len = 2
+        col_len = len(args[-1])
         lst_col = []
+        other_args = args[:-1]
+        last_arg = args[-1]
         for _ in range(col_len):
             lst_col.append(np.empty(row_len))
         for row_inx in prange(row_len):
@@ -3496,8 +3498,8 @@ def pd_dataframe_apply_overload(
             fixme: should check the return type, maybe series/list/array 
             now workaround: return a pd.Series in Mars, in default
             """
-            func_arr = func(df.iloc[row_inx], *args).values
-            for col_inx in range(col_len):
+            func_arr = func(df.iloc[row_inx], *other_args, last_arg).values
+            for col_inx in prange(col_len):
                 lst_col[col_inx][row_inx] = func_arr[col_inx]
 
         return init_dataframe_internal((lst_col,), df.index, df_type)

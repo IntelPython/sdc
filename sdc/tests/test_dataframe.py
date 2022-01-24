@@ -2995,8 +2995,8 @@ class TestDataFrame(TestCase):
 
     def test_df_apply_row_wise(self):
         def func(series, arg1, arg2):
-            col_names_lst = ['a', 'b']
-            return pd.Series(np.array([.1, .2]), index=col_names_lst)
+            arg2_lst = ['a' , 'b']
+            return pd.Series(np.array([.1, .2]), index=arg2_lst)
 
         @self.jit
         def _test_apply(df, func, args):
@@ -3006,7 +3006,7 @@ class TestDataFrame(TestCase):
         print(df)
         jit_func = self.jit()(func)
         print(jit_func(None, None, None))
-        jit_df = _test_apply(df, jit_func, (0, 2))
+        jit_df = _test_apply(df, jit_func, (0, ('a', 'b')))
         print(jit_df)
 
 
