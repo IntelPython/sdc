@@ -32,12 +32,9 @@
 import numba
 import numpy
 import operator
-
-import numpy as np
 import pandas
 from numba.core.target_extension import resolve_dispatcher_from_str, \
     current_target
-
 import sdc
 
 from pandas.core.indexing import IndexingError
@@ -3520,7 +3517,7 @@ def pd_dataframe_apply_overload(self, func, axis=0, raw=False, result_type=None,
         # allocate memory for func results in advance for parallel range
         lst_col = []
         for _ in range(col_len):
-            lst_col.append(np.empty(row_len))
+            lst_col.append(numpy.empty(row_len))
 
         for row_inx in prange(row_len):
             func_arr = func(self.iloc[row_inx], *other_args, last_arg).values
