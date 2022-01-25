@@ -3450,43 +3450,73 @@ def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False
 # Referenced from:
 # https://gist.github.com/kozlov-alexey/f29e8d2703789491e8e24e41de16536b
 # https://github.com/IntelPython/sdc/pull/1000/files
-# DataFrame.apply(func, axis=0, raw=False, result_type=None, args=(), **kwargs)
-# limitations:
-# 1. could not point out col_names
-# 2. unsupported arg: **kwargs
-@sdc_overload_method(DataFrameType, 'apply', prefer_literal=False)
-def pd_dataframe_apply_overload(
-        df, func, axis=0, raw=False, result_type=None, args=()):
-    """generate output dataframe type for impl"""
+@sdc_overload_method(DataFrameType, 'apply')
+def pd_dataframe_apply_overload(self, func, axis=0, raw=False, result_type=None,
+                                args=(), output_hint=1.0):
+    """
+    ********************************************
+    Pandas API: pandas.DataFrame.apply
+    apply(func, axis=0, raw=False, result_type=None, args=(), **kwargs)
+
+    Limitations
+    -----------
+    - args[-1] must appoint NO. of output columns, not use args[-1]'s values
+    - unsupported arg: kwargs
+    - not use args: axis, raw, result_type
+    - support func in lambda form? No.
+    - get_structure_maps cannot move into impl, since not jitted
+
+    Extensions
+    -----------
+    - An arg for SDC: output_type, because cannot wait for func result
+    """
+
+    # Type Checker
+    ty_checker = TypeChecker('Method apply().')
+    ty_checker.check(self, DataFrameType)
+    ty_checker.check(func, types.Callable)
+    ty_checker.check(args, types.Tuple)
+
+    # generate output dataframe type for impl
     col_len_outside = len(args[-1])
-    fake_col_names = tuple(['c' + str(i + 1) for i in range(col_len_outside)])
-    """fixme (from lida): generate col_type based on type(real_col_names)"""
-    col_type = types.Array(types.float64, 1, 'C')
+    col_names = tuple(['c' + str(i + 1) for i in range(col_len_outside)])
+
+    output_type = None
+    if isinstance(output_hint, int):
+        output_type = types.int64
+    elif isinstance(output_hint, float):
+        output_type = types.float64
+    # string not supported
+    elif isinstance(output_hint, str):
+        output_type = types.string
+
+    # assert output_type is not None
+    col_type = types.Array(output_type, 1, 'C')
     col_types = tuple([col_type, ] * col_len_outside)
-    column_loc, _, _ = get_structure_maps(col_types, fake_col_names)
+    column_loc, _, _ = get_structure_maps(col_types, col_names)
+
     typingctx = resolve_dispatcher_from_str(
         current_target()
     ).targetdescr.typing_context
     fnty = typingctx.resolve_value_type(fix_df_index)
-    index_type = df.index
+    index_type = self.index
 
-    """ fixme(from kov): add column argument"""
     fixed_index_sig = fnty.get_call_type(
         typingctx, (index_type, col_types[0]), {}
     )
     fixed_index_typ = fixed_index_sig.return_type
 
-    df_type = DataFrameType(
+    dataframe_typ = DataFrameType(
         col_types,
         fixed_index_typ,
-        fake_col_names,
+        col_names,
         column_loc=column_loc
     )
 
-    def pd_dataframe_apply_impl(
-            df, func, axis=0, raw=False, result_type=None, args=()):
+    def pd_dataframe_apply_impl(self, func, axis=0, raw=False, result_type=None,
+                                args=(), output_hint=1.0):
         """core dataframe apply implementation logic"""
-        row_len = len(df)
+        row_len = len(self)
         col_len = len(args[-1])
         lst_col = []
         other_args = args[:-1]
@@ -3494,14 +3524,11 @@ def pd_dataframe_apply_overload(
         for _ in range(col_len):
             lst_col.append(np.empty(row_len))
         for row_inx in prange(row_len):
-            """
-            fixme: should check the return type, maybe series/list/array 
-            now workaround: return a pd.Series in Mars, in default
-            """
-            func_arr = func(df.iloc[row_inx], *other_args, last_arg).values
+            # TODO: should check return type, maybe series/list/array
+            func_arr = func(self.iloc[row_inx], *other_args, last_arg).values
             for col_inx in prange(col_len):
                 lst_col[col_inx][row_inx] = func_arr[col_inx]
 
-        return init_dataframe_internal((lst_col,), df.index, df_type)
+        return init_dataframe_internal((lst_col,), self.index, dataframe_typ)
 
     return pd_dataframe_apply_impl

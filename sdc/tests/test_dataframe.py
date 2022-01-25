@@ -2995,7 +2995,7 @@ class TestDataFrame(TestCase):
 
     def test_df_apply_row_wise(self):
         def func(series, arg1, arg2):
-            arg2_lst = ['a' , 'b']
+            arg2_lst = ['a', 'b']
             return pd.Series(np.array([.1, .2]), index=arg2_lst)
 
         @self.jit
