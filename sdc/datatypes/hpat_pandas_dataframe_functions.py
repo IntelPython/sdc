@@ -33,8 +33,7 @@ import numba
 import numpy
 import operator
 import pandas
-from numba.core.target_extension import resolve_dispatcher_from_str, \
-    current_target
+
 import sdc
 
 from pandas.core.indexing import IndexingError
@@ -45,6 +44,10 @@ from numba.typed import List, Dict
 from numba.core.errors import TypingError
 from numba.core.registry import cpu_target
 from pandas.core.indexing import IndexingError
+from numba.core.target_extension import (
+    resolve_dispatcher_from_str,
+    current_target
+)
 
 from sdc.datatypes.indexes import *
 from sdc.hiframes.pd_dataframe_ext import DataFrameType
