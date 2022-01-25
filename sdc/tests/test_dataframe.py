@@ -2995,19 +2995,18 @@ class TestDataFrame(TestCase):
 
     def test_df_apply_row_wise(self):
         def func(series, arg1, arg2):
-            arg2_lst = ['a', 'b']
-            return pd.Series(np.array([.1, .2]), index=arg2_lst)
+            arg2_lst = [val for val in arg2]
+            return pd.Series(np.array([.1*arg1, .2]), index=arg2_lst)
 
         @self.jit
         def _test_apply(df, func, args):
             return df.apply(func, args=args)
 
         df = pd.DataFrame(np.arange(15).reshape(5, 3), columns=['A', 'B', 'C'])
-        print(df)
+        df2 = df.apply(func, axis=1, args=(0, ('c1', 'c2')))
         jit_func = self.jit()(func)
-        print(jit_func(None, None, None))
-        jit_df = _test_apply(df, jit_func, (0, ('a', 'b')))
-        print(jit_df)
+        jit_df = _test_apply(df, jit_func, (0, ('c1', 'c2')))
+        pd.testing.assert_frame_equal(df2, jit_df)
 
 
 if __name__ == "__main__":

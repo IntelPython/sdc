@@ -3452,11 +3452,11 @@ def sdc_pandas_dataframe_reset_index(self, level=None, drop=False, inplace=False
 # https://github.com/IntelPython/sdc/pull/1000/files
 @sdc_overload_method(DataFrameType, 'apply')
 def pd_dataframe_apply_overload(self, func, axis=0, raw=False, result_type=None,
-                                args=(), output_hint=1.0):
+                                args=(), output_hint=None):
     """
     ********************************************
     Pandas API: pandas.DataFrame.apply
-    apply(func, axis=0, raw=False, result_type=None, args=(), **kwargs)
+    df.apply(func, axis=0, raw=False, result_type=None, args=(), **kwargs)
 
     Limitations
     -----------
@@ -3465,12 +3465,13 @@ def pd_dataframe_apply_overload(self, func, axis=0, raw=False, result_type=None,
     - not use args: axis, raw, result_type
     - support func in lambda form? No.
     - get_structure_maps cannot move into impl, since not jitted
+    - only allow: func returns Series type
 
     Extensions
     -----------
-    - An arg for SDC: output_type, because cannot wait for func result
+    - (Future) An arg for SDC: output_hint, because cannot wait for func result
     """
-
+    # This piece of code executes in numba type inference stage
     # Type Checker
     ty_checker = TypeChecker('Method apply().')
     ty_checker.check(self, DataFrameType)
@@ -3481,16 +3482,7 @@ def pd_dataframe_apply_overload(self, func, axis=0, raw=False, result_type=None,
     col_len_outside = len(args[-1])
     col_names = tuple(['c' + str(i + 1) for i in range(col_len_outside)])
 
-    output_type = None
-    if isinstance(output_hint, int):
-        output_type = types.int64
-    elif isinstance(output_hint, float):
-        output_type = types.float64
-    # string not supported
-    elif isinstance(output_hint, str):
-        output_type = types.string
-
-    # assert output_type is not None
+    output_type = types.float64
     col_type = types.Array(output_type, 1, 'C')
     col_types = tuple([col_type, ] * col_len_outside)
     column_loc, _, _ = get_structure_maps(col_types, col_names)
@@ -3507,24 +3499,30 @@ def pd_dataframe_apply_overload(self, func, axis=0, raw=False, result_type=None,
     fixed_index_typ = fixed_index_sig.return_type
 
     dataframe_typ = DataFrameType(
-        col_types,
-        fixed_index_typ,
-        col_names,
+        data=col_types,
+        index=fixed_index_typ,
+        columns=col_names,
         column_loc=column_loc
     )
 
     def pd_dataframe_apply_impl(self, func, axis=0, raw=False, result_type=None,
-                                args=(), output_hint=1.0):
-        """core dataframe apply implementation logic"""
+                                args=(), output_hint=None):
+        """
+        core dataframe apply implementation logic
+        """
         row_len = len(self)
         col_len = len(args[-1])
-        lst_col = []
+
+        # numba limitation: https://github.com/numba/numba/issues/2625
         other_args = args[:-1]
         last_arg = args[-1]
+
+        # allocate memory for func results in advance for parallel range
+        lst_col = []
         for _ in range(col_len):
             lst_col.append(np.empty(row_len))
+
         for row_inx in prange(row_len):
-            # TODO: should check return type, maybe series/list/array
             func_arr = func(self.iloc[row_inx], *other_args, last_arg).values
             for col_inx in prange(col_len):
                 lst_col[col_inx][row_inx] = func_arr[col_inx]
