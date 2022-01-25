@@ -33,7 +33,6 @@ import numba
 import numpy
 import operator
 import pandas
-
 import sdc
 
 from pandas.core.indexing import IndexingError
