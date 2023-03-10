@@ -100,7 +100,7 @@ Building Intel® SDC on Windows requires Build Tools for Visual Studio 2019 (wit
 
 * Install `Build Tools for Visual Studio 2019 (with component MSVC v140 - VS 2015 C++ build tools (v14.00)) <https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019>`_.
 * Install `Miniconda for Windows <https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe>`_.
-* Start 'Anaconda prompt'
+* Start 'Anaconda prompt'.
 
 It is possible to build Intel® SDC via conda-build or setuptools. Follow one of the
 cases below to install Intel® SDC and its dependencies on Windows.
