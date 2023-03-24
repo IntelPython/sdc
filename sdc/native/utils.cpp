@@ -33,6 +33,9 @@
 
 #define HAS_TASK_SCHEDULER_INIT (TBB_INTERFACE_VERSION < 12002)
 #define HAS_TASK_SCHEDULER_HANDLE (TBB_INTERFACE_VERSION >= 12003)
+#define HAS_TASK_SCHEDULER_HANDLE_GET (HAS_TASK_SCHEDULER_HANDLE && TBB_INTERFACE_VERSION < 12060)
+#define HAS_TBB_ATTACH (TBB_INTERFACE_VERSION >= 12060)
+
 
 namespace utils
 {
@@ -67,10 +70,10 @@ struct tbb_context
     {
 #if HAS_TASK_SCHEDULER_INIT
         tsi.reset(new tbb::task_scheduler_init(tbb::task_arena::automatic));
-#elif HAS_TASK_SCHEDULER_HANDLE
+#elif HAS_TASK_SCHEDULER_HANDLE_GET
         tsh = tbb::task_scheduler_handle::get();
-#else
-        #pragma message("Unsupported version of TBB. Parallel sorting is disabled")
+#elif HAS_TBB_ATTACH
+        tsh = tbb::attach();
 #endif
         arena.reset(new tbb::task_arena());
     }
