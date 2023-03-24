@@ -32,7 +32,9 @@ from numba.core.ir import (Expr)
 from numba.extending import overload
 from numba.core.extending import intrinsic
 from numba.core.typing import signature
+from numba.core.target_extension import current_target, resolve_dispatcher_from_str
 
+import numpy as np
 from pandas import DataFrame
 from sys import modules
 from textwrap import dedent
@@ -45,13 +47,17 @@ from sdc.rewrites.ir_utils import (find_operations, is_dict,
                                    insert_before)
 from sdc.hiframes import pd_dataframe_ext as pd_dataframe_ext_module
 from sdc.hiframes.pd_dataframe_type import DataFrameType, ColumnLoc
-from sdc.hiframes.pd_dataframe_ext import get_structure_maps
+from sdc.hiframes.pd_dataframe_ext import get_structure_maps, init_dataframe_internal
 from sdc.hiframes.api import fix_df_array, fix_df_index
 from sdc.str_ext import string_type
 from sdc.extensions.indexes.empty_index_ext import init_empty_index
 from sdc.datatypes.indexes.empty_index_type import EmptyIndexType
-from sdc.utilities.sdc_typing_utils import TypeChecker
+from sdc.utilities.sdc_typing_utils import TypeChecker, SDCLimitation
 from sdc.str_arr_type import StringArrayType
+from sdc.functions.tuple_utils import sdc_tuple_map, sdc_tuple_zip
+from sdc.datatypes.indexes.positional_index_type import PositionalIndexType
+from sdc.utilities.utils import sdc_overload
+from sdc.utilities.sdc_typing_utils import get_nbtype_literal_values, sdc_pandas_index_types
 
 
 @register_rewrite('before-inference')
@@ -288,7 +294,7 @@ def gen_init_dataframe_func(func_name, func_text, global_vars):
     return loc_vars[func_name]
 
 
-@overload(DataFrame)
+@sdc_overload(DataFrame)
 def pd_dataframe_overload(data, index=None, columns=None, dtype=None, copy=False):
     """
     Intel Scalable Dataframe Compiler User Guide
@@ -302,20 +308,76 @@ def pd_dataframe_overload(data, index=None, columns=None, dtype=None, copy=False
 
     ty_checker = TypeChecker('Method DataFrame')
 
-    if not isinstance(data, (types.DictType, types.LiteralStrKeyDict)):
-        ty_checker.raise_exc(data, 'dict', 'data')
+    if not (isinstance(data, (types.DictType, types.LiteralStrKeyDict))
+            or isinstance(data, types.Array) and data.ndim == 2 and isinstance(data.dtype, types.Number)):
+        ty_checker.raise_exc(data, 'dict or 2d numeric array', 'data')
 
-    if not (isinstance(index, (types.Omitted, types.ListType, types.List,
-                               types.Array, StringArrayType, types.NoneType) or index is None)):
+    accepted_index_types = (types.Omitted, types.NoneType, types.ListType, types.List) + sdc_pandas_index_types
+    if not (isinstance(index, accepted_index_types) or index is None):
         ty_checker.raise_exc(index, 'array-like', 'index')
 
-    if not (isinstance(columns, (types.Omitted, types.NoneType, types.Tuple, types.UniTuple) or columns is None)):
+    if not (isinstance(columns, (types.Omitted, types.NoneType, types.Tuple, types.UniTuple)) or columns is None):
         ty_checker.raise_exc(columns, 'tuple of strings', 'columns')
 
-    if not (isinstance(dtype, (types.Omitted, types.NoneType) or dtype is None)):
+    if not (isinstance(dtype, (types.Omitted, types.NoneType)) or dtype is None):
         ty_checker.raise_exc(dtype, 'None', 'dtype')
 
-    if not (isinstance(copy, (types.Omitted, types.NoneType) or columns is False)):
+    if not (isinstance(copy, (types.Omitted, types.NoneType)) or copy is False):
         ty_checker.raise_exc(copy, 'False', 'copy')
+
+    if isinstance(data, types.Array):
+        # case of homogenous DF columns, is special as we can use views to input data
+        # when creating internal DF structure and avoid penalty in boxing DF as
+        # pd.DataFrame can be created from 2d array without copy
+
+        nb_col_names = None
+        try:
+            nb_col_names = tuple(get_nbtype_literal_values(columns))
+        except AssertionError:
+            ty_checker.raise_exc(columns, 'tuple of literal strings', 'columns')
+
+        n_cols = len(columns)
+        if index is None and n_cols == 0:
+            # DataFrame index type cannot be defined unless columns argument is provided
+            # as it depends on the runtime number of columns in data
+            raise SDCLimitation("pd.DataFrame constructor from np.ndarray " \
+                                f"requires columns argument. Given columns={columns}.")
+
+        # FIXME: there should be more accurate way to write this layout definition
+        if data.layout in ('C', 'A'):
+            col_type = types.Array(data.dtype, 1, 'A')
+        else:
+            col_type = types.Array(data.dtype, 1, 'C')
+        nb_col_types = tuple([col_type, ] * n_cols)
+        column_loc, _, _ = get_structure_maps(nb_col_types, nb_col_names)
+
+        typingctx = resolve_dispatcher_from_str(current_target()).targetdescr.typing_context
+        fnty = typingctx.resolve_value_type(fix_df_index)
+        nb_index_type = types.none if index is None else index
+        fixed_index_sig = fnty.get_call_type(typingctx, (nb_index_type, nb_col_types[0]), {})  ### FIXME: need add column argument
+        fixed_index_typ = fixed_index_sig.return_type
+        need_fix_index = fixed_index_typ != index
+
+        df_type = DataFrameType(nb_col_types, fixed_index_typ, nb_col_names, column_loc=column_loc)
+
+        def pd_dataframe_2d_array_impl(data, index=None, columns=None, dtype=None, copy=False):
+            data_as_columns = np.transpose(data)
+            df_columns_list = []
+
+            if n_cols != data.shape[1]:
+                raise AssertionError("Number of columns must match data shape")
+
+            for i in range(n_cols):
+                df_columns_list.append(data_as_columns[i])
+
+            data_tup = (df_columns_list, )
+            if need_fix_index == True:  # noqa
+                new_index = fix_df_index(index, df_columns_list[0])
+            else:
+                new_index = index
+
+            return init_dataframe_internal(data_tup, new_index, df_type)
+
+        return pd_dataframe_2d_array_impl
 
     return None

@@ -184,6 +184,37 @@ class TestDataFrame(TestCase):
                 result_ref = test_impl(A, B, index)
                 pd.testing.assert_frame_equal(result, result_ref)
 
+    def test_create_from_2d_array(self):
+        """ Verifies DF can be created from 2d np.ndarray """
+
+        n_cols = 4
+        col_names = tuple(f'f{i}' for i in range(n_cols))
+
+        def test_impl(data, index):
+            df = pd.DataFrame(data, index=index, columns=col_names)
+            res_sum = df[col_names[0]].sum()
+            return len(df), res_sum
+
+        sdc_func = self.jit(test_impl)
+
+        n_rows = 10
+        indexes_to_test = [
+            None,
+            np.arange(n_rows),
+            pd.RangeIndex(n_rows),
+        ]
+        layout_to_test = ('C', 'F', 'A')
+
+        np.random.seed(0)
+        data = np.random.rand(n_rows, n_cols)
+        for layout, index in product(layout_to_test, indexes_to_test):
+            with self.subTest(layout=layout, index=index):
+                data = data.copy(order=layout)
+                result = sdc_func(data, index)
+                result_ref = test_impl(data, index)
+                self.assertEqual(result[0], result_ref[0])
+                self.assertAlmostEqual(result[1], result_ref[1])
+
     def test_unbox_empty_df(self):
         def test_impl(df):
             return df
