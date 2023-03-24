@@ -2295,7 +2295,6 @@ class TestSeries(
         S2 = pd.Series([6., 7.])
         np.testing.assert_array_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
-    @skip_numba_jit
     def test_series_combine(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
@@ -2305,99 +2304,131 @@ class TestSeries(
         S2 = pd.Series([6.0, 21., 3.6, 5.])
         pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
-    @skip_numba_jit
-    def test_series_combine_float3264(self):
+    @unittest.expectedFailure
+    # https://github.com/numba/numba/issues/5792
+    def test_series_combine_div(self):
+        def test_impl(S1, S2):
+            return S1.combine(S2, lambda a, b: a/b, 0)
+
+        hpat_func = self.jit(test_impl)
+
+        sizes1 = [2, 4, 5, 6, 8]
+        sizes2 = [1, 3, 5, 7, 9]
+        series_dtypes = [None, np.int64, np.float64]
+
+        for n in sizes1:
+            for k in sizes2:
+                for dtype1, dtype2 in product(series_dtypes, series_dtypes):
+                    A = np.random.randint(-100, 100, n)
+                    B = np.arange(k) * 2 + 1
+                    S1 = pd.Series(A, dtype=dtype1)
+                    S2 = pd.Series(B, dtype=dtype2)
+                    with self.subTest(S1=S1, S2=S2):
+                        result = hpat_func(S1, S2)
+                        result_ref = test_impl(S1, S2)
+                        # check_dtype=False due to difference to pandas in some cases
+                        pd.testing.assert_series_equal(result, result_ref, check_dtype=False)
+
+    def test_series_combine_value(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
         hpat_func = self.jit(test_impl)
 
-        S1 = pd.Series([np.float64(1), np.float64(2),
-                        np.float64(3), np.float64(4), np.float64(5)])
-        S2 = pd.Series([np.float32(1), np.float32(2),
-                        np.float32(3), np.float32(4), np.float32(5)])
-        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+        series_indexes = [[1, 2, 3, 4, 5],
+                          [4, 5, 7, 8, 9],
+                          [0, 1, 7, 13, 25]]
+        # Only indixes ascending due to difference to pandas in some cases
 
-    @skip_numba_jit
-    def test_series_combine_assert1(self):
-        def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2 * a + b)
+        n = 5
+        np.random.seed(0)
+        A = np.random.randint(-100, 100, n)
+        B = np.arange(n) * 2 + 1
+
+        series_dtypes = [None, np.int64, np.float64]
+        fill_values = [None, np.nan, 4, 4.2]
+        for dtype1, dtype2 in product(series_dtypes, series_dtypes):
+            for series_index1 in series_indexes:
+                for series_index2 in series_indexes:
+                    S1 = pd.Series(A, index=series_index1, dtype=dtype1)
+                    S2 = pd.Series(B, index=series_index2, dtype=dtype2)
+                    with self.subTest(S1=S1, S2=S2):
+                        result = hpat_func(S1, S2)
+                        result_ref = test_impl(S1, S2)
+                        # check_dtype=False due to difference to pandas in some cases
+                        pd.testing.assert_series_equal(result, result_ref, check_dtype=False)
+
+    def test_series_combine_value_with_fill_value(self):
+        def test_impl(S1, S2, fill_value):
+            return S1.combine(S2, lambda a, b: 2 * a + b, fill_value)
         hpat_func = self.jit(test_impl)
 
-        S1 = pd.Series([1, 2, 3])
-        S2 = pd.Series([6., 21., 3., 5.])
-        with self.assertRaises(AssertionError):
-            hpat_func(S1, S2)
+        series_indexes = [[1, 2, 3, 4, 5],
+                          [4, 5, 7, 8, 9],
+                          [0, 1, 7, 13, 25]]
+        # Only indixes ascending due to difference to pandas in some cases
 
-    @skip_numba_jit
-    def test_series_combine_assert2(self):
-        def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2 * a + b)
+        n = 5
+        np.random.seed(0)
+        A = np.random.randint(-100, 100, n)
+        B = np.arange(n) * 2 + 1
+
+        series_dtypes = [None, np.int64, np.float64]
+        fill_values = [None, np.nan, 4, 4.2]
+        for dtype1, dtype2, fill_value in product(series_dtypes, series_dtypes, fill_values):
+            for series_index1 in series_indexes:
+                for series_index2 in series_indexes:
+                    S1 = pd.Series(A, index=series_index1, dtype=dtype1)
+                    S2 = pd.Series(B, index=series_index2, dtype=dtype2)
+                    with self.subTest(S1=S1, S2=S2, fill_value=fill_value):
+                        result = hpat_func(S1, S2, fill_value)
+                        result_ref = test_impl(S1, S2, fill_value)
+                        # check_dtype=False due to difference to pandas in some cases
+                        pd.testing.assert_series_equal(result, result_ref, check_dtype=False)
+
+    def test_series_combine_value_samelen(self):
+        def test_impl(S1, S2, fill_value):
+            return S1.combine(S2, lambda a, b: 2 * a + b, fill_value=fill_value)
         hpat_func = self.jit(test_impl)
 
-        S1 = pd.Series([6., 21., 3., 5.])
-        S2 = pd.Series([1, 2, 3])
-        with self.assertRaises(AssertionError):
-            hpat_func(S1, S2)
+        n = 11
+        np.random.seed(0)
+        A = np.random.randint(-100, 100, n)
+        B = np.arange(n) * 2 + 1
+        series_index = 1 + np.arange(n)
 
-    @skip_numba_jit
-    def test_series_combine_integer(self):
-        def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2 * a + b, 16)
-        hpat_func = self.jit(test_impl)
+        series_dtypes = [None, np.int64, np.float64]
+        fill_values = [None, np.nan, 4, 4.2]
+        for dtype1, dtype2, fill_value in product(series_dtypes, series_dtypes, fill_values):
+            S1 = pd.Series(A, index=series_index, dtype=dtype1)
+            S2 = pd.Series(B, index=series_index, dtype=dtype2)
+            with self.subTest(S1=S1, S2=S2, fill_value=fill_value):
+                result = hpat_func(S1, S2, fill_value)
+                result_ref = test_impl(S1, S2, fill_value)
+                # check_dtype=False due to difference to pandas in some cases
+                pd.testing.assert_series_equal(result, result_ref, check_dtype=False)
 
-        S1 = pd.Series([1, 2, 3, 4, 5])
-        S2 = pd.Series([6, 21, 3, 5])
-        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
-
-    @skip_numba_jit
     def test_series_combine_different_types(self):
         def test_impl(S1, S2):
             return S1.combine(S2, lambda a, b: 2 * a + b)
         hpat_func = self.jit(test_impl)
 
-        S1 = pd.Series([6.1, 21.2, 3.3, 5.4, 6.7])
-        S2 = pd.Series([1, 2, 3, 4, 5])
-        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
+        sizes1 = [2, 4, 5, 6, 8]
+        sizes2 = [1, 3, 5, 7, 9]
+        series_dtypes = [None, np.int64, np.float64]
 
-    @skip_numba_jit
-    def test_series_combine_integer_samelen(self):
-        def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2 * a + b)
-        hpat_func = self.jit(test_impl)
+        for n in sizes1:
+            for k in sizes2:
+                for dtype1, dtype2 in product(series_dtypes, series_dtypes):
+                    A = np.random.randint(-100, 100, n)
+                    B = np.arange(k) * 2 + 1
+                    S1 = pd.Series(A, dtype=dtype1)
+                    S2 = pd.Series(B, dtype=dtype2)
+                    with self.subTest(S1=S1, S2=S2):
+                        result = hpat_func(S1, S2)
+                        result_ref = test_impl(S1, S2)
+                        # check_dtype=False due to difference to pandas in some cases
+                        pd.testing.assert_series_equal(result, result_ref, check_dtype=False)
 
-        S1 = pd.Series([1, 2, 3, 4, 5])
-        S2 = pd.Series([6, 21, 17, -5, 4])
-        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
-
-    @skip_numba_jit
-    def test_series_combine_samelen(self):
-        def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2 * a + b)
-        hpat_func = self.jit(test_impl)
-
-        S1 = pd.Series([1.0, 2., 3., 4., 5.])
-        S2 = pd.Series([6.0, 21., 3.6, 5., 0.0])
-        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
-
-    @skip_numba_jit
-    def test_series_combine_value(self):
-        def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2 * a + b, 1237.56)
-        hpat_func = self.jit(test_impl)
-
-        S1 = pd.Series([1.0, 2., 3., 4., 5.])
-        S2 = pd.Series([6.0, 21., 3.6, 5.])
-        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
-
-    @skip_numba_jit
-    def test_series_combine_value_samelen(self):
-        def test_impl(S1, S2):
-            return S1.combine(S2, lambda a, b: 2 * a + b, 1237.56)
-        hpat_func = self.jit(test_impl)
-
-        S1 = pd.Series([1.0, 2., 3., 4., 5.])
-        S2 = pd.Series([6.0, 21., 3.6, 5., 0.0])
-        pd.testing.assert_series_equal(hpat_func(S1, S2), test_impl(S1, S2))
 
     def test_series_abs1(self):
         def test_impl(S):

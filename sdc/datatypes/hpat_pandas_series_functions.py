@@ -45,6 +45,7 @@ from numba.np import numpy_support
 from numba.typed import List, Dict
 from numba import prange
 from numba.np.arraymath import get_isnan
+from numba.core.registry import cpu_target
 from pandas.core.indexing import IndexingError
 
 import sdc
@@ -4873,3 +4874,78 @@ def sdc_pandas_series_skew(self, axis=None, skipna=None, level=None, numeric_onl
         return numpy_like.skew(self._data)
 
     return sdc_pandas_series_skew_impl
+
+
+@sdc_overload_method(SeriesType, 'combine', jit_options={'error_model': 'numpy'})
+def sdc_pandas_series_combine(self, other, func, fill_value=None):
+    """
+    Intel Scalable Dataframe Compiler User Guide
+    ********************************************
+
+    Pandas API: pandas.Series.combine
+
+    Limitations
+    -----------
+    - Resulting series dtype may be wider than in pandas due to
+      type-stability requirements and depends on fill_value dtype
+      and result of series indexes alignment.
+    - Indixes should be strictly ascending, as inside the function
+      they are sorted in ascending order and the answer becomes
+      different from the result of the pandas.
+
+    Examples
+    --------
+    .. literalinclude:: ../../../examples/series/series_combine.py
+       :language: python
+       :lines: 27-
+       :caption: Combined the Series with a Series according to func.
+       :name: ex_series_combine
+
+    .. command-output:: python ./series/series_combine.py
+       :cwd: ../../../examples
+
+    Intel Scalable Dataframe Compiler Developer Guide
+    *************************************************
+    Pandas Series method :meth:`pandas.Series.combine` implementation.
+
+    .. only:: developer
+        Test: python -m sdc.runtests -k sdc.tests.test_series.TestSeries.test_series_combine*
+    """
+    _func_name = 'Method Series.combine()'
+
+    ty_checker = TypeChecker(_func_name)
+    ty_checker.check(self, SeriesType)
+
+    ty_checker.check(other, SeriesType)
+
+    if not isinstance(fill_value, (types.Omitted, types.NoneType, types.Number)) and fill_value is not None:
+        ty_checker.raise_exc(fill_value, 'number', 'fill_value')
+
+    fill_is_default = isinstance(fill_value, (types.Omitted, types.NoneType)) or fill_value is None
+
+    sig = func.get_call_type(cpu_target.typing_context, [self.dtype, other.dtype], {})
+    ret_type = sig.return_type
+
+    fill_dtype = types.float64 if fill_is_default else fill_value
+    res_dtype = find_common_dtype_from_numpy_dtypes([], [ret_type, fill_dtype])
+
+    def sdc_pandas_series_combine_impl(self, other, func, fill_value=None):
+
+        _fill_value = numpy.nan if fill_value is None else fill_value
+
+        indexes, self_indexes, other_indexes = sdc_join_series_indexes(self.index, other.index)
+        len_val = len(indexes)
+
+        result = numpy.empty(len_val, res_dtype)
+
+        for i in prange(len_val):
+            self_idx, other_idx = self_indexes[i], other_indexes[i]
+            val_self = _fill_value if self_idx == -1 else self._data[self_idx]
+
+            val_other = _fill_value if other_idx == -1 else other._data[other_idx]
+
+            result[i] = func(val_self, val_other)
+
+        return pandas.Series(result, index=indexes)
+
+    return sdc_pandas_series_combine_impl
