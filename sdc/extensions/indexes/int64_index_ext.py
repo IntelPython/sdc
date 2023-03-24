@@ -52,6 +52,7 @@ from sdc.functions import numpy_like
 from sdc.hiframes.api import fix_df_index
 from sdc.extensions.indexes.indexes_generic import *
 from sdc.datatypes.common_functions import hpat_arrays_append
+from sdc.extensions.sdc_hashmap_ext import map_and_fill_indexer_int64
 
 
 @intrinsic
@@ -457,8 +458,16 @@ def pd_int64_index_reindex_overload(self, target, method=None, level=None, limit
         raise TypingError('{} Not allowed for non comparable indexes. \
         Given: self={}, target={}'.format(_func_name, self, target))
 
+    # FIXME: handle case when target is not numpy array!
     def pd_int64_index_reindex_impl(self, target, method=None, level=None, limit=None, tolerance=None):
-        return sdc_indexes_reindex(self, target=target, method=method, level=level, tolerance=tolerance)
+        # for Int64Index case index.data can be passed to native function that can built the map
+        # and fill the resulting indexer more efficiently than generic implementation
+        indexer = np.empty(len(target), dtype=np.int64)
+        ok = map_and_fill_indexer_int64(self.values, target, indexer)
+        if not ok:
+            raise ValueError("cannot reindex from a duplicate axis")
+
+        return target, indexer
 
     return pd_int64_index_reindex_impl
 

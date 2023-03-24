@@ -25,8 +25,30 @@
 // *****************************************************************************
 
 #include <Python.h>
+#include <unordered_map>
 #include "hashmap.hpp"
 
+class TrivialInt64TBBHashCompare {
+public:
+    static size_t hash(const int64_t& val) {
+        return (size_t)val;
+    }
+    static bool equal(const int64_t& k1, const int64_t& k2) {
+        return k1==k2;
+    }
+};
+
+struct TrivialInt64Hash {
+public:
+    TrivialInt64Hash() = default;
+    TrivialInt64Hash(const TrivialInt64Hash&) = default;
+    ~TrivialInt64Hash() = default;
+    size_t operator()(const int64_t& val) const {
+        return (size_t)val;
+    }
+};
+
+using namespace std;
 
 #define declare_hashmap_create(key_type, val_type, suffix) \
 void hashmap_create_##suffix(NRT_MemInfo** meminfo, \
@@ -210,6 +232,65 @@ declare_hashmap_create_from_data(int64_t, int64_t)
 declare_hashmap_create_from_data(int64_t, float)
 declare_hashmap_create_from_data(int64_t, double)
 
+void set_number_of_threads(uint64_t threads)
+{
+utils::tbb_control::set_threads_num(threads);
+}
+
+uint8_t native_map_and_fill_indexer_int64(int64_t* data, int64_t* searched, int64_t dsize, int64_t ssize, int64_t* res)
+{
+#if SUPPORTED_TBB_VERSION
+    // FIXME: we need to store the allocated map somewhere and re-use it later
+    // here it's allocated on the heap (but not freed) to avoid calling dtor (like pandas does the map once built is cached)
+    auto ptr_my_map = new tbb::concurrent_hash_map<int64_t, int64_t, TrivialInt64TBBHashCompare>(2*dsize, TrivialInt64TBBHashCompare());
+    utils::tbb_control::get_arena().execute([&]() {
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, dsize),
+                         [&](const tbb::blocked_range<size_t>& r) {
+                             for(size_t i=r.begin(); i!=r.end(); ++i) {
+                                 ptr_my_map->emplace(data[i], i);
+                             }
+                         }
+            );
+    });
+
+    if (ptr_my_map->size() < dsize)
+        return 0;
+
+    utils::tbb_control::get_arena().execute([&]() {
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, ssize),
+                     [&](const tbb::blocked_range<size_t>& r) {
+                         for(size_t i=r.begin(); i!=r.end(); ++i) {
+                             auto it_pair = ptr_my_map->equal_range(searched[i]);
+                             if (it_pair.first != ptr_my_map->end()) {
+                                 res[i] = it_pair.first->second;
+                             } else {
+                                 res[i] = -1;
+                             }
+                         }
+                     }
+        );
+    });
+
+    return 1;
+#else
+    auto ptr_my_map = new std::unordered_map<int64_t, int64_t, TrivialInt64Hash>(2*dsize, TrivialInt64Hash());
+    for(size_t i=0; i<dsize; ++i) {
+        ptr_my_map->emplace(data[i], i);
+    }
+
+    if (ptr_my_map->size() < dsize)
+        return 0;
+
+    for(size_t i=0; i<ssize; ++i) {
+        auto it = ptr_my_map->find(searched[i]);
+        res[i] = (it != ptr_my_map->end()) ? it->second : -1;
+    }
+
+    return 1;
+#endif
+}
+
+
 PyMODINIT_FUNC PyInit_hconc_dict()
 {
     static struct PyModuleDef moduledef = {
@@ -257,6 +338,8 @@ PyMODINIT_FUNC PyInit_hconc_dict()
     REGISTER(hashmap_create_from_data_int64_t_to_float)
     REGISTER(hashmap_create_from_data_int64_t_to_double)
 
+    REGISTER(native_map_and_fill_indexer_int64)
+    REGISTER(set_number_of_threads)
     utils::tbb_control::init();
 
     return m;

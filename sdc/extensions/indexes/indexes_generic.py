@@ -43,6 +43,7 @@ from sdc.utilities.sdc_typing_utils import (
 from sdc.hiframes.api import fix_df_index
 from sdc.functions import numpy_like
 from sdc.datatypes.common_functions import _sdc_internal_join
+from sdc.extensions.sdc_hashmap_type import ConcurrentDict
 
 
 def sdc_numeric_indexes_equals(left, right):
@@ -131,24 +132,20 @@ def pd_indexes_reindex_overload(self, target, method=None, level=None, limit=Non
         # build a dict of 'self' index values to their positions:
         map_index_to_position = Dict.empty(
             key_type=index_dtype,
-            value_type=types.int32
+            value_type=types.int64
         )
 
-        # TO-DO: needs concurrent hash map
+        # TO-DO: apply ConcurrentDict after it's perf is optimized
         for i, value in enumerate(self):
-            if value in map_index_to_position:
-                raise ValueError("cannot reindex from a duplicate axis")
-            else:
-                map_index_to_position[value] = i
+            map_index_to_position[value] = i
+
+        if len(map_index_to_position) < len(self):
+            raise ValueError("cannot reindex from a duplicate axis")
 
         res_size = len(target)
         indexer = np.empty(res_size, dtype=np.int64)
         for i in numba.prange(res_size):
-            val = target[i]
-            if val in map_index_to_position:
-                indexer[i] = map_index_to_position[val]
-            else:
-                indexer[i] = -1
+            indexer[i] = map_index_to_position.get(target[i], -1)
 
         return target, indexer
 
