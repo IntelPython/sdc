@@ -1112,6 +1112,22 @@ class TestSeries(
         S = pd.Series(['1', '4', '6', '33', '7'], ['1', '3', '5', '4', '7'], name='A')
         pd.testing.assert_series_equal(hpat_func(S), test_impl(S))
 
+    @unittest.skip('LLVM ERROR: out of memory')
+    def test_series_getitem_idx_int_negative_slice(self):
+        def test_impl(S, start, end):
+            return S[start:end]
+
+        jit_impl = self.jit(test_impl)
+
+        starts = [0, -2]
+        ends = [-2, 0]
+        indices = [[2, 3, 5, 6, 7], ['2', '3', '5', '6', '7'], ['2', '3', '5', '6', '7']]
+        for start, end, index in zip(starts, ends, indices):
+            S = pd.Series([11, 22, 33, 44, 55], index, name='A')
+            ref_result = test_impl(S, start, end)
+            jit_result = jit_impl(S, start, end)
+            pd.testing.assert_series_equal(jit_result, ref_result)
+
     def test_series_at(self):
         def test_impl(S, key):
             return S.at[key]
